@@ -26,6 +26,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 {
     private const string RepositoryPreparationStatusText = "Bereit Repository vor...";
 
+    /// <summary>Sichtbarer Hinweis im <see cref="CliStatusText"/>, dass die Session im
+    /// Pipe-Fallback (kein Pseudo-Terminal) läuft und damit nicht dem voll interaktiven
+    /// Modus entspricht.</summary>
+    private const string EingeschraenkterModusHinweis = " (eingeschränkter Modus – kein Pseudo-Terminal)";
+
     private enum DetailAnsicht
     {
         Info,
@@ -57,6 +62,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly ICliRawExportService _cliRawExportService;
+    private readonly ICliReplayExportService _cliReplayExportService;
     private readonly AufgabeLaufdatenChangedNotifier? _laufdatenChangedNotifier;
     private readonly Action<Action> _dispatcherInvoke;
 
@@ -75,7 +81,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private bool _disposed;
     private string _cliStatusText = "CLI inaktiv";
     private string? _aktiverCliName;
-    private PseudoConsoleSession? _cliStatusSession;
+    private ITerminalSession? _cliStatusSession;
     private PromptVorlage? _selectedPromptVorlage;
     private DetailAnsicht _ausgewaehlteAnsicht = DetailAnsicht.Info;
     private int? _scheduledPromptTargetHours;
@@ -551,6 +557,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob die CLI-Rohausgabe exportiert werden kann.</summary>
     public bool KannCliRawExportieren => _aufgabe is not null && _aufgabeId != Guid.Empty;
 
+    /// <summary>Gibt an, ob die CLI-Aufzeichnung exportiert werden kann.</summary>
+    public bool KannCliReplayExportieren => _aufgabe is not null && _aufgabeId != Guid.Empty;
+
     /// <summary>Der persistierte Pause-Endzeitpunkt der Aufgabe (UTC), oder null.</summary>
     public DateTimeOffset? PausiertBisUtc => _aufgabe?.PausiertBisUtc;
 
@@ -641,6 +650,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Exportiert die protokollierte CLI-Rohausgabe in eine *.raw-Datei.</summary>
     public ICommand ExportCliRawCommand { get; }
 
+    /// <summary>Exportiert den Rohbyte-Mitschnitt der CLI-Session in eine *.clireplay-Datei.</summary>
+    public ICommand ExportCliReplayCommand { get; }
+
     /// <summary>Öffnet den Pause-Dialog und setzt bzw. hebt die Pause der Aufgabe.</summary>
     public ICommand PauseEinstellenCommand { get; }
 
@@ -659,10 +671,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Zeigt die Auswahl der verfügbaren IDE-Einstiegspunkte an und öffnet den gewählten.</summary>
     public ICommand OeffneIdeAuswahlCommand { get; }
 
-    /// <summary>Wird gefeuert, wenn eine neue <see cref="PseudoConsoleSession"/> gestartet wurde. Löst weiterhin
+    /// <summary>Wird gefeuert, wenn eine neue <see cref="ITerminalSession"/> gestartet wurde. Löst weiterhin
     /// das Binden von <c>TerminalControl.Session</c> in <c>TaskDetailView</c> aus, unabhängig davon, ob die
     /// Leseschleife der Session bereits vor der UI-Bindung läuft (parallele CLI-Ausführungen, Issue-86).</summary>
-    public event Action<PseudoConsoleSession>? PseudoConsoleSessionGestartet;
+    public event Action<ITerminalSession>? TerminalSessionGestartet;
 
     /// <summary>Wird gefeuert, wenn der CLI-Prozess der aktuellen Aufgabe beendet wurde.</summary>
     public event Action? CliGestoppt;
@@ -670,12 +682,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Wird gefeuert, nachdem eine Promptvorlage erfolgreich an die CLI gesendet wurde.</summary>
     public event Action? PromptVorlageGesendet;
 
-    /// <summary>Gibt die aktive <see cref="PseudoConsoleSession"/> für die aktuelle Aufgabe zurück, oder null.
+    /// <summary>Gibt die aktive <see cref="ITerminalSession"/> für die aktuelle Aufgabe zurück, oder null.
     /// Die Session (und ihre Leseschleife) läuft unabhängig vom Lebenszyklus der View, die diese Methode
     /// aufruft — der zurückgegebene Prozess kann also bereits vor dem Öffnen dieser Aufgabenseite gestartet
     /// worden sein und weiterlaufen, nachdem die Seite wieder verlassen wird.</summary>
-    /// <returns>Die aktive <see cref="PseudoConsoleSession"/>, oder null wenn keine Session läuft.</returns>
-    public PseudoConsoleSession? GetPseudoConsoleSession() => _kiService.GetPseudoConsoleSession(_aufgabeId);
+    /// <returns>Die aktive <see cref="ITerminalSession"/>, oder null wenn keine Session läuft.</returns>
+    public ITerminalSession? GetTerminalSession() => _kiService.GetTerminalSession(_aufgabeId);
 
     /// <inheritdoc cref="TaskDetailViewModel"/>
     public TaskDetailViewModel(
@@ -700,6 +712,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         IOptions<AutonomAufgabenOptions> autonomAufgabenOptions,
         Action<Action>? dispatcherInvoke = null,
         ICliRawExportService? cliRawExportService = null,
+        ICliReplayExportService? cliReplayExportService = null,
         AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null)
     {
         _aufgabeService = aufgabeService;
@@ -722,6 +735,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _autonomAufgabenOptions = autonomAufgabenOptions;
         _timeProvider = timeProvider;
         _cliRawExportService = cliRawExportService ?? new CliRawExportService(protokollService, NullLogger<CliRawExportService>.Instance);
+        _cliReplayExportService = cliReplayExportService ?? new CliReplayExportService(kiService, new CliReplayAufzeichnungStore(), NullLogger<CliReplayExportService>.Instance);
         _laufdatenChangedNotifier = laufdatenChangedNotifier;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
         // Synchroner Default vor dem ersten Laden einer Aufgabe: LadenAsync ermittelt den DB-Wert
@@ -772,6 +786,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         // Arbeitsverzeichnis ab. IsAutonomAufgabenEnabled: Feature-Flag für Autonome Aufgaben (Issue 205).
         AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => CanAutonomAufgabeInitialisieren);
         ExportCliRawCommand = new AsyncRelayCommand(ExportCliRawAsync, () => KannCliRawExportieren);
+        ExportCliReplayCommand = new AsyncRelayCommand(ExportCliReplayAsync, () => KannCliReplayExportieren);
         PauseEinstellenCommand = new AsyncRelayCommand(PauseEinstellenAsync, () => KannPausieren);
         PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
             PromptVorlageAuswaehlenAsync,
@@ -796,7 +811,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             var darfCliAnzeigen = Aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(Aufgabe.Status) == true;
             IsCliRunning = darfCliAnzeigen && _kiService.IsRunning(_aufgabeId);
 
-            var session = darfCliAnzeigen ? _kiService.GetPseudoConsoleSession(_aufgabeId) : null;
+            var session = darfCliAnzeigen ? _kiService.GetTerminalSession(_aufgabeId) : null;
             AttachCliStatusSession(session);
             // Explizit erneut auslösen (nicht nur AttachCliStatusSession): Wechselt CurrentView in
             // MainWindowViewModel/ProjectDetailViewModel zwischen zwei TaskDetailViewModel-Instanzen
@@ -805,7 +820,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             // erneuten Abgleich bliebe TerminalControl.Session dauerhaft auf der vorherigen Aufgabe
             // stehen, wenn eine bereits laufende Sitzung wiederangebunden statt neu gestartet wird.
             if (session is not null)
-                PseudoConsoleSessionGestartet?.Invoke(session);
+                TerminalSessionGestartet?.Invoke(session);
             else
                 CliGestoppt?.Invoke();
 
@@ -979,7 +994,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (_scheduledPromptTargetHours.HasValue || _scheduledPromptTargetMinutes.HasValue)
             return;
 
-        var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
+        var session = _kiService.GetTerminalSession(_aufgabeId);
         if (session is null || !_isCliRunning)
             return;
 
@@ -1706,7 +1721,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 if (status == CliProcessStatus.Gestartet)
                 {
                     SetAktiverCliName(_aufgabe?.KiPluginPrefix);
-                    CliStatusText = "Gestartet";
+                    CliStatusText = _kiService.GetTerminalSession(_aufgabeId) is { IsPseudoTerminal: false }
+                        ? "Gestartet" + EingeschraenkterModusHinweis
+                        : "Gestartet";
                 }
                 else
                 {
@@ -1793,11 +1810,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             await LadenAsync(ct);
             SetAktiverCliName(pluginPrefix);
 
-            var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
+            var session = _kiService.GetTerminalSession(_aufgabeId);
             if (session != null)
             {
                 AttachCliStatusSession(session);
-                PseudoConsoleSessionGestartet?.Invoke(session);
+                TerminalSessionGestartet?.Invoke(session);
             }
         }
         catch (OperationCanceledException)
@@ -1886,11 +1903,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             await _aufgabeService.AusfuehrungAktivSetzenAsync(_aufgabeId, ct);
 
-            var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
+            var session = _kiService.GetTerminalSession(_aufgabeId);
             if (session != null)
             {
                 AttachCliStatusSession(session);
-                PseudoConsoleSessionGestartet?.Invoke(session);
+                TerminalSessionGestartet?.Invoke(session);
             }
         }
         catch
@@ -1936,7 +1953,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         return dialogResult.SelectedPluginPrefix;
     }
 
-    private void AttachCliStatusSession(PseudoConsoleSession? session)
+    private void AttachCliStatusSession(ITerminalSession? session)
     {
         if (ReferenceEquals(_cliStatusSession, session))
         {
@@ -1967,13 +1984,17 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     private void UpdateCliStatusText(CliRuntimeStatus status)
     {
-        CliStatusText = status switch
+        var statusText = status switch
         {
             CliRuntimeStatus.Laeuft => "CLI-Status: Ausführung läuft",
             CliRuntimeStatus.WartetAufEingabe => "CLI-Status: Wartet auf Eingabe",
             CliRuntimeStatus.Inaktiv => "CLI inaktiv",
             _ => "CLI-Status: unbekannt"
         };
+
+        CliStatusText = _cliStatusSession is { IsPseudoTerminal: false }
+            ? statusText + EingeschraenkterModusHinweis
+            : statusText;
     }
 
     private async Task SchedulePromptAsync(CancellationToken ct)
@@ -2331,6 +2352,53 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             _logger.LogError(ex, "CLI-Rohausgabe für Aufgabe {AufgabeId} konnte nicht exportiert werden.", _aufgabeId);
             FehlerMeldung = $"CLI-Rohausgabe konnte nicht exportiert werden: {ex.Message}";
+        }
+    }
+
+    private async Task ExportCliReplayAsync(CancellationToken ct)
+    {
+        if (!KannCliReplayExportieren)
+            return;
+
+        // Vorab prüfen, ob überhaupt ein Mitschnitt existiert — der Speicherdialog darf
+        // nicht umsonst geöffnet werden.
+        if (!_cliReplayExportService.HatAufzeichnung(_aufgabeId))
+        {
+            FehlerMeldung = "Für diese Aufgabe liegt keine Aufzeichnung vor — der Mitschnitt wird während einer CLI-Ausführung automatisch erstellt, aber nur flüchtig im Arbeitsspeicher gehalten (maximal die letzten 8 Aufgaben) und geht bei einem Neustart der Anwendung oder durch neuere Ausführungen verloren.";
+            return;
+        }
+
+        var defaultDateiname = $"cli-replay-{_aufgabeId:N}.clireplay";
+        var zielPfad = await _dialogService.ShowSaveFileDialogAsync(
+            "CLI-Aufzeichnung exportieren",
+            "CLI-Replay-Dateien (*.clireplay)|*.clireplay",
+            defaultDateiname,
+            null,
+            ct);
+
+        if (string.IsNullOrWhiteSpace(zielPfad))
+            return;
+
+        if (!zielPfad.EndsWith(".clireplay", StringComparison.OrdinalIgnoreCase))
+        {
+            FehlerMeldung = "Export-Zielpfad muss auf .clireplay enden.";
+            return;
+        }
+
+        FehlerMeldung = null;
+
+        try
+        {
+            await _cliReplayExportService.ExportCliReplayAsync(_aufgabeId, zielPfad, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CLI-Aufzeichnung für Aufgabe {AufgabeId} konnte nicht exportiert werden.", _aufgabeId);
+            FehlerMeldung = $"CLI-Aufzeichnung konnte nicht exportiert werden: {ex.Message}";
         }
     }
 

@@ -17,11 +17,14 @@ In der Aufgabendetailansicht im Ribbon-Menü das gewünschte KI-Plugin auswähle
 
 Button **Starten** im Ribbon klicken. Die Softwareschmiede:
 
-- Startet das CLI-Programm des Plugins im Aufgabenverzeichnis über die Pseudo Console API.
+- Prüft vorab die Voraussetzungen (Terminal-Unterstützung des Systems, Auffindbarkeit und Erreichbarkeit des CLI-Programms).
+- Startet das CLI-Programm des Plugins direkt im Aufgabenverzeichnis über die Pseudo Console API — oder über das Fallback-Backend, wenn kein Pseudo-Terminal verfügbar ist.
 - Initialisiert das Terminal-Rendering mit der aktuellen Fenster-Größe.
 - Wechselt den Aufgabenstatus auf **Gestartet**.
 
 > **Hinweis:** Das Terminal wird unmittelbar angezeigt. Output erscheint in Echtzeit, während das CLI läuft.
+
+> **Eingeschränkter Modus:** Läuft die CLI ohne echtes Pseudo-Terminal (z. B. auf einem zu alten Windows-Build oder weil das Plugin keine Terminal-Unterstützung deklariert), zeigt die Statuszeile den Hinweis **„ (eingeschränkter Modus – kein Pseudo-Terminal)"** — z. B. „Gestartet (eingeschränkter Modus – kein Pseudo-Terminal)". Die CLI läuft weiter und bleibt bedienbar, einige Funktionen (z. B. Terminal-Größenanpassung oder vollbildartige Darstellungen) können jedoch eingeschränkt sein. Details zum Grund stehen als „[Terminal-Diagnose]"-Eintrag im Aufgabenprotokoll. CLIs, die zwingend ein Pseudo-Terminal benötigen, starten in diesem Fall nicht — stattdessen erscheint eine verständliche Fehlermeldung.
 
 ### 3. Mit dem CLI arbeiten
 
@@ -47,6 +50,8 @@ Wenn die CLI mehr Text ausgibt, als im sichtbaren Terminalbereich Platz hat, ers
 Die CLI-Ansicht folgt neuen Ausgaben automatisch, solange Sie am Ende des Verlaufs stehen. Wenn Sie manuell nach oben scrollen, bleibt diese Leseposition stabil und wird durch neue Ausgabe nicht sofort ans Ende zurückgesetzt. Sobald Sie wieder bis ans Ende scrollen, folgt die Ansicht neuen Ausgaben wieder automatisch.
 
 Der Verlauf umfasst bis zu 1000 Scrollback-Zeilen zusätzlich zum aktuell sichtbaren Terminalbereich. Ältere Zeilen werden verworfen, wenn diese Grenze überschritten wird. Klicks in die Terminalfläche setzen den Fokus weiterhin auf das Terminal, sodass Tastatureingaben und `Ctrl+V` auch nach dem Scrollen direkt an die CLI gehen.
+
+> **Vollbild-Programme:** Wenn die CLI eine Vollbild-Ansicht nutzt (z. B. interaktive Auswahllisten oder Texteditoren), wird sie auf den eigenen Bildschirmbereich der CLI umgeschaltet. In diesem Modus ist der Verlauf bewusst nicht scrollbar — die Anzeige folgt dem Programm; beim Verlassen der Vollbild-Ansicht kehrt das normale Scroll-Verhalten zurück.
 
 ### 4. CLI beenden
 
@@ -75,3 +80,43 @@ Die Softwareschmiede unterstützt die parallele Ausführung mehrerer CLI-Prozess
    - Den aktuellen Zustand des Terminals mit allen neuesten Ausgaben
 
 > **Hinweis:** Dies ermöglicht Ihnen, mehrere lange laufende CLI-Prozesse parallel zu starten und zwischen ihnen zu navigieren, ohne dass eine Blockade entsteht. Jedes CLI läuft eigenständig weiter und puffert seine Ausgabe unabhängig von der UI-Anzeige.
+
+## CLI-Aufzeichnung exportieren und im Konsolentestfenster wiedergeben
+
+Zur Analyse von Darstellungsfehlern in der Terminal-Ausgabe zeichnet die Softwareschmiede die Ausgabe jeder CLI-Sitzung automatisch mit. Diese Aufzeichnung können Sie exportieren und im Konsolentestfenster Schritt für Schritt bzw. zeitversetzt erneut abspielen.
+
+### 1. Aufzeichnung exportieren
+
+1. Öffnen Sie die Aufgabendetailansicht einer Aufgabe, deren CLI bereits gelaufen ist oder läuft.
+2. Klicken Sie in der Ribbon-Gruppe **CLI** auf **Aufzeichnung exportieren**.
+3. Wählen Sie im Speichern-Dialog einen Zielpfad mit der Endung `.clireplay` und bestätigen Sie.
+
+> **Hinweis:** Sehen Sie stattdessen die Meldung „Für diese Aufgabe liegt noch keine Aufzeichnung vor", wurde für diese Aufgabe noch keine CLI-Sitzung gestartet — die Aufzeichnung läuft erst während einer Ausführung automatisch mit. Der Button **Rohausgabe exportieren** daneben erzeugt weiterhin die zeilenbasierte `.raw`-Textdatei.
+
+### 2. Konsolentestfenster öffnen
+
+1. Öffnen Sie die **Einstellungen**.
+2. Klicken Sie auf der Registerkarte **Allgemein** im Abschnitt **Diagnose** auf **Konsolentestfenster öffnen**.
+3. Das Fenster „Konsolentest" öffnet sich als eigenes Fenster — die Hauptanwendung bleibt parallel bedienbar.
+
+### 3. Aufzeichnung laden und abspielen
+
+1. Klicken Sie im Konsolentestfenster auf **Aufzeichnung öffnen…** und wählen Sie die exportierte `.clireplay`-Datei.
+2. Links erscheint die Terminal-Ausgabe, rechts die Liste aller aufgezeichneten Ausgabe-Blöcke mit Position, Zeitpunkt und Quelltext (Steuerzeichen sind sichtbar gemacht, z. B. `␛` für Escape-Sequenzen).
+3. Klicken Sie auf **Abspielen** — die Aufzeichnung wird in echtem Zeittempo wiedergegeben, genau wie sie damals am Bildschirm erschien.
+
+### 4. Wiedergabe steuern
+
+- **Pausieren/Fortsetzen** hält die Wiedergabe an und setzt sie an derselben Stelle fort.
+- **Schritt vor** wendet den nächsten Ausgabe-Block einzeln an — ohne Wartezeit, unabhängig von Zeitstempel und Zeitraffer-Schwelle.
+- **Schritt zurück** stellt den Bildschirmzustand vor dem zuletzt angewendeten Block wieder her — die Anzeige wird aus den verbleibenden Blöcken exakt neu aufgebaut, sodass auch Wirkungen von Steuersequenzen (Farben, Löschungen) korrekt zurückgenommen werden.
+- **Neu starten** bricht den laufenden Durchlauf ab und spielt sofort wieder von vorn. Im Schrittmodus (Position > 0 ohne laufende Wiedergabe) ist **Neu starten** ebenfalls aktiv und springt direkt zum Anfang zurück.
+- **Zeitraffer-Schwelle (s)** legt fest, wie lange die Wiedergabe bei längeren Ausgabe-Pausen maximal wartet: Steht dort z. B. `1`, werden Denkpausen der CLI auf eine Sekunde verkürzt; `0` spielt so schnell wie möglich ab. Der Wert kann jederzeit geändert werden.
+
+> **Hinweis Schrittmodus:** **Schritt vor** und **Schritt zurück** funktionieren auch ohne gestartete Wiedergabe (ab Position 0), im pausierten Zustand und nach einem beendeten Durchlauf — nur während eine Wiedergabe unpausiert läuft, sind beide Buttons deaktiviert. Nach jedem Schritt zeigt die Statuszeile die Aktion („Einzelschritt — Chunk n/y angewendet." bzw. „Schritt zurück — Chunk n/y zurückgenommen."), und in der rechten Liste bleibt die Zeile mit der „#"-Nummer des zuletzt angewendeten Blocks markiert. Ein anschließendes **Abspielen** oder **Fortsetzen** läuft ab der erreichten Schrittposition weiter; ein zurückgenommener Block wird dabei regulär erneut wiedergegeben.
+
+> **Hinweis:** Zeigt das Fenster das Band „Aufzeichnung unvollständig", wurde das Speicher-Limit der Aufzeichnung erreicht — die Wiedergabe endet dann vor dem tatsächlichen Ende der Sitzung.
+
+### Ergebnis
+
+Die Terminal-Ausgabe wird exakt so wiedergegeben, wie sie ursprünglich gerendert wurde. Der gerade wiedergegebene Block ist in der rechten Liste markiert, sodass Sie für jede sichtbare Ausgabe den zugehörigen Quelltext nachvollziehen können — etwa um festzustellen, an welcher Stelle Zeichen ausgelassen oder doppelt erscheinen.

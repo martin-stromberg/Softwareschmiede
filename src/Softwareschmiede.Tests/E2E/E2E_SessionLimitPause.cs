@@ -119,9 +119,8 @@ public partial class End2EndTest
 
         // Warten, bis der Marker auf dem echten Ausgabepfad verarbeitet wurde:
         // RateLimit-Protokolleintrag an Aufgabe B + PausiertBisUtc an beiden Aufgaben.
-        // Erhöhtes Zeitlimit: Der gesendete echo-Befehl liegt in der STDIN-Pipe, solange das
-        // simulierte Plugin-Kommando (ping -n 31 ≈ 30 s) die cmd.exe blockiert — die
-        // Marker-Ausgabe erscheint erst nach dessen Ende.
+        // Die interaktive /k-Shell des KiSimulators (Issue #271) führt den echo-Befehl sofort aus —
+        // kein 30-s-Blocker durch ein Einmal-Kommando mehr.
         await WartenBisAsync(async () =>
         {
             await using var db = OpenTestDbContext();

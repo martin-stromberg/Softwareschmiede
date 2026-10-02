@@ -15,6 +15,13 @@ public sealed class TerminalBuffer
     private readonly Queue<TerminalCell[]> _scrollback = new();
     private const int MaxScrollbackLines = 1000;
 
+    private int _scrollTop;
+    private int _scrollBottom;
+    private int _savedCursorRow;
+    private int _savedCursorCol;
+    private bool _isAlternateScreen;
+    private TerminalCell[,]? _mainScreenGrid;
+
     private Color _currentForeground = Color.FromArgb(229, 229, 229);
     private Color _currentBackground = Color.Black;
     private bool _currentBold;
@@ -29,7 +36,14 @@ public sealed class TerminalBuffer
         _cols = Math.Max(1, cols);
         _rows = Math.Max(1, rows);
         _grid = new TerminalCell[_rows, _cols];
+        _scrollBottom = _rows - 1;
         FillGrid(_grid, _rows, _cols);
+    }
+
+    /// <summary>Gibt an, ob der Alternate Screen (Vollbild-TUI, DECSET 47/1047/1049) aktiv ist.</summary>
+    public bool IsAlternateScreenActive
+    {
+        get { lock (_lock) return _isAlternateScreen; }
     }
 
     /// <summary>Aktuelle Zeilenanzahl des Buffers.</summary>
@@ -76,8 +90,8 @@ public sealed class TerminalBuffer
                 case CursorMovedEvent e:
                     if (e.IsAbsolute)
                     {
-                        _cursorRow = Clamp(e.Row, 0, _rows - 1);
-                        _cursorCol = Clamp(e.Col, 0, _cols - 1);
+                        if (e.Row >= 0) _cursorRow = Clamp(e.Row, 0, _rows - 1);
+                        if (e.Col >= 0) _cursorCol = Clamp(e.Col, 0, _cols - 1);
                     }
                     else
                     {
@@ -100,7 +114,66 @@ public sealed class TerminalBuffer
                     break;
                 case CursorVisibilityChangedEvent:
                     break;
+                case AlternateScreenChangedEvent e:
+                    ApplyAlternateScreen(e.Enabled);
+                    break;
+                case LinesInsertedEvent e:
+                    ApplyInsertLines(e.Count);
+                    break;
+                case LinesDeletedEvent e:
+                    ApplyDeleteLines(e.Count);
+                    break;
+                case CharsInsertedEvent e:
+                    ApplyInsertChars(e.Count);
+                    break;
+                case CharsDeletedEvent e:
+                    ApplyDeleteChars(e.Count);
+                    break;
+                case CharsErasedEvent e:
+                    ApplyEraseChars(e.Count);
+                    break;
+                case ScrollRegionChangedEvent e:
+                    ApplyScrollRegion(e.Top, e.Bottom);
+                    break;
+                case ScreenScrolledEvent e:
+                    // CSI S (SU) gehört nach xterm-Semantik grundsätzlich nicht in den Scrollback —
+                    // anders als der Newline-Scroll am Regionsrand (siehe AdvanceLine) wandern die
+                    // herausfallenden Zeilen hier nicht in den Hauptscreen-Scrollback.
+                    if (e.DeltaRows > 0)
+                        ScrollRangeUp(_scrollTop, _scrollBottom, e.DeltaRows, pushToScrollback: false);
+                    else if (e.DeltaRows < 0)
+                        ScrollRangeDown(_scrollTop, _scrollBottom, -e.DeltaRows);
+                    break;
+                case CursorSavedEvent e:
+                    ApplyCursorSaved(e.Restored);
+                    break;
+                case TerminalResetEvent:
+                    Reset();
+                    break;
             }
+        }
+    }
+
+    /// <summary>Setzt den Buffer vollständig zurück: leeres Grid, leerer Scrollback, Cursor an Home,
+    /// SGR-Attribute auf Standard, volle Scroll-Region, Alternate Screen deaktiviert.</summary>
+    public void Reset()
+    {
+        lock (_lock)
+        {
+            _isAlternateScreen = false;
+            _mainScreenGrid = null;
+            _cursorRow = 0;
+            _cursorCol = 0;
+            _savedCursorRow = 0;
+            _savedCursorCol = 0;
+            _scrollTop = 0;
+            _scrollBottom = _rows - 1;
+            _currentForeground = TerminalCell.Default.Foreground;
+            _currentBackground = TerminalCell.Default.Background;
+            _currentBold = false;
+            _currentDim = false;
+            _currentUnderline = false;
+            ClearAllCells();
         }
     }
 
@@ -121,8 +194,11 @@ public sealed class TerminalBuffer
             if (rows < _rows)
             {
                 var offset = _rows - rows;
-                for (var r = 0; r < offset; r++)
-                    PushToScrollback(CaptureRow(r));
+                // Im Alternate Screen haben die wegfallenden Zeilen keinen Scrollback-Anspruch —
+                // sie gehören nicht zum Hauptscreen und dürfen dessen Scrollback nicht füllen.
+                if (!_isAlternateScreen)
+                    for (var r = 0; r < offset; r++)
+                        PushToScrollback(CaptureRow(r));
 
                 for (var r = 0; r < rows; r++)
                     for (var c = 0; c < copyCols; c++)
@@ -144,6 +220,13 @@ public sealed class TerminalBuffer
             _cols = cols;
             _rows = rows;
             _cursorCol = Clamp(_cursorCol, 0, _cols - 1);
+            _scrollTop = Clamp(_scrollTop, 0, _rows - 1);
+            _scrollBottom = Clamp(_scrollBottom, 0, _rows - 1);
+            if (_scrollBottom <= _scrollTop)
+            {
+                _scrollTop = 0;
+                _scrollBottom = _rows - 1;
+            }
         }
     }
 
@@ -179,6 +262,11 @@ public sealed class TerminalBuffer
                 case '\x08':
                     if (_cursorCol > 0) _cursorCol--;
                     break;
+                case '\t':
+                    _cursorCol = Math.Min(_cursorCol + (8 - _cursorCol % 8), _cols - 1);
+                    break;
+                case '\x07':
+                    break;
                 default:
                     if (_cursorCol >= _cols)
                         NewLine();
@@ -205,24 +293,153 @@ public sealed class TerminalBuffer
 
     private void AdvanceLine()
     {
-        _cursorRow++;
-        if (_cursorRow >= _rows)
+        if (_cursorRow == _scrollBottom)
         {
-            ScrollUp();
-            _cursorRow = _rows - 1;
+            // Zeilenumbruch am unteren Rand der Scroll-Region: Inhalt innerhalb der Region
+            // nach oben scrollen. Nur bei voller Region (Hauptscreen) landen die herausfallenden
+            // Zeilen im Scrollback — im Alternate Screen und bei eingeschränkter Region nicht.
+            ScrollRangeUp(_scrollTop, _scrollBottom, 1, IsFullScrollRegion() && !_isAlternateScreen);
+        }
+        else if (_cursorRow < _rows - 1)
+        {
+            _cursorRow++;
         }
     }
 
-    private void ScrollUp()
+    private bool IsFullScrollRegion() => _scrollTop == 0 && _scrollBottom == _rows - 1;
+
+    private void ScrollRangeUp(int rangeTop, int rangeBottom, int count, bool pushToScrollback)
     {
-        PushToScrollback(CaptureRow(0));
+        if (rangeBottom < rangeTop)
+            return;
 
-        for (var r = 0; r < _rows - 1; r++)
+        count = Math.Min(count, rangeBottom - rangeTop + 1);
+
+        if (pushToScrollback)
+            for (var i = 0; i < count; i++)
+                PushToScrollback(CaptureRow(rangeTop + i));
+
+        for (var r = rangeTop; r <= rangeBottom - count; r++)
             for (var c = 0; c < _cols; c++)
-                _grid[r, c] = _grid[r + 1, c];
+                _grid[r, c] = _grid[r + count, c];
 
-        for (var c = 0; c < _cols; c++)
-            _grid[_rows - 1, c] = TerminalCell.Default;
+        for (var r = rangeBottom - count + 1; r <= rangeBottom; r++)
+            for (var c = 0; c < _cols; c++)
+                _grid[r, c] = TerminalCell.Default;
+    }
+
+    private void ScrollRangeDown(int rangeTop, int rangeBottom, int count)
+    {
+        if (rangeBottom < rangeTop)
+            return;
+
+        count = Math.Min(count, rangeBottom - rangeTop + 1);
+
+        for (var r = rangeBottom; r >= rangeTop + count; r--)
+            for (var c = 0; c < _cols; c++)
+                _grid[r, c] = _grid[r - count, c];
+
+        for (var r = rangeTop; r < rangeTop + count; r++)
+            for (var c = 0; c < _cols; c++)
+                _grid[r, c] = TerminalCell.Default;
+    }
+
+    private void ApplyInsertLines(int count)
+    {
+        // IL wirkt nur, wenn der Cursor innerhalb der Scroll-Region steht.
+        if (_cursorRow < _scrollTop || _cursorRow > _scrollBottom)
+            return;
+
+        ScrollRangeDown(_cursorRow, _scrollBottom, count);
+    }
+
+    private void ApplyDeleteLines(int count)
+    {
+        if (_cursorRow < _scrollTop || _cursorRow > _scrollBottom)
+            return;
+
+        ScrollRangeUp(_cursorRow, _scrollBottom, count, pushToScrollback: false);
+    }
+
+    private void ApplyInsertChars(int count)
+    {
+        count = Math.Min(Math.Max(1, count), _cols - _cursorCol);
+        for (var c = _cols - 1; c >= _cursorCol + count; c--)
+            _grid[_cursorRow, c] = _grid[_cursorRow, c - count];
+        for (var c = _cursorCol; c < _cursorCol + count; c++)
+            _grid[_cursorRow, c] = TerminalCell.Default;
+    }
+
+    private void ApplyDeleteChars(int count)
+    {
+        count = Math.Min(Math.Max(1, count), _cols - _cursorCol);
+        for (var c = _cursorCol; c <= _cols - 1 - count; c++)
+            _grid[_cursorRow, c] = _grid[_cursorRow, c + count];
+        for (var c = _cols - count; c < _cols; c++)
+            _grid[_cursorRow, c] = TerminalCell.Default;
+    }
+
+    private void ApplyEraseChars(int count)
+    {
+        count = Math.Min(Math.Max(1, count), _cols - _cursorCol);
+        for (var c = _cursorCol; c < _cursorCol + count; c++)
+            _grid[_cursorRow, c] = TerminalCell.Default;
+    }
+
+    private void ApplyScrollRegion(int top, int bottom)
+    {
+        var newTop = Clamp(top, 0, _rows - 1);
+        var newBottom = bottom < 0 || bottom >= _rows ? _rows - 1 : Clamp(bottom, 0, _rows - 1);
+        _scrollTop = newBottom > newTop ? newTop : 0;
+        _scrollBottom = newBottom > newTop ? newBottom : _rows - 1;
+        // DECSTBM setzt den Cursor auf Home.
+        _cursorRow = 0;
+        _cursorCol = 0;
+    }
+
+    private void ApplyCursorSaved(bool restored)
+    {
+        if (restored)
+        {
+            _cursorRow = Clamp(_savedCursorRow, 0, _rows - 1);
+            _cursorCol = Clamp(_savedCursorCol, 0, _cols - 1);
+        }
+        else
+        {
+            _savedCursorRow = _cursorRow;
+            _savedCursorCol = _cursorCol;
+        }
+    }
+
+    private void ApplyAlternateScreen(bool enabled)
+    {
+        if (enabled == _isAlternateScreen)
+            return;
+
+        if (enabled)
+        {
+            _mainScreenGrid = _grid;
+            _grid = new TerminalCell[_rows, _cols];
+            FillGrid(_grid, _rows, _cols);
+            _isAlternateScreen = true;
+        }
+        else
+        {
+            // Hauptscreen wiederherstellen, sofern die Buffer-Größe seitdem nicht geändert wurde.
+            if (_mainScreenGrid is not null
+                && _mainScreenGrid.GetLength(0) == _rows
+                && _mainScreenGrid.GetLength(1) == _cols)
+            {
+                _grid = _mainScreenGrid;
+            }
+            _mainScreenGrid = null;
+            _isAlternateScreen = false;
+        }
+
+        _scrollTop = 0;
+        _scrollBottom = _rows - 1;
+        _cursorRow = 0;
+        _cursorCol = 0;
     }
 
     private TerminalCell[] CaptureRow(int rowIndex)
@@ -325,10 +542,15 @@ public sealed class TerminalBuffer
             var gridCopy = new TerminalCell[_rows, _cols];
             Array.Copy(_grid, gridCopy, _grid.Length);
 
-            var scrollbackRows = new TerminalCell[_scrollback.Count][];
+            // Bei aktivem Alternate Screen bleibt der Scrollback der Hauptscreen-Ebene erhalten,
+            // wird aber für Render-Zwecke ausgeblendet (Vollbild-TUIs haben keinen Scrollback).
+            var scrollbackCount = _isAlternateScreen ? 0 : _scrollback.Count;
+            var scrollbackRows = new TerminalCell[scrollbackCount][];
             var index = 0;
             foreach (var row in _scrollback)
             {
+                if (index >= scrollbackCount)
+                    break;
                 var rowCopy = new TerminalCell[_cols];
                 Array.Copy(row, rowCopy, Math.Min(row.Length, _cols));
                 if (row.Length < _cols)

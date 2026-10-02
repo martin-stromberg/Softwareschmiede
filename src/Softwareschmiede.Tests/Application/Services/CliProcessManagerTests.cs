@@ -7,6 +7,7 @@ using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
 
+using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>Tests für den Concurrency-Schutz von CliProcessManager.AktualisierungAsync.</summary>
@@ -19,7 +20,7 @@ public sealed class CliProcessManagerTests : IDisposable
     public CliProcessManagerTests()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        _kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
         _sut = new CliProcessManager(
             _kiService,
             scopeFactoryMock.Object,
@@ -119,10 +120,7 @@ public sealed class CliProcessManagerTests : IDisposable
             .Setup(f => f.CreateScope())
             .Throws(new ObjectDisposedException("ServiceProvider"));
 
-        using var kiService = new KiAusfuehrungsService(
-            NullLogger<KiAusfuehrungsService>.Instance,
-            NullLoggerFactory.Instance,
-            scopeFactoryMock.Object);
+        using var kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
         using var manager = new CliProcessManager(
             kiService,
             scopeFactoryMock.Object,

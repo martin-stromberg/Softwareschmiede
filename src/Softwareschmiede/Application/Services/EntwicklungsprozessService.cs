@@ -154,7 +154,7 @@ public sealed class EntwicklungsprozessService
                 kiPlugin.PluginPrefix,
                 ct);
 
-            await _options.KiAusfuehrungsService.StartWithPseudoConsoleAsync(
+            await _options.KiAusfuehrungsService.StartTerminalSessionAsync(
                 aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, null, ct, repository.StartKonfiguration, gitPlugin);
         }
         catch (OperationCanceledException)
@@ -236,7 +236,7 @@ public sealed class EntwicklungsprozessService
         var repository = await ResolveRepositoryAsync(aufgabe, aufgabe.GitRepository?.RepositoryUrl ?? string.Empty, ct);
         var gitPlugin = await ResolvePluginAsync(repository, null, aufgabeId, ct);
 
-        await _options.KiAusfuehrungsService.StartWithPseudoConsoleAsync(
+        await _options.KiAusfuehrungsService.StartTerminalSessionAsync(
             aufgabeId,
             kiPlugin,
             aufgabe.LokalerKlonPfad,

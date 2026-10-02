@@ -339,6 +339,15 @@ public sealed class TaskDetailView : BaseWindowView
         return HandleSaveFileDialog(zielPfad);
     }
 
+    /// <summary>Klickt den "Aufzeichnung exportieren"-Button (CLI-Replay) und bedient den nativen Save-Dialog.</summary>
+    /// <param name="zielPfad">Der Zielpfad der zu speichernden *.clireplay-Datei oder null/leer für Abbruch.</param>
+    /// <returns>Diese Instanz.</returns>
+    public TaskDetailView ExportCliReplay(string? zielPfad)
+    {
+        WaitForEnabledElement(Window, "CliReplayExport", Medium).AsButton().ClickInForeground();
+        return HandleSaveFileDialog(zielPfad);
+    }
+
     /// <summary>Bedient den nativen Save-Dialog: schreibt den Zielpfad und bestätigt, oder bricht per ESC ab.</summary>
     /// <param name="zielPfad">Der Zielpfad oder null/leer zum Abbrechen.</param>
     /// <returns>Diese Instanz.</returns>
@@ -414,6 +423,17 @@ public sealed class TaskDetailView : BaseWindowView
         throw new TimeoutException(
             "TerminalConsole zeigte innerhalb des Timeouts keine Prozess-ID (HelpText) an. "
             + $"Vorhandene Descendants von Window: {DescribeDescendants(Window)}");
+    }
+
+    /// <returns>Der aktuell in der Fußzeile angezeigte CLI-Statustext. Das Element trägt die feste
+    /// AutomationId "CliStatusText" — für einen TextBlock (ohne gesetztes AutomationProperties.Name)
+    /// liefert die UIA-Name-Property den Textinhalt (wie bei "AktiverCliName").</returns>
+    public string GetCliStatusText()
+    {
+        var element = WaitForElement(Window, cf => cf.ByAutomationId("CliStatusText"), Short);
+        return element.Patterns.Text.IsSupported
+            ? element.Patterns.Text.Pattern.DocumentRange.GetText(int.MaxValue)
+            : element.Name;
     }
 
     /// <returns>Der in der Fußzeile angezeigte aktive CLI-Name (ohne das Präfix "CLI: ").</returns>

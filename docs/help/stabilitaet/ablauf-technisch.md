@@ -40,7 +40,7 @@ Beteiligte Komponenten:
 - `AsyncTaskExtensions.SafeFireAndForget(this Task task, ILogger logger, string operationName)`
 
 Ablauf:
-1. Eine Codestelle löst einen asynchronen Aufruf aus, dessen Ergebnis nicht abgewartet werden soll (z. B. `CliProcessManager.StartHeartbeat`, `KiAusfuehrungsService.SendCommandDelayedAsync`/`PersistFehlgeschlagenAsync`, die `CurrentView`-/`ProjektId`-/`AufgabeId`-Setter der ViewModels, `ProjectDetailView.IssueDoubleClick`). `PseudoConsoleSession.ReadLoopAsync` bildet eine Ausnahme: Sie fängt alle Exceptions bereits intern ab und läuft als eigenständiger, ab Konstruktion gestarteter Hintergrund-Task (`_readLoopTask`), unabhängig vom UI-Lebenszyklus.
+1. Eine Codestelle löst einen asynchronen Aufruf aus, dessen Ergebnis nicht abgewartet werden soll (z. B. `CliProcessManager.StartHeartbeat`, `KiAusfuehrungsService.PersistFehlgeschlagenAsync`, die `CurrentView`-/`ProjektId`-/`AufgabeId`-Setter der ViewModels, `ProjectDetailView.IssueDoubleClick`). `PseudoConsoleSession.ReadLoopAsync` bildet eine Ausnahme: Sie fängt alle Exceptions bereits intern ab und läuft als eigenständiger, ab Konstruktion gestarteter Hintergrund-Task (`_readLoopTask`), unabhängig vom UI-Lebenszyklus.
 2. Statt `_ = task;` wird `task.SafeFireAndForget(_logger, "Bezeichnung")` aufgerufen.
 3. `SafeFireAndForget` registriert `task.ContinueWith(...)` auf `TaskScheduler.Default` (läuft also nicht zwingend auf dem UI-Thread):
    - Ist der Task fehlgeschlagen (`t.IsFaulted`): `logger.LogError(t.Exception, "Unerwarteter Fehler in {OperationName}", operationName)`.
@@ -66,20 +66,20 @@ Ablauf:
    - Im finally-Block: `semaphore.Release()`, abgesichert gegen `ObjectDisposedException` (falls das Semaphore innerhalb desselben Aufrufs durch `StopHeartbeat` bereits disposed wurde).
 4. `StopHeartbeat(aufgabeId)` entfernt sowohl den Timer als auch das Semaphore aus den jeweiligen Dictionaries und disposed beide.
 
-### 5. Geschützter `Process.Exited`-Handler (klassischer und ConPTY-Start)
+### 5. Geschützte Prozessende-Behandlung (klassischer Start und Terminal-Session)
 
 Beteiligte Komponenten:
-- `KiAusfuehrungsService.HandleProcessExited(Guid aufgabeId, Process process, CliProcessHandle handle, string logKontext, Action? vorAufraeumen)` — gemeinsame Implementierung für beide Start-Varianten
-- `KiAusfuehrungsService.StartCliAsync` — registriert `process.Exited += (_, _) => HandleProcessExited(aufgabeId, process, handle, "Standard");`
-- `KiAusfuehrungsService.StartWithPseudoConsoleAsync` — registriert `process.Exited += (_, _) => HandleProcessExited(aufgabeId, process, handle, "ConPTY", () => handle.PseudoConsoleSession?.Dispose());`
+- `KiAusfuehrungsService.HandleExitedCoreAsync(Guid aufgabeId, CliProcessHandle handle, int? exitCode, string logKontext, Func<Task>? vorAufraeumenAsync)` — gemeinsame Implementierung für beide Start-Varianten
+- `KiAusfuehrungsService.StartCliAsync` (klassischer Pipe-Start) — registriert `process.Exited += (_, _) => HandleProcessExitedAsync(aufgabeId, process, handle, "Standard");` (Exit-Code via `TryGetExitCode`)
+- `KiAusfuehrungsService.StartTerminalSessionAsync` — registriert `session.Exited += (_, e) => HandleSessionEndedAsync(aufgabeId, handle, e.ExitCode, "Terminal")` und `session.Failed += (_, e) => HandleSessionFailedAsync(aufgabeId, handle, e)`; die Session erkennt das Prozessende selbst (`Process.Exited` bzw. Ende des Output-Streams) und ermittelt den Exit-Code PID-wiederverwendungs-sicher über `GetExitCodeProcess` auf dem nativen Prozess-Handle (ConPTY) bzw. `Process.ExitCode` (Pipe)
 
 Ablauf:
-1. Der native Prozess beendet sich; Windows löst `process.Exited` aus.
-2. `HandleProcessExited` wird ausgeführt — der **gesamte** Methodenkörper liegt in einem try-catch.
-3. `_handles.TryRemove(aufgabeId, out _)` entfernt das Handle atomar; gibt `TryRemove` `false` zurück (Handle bereits anderweitig entfernt), kehrt die Methode sofort zurück — jede Aktion wird so nur genau einmal ausgeführt.
-4. Das optionale `vorAufraeumen`-Callback wird ausgeführt (beim ConPTY-Pfad: `PseudoConsoleSession.Dispose()`, was bei parallelem Dispose eine `ObjectDisposedException` werfen kann).
-5. Exit-Code wird ermittelt (`TryGetExitCode`), das Ereignis wird geloggt, `RaiseRunningCountChanged()` wird aufgerufen.
-6. Je nach Zustand wird der Status bestimmt: `Gestoppt` (absichtlich beendet oder ExitCode 0), `Fehler` (ExitCode ≠ 0 und nicht absichtlich beendet). Bei `Fehler` wird zusätzlich `PersistFehlgeschlagenAsync(...).SafeFireAndForget(...)` aufgerufen.
+1. Der Prozess endet; der klassische Pfad löst `process.Exited` aus, die Terminal-Session ihr `Exited`-Event (bzw. `Failed` bei einem fatalen Laufzeitfehler — wird wie ein Exit ohne Code behandelt → Status `Fehler`).
+2. `HandleExitedCoreAsync` wird ausgeführt — der **gesamte** Methodenkörper liegt in einem try-catch.
+3. `_handles.TryRemove(aufgabeId, out _)` entfernt das Handle atomar; gibt `TryRemove` `false` zurück (Handle bereits anderweitig entfernt), kehrt die Methode sofort zurück — jede Aktion wird so nur genau einmal ausgeführt. Wurde zwischenzeitlich ein **neuer** Prozess für dieselbe Aufgabe gestartet (entfernter Handle ≠ übergebener Handle), wird der neue Handle wieder eingetragen und das alte Exit-Event ignoriert.
+4. Das optionale `vorAufraeumenAsync`-Callback wird ausgeführt (beim Terminal-Pfad: `DisposeSessionResourcesAsync` — kurzer `DrainOutputAsync`, dann `Session.Dispose()`, was bei parallelem Dispose eine `ObjectDisposedException` werfen kann, danach `OutputSink.CompleteAsync(...)` mit Timeout).
+5. Das Ereignis wird mit Exit-Code geloggt, `RaiseRunningCountChanged()` wird aufgerufen.
+6. Je nach Zustand wird der Status bestimmt: `Gestoppt` (absichtlich beendet oder ExitCode 0/null), `Fehler` (ExitCode ≠ 0 und nicht absichtlich beendet). Bei `Fehler` wird zusätzlich `PersistFehlgeschlagenAsync(...).SafeFireAndForget(...)` aufgerufen.
 7. `CliProcessStatusChanged?.Invoke(aufgabeId, status)` benachrichtigt alle Abonnenten (u. a. `CliProcessManager.OnCliProcessStatusChanged`, `TaskDetailViewModel.OnCliProcessStatusChanged`).
 8. Tritt in einem der obigen Schritte eine Exception auf, wird sie im äußeren catch-Block als `LogError` protokolliert; der Handler beendet sich normal, ohne die Exception weiterzuwerfen.
 
@@ -87,16 +87,17 @@ Da `CliProcessStatusChanged` ein Multicast-Delegate mit mehreren Abonnenten ist,
 
 ### 6. Ressourcenfreigabe beim Aufbau der ConPTY-Session
 
-Beteiligte Komponenten:
-- `KiAusfuehrungsService.StartPseudoConsoleProcess(Guid aufgabeId, string localRepoPath, string pluginCommand)` — startet `cmd.exe` über die ConPTY-API
-- `KiAusfuehrungsService.CreatePseudoConsoleSession(Guid aufgabeId, PseudoConsole pseudoConsole, Process process)` — erstellt die Ein-/Ausgabe-`FileStream`s und die `PseudoConsoleSession`
+Beteiligte Komponenten (liegen seit der Einführung der Session-Factory in den Launchern, nicht mehr im `KiAusfuehrungsService`):
+- `Win32PseudoConsoleProcessLauncher.Start(Guid aufgabeId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink)` — startet die normalisierte Spec direkt über die ConPTY-API (keine `cmd.exe`-Hülle mehr)
+- `Win32PseudoConsoleProcessLauncher.CreatePseudoConsoleSession(Guid aufgabeId, PseudoConsole pseudoConsole, Process process, IntPtr nativeProcessHandle, ITerminalOutputSink? outputSink)` — erstellt die Ein-/Ausgabe-`FileStream`s und die `PseudoConsoleSession`
+- `SimulatedPseudoConsoleProcessLauncher.Start` — analoges Aufräumen auf dem Pipe-Backend (`process.Kill()` + `Dispose` bei fehlgeschlagener Session-Erzeugung)
 
-Ablauf (`CreatePseudoConsoleSession`):
+Ablauf (`Win32PseudoConsoleProcessLauncher.CreatePseudoConsoleSession`):
 1. `inputStream` und `outputStream` werden zunächst `null` initialisiert.
-2. Im try-Block werden beide `FileStream`-Instanzen aus den ConPTY-Pipe-Handles erstellt und anschließend die `PseudoConsoleSession` daraus zusammengesetzt.
-3. Schlägt einer der Schritte fehl (Exception zwischen Erstellung der Streams und erfolgreichem Zusammenbau der Session), werden im catch-Block `inputStream?.Dispose()` und `outputStream?.Dispose()` aufgerufen, die Exception wird als `LogError` protokolliert und erneut geworfen (`throw;`), damit der Aufrufer (`StartPseudoConsoleProcess`) den Fehlerfall behandeln kann.
+2. Im try-Block werden beide `FileStream`-Instanzen aus den ConPTY-Pipe-Handles erstellt und anschließend die `PseudoConsoleSession` daraus zusammengesetzt (mit `PseudoConsoleSessionContext` inkl. nativem Prozess-Handle und `TerminalSessionOptions`).
+3. Schlägt einer der Schritte fehl (Exception zwischen Erstellung der Streams und erfolgreichem Zusammenbau der Session), werden im catch-Block `inputStream?.Dispose()` und `outputStream?.Dispose()` aufgerufen, die Exception wird als `LogError` protokolliert und erneut geworfen (`throw;`), damit der Aufrufer (`Start`) den Fehlerfall behandeln kann.
 
-`StartPseudoConsoleProcess` selbst räumt bei einem fehlgeschlagenen Prozessstart ebenfalls auf: Schlägt `PseudoConsoleProcessStarter.Start` fehl, wird `pseudoConsole.Dispose()` aufgerufen; schlägt die Ermittlung des `Process`-Objekts über `Process.GetProcessById` fehl, werden sowohl das native Prozess-Handle (`PseudoConsoleNativeMethods.CloseHandle`) als auch die PseudoConsole geschlossen, bevor die Exception weitergegeben wird.
+`Win32PseudoConsoleProcessLauncher.Start` selbst räumt bei einem fehlgeschlagenen Prozessstart ebenfalls auf: Schlägt `PseudoConsoleProcessStarter.Start` fehl, wird `pseudoConsole.Dispose()` aufgerufen; schlägt die Ermittlung des `Process`-Objekts über `Process.GetProcessById` fehl, werden sowohl das native Prozess-Handle (`PseudoConsoleNativeMethods.CloseHandle`) als auch die PseudoConsole geschlossen; schlägt die Session-Erzeugung fehl, wird der bereits laufende Kindprozess zusätzlich per `process.Kill(entireProcessTree: true)` beendet — es bleibt kein verwaister Prozess ohne zugehörige Sitzung zurück. Das native Prozess-Handle geht im Erfolgsfall in die Ownership der Session und wird erst in `PseudoConsoleSession.Dispose()` geschlossen.
 
 ### 7. Überwachter Terminal-Lesevorgang (parallele CLI-Ausführungen)
 
@@ -107,8 +108,8 @@ Dieser Schritt betrifft `PseudoConsoleSession` und ist im Detail in der [Termina
 - `PseudoConsoleSession.Dispose()` beendet die Leseschleife nach folgendem Verfahren:
   1. `_readCts.Cancel()` wird aufgerufen, um den CancellationToken zu setzen
   2. `OutputStream.Dispose()` wird aufgerufen — dies ist **kritisch**, da ein blockierter nativer Read (in `ReadLoopAsync`) sonst nur auf den CancellationToken warten würde. Durch das Schließen des Streams endet der Read sofort mit einem I/O-Fehler.
-  3. `_readLoopTask.Wait(5 Sekunden)` wartet mit Timeout auf Beendigung der ReadLoop
-  4. Danach werden `InputStream`, `_runtimeStatusTimer`, `PseudoConsole` und `Process` disposed
+  3. Bewusst **kein** synchrones `_readLoopTask.Wait(...)`: `Dispose()` kann aus dem `Process.Exited`-Handler auf einem ThreadPool-Thread aufgerufen werden — ein Wait würde unter ThreadPool-Druck genau die Threads blockieren, die zum Fortsetzen der eigenen Leseschleife gebraucht werden. Stattdessen läuft die Schleife asynchron aus; eine `ContinueWith`-Continuation räumt `_readCts` nach dem tatsächlichen Ende auf.
+  4. Danach werden `InputStream`, `_runtimeStatusTimer`, `PseudoConsole`, das native Prozess-Handle (`CloseHandle`, nur ConPTY-Pfad) und `Process` disposed
   5. Dies stellt sicher, dass keine verwaisten Leseschleifen zurückbleiben und alle Ressourcen korrekt freigegeben werden.
 - `TerminalControl` ist reiner Renderer: Es abonniert `PseudoConsoleSession.BufferChanged` und ruft bei jedem Ereignis `Dispatcher.InvokeAsync(InvalidateVisual)` auf, besitzt aber keine eigene Leseschleife mehr.
 
@@ -132,7 +133,7 @@ flowchart TD
     EXC -- Hintergrund-Thread --> BGH[OnAppDomainUnhandledException\nLogError, Prozess evtl. beendet]
     EXC -- Fire-and-Forget-Task --> FFH[SafeFireAndForget.ContinueWith\nLogError/LogInformation]
     EXC -- Unbeobachteter Task --> UTH[OnUnobservedTaskException\nLogError, e.SetObserved]
-    EXC -- Process.Exited-Handler --> PEH[HandleProcessExited\ntry-catch um gesamten Body]
+    EXC -- Prozessende-Handler --> PEH[HandleExitedCoreAsync\ntry-catch um gesamten Body]
 
     UIH --> RUNNING
     FFH --> RUNNING
@@ -152,7 +153,7 @@ flowchart TD
 | Fire-and-Forget-Task wird abgebrochen | `SafeFireAndForget` loggt als `LogInformation`. |
 | `GetRequiredService<CliProcessManager>()` schlägt beim Start fehl | Geloggt; Anwendung startet ohne CLI-Funktionalität. |
 | `mainWindow.Show()` schlägt fehl | Geloggt; kein Shutdown der Anwendung. |
-| Fehler in `Process.Exited`-Handler (z. B. `ObjectDisposedException` bei `PseudoConsoleSession.Dispose`) | `HandleProcessExited` fängt sie ab, loggt, Handler beendet normal. |
+| Fehler im Prozessende-Handler (z. B. `ObjectDisposedException` bei `PseudoConsoleSession.Dispose`) | `HandleExitedCoreAsync` fängt sie ab, loggt, Handler beendet normal. |
 | Fehler bei einem Abonnenten von `CliProcessStatusChanged` | Try-catch im jeweiligen Abonnenten (`CliProcessManager`, `TaskDetailViewModel`) verhindert Abbruch der Multicast-Kette. |
 | Fehler beim Erstellen der ConPTY-Streams | `CreatePseudoConsoleSession` disposed bereits erstellte Streams, loggt und wirft weiter. |
 | Überlappende Heartbeat-Ticks derselben Aufgabe | Pro-Aufgabe-`SemaphoreSlim` serialisiert; andere Aufgaben bleiben unbeeinflusst. |

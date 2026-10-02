@@ -67,7 +67,9 @@ public sealed class SettingsViewModelTests : IDisposable
             _pluginSettingsService,
             _promptVorlagenService,
             NullLogger<SettingsViewModel>.Instance,
-            Options.Create(autonomAufgabenOptions ?? new AutonomAufgabenOptions()));
+            Options.Create(autonomAufgabenOptions ?? new AutonomAufgabenOptions()),
+            new Mock<IDialogService>().Object,
+            new Mock<IServiceProvider>().Object);
 
     private static Mock<IGitPlugin> CreateScmPluginMock(string pluginName, IReadOnlyList<PluginSettingGroup>? groups = null)
     {

@@ -59,4 +59,17 @@ public interface IDialogService
         string defaultFileName,
         string? initialDirectory = null,
         CancellationToken ct = default);
+
+    /// <summary>Zeigt einen Öffnen-Dialog und gibt den gewählten Dateipfad zurück, oder null wenn abgebrochen.</summary>
+    Task<string?> ShowOpenFileDialogAsync(
+        string title,
+        string filter,
+        string? initialDirectory = null,
+        CancellationToken ct = default);
+
+    /// <summary>Zeigt das Konsolentestfenster für das CLI-Ausgabe-Replay nicht-modal an
+    /// (kehrt nach dem Anzeigen zurück — das Fenster bleibt parallel zur Anwendung nutzbar).</summary>
+    Task ShowKonsolenTestDialogAsync(
+        KonsolenTestViewModel viewModel,
+        CancellationToken ct = default);
 }

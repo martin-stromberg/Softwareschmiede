@@ -76,6 +76,7 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
         services.AddScoped<DashboardViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddSingleton<DarkModeService>();
+        services.AddSingleton(_dialogServiceMock.Object);
         services.AddSingleton(_runningStatusSourceMock.Object);
         services.AddSingleton(_pluginManagerMock.Object);
         services.AddSingleton<ICredentialStore>(new InMemoryCredentialStoreForSettings());

@@ -19,7 +19,7 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     {
         _db = TestDbContextFactory.Create();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        _kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
     }
 
     /// <summary>Dispose.</summary>
@@ -60,19 +60,19 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
         await _kiService.StopCliAsync(aufgabeId);
     }
 
-    /// <summary>StartWithPseudoConsoleAsync startet einen Prozess via ConPTY und liefert eine PseudoConsoleSession.</summary>
+    /// <summary>StartTerminalSessionAsync startet einen Prozess via ConPTY und liefert eine PseudoConsoleSession.</summary>
     [OsInterfaceFact]
     [Trait("Category", "ConPTY")]
-    public async Task StartWithPseudoConsoleAsync_StartetProzess_UndSetztPseudoConsoleSession()
+    public async Task StartTerminalSessionAsync_StartetProzess_UndSetztPseudoConsoleSession()
     {
         var aufgabeId = Guid.NewGuid();
         var pluginMock = new FakeKiPlugin();
 
-        var handle = await _kiService.StartWithPseudoConsoleAsync(aufgabeId, pluginMock, Path.GetTempPath());
+        var handle = await _kiService.StartTerminalSessionAsync(aufgabeId, pluginMock, Path.GetTempPath());
 
         handle.Should().NotBeNull();
         handle.AufgabeId.Should().Be(aufgabeId);
-        handle.PseudoConsoleSession.Should().NotBeNull("StartWithPseudoConsoleAsync muss eine PseudoConsoleSession liefern");
+        handle.Session.Should().NotBeNull("StartTerminalSessionAsync muss eine ITerminalSession liefern");
 
         await _kiService.StopCliAsync(aufgabeId);
     }
@@ -113,4 +113,11 @@ internal sealed class FakeKiPlugin : IKiPlugin
 
     /// <summary>Task.</summary>
     public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
+
+    /// <summary>TerminalCapabilities.</summary>
+    public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
+
+    /// <summary>GetTerminalStartSpecAsync.</summary>
+    public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+        => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
 }

@@ -58,6 +58,16 @@ public sealed class SettingsView : BaseWindowView
         return this;
     }
 
+    /// <summary>Öffnet über den "Konsolentestfenster öffnen"-Button (Tab "Allgemein") das
+    /// Konsolentestfenster und gibt dessen Dialog-View zurück.</summary>
+    /// <returns>Der Konsolentest-Dialog.</returns>
+    public Dialogs.KonsolenTestDialogView OpenKonsolenTestDialog()
+    {
+        SwitchTab("Allgemein");
+        WaitForElement(Window, cf => cf.ByName("KonsolenTestOeffnen"), Short).AsButton().ClickInForeground();
+        return new Dialogs.KonsolenTestDialogView(Window).ForceShow();
+    }
+
     /// <summary>Klickt den "Speichern"-Button und wartet auf die Bestätigung "Einstellungen gespeichert.".</summary>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SaveSettings()

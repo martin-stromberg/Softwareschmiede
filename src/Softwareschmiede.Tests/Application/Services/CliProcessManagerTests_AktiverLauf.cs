@@ -10,6 +10,7 @@ using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Infrastructure.Data;
 
+using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>
@@ -63,7 +64,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
 
         var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
         var kiScopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, kiScopeFactoryMock.Object);
+        _kiService = TestKiAusfuehrungsServiceFactory.Create(kiScopeFactoryMock.Object);
         _sut = new CliProcessManager(
             _kiService,
             scopeFactory,

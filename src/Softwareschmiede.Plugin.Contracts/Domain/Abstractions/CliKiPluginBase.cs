@@ -32,6 +32,52 @@ public abstract class CliKiPluginBase : IKiPlugin
         return Task.FromResult(psi);
     }
 
+    /// <inheritdoc/>
+    public virtual TerminalProviderCapabilities TerminalCapabilities => TerminalProviderCapabilities.SupportsPty;
+
+    /// <inheritdoc/>
+    public Task<TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+        => Task.FromResult(BuildTerminalStartSpec(localRepoPath, parameters));
+
+    /// <summary>Mappt das <see cref="BuildProcessStartInfo"/>-Ergebnis auf eine <see cref="TerminalSessionStartSpec"/>.</summary>
+    /// <param name="localRepoPath">Lokales Arbeitsverzeichnis.</param>
+    /// <param name="parameters">Optionale Parameter (z.B. Session-ID).</param>
+    /// <returns>Die Startbeschreibung für den interaktiven Terminal-Pfad.</returns>
+    public TerminalSessionStartSpec BuildTerminalStartSpec(string localRepoPath, string? parameters)
+    {
+        var psi = BuildProcessStartInfo(localRepoPath, parameters);
+        if (string.IsNullOrWhiteSpace(psi.FileName))
+            throw new InvalidOperationException(
+                $"Das Plugin '{PluginName}' lieferte über BuildProcessStartInfo ein leeres FileName — TerminalSessionStartSpec.FileName darf nicht leer sein.");
+
+        return new TerminalSessionStartSpec
+        {
+            FileName = psi.FileName,
+            Arguments = psi.Arguments,
+            WorkingDirectory = psi.WorkingDirectory,
+            EnvironmentVariables = GetEnvironmentVariables(psi),
+            Capabilities = TerminalCapabilities,
+            PluginName = PluginName,
+            OptionalParameters = parameters,
+        };
+    }
+
+    private static IReadOnlyDictionary<string, string?> GetEnvironmentVariables(ProcessStartInfo psi)
+    {
+        var result = new Dictionary<string, string?>();
+        if (!psi.UseShellExecute)
+        {
+            foreach (var entry in psi.Environment)
+                result[entry.Key] = entry.Value;
+        }
+        else
+        {
+            foreach (System.Collections.DictionaryEntry entry in psi.EnvironmentVariables)
+                result[(string)entry.Key] = (string?)entry.Value;
+        }
+        return result;
+    }
+
     /// <summary>
     /// Ruft die CLI mit <c>--help</c> auf und gibt den Ausgabetext zurück.
     /// Gibt <c>null</c> zurück bei Timeout, Prozessfehler oder fehlender CLI.

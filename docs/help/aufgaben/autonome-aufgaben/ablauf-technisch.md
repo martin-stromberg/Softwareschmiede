@@ -238,15 +238,15 @@ ProjektleiterAgentService.StarteAgentAsync(konfiguration, optionalResumePrompt: 
 1. **Skill-Datei erzeugen** (falls nicht vorhanden): `skills/skill_projektleiter_v1.md` im Arbeitsverzeichnis, Inhalt aus `BuildDefaultProjektleiterSkill(konfiguration)` (enthält u. a. den Initialprompt).
 2. **Plugin auflösen**: `PluginSelectionService.ResolveDevelopmentAutomationPluginAsync(aufgabe.KiPluginPrefix, ct)` liefert das zu verwendende `IKiPlugin`.
 3. **`optionalParameters` bestimmen**: `"--continue"`, wenn `optionalResumePrompt` gesetzt ist (Resume-Fall, siehe Phase 2b) **und** `kiPlugin.SupportsSessionContinuation() == true`; sonst `null`. Wichtig: Dieser Parameter wird von jedem KI-Plugin als rohe Kommandozeilenargumente interpretiert (`ProcessStartInfo.Arguments`) — er enthält **niemals** den Prompttext selbst.
-4. **CLI starten**: `KiAusfuehrungsService.StartWithPseudoConsoleAsync(aufgabeId, kiPlugin, konfiguration.ArbeitsverzeichnisPfad, optionalParameters, ct)` — startet den CLI-Prozess per ConPTY (dieselbe Mechanik wie `EntwicklungsprozessService.CliNeustartenAsync()` für reguläre Aufgaben). Schlägt dieser Schritt fehl, wird `AusfuehrungsStatus = Beendet` gesetzt und die Exception weitergeworfen.
-5. **Prompt verzögert senden**: Fire-and-Forget-Aufruf der privaten Methode `SendeInitialPromptVerzoegertAsync(aufgabeId, promptText, ct)` mit `promptText = optionalResumePrompt ?? konfiguration.InitialPrompt`. Diese wartet `PromptSendeVerzoegerungMs` (3000 ms — deutlich länger als die 300-ms-Verzögerung beim regulären CLI-Start, da zusätzlich der Eigenstart der KI-CLI abgewartet werden muss) und ruft anschließend `KiAusfuehrungsService.GetPseudoConsoleSession(aufgabeId)` sowie `PseudoConsoleSession.WritePromptAsync(promptText, ct)` auf — der Prompt wird damit als Texteingabe in die laufende CLI-Session geschrieben, nicht als Kommandozeilenargument. Fehler (z. B. Session bereits beendet) werden geloggt, nicht geworfen.
+4. **CLI starten**: `KiAusfuehrungsService.StartTerminalSessionAsync(aufgabeId, kiPlugin, konfiguration.ArbeitsverzeichnisPfad, optionalParameters, ct)` — startet den CLI-Prozess über die `ITerminalSessionFactory` per ConPTY bzw. diagnostiziertem Pipe-Fallback (dieselbe Mechanik wie `EntwicklungsprozessService.CliNeustartenAsync()` für reguläre Aufgaben). Schlägt dieser Schritt fehl, wird `AusfuehrungsStatus = Beendet` gesetzt und die Exception weitergeworfen.
+5. **Prompt verzögert senden**: Fire-and-Forget-Aufruf der privaten Methode `SendeInitialPromptVerzoegertAsync(aufgabeId, promptText, ct)` mit `promptText = optionalResumePrompt ?? konfiguration.InitialPrompt`. Diese wartet `PromptSendeVerzoegerungMs` (3000 ms — der Eigenstart der KI-CLI muss abgewartet werden, bis sie Eingaben annimmt) und ruft anschließend `KiAusfuehrungsService.GetTerminalSession(aufgabeId)` sowie `ITerminalSession.WritePromptAsync(promptText, ct)` auf — der Prompt wird damit als Texteingabe in die laufende CLI-Session geschrieben, nicht als Kommandozeilenargument. Fehler (z. B. Session bereits beendet) werden geloggt, nicht geworfen.
 6. **DB aktualisieren**: neue `agentId` (`projektleiter-{guid}`) erzeugen, `AutonomKonfiguration.ProjektleiterAgentId`, `AutonomKonfiguration.ExplizitGestoppt = false`, `Aufgabe.AusfuehrungsStatus = Aktiv`, `Aufgabe.AktiveRunId`, `Aufgabe.LastHeartbeatUtc` setzen, `SaveChangesAsync()`.
 
 Die **„Automatisierung"**-Registerkarte zeigt den Status als **„Läuft"** an, sobald `KiAusfuehrungsService.CliProcessStatusChanged` das `AutonomAufgabeDetailViewModel` über den erfolgreichen Start informiert (`CliIsRunning` wird darüber aktualisiert).
 
 **Beteiligte Klassen:**
 - `ProjektleiterAgentService`
-- `KiAusfuehrungsService` (CLI-Prozessverwaltung, `StartWithPseudoConsoleAsync`, `GetPseudoConsoleSession`, `StopCliAsync`)
+- `KiAusfuehrungsService` (CLI-Prozessverwaltung, `StartTerminalSessionAsync`, `GetTerminalSession`, `StopCliAsync`)
 - `PluginSelectionService` (`ResolveDevelopmentAutomationPluginAsync`)
 - `PseudoConsoleSession` (`WritePromptAsync`)
 - `SoftwareschmiededDbContext`
@@ -577,7 +577,7 @@ sequenceDiagram
     Benutzer->>UI: Klickt "Start" Button im Ribbon
     UI->>Proj: StarteAgentAsync(konfiguration)
     Proj->>Proj: Skill-Datei erzeugen, Plugin auflösen
-    Proj->>Agent: KiAusfuehrungsService.StartWithPseudoConsoleAsync (echter CLI-Prozess)
+    Proj->>Agent: KiAusfuehrungsService.StartTerminalSessionAsync (echter CLI-Prozess)
     Proj->>Agent: (verzögert, Fire-and-Forget) PseudoConsoleSession.WritePromptAsync(Initialprompt)
     Proj->>DB: ProjektleiterAgentId, ExplizitGestoppt=false speichern
     Proj-->>UI: agent_id zurück

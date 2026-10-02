@@ -104,7 +104,13 @@
                             <controls:RibbonLargeButton ButtonIcon="🗎"
                                                         ButtonText="Rohausgabe exportieren"
                                                         AutomationName="CliRawExport"
-                                                        ButtonCommand="{Binding ExportCliRawCommand}" />
+                                                        ButtonCommand="{Binding ExportCliRawCommand}"
+                                                        ToolTip="Protokollierte CLI-Ausgabe als Textdatei exportieren (.raw)" />
+                            <controls:RibbonLargeButton ButtonIcon="⏺"
+                                                        ButtonText="Aufzeichnung exportieren"
+                                                        AutomationName="CliReplayExport"
+                                                        ButtonCommand="{Binding ExportCliReplayCommand}"
+                                                        ToolTip="CLI-Aufzeichnung für das Konsolentestfenster exportieren (.clireplay)" />
                             <StackPanel Margin="12,0,0,0"
                                         VerticalAlignment="Center">
                                 <TextBlock Text="Promptvorlage"
@@ -664,7 +670,7 @@
                            FontSize="12"
                            VerticalAlignment="Center"
                            HorizontalAlignment="Center"
-                           AutomationProperties.Name="CliStatusText" />
+                           AutomationProperties.AutomationId="CliStatusText" />
                 <TextBlock Grid.Column="2"
                            Text="{Binding AktiverCliName, StringFormat='CLI: {0}'}"
                            Foreground="{DynamicResource SecondaryTextBrush}"

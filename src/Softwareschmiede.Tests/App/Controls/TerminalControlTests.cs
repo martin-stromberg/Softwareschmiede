@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using Softwareschmiede.App.Controls;
 using Softwareschmiede.Tests.Helpers;
@@ -192,6 +193,85 @@ public sealed partial class TerminalControlTests
         });
     }
 
+    /// <summary>Bei der Neuanbindung einer Session (Weg-/Zurücknavigation) wird der Buffer aus dem
+    /// Replay-Puffer neu aufgebaut — Ausgabe, die während der Trennung eintraf, ist genau einmal
+    /// vorhanden, Live-Chunks erscheinen nicht doppelt.</summary>
+    [Fact]
+    public void OnSessionChanged_ReattachedSession_KeineDoppelteAusgabe()
+    {
+        RunOnSta(() =>
+        {
+            var control = new TerminalControl();
+            using var stream = new ControllableStream();
+            using var session = CreateSession(stream);
+
+            control.Session = session;
+
+            // "A" schieben, solange das Control gebunden ist.
+            var aVerarbeitet = new TaskCompletionSource();
+            session.BufferChanged += (_, _) => { if (BufferText(session).Contains('A')) aVerarbeitet.TrySetResult(); };
+            stream.Push("A");
+            Task.WhenAny(aVerarbeitet.Task, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
+            aVerarbeitet.Task.IsCompletedSuccessfully.Should().BeTrue("die gebundene Ausgabe muss verarbeitet werden");
+
+            // Trennen; währenddessen trifft "B" ein (nur im Buffer/Replay der Session, nicht am Control).
+            control.Session = null;
+            var bVerarbeitet = new TaskCompletionSource();
+            session.BufferChanged += (_, _) => { if (BufferText(session).Contains('B')) bVerarbeitet.TrySetResult(); };
+            stream.Push("B");
+            Task.WhenAny(bVerarbeitet.Task, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
+            bVerarbeitet.Task.IsCompletedSuccessfully.Should().BeTrue("die Ausgabe während der Trennung muss sessionseitig weiterlaufen");
+
+            // Reattach: RebuildBufferFromReplay stellt "AB" wieder her — ohne Duplikat.
+            control.Session = session;
+
+            var text = BufferText(session);
+            text.IndexOf('A').Should().Be(text.LastIndexOf('A'), "'A' darf nach dem Rebuild nicht doppelt erscheinen");
+            text.IndexOf('B').Should().Be(text.LastIndexOf('B'), "'B' darf nach dem Rebuild nicht doppelt erscheinen");
+            text.IndexOf('A').Should().BeLessThan(text.IndexOf('B'));
+        });
+    }
+
+    /// <summary>Bei aktivem Alternate Screen meldet das Control kein Scrollback: Extent entspricht dem
+    /// sichtbaren Grid, der Offset bleibt auf 0 geklemmt und Line-/Page-Scrollen sind No-Ops.</summary>
+    [Fact]
+    public void ScrollInfo_AlternateScreen_KeinScrollbackKeinOffset()
+    {
+        RunOnSta(() =>
+        {
+            var control = CreateArrangedControl();
+            using var session = CreateSession(new ImmediateEofStream());
+            control.Session = session;
+            WriteLines(session, 20);
+
+            // Alternate Screen aktivieren (Vollbild-TUI): sichtbarer Bereich ohne Scrollback.
+            session.Buffer.Apply(new Softwareschmiede.Domain.Terminal.AlternateScreenChangedEvent(true));
+            WriteLines(session, 3);
+            InvokeUpdateScrollInfo(control);
+
+            var scrollInfo = (IScrollInfo)control;
+            scrollInfo.ExtentHeight.Should().Be(session.Buffer.Rows, "bei Alt-Screen entspricht die Extent dem sichtbaren Grid");
+            scrollInfo.VerticalOffset.Should().Be(0);
+
+            scrollInfo.SetVerticalOffset(5);
+            scrollInfo.VerticalOffset.Should().Be(0, "SetVerticalOffset ist bei aktivem Alt-Screen ein No-Op");
+            scrollInfo.LineUp();
+            scrollInfo.LineDown();
+            scrollInfo.PageUp();
+            scrollInfo.PageDown();
+            scrollInfo.VerticalOffset.Should().Be(0, "Scroll-Navigation ist bei aktivem Alt-Screen ein No-Op");
+        });
+    }
+
+    private static string BufferText(PseudoConsoleSession session)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (var row = 0; row < session.Buffer.Rows; row++)
+            foreach (var cell in session.Buffer.GetRow(row))
+                sb.Append(cell.Character);
+        return sb.ToString();
+    }
+
     /// <summary>TerminalControl stellt dem umgebenden ScrollViewer zeilenbasierte Scrollinformationen bereit.</summary>
     [Fact]
     public void ScrollInfo_LangerVerlauf_MeldetExtentGroesserAlsViewport()
@@ -347,6 +427,182 @@ public sealed partial class TerminalControlTests
         });
     }
 
+    /// <summary>Bei einer Session mit fixierter Geometrie (<see cref="ITerminalSession.SupportsResize"/>
+    /// == <c>false</c>, z. B. <see cref="TerminalReplaySession"/>) darf das Control den Buffer beim
+    /// Binden nicht auf die Control-Größe verkleinern — die Aufzeichnungs-Geometrie bleibt erhalten.</summary>
+    [Fact]
+    public void OnSessionChanged_FixierteGeometrie_BehaeltAufzeichnungsGroesse()
+    {
+        RunOnSta(() =>
+        {
+            var control = CreateArrangedControl(); // 160×48 px — deutlich kleiner als 220×50 Zellen
+            using var session = CreateReplaySession(220, 50, "X");
+
+            control.Session = session;
+
+            session.Buffer.Cols.Should().Be(220,
+                "ein fixierter Buffer darf beim Binden nicht auf die Control-Breite verkleinert werden");
+            session.Buffer.Rows.Should().Be(50,
+                "ein fixierter Buffer darf beim Binden nicht auf die Control-Höhe verkleinert werden");
+        });
+    }
+
+    /// <summary>Bei fixierter Geometrie darf auch eine Größenänderung des Controls den Buffer nicht
+    /// verkleinern; der horizontale Extent bildet weiterhin die volle Aufzeichnungsbreite ab.</summary>
+    [Fact]
+    public void OnRenderSizeChanged_FixierteGeometrie_ResizedNicht()
+    {
+        RunOnSta(() =>
+        {
+            var control = CreateArrangedControl();
+            using var session = CreateReplaySession(220, 50, "X");
+            control.Session = session;
+            control.CanHorizontallyScroll = true;
+
+            var scrollInfo = (IScrollInfo)control;
+            var cellWidth = GetCellWidth(control);
+            scrollInfo.ExtentWidth.Should().BeApproximately(220 * cellWidth, 0.01);
+
+            // Re-Arrange auf eine andere Control-Größe — die Buffer-Geometrie bleibt fixiert.
+            var neueGroesse = new Size(320, 96);
+            control.Measure(neueGroesse);
+            control.Arrange(new Rect(neueGroesse));
+
+            session.Buffer.Cols.Should().Be(220);
+            session.Buffer.Rows.Should().Be(50);
+            scrollInfo.ExtentWidth.Should().BeApproximately(220 * cellWidth, 0.01,
+                "der Extent bildet weiterhin die volle Aufzeichnungsbreite ab");
+        });
+    }
+
+    /// <summary>Bei fixierter Geometrie bildet die horizontale <see cref="IScrollInfo"/>-Achse
+    /// (Pixel-Einheiten) den Buffer-Extent ab: <see cref="IScrollInfo.SetHorizontalOffset"/> klemmt
+    /// auf den ScrollableWidth-Bereich und die Line-/Page-/MouseWheel-Methoden verschieben den
+    /// Offset erwartbar — ohne Einfluss auf die vertikale Achse.</summary>
+    [Fact]
+    public void ScrollInfo_FixierteGeometrie_HorizontalesScrollen()
+    {
+        RunOnSta(() =>
+        {
+            var control = CreateArrangedControl();
+            using var session = CreateReplaySession(220, 50, "X");
+            control.Session = session;
+            control.CanHorizontallyScroll = true;
+            InvokeUpdateScrollInfo(control);
+
+            var scrollInfo = (IScrollInfo)control;
+            var cellWidth = GetCellWidth(control);
+            var extentWidth = 220 * cellWidth;
+
+            scrollInfo.ExtentWidth.Should().BeApproximately(extentWidth, 0.01);
+            scrollInfo.ExtentWidth.Should().BeGreaterThan(scrollInfo.ViewportWidth,
+                "ein 220-spaltiger Buffer ist breiter als der 160-px-Viewport");
+            var maxOffset = scrollInfo.ExtentWidth - scrollInfo.ViewportWidth;
+            var verticalOffsetVorher = scrollInfo.VerticalOffset;
+
+            scrollInfo.SetHorizontalOffset(-10);
+            scrollInfo.HorizontalOffset.Should().Be(0);
+
+            scrollInfo.LineRight();
+            scrollInfo.HorizontalOffset.Should().BeApproximately(cellWidth, 0.01,
+                "LineRight verschiebt um eine Zelle");
+
+            scrollInfo.PageRight();
+            scrollInfo.HorizontalOffset.Should().BeApproximately(
+                scrollInfo.ViewportWidth, 0.01, "PageRight verschiebt um Viewport minus eine Zelle");
+
+            scrollInfo.MouseWheelRight();
+            scrollInfo.HorizontalOffset.Should().BeApproximately(
+                scrollInfo.ViewportWidth + 3 * cellWidth, 0.01,
+                "MouseWheelRight verschiebt um drei Zellen");
+
+            scrollInfo.SetHorizontalOffset(99999);
+            scrollInfo.HorizontalOffset.Should().BeApproximately(maxOffset, 0.01,
+                "der Offset wird auf den ScrollableWidth-Bereich geklemmt");
+
+            scrollInfo.LineLeft();
+            scrollInfo.HorizontalOffset.Should().BeApproximately(maxOffset - cellWidth, 0.01);
+
+            scrollInfo.VerticalOffset.Should().Be(verticalOffsetVorher,
+                "horizontales Scrollen darf die vertikale Achse nicht beeinflussen");
+
+            // Ohne CanHorizontallyScroll des Hosts fällt der Extent auf den Viewport zurück —
+            // und ein gesetzter Offset wird sofort (nicht erst beim nächsten UpdateScrollInfo)
+            // auf den leeren Scrollbereich zurückgeklemmt.
+            control.CanHorizontallyScroll = false;
+            scrollInfo.ExtentWidth.Should().Be(scrollInfo.ViewportWidth);
+            scrollInfo.HorizontalOffset.Should().Be(0,
+                "bei deaktiviertem horizontalem Scrollen existiert kein Scrollbereich — der Offset muss sofort auf 0 fallen");
+
+            // Zurückgeschaltet meldet der Extent wieder die volle Aufzeichnungsbreite.
+            control.CanHorizontallyScroll = true;
+            scrollInfo.ExtentWidth.Should().BeApproximately(extentWidth, 0.01);
+        });
+    }
+
+    /// <summary>Ist der Viewport schmaler als eine Zelle (<see cref="IScrollInfo.ViewportWidth"/>
+    /// &lt; Zellbreite, z. B. vor dem ersten Arrange mit <c>ActualWidth == 0</c>), muss die
+    /// Seiten-Scrollweite auf eine Zelle geklemmt bleiben — ohne die Klemmung würde die Distanz
+    /// negativ und PageLeft/PageRight scrollten in die falsche Richtung.</summary>
+    [Fact]
+    public void ScrollInfo_PageScrollen_SchmalerViewport_ScrollrichtungBleibtErhalten()
+    {
+        RunOnSta(() =>
+        {
+            var control = new TerminalControl();
+            // Viewport enger als eine Zelle: die ungeschützte Formel ViewportWidth - _cellWidth
+            // würde hier ein negatives Seiten-Delta erzeugen (invertierte Scrollrichtung).
+            var size = new Size(1, 48);
+            control.Measure(size);
+            control.Arrange(new Rect(size));
+
+            using var session = CreateReplaySession(220, 50, "X");
+            control.Session = session;
+            control.CanHorizontallyScroll = true;
+            InvokeUpdateScrollInfo(control);
+
+            var scrollInfo = (IScrollInfo)control;
+            var cellWidth = GetCellWidth(control);
+            scrollInfo.ViewportWidth.Should().BeLessThan(cellWidth,
+                "der Test arrangiert absichtlich einen Viewport schmaler als eine Zelle");
+
+            scrollInfo.SetHorizontalOffset(100);
+
+            scrollInfo.PageRight();
+            scrollInfo.HorizontalOffset.Should().BeGreaterThan(100,
+                "PageRight muss auch bei winzigem Viewport nach rechts scrollen (Minimum: eine Zelle)");
+
+            scrollInfo.PageLeft();
+            scrollInfo.HorizontalOffset.Should().Be(100,
+                "PageLeft muss den vorherigen PageRight exakt zurücknehmen (symmetrische Seitenweite)");
+        });
+    }
+
+    /// <summary>Regressions-Nachweis für Live-Sessions (<see cref="ITerminalSession.SupportsResize"/>
+    /// == <c>true</c>): die Buffer-Breite folgt per Floor-Arithmetik der Control-Breite — der
+    /// Extent kann den Viewport dadurch nie übersteigen und es entsteht kein horizontaler
+    /// Scrollbereich.</summary>
+    [Fact]
+    public void ScrollInfo_LiveSession_KeinHorizontalerScrollbereich()
+    {
+        RunOnSta(() =>
+        {
+            var control = CreateArrangedControl();
+            using var session = CreateSession(new ImmediateEofStream());
+            control.Session = session;
+            control.CanHorizontallyScroll = true;
+            InvokeUpdateScrollInfo(control);
+
+            var scrollInfo = (IScrollInfo)control;
+            scrollInfo.ExtentWidth.Should().BeLessThanOrEqualTo(scrollInfo.ViewportWidth,
+                "bei Live-Sessions ist die Buffer-Breite konstruktionsbedingt <= Viewport");
+
+            scrollInfo.SetHorizontalOffset(100);
+            scrollInfo.HorizontalOffset.Should().Be(0,
+                "ohne scrollbaren Extent bleibt der horizontale Offset auf 0 geklemmt");
+        });
+    }
+
     /// <summary>Schiebt <paramref name="content"/> in <paramref name="stream"/>, wartet auf die vollständige
     /// Verarbeitung durch die Leseschleife von <paramref name="session"/> und zählt dabei, wie viele Operationen
     /// währenddessen am aktuellen UI-Dispatcher angestoßen wurden. Ein gebundenes <c>TerminalControl</c> stößt bei
@@ -414,6 +670,37 @@ public sealed partial class TerminalControlTests
     private static PseudoConsoleSession CreateSession(Stream inputStream, Stream outputStream)
     {
         return TestPseudoConsoleSessionFactory.Create(inputStream, outputStream);
+    }
+
+    /// <summary>Erstellt eine <see cref="TerminalReplaySession"/> (fixierte Geometrie,
+    /// <see cref="ITerminalSession.SupportsResize"/> == <c>false</c>) in der angegebenen
+    /// Aufzeichnungs-Geometrie — das Gegenstück zu <see cref="CreateSession(Stream)"/> für
+    /// Live-Sessions.</summary>
+    private static TerminalReplaySession CreateReplaySession(int cols, int rows, params string[] chunkInhalte)
+    {
+        var chunks = chunkInhalte
+            .Select((text, i) => new CliOutputChunkRecord(
+                TimeSpan.FromMilliseconds(i * 10),
+                System.Text.Encoding.UTF8.GetBytes(text)))
+            .ToArray();
+        return new TerminalReplaySession(
+            new CliOutputAufzeichnung
+            {
+                AufgabeId = Guid.NewGuid(),
+                PluginName = "TestPlugin",
+                StartUtc = DateTimeOffset.UtcNow,
+                Cols = cols,
+                Rows = rows,
+                IstVollstaendig = true,
+                Chunks = chunks,
+            },
+            new FakeTimeProvider());
+    }
+
+    private static double GetCellWidth(TerminalControl control)
+    {
+        var field = typeof(TerminalControl).GetField("_cellWidth", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        return (double)field.GetValue(control)!;
     }
 
     /// <summary>Stream, der beim Lesevorgang sofort 0 Bytes liefert (simuliertes Stream-Ende), ohne die Dispatcher-Pumpe zu benötigen.</summary>

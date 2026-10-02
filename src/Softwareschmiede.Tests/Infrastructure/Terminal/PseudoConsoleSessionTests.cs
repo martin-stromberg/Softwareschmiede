@@ -209,7 +209,8 @@ public sealed class PseudoConsoleSessionTests
     [Fact]
     public void ReadLoopAsync_BufferChangedFiredAfterBufferUpdated()
     {
-        using var session = CreateSession(new FixedContentStream("HELLO"));
+        var gate = new ManualResetEventSlim(false);
+        using var session = CreateSession(new GatedStream("HELLO", gate));
         char? characterAtEventTime = null;
         var bufferChanged = new ManualResetEventSlim(false);
 
@@ -218,6 +219,7 @@ public sealed class PseudoConsoleSessionTests
             characterAtEventTime = session.Buffer.GetRow(0)[0].Character;
             bufferChanged.Set();
         };
+        gate.Set();
 
         bufferChanged.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
             "BufferChanged muss nach Verarbeitung der gelesenen Ausgabe gefeuert werden");
@@ -245,6 +247,170 @@ public sealed class PseudoConsoleSessionTests
         await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
         sink.IsCompleted.Should().BeTrue("die Senke muss beim Ende der Leseschleife abgeschlossen werden");
         session.Buffer.GetRow(0)[0].Character.Should().Be('H');
+    }
+
+    /// <summary><see cref="ITerminalSession.OutputChunk"/> feuert mit den rohen, ungeparsten Bytes des
+    /// gelesenen Chunks — die Grundlage für Raw-Replay bei UI-Reattachment.</summary>
+    [Fact]
+    public async Task ReadLoopAsync_OutputChunk_EventEnthaeltRohbytes()
+    {
+        var received = new System.Text.StringBuilder();
+        var chunkFired = new ManualResetEventSlim(false);
+        var gate = new ManualResetEventSlim(false);
+        using var session = CreateSession(new GatedStream("RAW\x1b[31mDATA", gate));
+
+        session.OutputChunk += (_, e) =>
+        {
+            received.Append(System.Text.Encoding.UTF8.GetString(e.Data.Span));
+            chunkFired.Set();
+        };
+        gate.Set();
+
+        chunkFired.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        received.ToString().Should().Contain("RAW");
+        received.ToString().Should().Contain("\x1b[31m", "OutputChunk liefert die Rohbytes inkl. Escape-Sequenzen");
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    /// <summary>Regression: Ruft ein <see cref="ITerminalOutputSink"/>-Aufruf (vor dem Parse/Apply des
+    /// Chunks) synchron <see cref="PseudoConsoleSession.RebuildBufferFromReplay"/> auf, darf der laufende
+    /// Chunk nicht doppelt angewendet werden — Replay-Append und Parse/Apply stehen unter demselben
+    /// <c>_renderLock</c>, damit der Rebuild den Chunk entweder ganz oder gar nicht sieht.</summary>
+    [Fact]
+    public async Task ReadLoopAsync_RebuildAusOutputSink_WendetChunkNichtDoppeltAn()
+    {
+        var sink = new RebuildCallingSink();
+        using var session = TestPseudoConsoleSessionFactory.Create(
+            new MemoryStream(),
+            new FixedContentStream("AB"),
+            outputSink: sink);
+        sink.Session = session;
+
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+
+        var zeile = new string(session.Buffer.GetRow(0).Select(c => c.Character).ToArray()).TrimEnd();
+        zeile.Should().Be("AB",
+            "der Chunk darf nur einmal angewendet werden — ein Rebuild vor dem Live-Apply darf ihn nicht doppelt einspielen");
+    }
+
+    /// <summary>Senke, die im <see cref="ITerminalOutputSink.OnOutputChunk"/>-Aufruf synchron einen
+    /// Buffer-Rebuild auslöst — reproduziert den Race aus <c>TerminalControl.OnSessionChanged</c>
+    /// (Rebuild gegen noch nicht angewendeten Chunk).</summary>
+    private sealed class RebuildCallingSink : ITerminalOutputSink
+    {
+        private int _rebuildAufrufe;
+
+        public PseudoConsoleSession? Session { get; set; }
+
+        public void OnOutputChunk(ReadOnlySpan<byte> bytes)
+        {
+            if (Interlocked.Increment(ref _rebuildAufrufe) == 1)
+                Session?.RebuildBufferFromReplay();
+        }
+
+        public void Complete()
+        {
+        }
+
+        public Task CompleteAsync(TimeSpan timeout, CancellationToken ct = default)
+            => Task.CompletedTask;
+    }
+
+    /// <summary>Der Buffer kann jederzeit aus den aufgezeichneten Replay-Rohdaten komplett neu aufgebaut
+    /// werden — deterministisch derselbe Endzustand wie zur Laufzeit.</summary>
+    [Fact]
+    public async Task RebuildBufferFromReplay_StelltBufferzustandWiederHer()
+    {
+        using var session = CreateSession(new FixedContentStream("A\r\nB"));
+        var bufferChanged = new ManualResetEventSlim(false);
+        session.BufferChanged += (_, _) => bufferChanged.Set();
+        bufferChanged.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+
+        session.Buffer.GetRow(0)[0].Character.Should().Be('A');
+        session.Buffer.GetRow(1)[0].Character.Should().Be('B');
+
+        session.RebuildBufferFromReplay();
+
+        session.Buffer.GetRow(0)[0].Character.Should().Be('A', "der Replay-Aufbau muss denselben Zustand ergeben");
+        session.Buffer.GetRow(1)[0].Character.Should().Be('B');
+    }
+
+    /// <summary>Ein identischer Resize-Aufruf wird dedupliziert und kehrt sofort zurück; ein zweiter
+    /// identischer Aufruf löst keinen weiteren ConPTY-Resize aus.</summary>
+    [Fact]
+    public void Resize_IdentischeDimensionen_WirdDedupliziert()
+    {
+        using var session = CreateSession(new MemoryStream());
+
+        session.Resize(100, 30);
+        session.Resize(100, 30); // darf nicht werfen und muss dedupliziert sofort zurückkehren
+    }
+
+    /// <summary>Beim normalen Prozessende (Stream-EOF) wird <see cref="ITerminalSession.Exited"/> mit dem
+    /// Exit-Code gefeuert — für <c>Process.GetCurrentProcess()</c> (läuft weiter) kein Event.</summary>
+    [Fact]
+    public async Task ReadLoopAsync_EofOhneProzessende_KeinExitedEvent()
+    {
+        var exited = false;
+        using var session = CreateSession(new FixedContentStream("X"));
+        session.Exited += (_, _) => exited = true;
+
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.Delay(200);
+
+        exited.Should().BeFalse("der Testprozess läuft noch — Exited darf bei reinem Stream-EOF nicht feuern");
+    }
+
+    /// <summary><see cref="ITerminalSession.IsPseudoTerminal"/> spiegelt den verwendeten Backend-Pfad.</summary>
+    [Fact]
+    public void IsPseudoTerminal_SpiegeltBackend()
+    {
+        using var pipeSession = TestPseudoConsoleSessionFactory.Create(new MemoryStream(), new MemoryStream());
+        pipeSession.IsPseudoTerminal.Should().BeFalse();
+    }
+
+    /// <summary>Live-Sessions melden über <see cref="ITerminalSession.SupportsResize"/> <c>true</c> —
+    /// der Gegenpol zum fixierten <c>false</c> der <c>TerminalReplaySession</c>, damit ein gebundenes
+    /// <c>TerminalControl</c> weiterhin Buffer- und PTY-Resize ausführt.</summary>
+    [Fact]
+    public void SupportsResize_LiveTrue()
+    {
+        using var session = CreateSession(new MemoryStream());
+        session.SupportsResize.Should().BeTrue();
+    }
+
+    /// <summary>Ein Leseschleifen-Fehler muss über <see cref="ITerminalSession.Failure"/> sichtbar bleiben —
+    /// auch dann, wenn zum Fehlerzeitpunkt noch kein <see cref="ITerminalSession.Failed"/>-Handler registriert
+    /// war. Das ist die Grundlage des Fehler-Rechecks in
+    /// <c>KiAusfuehrungsService.StartTerminalSessionAsync</c> (Failed vor der Event-Verdrahtung).</summary>
+    [Fact]
+    public async Task ReadLoopAsync_Lesefehler_SetztFailureZustand()
+    {
+        using var session = CreateSession(new ThrowingStream());
+
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+
+        session.Failure.Should().NotBeNull("ein Leseschleifen-Fehler muss über Failure dauerhaft sichtbar bleiben");
+        session.Failure!.Phase.Should().Be("ReadLoop");
+        session.Failure.Error.Should().BeOfType<IOException>();
+    }
+
+    /// <summary>Ein Schreibfehler in <see cref="PseudoConsoleSession.WriteInputAsync"/> muss
+    /// <see cref="ITerminalSession.Failure"/> setzen und <see cref="ITerminalSession.Failed"/> mit demselben
+    /// Argument-Objekt auslösen (Konsistenz zwischen beobachtbarem Zustand und Event).</summary>
+    [Fact]
+    public async Task WriteInputAsync_Schreibfehler_SetztFailureUndFeiertFailed()
+    {
+        using var session = TestPseudoConsoleSessionFactory.Create(new ThrowingWriteStream(), new MemoryStream());
+        TerminalSessionFailedEventArgs? failedArgs = null;
+        session.Failed += (_, e) => failedArgs = e;
+
+        var act = () => session.WriteInputAsync(new byte[] { 0x41 });
+        await act.Should().ThrowAsync<IOException>();
+
+        failedArgs.Should().NotBeNull("ein Schreibfehler muss das Failed-Event auslösen");
+        failedArgs!.Phase.Should().Be("Write");
+        session.Failure.Should().BeSameAs(failedArgs, "Failure muss exakt das gemeldete Fehler-Ereignis tragen");
     }
 
     private static Task GetReadLoopTask(PseudoConsoleSession session)
@@ -277,6 +443,26 @@ public sealed class PseudoConsoleSessionTests
             Complete();
             return Task.CompletedTask;
         }
+    }
+
+    /// <summary>Stream, der beim Schreibvorgang eine Exception wirft (z. B. simulierter Pipe-Fehler auf
+    /// dem Input-Pfad).</summary>
+    private sealed class ThrowingWriteStream : Stream
+    {
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => 0;
+        public override long Position { get; set; }
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+            => throw new IOException("Simulierter Schreibfehler des Terminal-Input-Streams");
+
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new IOException("Simulierter Schreibfehler des Terminal-Input-Streams");
     }
 
     /// <summary>Stream, der beim Lesevorgang eine Exception wirft (z. B. simulierter Pipe-Fehler).</summary>
@@ -423,6 +609,44 @@ public sealed class PseudoConsoleSessionTests
             _served = true;
             _content.CopyTo(buffer);
             return new ValueTask<int>(_content.Length);
+        }
+
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    /// <summary>Stream, dessen Lesevorgang erst zurückkehrt, nachdem ein Gate gesetzt wurde — damit Tests
+    /// Event-Handler registrieren können, bevor die Leseschleife Inhalte liefert.</summary>
+    private sealed class GatedStream : Stream
+    {
+        private readonly byte[] _content;
+        private readonly ManualResetEventSlim _gate;
+        private bool _served;
+
+        public GatedStream(string content, ManualResetEventSlim gate)
+        {
+            _content = System.Text.Encoding.UTF8.GetBytes(content);
+            _gate = gate;
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => 0;
+        public override long Position { get; set; }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await Task.Run(() => _gate.Wait(cancellationToken), cancellationToken).ConfigureAwait(false);
+            if (_served)
+                return 0;
+
+            _served = true;
+            _content.CopyTo(buffer);
+            return _content.Length;
         }
 
         public override void Flush() { }

@@ -1,11 +1,14 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Infrastructure.Terminal;
 
 /// <summary>
-/// Startet den CLI-Kindprozess ohne echtes ConPTY über gewöhnliche STDIN/STDOUT-Umleitung.
-/// Wird im E2E-Testmodus anstelle von <see cref="Win32PseudoConsoleProcessLauncher"/> verwendet, da
+/// Startet den CLI-Kindprozess ohne echtes ConPTY über gewöhnliche STDIN/STDOUT-Umleitung direkt aus
+/// einer normalisierten <see cref="TerminalSessionStartSpec"/>. Dient als explizit diagnostizierter
+/// Pipe-Fallback und im E2E-Testmodus anstelle von <see cref="Win32PseudoConsoleProcessLauncher"/>, da
 /// ein über die Windows-Pseudo-Console-API angehängter Kindprozess unter <c>dotnet test</c>/
 /// <c>vstest.console.exe</c> unmittelbar nach dem Start beendet wird (siehe
 /// docs/features/e2e-korrektur/requirement.md).
@@ -14,25 +17,32 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
 {
     private readonly ILogger<SimulatedPseudoConsoleProcessLauncher> _logger;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly IOptions<TerminalSessionOptions> _options;
 
     /// <summary>Erstellt eine neue Instanz von <see cref="SimulatedPseudoConsoleProcessLauncher"/>.</summary>
     /// <param name="logger">Logger für Diagnosemeldungen.</param>
     /// <param name="loggerFactory">Factory zum Erzeugen des <see cref="PseudoConsoleSession"/>-Loggers.</param>
-    public SimulatedPseudoConsoleProcessLauncher(ILogger<SimulatedPseudoConsoleProcessLauncher> logger, ILoggerFactory loggerFactory)
+    /// <param name="options">Terminal-Laufzeitparameter (Replay-Budget, initiale Buffer-Größe).</param>
+    public SimulatedPseudoConsoleProcessLauncher(ILogger<SimulatedPseudoConsoleProcessLauncher> logger, ILoggerFactory loggerFactory, IOptions<TerminalSessionOptions> options)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
+        _options = options;
     }
 
     /// <inheritdoc/>
-    public (Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand, ITerminalOutputSink? outputSink = null)
+    public bool IsPseudoTerminal => false;
+
+    /// <inheritdoc/>
+    public TerminalSessionStartResult Start(Guid aufgabeId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
     {
-        var workingDir = !string.IsNullOrEmpty(effectiveWorkingDirectory) && Directory.Exists(effectiveWorkingDirectory)
-            ? effectiveWorkingDirectory
+        var workingDir = !string.IsNullOrEmpty(spec.WorkingDirectory) && Directory.Exists(spec.WorkingDirectory)
+            ? spec.WorkingDirectory
             : Path.GetTempPath();
         var psi = new ProcessStartInfo
         {
-            FileName = "cmd.exe",
+            FileName = spec.FileName,
+            Arguments = spec.Arguments,
             WorkingDirectory = workingDir,
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -40,23 +50,40 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        psi.EnvironmentVariables["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        foreach (var entry in spec.EnvironmentVariables)
+            psi.EnvironmentVariables[entry.Key] = entry.Value;
 
-        _logger.LogInformation("CLI-Prozess (simuliert, cmd.exe → {Command}) für Aufgabe {AufgabeId} starten.", pluginCommand, aufgabeId);
+        _logger.LogInformation("CLI-Prozess (Pipe-Backend, {FileName} {Arguments}) für Aufgabe {AufgabeId} starten.", spec.FileName, spec.Arguments, aufgabeId);
 
         var process = Process.Start(psi)
-            ?? throw new InvalidOperationException("Simulierter CLI-Prozess konnte nicht gestartet werden.");
+            ?? throw new InvalidOperationException("CLI-Prozess auf dem Pipe-Backend konnte nicht gestartet werden.");
         process.BeginErrorReadLine();
 
-        var session = new PseudoConsoleSession(
-            NullPseudoConsoleHandle.Instance,
-            process,
-            new CrSubmittingInputStream(process.StandardInput.BaseStream),
-            process.StandardOutput.BaseStream,
-            _loggerFactory.CreateLogger<PseudoConsoleSession>(),
-            outputSink);
+        PseudoConsoleSession session;
+        try
+        {
+            session = new PseudoConsoleSession(
+                NullPseudoConsoleHandle.Instance,
+                process,
+                new CrSubmittingInputStream(process.StandardInput.BaseStream),
+                process.StandardOutput.BaseStream,
+                new PseudoConsoleSessionContext
+                {
+                    Logger = _loggerFactory.CreateLogger<PseudoConsoleSession>(),
+                    OutputSink = outputSink,
+                    Options = _options.Value,
+                });
+        }
+        catch
+        {
+            // Der Kindprozess läuft bereits — ohne Session muss er aufgeräumt werden, sonst läuft
+            // ein verwaister Prozess ohne zugehörige Sitzung weiter (analog Win32PseudoConsoleProcessLauncher).
+            try { process.Kill(entireProcessTree: true); } catch { /* Best Effort. */ }
+            try { process.Dispose(); } catch { /* Best Effort. */ }
+            throw;
+        }
 
-        return (process, session, IntPtr.Zero);
+        return new TerminalSessionStartResult(process, session, IsPseudoTerminal: false);
     }
 
     /// <summary>
@@ -65,12 +92,14 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
     /// nacktes CR, weil ein echtes ConPTY damit einen Tastatur-Enter emuliert. Auf einer umgeleiteten
     /// STDIN-Pipe terminiert <c>cmd.exe</c> eine Zeile dagegen nur per <c>\r\n</c> — ohne Übersetzung
     /// bliebe der Prompt unzustellt im Eingabepuffer liegen. Bereits vorhandene <c>\r\n</c>-Sequenzen
-    /// (z. B. der Plugin-Startbefehl aus <c>KiAusfuehrungsService.SendCommandDelayedAsync</c>) werden
-    /// unverändert durchgereicht.
+    /// werden unverändert durchgereicht.
     /// </summary>
     private sealed class CrSubmittingInputStream : Stream
     {
+        private static readonly byte[] CrLf = [(byte)'\r', (byte)'\n'];
+
         private readonly Stream _inner;
+        private bool _pendingCr;
 
         public CrSubmittingInputStream(Stream inner)
         {
@@ -88,9 +117,25 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
             set => throw new NotSupportedException();
         }
 
-        public override void Flush() => _inner.Flush();
+        public override void Flush()
+        {
+            FlushPendingCarriageReturn();
+            _inner.Flush();
+        }
 
-        public override Task FlushAsync(CancellationToken cancellationToken) => _inner.FlushAsync(cancellationToken);
+        public override async Task FlushAsync(CancellationToken cancellationToken)
+        {
+            // Ein zurückgehaltenes '\r' muss spätestens beim Flush als abgeschlossenes '\r\n'
+            // ausgegeben werden — der Aufrufer (PseudoConsoleSession.WriteInputAsync) flusht nach
+            // jedem Schreibvorgang, sonst bliebe ein abschließender Submit ('\r') unzustellt.
+            if (_pendingCr)
+            {
+                _pendingCr = false;
+                await _inner.WriteAsync(CrLf, cancellationToken).ConfigureAwait(false);
+            }
+
+            await _inner.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
 
         public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 
@@ -114,34 +159,72 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
         {
             if (disposing)
             {
+                try
+                {
+                    FlushPendingCarriageReturn();
+                }
+                catch
+                {
+                    // Best Effort beim Schließen — ein zurückgehaltenes '\r' soll nicht still verloren gehen.
+                }
+
                 _inner.Dispose();
             }
 
             base.Dispose(disposing);
         }
 
-        private static byte[] Translate(ReadOnlySpan<byte> input)
+        private void FlushPendingCarriageReturn()
         {
-            var extra = 0;
-            for (var i = 0; i < input.Length; i++)
+            if (!_pendingCr)
             {
-                if (input[i] == '\r' && (i + 1 >= input.Length || input[i + 1] != '\n'))
+                return;
+            }
+
+            _pendingCr = false;
+            _inner.Write(CrLf, 0, CrLf.Length);
+        }
+
+        /// <summary>Übersetzt alleinstehende <c>\r</c> in <c>\r\n</c> und lässt bestehende <c>\r\n</c>-Paare
+        /// unverändert. Ein <c>\r</c> als letztes Byte des Chunks wird zurückgehalten (<see cref="_pendingCr"/>),
+        /// weil <c>WriteInputAsync</c> in 4-KB-Stücken schreibt und ein <c>\r\n</c>-Paar genau an der
+        /// Chunk-Grenze getrennt werden kann — erst der nächste Schreibaufruf (oder Flush) entscheidet,
+        /// ob ein <c>\n</c> folgt.</summary>
+        private byte[] Translate(ReadOnlySpan<byte> input)
+        {
+            var pendingCr = _pendingCr;
+            var carryCr = input.Length > 0 && input[^1] == '\r';
+            var effective = carryCr ? input[..^1] : input;
+            _pendingCr = carryCr;
+
+            // Ein zurückgehaltenes '\r' wird jetzt aufgelöst: Folgt ein '\n', bildet es ein normales
+            // '\r\n'-Paar; sonst wird wie bei einem alleinstehenden CR ein '\n' nachgeschoben.
+            var pendingNeedsLf = pendingCr && (effective.Length == 0 || effective[0] != '\n');
+
+            var extra = 0;
+            for (var i = 0; i < effective.Length; i++)
+            {
+                if (effective[i] == '\r' && (i + 1 >= effective.Length || effective[i + 1] != '\n'))
                 {
                     extra++;
                 }
             }
 
-            if (extra == 0)
+            var output = new byte[effective.Length + (pendingCr ? 1 : 0) + (pendingNeedsLf ? 1 : 0) + extra];
+            var pos = 0;
+            if (pendingCr)
             {
-                return input.ToArray();
+                output[pos++] = (byte)'\r';
+                if (pendingNeedsLf)
+                {
+                    output[pos++] = (byte)'\n';
+                }
             }
 
-            var output = new byte[input.Length + extra];
-            var pos = 0;
-            for (var i = 0; i < input.Length; i++)
+            for (var i = 0; i < effective.Length; i++)
             {
-                output[pos++] = input[i];
-                if (input[i] == '\r' && (i + 1 >= input.Length || input[i + 1] != '\n'))
+                output[pos++] = effective[i];
+                if (effective[i] == '\r' && (i + 1 >= effective.Length || effective[i + 1] != '\n'))
                 {
                     output[pos++] = (byte)'\n';
                 }

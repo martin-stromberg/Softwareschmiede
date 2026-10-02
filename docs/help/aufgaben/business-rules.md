@@ -247,7 +247,7 @@
 
 ## Session-Limit-Erkennung und automatische Pause
 
-**Beschreibung:** Meldet ein KI-CLI ein Session-Limit über den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]`, wird der Reset-Zeitpunkt pro `KiPluginPrefix` persistiert und alle aktiv laufenden regulären Aufgaben desselben Plugins automatisch pausiert. Der Erkennungspfad läuft über `ProtokollService.AddCliOutputAsync` bzw. `CliOutputProtokollWriter` in der automatischen ConPTY-Ausgabeprotokollierung.
+**Beschreibung:** Meldet ein KI-CLI ein Session-Limit über den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]`, wird der Reset-Zeitpunkt pro `KiPluginPrefix` persistiert und alle aktiv laufenden regulären Aufgaben desselben Plugins automatisch pausiert. Der Erkennungspfad läuft über `ProtokollService.AddCliOutputAsync` bzw. `CliOutputProtokollWriter` in der automatischen Terminal-Ausgabeprotokollierung.
 
 **Bedingungen:**
 - Eine CLI-Ausgabezeile enthält den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel.
@@ -269,14 +269,14 @@
 
 ## Automatische CLI-Ausgabeprotokollierung
 
-**Beschreibung:** CLI-Ausgaben einer ConPTY-Sitzung werden automatisch dem Protokoll der zugehörigen Aufgabe zugeordnet.
+**Beschreibung:** CLI-Ausgaben einer Terminal-Sitzung (ConPTY oder diagnostizierter Pipe-Fallback) werden automatisch dem Protokoll der zugehörigen Aufgabe zugeordnet.
 
 **Bedingungen:**
-- Der CLI-Prozess wird über `KiAusfuehrungsService.StartWithPseudoConsoleAsync` gestartet.
-- Die `PseudoConsoleSession` liefert Output-Bytes aus ihrer internen Leseschleife.
+- Der CLI-Prozess wird über `KiAusfuehrungsService.StartTerminalSessionAsync` gestartet.
+- Die `ITerminalSession` (Implementierung: `PseudoConsoleSession`) liefert Output-Bytes aus ihrer internen Leseschleife.
 
 **Verhalten:**
-- Pro ConPTY-Start wird ein `CliOutputProtokollWriter` für genau eine `aufgabeId` erzeugt.
+- Pro Terminal-Session-Start wird ein `CliOutputProtokollWriter` für genau eine `aufgabeId` erzeugt.
 - Die Ausgabe wird zeilenweise als `ProtokollTyp.CliOutput` gespeichert.
 - Die Reihenfolge innerhalb einer Session bleibt durch einen sequenziellen Hintergrund-Worker erhalten.
 - Die Protokollierung ist UI-unabhängig und läuft weiter, wenn kein `TerminalControl` gebunden ist.
@@ -284,7 +284,7 @@
 - Bei hoher Ausgaberate begrenzt eine bounded Queue den Speicherverbrauch und erzeugt Backpressure.
 - Beim Abschluss wartet die Senke auf die aktive Queue-Phase eines bereits dekodierten Chunks, bevor der Channel geschlossen wird.
 
-**Umsetzung:** `ITerminalOutputSink`, `CliOutputLineAccumulator`, `CliOutputProtokollWriter`, `PseudoConsoleSession.ReadLoopAsync`, `KiAusfuehrungsService.StartWithPseudoConsoleAsync`, `ProtokollService.AddCliOutputAsync`.
+**Umsetzung:** `ITerminalOutputSink`, `CliOutputLineAccumulator`, `CliOutputProtokollWriter`, `PseudoConsoleSession.ReadLoopAsync`, `KiAusfuehrungsService.StartTerminalSessionAsync`, `ProtokollService.AddCliOutputAsync`.
 
 ---
 
@@ -303,6 +303,26 @@
 - Andere Protokolltypen wie `Prompt`, `KiAntwort` oder `SystemMeldung` werden nicht exportiert.
 
 **Umsetzung:** `TaskDetailViewModel.ExportCliRawAsync` und `CliRawExportService.ExportCliRawAsync` — das ViewModel steuert Dialog und Validierung, der Service schreibt die gefilterten `CliOutput`-Zeilen in UTF-8 ohne BOM.
+
+---
+
+## CLI-Aufzeichnungs-Export (.clireplay)
+
+**Beschreibung:** Der Export-Button **Aufzeichnung exportieren** schreibt den automatisch mitgeschnittenen Rohbyte-Mitschnitt der letzten Terminal-Session der Aufgabe als `.clireplay`-Binärdatei. Er setzt einen vorhandenen Mitschnitt voraus — der Mitschnitt läuft beim Session-Start im `KiAusfuehrungsService` mit, nicht erst beim Export.
+
+**Bedingungen:**
+- Der Export wird aus der Aufgabendetailansicht gestartet (`KannCliReplayExportieren` = Aufgabe geladen).
+- Für die Aufgabe liegt ein Mitschnitt vor (`CliReplayExportService.HatAufzeichnung`): mindestens ein Terminal-Session-Start mit aktivem `AufzeichnungByteBudget`, und die Aufgabe gehört zu den letzten 8 mit Mitschnitt.
+
+**Verhalten:**
+- Wenn keine Aufzeichnung vorliegt: `FehlerMeldung` „Für diese Aufgabe liegt noch keine Aufzeichnung vor — sie wird während einer CLI-Ausführung automatisch mitgeschnitten." — der Speicherdialog wird nicht geöffnet.
+- Wenn der Speichern-Dialog abgebrochen wird: kein Export, keine Fehlermeldung.
+- Wenn der Zielpfad nicht auf `.clireplay` endet: `FehlerMeldung` „Export-Zielpfad muss auf .clireplay enden."
+- Wenn der Schreibvorgang fehlschlägt: der Fehler wird geloggt und als Exportfehler angezeigt.
+- Der Mitschnitt ist flüchtig: Budget-Überschreitung kürzt ihn auf das Präfix (`IstVollstaendig = false` im Datei-Header), nur die letzten 8 Aufgaben behalten einen Mitschnitt, App-Ende verwirft alle.
+- `.raw`- und `.clireplay`-Export bestehen parallel und decken unterschiedliche Zwecke ab (zeilennormalisierte Sicht vs. byte-exaktes, zeitreales Replay).
+
+**Umsetzung:** `TaskDetailViewModel.ExportCliReplayAsync` (Vorab-Prüfung, Dialog, Endungsvalidierung), `CliReplayExportService` (`HatAufzeichnung`/`ExportCliReplayAsync` über `KiAusfuehrungsService.GetCliAufzeichnung` + `CliReplayAufzeichnungStore`), `CliOutputRecorder` (Mitschnitt beim Session-Start).
 
 ---
 

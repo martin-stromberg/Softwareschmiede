@@ -1,0 +1,184 @@
+<Window x:Class="Softwareschmiede.App.Views.KonsolenTestDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Softwareschmiede.App.Controls"
+        Title="Konsolentest"
+        Background="{DynamicResource BackgroundBrush}"
+        Width="1200"
+        Height="720"
+        WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Werkzeugleiste -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="8">
+            <!-- WrapPanel statt StackPanel: die Leiste übersteigt die Standard-Fensterbreite —
+                 ohne Umbruch würden PositionsText und "Schließen" unsichtbar abgeschnitten. -->
+            <WrapPanel VerticalAlignment="Center">
+                <Button Content="Aufzeichnung öffnen…"
+                        AutomationProperties.Name="AufzeichnungOeffnen"
+                        Command="{Binding AufzeichnungOeffnenCommand}"
+                        Padding="10,4" />
+                <TextBlock Text="{Binding DateiPfad}"
+                           AutomationProperties.Name="AufzeichnungPfad"
+                           AutomationProperties.HelpText="{Binding DateiPfad}"
+                           ToolTip="{Binding DateiPfad}"
+                           FontSize="11"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           VerticalAlignment="Center"
+                           MaxWidth="320"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="8,0,16,0" />
+                <Button Content="Abspielen"
+                        AutomationProperties.Name="WiedergabeStarten"
+                        Command="{Binding WiedergabeStartenCommand}"
+                        Padding="10,4" />
+                <Button Content="Neu starten"
+                        AutomationProperties.Name="WiedergabeNeustarten"
+                        Command="{Binding WiedergabeNeustartenCommand}"
+                        ToolTip="Wiedergabe abbrechen und sofort wieder ab Position 0 abspielen"
+                        Padding="10,4"
+                        Margin="8,0,0,0" />
+                <Button Content="Pausieren/Fortsetzen"
+                        AutomationProperties.Name="WiedergabePausieren"
+                        Command="{Binding WiedergabePausierenCommand}"
+                        Padding="10,4"
+                        Margin="8,0,0,0" />
+                <Button Content="Schritt zurück"
+                        AutomationProperties.Name="SchrittZurueck"
+                        Command="{Binding SchrittZurueckCommand}"
+                        ToolTip="Zustand vor dem zuletzt angewendeten Chunk wiederherstellen"
+                        Padding="10,4"
+                        Margin="8,0,0,0" />
+                <Button Content="Schritt vor"
+                        AutomationProperties.Name="SchrittVor"
+                        Command="{Binding SchrittVorCommand}"
+                        ToolTip="Nächsten aufgezeichneten Chunk anwenden"
+                        Padding="10,4"
+                        Margin="8,0,0,0" />
+                <TextBlock Text="Zeitraffer-Schwelle (s):"
+                           FontSize="12"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           VerticalAlignment="Center"
+                           Margin="16,0,4,0" />
+                <TextBox Text="{Binding ZeitrafferSchwelleText, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="ZeitrafferSchwelle"
+                         Width="60"
+                         Padding="4,2" />
+                <TextBlock Text="{Binding StatusText}"
+                           AutomationProperties.Name="WiedergabeStatus"
+                           AutomationProperties.HelpText="{Binding StatusText}"
+                           FontSize="12"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           VerticalAlignment="Center"
+                           Margin="16,0,0,0" />
+                <TextBlock Text="{Binding PositionsText}"
+                           AutomationProperties.Name="WiedergabePosition"
+                           AutomationProperties.HelpText="{Binding PositionsText}"
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0" />
+                <TextBlock Text="{Binding GeometrieText}"
+                           AutomationProperties.Name="AufzeichnungGeometrie"
+                           AutomationProperties.HelpText="{Binding GeometrieText}"
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0" />
+                <Button Content="Schließen"
+                        AutomationProperties.Name="KonsolenTestSchliessen"
+                        Command="{Binding SchliessenCommand}"
+                        Padding="10,4"
+                        Margin="16,0,0,0"
+                        HorizontalAlignment="Right" />
+            </WrapPanel>
+        </Border>
+
+        <!-- Hinweis bei unvollständiger Aufzeichnung -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="8,4"
+                Margin="8,8,8,0"
+                Visibility="{Binding UnvollstaendigHinweis, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock Text="{Binding UnvollstaendigHinweis}"
+                       AutomationProperties.Name="UnvollstaendigHinweis"
+                       AutomationProperties.HelpText="{Binding UnvollstaendigHinweis}"
+                       Foreground="{DynamicResource SecondaryTextBrush}" />
+        </Border>
+
+        <!-- Fehlerbanner -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource ErrorBrush}"
+                CornerRadius="4"
+                Padding="12,8"
+                Margin="8,8,8,0"
+                Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock AutomationProperties.Name="FehlerMeldung"
+                       AutomationProperties.HelpText="{Binding FehlerMeldung}"
+                       Text="{Binding FehlerMeldung}"
+                       Foreground="White" />
+        </Border>
+
+        <!-- Zweigeteilter Bereich: Replay-Terminal + Quell-Chunk-Liste -->
+        <Grid Grid.Row="3" Margin="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="5" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer x:Name="ReplayTerminalScrollViewer"
+                          Grid.Column="0"
+                          AutomationProperties.Name="ReplayTerminalScrollViewer"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Auto"
+                          CanContentScroll="True">
+                <controls:TerminalControl x:Name="ReplayTerminal"
+                                          AutomationProperties.Name="ReplayTerminal"
+                                          Session="{Binding Session}" />
+            </ScrollViewer>
+
+            <GridSplitter Grid.Column="1"
+                          HorizontalAlignment="Stretch"
+                          Background="{DynamicResource BorderBrush}" />
+
+            <ListView x:Name="QuellChunkListe"
+                      Grid.Column="2"
+                      AutomationProperties.Name="QuellChunkListe"
+                      ItemsSource="{Binding QuellEintraege}"
+                      SelectedItem="{Binding AktuellerQuellEintrag, Mode=TwoWay}"
+                      SelectionChanged="OnQuellListeSelectionChanged"
+                      FontFamily="Consolas"
+                      FontSize="11">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="#"
+                                        DisplayMemberBinding="{Binding Index}"
+                                        Width="50" />
+                        <GridViewColumn Header="Offset"
+                                        DisplayMemberBinding="{Binding Offset}"
+                                        Width="110" />
+                        <GridViewColumn Header="Bytes"
+                                        DisplayMemberBinding="{Binding Laenge}"
+                                        Width="60" />
+                        <GridViewColumn Header="Quelltext"
+                                        DisplayMemberBinding="{Binding Quelltext}" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Grid>
+    </Grid>
+</Window>
