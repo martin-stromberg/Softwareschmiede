@@ -204,7 +204,7 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
     {
         var (aufgabe, konfiguration) = await ProjektleiterAgentServiceTestDatenFactory.ErstelleAutonomeAufgabeAsync(_db, _projektId, _testRoot);
         _kiPluginMock
-            .Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(p => p.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("CLI-Start fehlgeschlagen"));
 
         var akt = () => _sut.StarteAgentAsync(konfiguration);

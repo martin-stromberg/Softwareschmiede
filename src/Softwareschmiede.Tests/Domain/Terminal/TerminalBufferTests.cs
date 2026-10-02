@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Linq;
 using FluentAssertions;
 using Softwareschmiede.Domain.Terminal;
 
@@ -412,5 +413,216 @@ public sealed class TerminalBufferTests
         var snapshot = sut.GetSnapshot();
         snapshot.ScrollbackRows.Should().BeEmpty();
         snapshot.TotalRows.Should().Be(snapshot.Rows);
+    }
+    /// <summary>AlternateScreenChangedEvent(true) aktiviert den Alternativ-Bildschirm; GetSnapshot
+    /// liefert nur das Alt-Grid ohne Scrollback.</summary>
+    [Fact]
+    public void Buffer_AlternateScreen_GetSnapshotZeigtNurAltGrid()
+    {
+        var sut = new TerminalBuffer(8, 3);
+        for (var i = 0; i < 8; i++)
+            sut.Apply(new TextWrittenEvent("X\n"));
+
+        sut.Apply(new AlternateScreenChangedEvent(true));
+        sut.Apply(new TextWrittenEvent("ALT"));
+
+        sut.IsAlternateScreenActive.Should().BeTrue();
+        var snapshot = sut.GetSnapshot();
+        snapshot.ScrollbackRows.Should().BeEmpty();
+        snapshot.Grid[0, 0].Character.Should().Be('A');
+        snapshot.TotalRows.Should().Be(3);
+    }
+
+    /// <summary>Nach dem Zurückwechseln (false) ist der Hauptbildschirm inkl. Inhalt wiederhergestellt.</summary>
+    [Fact]
+    public void Buffer_AlternateScreenDeaktiviert_StelltHauptbildschirmWiederHer()
+    {
+        var sut = new TerminalBuffer(8, 3);
+        sut.Apply(new TextWrittenEvent("MAIN"));
+
+        sut.Apply(new AlternateScreenChangedEvent(true));
+        sut.Apply(new TextWrittenEvent("\rALT-SCREEN"));
+
+        sut.Apply(new AlternateScreenChangedEvent(false));
+
+        sut.IsAlternateScreenActive.Should().BeFalse();
+        sut.GetRow(0)[0].Character.Should().Be('M', "der Hauptbildschirm muss seinen Inhalt behalten haben");
+    }
+
+    /// <summary>LinesInsertedEvent schiebt Inhalte unterhalb der Cursorzeile nach unten.</summary>
+    [Fact]
+    public void Buffer_LinesInserted_SchiebtZeilenNachUnten()
+    {
+        var sut = new TerminalBuffer(4, 3);
+        sut.Apply(new TextWrittenEvent("AAA"));
+        sut.Apply(new CursorMovedEvent(1, 0, true));
+        sut.Apply(new TextWrittenEvent("BBB"));
+        sut.Apply(new CursorMovedEvent(0, 0, true));
+
+        sut.Apply(new LinesInsertedEvent(1));
+
+        sut.GetRow(0).Take(3).Select(c => c.Character).Should().Equal(' ', ' ', ' ');
+        sut.GetRow(1).Take(3).Select(c => c.Character).Should().Equal('A', 'A', 'A');
+        sut.GetRow(2).Take(3).Select(c => c.Character).Should().Equal('B', 'B', 'B');
+    }
+
+    /// <summary>LinesDeletedEvent entfernt die Cursorzeile und schiebt darunterliegende nach oben.</summary>
+    [Fact]
+    public void Buffer_LinesDeleted_SchiebtZeilenNachOben()
+    {
+        var sut = new TerminalBuffer(4, 3);
+        sut.Apply(new TextWrittenEvent("AAA"));
+        sut.Apply(new CursorMovedEvent(1, 0, true));
+        sut.Apply(new TextWrittenEvent("BBB"));
+        sut.Apply(new CursorMovedEvent(0, 0, true));
+
+        sut.Apply(new LinesDeletedEvent(1));
+
+        sut.GetRow(0).Take(3).Select(c => c.Character).Should().Equal('B', 'B', 'B');
+        sut.GetRow(1).Take(3).Select(c => c.Character).Should().Equal(' ', ' ', ' ');
+    }
+
+    /// <summary>CharsInsertedEvent schiebt Zeichen ab dem Cursor nach rechts.</summary>
+    [Fact]
+    public void Buffer_CharsInserted_SchiebtZeichenNachRechts()
+    {
+        var sut = new TerminalBuffer(8, 2);
+        sut.Apply(new TextWrittenEvent("ABCD"));
+        sut.Apply(new CursorMovedEvent(0, 1, true));
+
+        sut.Apply(new CharsInsertedEvent(2));
+
+        sut.GetRow(0).Take(6).Select(c => c.Character).Should().Equal('A', ' ', ' ', 'B', 'C', 'D');
+    }
+
+    /// <summary>CharsDeletedEvent entfernt Zeichen ab dem Cursor.</summary>
+    [Fact]
+    public void Buffer_CharsDeleted_EntferntZeichenAbCursor()
+    {
+        var sut = new TerminalBuffer(8, 2);
+        sut.Apply(new TextWrittenEvent("ABCD"));
+        sut.Apply(new CursorMovedEvent(0, 1, true));
+
+        sut.Apply(new CharsDeletedEvent(2));
+
+        sut.GetRow(0).Take(3).Select(c => c.Character).Should().Equal('A', 'D', ' ');
+    }
+
+    /// <summary>CharsErasedEvent löscht Zeichen ab dem Cursor ohne Verschieben.</summary>
+    [Fact]
+    public void Buffer_CharsErased_LoeschtZeichenAbCursor()
+    {
+        var sut = new TerminalBuffer(8, 2);
+        sut.Apply(new TextWrittenEvent("ABCD"));
+        sut.Apply(new CursorMovedEvent(0, 1, true));
+
+        sut.Apply(new CharsErasedEvent(2));
+
+        sut.GetRow(0).Take(4).Select(c => c.Character).Should().Equal('A', ' ', ' ', 'D');
+    }
+
+    /// <summary>ScrollRegionChangedEvent beschränkt das Scrollen: Zeilen außerhalb der Region bleiben stehen,
+    /// innerhalb wird rotiert.</summary>
+    [Fact]
+    public void Buffer_ScrollRegion_NewlineScrolltNurRegion()
+    {
+        var sut = new TerminalBuffer(4, 4);
+        sut.Apply(new TextWrittenEvent("AAAA\nBBBB\nCCCC\nDDDD"));
+
+        sut.Apply(new ScrollRegionChangedEvent(1, 2)); // DECSTBM -> Cursor Home
+        sut.Apply(new CursorMovedEvent(2, 0, true));
+        sut.Apply(new TextWrittenEvent("XX\n")); // Newline am Regionende scrollt nur Zeilen 1-2
+
+        var row0 = string.Concat(sut.GetRow(0).Take(4).Select(c => c.Character));
+        var row1 = string.Concat(sut.GetRow(1).Take(4).Select(c => c.Character));
+        var row2 = string.Concat(sut.GetRow(2).Take(4).Select(c => c.Character));
+        var row3 = string.Concat(sut.GetRow(3).Take(4).Select(c => c.Character));
+        row0.Should().Be("AAAA", "Zeilen oberhalb der Scroll-Region dürfen nicht scrollen");
+        row1.Should().Be("XXCC", "die region-interne Scrollbewegung schiebt Zeile 2 (XX über CCCC geschrieben) nach Zeile 1");
+        row2.Should().Be("    ");
+        row3.Should().Be("DDDD", "Zeilen unterhalb der Scroll-Region dürfen nicht scrollen");
+    }
+
+    /// <summary>CursorSavedEvent/Restore stellt eine zwischenzeitlich veränderte Cursorposition wieder her.</summary>
+    [Fact]
+    public void Buffer_SaveRestoreCursor_StelltPositionWiederHer()
+    {
+        var sut = new TerminalBuffer(8, 4);
+        sut.Apply(new CursorMovedEvent(2, 3, true));
+        sut.Apply(new CursorSavedEvent(false));
+
+        sut.Apply(new CursorMovedEvent(0, 0, true));
+        sut.Apply(new CursorSavedEvent(true));
+
+        sut.CursorRow.Should().Be(2);
+        sut.CursorCol.Should().Be(3);
+    }
+
+    /// <summary>TerminalResetEvent setzt Buffer, Cursor und Alternate-Screen-Status zurück.</summary>
+    [Fact]
+    public void Buffer_TerminalReset_SetztAllesZurueck()
+    {
+        var sut = new TerminalBuffer(8, 4);
+        sut.Apply(new AlternateScreenChangedEvent(true));
+        sut.Apply(new TextWrittenEvent("X"));
+        sut.Apply(new CursorMovedEvent(3, 5, true));
+
+        sut.Apply(new TerminalResetEvent());
+
+        sut.IsAlternateScreenActive.Should().BeFalse();
+        sut.CursorRow.Should().Be(0);
+        sut.CursorCol.Should().Be(0);
+        sut.GetRow(0).All(c => c.Character == ' ').Should().BeTrue();
+    }
+
+    /// <summary>ScreenScrolledEvent (CSI S, SU) darf die herausfallenden Zeilen nicht in den Scrollback
+    /// schieben — anders als der Newline-Scroll am Regionsrand gehören SU-Zeilen nach xterm-Semantik
+    /// nicht in den Verlauf.</summary>
+    [Fact]
+    public void Buffer_ScreenScrolled_SchiebtNichtInScrollback()
+    {
+        var sut = new TerminalBuffer(4, 2);
+        sut.Apply(new TextWrittenEvent("A\nB"));
+
+        var scrollbackVorher = sut.ScrollbackCount;
+
+        sut.Apply(new ScreenScrolledEvent(5)); // Delta >= _rows (bisheriger Triggermechanismus)
+        sut.Apply(new ScreenScrolledEvent(1));
+
+        sut.ScrollbackCount.Should().Be(scrollbackVorher, "SU-Scrolls dürfen den Scrollback nicht füllen");
+    }
+
+    /// <summary>Ein ScreenScrolledEvent im Alternate Screen darf keine Alt-Screen-Zeilen in den
+    /// Hauptscreen-Scrollback schieben — sie wären nach dem Verlassen des Alt-Screens sichtbar.</summary>
+    [Fact]
+    public void Buffer_ScreenScrolled_AlternateScreen_KeinScrollback()
+    {
+        var sut = new TerminalBuffer(4, 2);
+        sut.Apply(new AlternateScreenChangedEvent(true));
+        sut.Apply(new TextWrittenEvent("ALT1\nALT2"));
+
+        sut.Apply(new ScreenScrolledEvent(5));
+        sut.Apply(new AlternateScreenChangedEvent(false));
+
+        sut.ScrollbackCount.Should().Be(0, "Alt-Screen-Zeilen dürfen nicht im Hauptscreen-Scrollback auftauchen");
+    }
+
+    /// <summary>Verkleinert man den Buffer bei aktivem Alternate Screen, wandern die wegfallenden
+    /// Alt-Screen-Zeilen nicht in den Hauptscreen-Scrollback.</summary>
+    [Fact]
+    public void Buffer_ResizeKleiner_AlternateScreen_KeinScrollback()
+    {
+        var sut = new TerminalBuffer(10, 5);
+        sut.Apply(new AlternateScreenChangedEvent(true));
+        for (var r = 0; r < 5; r++)
+        {
+            sut.Apply(new CursorMovedEvent(r, 0, true));
+            sut.Apply(new TextWrittenEvent("ALT"));
+        }
+
+        sut.Resize(10, 3);
+        sut.Apply(new AlternateScreenChangedEvent(false));
+
+        sut.ScrollbackCount.Should().Be(0, "beim Verkleinern im Alt-Screen verworfene Zeilen gehören nicht in den Hauptscreen-Scrollback");
     }
 }

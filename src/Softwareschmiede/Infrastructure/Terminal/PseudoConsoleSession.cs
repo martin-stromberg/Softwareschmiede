@@ -6,18 +6,18 @@ using Softwareschmiede.Domain.Terminal;
 
 namespace Softwareschmiede.Infrastructure.Terminal;
 
-/// <summary>Koordiniert eine laufende Pseudo-Console-Sitzung bestehend aus <see cref="PseudoConsole"/>,
-/// <see cref="Process"/>, Eingabe- und Ausgabe-Stream. Betreibt die Leseschleife (<see cref="ReadLoopAsync"/>)
-/// ab Konstruktion bis <see cref="Dispose"/> unabhängig vom Lebenszyklus eines anzeigenden Controls, damit
-/// mehrere CLI-Prozesse parallel weiterlaufen können, auch wenn ihre Aufgabenseite nicht angezeigt wird.</summary>
-public sealed class PseudoConsoleSession : IDisposable
+/// <summary>Koordiniert eine laufende Terminal-Sitzung (Pseudo-Console oder Pipe-Backend) bestehend aus
+/// <see cref="PseudoConsole"/>, <see cref="Process"/>, Eingabe- und Ausgabe-Stream. Betreibt die
+/// Leseschleife (<see cref="ReadLoopAsync"/>) ab Konstruktion bis <see cref="Dispose"/> unabhängig vom
+/// Lebenszyklus eines anzeigenden Controls, damit mehrere CLI-Prozesse parallel weiterlaufen können,
+/// auch wenn ihre Aufgabenseite nicht angezeigt wird.</summary>
+public sealed class PseudoConsoleSession : ITerminalSession
 {
-    private const int DefaultCols = 220;
-    private const int DefaultRows = 50;
     private const int InputWriteChunkSize = 4096;
 
     private readonly IPseudoConsoleHandle _pseudoConsole;
     private readonly Process _process;
+    private readonly IntPtr _nativeProcessHandle;
     private readonly TimeProvider _timeProvider;
     private readonly Timer _runtimeStatusTimer;
     private readonly TimeSpan _waitingThreshold;
@@ -26,10 +26,18 @@ public sealed class PseudoConsoleSession : IDisposable
     private readonly ILogger _logger;
     private readonly ITerminalOutputSink? _outputSink;
     private readonly AnsiSequenceParser _parser = new();
+    private readonly TerminalReplayBuffer _replayBuffer;
+    private readonly object _renderLock = new();
+    private readonly object _resizeLock = new();
     private readonly CancellationTokenSource _readCts = new();
     private readonly SemaphoreSlim _inputWriteLock = new(1, 1);
     private readonly Task _readLoopTask;
     private int _disposed;
+    private int _exitedSignaled;
+    private bool _hasResize;
+    private int _lastResizeCols;
+    private int _lastResizeRows;
+    private bool _lastResizeResult = true;
     private CliRuntimeStatus _runtimeStatus = CliRuntimeStatus.Laeuft;
     private DateTimeOffset? _lastOutputUtc;
     private DateTimeOffset? _lastInputUtc;
@@ -60,43 +68,79 @@ public sealed class PseudoConsoleSession : IDisposable
 
     /// <summary>Der Terminal-Buffer dieser Sitzung. Wird bereits bei Konstruktion angelegt und von der
     /// Leseschleife dieser Sitzung befüllt, unabhängig davon, ob ein <c>TerminalControl</c> gebunden ist.</summary>
-    public TerminalBuffer Buffer { get; } = new(DefaultCols, DefaultRows);
+    public TerminalBuffer Buffer { get; }
 
     /// <summary>Wird nach jeder erfolgreichen Verarbeitung eines Ausgabe-Chunks durch die Leseschleife ausgelöst,
     /// damit ein gebundenes <c>TerminalControl</c> seine Anzeige aktualisieren kann.</summary>
     public event EventHandler? BufferChanged;
+
+    /// <inheritdoc/>
+    public event EventHandler<TerminalOutputChunkEventArgs>? OutputChunk;
+
+    /// <inheritdoc/>
+    public event EventHandler<TerminalSessionExitedEventArgs>? Exited;
+
+    /// <inheritdoc/>
+    public event EventHandler<TerminalSessionFailedEventArgs>? Failed;
+
+    /// <inheritdoc/>
+    public bool IsPseudoTerminal { get; }
+
+    /// <inheritdoc/>
+    public bool SupportsResize => true;
+
+    /// <inheritdoc/>
+    public int? ExitCode { get; private set; }
+
+    private TerminalSessionFailedEventArgs? _failure;
+
+    /// <inheritdoc/>
+    public TerminalSessionFailedEventArgs? Failure => Volatile.Read(ref _failure);
 
     /// <summary>Erstellt eine neue <see cref="PseudoConsoleSession"/> und startet sofort die Leseschleife.</summary>
     /// <param name="pseudoConsole">Die zugehörige Pseudo Console.</param>
     /// <param name="process">Der gestartete Prozess.</param>
     /// <param name="inputStream">Schreibbarer Stream für Eingaben an den Prozess.</param>
     /// <param name="outputStream">Lesbarer Stream für die Prozessausgabe.</param>
-    /// <param name="logger">Logger für Fehler- und Diagnosemeldungen der Leseschleife (optional).</param>
-    /// <param name="outputSink">Optionale Senke für gelesene Terminal-Ausgabe.</param>
-    internal PseudoConsoleSession(IPseudoConsoleHandle pseudoConsole, Process process, Stream inputStream, Stream outputStream, ILogger? logger = null, ITerminalOutputSink? outputSink = null)
-        : this(pseudoConsole, process, inputStream, outputStream, TimeProvider.System, TimeSpan.FromSeconds(4), logger, outputSink)
-    {
-    }
-
+    /// <param name="context">Gebündelte optionale Parameter (Logger, Output-Senke, natives Prozess-Handle,
+    /// <see cref="TerminalSessionOptions"/>, PTY-Flag sowie die Test-Hooks <c>TimeProvider</c>/
+    /// <c>WaitingThreshold</c>); <c>null</c> verwendet die Defaults.</param>
     internal PseudoConsoleSession(
         IPseudoConsoleHandle pseudoConsole,
         Process process,
         Stream inputStream,
         Stream outputStream,
-        TimeProvider timeProvider,
-        TimeSpan waitingThreshold,
-        ILogger? logger = null,
-        ITerminalOutputSink? outputSink = null)
+        PseudoConsoleSessionContext? context = null)
     {
+        var effectiveOptions = context?.Options ?? new TerminalSessionOptions();
         _pseudoConsole = pseudoConsole;
         _process = process;
+        _nativeProcessHandle = context?.NativeProcessHandle ?? IntPtr.Zero;
         InputStream = inputStream;
         OutputStream = outputStream;
-        _timeProvider = timeProvider;
-        _waitingThreshold = waitingThreshold;
+        _timeProvider = context?.TimeProvider ?? TimeProvider.System;
+        _waitingThreshold = context?.WaitingThreshold ?? TimeSpan.FromSeconds(4);
         _startedUtc = _timeProvider.GetUtcNow();
-        _logger = logger ?? NullLogger.Instance;
-        _outputSink = outputSink;
+        _logger = context?.Logger ?? NullLogger.Instance;
+        _outputSink = context?.OutputSink;
+        IsPseudoTerminal = context?.IsPseudoTerminal ?? false;
+        Buffer = new TerminalBuffer(effectiveOptions.DefaultCols, effectiveOptions.DefaultRows);
+        _replayBuffer = new TerminalReplayBuffer(effectiveOptions.ReplayBufferByteBudget);
+
+        try
+        {
+            _process.EnableRaisingEvents = true;
+            _process.Exited += OnProcessExited;
+            // Race: Der Prozess kann bereits vor der Registrierung beendet worden sein —
+            // dann feuert das Exited-Event nicht mehr selbständig.
+            if (_process.HasExited)
+                RaiseExited();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Exited-Registrierung für die Terminal-Session nicht möglich; Exit wird über das Ende des Output-Streams erkannt.");
+        }
+
         _runtimeStatusTimer = new Timer(_ => RefreshRuntimeStatus(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         _readLoopTask = Task.Run(() => ReadLoopAsync(_readCts.Token));
     }
@@ -123,12 +167,28 @@ public sealed class PseudoConsoleSession : IDisposable
         SetRuntimeStatus(CliRuntimeStatus.Laeuft);
     }
 
-    /// <summary>Ändert die Größe der Pseudo Console.</summary>
+    /// <summary>Ändert die Größe der Pseudo Console. Identische Dimensionsaufrufe werden dedupliziert
+    /// und parallele Aufrufe serialisiert; ungültige Werte werden ignoriert (kein PTY-Call).</summary>
     /// <param name="cols">Neue Spaltenanzahl.</param>
     /// <param name="rows">Neue Zeilenanzahl.</param>
-    /// <returns><c>true</c>, wenn die Größenänderung erfolgreich war; andernfalls <c>false</c>.</returns>
+    /// <returns><c>true</c>, wenn die Größenänderung erfolgreich war oder bereits dem aktuellen Zustand entspricht; andernfalls <c>false</c>.</returns>
     public bool Resize(int cols, int rows)
-        => _pseudoConsole.Resize((short)cols, (short)rows);
+    {
+        if (cols <= 0 || rows <= 0)
+            return false;
+
+        lock (_resizeLock)
+        {
+            if (_hasResize && cols == _lastResizeCols && rows == _lastResizeRows)
+                return _lastResizeResult;
+
+            _lastResizeResult = _pseudoConsole.Resize((short)cols, (short)rows);
+            _lastResizeCols = cols;
+            _lastResizeRows = rows;
+            _hasResize = true;
+            return _lastResizeResult;
+        }
+    }
 
     /// <inheritdoc/>
     public void Dispose()
@@ -166,9 +226,14 @@ public sealed class PseudoConsoleSession : IDisposable
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
+        try { _process.Exited -= OnProcessExited; } catch { }
         try { InputStream.Dispose(); } catch { }
         try { _runtimeStatusTimer.Dispose(); } catch { }
         try { _pseudoConsole.Dispose(); } catch { }
+        if (_nativeProcessHandle != IntPtr.Zero)
+        {
+            try { PseudoConsoleNativeMethods.CloseHandle(_nativeProcessHandle); } catch { }
+        }
         try { _process.Dispose(); } catch { }
     }
 
@@ -229,19 +294,32 @@ public sealed class PseudoConsoleSession : IDisposable
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Fehler beim Lesen aus dem Terminal-Output-Stream der Sitzung.");
+                    RaiseFailed(ex, "ReadLoop");
+                    RaiseExited();
                     break;
                 }
 
                 if (bytesRead == 0)
+                {
+                    RaiseExited();
                     break;
+                }
 
                 MarkOutputActivity();
 
                 _outputSink?.OnOutputChunk(data.AsSpan(0, bytesRead));
 
-                var events = _parser.Parse(data.AsSpan(0, bytesRead));
-                foreach (var evt in events)
-                    Buffer.Apply(evt);
+                OutputChunk?.Invoke(this, new TerminalOutputChunkEventArgs(data.AsMemory(0, bytesRead)));
+
+                // Render-Lock: Replay-Append, Parse+Apply müssen gegenüber RebuildBufferFromReplay
+                // serialisiert werden — ein gleichzeitiger Neuaufbau darf den Chunk nicht sehen, bevor
+                // er hier angewendet wurde (sonst wird er doppelt angewendet → doppelte Ausgabe).
+                lock (_renderLock)
+                {
+                    _replayBuffer.Append(data.AsSpan(0, bytesRead));
+                    foreach (var evt in _parser.Parse(data.AsSpan(0, bytesRead)))
+                        Buffer.Apply(evt);
+                }
 
                 BufferChanged?.Invoke(this, EventArgs.Empty);
             }
@@ -252,10 +330,111 @@ public sealed class PseudoConsoleSession : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unerwarteter Fehler im Terminal-Lesevorgang der Sitzung.");
+            RaiseFailed(ex, "ReadLoop");
         }
         finally
         {
             _outputSink?.Complete();
+        }
+    }
+
+    /// <summary>Baut <see cref="Buffer"/> synchron aus den gespeicherten <see cref="TerminalReplayBuffer"/>-Chunks
+    /// mit einem frischen <see cref="AnsiSequenceParser"/> neu auf. Läuft unter demselben Render-Lock wie die
+    /// Leseschleife, damit sich Neuaufbau und Live-Chunks nicht vermischen (keine doppelten Ausgaben).</summary>
+    public void RebuildBufferFromReplay()
+    {
+        lock (_renderLock)
+        {
+            Buffer.Reset();
+            var parser = new AnsiSequenceParser();
+            foreach (var chunk in _replayBuffer.GetChunks())
+                foreach (var evt in parser.Parse(chunk))
+                    Buffer.Apply(evt);
+        }
+    }
+
+    /// <summary>Liefert eine Momentaufnahme der gespeicherten Replay-Rohchunks (für Diagnose/Tests).</summary>
+    /// <returns>Die gepufferten Chunks in Eingangsreihenfolge.</returns>
+    internal IReadOnlyList<byte[]> GetReplayChunks() => _replayBuffer.GetChunks();
+
+    private void OnProcessExited(object? sender, EventArgs e) => RaiseExited();
+
+    /// <summary>Löst <see cref="Exited"/> genau einmal aus, sofern der Prozess tatsächlich beendet ist
+    /// (aufgerufen aus dem <see cref="Process.Exited"/>-Event sowie bei Ende des Output-Streams).</summary>
+    private void RaiseExited()
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+            return;
+
+        // Exit-Code bzw. Prozessende erst prüfen: Ein Ende des Output-Streams bei noch laufendem
+        // Prozess (oder STILL_ACTIVE auf dem nativen Handle) darf kein Exited auslösen.
+        int? exitCode;
+        if (_nativeProcessHandle != IntPtr.Zero)
+        {
+            if (!PseudoConsoleNativeMethods.GetExitCodeProcess(_nativeProcessHandle, out var rawExitCode))
+            {
+                _logger.LogWarning("GetExitCodeProcess für den Terminal-Session-Prozess fehlgeschlagen (Win32-Fehler {Win32Error}).", System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+                exitCode = null;
+            }
+            else if (rawExitCode == PseudoConsoleNativeMethods.STILL_ACTIVE)
+            {
+                return;
+            }
+            else
+            {
+                exitCode = unchecked((int)rawExitCode);
+            }
+        }
+        else
+        {
+            try
+            {
+                if (!_process.HasExited)
+                    return;
+                exitCode = _process.ExitCode;
+            }
+            catch (Exception ex)
+            {
+                // Z. B. PID-Wiederverwendung auf GetProcessById-Objekten: der Prozess ist dann als
+                // beendet zu werten, der Code aber nicht mehr ermittelbar.
+                _logger.LogDebug(ex, "Exit-Status der Terminal-Session konnte nicht über den Prozess ermittelt werden.");
+                exitCode = null;
+            }
+        }
+
+        if (Interlocked.CompareExchange(ref _exitedSignaled, 1, 0) != 0)
+            return;
+
+        ExitCode = exitCode;
+        try
+        {
+            Exited?.Invoke(this, new TerminalSessionExitedEventArgs(exitCode));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fehler im Exited-Eventhandler der Terminal-Session.");
+        }
+    }
+
+    private void RaiseFailed(Exception error, string phase)
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+            return;
+
+        var args = new TerminalSessionFailedEventArgs(error, phase);
+        // Fehlerzustand vor dem Event festhalten: Ein Failed, das ohne Subscriber ausläuft (z. B. ein
+        // Leseschleifen-Fehler zwischen Session-Erzeugung und Event-Verdrahtung im Aufrufer), bleibt
+        // sonst für immer undetektiert. Der erste Fehler gewinnt — er ist die übliche Fehlerursache,
+        // spätere Fehler sind meist Folgeeffekte derselben Störung.
+        Interlocked.CompareExchange(ref _failure, args, null);
+
+        try
+        {
+            Failed?.Invoke(this, args);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fehler im Failed-Eventhandler der Terminal-Session.");
         }
     }
 
@@ -358,6 +537,8 @@ public sealed class PseudoConsoleSession : IDisposable
                 totalBytes,
                 Math.Max(0, chunkIndex),
                 chunkCount);
+            if (ex is not ObjectDisposedException)
+                RaiseFailed(ex, "Write");
             throw;
         }
         finally

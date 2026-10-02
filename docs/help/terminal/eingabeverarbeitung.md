@@ -17,7 +17,7 @@ Wenn der Benutzer eine Taste drückt, wird das Ereignis vom Windows Presentation
 1. **Vorverarbeitung:** `OnPreviewKeyDown` prüft, ob die Taste eine Sonderbehandlung benötigt.
 2. **VT100-Kodierung:** `KeyToVt100Encoder.Encode()` konvertiert das Ereignis in eine VT100-Byte-Sequenz oder gibt `null` zurück.
 3. **Text-Eingabe:** Für Tasten, die normale Zeichen erzeugen (inklusive Alt Gr-Sonderzeichen), wird das `TextInput`-Event genutzt, um UTF-8-kodierten Text zu erfassen.
-4. **Eingabeschreiben:** Kodierte Bytes werden in den Input-Stream der `PseudoConsoleSession` geschrieben, die sie an den laufenden CLI-Prozess weiterleitet.
+4. **Eingabeschreiben:** Kodierte Bytes werden in den Input-Stream der `ITerminalSession` geschrieben, die sie an den laufenden CLI-Prozess weiterleitet.
 
 ### Alt Gr-Sonderzeichen
 
@@ -49,7 +49,7 @@ Mit **Ctrl+V** fügt das Terminal den aktuellen Text aus der Windows-Zwischenabl
 
 Mehrzeilige Clipboard-Inhalte werden über `KeyToVt100Encoder.EncodeClipboardText()` normalisiert. Alle Zeilenumbruchsvarianten (`\n`, `\r\n`, `\r`) werden als Carriage Return (`\r`) an die Pseudokonsole weitergegeben. Zeichen wie Backticks, Pfade, Klammern, generische Typnamen, Umlaute und weitere Sonderzeichen bleiben als UTF-8 erhalten.
 
-Lange Eingaben werden über die gemeinsame `PseudoConsoleSession.WriteInputAsync`-Schreiblogik übertragen. Diese serialisiert längere Eingaben pro Session, schreibt große Bytefolgen kontrolliert in Chunks, wartet jeden Chunk ab und führt am Ende einen Flush aus. Dadurch bleiben Reihenfolge und Vollständigkeit erhalten, auch wenn Paste, Promptversand oder Startbefehle zeitlich nah beieinander liegen. Normale kurze Tastatureingaben bleiben auf ihrem direkten Schreibpfad.
+Lange Eingaben werden über die gemeinsame `ITerminalSession.WriteInputAsync`-Schreiblogik übertragen. Diese serialisiert längere Eingaben pro Session, schreibt große Bytefolgen kontrolliert in Chunks, wartet jeden Chunk ab und führt am Ende einen Flush aus. Dadurch bleiben Reihenfolge und Vollständigkeit erhalten, auch wenn Paste, Promptversand oder Startbefehle zeitlich nah beieinander liegen. Normale kurze Tastatureingaben bleiben auf ihrem direkten Schreibpfad.
 
 ## Technischer Ablauf
 
@@ -91,7 +91,7 @@ if (!string.IsNullOrEmpty(e.Text))
 
 **Schritt 5: In Input-Stream schreiben**
 
-Die kodierten Bytes werden in den Input-Stream der `PseudoConsoleSession` geschrieben, die sie an den laufenden CLI-Prozess weiterleitet.
+Die kodierten Bytes werden in den Input-Stream der `ITerminalSession` geschrieben, die sie an den laufenden CLI-Prozess weiterleitet.
 
 ### Ctrl+Left-Navigation (Cursor wortweise nach links)
 
@@ -139,7 +139,7 @@ bash oder anderes POSIX-Shell empfängt die Sequenz `\x1b[1;5D` und interpretier
 
 **Schritt 1: Zielsession festhalten**
 
-Beim Paste-Start übernimmt das `TerminalControl` die aktuell gebundene `PseudoConsoleSession` in eine lokale Variable. Diese Session bleibt das Ziel des Paste-Vorgangs, auch wenn die UI währenddessen zu einer anderen Aufgabe wechselt.
+Beim Paste-Start übernimmt das `TerminalControl` die aktuell gebundene `ITerminalSession` in eine lokale Variable. Diese Session bleibt das Ziel des Paste-Vorgangs, auch wenn die UI währenddessen zu einer anderen Aufgabe wechselt.
 
 **Schritt 2: Clipboard-Text lesen und kodieren**
 
@@ -160,7 +160,7 @@ await session.WriteInputAsync(encoded);
 
 **Schritt 4: CLI-Prozess empfängt vollständige Eingabe**
 
-Der CLI-Prozess erhält die zusammenhängende Eingabe mit erhaltener Zeilenstruktur und unveränderten Sonderzeichen. Das gilt für Claude CLI ebenso wie für andere Plugins, die dieselbe `PseudoConsoleSession` nutzen.
+Der CLI-Prozess erhält die zusammenhängende Eingabe mit erhaltener Zeilenstruktur und unveränderten Sonderzeichen. Das gilt für Claude CLI ebenso wie für andere Plugins, die dieselbe `ITerminalSession`-Implementierung nutzen.
 
 ## Diagramm: Tastaturereignis-Verarbeitung
 
@@ -180,7 +180,7 @@ flowchart TD
     K --> H
 
     B -->|Ctrl+V| L["Clipboard lesen und EncodeClipboardText"]
-    L --> I["PseudoConsoleSession.WriteInputAsync"]
+    L --> I["ITerminalSession.WriteInputAsync"]
     I --> M
 ```
 
@@ -190,7 +190,7 @@ flowchart TD
 |--------|-------|-------|
 | `KeyToVt100Encoder` | `src/Softwareschmiede.App/Controls/KeyToVt100Encoder.cs` | Utility-Klasse für VT100-Kodierung aller Tastaturereignisse |
 | `TerminalControl` | `src/Softwareschmiede.App/Controls/TerminalControl.cs` | WPF-UserControl, das Tastaturereignisse und Clipboard-Paste an den Encoder delegiert |
-| `PseudoConsoleSession` | `src/Softwareschmiede/Infrastructure/Terminal/PseudoConsoleSession.cs` | Verwaltet Input/Output-Streams der ConPTY und serialisiert längere Input-Writes |
+| `PseudoConsoleSession` (`ITerminalSession`) | `src/Softwareschmiede/Infrastructure/Terminal/PseudoConsoleSession.cs` | Verwaltet Input/Output-Streams der Session (ConPTY oder Pipe-Backend) und serialisiert längere Input-Writes |
 
 ## Einschränkungen
 

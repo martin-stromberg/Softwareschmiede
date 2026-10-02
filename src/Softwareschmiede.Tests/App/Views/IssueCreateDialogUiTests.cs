@@ -119,5 +119,8 @@ public sealed class IssueCreateDialogUiTests
         public string GetProcessWindowTitle(Guid aufgabeId) => PluginName;
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
+        public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
+        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+            => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
     }
 }

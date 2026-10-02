@@ -150,6 +150,61 @@ public sealed class CliKiPluginBaseTests
         psi.StandardErrorEncoding.Should().BeSameAs(System.Text.Encoding.UTF8);
     }
 
+    /// <summary>GetTerminalStartSpecAsync mappt BuildProcessStartInfo auf eine TerminalSessionStartSpec inkl. Capabilities.</summary>
+    [Fact]
+    public async Task GetTerminalStartSpecAsync_MapptProcessStartInfoUndCapabilities()
+    {
+        var sut = new TestCliKiPlugin(supportsSession: true);
+
+        var spec = await sut.GetTerminalStartSpecAsync("/repo", "session-42");
+
+        spec.FileName.Should().Be("test-cli");
+        spec.Arguments.Should().Be("session-42");
+        spec.WorkingDirectory.Should().Be("/repo");
+        spec.PluginName.Should().Be("Test");
+        spec.OptionalParameters.Should().Be("session-42");
+        spec.Capabilities.Should().Be(TerminalProviderCapabilities.SupportsPty);
+    }
+
+    /// <summary>BuildTerminalStartSpec wirft InvalidOperationException bei leerem FileName
+    /// (Vertragsverletzung der Plugin-Implementierung, kein Aufrufer-Fehler).</summary>
+    [Fact]
+    public void BuildTerminalStartSpec_FileNameLeer_WirftInvalidOperationException()
+    {
+        var sut = new TestCliKiPluginWithEmptyFileName();
+
+        var act = () => sut.BuildTerminalStartSpec("/repo", null);
+
+        act.Should().Throw<InvalidOperationException>().Which.Message.Should().Contain("Test");
+    }
+
+    /// <summary>Ein Plugin mit RequiresPty-Capability liefert diese in der Spec.</summary>
+    [Fact]
+    public async Task GetTerminalStartSpecAsync_RequiresPtyPlugin_LiefertRequiresPtyCapability()
+    {
+        var sut = new TestCliKiPluginRequiresPty();
+
+        var spec = await sut.GetTerminalStartSpecAsync("/repo");
+
+        spec.Capabilities.Should().HaveFlag(TerminalProviderCapabilities.RequiresPty);
+        spec.Capabilities.Should().HaveFlag(TerminalProviderCapabilities.SupportsPty);
+    }
+
+    private sealed class TestCliKiPluginWithEmptyFileName() : BaseTestPlugin
+    {
+        protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
+            => new() { FileName = "", WorkingDirectory = localRepoPath };
+    }
+
+    private sealed class TestCliKiPluginRequiresPty() : BaseTestPlugin
+    {
+        public override TerminalProviderCapabilities TerminalCapabilities =>
+            TerminalProviderCapabilities.RequiresPty | TerminalProviderCapabilities.SupportsPty;
+
+        protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
+            => new() { FileName = "test-cli", WorkingDirectory = localRepoPath };
+    }
+
     private abstract class BaseTestPlugin(string providerPraefix = "test") : CliKiPluginBase
     {
         public override string ProviderDateiPraefix => providerPraefix;

@@ -307,11 +307,7 @@ public sealed partial class TerminalControlTests
     }
 
     private static void InvokeReadClipboardAndInsertAsync(TerminalControl control)
-    {
-        var method = typeof(TerminalControl).GetMethod("ReadClipboardAndInsertAsync", BindingFlags.NonPublic | BindingFlags.Instance, null, Type.EmptyTypes, null)!;
-        var task = (Task)method.Invoke(control, null)!;
-        task.GetAwaiter().GetResult();
-    }
+        => InvokeReadClipboardAndInsertAsync(control, control.Session!);
 
     private static void InvokeReadClipboardAndInsertAsyncWithClipboardRetry(
         TerminalControl control,
@@ -334,13 +330,13 @@ public sealed partial class TerminalControlTests
         }
     }
 
-    private static void InvokeReadClipboardAndInsertAsync(TerminalControl control, PseudoConsoleSession session)
+    private static void InvokeReadClipboardAndInsertAsync(TerminalControl control, ITerminalSession session)
     {
         var method = typeof(TerminalControl).GetMethod(
             "ReadClipboardAndInsertAsync",
             BindingFlags.NonPublic | BindingFlags.Instance,
             null,
-            [typeof(PseudoConsoleSession)],
+            [typeof(ITerminalSession)],
             null)!;
         var task = (Task)method.Invoke(control, [session])!;
         task.GetAwaiter().GetResult();

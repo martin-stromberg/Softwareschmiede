@@ -29,6 +29,10 @@ public sealed class CodexPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
     public override PluginType PluginType => PluginType.DevelopmentAutomation;
 
     /// <inheritdoc/>
+    public override TerminalProviderCapabilities TerminalCapabilities =>
+        TerminalProviderCapabilities.RequiresPty | TerminalProviderCapabilities.SupportsPty;
+
+    /// <inheritdoc/>
     public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
     [
         new PluginSettingGroup("Ausfuehrung",

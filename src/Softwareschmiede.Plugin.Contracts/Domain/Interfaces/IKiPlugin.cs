@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Domain.Interfaces;
@@ -23,4 +24,14 @@ public interface IKiPlugin : IPlugin
     /// <summary>Prüft ob das Plugin verfügbar ist.</summary>
     /// <param name="ct">Cancellation Token.</param>
     Task<bool> CheckHealthAsync(CancellationToken ct = default);
+
+    /// <summary>Terminal-Fähigkeiten der CLI (PTY-Unterstützung/-Bedarf).</summary>
+    TerminalProviderCapabilities TerminalCapabilities { get; }
+
+    /// <summary>Liefert die Startbeschreibung für den interaktiven Terminal-Pfad.</summary>
+    /// <param name="localRepoPath">Lokaler Pfad des Arbeitsverzeichnisses.</param>
+    /// <param name="parameters">Optionale Parameter (z.B. Session-ID für --continue).</param>
+    /// <param name="ct">Cancellation Token.</param>
+    /// <returns>Die <see cref="TerminalSessionStartSpec"/> für den Session-Start.</returns>
+    Task<TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default);
 }

@@ -230,6 +230,7 @@ public sealed partial class App : System.Windows.Application
         services.AddMemoryCache();
         services.Configure<DirectoryStructureOptions>(context.Configuration.GetSection(DirectoryStructureOptions.SectionName));
         services.Configure<AutonomAufgabenOptions>(context.Configuration.GetSection(AutonomAufgabenOptions.SectionName));
+        services.Configure<TerminalSessionOptions>(context.Configuration.GetSection(TerminalSessionOptions.SectionName));
         services.AddSingleton<IOptions<UpdateOptions>>(Options.Create(new UpdateOptions()));
         services.AddSingleton<DirectoryStructureBrowserService>();
 
@@ -284,18 +285,28 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<IUpdateService, UpdateService>();
 
         // Infrastructure Services
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH")))
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(TerminalSessionService.TestDatenbankPfadVariable)))
         {
-            services.AddSingleton<IPseudoConsoleProcessLauncher, SimulatedPseudoConsoleProcessLauncher>();
             services.AddSingleton<IProzessStarter>(sp => new AufzeichnenderProzessStarter(
                 sp.GetRequiredService<ILogger<AufzeichnenderProzessStarter>>(),
                 AufzeichnenderProzessStarter.ResolveLogDateiPfad(dbPath)));
         }
         else
         {
-            services.AddSingleton<IPseudoConsoleProcessLauncher, Win32PseudoConsoleProcessLauncher>();
             services.AddSingleton<IProzessStarter, SystemProzessStarter>();
         }
+
+        // Terminal-Session-Erzeugung: die Backend-Wahl (PTY/Pipe, E2E-Modus, Diagnose) liegt vollständig
+        // im TerminalSessionService — beide Launcher werden als konkrete Typen registriert und über die
+        // Factory injiziert.
+        services.AddSingleton<Win32PseudoConsoleProcessLauncher>();
+        services.AddSingleton<SimulatedPseudoConsoleProcessLauncher>();
+        services.AddSingleton<ITerminalSessionFactory>(sp => new TerminalSessionService(
+            sp.GetRequiredService<IOptions<TerminalSessionOptions>>(),
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<Win32PseudoConsoleProcessLauncher>(),
+            sp.GetRequiredService<SimulatedPseudoConsoleProcessLauncher>(),
+            sp.GetRequiredService<ILogger<TerminalSessionService>>()));
         services.AddSingleton<KiAusfuehrungsService>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<PromptZeitVersandService>();
@@ -311,6 +322,8 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<DarkModeService>();
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<ICliRawExportService, CliRawExportService>();
+        services.AddSingleton<CliReplayAufzeichnungStore>();
+        services.AddSingleton<ICliReplayExportService, CliReplayExportService>();
         services.AddSingleton<IUpdateProgressDialogService, WpfUpdateProgressDialogService>();
         services.AddSingleton<IApplicationShutdownService, WpfApplicationShutdownService>();
         services.AddSingleton<PluginSelectionDialogService>();
@@ -361,6 +374,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<OpenTodosDialogViewModel>();
         services.AddTransient<AutonomAufgabeInitialisierungsDialogViewModel>();
         services.AddTransient<AufgabePausierenDialogViewModel>();
+        services.AddTransient<KonsolenTestViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

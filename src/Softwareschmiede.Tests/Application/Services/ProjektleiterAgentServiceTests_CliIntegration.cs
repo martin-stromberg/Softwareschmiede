@@ -66,7 +66,7 @@ public sealed class ProjektleiterAgentServiceTests_CliIntegration : IDisposable
         await _sut.StarteAgentAsync(konfiguration);
 
         _kiPluginMock.Verify(
-            p => p.StartCliAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()),
+            p => p.GetTerminalStartSpecAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -78,7 +78,7 @@ public sealed class ProjektleiterAgentServiceTests_CliIntegration : IDisposable
 
         await _sut.StarteAgentAsync(konfiguration);
 
-        var session = _kiAusfuehrungsService.GetPseudoConsoleSession(aufgabe.Id);
+        var session = _kiAusfuehrungsService.GetTerminalSession(aufgabe.Id);
         session.Should().NotBeNull();
 
         var gesendet = await WarteAufGesendetenPromptAsync(session!, konfiguration.InitialPrompt, TimeSpan.FromSeconds(10));
@@ -94,7 +94,7 @@ public sealed class ProjektleiterAgentServiceTests_CliIntegration : IDisposable
 
         await _sut.StarteAgentAsync(konfiguration, optionalResumePrompt: resumePrompt);
 
-        var session = _kiAusfuehrungsService.GetPseudoConsoleSession(aufgabe.Id);
+        var session = _kiAusfuehrungsService.GetTerminalSession(aufgabe.Id);
         session.Should().NotBeNull();
 
         var gesendet = await WarteAufGesendetenPromptAsync(session!, resumePrompt, TimeSpan.FromSeconds(10));
@@ -102,7 +102,7 @@ public sealed class ProjektleiterAgentServiceTests_CliIntegration : IDisposable
         gesendet.Should().NotContain(konfiguration.InitialPrompt);
     }
 
-    /// <summary>Bei Resume und einem Plugin mit SupportsSessionContinuation() == true wird optionalParameters == "--continue" an StartWithPseudoConsoleAsync übergeben.</summary>
+    /// <summary>Bei Resume und einem Plugin mit SupportsSessionContinuation() == true wird optionalParameters == "--continue" an die Terminal-Startbeschreibung (GetTerminalStartSpecAsync) übergeben.</summary>
     [Fact]
     public async Task StarteAgentAsync_MitResumePromptUndSessionContinuationPlugin_UebergibtContinueFlag()
     {
@@ -112,7 +112,7 @@ public sealed class ProjektleiterAgentServiceTests_CliIntegration : IDisposable
         await _sut.StarteAgentAsync(konfiguration, optionalResumePrompt: "Weitermachen: ...");
 
         _kiPluginMock.Verify(
-            p => p.StartCliAsync(It.IsAny<string>(), "--continue", It.IsAny<CancellationToken>()),
+            p => p.GetTerminalStartSpecAsync(It.IsAny<string>(), "--continue", It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -126,7 +126,7 @@ public sealed class ProjektleiterAgentServiceTests_CliIntegration : IDisposable
         await _sut.StarteAgentAsync(konfiguration, optionalResumePrompt: "Weitermachen: ...");
 
         _kiPluginMock.Verify(
-            p => p.StartCliAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()),
+            p => p.GetTerminalStartSpecAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -142,7 +142,7 @@ public sealed class ProjektleiterAgentServiceTests_CliIntegration : IDisposable
         var konfigurationAktualisiert = await _db.AutonomAufgabeKonfigurationen.FindAsync(konfiguration.Id);
         konfigurationAktualisiert!.ProjektleiterAgentId.Should().NotBeNullOrWhiteSpace();
 
-        var session = _kiAusfuehrungsService.GetPseudoConsoleSession(aufgabe.Id);
+        var session = _kiAusfuehrungsService.GetTerminalSession(aufgabe.Id);
         session.Should().NotBeNull();
         var gesendet = await WarteAufGesendetenPromptAsync(session!, resumePrompt, TimeSpan.FromSeconds(10));
         gesendet.Should().Contain(resumePrompt);
@@ -182,11 +182,11 @@ public sealed class ProjektleiterAgentServiceTests_CliIntegration : IDisposable
     /// Plugin-Befehl enthält (KiAusfuehrungsService.SendCommandDelayedAsync), genügt ein einfacher
     /// "nicht-leer"-Check nicht — es muss auf den tatsächlich erwarteten Inhalt gewartet werden.
     /// </summary>
-    /// <param name="session">Die zu prüfende PseudoConsoleSession.</param>
+    /// <param name="session">Die zu prüfende ITerminalSession.</param>
     /// <param name="erwarteterInhalt">Der Text, auf dessen Erscheinen im Input-Stream gewartet wird.</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Den zuletzt gelesenen Inhalt des Input-Streams (enthält <paramref name="erwarteterInhalt"/>, sofern rechtzeitig gesendet).</returns>
-    private static async Task<string> WarteAufGesendetenPromptAsync(PseudoConsoleSession session, string erwarteterInhalt, TimeSpan timeout)
+    private static async Task<string> WarteAufGesendetenPromptAsync(ITerminalSession session, string erwarteterInhalt, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         var letzterInhalt = string.Empty;

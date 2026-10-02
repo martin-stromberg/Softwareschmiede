@@ -38,7 +38,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
     /// Verwaltung entfernt und Tests, die eine über mehrere <c>FakeTimeProvider.Advance</c>-Aufrufe hinweg
     /// gültige Session voraussetzen, nichtdeterministisch scheitern lässt. Der Ping-Prozess bleibt dagegen
     /// zuverlässig für die Testdauer aktiv; die <see cref="PseudoConsoleSession"/> wird manuell an das Handle
-    /// angehängt, damit <see cref="KiAusfuehrungsService.GetPseudoConsoleSession"/> sie zurückgibt.
+    /// angehängt, damit <see cref="KiAusfuehrungsService.GetTerminalSession"/> sie zurückgibt.
     /// </summary>
     /// <returns>Die ID der Aufgabe, für die eine Session registriert wurde.</returns>
     private Task<Guid> StartCliSessionAsync()
@@ -54,7 +54,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var session = TestPseudoConsoleSessionFactory.Create(new MemoryStream(), new MemoryStream());
         var handle = new CliProcessHandle(aufgabeId, System.Diagnostics.Process.GetCurrentProcess())
         {
-            PseudoConsoleSession = session
+            Session = session
         };
 
         var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;

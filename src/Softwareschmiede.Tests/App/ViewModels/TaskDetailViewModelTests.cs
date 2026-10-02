@@ -60,6 +60,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
                 UseShellExecute = false,
                 CreateNoWindow = true,
             });
+        _kiPluginMock.SetupTerminalSpec("cmd.exe", "/k");
 
         _gitPluginForResolutionMock = new Mock<IGitPlugin>();
         _gitPluginForResolutionMock.SetupGet(p => p.PluginName).Returns("Test Git");
@@ -562,7 +563,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         var arbeitsverzeichnis = _tempDirectoryFixture.CreateTempDirectory("autonom-cli-stoppen-test");
-        await _kiService.StartWithPseudoConsoleAsync(aufgabe.Id, _kiPluginMock.Object, arbeitsverzeichnis, null, CancellationToken.None);
+        await _kiService.StartTerminalSessionAsync(aufgabe.Id, _kiPluginMock.Object, arbeitsverzeichnis, null, CancellationToken.None);
 
         sut.IsCliRunning.Should().BeTrue("Vorbedingung: der Projektleiter-Agent-Prozess läuft unter derselben AufgabeId");
         sut.KannCliStoppen.Should().BeFalse();
@@ -1309,19 +1310,19 @@ public sealed class TaskDetailViewModelTests : IDisposable
     }
 
     /// <summary>
-    /// StartenAsync muss PseudoConsoleSessionGestartet feuern, damit TaskDetailView
+    /// StartenAsync muss TerminalSessionGestartet feuern, damit TaskDetailView
     /// das TerminalControl mit der Session verbinden kann.
     /// </summary>
     [Fact]
-    public async Task StartenAsync_FiresPseudoConsoleSessionGestartet_NachErfolgreichemStart()
+    public async Task StartenAsync_FiresTerminalSessionGestartet_NachErfolgreichemStart()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        Softwareschmiede.Infrastructure.Terminal.PseudoConsoleSession? gemeldetSession = null;
-        sut.PseudoConsoleSessionGestartet += s => gemeldetSession = s;
+        Softwareschmiede.Infrastructure.Terminal.ITerminalSession? gemeldetSession = null;
+        sut.TerminalSessionGestartet += s => gemeldetSession = s;
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(
@@ -1331,16 +1332,16 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
 
         gemeldetSession.Should().NotBeNull(
-            "PseudoConsoleSessionGestartet muss nach StartenCommand feuern, damit das TerminalControl die Session erhält");
+            "TerminalSessionGestartet muss nach StartenCommand feuern, damit das TerminalControl die Session erhält");
     }
 
     /// <summary>
-    /// GetPseudoConsoleSession gibt nach explizitem Start die laufende Session zurück.
+    /// GetTerminalSession gibt nach explizitem Start die laufende Session zurück.
     /// Das erlaubt <see cref="Softwareschmiede.App.Views.TaskDetailView"/> im Loaded-Handler die Session
-    /// auch dann zu holen, wenn PseudoConsoleSessionGestartet schon gefeuert hat.
+    /// auch dann zu holen, wenn TerminalSessionGestartet schon gefeuert hat.
     /// </summary>
     [Fact]
-    public async Task GetPseudoConsoleSession_ReturnsSession_AfterExplicitStart()
+    public async Task GetTerminalSession_ReturnsSession_AfterExplicitStart()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
 
@@ -1355,19 +1356,44 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
 
-        // Simuliert: Loaded feuert NACH LadenAsync/PseudoConsoleSessionGestartet.
-        // Der View ruft GetPseudoConsoleSession() im Loaded-Handler auf und setzt TerminalConsole.Session direkt.
-        var session = sut.GetPseudoConsoleSession();
+        // Simuliert: Loaded feuert NACH LadenAsync/TerminalSessionGestartet.
+        // Der View ruft GetTerminalSession() im Loaded-Handler auf und setzt TerminalConsole.Session direkt.
+        var session = sut.GetTerminalSession();
 
         session.Should().NotBeNull(
-            "GetPseudoConsoleSession muss die Session liefern damit der View das TerminalControl verbinden kann " +
-            "wenn Loaded nach PseudoConsoleSessionGestartet feuert");
+            "GetTerminalSession muss die Session liefern damit der View das TerminalControl verbinden kann " +
+            "wenn Loaded nach TerminalSessionGestartet feuert");
+    }
+
+    /// <summary>
+    /// Läuft die gestartete Session im Pipe-Fallback (kein echtes Pseudo-Terminal), muss der
+    /// CliStatusText den eingeschränkten Modus sichtbar machen — der Fallback gilt nicht
+    /// stillschweigend als gleichwertiger interaktiver Modus.
+    /// </summary>
+    [Fact]
+    public async Task StartenAsync_PipeFallbackSession_ZeigtEingeschraenktenModusImStatusText()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(
+                It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        sut.CliStatusText.Should().Contain(
+            "eingeschränkter Modus",
+            "eine Session ohne Pseudo-Terminal (Pipe-Fallback) muss für die Anwenderin als eingeschränkter Modus sichtbar sein");
     }
 
     /// <summary>
     /// Navigiert der Anwender zurück (Dispose des alten VM), läuft die CLI weiter.
     /// Öffnet er die Aufgabe erneut, muss das neue VM IsCliRunning=true melden
-    /// und GetPseudoConsoleSession() die Session zurückgeben, damit der Loaded-Handler
+    /// und GetTerminalSession() die Session zurückgeben, damit der Loaded-Handler
     /// das TerminalControl verbinden kann.
     /// </summary>
     [Fact]
@@ -1394,11 +1420,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         zweiteVm.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)zweiteVm.LadenCommand).ExecuteAsync();
 
-        // CLI muss noch laufen und GetPseudoConsoleSession muss die Session liefern
+        // CLI muss noch laufen und GetTerminalSession muss die Session liefern
         zweiteVm.IsCliRunning.Should().BeTrue(
             "CLI soll nach Navigation-Zurück weiterlaufen");
-        zweiteVm.GetPseudoConsoleSession().Should().NotBeNull(
-            "GetPseudoConsoleSession muss die Session zurückgeben damit der Loaded-Handler das TerminalControl verbinden kann");
+        zweiteVm.GetTerminalSession().Should().NotBeNull(
+            "GetTerminalSession muss die Session zurückgeben damit der Loaded-Handler das TerminalControl verbinden kann");
     }
 
     /// <summary>Beim Start über Projekt-Default bleibt der CLI-Name nach erneutem Öffnen laufender Aufgaben sichtbar.</summary>
@@ -1617,7 +1643,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         sut.IsCliRunning.Should().BeTrue();
         _kiPluginMock.Verify(
-            p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            p => p.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -1663,7 +1689,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         sut.IsCliRunning.Should().BeTrue();
         _kiPluginMock.Verify(
-            p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            p => p.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

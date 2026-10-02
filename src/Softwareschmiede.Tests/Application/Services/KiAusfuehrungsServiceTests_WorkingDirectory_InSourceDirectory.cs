@@ -7,8 +7,8 @@ using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Plugins;
-using Softwareschmiede.Tests.Helpers;
 
+using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>

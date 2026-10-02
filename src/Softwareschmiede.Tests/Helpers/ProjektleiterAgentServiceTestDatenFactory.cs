@@ -37,6 +37,7 @@ internal static class ProjektleiterAgentServiceTestDatenFactory
                 UseShellExecute = false,
                 CreateNoWindow = true
             });
+        kiPluginMock.SetupTerminalSpec("cmd.exe", "/c exit 0");
 
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPluginMock.Object]);

@@ -41,6 +41,34 @@ public sealed class CliOutputProtokollWriterTests
         eintraege.Should().Equal("erste", "zweite ohne ende");
     }
 
+    /// <summary><see cref="CliOutputProtokollWriter"/> implementiert <see cref="Softwareschmiede.Infrastructure.Terminal.ITerminalDiagnoseSink"/>:
+    /// Diagnose-Marker laufen denselben Accumulator-Pfad wie normale CLI-Ausgabe und landen als
+    /// Protokollzeilen im Aufgabenprotokoll.</summary>
+    [Fact]
+    public async Task OnDiagnoseChunk_SchreibtMarkerAlsProtokollzeilen()
+    {
+        await using var provider = CreateCliOutputServiceProvider();
+        var aufgabeId = Guid.NewGuid();
+        var sut = new CliOutputProtokollWriter(
+            aufgabeId,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            NullLogger<CliOutputProtokollWriter>.Instance);
+
+        sut.Should().BeAssignableTo<Softwareschmiede.Infrastructure.Terminal.ITerminalDiagnoseSink>();
+        sut.OnDiagnoseChunk(System.Text.Encoding.UTF8.GetBytes("[Terminal-Diagnose] Markerzeile\r\n"));
+        await sut.CompleteAsync(TimeSpan.FromSeconds(2));
+
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
+        var eintraege = db.Protokolleintraege
+            .AsNoTracking()
+            .Where(e => e.AufgabeId == aufgabeId && e.Typ == ProtokollTyp.CliOutput)
+            .Select(e => e.Inhalt)
+            .ToList();
+
+        eintraege.Should().Equal("[Terminal-Diagnose] Markerzeile");
+    }
+
     /// <summary>Persistenzfehler werden geloggt und schlagen nicht in den Terminal-Lesepfad zurueck.</summary>
     [Fact]
     public async Task CliOutputProtokollWriter_Persistenzfehler_BeeintraechtigtSessionNicht()
@@ -120,7 +148,7 @@ public sealed class CliOutputProtokollWriterTests
             .Setup(l => l.Log(
                 It.Is<LogLevel>(lvl => lvl == LogLevel.Warning),
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("ist voll", StringComparison.Ordinal)),
+                It.Is<It.IsAnyType>((state, _) => IstQueueVollLogeintrag(state)),
                 It.IsAny<Exception?>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
             .Callback(() => queueFullLogged.TrySetResult());
@@ -218,6 +246,9 @@ public sealed class CliOutputProtokollWriterTests
             .Should().BeFalse("ohne Marker darf kein Session-Limit persistiert werden");
         db.Aufgaben.AsNoTracking().Single(a => a.Id == aufgabeId).PausiertBisUtc.Should().BeNull();
     }
+
+    private static bool IstQueueVollLogeintrag(object? state)
+        => state?.ToString()?.Contains("ist voll", StringComparison.Ordinal) == true;
 
     private static async Task<Guid> SeedLaufendeAufgabeAsync(ServiceProvider provider)
     {

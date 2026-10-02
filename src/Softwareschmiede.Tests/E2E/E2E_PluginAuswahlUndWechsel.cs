@@ -95,9 +95,17 @@ public partial class End2EndTest
         // Vor dem Wechsel: CLI-Panel sichtbar (ShowCliPanel==true, AusfuehrungsStatus==Aktiv)
         Assert.True(taskDetail.HasCliPanel());
 
+        // Vor dem Wechsel: Codex-ExecutablePath auf die garantiert vorhandene cmd.exe seeden, damit
+        // der Direct-Start-Pfad (Issue #271) die Executable auflösen kann — ein nackter "codex"-Name
+        // würde ohne Installation sonst als NotFound hart fehlschlagen. CommandLineParameters wird
+        // defensiv gelöscht (beide Schlüssel sind bereits in ManagedCredentialKeys erfasst).
+        var credentialStore = new Softwareschmiede.Infrastructure.Services.WindowsCredentialStore();
+        credentialStore.SetCredential("Softwareschmiede.Codex.ExecutablePath", Path.Combine(Environment.SystemDirectory, "cmd.exe"));
+        credentialStore.DeleteCredential("Softwareschmiede.Codex.CommandLineParameters");
+
         // Plugin ändern: Dialog mit aktuellem Plugin vorselektiert anzeigen
         var wechselDialog = taskDetail.OpenPluginChangeDialog();
-        wechselDialog.SelectPlugin("Softwareschmiede.ClaudeCli");
+        wechselDialog.SelectPlugin("Softwareschmiede.Codex");
         wechselDialog.Confirm();
 
         // Nach dem Wechsel: alter Prozess gestoppt, neuer CLI-Prozess läuft (Stoppen-Button weiterhin sichtbar)
@@ -107,10 +115,10 @@ public partial class End2EndTest
         Assert.True(taskDetail.HasCliPanel());
 
         // Fußzeile muss den neuen CLI-Namen anzeigen, nicht den zuerst gestarteten.
-        Assert.Equal("Claude CLI", taskDetail.GetActiveCliName());
+        Assert.Equal("Codex CLI", taskDetail.GetActiveCliName());
 
         // Seitenleiste/Programmmenü-Button muss ebenfalls den neuen CLI-Namen anzeigen.
-        Assert.Equal("Claude CLI", new MenuView(taskDetail.Window).GetActiveTaskKiPluginName("Neue Aufgabe"));
+        Assert.Equal("Codex CLI", new MenuView(taskDetail.Window).GetActiveTaskKiPluginName("Neue Aufgabe"));
 
         Assert.False(new ErrorView(taskDetail.Window).IsVisible);
     }

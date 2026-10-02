@@ -6,7 +6,7 @@ namespace Softwareschmiede.Application.Services;
 
 /// <summary>
 /// Singleton-Service, der die Laufzeit-Warteschlange zeitgesteuerter Prompts pro Aufgabe verwaltet
-/// und bei Erreichen der Zielzeit den Versand an die aktive <see cref="PseudoConsoleSession"/> auslöst.
+/// und bei Erreichen der Zielzeit den Versand an die aktive <see cref="ITerminalSession"/> auslöst.
 /// Es gibt keine Persistierung — die Verzögerung ist rein sitzungsgebunden.
 /// </summary>
 public sealed class PromptZeitVersandService
@@ -192,7 +192,7 @@ public sealed class PromptZeitVersandService
 
     private async Task SendPromptAsync(Guid aufgabeId, string promptText)
     {
-        var session = _kiService.GetPseudoConsoleSession(aufgabeId);
+        var session = _kiService.GetTerminalSession(aufgabeId);
         if (session is null)
         {
             _logger.LogWarning(

@@ -126,7 +126,7 @@ public sealed class AutonomAufgabeDetailViewModel : ViewModelBase, IDisposable
         // Zusätzlich an !CliIsRunning gebunden: Start/Resume sind sinnlos (bzw. bei Start sogar schädlich), solange
         // die CLI der Aufgabe bereits läuft. Verhindert insbesondere, dass ein zweiter Klick auf "Start" innerhalb
         // des Verzögerungsfensters von SendeInitialPromptVerzoegertAsync (siehe ProjektleiterAgentService) den
-        // Initialprompt doppelt an dieselbe CLI-Session sendet: KiAusfuehrungsService.StartWithPseudoConsoleAsync
+        // Initialprompt doppelt an dieselbe CLI-Session sendet: KiAusfuehrungsService.StartTerminalSessionAsync
         // setzt CliIsRunning bereits synchron auf true, bevor IsBusy im finally-Block zurückgesetzt wird.
         StartCommand = new AsyncRelayCommand(ct => StarteAgentAsync(ct), () => !IsBusy && !CliIsRunning);
         // Bewusst nicht auf CliIsRunning eingeschränkt: "Beenden" muss auch dann verfügbar sein, wenn der

@@ -90,7 +90,7 @@ Das ausgewählte `SelectedWorkingDirectory` wird mit der `RepositoryStartKonfigu
 - Path-Traversal-Angriffe zu verhindern (Validierung, dass normalisierter Pfad innerhalb normalisierten Roots liegt)
 - Existenz des Zielverzeichnisses zu prüfen
 
-Der resultierende Pfad wird an `KiAusfuehrungsService.StartCliAsync()` / `StartWithPseudoConsoleAsync()` als `ProcessStartInfo.WorkingDirectory` übergeben. Zusätzlich validiert `GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(...)` das konfigurierte Arbeitsverzeichnis bereits direkt nach dem Git-Klon (aufgerufen aus `EntwicklungsprozessService.ProzessStartenAsync`), sodass ein fehlendes oder ungültiges Verzeichnis früher und mit einem klareren Fehlerbild erkannt wird als erst beim CLI-Start.
+Der resultierende Pfad wird an `KiAusfuehrungsService.StartCliAsync()` / `StartTerminalSessionAsync()` als `ProcessStartInfo.WorkingDirectory` übergeben. Zusätzlich validiert `GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(...)` das konfigurierte Arbeitsverzeichnis bereits direkt nach dem Git-Klon (aufgerufen aus `EntwicklungsprozessService.ProzessStartenAsync`), sodass ein fehlendes oder ungültiges Verzeichnis früher und mit einem klareren Fehlerbild erkannt wird als erst beim CLI-Start.
 
 Das einmal zugewiesene Arbeitsverzeichnis kann jederzeit nachträglich geändert werden, ohne das Repository neu zuzuweisen — siehe [Dialog „Arbeitsverzeichnis bearbeiten"](dialog-arbeitsverzeichnis-bearbeiten.md).
 

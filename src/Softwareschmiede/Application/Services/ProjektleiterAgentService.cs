@@ -14,8 +14,8 @@ namespace Softwareschmiede.Application.Services;
 public sealed class ProjektleiterAgentService
 {
     /// <summary>Feste Verzögerung, bevor der Initial-/Weitermachen-Prompt nach dem CLI-Start an die PseudoConsoleSession
-    /// gesendet wird. Deutlich länger als die 300ms-Verzögerung in <see cref="KiAusfuehrungsService.SendCommandDelayedAsync"/>,
-    /// da hier zusätzlich auf den Eigenstart der KI-CLI selbst gewartet werden muss (kein Ready-Signal vorhanden).</summary>
+    /// gesendet wird — lang genug, damit die direkt gestartete KI-CLI selbst bereit ist
+    /// (kein Ready-Signal vorhanden).</summary>
     private const int PromptSendeVerzoegerungMs = 3000;
 
     private readonly SoftwareschmiededDbContext _db;
@@ -50,8 +50,8 @@ public sealed class ProjektleiterAgentService
 
     /// <summary>
     /// Startet den Projektleiter-Agenten: erzeugt den Projektleiter-Skill, startet den echten CLI-Prozess über
-    /// <see cref="KiAusfuehrungsService.StartWithPseudoConsoleAsync"/> und sendet anschließend (verzögert, Fire-and-Forget)
-    /// den Initial- bzw. Weitermachen-Prompt über die <see cref="PseudoConsoleSession"/> der Aufgabe.
+    /// <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/> und sendet anschließend (verzögert, Fire-and-Forget)
+    /// den Initial- bzw. Weitermachen-Prompt über die <see cref="ITerminalSession"/> der Aufgabe.
     /// </summary>
     /// <param name="konfiguration">Die Konfiguration der Autonomen Aufgabe.</param>
     /// <param name="optionalResumePrompt">Bei App-Neustart-Recovery der Weitermachen-Prompt; bei Erststart <c>null</c>.</param>
@@ -91,7 +91,7 @@ public sealed class ProjektleiterAgentService
 
         try
         {
-            await _kiAusfuehrungsService.StartWithPseudoConsoleAsync(
+            await _kiAusfuehrungsService.StartTerminalSessionAsync(
                 konfiguration.AufgabeId,
                 kiPlugin,
                 konfiguration.ArbeitsverzeichnisPfad,
@@ -302,8 +302,8 @@ public sealed class ProjektleiterAgentService
 
     /// <summary>
     /// Wartet <see cref="PromptSendeVerzoegerungMs"/> ab und sendet anschließend <paramref name="promptText"/> über die
-    /// aktive <see cref="PseudoConsoleSession"/> der Aufgabe. Best-Effort: Ist keine Session (mehr) vorhanden oder
-    /// tritt ein Fehler auf, wird lediglich geloggt, nicht geworfen (analog zu <see cref="KiAusfuehrungsService.SendCommandDelayedAsync"/>).
+    /// aktive <see cref="ITerminalSession"/> der Aufgabe. Best-Effort: Ist keine Session (mehr) vorhanden oder
+    /// tritt ein Fehler auf, wird lediglich geloggt, nicht geworfen.
     /// </summary>
     /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Session den Prompt erhalten soll.</param>
     /// <param name="promptText">Der zu sendende Prompttext.</param>
@@ -314,7 +314,7 @@ public sealed class ProjektleiterAgentService
         {
             await Task.Delay(PromptSendeVerzoegerungMs, ct).ConfigureAwait(false);
 
-            var session = _kiAusfuehrungsService.GetPseudoConsoleSession(aufgabeId);
+            var session = _kiAusfuehrungsService.GetTerminalSession(aufgabeId);
             if (session is null)
             {
                 _logger.LogWarning(

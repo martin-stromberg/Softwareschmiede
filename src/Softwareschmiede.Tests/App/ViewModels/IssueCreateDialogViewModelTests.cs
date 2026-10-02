@@ -464,6 +464,9 @@ public sealed class IssueCreateDialogViewModelTests
         public string GetProcessWindowTitle(Guid aufgabeId) => "Fake KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
+        public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
+        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+            => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
         public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
         {
             ReceivedTemplateBody = templateBody;
@@ -482,6 +485,9 @@ public sealed class IssueCreateDialogViewModelTests
         public string GetProcessWindowTitle(Guid aufgabeId) => "Fail KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
+        public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
+        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+            => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
         public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
             => throw new InvalidOperationException("Providerfehler");
     }
@@ -496,6 +502,9 @@ public sealed class IssueCreateDialogViewModelTests
         public string GetProcessWindowTitle(Guid aufgabeId) => "Cancel KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
+        public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
+        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+            => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
         public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
             => throw new OperationCanceledException(ct);
     }
@@ -510,5 +519,8 @@ public sealed class IssueCreateDialogViewModelTests
         public string GetProcessWindowTitle(Guid aufgabeId) => "Plain KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
+        public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
+        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+            => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
     }
 }

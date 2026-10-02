@@ -20,6 +20,7 @@ public static class WindowExtensions
         w => new SolutionSelectionDialogView(w),
         w => new UpdateProgressDialogView(w),
         w => new DeleteConfirmationDialogView(w),
+        w => new KonsolenTestDialogView(w),
     ];
 
     /// <summary>

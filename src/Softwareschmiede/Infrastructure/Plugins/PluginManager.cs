@@ -110,7 +110,7 @@ public sealed class PluginManager : IPluginManager
     }
 
     private static bool IsTestMode()
-        => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH"));
+        => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Terminal.TerminalSessionService.TestDatenbankPfadVariable));
 
     private static bool IsAllowedInTestMode(string dllFileName)
     {

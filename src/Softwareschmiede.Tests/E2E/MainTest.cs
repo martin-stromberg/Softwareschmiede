@@ -31,7 +31,9 @@ public partial class End2EndTest : WpfTestBase
         TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(mainWindow);
         await AufgabePausieren_DialogCountdownAbblendungUndAufheben_E2E(mainWindow);
         await SessionLimit_MarkerPauseProtokollUndUpdateSicherheit_E2E(mainWindow);
+        await TerminalFallbackDiagnose_PipeFallbackUndRequiresPtyFehler_E2E(mainWindow);
         CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(mainWindow);
+        await KonsolenTestfenster_OeffnetLaedtAufzeichnungUndSpieltAb_E2E(mainWindow);
 
         ViewPatternHappyPath_NavigiertUndErstelltKorrekt_E2E(mainWindow);
         AnsichtenErkennung_LiefertKorrekteViewTypen_E2E(mainWindow);
@@ -87,7 +89,7 @@ public partial class End2EndTest : WpfTestBase
         PluginAktivierung_ValidierungPersistenzUndSinglePluginVerhalten_E2E(mainWindow);
         DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E(mainWindow);
         AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E(mainWindow);
-        ConPtyLifecycle_StartResizeTastatureingabeUndProzessende_E2E(mainWindow);
+        await ConPtyLifecycle_StartResizeTastatureingabeUndProzessende_E2E(mainWindow);
         AufgabeOeffnen_NachStoppen_StartetCliNichtAutomatischErstExplizit_E2E(mainWindow);
         AufgabeStarten_KlontRepositoryUndStartetCli_E2E(mainWindow);
         CliRawExport_ErstelltRawDateiMitCliOutput_HappyPath_E2E(mainWindow);

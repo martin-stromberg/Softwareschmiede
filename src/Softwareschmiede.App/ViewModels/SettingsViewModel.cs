@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.App.Services;
@@ -27,6 +28,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private readonly PromptVorlagenService _promptVorlagenService;
     private readonly IOptions<AutonomAufgabenOptions> _autonomAufgabenOptions;
     private readonly ILogger<SettingsViewModel> _logger;
+    private readonly IDialogService _dialogService;
+    private readonly IServiceProvider _serviceProvider;
     private readonly List<Guid> _geloeschtePromptVorlagenIds = [];
 
     private string? _arbeitsverzeichnis;
@@ -241,6 +244,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     /// <summary>Entfernt eine Promptvorlage aus der Liste.</summary>
     public ICommand PromptVorlageLoeschenCommand { get; }
 
+    /// <summary>Öffnet das nicht-modale Konsolentestfenster (Diagnose-Werkzeug für das CLI-Ausgabe-Replay).</summary>
+    public ICommand KonsolenTestOeffnenCommand { get; }
+
     /// <inheritdoc cref="SettingsViewModel"/>
     public SettingsViewModel(
         AppEinstellungService einstellungService,
@@ -251,7 +257,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         PluginSettingsService pluginSettingsService,
         PromptVorlagenService promptVorlagenService,
         ILogger<SettingsViewModel> logger,
-        IOptions<AutonomAufgabenOptions> autonomAufgabenOptions)
+        IOptions<AutonomAufgabenOptions> autonomAufgabenOptions,
+        IDialogService dialogService,
+        IServiceProvider serviceProvider)
     {
         _einstellungService = einstellungService;
         _arbeitsverzeichnisService = arbeitsverzeichnisService;
@@ -262,6 +270,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         _promptVorlagenService = promptVorlagenService;
         _logger = logger;
         _autonomAufgabenOptions = autonomAufgabenOptions;
+        _dialogService = dialogService;
+        _serviceProvider = serviceProvider;
 
         _designMode = darkModeService.Current;
         _darkModeService.ModeChanged += OnDarkModeChanged;
@@ -285,6 +295,25 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         IdePluginMoveDownCommand = new RelayCommand<PluginActivationEntry>(entry => MoveIdePlugin(entry, 1), entry => CanMoveIdePlugin(entry, 1));
         PromptVorlageHinzufuegenCommand = new RelayCommand(PromptVorlageHinzufuegen);
         PromptVorlageLoeschenCommand = new RelayCommand<PromptVorlageEntry>(PromptVorlageLoeschen, entry => entry is not null);
+        KonsolenTestOeffnenCommand = new AsyncRelayCommand(KonsolenTestOeffnenAsync);
+    }
+
+    private async Task KonsolenTestOeffnenAsync(CancellationToken ct)
+    {
+        try
+        {
+            var viewModel = _serviceProvider.GetRequiredService<KonsolenTestViewModel>();
+            await _dialogService.ShowKonsolenTestDialogAsync(viewModel, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Das Konsolentestfenster konnte nicht geöffnet werden.");
+            FehlerMeldung = $"Konsolentestfenster konnte nicht geöffnet werden: {ex.Message}";
+        }
     }
 
     private async Task LadenAsync(CancellationToken ct)

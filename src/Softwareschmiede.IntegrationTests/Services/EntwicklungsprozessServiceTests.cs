@@ -387,7 +387,7 @@ public sealed class EntwicklungsprozessServiceTests
     /// intern zuerst aufruft) unabhängig vom Feature-Flag <see cref="AutonomAufgabenOptions.Enabled"/> für
     /// Autonome Aufgaben funktioniert (Issue 205): <see cref="EntwicklungsprozessService"/> hat bewusst keine
     /// Abhängigkeit zu <see cref="AutonomAufgabenOptions"/> und wird daher nicht durch das deaktivierte Flag
-    /// blockiert. Der eigentliche CLI-Start (<c>KiAusfuehrungsService.StartWithPseudoConsoleAsync</c>) wird hier
+    /// blockiert. Der eigentliche CLI-Start (<c>KiAusfuehrungsService.StartTerminalSessionAsync</c>) wird hier
     /// bewusst nicht mitgeprüft, da er einen echten ConPTY-Kindprozess erfordert (siehe CLAUDE.md, Abschnitt
     /// Testing, zur ConPTY-Instabilität dieser Sandbox) und für den Nachweis der Feature-Flag-Unabhängigkeit
     /// nicht erforderlich ist.

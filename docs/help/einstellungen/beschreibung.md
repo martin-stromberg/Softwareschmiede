@@ -12,6 +12,7 @@ Die Einstellungsseite ermöglicht die zentrale Konfiguration der Anwendung ohne 
 6. **Promptvorlagen** — Wiederkehrende CLI-Prompts zentral verwalten
 7. **Automatisierung** — Autonome Aufgaben aktivieren oder deaktivieren
 8. **Updates** — Update-Modus (Aus / Nur prüfen / Bei Programmstart prüfen und ausführen) und optionale Prerelease-Berücksichtigung
+9. **Diagnose** — Öffnet das Konsolentestfenster zur Wiedergabe exportierter CLI-Aufzeichnungen
 
 ## Funktionsweise
 
@@ -79,6 +80,10 @@ Im Abschnitt **Updates** der Registerkarte „Allgemein" steuert eine Auswahlbox
 - **Bei Programmstart prüfen und ausführen** — beim Programmstart wird geprüft und ein gefundenes Update automatisch installiert
 
 Die Checkbox **„Prerelease-Versionen laden"** legt fest, ob bei der Prüfung auch Vorabversionen berücksichtigt werden. Beide Werte werden persistent gespeichert und erst mit **Speichern** wirksam. Details zum Update-Ablauf siehe [Programmupdate](../programmupdate/index.md).
+
+### Diagnose
+
+Im Abschnitt **Diagnose** der Registerkarte „Allgemein" öffnet die Schaltfläche **„Konsolentestfenster öffnen"** das Diagnosewerkzeug für die Terminal-Ausgabe: ein nicht-modales Fenster, in dem eine zuvor aus der Aufgabendetailansicht exportierte CLI-Aufzeichnung (`.clireplay`) zeitgesteuert durch den echten Terminal-Renderpfad abgespielt werden kann — mit Quell-Ansicht der aufgezeichneten Ausgabe-Blöcke, Pausieren/Fortsetzen, Einzelschritt-Wiedergabe vorwärts/rückwärts („Schritt vor"/„Schritt zurück"), Neu starten und einstellbarer Zeitraffer-Schwelle. Details siehe [Terminal-Integration](../terminal/index.md). Der Abschnitt enthält keine speicherbaren Einstellungen — ein **Speichern** ist dafür nicht nötig.
 
 ### IDE-Verhalten
 

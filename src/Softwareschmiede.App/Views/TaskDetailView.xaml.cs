@@ -50,12 +50,12 @@ public sealed partial class TaskDetailView : UserControl
 
         if (e.NewValue is TaskDetailViewModel vm)
         {
-            vm.PseudoConsoleSessionGestartet += OnPseudoConsoleSessionGestartet;
+            vm.TerminalSessionGestartet += OnTerminalSessionGestartet;
             vm.CliGestoppt += OnCliGestoppt;
             vm.PromptVorlageGesendet += OnPromptVorlageGesendet;
             _subscribedViewModel = vm;
 
-            SetTerminalSession(vm.GetPseudoConsoleSession());
+            SetTerminalSession(vm.GetTerminalSession());
         }
         else
         {
@@ -68,13 +68,13 @@ public sealed partial class TaskDetailView : UserControl
         if (vm is null)
             return;
 
-        vm.PseudoConsoleSessionGestartet -= OnPseudoConsoleSessionGestartet;
+        vm.TerminalSessionGestartet -= OnTerminalSessionGestartet;
         vm.CliGestoppt -= OnCliGestoppt;
         vm.PromptVorlageGesendet -= OnPromptVorlageGesendet;
         vm.Dispose();
     }
 
-    private void OnPseudoConsoleSessionGestartet(PseudoConsoleSession session)
+    private void OnTerminalSessionGestartet(ITerminalSession session)
     {
         SetTerminalSession(session);
     }
@@ -141,14 +141,14 @@ public sealed partial class TaskDetailView : UserControl
 
     /// <summary>Setzt die im TerminalControl angezeigte Sitzung und legt deren Prozess-ID zu Testzwecken als AutomationProperties.HelpText ab (siehe E2E_TaskWechselUeberMenue).</summary>
     /// <param name="session">Die anzuzeigende CLI-Sitzung, oder <c>null</c>, wenn keine Sitzung eingebettet werden soll.</param>
-    private void SetTerminalSession(PseudoConsoleSession? session)
+    private void SetTerminalSession(ITerminalSession? session)
     {
         TerminalConsole.Session = session;
         AutomationProperties.SetHelpText(TerminalConsole, TryGetProcessId(session));
     }
 
     /// <summary>
-    /// Liest die Prozess-ID einer Sitzung robust aus. <see cref="PseudoConsoleSession.Process"/> stammt
+    /// Liest die Prozess-ID einer Sitzung robust aus. <see cref="ITerminalSession.Process"/> stammt
     /// bei ConPTY-Sitzungen aus <see cref="System.Diagnostics.Process.GetProcessById(int)"/> - ist der
     /// zugrunde liegende Prozess bereits beendet (z. B. sehr kurzlebige ConPTY-Kindprozesse), kann jeder
     /// Zugriff darauf mit <see cref="InvalidOperationException"/> ("No process is associated with this
@@ -158,7 +158,7 @@ public sealed partial class TaskDetailView : UserControl
     /// </summary>
     /// <param name="session">Die Sitzung, deren Prozess-ID gelesen werden soll, oder <c>null</c>.</param>
     /// <returns>Die Prozess-ID als String, oder ein leerer String, wenn keine Sitzung vorhanden ist oder die ID nicht (mehr) gelesen werden kann.</returns>
-    private static string TryGetProcessId(PseudoConsoleSession? session)
+    private static string TryGetProcessId(ITerminalSession? session)
     {
         if (session is null)
             return string.Empty;

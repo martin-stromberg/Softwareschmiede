@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -19,24 +19,42 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     private static readonly TimeSpan ConPtyOutputDrainTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan CliOutputWriterDrainTimeout = TimeSpan.FromSeconds(2);
 
+    /// <summary>Maximale Anzahl gleichzeitig vorgehaltener CLI-Aufzeichnungen (ältere werden verworfen).</summary>
+    internal const int MaxAufzeichnungenAnzahl = 8;
+
     private readonly ConcurrentDictionary<Guid, CliProcessHandle> _handles = new();
+    private readonly ConcurrentDictionary<Guid, CliOutputRecorder> _aufzeichnungen = new();
+    private readonly LinkedList<Guid> _aufzeichnungsReihenfolge = new();
+    private readonly object _aufzeichnungenLock = new();
     private readonly ILogger<KiAusfuehrungsService> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IPseudoConsoleProcessLauncher _launcher;
+    private readonly ITerminalSessionFactory _sessionFactory;
+    private readonly IOptions<TerminalSessionOptions> _terminalOptions;
+    private readonly TimeProvider _timeProvider;
     private volatile bool _isDisposed;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="KiAusfuehrungsService"/>.</summary>
     /// <param name="logger">Logger-Instanz.</param>
     /// <param name="loggerFactory">Factory zum Erzeugen kategoriespezifischer Logger (z. B. für <see cref="PseudoConsoleSession"/>).</param>
     /// <param name="scopeFactory">Factory für DI-Scopes (wird für Fehler-Persistierung verwendet).</param>
-    /// <param name="launcher">Austauschpunkt für den ConPTY-Prozessstart. Bei <c>null</c> wird <see cref="Win32PseudoConsoleProcessLauncher"/> verwendet.</param>
-    public KiAusfuehrungsService(ILogger<KiAusfuehrungsService> logger, ILoggerFactory loggerFactory, IServiceScopeFactory scopeFactory, IPseudoConsoleProcessLauncher? launcher = null)
+    /// <param name="sessionFactory">Zentrale Erzeugung der interaktiven Terminal-Session (Auflösung, Preflight, Backend-Wahl).</param>
+    /// <param name="terminalOptions">Terminal-Laufzeitparameter (u. a. <see cref="TerminalSessionOptions.AufzeichnungByteBudget"/>).</param>
+    /// <param name="timeProvider">Zeitquelle für die Aufzeichnungs-Zeitstempel.</param>
+    public KiAusfuehrungsService(
+        ILogger<KiAusfuehrungsService> logger,
+        ILoggerFactory loggerFactory,
+        IServiceScopeFactory scopeFactory,
+        ITerminalSessionFactory sessionFactory,
+        IOptions<TerminalSessionOptions> terminalOptions,
+        TimeProvider timeProvider)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
         _scopeFactory = scopeFactory;
-        _launcher = launcher ?? new Win32PseudoConsoleProcessLauncher(loggerFactory.CreateLogger<Win32PseudoConsoleProcessLauncher>(), loggerFactory);
+        _sessionFactory = sessionFactory;
+        _terminalOptions = terminalOptions;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>Wird ausgelöst, wenn ein CLI-Prozess gestartet, gestoppt oder ein Fehler aufgetreten ist.</summary>
@@ -167,7 +185,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         }
     }
 
-    /// <summary>Startet einen CLI-Prozess für eine Aufgabe über die Windows Pseudo Console API.</summary>
+    /// <summary>Startet einen CLI-Prozess für eine Aufgabe über eine interaktive Terminal-Session
+    /// (PTY-Backend oder diagnostizierter Pipe-Fallback, gewählt durch <see cref="ITerminalSessionFactory"/>).</summary>
     /// <param name="aufgabeId">ID der Aufgabe.</param>
     /// <param name="kiPlugin">Das zu verwendende KI-Plugin.</param>
     /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis.</param>
@@ -179,7 +198,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// tatsächlichen Repository-Pfads, z. B. bei <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus).
     /// </param>
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
-    public async Task<CliProcessHandle> StartWithPseudoConsoleAsync(
+    public async Task<CliProcessHandle> StartTerminalSessionAsync(
         Guid aufgabeId,
         IKiPlugin kiPlugin,
         string localRepoPath,
@@ -206,71 +225,98 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 
             var effectiveWorkdir = await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(localRepoPath, startConfig, gitPlugin, ct).ConfigureAwait(false);
 
-            // Plugin-Befehl ermitteln (FileName + Arguments) — wird nach cmd.exe-Start in die Konsole gesendet.
-            var pluginPsi = await kiPlugin.StartCliAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
-            var pluginCommand = BuildCliCommand(pluginPsi);
+            var spec = await kiPlugin.GetTerminalStartSpecAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
 
             var outputWriter = new CliOutputProtokollWriter(
                 aufgabeId,
                 _scopeFactory,
                 _loggerFactory.CreateLogger<CliOutputProtokollWriter>());
 
-            Process process;
-            PseudoConsoleSession session;
-            IntPtr nativeProcessHandle;
+            // Rohbyte-Mitschnitt (Diagnose-Werkzeug): läuft ab Session-Erzeugung mit und erfasst
+            // damit auch frühe Chunks ohne Race-Bedingung. Bei deaktiviertem Budget wird der
+            // Protokoll-Writer direkt übergeben (keine einelementige Composite).
+            var options = _terminalOptions.Value;
+            CliOutputRecorder? recorder = options.AufzeichnungByteBudget > 0
+                ? new CliOutputRecorder(
+                    aufgabeId,
+                    spec.PluginName,
+                    options.DefaultCols,
+                    options.DefaultRows,
+                    options.AufzeichnungByteBudget,
+                    _timeProvider,
+                    _loggerFactory.CreateLogger<CliOutputRecorder>())
+                : null;
+            ITerminalOutputSink outputSink = recorder is not null
+                ? new CompositeTerminalOutputSink(outputWriter, recorder)
+                : outputWriter;
+
+            TerminalSessionStartResult startResult;
             try
             {
-                (process, session, nativeProcessHandle) = _launcher.Start(aufgabeId, effectiveWorkdir, pluginCommand, outputWriter);
+                startResult = await _sessionFactory.StartAsync(aufgabeId, spec, outputSink, kiPlugin.CheckHealthAsync, ct).ConfigureAwait(false);
             }
             catch
             {
-                await outputWriter.CompleteAsync(CliOutputWriterDrainTimeout, ct).ConfigureAwait(false);
+                await outputSink.CompleteAsync(CliOutputWriterDrainTimeout, ct).ConfigureAwait(false);
                 throw;
             }
 
-            var sendCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            // Token sofort abgreifen: Wird er erst später (z. B. beim Fire-and-Forget-Aufruf weiter unten)
-            // von sendCts gelesen, kann ein zwischenzeitlich auf einem anderen Thread ausgelöstes Exited-Event
-            // sendCts bereits disposed haben (siehe CancelAndDisposeConPtyResourcesAsync) — der Zugriff auf
-            // sendCts.Token würde dann selbst eine ObjectDisposedException werfen. Ein einmal (vor dem Dispose)
-            // abgegriffener CancellationToken bleibt dagegen gültig auswertbar.
-            var sendToken = sendCts.Token;
+            var process = startResult.Process;
+            var session = startResult.Session;
             var handle = new CliProcessHandle(aufgabeId, process)
             {
-                PseudoConsoleSession = session,
-                SendCts = sendCts,
-                NativeProcessHandle = nativeProcessHandle,
-                OutputSink = outputWriter
+                Session = session,
+                OutputSink = outputSink
             };
 
-            // EnableRaisingEvents vor der Handler-Registrierung setzen. So ist sichergestellt, dass
-            // das Exited-Event nicht zwischen Prozessstart und Handler-Registrierung verloren geht.
-            process.EnableRaisingEvents = true;
-            process.Exited += (_, _) => HandleProcessExitedAsync(aufgabeId, process, handle, "ConPTY", () => CancelAndDisposeConPtyResourcesAsync(handle)).SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleProcessExitedAsync");
+            // Der Recorder-Eintrag überlebt das Session-Ende (der CliProcessHandle wird bei Exited
+            // entfernt) und wird beim nächsten Start derselben Aufgabe ersetzt.
+            if (recorder is not null)
+                RegistriereAufzeichnung(aufgabeId, recorder);
 
+            // Exit-/Fehlerbehandlung läuft über die Session — sie besitzt das native Prozess-Handle und
+            // erkennt das Prozessende selbst (Process.Exited bzw. Ende des Output-Streams). Das Handle wird
+            // vor der Event-Verdrahtung eingetragen, damit ein bereits ausgelöstes Exited/Failed das
+            // Handle vorfindet (sonst würde HandleExitedCoreAsync es stillschweigend verwerfen).
             _handles[aufgabeId] = handle;
 
-            // Wenn der Prozess bereits vor dem Setzen von EnableRaisingEvents beendet wurde,
-            // wird das Exited-Event nicht mehr ausgelöst. Dann hier manuell bereinigen und
-            // frühzeitig zurückkehren — kein Gestartet-Event für einen bereits beendeten Prozess.
-            if (process.HasExited && _handles.TryRemove(aufgabeId, out var earlyExitHandle))
+            session.Exited += (_, e) => HandleSessionEndedAsync(aufgabeId, handle, e.ExitCode, "Terminal").SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionEndedAsync");
+            session.Failed += (_, e) => HandleSessionFailedAsync(aufgabeId, handle, e).SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionFailedAsync");
+
+            // Ein vor der Verdrahtung ausgelöstes Failed (z. B. Leseschleifen-Fehler bei noch
+            // laufendem Prozess) ist ohne Subscriber verlorengegangen — über den auf der Session
+            // sichtbaren Fehlerzustand nachträglich wie ein reguläres Failed behandeln. Der Check
+            // steht vor dem HasExited-Recheck: Ein fataler Session-Fehler ist der schwerwiegendere
+            // Zustand und führt gemäß Plan auf CliProcessStatus.Fehler (der Exit-Code wird dabei
+            // mitgeführt, sofern er bereits bekannt ist).
+            if (session.Failure is { } preWiringFailure)
             {
-                await CancelAndDisposeConPtyResourcesAsync(earlyExitHandle).ConfigureAwait(false);
-                RaiseRunningCountChanged();
-                await PersistAusfuehrungBeendetAsync(aufgabeId).ConfigureAwait(false);
-                CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestoppt);
+                await HandleSessionFailedAsync(aufgabeId, handle, preWiringFailure).ConfigureAwait(false);
                 return handle;
             }
 
-            _logger.LogInformation("CLI-Prozess (ConPTY) für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, process.Id);
+            // Wenn der Prozess bereits vor der Event-Verdrahtung beendet wurde, hat die Session ihr
+            // Exited eventuell schon vor der Registrierung ausgelöst — dann hier über denselben Pfad
+            // wie ein reguläres Exited-Event bereinigen: HandleExitedCoreAsync entfernt das Handle
+            // atomar (Genau-einmal-Semantik auch gegen ein parallel zugestelltes Exited) und bildet
+            // den Exit-Code korrekt auf Gestoppt/Fehler inkl. Fehler-Protokolleintrag ab (kein
+            // Gestartet-Event für einen bereits beendeten Prozess).
+            if (process.HasExited)
+            {
+                await HandleSessionEndedAsync(aufgabeId, handle, session.ExitCode ?? TryGetExitCode(process), "Terminal").ConfigureAwait(false);
+                return handle;
+            }
+
+            // Hat ein zwischenzeitlich ausgelöstes Session-Event (Exited/Failed) das Handle bereits
+            // entfernt und den Endzustand gemeldet, darf kein Gestartet-Event mehr folgen.
+            if (!_handles.TryGetValue(aufgabeId, out var registered) || !ReferenceEquals(registered, handle))
+            {
+                return handle;
+            }
+
+            _logger.LogInformation("CLI-Prozess (Terminal-Session) für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, process.Id);
             RaiseRunningCountChanged();
             CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestartet);
-
-            // Plugin-Befehl verzögert senden: cmd.exe braucht ~200ms bis der Prompt bereit ist.
-            if (!string.IsNullOrEmpty(pluginCommand))
-            {
-                SendCommandDelayedAsync(session, pluginCommand, aufgabeId, sendToken).SafeFireAndForget(_logger, "KiAusfuehrungsService.SendCommandDelayedAsync");
-            }
 
             return handle;
         }
@@ -280,14 +326,42 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         }
     }
 
-    /// <summary>Gibt die <see cref="PseudoConsoleSession"/> für eine Aufgabe zurück, oder null wenn keine vorhanden.</summary>
+    /// <summary>Gibt die <see cref="ITerminalSession"/> für eine Aufgabe zurück, oder null wenn keine vorhanden.</summary>
     /// <param name="aufgabeId">ID der Aufgabe.</param>
-    /// <returns>Die <see cref="PseudoConsoleSession"/>, oder null.</returns>
-    public PseudoConsoleSession? GetPseudoConsoleSession(Guid aufgabeId)
+    /// <returns>Die <see cref="ITerminalSession"/>, oder null.</returns>
+    public ITerminalSession? GetTerminalSession(Guid aufgabeId)
     {
         if (!_handles.TryGetValue(aufgabeId, out var handle))
             return null;
-        return handle.PseudoConsoleSession;
+        return handle.Session;
+    }
+
+    /// <summary>Gibt die Rohbyte-Aufzeichnung der letzten Terminal-Session einer Aufgabe zurück —
+    /// auch nach dem Session-Ende abrufbar (der Eintrag überlebt das Handle).</summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <returns>Ein Snapshot der <see cref="CliOutputAufzeichnung"/>, oder null wenn keine Aufzeichnung
+    /// existiert (kein Session-Start oder Aufzeichnung via <c>AufzeichnungByteBudget</c> deaktiviert).</returns>
+    public CliOutputAufzeichnung? GetCliAufzeichnung(Guid aufgabeId)
+        => _aufzeichnungen.TryGetValue(aufgabeId, out var recorder) ? recorder.GetAufzeichnung() : null;
+
+    /// <summary>Registriert einen Recorder für den Export. Die Registry ist auf die letzten
+    /// <see cref="MaxAufzeichnungenAnzahl"/> Aufgaben begrenzt — ältere Mitschnitte werden
+    /// verworfen, damit der Speicherverbrauch nicht unbegrenzt mit der Zahl gestarteter
+    /// Sessions wächst (ein Eintrag kann bis zu <c>AufzeichnungByteBudget</c> Bytes halten).
+    /// Ein Neustart derselben Aufgabe zählt als jüngster Eintrag.</summary>
+    private void RegistriereAufzeichnung(Guid aufgabeId, CliOutputRecorder recorder)
+    {
+        lock (_aufzeichnungenLock)
+        {
+            _aufzeichnungen[aufgabeId] = recorder;
+            _aufzeichnungsReihenfolge.Remove(aufgabeId);
+            _aufzeichnungsReihenfolge.AddLast(aufgabeId);
+            while (_aufzeichnungsReihenfolge.Count > MaxAufzeichnungenAnzahl)
+            {
+                _aufzeichnungen.TryRemove(_aufzeichnungsReihenfolge.First!.Value, out _);
+                _aufzeichnungsReihenfolge.RemoveFirst();
+            }
+        }
     }
 
     /// <summary>Stoppt den laufenden CLI-Prozess für eine Aufgabe (SIGTERM → 5s → Kill).</summary>
@@ -337,7 +411,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             return null;
         }
 
-        return TryGetExitCode(handle.Process, handle.NativeProcessHandle);
+        return handle.Session?.ExitCode ?? TryGetExitCode(handle.Process);
     }
 
     /// <summary>Aktualisiert LastHeartbeatUtc der Aufgabe (für externe Nutzung durch AufgabeService).</summary>
@@ -364,7 +438,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                     handle.Process.Kill(entireProcessTree: true);
                 }
 
-                CancelAndDisposeConPtyResourcesAsync(handle).GetAwaiter().GetResult();
+                DisposeSessionResourcesAsync(handle).GetAwaiter().GetResult();
                 handle.Process.Dispose();
             }
             catch (Exception)
@@ -376,7 +450,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         _startLock.Dispose();
     }
 
-    private async Task PersistFehlgeschlagenAsync(Guid aufgabeId, int exitCode)
+    private async Task PersistFehlgeschlagenAsync(Guid aufgabeId, int? exitCode)
     {
         if (_isDisposed)
         {
@@ -402,7 +476,9 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             await protokollService.AddEintragAsync(
                 aufgabeId,
                 ProtokollTyp.SystemMeldung,
-                $"CLI-Prozess mit Fehler beendet (ExitCode: {exitCode}). Aufgabe bleibt im Status Gestartet — CLI-Start kann erneut versucht werden.").ConfigureAwait(false);
+                exitCode is not null and not 0
+                    ? $"CLI-Prozess mit Fehler beendet (ExitCode: {exitCode.Value}). Aufgabe bleibt im Status Gestartet — CLI-Start kann erneut versucht werden."
+                    : "Terminal-Session mit einem Laufzeitfehler beendet. Aufgabe bleibt im Status Gestartet — CLI-Start kann erneut versucht werden.").ConfigureAwait(false);
 
             _logger.LogInformation("Aufgabe {AufgabeId}: CLI-Prozess mit Fehler beendet (ExitCode: {ExitCode}), Status bleibt unverändert.", aufgabeId, exitCode);
         }
@@ -427,8 +503,38 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// <param name="process">Der beendete Prozess.</param>
     /// <param name="handle">Das zugehörige <see cref="CliProcessHandle"/>.</param>
     /// <param name="logKontext">Bezeichnung des Start-Modus für die Log-Ausgabe (z. B. "Standard" oder "ConPTY").</param>
-    /// <param name="vorAufraeumenAsync">Optionale zusätzliche Aufräumlogik (z. B. Drain und Dispose der PseudoConsoleSession), die nach der Handle-Entfernung, aber vor der Statusermittlung ausgeführt wird.</param>
+    /// <param name="vorAufraeumenAsync">Optionale zusätzliche Aufräumlogik (z. B. Drain und Dispose der Session), die nach der Handle-Entfernung, aber vor der Statusermittlung ausgeführt wird.</param>
     private async Task HandleProcessExitedAsync(Guid aufgabeId, Process process, CliProcessHandle handle, string logKontext, Func<Task>? vorAufraeumenAsync = null)
+    {
+        await HandleExitedCoreAsync(aufgabeId, handle, TryGetExitCode(process), logKontext, vorAufraeumenAsync).ConfigureAwait(false);
+    }
+
+    /// <summary>Behandelt das <see cref="ITerminalSession.Exited"/>-Ereignis einer Terminal-Session:
+    /// Exit-Code kommt aus <see cref="TerminalSessionExitedEventArgs"/>, die Session-Ressourcen werden
+    /// über <see cref="DisposeSessionResourcesAsync"/> aufgeräumt.</summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="handle">Das zugehörige <see cref="CliProcessHandle"/>.</param>
+    /// <param name="exitCode">Der ermittelte Exit-Code, oder <c>null</c>, wenn keiner bekannt ist.</param>
+    /// <param name="logKontext">Bezeichnung des Kontexts für die Log-Ausgabe (z. B. "Terminal").</param>
+    /// <param name="istFehlerhaftesEnde"><c>true</c>, wenn das Ende auf einem fatalen
+    /// Laufzeitfehler der Session beruht (<see cref="ITerminalSession.Failed"/>) — dann wird auch ohne
+    /// bekannten Exit-Code der Status <see cref="CliProcessStatus.Fehler"/> gemeldet.</param>
+    private async Task HandleSessionEndedAsync(Guid aufgabeId, CliProcessHandle handle, int? exitCode, string logKontext, bool istFehlerhaftesEnde = false)
+    {
+        await HandleExitedCoreAsync(aufgabeId, handle, exitCode, logKontext, () => DisposeSessionResourcesAsync(handle), istFehlerhaftesEnde).ConfigureAwait(false);
+    }
+
+    /// <summary>Behandelt das <see cref="ITerminalSession.Failed"/>-Ereignis einer Terminal-Session:
+    /// ein fataler Laufzeitfehler wird wie ein Exit mit Fehlercode behandelt (Status
+    /// <see cref="CliProcessStatus.Fehler"/> inkl. Fehler-Protokolleintrag; ein bekannt gewordener
+    /// Exit-Code wird dabei mitgeführt).</summary>
+    private async Task HandleSessionFailedAsync(Guid aufgabeId, CliProcessHandle handle, TerminalSessionFailedEventArgs args)
+    {
+        _logger.LogError(args.Error, "Terminal-Session für Aufgabe {AufgabeId} fehlgeschlagen (Phase: {Phase}).", aufgabeId, args.Phase);
+        await HandleSessionEndedAsync(aufgabeId, handle, handle.Session?.ExitCode ?? TryGetExitCode(handle.Process), "Terminal-Fehler", istFehlerhaftesEnde: true).ConfigureAwait(false);
+    }
+
+    private async Task HandleExitedCoreAsync(Guid aufgabeId, CliProcessHandle handle, int? exitCode, string logKontext, Func<Task>? vorAufraeumenAsync, bool istFehlerhaftesEnde = false)
     {
         try
         {
@@ -448,10 +554,6 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 return;
             }
 
-            // Exit-Code VOR dem Aufräumen ermitteln: CancelAndDisposeConPtyResourcesAsync (vorAufraeumen)
-            // schließt handle.NativeProcessHandle - danach wäre GetExitCodeProcess nicht mehr möglich.
-            var exitCode = TryGetExitCode(process, handle.NativeProcessHandle);
-
             if (vorAufraeumenAsync is not null)
                 await vorAufraeumenAsync().ConfigureAwait(false);
 
@@ -468,10 +570,10 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             {
                 status = CliProcessStatus.Gestoppt;
             }
-            else if (exitCode.HasValue && exitCode.Value != 0)
+            else if (istFehlerhaftesEnde || (exitCode.HasValue && exitCode.Value != 0))
             {
                 status = CliProcessStatus.Fehler;
-                PersistFehlgeschlagenAsync(aufgabeId, exitCode.Value).SafeFireAndForget(_logger, "KiAusfuehrungsService.PersistFehlgeschlagenAsync");
+                PersistFehlgeschlagenAsync(aufgabeId, exitCode).SafeFireAndForget(_logger, "KiAusfuehrungsService.PersistFehlgeschlagenAsync");
             }
             else
             {
@@ -543,30 +645,13 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     private readonly object _runningCountLock = new();
 
     /// <summary>
-    /// Ermittelt den Exit-Code eines beendeten Prozesses. Beim ConPTY-Start (erkennbar an
-    /// <paramref name="nativeProcessHandle"/> != <see cref="IntPtr.Zero"/>) wird bewusst
-    /// <c>GetExitCodeProcess</c> auf dem nativen Handle genutzt statt <see cref="Process.ExitCode"/>:
-    /// Das <see cref="Process"/>-Objekt stammt dort aus <see cref="Process.GetProcessById(int)"/> und
-    /// kann, wenn dessen PID zwischenzeitlich einem anderen (bereits beendeten) Prozess zugeordnet
-    /// wurde, mit <see cref="InvalidOperationException"/> ("No process is associated with this
-    /// object") fehlschlagen. Das native Handle ist dagegen unabhängig von PID-Wiederverwendung
-    /// eindeutig an den ursprünglichen Prozess gebunden.
+    /// Ermittelt den Exit-Code eines beendeten Prozesses (nur klassischer Pipe-Start ohne Session —
+    /// beim Terminal-Session-Pfad kommt der Code aus <see cref="TerminalSessionExitedEventArgs"/>).
     /// </summary>
     /// <param name="process">Der Prozess, dessen Exit-Code ermittelt werden soll.</param>
-    /// <param name="nativeProcessHandle">Natives Win32-Handle aus <c>CreateProcess</c> (ConPTY-Start), oder <see cref="IntPtr.Zero"/> beim klassischen Start.</param>
     /// <returns>Der Exit-Code, oder <c>null</c> wenn der Prozess noch läuft oder nicht ermittelbar ist.</returns>
-    private int? TryGetExitCode(Process process, IntPtr nativeProcessHandle = default)
+    private int? TryGetExitCode(Process process)
     {
-        if (nativeProcessHandle != IntPtr.Zero)
-        {
-            if (!PseudoConsoleNativeMethods.GetExitCodeProcess(nativeProcessHandle, out var rawExitCode))
-            {
-                _logger.LogWarning("GetExitCodeProcess für ConPTY-Prozess fehlgeschlagen (Win32-Fehler {Win32Error}).", Marshal.GetLastWin32Error());
-                return null;
-            }
-            return rawExitCode == PseudoConsoleNativeMethods.STILL_ACTIVE ? null : unchecked((int)rawExitCode);
-        }
-
         try
         {
             return process.HasExited ? process.ExitCode : null;
@@ -599,74 +684,22 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         }
     }
 
-    private async Task SendCommandDelayedAsync(PseudoConsoleSession session, string command, Guid aufgabeId, CancellationToken ct = default)
-    {
-        try
-        {
-            await Task.Delay(300, ct).ConfigureAwait(false);
-            var bytes = System.Text.Encoding.UTF8.GetBytes(command + "\r\n");
-            await session.WriteInputAsync(bytes, ct).ConfigureAwait(false);
-            _logger.LogInformation("Plugin-Befehl an cmd.exe gesendet für Aufgabe {AufgabeId}: {Command}", aufgabeId, command);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (ObjectDisposedException ex)
-        {
-            _logger.LogDebug(ex, "Plugin-Befehl konnte nicht an cmd.exe gesendet werden für Aufgabe {AufgabeId}, da der Prozess bereits beendet und die Session disposed wurde.", aufgabeId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Plugin-Befehl konnte nicht an cmd.exe gesendet werden für Aufgabe {AufgabeId}.", aufgabeId);
-        }
-    }
-
     /// <summary>
-    /// Storniert den ggf. noch ausstehenden verzögerten Plugin-Befehlsversand (<see cref="SendCommandDelayedAsync"/>)
-    /// und disposed anschließend CancellationTokenSource und <see cref="PseudoConsoleSession"/> des Handles.
-    /// Verhindert, dass nach dem Dispose der Session noch versucht wird, in den bereits geschlossenen
-    /// Input-Stream zu schreiben (Race Condition bei sehr kurzlebigen ConPTY-Kindprozessen).
+    /// Beendet die Session-Ressourcen eines Handles kontrolliert: erst auf den Leseschleifen-Drain
+    /// warten (Tail-Output landet noch in der Protokoll-Senke), dann die Session und zuletzt die
+    /// Output-Senke abschließen. Das native Prozess-Handle liegt in der Session und wird von deren
+    /// <see cref="IDisposable.Dispose"/> geschlossen.
     /// </summary>
-    /// <param name="handle">Das Handle, dessen ConPTY-Ressourcen bereinigt werden sollen.</param>
-    private async Task CancelAndDisposeConPtyResourcesAsync(CliProcessHandle handle)
+    /// <param name="handle">Das Handle, dessen Session-Ressourcen bereinigt werden sollen.</param>
+    private async Task DisposeSessionResourcesAsync(CliProcessHandle handle)
     {
-        try
-        {
-            handle.SendCts?.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-        }
+        if (handle.Session is not null)
+            await handle.Session.DrainOutputAsync(ConPtyOutputDrainTimeout).ConfigureAwait(false);
 
-        handle.SendCts?.Dispose();
-
-        if (handle.PseudoConsoleSession is not null)
-            await handle.PseudoConsoleSession.DrainOutputAsync(ConPtyOutputDrainTimeout).ConfigureAwait(false);
-
-        handle.PseudoConsoleSession?.Dispose();
+        handle.Session?.Dispose();
 
         if (handle.OutputSink is not null)
             await handle.OutputSink.CompleteAsync(CliOutputWriterDrainTimeout).ConfigureAwait(false);
-
-        if (handle.NativeProcessHandle != IntPtr.Zero)
-        {
-            PseudoConsoleNativeMethods.CloseHandle(handle.NativeProcessHandle);
-            handle.NativeProcessHandle = IntPtr.Zero;
-        }
-    }
-
-    private static string BuildCliCommand(System.Diagnostics.ProcessStartInfo psi)
-    {
-        var fileName = psi.FileName;
-        if (string.IsNullOrWhiteSpace(fileName))
-            return string.Empty;
-
-        if (fileName.Contains(' '))
-            fileName = $"\"{fileName}\"";
-
-        return string.IsNullOrWhiteSpace(psi.Arguments)
-            ? fileName
-            : $"{fileName} {psi.Arguments}";
     }
 
 }
@@ -692,27 +725,8 @@ public sealed class CliProcessHandle
         set => _absichtlichGestoppt = value;
     }
 
-    /// <summary>Die zugehörige <see cref="PseudoConsoleSession"/>, oder null bei klassischem Start.</summary>
-    public PseudoConsoleSession? PseudoConsoleSession { get; set; }
-
-    /// <summary>
-    /// Natives Win32-Prozess-Handle aus <c>CreateProcess</c> (nur beim ConPTY-Start gesetzt, sonst
-    /// <see cref="IntPtr.Zero"/>). Wird bewusst offen gehalten statt sofort geschlossen, damit der
-    /// Exit-Code zuverlässig per <c>GetExitCodeProcess</c> gelesen werden kann - im Gegensatz zu
-    /// <see cref="Process.GetProcessById(int)"/>-Objekten, die nach Wiederverwendung der PID durch
-    /// einen anderen (bereits beendeten) Prozess mit <see cref="InvalidOperationException"/>
-    /// ("No process is associated with this object") auf <see cref="Process.HasExited"/>/
-    /// <see cref="Process.ExitCode"/> fehlschlagen koennen. Muss ueber
-    /// <c>CancelAndDisposeConPtyResourcesAsync</c> geschlossen werden.
-    /// </summary>
-    public IntPtr NativeProcessHandle { get; set; }
-
-    /// <summary>
-    /// Koppelt den verzögerten Plugin-Befehlsversand (<see cref="KiAusfuehrungsService.SendCommandDelayedAsync"/>)
-    /// an das Prozess-Lebensende: Wird beim <see cref="Process.Exited"/>-Event storniert, damit kein Zugriff
-    /// auf die bereits disposte <see cref="PseudoConsoleSession"/> erfolgt. Nur beim ConPTY-Start gesetzt.
-    /// </summary>
-    public CancellationTokenSource? SendCts { get; set; }
+    /// <summary>Die zugehörige <see cref="ITerminalSession"/>, oder null bei klassischem Start.</summary>
+    public ITerminalSession? Session { get; set; }
 
     /// <summary>Optionale Senke fuer Terminal-Ausgabe, die beim Aufraeumen abgeschlossen wird.</summary>
     public ITerminalOutputSink? OutputSink { get; set; }
