@@ -148,7 +148,7 @@ public sealed class CliOutputProtokollWriterTests
             .Setup(l => l.Log(
                 It.Is<LogLevel>(lvl => lvl == LogLevel.Warning),
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("ist voll", StringComparison.Ordinal)),
+                It.Is<It.IsAnyType>((state, _) => IstQueueVollLogeintrag(state)),
                 It.IsAny<Exception?>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
             .Callback(() => queueFullLogged.TrySetResult());
@@ -246,6 +246,9 @@ public sealed class CliOutputProtokollWriterTests
             .Should().BeFalse("ohne Marker darf kein Session-Limit persistiert werden");
         db.Aufgaben.AsNoTracking().Single(a => a.Id == aufgabeId).PausiertBisUtc.Should().BeNull();
     }
+
+    private static bool IstQueueVollLogeintrag(object? state)
+        => state?.ToString()?.Contains("ist voll", StringComparison.Ordinal) == true;
 
     private static async Task<Guid> SeedLaufendeAufgabeAsync(ServiceProvider provider)
     {

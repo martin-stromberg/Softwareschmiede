@@ -467,8 +467,9 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(text))
             return false;
 
-        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out var sekunden)
-            && !double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out sekunden))
+        // Kulturunabhängig: beide Dezimaltrenner akzeptieren — unter en-US scheitert
+        // "0,25" (Komma ist dort ein Gruppentrenner, bei Float ohne AllowThousands unzulässig).
+        if (!double.TryParse(text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var sekunden))
             return false;
 
         // Obergrenze: TimeSpan.FromSeconds wirft für Sekunden > ~9,2·10^11 eine
