@@ -2,33 +2,36 @@
 
 ## Status: Offene Aufgaben vorhanden
 
-Die Kernimplementierung in `TerminalControl` und die Buffer-Identitäten decken wesentliche Teile des Plans ab. Der aktuelle Nachweisstand erfüllt die verbindlichen Abnahmekriterien jedoch nicht. E-01 ist zwar in den Quellen aufgerufen, führt die geplante Auswahl-/Kopierabnahme aber nicht aus. E-02 ist registriert, enthält jedoch eine fehlerhafte Fixture und prüft die sichtbare Markierung nicht. Für dieses Review wurden keine Tests ausgeführt.
+Die Kernimplementierung erfüllt wesentliche Planbestandteile: `TerminalControl` bietet zellbasierte Maus- und Tastaturauswahl, sichtbares Overlay, Snapshot-basierte Textextraktion und `Ctrl+Shift+C`; `Ctrl+C` bleibt unverändert dem Terminaleingabepfad vorbehalten. Zeilen-IDs, Zellversionen und Buffer-Generationen stützen die Auswahl-Lifecycle-Regeln.
+
+Der verbindliche Funktionsnachweis ist dennoch nicht vollständig. Insbesondere E-01 testet den vorgesehenen Live-Auswahl- und Kopierablauf nicht. E-02 verwendet inzwischen korrekte echte CR/LF-Zeilen, weist die sichtbare Auswahl aber weiterhin nicht nach. Die Pflicht-E2E-Szenarien wurden für den aktuellen Stand nicht erfolgreich ausgeführt.
+
+Für dieses Review wurden keine Tests ausgeführt.
 
 ## Umgesetzte Planelemente
 
-- `TerminalControl` enthält Zell-Auswahl per Maus und Tastatur, Auswahl-Overlay, Snapshot-basierte Extraktion sowie `Ctrl+Shift+C`. `Ctrl+C` wird nicht zum Kopieren verwendet; bei `Ctrl+Shift+C` ohne Auswahl wird die Taste nicht an den Prozess gesendet.
-- Auswahlvalidierung bindet Zeilen und Zellen an IDs, Versionen und Buffer-Generation. Unit-Tests decken ausgewählte Tastaturpfade, Kopieren mit/ohne Auswahl sowie den Erhalt einer Auswahl bei normalem Scrollen ab.
-- Die E2E-Aufrufe sind vorhanden: E-01 wird über den ConPTY-Lifecycle aufgerufen; E-02 steht in `MainTest.RunGeneralTests`.
+- `TerminalControl` unterstützt Mausdrag sowie `Shift`+Pfeile und `Shift`+`Home`/`End`, zeichnet die Auswahl über den Terminalzellen und extrahiert sie aus einem konsistenten Snapshot.
+- `Ctrl+Shift+C` kopiert nur bei Auswahl und schreibt dann keine Terminal-Input-Bytes; ohne Auswahl bleiben Clipboard und CLI-Eingabe unverändert. Der vorhandene `Ctrl+C`-Eingabepfad bleibt bestehen.
+- Auswahlgrenzen enthalten Zeilen-IDs, Zellversionen und Generation. Änderungen an ausgewählten Zellen, verlorene Zeilen, Reset, Resize und Screenwechsel invalidieren sie; normales Scrollen kann die logische Auswahl erhalten.
+- E-02 ist in `RunGeneralTests` registriert und erzeugt nun zwei echte Terminalzeilen mit `"erste Zeile\r\nzweite Zeile"`. Maus- und Tastaturauswahl vergleichen den Clipboardinhalt.
 
 ## Offene Aufgaben
 
-1. **E-01 ist kein Nachweis für die geplante Live-Auswahl und das Kopieren.** `TerminalText_LiveMarkCopyAndKeepSelection` in `E2E_ConPtyLifecycle.cs` tippt lediglich einen Echo-Befehl, wartet auf dessen Marker im Ausgabeprotokoll und prüft `HasTerminalOutput()` sowie `IsCliRunning()`. Die Methode markiert keinen Text, prüft keine Pixel, löst keine weitere Ausgabe nach der Auswahl aus und scrollt den Buffer nicht. Sie sendet auch kein `Ctrl+Shift+C` und liest die Zwischenablage nicht aus. Damit sind sämtliche wesentlichen E-01-Abnahmepunkte unbelegt. Der Aufruf innerhalb der registrierten ConPTY-Phase ändert daran nichts.
-2. **E-02-Fixture erzeugt nicht die zwei geplanten Terminalzeilen.** In `E2E_KonsolenTestfenster.cs` wird `Encoding.UTF8.GetBytes("erste Zeile\\r\\nzweite Zeile")` verwendet. Die doppelten Backslashes kodieren wörtliche `\r\n`-Zeichen statt CR/LF-Steuerzeichen; der Terminalbuffer erhält daher keine zwei getrennten Zeilen wie im erwarteten Clipboardwert. Der erwartete Vergleich `erste Zeile{Environment.NewLine}zweite Zeile` belegt so nicht den geplanten mehrzeiligen Auswahlfluss und dürfte mit dieser Fixture fehlschlagen.
-3. **E-02 prüft die sichtbare Markierung nicht.** Zwar führt der Test Mausdrag am `ReplayTerminal` aus und vergleicht danach den Clipboardinhalt; ein Vorher-/Nachher-Screenshot oder Pixelvergleich im Auswahlrechteck fehlt. Der Plan fordert diesen sichtbaren Nachweis ausdrücklich. Der Tastaturpfad wird ebenfalls ausgeführt, sein Ergebnis kann wegen der fehlerhaften Fixture aber nicht den geplanten Zwei-Zeilen-Fluss belegen.
-4. **Die geplante Testabdeckung ist nur teilweise vorhanden.** Es gibt einige Tests für Kopieren mit/ohne Auswahl und Scroll-Erhalt. In den geprüften Testdateien fehlen weiterhin gezielte Fälle für Extraktionsgrenzen und Leerzeichen-/Zeilenumbruchregeln, Mauskoordinaten mit Scrolloffsets, sichtbares Overlay, Invalidierung durch Mutation/Erase/Abwurf/Reset/Resize/Screen-/Sessionwechsel sowie einen kontrolliert ausgelösten Clipboard-Schreibfehler. Die vollständigen Tastaturregressionen `Ctrl+C` und `Ctrl+V` sind durch den vorhandenen Bestand teilweise abgedeckt, ersetzen diese Auswahltests aber nicht.
-5. **Der vorhandene Testbericht ist für den aktuellen Quellstand veraltet.** `test-results.md` behauptet, E-01 und E-02 seien nicht vorhanden/registriert. In den aktuellen Quellen existieren beide Methoden und ihre Aufrufe. Der Bericht enthält daher keinen gültigen Ausführungsnachweis für den jetzigen Stand; E-01/E-02 müssen nach Korrektur ausgeführt und die Ergebnisse aktualisiert dokumentiert werden.
+1. **E-01 weist den Live-Benutzerfluss nicht nach.** `TerminalText_LiveMarkCopyAndKeepSelection` in `E2E_ConPtyLifecycle.cs` gibt nur einen eindeutigen Marker aus und prüft Terminalausgabe sowie Prozessstatus. Es fehlen Mausauswahl, sichtbare Hervorhebung, `Ctrl+Shift+C`, STA-Clipboardvergleich, Erhalt nach weiterer Ausgabe, Scrollback-Verschiebung mit Rückscrollen und der geforderte Tastaturauswahl-Durchlauf. Der Kommentar, die detaillierten Prüfungen lägen bewusst bei Replay, widerspricht der verbindlichen E-01-Abnahme im Plan.
+2. **E-02 prüft das Auswahl-Overlay nicht.** `ReplayText_MarkAndCopy` führt Drag, Tastaturauswahl und Clipboardvergleiche aus, nimmt aber keinen Vorher-/Nachher-Screenshot auf und vergleicht keine Pixel im erwarteten Zellenrechteck. Damit fehlt der planmäßig verbindliche sichtbare Nachweis.
+3. **Geplante Control-/Buffer-Testabdeckung fehlt weitgehend.** Es fehlen gezielte Tests für Vorwärts-/Rückwärts-Extraktion, Teilzeilen, Leerzeilen und Leerzeichen-/Zeilenumbruchregeln, Mauskoordinaten mit horizontalem und vertikalem Offset, Overlay-Clipping sowie Invalidierung durch Überschreiben, Erase, Scrollback-Abwurf, Reset, Resize, Alternate-Screen- und Sessionwechsel. Ebenso fehlt ein deterministischer Clipboard-Schreibfehler-Test.
+4. **Es liegt kein erfolgreicher aktueller E2E-Nachweis vor.** `test-results.md` dokumentiert einen früheren Lauf und nennt noch die inzwischen korrigierte `\\r\\n`-Fixture als Fehler. Die nachträglichen Änderungen an E-02 und am normalen Scrollback-Test sind dort nicht abgenommen. E-01 und E-02 müssen seriell mit Desktop-, Maus-, Tastatur- und Clipboardzugriff erfolgreich durchlaufen; nicht ausgeführte Szenarien gelten gemäß Plan nicht als grün.
 
 ## E2E-Nachweisstatus
 
-| Szenario | Im aktuellen Code | Plan-Nachweisstatus |
+| Szenario | Aktueller Code | Plan-Nachweisstatus |
 |---|---|---|
-| E-01 `TerminalText_LiveMarkCopyAndKeepSelection` | In der ConPTY-Lifecycle-Phase aufgerufen, aber nur Marker-Ausgabe und Prozessstatus geprüft. | **Nicht bestanden / nicht nachgewiesen:** Auswahl, UI-Hervorhebung, Erhalt nach Ausgabe, Scrollback, Tastaturauswahl und Clipboardvergleich fehlen. |
-| E-02 `ReplayText_MarkAndCopy` | In `RunGeneralTests` aufgerufen; Maus-/Tastaturaktionen und Clipboardvergleich sind enthalten. | **Nicht bestanden / nicht nachgewiesen:** Fixture nutzt wörtliche `\\r\\n` statt Zeilenumbrüchen; Pixel-Hervorhebung wird nicht geprüft. Der aktuelle Testlauf ist zudem nicht belegt. |
-
-Der frühere Eintrag in `test-results.md`, ein Filterlauf habe keinen der beiden Tests gefunden, ist wegen der inzwischen vorhandenen und registrierten Methoden überholt. Ein erfolgreicher Lauf der aktuellen E2E-Szenarien liegt in den geprüften Artefakten nicht vor. Ein erfolgreicher Unit-/Control-Testlauf kann die verbindlichen E2E-Abnahmen laut Plan nicht ersetzen.
+| E-01 `TerminalText_LiveMarkCopyAndKeepSelection` | Registrierte ConPTY-Phase, aber nur Marker-Ausgabe und Prozessstatus. | **Nicht bestanden / nicht nachgewiesen:** Auswahl, Overlay, Erhalt, Scrollback, Tastaturauswahl und Clipboardvergleich fehlen. |
+| E-02 `ReplayText_MarkAndCopy` | Registriert; echte zwei Zeilen sowie Maus-/Tastaturauswahl und Clipboardvergleiche vorhanden. | **Nicht vollständig nachgewiesen:** Pixel-/Overlayvergleich fehlt; kein erfolgreicher aktueller E2E-Lauf dokumentiert. |
 
 ## Erforderliche Nacharbeiten
 
-- E-01 um den tatsächlichen Live-UI-Ablauf ergänzen: kontrollierte Ausgabe, Maus- und Tastaturauswahl, sichtbare Pixelprüfung, Erhalt nach weiterer Ausgabe und Scrollback-Verschiebung sowie exakter STA-Clipboardvergleich.
-- E-02 mit echten CR/LF-Zeilen erstellen, die sichtbare Auswahl per Vorher-/Nachher-Pixelvergleich nachweisen und beide Clipboardpfade am tatsächlichen Replay-Control bestätigen.
-- Fehlende geplante Control-/Buffer-Tests ergänzen und danach E-01 sowie E-02 tatsächlich ausführen. `test-results.md` auf den aktuellen Stand bringen; fehlende oder fehlgeschlagene Abnahmen als solche dokumentieren.
+- E-01 als echten Live-UI-Test vollständig umsetzen und ausführen.
+- E-02 um Screenshot-/Pixelprüfung der sichtbaren Auswahl ergänzen und ausführen.
+- Die fehlenden Buffer-/Control-Tests aus dem Plan ergänzen, insbesondere alle Invalidierungsfälle und den Clipboard-Fehlerpfad.
+- Die betroffenen Tests sowie beide Pflicht-E2E seriell erfolgreich ausführen und `test-results.md` auf den tatsächlichen Quellstand aktualisieren.

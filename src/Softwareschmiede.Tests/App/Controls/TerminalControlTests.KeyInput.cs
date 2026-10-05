@@ -107,12 +107,14 @@ public sealed partial class TerminalControlTests
         {
             var control = new TerminalControl();
             var buffer = new Softwareschmiede.Domain.Terminal.TerminalBuffer(12, 2);
-            buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("erste\\nzweite"));
+            // Tatsächliche Terminal-Zeilenumbrüche sind nötig: Ein literales "\\n"
+            // bleibt in derselben Zellezeile und kann keinen Scrollback-Fall erzeugen.
+            buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("erste\nzweite"));
             SetBufferForSelectionTest(control, buffer);
 
             // Cursor steht hinter "zweite"; Shift+Home markiert genau diese Zeile.
             InvokeExtendSelection(control, Key.Home);
-            buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("\\n"));
+            buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("\n"));
 
             typeof(TerminalControl).GetMethod("ValidateSelection", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(control, null);

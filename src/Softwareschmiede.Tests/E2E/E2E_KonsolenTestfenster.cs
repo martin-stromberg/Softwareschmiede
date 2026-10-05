@@ -41,7 +41,9 @@ public partial class End2EndTest
                     Chunks =
                     [
                         new CliOutputChunkRecord(TimeSpan.Zero,
-                            Encoding.UTF8.GetBytes("erste Zeile\\r\\nzweite Zeile")),
+                            // Echte CR/LF-Zeilen erzwingen zwei Terminalzeilen; ein
+                            // literales "\\r\\n" wäre kein Replay-Auswahlfall.
+                            Encoding.UTF8.GetBytes("erste Zeile\r\nzweite Zeile")),
                     ],
                 });
             }
@@ -75,18 +77,29 @@ public partial class End2EndTest
 
     private static string GetClipboardText()
     {
-        string? text = null;
-        Exception? error = null;
-        var thread = new Thread(() =>
+        // Die Windows-Zwischenablage kann kurz nach Ctrl+Shift+C noch belegt sein.
+        // Begrenzte Wiederholungen halten den E2E-Test robust, ohne Fehler zu verstecken.
+        Exception? lastError = null;
+        for (var attempt = 0; attempt < 5; attempt++)
         {
-            try { text = System.Windows.Clipboard.GetText(); }
-            catch (Exception ex) { error = ex; }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (error is not null) throw error;
-        return text ?? string.Empty;
+            string? text = null;
+            Exception? error = null;
+            var thread = new Thread(() =>
+            {
+                try { text = System.Windows.Clipboard.GetText(); }
+                catch (Exception ex) { error = ex; }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+            if (error is null)
+                return text ?? string.Empty;
+
+            lastError = error;
+            Thread.Sleep(100);
+        }
+
+        throw new InvalidOperationException("Die Zwischenablage konnte nach 5 Versuchen nicht gelesen werden.", lastError);
     }
 
     /// <summary>

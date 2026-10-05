@@ -20,7 +20,7 @@ und müssen manuell oder in einem erneuten Lauf bearbeitet werden.
 
 ## Usability-Befunde
 
-Keine.
+- [ ] Auswahl bei neuer CLI-Ausgabe außerhalb der Auswahl erhalten: Der aktuelle Snapshot-/Validierungspfad verwirft die Markierung noch, obwohl die ausgewählten Zellen unverändert vorhanden sind.
 
 ## Fehlgeschlagene Tests
 

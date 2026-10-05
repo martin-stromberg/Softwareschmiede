@@ -2,31 +2,71 @@
 
 ## Status: Befunde vorhanden
 
-Geprüft wurden die aktuellen Änderungen an `TerminalControl`, `TerminalBuffer` sowie die ergänzten Unit- und E2E-Tests. Sämtliche Vorkommen von `RaiseUiActionRequested` unter `src/` wurden ebenfalls geprüft: Es gibt keine Vorkommen. Damit gibt es in diesem Änderungsumfang keine ausgelöste UI-Aktion ohne zugehörigen Blazor-Handler.
+Geprüft wurden alle Änderungen des Feature-Branches einschließlich der aktuellen
+Arbeitsbereichsänderungen. Die Korrekturen verwenden nun echte Zeilenumbrüche
+in den relevanten Tests; der Zugriff auf die Windows-Zwischenablage im
+Replay-E2E hat außerdem einen begrenzten Retry. Die Selection-Validierung
+bindet sich über Zeilen-IDs, Zellversionen und die Buffer-Generation an den
+ursprünglichen Inhalt. Bei normalem Scrollen werden die Versionsdaten zusammen
+mit den logischen Zeilen verschoben.
+
+`RaiseUiActionRequested` kommt im Produktquellcode unter `src/` nicht vor.
+Es gibt daher keine ausgelöste UI-Aktion, für die ein Blazor-Seiten- oder
+Komponentenhandler fehlen könnte.
 
 ## Befunde
 
-1. **Hoch – E-01 ist als Pflicht-E2E registriert, testet den geforderten Auswahl- und Kopierfluss aber nicht.**  
-   `TerminalText_LiveMarkCopyAndKeepSelection` in `src/Softwareschmiede.Tests/E2E/E2E_ConPtyLifecycle.cs:179` erzeugt nur einen Marker und prüft danach, dass Ausgabe sichtbar ist und der Prozess läuft. Es wird weder eine Textauswahl im echten Live-Terminal per Maus oder Tastatur angelegt, noch die sichtbare Markierung per Pixelvergleich geprüft, weitere Ausgabe zur Prüfung des Auswahl-Erhalts bzw. der Scrollback-Nachführung erzeugt, `Ctrl+Shift+C` gesendet oder der Clipboardtext kontrolliert. Der XML-Kommentar verlagert diese Nachweise ausdrücklich auf Replay; das widerspricht dem verbindlichen, eigenständigen E-01-Szenario.  
-   **Korrektur:** Den Live-Terminal-Helper um tatsächliche Zellkoordinaten, Mausdrag, Tastaturauswahl, Screenshot-/Pixelnachweis, Clipboard-Retry und eine kontrollierte Ausgabe außerhalb der Auswahl ergänzen. Nach einem deterministischen Scrollback-Fall muss dieselbe Auswahl nach Rückscrollen sichtbar sein und exakt denselben Text kopieren.
+1. **Hoch – E-01 weist den geforderten Live-Auswahl- und Kopierfluss weiterhin nicht nach.**
+   `TerminalText_LiveMarkCopyAndKeepSelection` in
+   `src/Softwareschmiede.Tests/E2E/E2E_ConPtyLifecycle.cs` erzeugt lediglich
+   einen Marker und prüft sichtbare Ausgabe sowie den laufenden Prozess. Der
+   Test führt keine Maus- oder Tastaturauswahl am Live-Terminal aus, prüft kein
+   Auswahl-Overlay, löst keine Ausgabe nach der Auswahl und keinen
+   Scrollback-Fall aus und kontrolliert weder `Ctrl+Shift+C` noch den
+   Clipboard-Inhalt. Damit fehlt der vollständige, im Plan verbindliche
+   Nachweis für E-01.
 
-2. **Hoch – E-02 prüft die sichtbare Markierung nicht und deckt den festgelegten UI-Nachweis damit nicht ab.**  
-   `ReplayText_MarkAndCopy` in `src/Softwareschmiede.Tests/E2E/E2E_KonsolenTestfenster.cs:22` führt Mausdrag und Clipboardvergleich aus, nimmt jedoch keinen Screenshot vor und prüft kein Pixel im erwarteten Auswahlrechteck. Damit kann der Test auch bestehen, wenn die Auswahl nicht sichtbar gezeichnet wird. Die festgelegte E-02-Abnahme verlangt ausdrücklich einen Pixelnachweis der Hervorhebung. Zusätzlich liest `GetClipboardText` in `:76` die Zwischenablage ohne den im Plan verlangten begrenzten Retry bei temporärer Belegung; dadurch ist der gemeinsame Windows-Clipboard-Test unnötig flakey.  
-   **Korrektur:** Vor und nach der Auswahl denselben Terminalausschnitt erfassen und die hervorgehobenen Zellen robust vergleichen. Das Lesen der Zwischenablage in einem STA-Thread mit begrenzten Wiederholungen bei Clipboardbelegung kapseln. Der Tastaturdurchlauf sollte ebenfalls mit der dokumentierten Fokus-/Caret-Position und seinem erwarteten Clipboardtext nachgewiesen werden.
+2. **Hoch – E-02 prüft die sichtbare Auswahl nicht.**
+   `ReplayText_MarkAndCopy` in
+   `src/Softwareschmiede.Tests/E2E/E2E_KonsolenTestfenster.cs` erzeugt jetzt
+   korrekt zwei Terminalzeilen und vergleicht nach Maus- und Tastaturpfad den
+   Clipboard-Text. Es nimmt jedoch keinen Vorher-/Nachher-Screenshot auf und
+   führt keinen Pixelvergleich im erwarteten Auswahlrechteck aus. Der im Plan
+   festgelegte visuelle Nachweis kann daher auch bei fehlendem oder falsch
+   positioniertem Overlay bestehen.
+
+3. **Mittel – Die übrige verbindliche Testabdeckung für Auswahl-Lifecycle und
+   Extraktion fehlt.**
+   Es fehlen gezielte Tests für Vorwärts-/Rückwärts-Extraktion, Teilzeilen,
+   Leerzeilen und Leerzeichenregeln, Mauskoordinaten mit Scrolloffsets sowie
+   Overlay-Clipping. Ebenso fehlen die geforderten Invalidierungsfälle
+   (Überschreiben, Erase, Scrollback-Abwurf, Reset, Resize,
+   Alternate-Screen- und Sessionwechsel) und ein deterministischer
+   Clipboard-Schreibfehler. Der vorhandene Scrollback-Erhaltstest deckt nur
+   einen Teil dieser Regeln ab.
 
 ## Positiv geprüft
 
-- Die zuvor beanstandete Behandlung des Cursors hinter der letzten Spalte ist in `TerminalControl.ExtendSelection` durch Klemmen der Spalte behoben und durch einen Test abgedeckt.
-- Der Snapshot normiert nach Resize auch die Scrollback-Versionsarrays auf die aktuelle Spaltenzahl (`TerminalBuffer.GetSnapshot`); dafür gibt es einen gezielten Test.
-- Bei normalem Vollbild-Scrollen werden Zeilen-ID und Zellversionen nun zusammen verschoben (`TerminalBuffer.ScrollRangeUp`, `:332`), sodass `TerminalControl.TryNormalizeSelection` die Auswahl weiterhin derselben logischen Zeile zuordnen kann. Der zugehörige Control-Test prüft Auswahl und Kopiertext nach dem Scrollen.
-- `Ctrl+Shift+C` wird gegen vorhandene Auswahl behandelt, ohne CLI-Bytes zu schreiben; `Ctrl+C` bleibt im bestehenden Eingabepfad unverändert.
+- `Ctrl+Shift+C` wird bei gültiger Auswahl lokal verarbeitet und schreibt keine
+  Eingabebytes; der bestehende `Ctrl+C`-Pfad bleibt unverändert.
+- Die Korrektur für den Cursor hinter der letzten Spalte begrenzt die
+  Auswahlspalte vor dem Zellversionszugriff.
+- `TerminalBuffer.GetSnapshot` normiert nach Resize auch die Versionsarrays
+  der Scrollback-Zeilen auf die aktuelle Spaltenzahl.
+- Die aktuelle Teständerung verwendet für Scrollback und Replay echte
+  Steuerzeichen statt literaler `\\n` beziehungsweise `\\r\\n`-Folgen.
 
 ## Prüfung
 
-- `rg -n "RaiseUiActionRequested" src`: keine Vorkommen.
-- `git diff --check`: keine Whitespace-Befunde; Git meldet ausschließlich die bekannte CRLF-Normalisierung.
-- Tests wurden in diesem Review nicht erneut ausgeführt; der separate Testschritt ist für das Ausführungsergebnis maßgeblich.
+- `git diff --check` enthält keine Whitespace-Befunde; Git meldet nur die
+  bekannte CRLF-Normalisierung in bestehenden Arbeitsbereichsdateien.
+- Suche nach `RaiseUiActionRequested` unter `src/`: keine Vorkommen.
+- Tests wurden in diesem Review nicht erneut ausgeführt; der separate
+  Testschritt ist für den Ausführungsnachweis maßgeblich.
 
 ## Ergebnis
 
-Die Auswahlbindung für die normale Scrollback-Verschiebung ist im Code nun konsistent umgesetzt. Die zwei verbindlichen E2E-Abnahmen sind jedoch noch nicht vollständig: E-01 prüft den eigentlichen Featurefluss überhaupt nicht, E-02 lässt den sichtbaren Markierungsnachweis aus. Vor der Abnahme müssen beide Befunde behoben und die E2E-Szenarien erfolgreich ausgeführt werden.
+Die aktuelle Korrektur beseitigt die fehlerhafte E2E-Fixture und reduziert
+Clipboard-Flakiness. Vor Abschluss müssen E-01 vollständig implementiert,
+E-02 um den visuellen Pixelnachweis ergänzt und die noch ausstehenden
+verbindlichen Auswahltests ergänzt sowie erfolgreich ausgeführt werden.
