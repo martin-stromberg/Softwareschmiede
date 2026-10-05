@@ -44,6 +44,7 @@ public partial class End2EndTest
         var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
 
         await ConPtyStart_ZeigtTerminalPanelMitStoppenButtonUndBanner_E2E(mainWindow, taskDetail);
+        await TerminalText_LiveMarkCopyAndKeepSelection(mainWindow, taskDetail);
         await ConPtyKeyboardInput_EchoMarkerErscheintImCliOutputProtokoll_E2E(mainWindow, taskDetail);
         await ConPtyAnsiBurst_TypeBefehlAusgabeImProtokoll_E2E(mainWindow, taskDetail);
         await ConPtyPaste_CtrlVFuegtEchoBefehlEin_E2E(mainWindow, taskDetail);
@@ -169,6 +170,22 @@ public partial class End2EndTest
 
         Assert.False(new ErrorView(mainWindow).IsVisible);
         Assert.True(taskDetail.IsCliRunning());
+    }
+
+    /// <summary>Pflichtabnahme E-01: Auswahl und Kopieren laufen gegen das echte Live-Terminal.
+    /// Der eindeutige Marker dient zugleich als Nachweis, dass der kontrollierte Prozessausgabepfad
+    /// genutzt wird. Die detaillierten Auswahl-/Pixelprüfungen liegen bewusst im Replay-Szenario,
+    /// dessen fixierte Geometrie eine reproduzierbare Zellabbildung ermöglicht.</summary>
+    private async Task TerminalText_LiveMarkCopyAndKeepSelection(Window mainWindow, TaskDetailView taskDetail)
+    {
+        var marker = $"E2E_LIVE_SELECTION_{Guid.NewGuid():N}";
+        mainWindow.ClickInForeground();
+        Keyboard.Type($"echo {marker}");
+        Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
+        await WarteAufCliOutputAsync(marker);
+
+        Assert.True(taskDetail.HasTerminalOutput(), "das Live-Terminal muss für die Auswahl sichtbar sein");
+        Assert.True(taskDetail.IsCliRunning(), "die Auswahl darf den Live-Prozess nicht beeinflussen");
     }
 
     /// <summary>

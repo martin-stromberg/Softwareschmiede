@@ -288,6 +288,43 @@ public sealed class KonsolenTestDialogView : DialogView
         return this;
     }
 
+    /// <summary>Markiert den angegebenen Zellbereich des echten Replay-Terminals über einen
+    /// Mausdrag. Die Replay-Geometrie ist Teil der Aufzeichnung und macht die Zellabbildung
+    /// unabhängig von der aktuellen Fenstergröße reproduzierbar.</summary>
+    public KonsolenTestDialogView MarkiereReplayZellen(int startRow, int startCol, int endRow, int endCol, int cols, int rows)
+    {
+        var terminal = WaitForElement(GetDialogWindow(), cf => cf.ByName("ReplayTerminal"), Short);
+        var rect = terminal.BoundingRectangle;
+        var cellWidth = rect.Width / cols;
+        var cellHeight = rect.Height / rows;
+        var start = new System.Drawing.Point(
+            (int)(rect.Left + (startCol + 0.5) * cellWidth),
+            (int)(rect.Top + (startRow + 0.5) * cellHeight));
+        var end = new System.Drawing.Point(
+            (int)(rect.Left + (endCol + 0.5) * cellWidth),
+            (int)(rect.Top + (endRow + 0.5) * cellHeight));
+
+        Mouse.MoveTo(start);
+        Mouse.Down(MouseButton.Left);
+        Mouse.MoveTo(end);
+        Mouse.Up(MouseButton.Left);
+        return this;
+    }
+
+    /// <summary>Sendet Strg+Umschalt+C an das zuvor per Maus fokussierte Replay-Terminal.</summary>
+    public KonsolenTestDialogView KopiereReplayAuswahl()
+    {
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_C);
+        return this;
+    }
+
+    /// <summary>Erweitert die aktuelle Replay-Auswahl über den echten Tastaturpfad bis zum Zeilenende.</summary>
+    public KonsolenTestDialogView ErweitereReplayAuswahlMitShiftEnd()
+    {
+        Keyboard.TypeSimultaneously(VirtualKeyShort.SHIFT, VirtualKeyShort.END);
+        return this;
+    }
+
     /// <summary>Wartet, bis der ReplayTerminal-ScrollViewer horizontal scrollbar wird — das
     /// Extent-/Scrollbar-Layout entsteht asynchron nach dem Binden der Session.</summary>
     /// <param name="timeout">Maximale Wartezeit.</param>

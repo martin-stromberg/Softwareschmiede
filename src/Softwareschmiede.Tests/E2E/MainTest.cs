@@ -34,6 +34,7 @@ public partial class End2EndTest : WpfTestBase
         await TerminalFallbackDiagnose_PipeFallbackUndRequiresPtyFehler_E2E(mainWindow);
         CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(mainWindow);
         await KonsolenTestfenster_OeffnetLaedtAufzeichnungUndSpieltAb_E2E(mainWindow);
+        await ReplayText_MarkAndCopy(mainWindow);
 
         ViewPatternHappyPath_NavigiertUndErstelltKorrekt_E2E(mainWindow);
         AnsichtenErkennung_LiefertKorrekteViewTypen_E2E(mainWindow);

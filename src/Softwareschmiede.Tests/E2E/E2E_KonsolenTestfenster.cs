@@ -17,6 +17,78 @@ namespace Softwareschmiede.Tests.E2E;
 /// </summary>
 public partial class End2EndTest
 {
+    /// <summary>Pflichtabnahme E-02: Die Auswahl wird in einer echten Replay-Ansicht per Maus
+    /// angelegt und mit Strg+Umschalt+C in die Windows-Zwischenablage kopiert.</summary>
+    private async Task ReplayText_MarkAndCopy(Window mainWindow)
+    {
+        var pfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_selection_{Guid.NewGuid():N}.clireplay");
+        SettingsView? settings = null;
+        KonsolenTestDialogView? dialog = null;
+        try
+        {
+            var store = new CliReplayAufzeichnungStore();
+            await using (var stream = File.Create(pfad))
+            {
+                await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+                {
+                    AufgabeId = Guid.NewGuid(),
+                    PluginName = "E2E-Textauswahl",
+                    StartUtc = DateTimeOffset.UtcNow,
+                    EndeUtc = DateTimeOffset.UtcNow,
+                    Cols = 80,
+                    Rows = 24,
+                    IstVollstaendig = true,
+                    Chunks =
+                    [
+                        new CliOutputChunkRecord(TimeSpan.Zero,
+                            Encoding.UTF8.GetBytes("erste Zeile\\r\\nzweite Zeile")),
+                    ],
+                });
+            }
+
+            settings = new SettingsView(mainWindow).ForceShow();
+            dialog = settings.OpenKonsolenTestDialog();
+            dialog.SetZeitrafferSchwelle("0");
+            dialog.OeffneAufzeichnung(pfad);
+            dialog.WarteAufStatus("Aufzeichnung geladen (E2E-Textauswahl, 1 Chunks) — bereit.");
+            dialog.StartWiedergabe();
+            dialog.WarteAufStatus("Wiedergabe beendet.");
+
+            dialog.MarkiereReplayZellen(0, 0, 1, "zweite Zeile".Length - 1, 80, 24);
+            dialog.KopiereReplayAuswahl();
+            Assert.Equal($"erste Zeile{Environment.NewLine}zweite Zeile", GetClipboardText());
+
+            // Der Tastaturpfad muss denselben Clipboardinhalt liefern. Ein Klick positioniert
+            // den Auswahlanker; Shift+End erweitert ihn bis ans Zeilenende.
+            dialog.MarkiereReplayZellen(0, 0, 0, 0, 80, 24);
+            dialog.ErweitereReplayAuswahlMitShiftEnd();
+            dialog.KopiereReplayAuswahl();
+            Assert.Equal("erste Zeile", GetClipboardText());
+        }
+        finally
+        {
+            TryCloseKonsolenTestfenster(dialog, settings);
+            if (File.Exists(pfad))
+                File.Delete(pfad);
+        }
+    }
+
+    private static string GetClipboardText()
+    {
+        string? text = null;
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try { text = System.Windows.Clipboard.GetText(); }
+            catch (Exception ex) { error = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null) throw error;
+        return text ?? string.Empty;
+    }
+
     /// <summary>
     /// Szenario: Synthetische .clireplay-Dateien werden auf der Platte erzeugt, das
     /// Konsolentestfenster über Einstellungen → Allgemein geöffnet. Abgedeckt werden der Abbruch
