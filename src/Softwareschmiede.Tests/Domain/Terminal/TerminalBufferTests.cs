@@ -354,6 +354,39 @@ public sealed class TerminalBufferTests
         sut.CursorRow.Should().Be(0, "der Cursor lag vor der Verkleinerung oberhalb des neuen sichtbaren Bereichs und muss auf die erste sichtbare Zeile geklemmt werden");
     }
 
+    /// <summary>Eine vor dem Resize bildschirmfüllende Scroll-Region wächst mit der neuen Höhe,
+    /// damit Zeilenumbrüche am neuen unteren Rand weiterhin ins Scrollback verschieben.</summary>
+    [Fact]
+    public void Buffer_ResizeHoeher_VollstaendigeScrollRegionWaechstUndFuelltScrollback()
+    {
+        var sut = new TerminalBuffer(10, 50);
+        sut.Apply(new CursorMovedEvent(0, 0, true));
+        sut.Apply(new TextWrittenEvent("Marker"));
+
+        sut.Resize(10, 75);
+        sut.Apply(new CursorMovedEvent(74, 0, true));
+        sut.Apply(new TextWrittenEvent(new string('\n', 66)));
+
+        sut.ScrollbackCount.Should().Be(66, "die auf den Resize folgenden Zeilenumbrüche am neuen unteren Bildschirmrand müssen die obersten Zeilen ins Scrollback verschieben");
+        string.Concat(sut.GetSnapshot().ScrollbackRows[0].Select(cell => cell.Character))
+            .Should().StartWith("Marker");
+    }
+
+    /// <summary>Eine explizit eingeschränkte Scroll-Region darf durch einen Resize nicht zu einer
+    /// bildschirmfüllenden Region werden.</summary>
+    [Fact]
+    public void Buffer_ResizeHoeher_EingeschraenkteScrollRegionBleibtEingeschraenkt()
+    {
+        var sut = new TerminalBuffer(10, 5);
+        sut.Apply(new ScrollRegionChangedEvent(1, 3));
+
+        sut.Resize(10, 75);
+        sut.Apply(new CursorMovedEvent(3, 0, true));
+        sut.Apply(new TextWrittenEvent("\n"));
+
+        sut.ScrollbackCount.Should().Be(0, "ein Zeilenumbruch in einer absichtlich eingeschränkten Region darf nicht ins Scrollback verschieben");
+    }
+
     /// <summary>Verkleinert man die Spaltenzahl, wird der Zeileninhalt rechts abgeschnitten statt in die nächste Zeile umzubrechen.</summary>
     [Fact]
     public void Buffer_ResizeSchmaler_SchneidetRechtsAb()

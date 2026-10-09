@@ -207,6 +207,7 @@ public sealed class TerminalBuffer
         {
             cols = Math.Max(1, cols);
             rows = Math.Max(1, rows);
+            var hadFullScrollRegion = IsFullScrollRegion();
 
             var newGrid = new TerminalCell[rows, cols];
             FillGrid(newGrid, rows, cols);
@@ -243,12 +244,24 @@ public sealed class TerminalBuffer
             _cols = cols;
             _rows = rows;
             _cursorCol = Clamp(_cursorCol, 0, _cols - 1);
-            _scrollTop = Clamp(_scrollTop, 0, _rows - 1);
-            _scrollBottom = Clamp(_scrollBottom, 0, _rows - 1);
-            if (_scrollBottom <= _scrollTop)
+            if (hadFullScrollRegion)
             {
+                // Eine zuvor bildschirmfüllende Scroll-Region muss mit der neuen
+                // Bildschirmhöhe wachsen. Andernfalls würde ein Zeilenumbruch nach
+                // einer Vergrößerung nur im alten Ausschnitt scrollen und dessen
+                // herausfallende Zeilen fälschlich nicht ins Scrollback übernehmen.
                 _scrollTop = 0;
                 _scrollBottom = _rows - 1;
+            }
+            else
+            {
+                _scrollTop = Clamp(_scrollTop, 0, _rows - 1);
+                _scrollBottom = Clamp(_scrollBottom, 0, _rows - 1);
+                if (_scrollBottom <= _scrollTop)
+                {
+                    _scrollTop = 0;
+                    _scrollBottom = _rows - 1;
+                }
             }
             _generation++;
         }
