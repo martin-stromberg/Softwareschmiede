@@ -159,6 +159,9 @@ public sealed class TerminalBuffer
                     else if (e.DeltaRows < 0)
                         ScrollRangeDown(_scrollTop, _scrollBottom, -e.DeltaRows);
                     break;
+                case TerminalResizedEvent e:
+                    Resize(e.Cols, e.Rows);
+                    break;
                 case CursorSavedEvent e:
                     ApplyCursorSaved(e.Restored);
                     break;

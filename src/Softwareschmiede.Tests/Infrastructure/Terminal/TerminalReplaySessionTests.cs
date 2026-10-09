@@ -745,14 +745,13 @@ public sealed class TerminalReplaySessionTests
         events.Should().Be(0, "nach Dispose dürfen keine Events mehr feuern");
     }
 
-    /// <summary>Die Buffer-Geometrie bleibt über die gesamte Session-Lebensdauer auf den
-    /// Aufzeichnungs-Header-Werten fixiert — auch über Einzelschritte und den Präfix-Rebuild
-    /// hinweg (<c>TerminalBuffer.Reset()</c> erhält die Dimensionen).</summary>
+    /// <summary>Ein aufgezeichnetes CSI-8-Resize ändert die Replay-Geometrie. Der Rückwärtsschritt
+    /// baut den Header-Zustand vor dem Resize wieder auf, ohne dass die WPF-Fenstergröße beteiligt ist.</summary>
     [Fact]
-    public void Geometrie_BleibtUeberSchritteUndRebuild_Fixiert()
+    public void Geometrie_Csi8Resize_WirdWiedergegebenUndBeimRueckwaertsschrittZurueckgesetzt()
     {
         var aufzeichnung = CreateAufzeichnung(
-            [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B")],
+            [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("\x1b[8;73;142tB")],
             TimeSpan.Zero,
             cols: 220,
             rows: 50);
@@ -762,17 +761,22 @@ public sealed class TerminalReplaySessionTests
         session.Buffer.Rows.Should().Be(50);
 
         session.SchrittVor();
-        session.Buffer.Cols.Should().Be(220, "SchrittVor darf die Buffer-Geometrie nicht ändern");
+        session.Buffer.Cols.Should().Be(220);
         session.Buffer.Rows.Should().Be(50);
 
         session.SchrittVor();
+        session.Buffer.Cols.Should().Be(142, "CSI 8;73;142t setzt die Textfläche auf 142 Spalten");
+        session.Buffer.Rows.Should().Be(73);
+        ZeilenText(session.Buffer, 0).StartsWith("AB").Should().BeTrue();
+
         session.SchrittZurueck();
-        session.Buffer.Cols.Should().Be(220, "der Präfix-Rebuild (Buffer.Reset) erhält die Dimensionen");
+        session.Buffer.Cols.Should().Be(220, "der Präfix-Rebuild stellt die Header-Geometrie vor dem Resize wieder her");
         session.Buffer.Rows.Should().Be(50);
 
+        session.SchrittVor();
         session.RebuildBufferFromReplay();
-        session.Buffer.Cols.Should().Be(220);
-        session.Buffer.Rows.Should().Be(50);
+        session.Buffer.Cols.Should().Be(142, "der Rebuild reproduziert auch CSI-8-Resizes aus dem Präfix");
+        session.Buffer.Rows.Should().Be(73);
     }
 
     private static Task GetReadLoopTask(PseudoConsoleSession session)

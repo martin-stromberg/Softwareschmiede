@@ -284,6 +284,12 @@ public sealed class AnsiSequenceParser
             case 'T':
                 events.Add(new ScreenScrolledEvent(-(GetParam(parts, 0, 1))));
                 break;
+            case 't' when parts.Length >= 3 && parts[0] == 8 && parts[1] > 0 && parts[2] > 0:
+                // xterm "Resize the text area": CSI 8 ; rows ; cols t. Andere Window-
+                // Manipulationen mit finalem 't' (Abfragen, Pixelgrößen usw.) verändern den
+                // Zeichenbuffer nicht und bleiben daher bewusst unbeachtet.
+                events.Add(new TerminalResizedEvent(Cols: parts[2], Rows: parts[1]));
+                break;
             case 'r':
                 var regionTop = Math.Max(0, GetParam(parts, 0, 1) - 1);
                 var regionBottom = parts.Length > 1 ? parts[1] - 1 : -1;

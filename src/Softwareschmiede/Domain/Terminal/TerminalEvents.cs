@@ -95,6 +95,13 @@ public sealed record ScrollRegionChangedEvent(int Top, int Bottom) : TerminalEve
 /// <returns>Eine neue <see cref="ScreenScrolledEvent"/>-Instanz.</returns>
 public sealed record ScreenScrolledEvent(int DeltaRows) : TerminalEvent;
 
+/// <summary>Ändert die Textfläche des Terminals (CSI 8;Zeilen;Spalten t).</summary>
+/// <param name="Cols">Neue Spaltenanzahl.</param>
+/// <param name="Rows">Neue Zeilenanzahl.</param>
+/// <remarks>Das Ereignis beschreibt ausschließlich die Terminal-Buffer-Geometrie. Es fordert
+/// ausdrücklich keine Größenänderung des umgebenden Anwendungsfensters an.</remarks>
+public sealed record TerminalResizedEvent(int Cols, int Rows) : TerminalEvent;
+
 /// <summary>Cursorposition speichern bzw. wiederherstellen (DECSC/DECRC: ESC 7/8, CSI s/u).</summary>
 /// <param name="Restored">true für Wiederherstellen, false für Speichern.</param>
 /// <returns>Eine neue <see cref="CursorSavedEvent"/>-Instanz.</returns>
