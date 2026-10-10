@@ -2,6 +2,8 @@ using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
+using System.Globalization;
+using FlowDirection = System.Windows.FlowDirection;
 using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E.Views;
@@ -42,8 +44,16 @@ public sealed class TaskDetailView : BaseWindowView
         return this;
     }
 
-    /// <returns>Der aktuelle Aufgabentitel.</returns>
-    public string GetTaskTitle() => WaitForElement(Window, cf => cf.ByName("EditTitel"), Short).AsTextBox().Text;
+    /// <returns>Der aktuelle Aufgabentitel. Bei neuen Aufgaben ist das Bearbeitungsfeld die
+    /// maßgebliche Quelle; nach dem Start bleibt nur das Anzeigeelement sichtbar.</returns>
+    public string GetTaskTitle()
+    {
+        var editTitel = Window.FindFirstDescendant(cf => cf.ByName("EditTitel"));
+        if (editTitel is not null && !editTitel.IsOffscreen)
+            return editTitel.AsTextBox().Text;
+
+        return WaitForElement(Window, cf => cf.ByName("AufgabeTitel"), Short).Name;
+    }
 
     /// <param name="title">Der neue Aufgabentitel.</param>
     /// <returns>Diese Instanz.</returns>
@@ -400,28 +410,166 @@ public sealed class TaskDetailView : BaseWindowView
         return this;
     }
 
+    /// <summary>Ermittelt die sichtbare Zellgeometrie des echten Live-Terminals aus dessen
+    /// schreibgeschütztem UIA-ItemStatus. Anders als eine lokale Font-/DPI-Rechnung kann diese
+    /// Information nicht vom Renderer, der Windows-Skalierung oder einer abweichenden
+    /// ConPTY-Größe auseinanderlaufen.</summary>
+    public LiveTerminalGeometry GetLiveTerminalGeometry()
+    {
+        var terminal = WaitForElement(Window, cf => cf.ByName("TerminalConsole"), Short);
+        var deadline = DateTime.UtcNow + Short;
+        while (DateTime.UtcNow < deadline)
+        {
+            var status = terminal.Properties.ItemStatus.ValueOrDefault;
+            if (TryReadLiveTerminalGeometry(terminal, status, out var geometry))
+                return geometry;
+
+            Thread.Sleep(50);
+        }
+
+        throw new TimeoutException(
+            "TerminalConsole veröffentlichte innerhalb des Zeitlimits keine gültige sichtbare "
+            + $"Viewport-Geometrie über UIA ItemStatus (letzter Wert: '{terminal.Properties.ItemStatus.ValueOrDefault}').");
+    }
+
+    /// <summary>Markiert eine sichtbare Zeile des Live-Terminals mit einem echten Mausdrag.</summary>
+    public void MarkiereLiveTerminalZeile(LiveTerminalGeometry geometry, int viewportRow, int startCol, int endCol)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(viewportRow);
+        ArgumentOutOfRangeException.ThrowIfNegative(startCol);
+        if (viewportRow >= geometry.Rows || endCol < startCol || endCol >= geometry.Cols)
+            throw new ArgumentOutOfRangeException(nameof(endCol));
+
+        var start = geometry.CellCenter(viewportRow, startCol);
+        var end = geometry.CellCenter(viewportRow, endCol);
+        Mouse.MoveTo(start);
+        Thread.Sleep(50);
+        Mouse.Down(MouseButton.Left);
+        Mouse.MoveTo(end);
+        Thread.Sleep(50);
+        Mouse.Up(MouseButton.Left);
+        Thread.Sleep(100);
+    }
+
+    /// <summary>Erfasst ausschließlich die Pixel eines berechneten Zellrechtecks im Live-Terminal.</summary>
+    public byte[] ErfasseLiveZellPixel(LiveTerminalGeometry geometry, int viewportRow, int startCol, int endCol)
+    {
+        using var screenshot = geometry.Terminal.Capture();
+        var left = Math.Clamp((int)Math.Floor(startCol * geometry.CellWidth), 0, screenshot.Width - 1);
+        var top = Math.Clamp((int)Math.Floor(viewportRow * geometry.CellHeight), 0, screenshot.Height - 1);
+        var right = Math.Clamp((int)Math.Ceiling((endCol + 1) * geometry.CellWidth), left + 1, screenshot.Width);
+        var bottom = Math.Clamp((int)Math.Ceiling((viewportRow + 1) * geometry.CellHeight), top + 1, screenshot.Height);
+        var pixels = new byte[(right - left) * (bottom - top) * 3];
+        var index = 0;
+        for (var y = top; y < bottom; y++)
+        {
+            for (var x = left; x < right; x++)
+            {
+                var color = screenshot.GetPixel(x, y);
+                pixels[index++] = color.R;
+                pixels[index++] = color.G;
+                pixels[index++] = color.B;
+            }
+        }
+        return pixels;
+    }
+
+    /// <summary>Fokussiert die Auswahl und löst den realen Strg+Umschalt+C-Kopierpfad aus.</summary>
+    public void KopiereLiveAuswahl()
+    {
+        var terminal = WaitForElement(Window, cf => cf.ByName("TerminalConsole"), Short);
+        terminal.Focus();
+        Thread.Sleep(100);
+        Keyboard.Release(VirtualKeyShort.LCONTROL);
+        Keyboard.Release(VirtualKeyShort.RCONTROL);
+        Keyboard.Release(VirtualKeyShort.LSHIFT);
+        Keyboard.Release(VirtualKeyShort.RSHIFT);
+        Keyboard.TypeSimultaneously(VirtualKeyShort.LCONTROL, VirtualKeyShort.LSHIFT, VirtualKeyShort.KEY_C);
+        Thread.Sleep(100);
+    }
+
+    /// <summary>Liefert den diagnosefähigen UIA-Status des Live-Terminals.</summary>
+    public string GetLiveTerminalStatus()
+        => WaitForElement(Window, cf => cf.ByName("TerminalConsole"), Short).ItemStatus;
+
+    private static bool TryReadLiveTerminalGeometry(AutomationElement terminal, string? status, out LiveTerminalGeometry geometry)
+    {
+        geometry = default!;
+        if (string.IsNullOrWhiteSpace(status) || !status.StartsWith("TerminalViewport;State=Ready;", StringComparison.Ordinal))
+            return false;
+
+        var values = status.Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Skip(1)
+            .Select(part => part.Split('=', 2))
+            .Where(parts => parts.Length == 2)
+            .ToDictionary(parts => parts[0], parts => parts[1], StringComparer.Ordinal);
+
+        if (!TryGetInt(values, "StartRow", out var startRow)
+            || !TryGetInt(values, "Rows", out var rows)
+            || !TryGetInt(values, "FirstColumn", out var firstColumn)
+            || !TryGetInt(values, "Columns", out var columns)
+            || !TryGetInt(values, "CursorRow", out var cursorRow)
+            || !TryGetInt(values, "CursorColumn", out var cursorColumn)
+            || !TryGetDouble(values, "CellWidth", out var cellWidth)
+            || !TryGetDouble(values, "CellHeight", out var cellHeight)
+            || rows < 1 || columns < 1 || cellWidth <= 0 || cellHeight <= 0)
+            return false;
+
+        geometry = new LiveTerminalGeometry(
+            terminal,
+            terminal.BoundingRectangle,
+            startRow,
+            firstColumn,
+            cursorRow,
+            cursorColumn,
+            cellWidth,
+            cellHeight,
+            columns,
+            rows);
+        return true;
+    }
+
+    private static bool TryGetInt(IReadOnlyDictionary<string, string> values, string name, out int value)
+    {
+        value = default;
+        return values.TryGetValue(name, out var text)
+               && int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+    }
+
+    private static bool TryGetDouble(IReadOnlyDictionary<string, string> values, string name, out double value)
+    {
+        value = default;
+        return values.TryGetValue(name, out var text)
+               && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+    }
+
     /// <summary>
-    /// Wartet, bis das TerminalConsole-Element eine nicht-leere Prozess-ID (AutomationProperties.HelpText,
+    /// Wartet, bis das TerminalConsole-Element eine nicht-leere Aufgaben-ID (AutomationProperties.HelpText,
     /// siehe TaskDetailView.xaml.cs) anzeigt, und gibt diese zurück.
     /// </summary>
     /// <param name="timeout">Maximale Wartezeit.</param>
-    /// <returns>Die als HelpText hinterlegte Prozess-ID des aktuell eingebetteten CLI-Prozesses.</returns>
-    /// <exception cref="TimeoutException">Wird geworfen, wenn innerhalb des Timeouts keine Prozess-ID angezeigt wird.</exception>
-    public string WaitForTerminalProcessId(TimeSpan timeout)
+    /// <returns>Die als HelpText hinterlegte Aufgaben-ID der aktuell eingebetteten CLI-Sitzung.</returns>
+    /// <exception cref="TimeoutException">Wird geworfen, wenn innerhalb des Timeouts keine Aufgaben-ID angezeigt wird.</exception>
+    public string WaitForTerminalTaskId(TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            var terminal = Window.FindFirstDescendant(cf => cf.ByName("TerminalConsole"));
-            var pid = terminal?.HelpText;
-            if (!string.IsNullOrWhiteSpace(pid))
-                return pid;
+            // Beim Wechsel zwischen zwei fensterumfassenden Aufgabenansichten kann die zuvor
+            // verwendete Ansicht noch verdeckt im UIA-Baum stehen. Die Aufgaben-ID muss vom
+            // sichtbaren Terminal stammen, sonst würde der Test die Sitzung der alten Aufgabe
+            // auswerten.
+            var terminal = Window.FindAllDescendants(cf => cf.ByName("TerminalConsole"))
+                .FirstOrDefault(element => !element.IsOffscreen);
+            var taskId = terminal?.HelpText;
+            if (!string.IsNullOrWhiteSpace(taskId))
+                return taskId;
 
             Thread.Sleep(200);
         }
 
         throw new TimeoutException(
-            "TerminalConsole zeigte innerhalb des Timeouts keine Prozess-ID (HelpText) an. "
+            "TerminalConsole zeigte innerhalb des Timeouts keine Aufgaben-ID (HelpText) an. "
             + $"Vorhandene Descendants von Window: {DescribeDescendants(Window)}");
     }
 
@@ -499,7 +647,8 @@ public sealed class TaskDetailView : BaseWindowView
             .And(cf.ByName("Speichern unter")
                 .Or(cf.ByName("Save As"))
                 .Or(cf.ByName("Save"))
-                .Or(cf.ByName("CLI-Rohausgabe exportieren")));
+                .Or(cf.ByName("CLI-Rohausgabe exportieren"))
+                .Or(cf.ByName("CLI-Aufzeichnung exportieren")));
 
     private static AutomationElement WaitForEnabledElement(AutomationElement parent, string automationName, TimeSpan timeout)
     {
@@ -539,4 +688,24 @@ public sealed class TaskDetailView : BaseWindowView
         var projectDetail = new ProjectDetailView(Window);
         return projectDetail.OpenFirstTask();
     }
+}
+
+/// <summary>Sichtbare, physische Zellgeometrie eines <c>TerminalControl</c> im E2E-Fenster.</summary>
+public sealed record LiveTerminalGeometry(
+    AutomationElement Terminal,
+    System.Drawing.Rectangle Rect,
+    int StartRow,
+    int FirstColumn,
+    int CursorRow,
+    int CursorColumn,
+    double CellWidth,
+    double CellHeight,
+    int Cols,
+    int Rows)
+{
+    /// <summary>Gibt den Mittelpunkt einer sichtbaren Terminalzelle in Bildschirmkoordinaten zurück.</summary>
+    public System.Drawing.Point CellCenter(int viewportRow, int col)
+        => new(
+            (int)Math.Round(Rect.Left + (col + 0.5) * CellWidth),
+            (int)Math.Round(Rect.Top + (viewportRow + 0.5) * CellHeight));
 }

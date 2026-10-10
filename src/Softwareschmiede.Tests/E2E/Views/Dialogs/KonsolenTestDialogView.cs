@@ -288,6 +288,106 @@ public sealed class KonsolenTestDialogView : DialogView
         return this;
     }
 
+    /// <summary>Markiert den angegebenen Zellbereich des echten Replay-Terminals über einen
+    /// Mausdrag. Die Replay-Geometrie ist Teil der Aufzeichnung und macht die Zellabbildung
+    /// unabhängig von der aktuellen Fenstergröße reproduzierbar.</summary>
+    public KonsolenTestDialogView MarkiereReplayZellen(int startRow, int startCol, int endRow, int endCol, int cols, int rows)
+    {
+        var terminal = WaitForElement(GetDialogWindow(), cf => cf.ByName("ReplayTerminal"), Short);
+        var rect = terminal.BoundingRectangle;
+        var cellWidth = rect.Width / cols;
+        // Die Replay-Geometrie fixiert die Spalten, die verfügbare Dialoghöhe kann
+        // aber mehr als die aufgezeichneten Zeilen zeigen. Höhe/rows würde daher
+        // in eine zu tiefe Zeile klicken. Consolas 13 pt hat im TerminalControl
+        // ein stabiles 3:2-Höhe/Breite-Verhältnis.
+        var cellHeight = cellWidth * 1.5;
+        var start = new System.Drawing.Point(
+            (int)(rect.Left + (startCol + 0.5) * cellWidth),
+            (int)(rect.Top + (startRow + 0.5) * cellHeight));
+        var end = new System.Drawing.Point(
+            (int)(rect.Left + (endCol + 0.5) * cellWidth),
+            (int)(rect.Top + (endRow + 0.5) * cellHeight));
+
+        Mouse.MoveTo(start);
+        Mouse.Down(MouseButton.Left);
+        Mouse.MoveTo(end);
+        Mouse.Up(MouseButton.Left);
+        return this;
+    }
+
+    /// <summary>Erfasst die Pixel des angegebenen Zellrechtecks im echten Replay-Terminal.
+    /// Der Helfer dient dem E2E-Nachweis der gezeichneten Auswahl: UIA kann den Inhalt des
+    /// Custom-Renderers nicht als TextPattern lesen, ein vorher/nachher Pixelvergleich aber
+    /// sehr wohl die sichtbare Hervorhebung belegen.</summary>
+    public byte[] ErfasseReplayZellPixel(int startRow, int startCol, int endRow, int endCol, int cols, int rows)
+    {
+        var terminal = WaitForElement(GetDialogWindow(), cf => cf.ByName("ReplayTerminal"), Short);
+        using var screenshot = terminal.Capture();
+        var cellWidth = screenshot.Width / (double)cols;
+        var cellHeight = cellWidth * 1.5;
+        var left = Math.Clamp((int)Math.Floor(startCol * cellWidth), 0, screenshot.Width - 1);
+        var top = Math.Clamp((int)Math.Floor(startRow * cellHeight), 0, screenshot.Height - 1);
+        var right = Math.Clamp((int)Math.Ceiling((endCol + 1) * cellWidth), left + 1, screenshot.Width);
+        var bottom = Math.Clamp((int)Math.Ceiling((endRow + 1) * cellHeight), top + 1, screenshot.Height);
+        var pixels = new byte[(right - left) * (bottom - top) * 3];
+        var index = 0;
+        for (var y = top; y < bottom; y++)
+        {
+            for (var x = left; x < right; x++)
+            {
+                var color = screenshot.GetPixel(x, y);
+                pixels[index++] = color.R;
+                pixels[index++] = color.G;
+                pixels[index++] = color.B;
+            }
+        }
+
+        return pixels;
+    }
+
+    /// <summary>Ermittelt die Zahl unterschiedlicher RGB-Kanäle zweier gleich großer
+    /// Zell-Screenshots. Ein Schwellenwert statt eines exakten Bildvergleichs bleibt bei
+    /// Cursor-Blinken robust, verlangt aber eine tatsächlich gezeichnete Fläche.</summary>
+    public static int ZaehleAbweichendeReplayPixel(byte[] vorher, byte[] nachher)
+    {
+        var abweichungen = 0;
+        // Das Dialoglayout kann sich zwischen zwei Aufnahmen um wenige Pixel
+        // nachjustieren (z. B. nach der ersten Fokus-/Scrollbar-Aktualisierung).
+        // Verglichen wird deshalb der gemeinsame Zell-Ausschnitt; die Aufnahmen
+        // stammen beide aus identischen logischen Zellen.
+        var gemeinsameLaenge = Math.Min(vorher.Length, nachher.Length) / 3 * 3;
+        for (var index = 0; index < gemeinsameLaenge; index += 3)
+            if (vorher[index] != nachher[index] || vorher[index + 1] != nachher[index + 1] || vorher[index + 2] != nachher[index + 2])
+                abweichungen++;
+        return abweichungen;
+    }
+
+    /// <summary>Setzt den UIA-Fokus auf das Replay-Terminal, ohne dessen Auswahl zu verändern,
+    /// und sendet anschließend Strg+Umschalt+C. Screenshots und Clipboard-Zugriffe können den
+    /// nativen Vordergrundsfokus vom Custom-Control wegnehmen.</summary>
+    public KonsolenTestDialogView KopiereReplayAuswahl()
+    {
+        // Capture() und die eigenständigen STA-Zugriffe auf die Zwischenablage können den
+        // nativen Vordergrund-/Tastaturfokus vom WPF-Control wegnehmen. UIA.Focus stellt
+        // den WPF-Fokus wieder her; die kurze Wartezeit lässt den Fokuswechsel im Dispatcher
+        // ankommen, bevor SendInput die Tastenkombination an das Vordergrundfenster sendet.
+        var terminal = WaitForElement(GetDialogWindow(), cf => cf.ByName("ReplayTerminal"), Short);
+        terminal.Focus();
+        Thread.Sleep(100);
+
+        // Die vorangehenden Shift+Rechts-Inputs werden per SendInput ausgelöst. Ein explizites
+        // Release verhindert, dass ein hängen gebliebener Modifier die exakt erwartete
+        // Ctrl+Shift+C-Geste verfälscht. LCONTROL/LSHIFT bilden dabei denselben WPF-
+        // Modifierzustand (Control | Shift) wie der reale linke Tastaturpfad.
+        Keyboard.Release(VirtualKeyShort.LCONTROL);
+        Keyboard.Release(VirtualKeyShort.RCONTROL);
+        Keyboard.Release(VirtualKeyShort.LSHIFT);
+        Keyboard.Release(VirtualKeyShort.RSHIFT);
+        Keyboard.TypeSimultaneously(VirtualKeyShort.LCONTROL, VirtualKeyShort.LSHIFT, VirtualKeyShort.KEY_C);
+        Thread.Sleep(100);
+        return this;
+    }
+
     /// <summary>Wartet, bis der ReplayTerminal-ScrollViewer horizontal scrollbar wird — das
     /// Extent-/Scrollbar-Layout entsteht asynchron nach dem Binden der Session.</summary>
     /// <param name="timeout">Maximale Wartezeit.</param>

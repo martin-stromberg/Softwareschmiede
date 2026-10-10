@@ -9,10 +9,11 @@ namespace Softwareschmiede.Infrastructure.Terminal;
 /// zeitreal durch denselben Renderpfad wie <see cref="PseudoConsoleSession"/> abspielt
 /// (<see cref="AnsiSequenceParser"/> → <see cref="TerminalBuffer"/> → <see cref="BufferChanged"/>).
 /// Zusätzlich zur Schnittstelle steuert sie die Wiedergabe (Start, Pause/Fortsetzen, Zeitraffer).
-/// Die im Header der Aufzeichnung gespeicherte Geometrie ist die dauerhafte Buffer-Geometrie
-/// (<see cref="SupportsResize"/> ist <c>false</c> — das anzeigende <c>TerminalControl</c> resized
-/// Replay-Sessions nicht; überschüssige Breite wird dort per <c>IScrollInfo</c> horizontal
-/// scrollbar). Resize-Ereignisse werden nicht aufgezeichnet und nicht reproduziert.</summary>
+/// Die im Header der Aufzeichnung gespeicherte Geometrie ist die anfängliche Buffer-Geometrie.
+/// Während der Wiedergabe werden aufgezeichnete xterm-Textflächen-Resizes (CSI 8;Zeilen;Spalten t)
+/// auf den Buffer angewendet. <see cref="SupportsResize"/> bleibt dennoch <c>false</c>: Das
+/// anzeigende <c>TerminalControl</c> darf Replay-Geometrien nicht aus seiner WPF-Größe ableiten
+/// und ändert dabei niemals das Anwendungsfenster.</summary>
 public sealed class TerminalReplaySession : ITerminalSession
 {
     private readonly CliOutputAufzeichnung _aufzeichnung;
@@ -500,6 +501,10 @@ public sealed class TerminalReplaySession : ITerminalSession
     /// <see cref="_parser"/>). Muss unter <see cref="_renderLock"/> aufgerufen werden.</summary>
     private void BaueBufferUndParserAusPraefixNeuAuf()
     {
+        // TerminalBuffer.Reset() erhält absichtlich seine aktuelle Geometrie. Beim Replay muss
+        // der Neuaufbau jedoch beim Header-Zustand beginnen, weil das Präfix CSI-8-Resizes
+        // enthalten kann, die beim Rückwärtsschritt nicht mehr gelten.
+        Buffer.Resize(Math.Max(1, _aufzeichnung.Cols), Math.Max(1, _aufzeichnung.Rows));
         Buffer.Reset();
         _parser.Reset();
         foreach (var chunk in _abgespielteChunks)

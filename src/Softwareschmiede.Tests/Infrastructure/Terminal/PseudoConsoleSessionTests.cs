@@ -335,6 +335,21 @@ public sealed class PseudoConsoleSessionTests
         session.Buffer.GetRow(1)[0].Character.Should().Be('B');
     }
 
+    /// <summary>CSI 8;Zeilen;Spalten t wird auch im Live-Parserpfad als Änderung der
+    /// Terminal-Textfläche verarbeitet. Das betrifft nur den Buffer, nicht das WPF-Fenster.</summary>
+    [Fact]
+    public async Task ReadLoopAsync_Csi8Resize_AktualisiertBufferGeometrie()
+    {
+        using var session = CreateSession(new FixedContentStream("A\x1b[8;73;142tB"));
+
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+
+        session.Buffer.Cols.Should().Be(142);
+        session.Buffer.Rows.Should().Be(73);
+        session.Buffer.GetRow(0)[0].Character.Should().Be('A');
+        session.Buffer.GetRow(0)[1].Character.Should().Be('B');
+    }
+
     /// <summary>Ein identischer Resize-Aufruf wird dedupliziert und kehrt sofort zurück; ein zweiter
     /// identischer Aufruf löst keinen weiteren ConPTY-Resize aus.</summary>
     [Fact]

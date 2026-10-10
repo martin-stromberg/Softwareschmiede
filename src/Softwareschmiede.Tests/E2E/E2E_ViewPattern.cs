@@ -10,8 +10,8 @@ namespace Softwareschmiede.Tests.E2E;
 /// E2E-Szenarien für das View-Pattern (Issue #231): erkennt Ansichten über
 /// <see cref="WindowExtensions.CurrentView"/> und navigiert über die <c>*View</c>-Klassen aus
 /// <c>Softwareschmiede.Tests.E2E.Views</c>, statt direkt mit rohen FlaUI-Aufrufen zu arbeiten.
-/// Alle Phasen laufen als aufeinanderfolgende Schritte in einem gemeinsamen App-Lifecycle
-/// (aufgerufen aus <see cref="End2EndTest.RunGeneralTests"/>), um zusätzliche App-Starts zu vermeiden.
+/// Alle Phasen laufen als aufeinanderfolgende Schritte im isolierten
+/// <c>General_ViewNavigation_E2E</c>-Szenario, damit Fehler dieser Navigation von anderen E2E-Flows getrennt bleiben.
 /// </summary>
 public partial class End2EndTest
 {

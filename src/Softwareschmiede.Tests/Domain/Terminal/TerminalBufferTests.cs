@@ -8,6 +8,62 @@ namespace Softwareschmiede.Tests.Domain.Terminal;
 /// <summary>Unit-Tests für TerminalBuffer.</summary>
 public sealed class TerminalBufferTests
 {
+    /// <summary>Beim Resize wird der Scrollback-Snapshot auf die neue Geometrie normalisiert,
+    /// damit Auswahlcode jede sichtbare Spalte samt Versionsnummer gefahrlos lesen kann.</summary>
+    [Fact]
+    public void Buffer_GetSnapshot_ResizeNormalizesScrollbackCellVersions()
+    {
+        var sut = new TerminalBuffer(3, 1);
+        sut.Apply(new TextWrittenEvent("ABC\n"));
+        sut.Resize(6, 1);
+
+        var snapshot = sut.GetSnapshot();
+
+        snapshot.ScrollbackCount.Should().Be(1);
+        snapshot.ScrollbackRows[0].Should().HaveCount(6);
+        snapshot.ScrollbackCellVersions[0].Should().HaveCount(6);
+        snapshot.ScrollbackCellVersions[0][5].Should().Be(0);
+    }
+
+    /// <summary>Ein Insert-Zeichen mutiert die jeweiligen Zielzellen; ihre Schreibversion darf
+    /// nicht von der Quellzelle übernommen werden.</summary>
+    [Fact]
+    public void Buffer_CharsInserted_AssignsNewVersionsToMovedTargetCells()
+    {
+        var sut = new TerminalBuffer(8, 1);
+        sut.Apply(new TextWrittenEvent("ABCD"));
+        var before = sut.GetSnapshot();
+        sut.Apply(new CursorMovedEvent(0, 1, true));
+
+        sut.Apply(new CharsInsertedEvent(1));
+
+        var after = sut.GetSnapshot();
+        after.Grid[0, 2].Character.Should().Be('B');
+        after.GridCellVersions[0, 2].Should().NotBe(before.GridCellVersions[0, 1]);
+    }
+
+    /// <summary>Ein normaler Vollbild-Scroll verschiebt vollständige logische Zeilen.
+    /// Deren Zellversionen sind Auswahlidentitäten und müssen daher mit der Zeile wandern.</summary>
+    [Fact]
+    public void Buffer_NormalScroll_MovesCellVersionsWithLogicalRows()
+    {
+        var sut = new TerminalBuffer(8, 2);
+        sut.Apply(new TextWrittenEvent("erste\nzweite"));
+        var before = sut.GetSnapshot();
+        var secondRowId = before.GridRowIds[1];
+        var secondVersion = before.GridCellVersions[1, 0];
+
+        // Die Ausgabe auf der unteren Zeile bewirkt beim Zeilenumbruch einen
+        // Vollbild-Scroll; "zweite" bleibt als oberste sichtbare logische Zeile.
+        sut.Apply(new TextWrittenEvent("\n"));
+
+        var after = sut.GetSnapshot();
+        after.GridRowIds[0].Should().Be(secondRowId);
+        after.GridCellVersions[0, 0].Should().Be(secondVersion,
+            "eine Scrollback-Verschiebung darf eine gültige Auswahl nicht invalidieren");
+        after.Grid[0, 0].Character.Should().Be('z');
+    }
+
     /// <summary>Apply(TextWrittenEvent) schreibt Zeichen an die korrekte Position im Grid.</summary>
     [Fact]
     public void Buffer_SchreibtText_AktualisiertZellen()
@@ -296,6 +352,39 @@ public sealed class TerminalBufferTests
         sut.Resize(10, 2);
 
         sut.CursorRow.Should().Be(0, "der Cursor lag vor der Verkleinerung oberhalb des neuen sichtbaren Bereichs und muss auf die erste sichtbare Zeile geklemmt werden");
+    }
+
+    /// <summary>Eine vor dem Resize bildschirmfüllende Scroll-Region wächst mit der neuen Höhe,
+    /// damit Zeilenumbrüche am neuen unteren Rand weiterhin ins Scrollback verschieben.</summary>
+    [Fact]
+    public void Buffer_ResizeHoeher_VollstaendigeScrollRegionWaechstUndFuelltScrollback()
+    {
+        var sut = new TerminalBuffer(10, 50);
+        sut.Apply(new CursorMovedEvent(0, 0, true));
+        sut.Apply(new TextWrittenEvent("Marker"));
+
+        sut.Resize(10, 75);
+        sut.Apply(new CursorMovedEvent(74, 0, true));
+        sut.Apply(new TextWrittenEvent(new string('\n', 66)));
+
+        sut.ScrollbackCount.Should().Be(66, "die auf den Resize folgenden Zeilenumbrüche am neuen unteren Bildschirmrand müssen die obersten Zeilen ins Scrollback verschieben");
+        string.Concat(sut.GetSnapshot().ScrollbackRows[0].Select(cell => cell.Character))
+            .Should().StartWith("Marker");
+    }
+
+    /// <summary>Eine explizit eingeschränkte Scroll-Region darf durch einen Resize nicht zu einer
+    /// bildschirmfüllenden Region werden.</summary>
+    [Fact]
+    public void Buffer_ResizeHoeher_EingeschraenkteScrollRegionBleibtEingeschraenkt()
+    {
+        var sut = new TerminalBuffer(10, 5);
+        sut.Apply(new ScrollRegionChangedEvent(1, 3));
+
+        sut.Resize(10, 75);
+        sut.Apply(new CursorMovedEvent(3, 0, true));
+        sut.Apply(new TextWrittenEvent("\n"));
+
+        sut.ScrollbackCount.Should().Be(0, "ein Zeilenumbruch in einer absichtlich eingeschränkten Region darf nicht ins Scrollback verschieben");
     }
 
     /// <summary>Verkleinert man die Spaltenzahl, wird der Zeileninhalt rechts abgeschnitten statt in die nächste Zeile umzubrechen.</summary>

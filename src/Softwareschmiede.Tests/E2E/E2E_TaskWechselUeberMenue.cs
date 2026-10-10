@@ -17,7 +17,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// nur in den Loaded/Unloaded-Handlern gesetzte TerminalControl.Session blieb dadurch auf der
 /// vorherigen Aufgabe stehen.
 ///
-/// Testbarkeit: Die tatsächlich im TerminalControl eingebettete Prozess-ID wird über
+/// Testbarkeit: Die tatsächlich im TerminalControl eingebettete Aufgaben-ID wird über
 /// AutomationProperties.HelpText offengelegt (siehe TaskDetailView.xaml.cs), damit der Test
 /// unabhängig von der (custom-gezeichneten) Terminal-Darstellung verifizieren kann, welcher
 /// CLI-Prozess tatsächlich angezeigt wird.
@@ -38,7 +38,7 @@ public partial class End2EndTest
     /// Szenario: Aufgabe A ist geöffnet und ihre CLI läuft. Ohne über "Zurück" zu navigieren, wählt
     /// der Anwender über die Aufgabenliste in der Seitenleiste ("Aktive Aufgaben") Aufgabe B aus.
     /// Prüft: Danach wird tatsächlich Aufgabe B angezeigt — inklusive der zu Aufgabe B gehörenden CLI
-    /// (eigene Prozess-ID), nicht mehr die CLI von Aufgabe A.
+    /// (eigene Aufgaben-ID), nicht mehr die CLI von Aufgabe A.
     /// </summary>
     protected void AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E(Window mainWindow)
     {
@@ -58,16 +58,16 @@ public partial class End2EndTest
 
         // Aufgabe A anlegen, öffnen und CLI starten
         var taskA = ErstelleUndStarteAufgabe(projectDetail, TitelA);
-        var pidA = taskA.WaitForTerminalProcessId(Medium);
+        var taskIdA = taskA.WaitForTerminalTaskId(Medium);
 
         // Zurück zum Projekt, um Aufgabe B anzulegen
         taskA.GoBack();
         var projectDetailForB = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
-        // Aufgabe B anlegen, öffnen und CLI starten (eigener Prozess, andere PID als Aufgabe A)
+        // Aufgabe B anlegen, öffnen und CLI starten (eigene Aufgaben-ID, nicht Aufgabe A)
         var taskB = ErstelleUndStarteAufgabe(projectDetailForB, TitelB);
-        var pidB = taskB.WaitForTerminalProcessId(Medium);
-        Assert.NotEqual(pidA, pidB);
+        var taskIdB = taskB.WaitForTerminalTaskId(Medium);
+        Assert.NotEqual(taskIdA, taskIdB);
 
         // Zurück zum Projekt und Aufgabe A erneut öffnen — Aufgabe A ist nun die "geöffnete" Aufgabe
         taskB.GoBack();
@@ -75,17 +75,17 @@ public partial class End2EndTest
 
         var taskAReopened = projectDetailForReopen.OpenTask(TitelA);
         taskAReopened.WaitForCliRunning();
-        var pidAErneutGeoeffnet = taskAReopened.WaitForTerminalProcessId(Medium);
-        Assert.Equal(pidA, pidAErneutGeoeffnet);
+        var taskIdAErneutGeoeffnet = taskAReopened.WaitForTerminalTaskId(Medium);
+        Assert.Equal(taskIdA, taskIdAErneutGeoeffnet);
 
         // Über die Aufgabenliste in der Seitenleiste ("Aktive Aufgaben") zu Aufgabe B wechseln,
         // OHNE über "Zurück" zu navigieren — genau das im Bug-Report beschriebene Szenario.
         var taskAfterSwitchToB = taskAReopened.Menu.NavigateToTask(TitelB);
 
         // Die eingebettete CLI muss jetzt tatsächlich zu Aufgabe B gehören (nicht mehr zu Aufgabe A).
-        var pidNachWechsel = taskAfterSwitchToB.WaitForTerminalProcessId(Medium);
-        Assert.NotEqual(pidA, pidNachWechsel);
-        Assert.Equal(pidB, pidNachWechsel);
+        var taskIdNachWechsel = taskAfterSwitchToB.WaitForTerminalTaskId(Medium);
+        Assert.NotEqual(taskIdA, taskIdNachWechsel);
+        Assert.Equal(taskIdB, taskIdNachWechsel);
 
         // Zusätzlich (nicht nur Titel/Fußzeile): Das Info-Panel zeigt den Titel von Aufgabe B.
         taskAfterSwitchToB.SwitchPanel("InfoCliToggle");
@@ -96,9 +96,12 @@ public partial class End2EndTest
         var taskAfterSwitchToA = taskAfterSwitchToB.Menu.NavigateToTask(TitelA);
 
         // Die eingebettete CLI muss jetzt tatsächlich zu Aufgabe A gehören (nicht mehr zu Aufgabe B).
-        pidNachWechsel = taskAfterSwitchToA.WaitForTerminalProcessId(Medium);
-        Assert.NotEqual(pidB, pidNachWechsel);
-        Assert.Equal(pidA, pidNachWechsel);
+        // Der vorherige Informationsnachweis hat das Info-Panel geöffnet; für die CLI-Prüfung
+        // muss das Terminal daher bewusst wieder sichtbar geschaltet werden.
+        taskAfterSwitchToA.SwitchPanel("CliViewButton");
+        taskIdNachWechsel = taskAfterSwitchToA.WaitForTerminalTaskId(Medium);
+        Assert.NotEqual(taskIdB, taskIdNachWechsel);
+        Assert.Equal(taskIdA, taskIdNachWechsel);
 
         // Zusätzlich (nicht nur Titel/Fußzeile): Das Info-Panel zeigt den Titel von Aufgabe A.
         taskAfterSwitchToA.SwitchPanel("InfoCliToggle");

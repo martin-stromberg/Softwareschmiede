@@ -38,6 +38,7 @@ Unterstützte Eingaben:
 - Enter zum Ausführen
 - Backspace und Delete zum Löschen
 - **Ctrl+V zum Einfügen aus der Zwischenablage** — auch längerer mehrzeiliger Text wird vollständig und zeilenweise eingefügt
+- **Ctrl+Shift+C zum Kopieren einer Auswahl** — markierter Terminaltext wird in die Zwischenablage kopiert
 
 Die Ansicht passt sich automatisch bei Größenänderungen an; das Terminal wird neu dimensioniert.
 
@@ -52,6 +53,14 @@ Die CLI-Ansicht folgt neuen Ausgaben automatisch, solange Sie am Ende des Verlau
 Der Verlauf umfasst bis zu 1000 Scrollback-Zeilen zusätzlich zum aktuell sichtbaren Terminalbereich. Ältere Zeilen werden verworfen, wenn diese Grenze überschritten wird. Klicks in die Terminalfläche setzen den Fokus weiterhin auf das Terminal, sodass Tastatureingaben und `Ctrl+V` auch nach dem Scrollen direkt an die CLI gehen.
 
 > **Vollbild-Programme:** Wenn die CLI eine Vollbild-Ansicht nutzt (z. B. interaktive Auswahllisten oder Texteditoren), wird sie auf den eigenen Bildschirmbereich der CLI umgeschaltet. In diesem Modus ist der Verlauf bewusst nicht scrollbar — die Anzeige folgt dem Programm; beim Verlassen der Vollbild-Ansicht kehrt das normale Scroll-Verhalten zurück.
+
+### 3.2. Terminaltext auswählen und kopieren
+
+Ziehen Sie mit gedrückter linker Maustaste über den gewünschten Text, um eine Auswahl zu markieren. Mit **Shift+Pfeiltasten** lässt sich die Auswahl zellweise erweitern; **Shift+Home** und **Shift+End** erweitern sie bis zum Anfang beziehungsweise Ende der Zeile. Über **Ctrl+Shift+C** oder den Kontextmenüeintrag **Kopieren** wird die Auswahl in die Windows-Zwischenablage übernommen. Bei mehrzeiliger Auswahl bleiben Leerzeilen und Leerzeichen innerhalb des Textes erhalten; Leerzeichen am rechten Rand der Terminalzeilen werden nicht mitkopiert.
+
+**Ctrl+C** bleibt der CLI vorbehalten und kann dort weiterhin ein laufendes Kommando abbrechen. **Ctrl+Shift+C** ohne aktive Auswahl ändert die Zwischenablage nicht und wird nicht an die CLI gesendet.
+
+Eine Auswahl soll normale neue Ausgabe überstehen und am ausgewählten Inhalt verankert bleiben, wenn der Verlauf weiterscrollt. Der Erhalt nach Scrollback-Verschiebung ist derzeit noch Gegenstand einer offenen Korrektur; bei einer solchen Verschiebung kann die Auswahl daher verloren gehen. E2E-Nachweise für Live-Terminal und Replay sind ebenfalls noch offen.
 
 ### 4. CLI beenden
 
