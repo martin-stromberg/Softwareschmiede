@@ -29,11 +29,12 @@ public sealed partial class TerminalControlTests
             session.Buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("copy"));
             session.Buffer.Apply(new Softwareschmiede.Domain.Terminal.CursorMovedEvent(0, 4, true));
             InvokeExtendSelection(control, Key.Home);
+            SetClipboardTextWithRetry("darf-nicht-eingefuegt-werden");
 
             InvokePreviewKeyDown(control, Key.C, Key.LeftCtrl, Key.LeftShift);
 
             System.Windows.Clipboard.GetText().Should().Be("copy");
-            input.ToArray().Should().BeEmpty();
+            input.ToArray().Should().BeEmpty("Ctrl+Shift+C muss exklusiv kopieren und darf keinen Pastepfad auslösen");
         });
     }
 
@@ -98,6 +99,42 @@ public sealed partial class TerminalControlTests
         });
     }
 
+    /// <summary>Ein durch die Maus gesetzter Ein-Zell-Anker wird durch eine echte WPF-
+    /// <see cref="KeyEventArgs"/>-Umschalt+Rechts-Geste erweitert. Der Test prüft dabei
+    /// Modifierpfad, sichtbares Overlay und das anschließende Kopieren, ohne von der
+    /// Windows-Eingabeinjektion des E2E-Hosts abhängig zu sein.</summary>
+    [Fact]
+    public void OnPreviewKeyDown_MausankerDannShiftRechts_ZeichnetAuswahlUndKopiertText()
+    {
+        RunOnSta(() =>
+        {
+            var control = new TerminalControl();
+            var buffer = new Softwareschmiede.Domain.Terminal.TerminalBuffer(12, 1);
+            buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("erste Zeile"));
+            SetBufferForSelectionTest(control, buffer);
+
+            var snapshot = buffer.GetSnapshot();
+            var anchor = CreateSelectionPoint(snapshot, 0, 0);
+            SetSelection(control, anchor, anchor);
+
+            var args = InvokePreviewKeyDown(control, Key.Right, Key.LeftShift);
+
+            args.Handled.Should().BeTrue();
+            var selection = GetSelection(control);
+            GetSelectionColumn(selection, "Anchor").Should().Be(0);
+            GetSelectionColumn(selection, "End").Should().Be(1);
+
+            typeof(TerminalControl).GetMethod("HasValidSelection", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(control, null).Should().Be(true,
+                    "die erweiterte Auswahl muss für den Renderer als sichtbares Overlay gültig sein");
+
+            SetClipboardTextWithRetry("vorher");
+            var copyArgs = InvokePreviewKeyDown(control, Key.C, Key.LeftCtrl, Key.LeftShift);
+            copyArgs.Handled.Should().BeTrue();
+            System.Windows.Clipboard.GetText().Should().Be("er");
+        });
+    }
+
     /// <summary>Normale Ausgabe darf eine Auswahl nicht verlieren, wenn die markierte
     /// logische Zeile beim Scrollen nur ihre sichtbare Position wechselt.</summary>
     [Fact]
@@ -125,6 +162,39 @@ public sealed partial class TerminalControlTests
             typeof(TerminalControl).GetMethod("CopySelectionToClipboard", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(control, null);
             System.Windows.Clipboard.GetText().Should().Be("zweite");
+        });
+    }
+
+    /// <summary>Neue Ausgabe in einer anderen logischen Zeile darf die bereits markierten
+    /// Zellen weder entmarkieren noch den daraus kopierten Text verändern.</summary>
+    [Fact]
+    public void Selection_NewOutputOutsideSelection_KeepsSelectionAndCopyText()
+    {
+        RunOnSta(() =>
+        {
+            var control = new TerminalControl();
+            var buffer = new Softwareschmiede.Domain.Terminal.TerminalBuffer(12, 2);
+            buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("ausgewaehlt\n"));
+            SetBufferForSelectionTest(control, buffer);
+
+            // Der Cursor steht am Beginn der zweiten Zeile; für die Auswahl der ersten
+            // Zeile wird er gezielt dorthin zurückgesetzt und Shift+End verwendet.
+            buffer.Apply(new Softwareschmiede.Domain.Terminal.CursorMovedEvent(0, 0, true));
+            InvokeExtendSelection(control, Key.End);
+
+            // Diese Ausgabe schreibt ausschließlich in die zweite Zeile.
+            buffer.Apply(new Softwareschmiede.Domain.Terminal.CursorMovedEvent(1, 0, true));
+            buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("spaeter"));
+            typeof(TerminalControl).GetMethod("ValidateSelection", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(control, null);
+
+            typeof(TerminalControl).GetField("_selection", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(control).Should().NotBeNull("Ausgabe außerhalb der Auswahl darf deren Zellversionen nicht verändern");
+
+            SetClipboardTextWithRetry("vorher");
+            typeof(TerminalControl).GetMethod("CopySelectionToClipboard", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(control, null);
+            System.Windows.Clipboard.GetText().Should().Be("ausgewaehlt");
         });
     }
     /// <summary>Bei einer Session ohne Eingabekanal (Replay: <c>InputStream == Stream.Null</c>)
@@ -219,4 +289,29 @@ public sealed partial class TerminalControlTests
 
     private static void InvokeExtendSelection(TerminalControl control, Key key)
         => typeof(TerminalControl).GetMethod("ExtendSelection", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(control, [key]);
+
+    private static object CreateSelectionPoint(Softwareschmiede.Domain.Terminal.TerminalBufferSnapshot snapshot, int row, int column)
+    {
+        var pointType = typeof(TerminalControl).GetNestedType("TerminalSelectionPoint", BindingFlags.NonPublic)!;
+        var rowId = snapshot.GridRowIds[row];
+        var version = snapshot.GridCellVersions[row, column];
+        return Activator.CreateInstance(pointType, rowId, column, version)!;
+    }
+
+    private static void SetSelection(TerminalControl control, object anchor, object end)
+    {
+        var createSelection = typeof(TerminalControl).GetMethod("CreateSelection", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var selection = createSelection.Invoke(control, [anchor, end]);
+        typeof(TerminalControl).GetField("_selection", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(control, selection);
+    }
+
+    private static object GetSelection(TerminalControl control)
+        => typeof(TerminalControl).GetField("_selection", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(control)!;
+
+    private static int GetSelectionColumn(object selection, string propertyName)
+    {
+        var point = selection.GetType().GetProperty(propertyName)!.GetValue(selection)!;
+        return (int)point.GetType().GetProperty("Column")!.GetValue(point)!;
+    }
+
 }

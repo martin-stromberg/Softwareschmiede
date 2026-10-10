@@ -2,36 +2,40 @@
 
 ## Status: Offene Aufgaben vorhanden
 
-Die Kernimplementierung erfüllt wesentliche Planbestandteile: `TerminalControl` bietet zellbasierte Maus- und Tastaturauswahl, sichtbares Overlay, Snapshot-basierte Textextraktion und `Ctrl+Shift+C`; `Ctrl+C` bleibt unverändert dem Terminaleingabepfad vorbehalten. Zeilen-IDs, Zellversionen und Buffer-Generationen stützen die Auswahl-Lifecycle-Regeln.
+Die Produktimplementierung deckt die Kernanforderung ab: zellbasierte Auswahl per Maus und Tastatur, sichtbares Overlay, `Ctrl+Shift+C` sowie der unveränderte `Ctrl+C`-Eingabepfad sind vorhanden. Stabile Zeilen-IDs und Zellversionen halten eine unveränderte Auswahl bei normaler Ausgabe und Scrollback fest. Der gezielte Live-Maustest E-01 wurde erfolgreich ausgeführt.
 
-Der verbindliche Funktionsnachweis ist dennoch nicht vollständig. Insbesondere E-01 testet den vorgesehenen Live-Auswahl- und Kopierablauf nicht. E-02 verwendet inzwischen korrekte echte CR/LF-Zeilen, weist die sichtbare Auswahl aber weiterhin nicht nach. Die Pflicht-E2E-Szenarien wurden für den aktuellen Stand nicht erfolgreich ausgeführt.
+Der Plan verlangt jedoch ausdrücklich echte E2E-Nachweise für die Tastaturauswahl in Live- und Replay-Terminal. Diese sind noch nicht erbracht: Die getrennten E2E-Tests belegen Mausauswahl und Kopier-Shortcut, aber keine per `Shift`+Navigation erzeugte Auswahl. Der WPF-Test mit konstruierten `KeyEventArgs` ist ein wertvoller Integrationstest, ersetzt die verpflichtende E2E-Abnahme aber nicht. Darüber hinaus fehlen noch Teile der verbindlichen Control-/Buffer-Testmatrix.
 
-Für dieses Review wurden keine Tests ausgeführt.
+Für diesen Review wurden keine Tests ausgeführt; die Aussagen zu erfolgreichen Läufen folgen dem aktuellen `test-results.md` und `continue.md`.
 
-## Umgesetzte Planelemente
+## Erfüllte Planpunkte
 
-- `TerminalControl` unterstützt Mausdrag sowie `Shift`+Pfeile und `Shift`+`Home`/`End`, zeichnet die Auswahl über den Terminalzellen und extrahiert sie aus einem konsistenten Snapshot.
-- `Ctrl+Shift+C` kopiert nur bei Auswahl und schreibt dann keine Terminal-Input-Bytes; ohne Auswahl bleiben Clipboard und CLI-Eingabe unverändert. Der vorhandene `Ctrl+C`-Eingabepfad bleibt bestehen.
-- Auswahlgrenzen enthalten Zeilen-IDs, Zellversionen und Generation. Änderungen an ausgewählten Zellen, verlorene Zeilen, Reset, Resize und Screenwechsel invalidieren sie; normales Scrollen kann die logische Auswahl erhalten.
-- E-02 ist in `RunGeneralTests` registriert und erzeugt nun zwei echte Terminalzeilen mit `"erste Zeile\r\nzweite Zeile"`. Maus- und Tastaturauswahl vergleichen den Clipboardinhalt.
+- `TerminalControl` enthält zellbasierte Maus- und Tastaturauswahl, rendert ein Overlay und extrahiert Text aus dem Buffer-Snapshot. `Ctrl+Shift+C` kopiert; der bestehende `Ctrl+C`-Eingabepfad bleibt erhalten.
+- Die Auswahl wird über stabile Zeilen-IDs und Zellversionen validiert. `OnBufferChanged` validiert die Auswahl vor dem Rendern.
+- `TerminalControlTests.KeyInput.cs` enthält `Selection_NewOutputOutsideSelection_KeepsSelectionAndCopyText` und `Selection_NormalScroll_KeepsLogicalRowAndCopyText`. Beide prüfen, dass Auswahltext bei Ausgabe außerhalb der Auswahl beziehungsweise logischer Zeilenverschiebung erhalten bleibt.
+- Der isolierte E-01-Test erzeugt eine Live-Ausgabe, markiert den sichtbaren Marker mit einem echten Mausdrag, weist das Overlay per Pixelvergleich nach und prüft Kopieren sowie Erhalt nach neuer Ausgabe und Scrollback-Ausgabe.
+- E-02 ist in zwei frische, gezielt ausführbare Szenarien aufgeteilt. Der Mauspfad weist eine mehrzeilige Replay-Auswahl, sichtbares Overlay und den exakten Clipboardtext nach; der Shortcutpfad prüft Fokus und `Ctrl+Shift+C` auf einer vorhandenen Auswahl.
+- Die UIA-Viewportinformation ist als schreibgeschütztes `AutomationProperties.ItemStatus` umgesetzt. Sie enthält keinen Terminalinhalt und erlaubt dem Live-E2E-Test eine zellgenaue Mauspositionierung ohne OCR oder zeilenabhängige Screenshot-Suche.
 
 ## Offene Aufgaben
 
-1. **E-01 weist den Live-Benutzerfluss nicht nach.** `TerminalText_LiveMarkCopyAndKeepSelection` in `E2E_ConPtyLifecycle.cs` gibt nur einen eindeutigen Marker aus und prüft Terminalausgabe sowie Prozessstatus. Es fehlen Mausauswahl, sichtbare Hervorhebung, `Ctrl+Shift+C`, STA-Clipboardvergleich, Erhalt nach weiterer Ausgabe, Scrollback-Verschiebung mit Rückscrollen und der geforderte Tastaturauswahl-Durchlauf. Der Kommentar, die detaillierten Prüfungen lägen bewusst bei Replay, widerspricht der verbindlichen E-01-Abnahme im Plan.
-2. **E-02 prüft das Auswahl-Overlay nicht.** `ReplayText_MarkAndCopy` führt Drag, Tastaturauswahl und Clipboardvergleiche aus, nimmt aber keinen Vorher-/Nachher-Screenshot auf und vergleicht keine Pixel im erwarteten Zellenrechteck. Damit fehlt der planmäßig verbindliche sichtbare Nachweis.
-3. **Geplante Control-/Buffer-Testabdeckung fehlt weitgehend.** Es fehlen gezielte Tests für Vorwärts-/Rückwärts-Extraktion, Teilzeilen, Leerzeilen und Leerzeichen-/Zeilenumbruchregeln, Mauskoordinaten mit horizontalem und vertikalem Offset, Overlay-Clipping sowie Invalidierung durch Überschreiben, Erase, Scrollback-Abwurf, Reset, Resize, Alternate-Screen- und Sessionwechsel. Ebenso fehlt ein deterministischer Clipboard-Schreibfehler-Test.
-4. **Es liegt kein erfolgreicher aktueller E2E-Nachweis vor.** `test-results.md` dokumentiert einen früheren Lauf und nennt noch die inzwischen korrigierte `\\r\\n`-Fixture als Fehler. Die nachträglichen Änderungen an E-02 und am normalen Scrollback-Test sind dort nicht abgenommen. E-01 und E-02 müssen seriell mit Desktop-, Maus-, Tastatur- und Clipboardzugriff erfolgreich durchlaufen; nicht ausgeführte Szenarien gelten gemäß Plan nicht als grün.
+1. **Tastaturauswahl ist nicht E2E-abgenommen.** `ReplayText_CopyShortcutWithFocusedSelection_E2E` erzeugt die Auswahl weiterhin mit `MarkiereReplayZellen` (Maus) und sendet nur den Kopier-Shortcut. `TerminalText_LiveMarkCopyAndKeepSelection_E2E` enthält gar keinen Tastaturdurchlauf. Damit fehlen die in E-01 und E-02 verbindlich geforderten echten `Shift`+Pfeil-/`Home`-/`End`-Abläufe inklusive sichtbarer Auswahl und Clipboardvergleich. Der WPF-Test `OnPreviewKeyDown_MausankerDannShiftRechts_ZeichnetAuswahlUndKopiertText` belegt die Produktlogik, ist aber wegen direkt konstruierter Ereignisdaten kein Ersatz für diese E2E-Anforderung.
+2. **E-01 deckt den vollständigen Live-Erhaltspfad noch nicht sichtbar ab.** Der Test markiert einen einzelnen Marker statt der im Plan verlangten zwei kontrollierten Zeilen. Nach weiterer Ausgabe und nach Scrollback wird nur erneut kopiert; der Test scrollt nicht zur Auswahl zurück und vergleicht weder deren sichtbares Overlay noch den ursprünglichen Ausschnitt. Ergänzt werden müssen: mehrzeilige Auswahl, Pixelnachweis nach normaler Ausgabe, Rückscrollen zur verschobenen Auswahl und erneuter sichtbarer Pixelnachweis.
+3. **Die Control-/Buffer-Testmatrix aus dem Plan ist unvollständig.** Weiterhin fehlen gezielte Tests für Vorwärts-/Rückwärts- und Teilzeilenextraktion, Leerzeilen sowie Endleerzeichen/Zeilenumbrüche, Mauskoordinaten mit horizontalem und vertikalem Offset, Overlay-Clipping und die Invalidierung nach Überschreiben, Erase mit identischem Neuschreiben, Scrollback-Abwurf, Reset, Resize, Alternate-Screen- und Sessionwechsel. Ein kontrollierter Schreibfehler beim Kopieren ist ebenfalls nicht nachgewiesen.
+4. **Die neue UIA-Geometrie ist ein produktiver, impliziter Testvertrag und muss stabilisiert werden.** Die Wahl von `ItemStatus` ist für den E2E-Use-Case vertretbar, weil sie standardisiert, schreibgeschützt und inhaltsfrei ist. Das semikolongetrennte Format samt physischer Pixelmaße wird jedoch direkt vom Testparser als Protokoll konsumiert. Es braucht deshalb einen eng begrenzten Contract-Test für Format, DPI-Bezug und Aktualisierung bei Scroll/Resize. Zudem wird `FirstColumn` zwar veröffentlicht, von `LiveTerminalGeometry.CellCenter` aber nicht einbezogen; ein horizontal gescrollter Viewport würde daher an der falschen Zelle ziehen. Der Geometriehelfer muss relative sichtbare Spalten von logischen Spalten klar trennen und mit horizontalem Offset getestet werden.
+5. **Der vollständige, aktuelle E2E-Nachweis fehlt noch in `test-results.md`.** Die Datei nennt E-02 noch als abgebrochen, während `continue.md` bereits getrennte grüne Nachweise behauptet. Nach Abschluss des Tastaturfalls müssen die drei gezielten E2E-Szenarien seriell ausgeführt und mit ihren tatsächlichen Ergebnissen dokumentiert werden.
 
 ## E2E-Nachweisstatus
 
-| Szenario | Aktueller Code | Plan-Nachweisstatus |
+| Szenario | Implementierungsstand | Nachweis |
 |---|---|---|
-| E-01 `TerminalText_LiveMarkCopyAndKeepSelection` | Registrierte ConPTY-Phase, aber nur Marker-Ausgabe und Prozessstatus. | **Nicht bestanden / nicht nachgewiesen:** Auswahl, Overlay, Erhalt, Scrollback, Tastaturauswahl und Clipboardvergleich fehlen. |
-| E-02 `ReplayText_MarkAndCopy` | Registriert; echte zwei Zeilen sowie Maus-/Tastaturauswahl und Clipboardvergleiche vorhanden. | **Nicht vollständig nachgewiesen:** Pixel-/Overlayvergleich fehlt; kein erfolgreicher aktueller E2E-Lauf dokumentiert. |
+| E-01 Live-Mausauswahl | Isoliert erfolgreich: Drag, Overlay, Clipboard, Erhalt per erneutem Kopieren. | Teilweise erfüllt; mehrzeiliger, sichtbarer Erhalt- und Tastaturpfad fehlen. |
+| E-02 Replay-Mausauswahl | Getrennt implementiert und laut `continue.md` erfolgreich: Pixelvergleich und exakter Mehrzeilen-Clipboardtext. | Erfüllt für Maus. |
+| E-02 Replay-Tastaturauswahl | E2E prüft Fokus und Kopier-Shortcut auf einer zuvor per Maus gesetzten Auswahl; WPF-Test prüft `Shift`+Rechts. | Nicht erfüllt: keine echte E2E-Tastaturauswahl. |
 
 ## Erforderliche Nacharbeiten
 
-- E-01 als echten Live-UI-Test vollständig umsetzen und ausführen.
-- E-02 um Screenshot-/Pixelprüfung der sichtbaren Auswahl ergänzen und ausführen.
-- Die fehlenden Buffer-/Control-Tests aus dem Plan ergänzen, insbesondere alle Invalidierungsfälle und den Clipboard-Fehlerpfad.
-- Die betroffenen Tests sowie beide Pflicht-E2E seriell erfolgreich ausführen und `test-results.md` auf den tatsächlichen Quellstand aktualisieren.
+- Einen verlässlichen E2E-Eingabepfad für `Shift`+Navigation herstellen oder den Plan nach ausdrücklicher Produktentscheidung anpassen; anschließend Live- und Replay-Tastaturauswahl mit Overlay- und Clipboardnachweis ausführen.
+- E-01 um den mehrzeiligen, nach Ausgabe und Rückscrollen weiterhin sichtbaren Auswahlablauf ergänzen.
+- Die ausstehende Control-/Buffer-Testmatrix und den UIA-Geometrie-Contract einschließlich horizontalem Offset ergänzen.
+- Alle gezielten Pflicht-E2E seriell ausführen und `test-results.md` konsistent aktualisieren.

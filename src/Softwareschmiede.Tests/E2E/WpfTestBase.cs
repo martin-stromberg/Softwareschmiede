@@ -191,11 +191,6 @@ public abstract class WpfTestBase : IDisposable
 
         var appPath = ResolveAppExePath();
 
-        // WICHTIG: Die Umgebungsvariable gilt prozessweit für alle parallel laufenden Tests.
-        // Deshalb ist [Collection("E2E")] zwingend erforderlich, um parallele Ausführung zu verhindern
-        // und sicherzustellen, dass jeder Test seine eigene Datenbankinstanz isoliert benutzt.
-        Environment.SetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH", _testDbPath);
-
         _appLogDirectory = ResolveAppLogDirectory(appPath);
         _appLogSnapshot = AppStartupLogInspector.Snapshot(_appLogDirectory);
 
@@ -373,10 +368,6 @@ public abstract class WpfTestBase : IDisposable
 
         try { DeleteProzessStartLog(); }
         catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Löschen der Prozessstart-Logdatei: {ex}"); }
-
-        // Umgebungsvariable zurücksetzen, damit sie nicht in andere Tests im selben Prozess
-        // hineinleckt (z. B. PluginManagerTests, die ohne Test-Modus-Einschränkung laufen sollen).
-        Environment.SetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH", null);
 
         // Credential-Store-Zustand aus dem OS-weiten Windows-Credential-Store wiederherstellen,
         // damit produktive Werte durch den Testlauf nicht verloren gehen oder zwischen E2E-Tests leaken.

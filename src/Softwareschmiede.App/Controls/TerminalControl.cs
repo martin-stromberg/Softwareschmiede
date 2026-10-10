@@ -1,5 +1,7 @@
 using System.IO;
+using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -141,6 +143,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             _viewportHeight = 0;
             _isFollowingEnd = true;
             ScrollOwner?.InvalidateScrollInfo();
+            UpdateViewportAutomationInfo();
             InvalidateVisual();
             return;
         }
@@ -321,7 +324,10 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             return;
         }
 
-        if (e.Key == Key.V && (modifiers & ModifierKeys.Control) != 0)
+        // Ctrl+V und Ctrl+Shift+V fügen beide ein. Ctrl+Shift+C wird weiter oben
+        // exklusiv für die Auswahlkopie behandelt und kann daher nicht hierher fallen.
+        if (e.Key == Key.V &&
+            (modifiers == ModifierKeys.Control || modifiers == (ModifierKeys.Control | ModifierKeys.Shift)))
         {
             if (session?.InputStream != null)
             {
@@ -445,9 +451,16 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             {
                 var cols = CalculateCols();
                 var rows = CalculateRows();
-                buffer.Resize(cols, rows);
-                session.Resize(cols, rows);
-                ClearSelection();
+                // Layout kann sich ändern, ohne dass sich die Terminalgeometrie ändert
+                // (z. B. durch einen Scrollbar- oder Fokuswechsel). In diesem Fall bleiben
+                // die Zellen und damit eine bestehende Auswahl unverändert; sie darf nicht
+                // allein wegen eines Renderpasses verloren gehen.
+                if (cols != buffer.Cols || rows != buffer.Rows)
+                {
+                    buffer.Resize(cols, rows);
+                    session.Resize(cols, rows);
+                    ClearSelection();
+                }
             }
 
             UpdateScrollInfo(followEndIfNeeded: true);
@@ -550,6 +563,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     {
         _horizontalOffset = ClampOffset(offset, ScrollableWidth);
         ScrollOwner?.InvalidateScrollInfo();
+        UpdateViewportAutomationInfo();
         InvalidateVisual();
     }
 
@@ -563,6 +577,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             _verticalOffset = 0;
             _isFollowingEnd = true;
             ScrollOwner?.InvalidateScrollInfo();
+            UpdateViewportAutomationInfo();
             return;
         }
 
@@ -570,6 +585,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         _verticalOffset = clamped;
         _isFollowingEnd = clamped >= ScrollableHeight - ScrollEndEpsilon;
         ScrollOwner?.InvalidateScrollInfo();
+        UpdateViewportAutomationInfo();
         InvalidateVisual();
     }
 
@@ -612,6 +628,44 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         _horizontalOffset = ClampOffset(_horizontalOffset, ScrollableWidth);
 
         ScrollOwner?.InvalidateScrollInfo();
+        UpdateViewportAutomationInfo();
+    }
+
+    /// <summary>
+    /// Veröffentlicht die aktuell sichtbare Terminalgeometrie über die standardisierte UI-Automation-
+    /// Eigenschaft <see cref="AutomationProperties.ItemStatusProperty"/>. Der Wert ist ausschließlich
+    /// diagnostisch und schreibgeschützt: UIA-Clients können damit eine sichtbare Bufferzeile gezielt
+    /// ansteuern, ohne den gerenderten Text per Screenshot oder OCR erraten zu müssen.
+    /// </summary>
+    /// <remarks>
+    /// Alle Größen außer den logischen Zeilen-/Spaltennummern sind physische Bildschirmpixel und
+    /// lassen sich deshalb direkt mit <c>BoundingRectangle</c> aus UIA kombinieren. Die Information
+    /// wird bei Ausgabe, Resize und beiden Scrollrichtungen erneuert.
+    /// </remarks>
+    private void UpdateViewportAutomationInfo()
+    {
+        var snapshot = _buffer?.GetSnapshot();
+        if (snapshot is null || ActualWidth <= 0 || ActualHeight <= 0)
+        {
+            AutomationProperties.SetItemStatus(this, "TerminalViewport;State=Empty");
+            return;
+        }
+
+        MeasureCellSize();
+        var visibleRows = CalculateRows();
+        var visibleStart = _isFollowingEnd
+            ? Math.Max(0, snapshot.TotalRows - visibleRows)
+            : Clamp((int)Math.Round(_verticalOffset), 0, Math.Max(0, snapshot.TotalRows - visibleRows));
+        var firstVisibleCol = Clamp((int)(_horizontalOffset / _cellWidth), 0, snapshot.Cols);
+        var lastVisibleCol = Clamp((int)Math.Ceiling((_horizontalOffset + ActualWidth) / _cellWidth), 0, snapshot.Cols);
+        var cursorRow = snapshot.ScrollbackCount + snapshot.CursorRow;
+        var dpi = VisualTreeHelper.GetDpi(this);
+
+        // ItemStatus ist ein Standard-UIA-Kanal für dynamische Statusinformationen. Das knappe,
+        // kulturinvariante Format bleibt bewusst maschinenlesbar und enthält keinen Terminalinhalt.
+        var selectionState = _selection is null ? "None" : HasValidSelection() ? "Valid" : "Invalid";
+        AutomationProperties.SetItemStatus(this, string.Create(CultureInfo.InvariantCulture,
+            $"TerminalViewport;State=Ready;Selection={selectionState};StartRow={visibleStart};Rows={visibleRows};FirstColumn={firstVisibleCol};Columns={lastVisibleCol - firstVisibleCol};CursorRow={cursorRow};CursorColumn={snapshot.CursorCol};CellWidth={_cellWidth * dpi.DpiScaleX:F3};CellHeight={_cellHeight * dpi.DpiScaleY:F3}"));
     }
 
     private static TerminalCell GetSnapshotCell(TerminalBufferSnapshot snapshot, int logicalRow, int col)
@@ -660,8 +714,8 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     {
         var snapshot = _buffer?.GetSnapshot();
         return snapshot is null
-            ? new TerminalSelection(-1, anchor, end, new Dictionary<(long RowId, int Column), long>())
-            : new TerminalSelection(snapshot.Generation, anchor, end, CaptureCellVersions(snapshot, anchor, end));
+            ? new TerminalSelection(anchor, end, new Dictionary<(long RowId, int Column), long>())
+            : new TerminalSelection(anchor, end, CaptureCellVersions(snapshot, anchor, end));
     }
 
     private void ExtendSelection(Key key)
@@ -739,7 +793,13 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         lastRow = FindLogicalRow(snapshot, selection.End.RowId);
         firstCol = selection.Anchor.Column;
         lastCol = selection.End.Column;
-        if (selection.Generation != snapshot.Generation || firstRow < 0 || lastRow < 0 ||
+        // Die Buffer-Generation ändert sich bei jeder Ausgabe. Sie ist daher kein
+        // Auswahlkriterium: Ausgabe außerhalb der Auswahl darf eine Markierung nicht
+        // verlieren. Stabile Zeilen-IDs und Zellversionen prüfen dagegen präzise,
+        // ob die gewählten Zellen noch existieren und unverändert sind. Reset, Resize
+        // und Screenwechsel erzeugen neue IDs bzw. Versionen und invalidieren damit
+        // weiterhin zuverlässig.
+        if (firstRow < 0 || lastRow < 0 ||
             GetCellVersion(snapshot, firstRow, firstCol) != selection.Anchor.CellVersion ||
             GetCellVersion(snapshot, lastRow, lastCol) != selection.End.CellVersion)
             return false;
@@ -838,7 +898,8 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             return;
 
         var bytes = KeyToVt100Encoder.EncodeClipboardText(text);
-        await WriteToInputStreamAsync(session, bytes, "Fehler beim Einfügen aus der Zwischenablage in den Terminal-Input-Stream").ConfigureAwait(false);
+        if (await WriteToInputStreamAsync(session, bytes, "Fehler beim Einfügen aus der Zwischenablage in den Terminal-Input-Stream").ConfigureAwait(false))
+            session.MarkInputActivity();
     }
 
     /// <summary>Schreibt Bytes asynchron in den Input-Stream der aktuellen Session und protokolliert Schreibfehler
@@ -847,15 +908,17 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     /// <param name="session">Die Zielsession für den Schreibvorgang.</param>
     /// <param name="bytes">Die zu schreibenden Bytes.</param>
     /// <param name="errorMessage">Die Log-Nachricht bei einem Schreibfehler.</param>
-    private async Task WriteToInputStreamAsync(ITerminalSession session, byte[] bytes, string errorMessage)
+    private async Task<bool> WriteToInputStreamAsync(ITerminalSession session, byte[] bytes, string errorMessage)
     {
         try
         {
             await session.WriteInputAsync(bytes).ConfigureAwait(false);
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, errorMessage);
+            return false;
         }
     }
 
@@ -877,7 +940,6 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     private readonly record struct TerminalSelectionPoint(long RowId, int Column, long CellVersion);
 
     private sealed record TerminalSelection(
-        long Generation,
         TerminalSelectionPoint Anchor,
         TerminalSelectionPoint End,
         IReadOnlyDictionary<(long RowId, int Column), long> CellVersions);

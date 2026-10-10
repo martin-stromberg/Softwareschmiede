@@ -76,12 +76,18 @@ public sealed partial class TaskDetailView : UserControl
 
     private void OnTerminalSessionGestartet(ITerminalSession session)
     {
-        SetTerminalSession(session);
+        // Ein bereits eingeplantes Ereignis einer vorherigen Detailansicht kann noch nach
+        // dem DataContext-Wechsel eintreffen. Die mitgelieferte Sitzung darf dann nicht
+        // blind übernommen werden, weil sie zu einer anderen Aufgabe gehören kann.
+        // Maßgeblich ist ausschließlich die Sitzung des aktuell gebundenen ViewModels.
+        SetTerminalSession(_subscribedViewModel?.GetTerminalSession());
     }
 
     private void OnCliGestoppt()
     {
-        SetTerminalSession(null);
+        // Analog zum Start-Ereignis darf ein verspätetes Stopp-Ereignis einer alten Aufgabe
+        // die sichtbare Sitzung der aktuell gewählten Aufgabe nicht entfernen.
+        SetTerminalSession(_subscribedViewModel?.GetTerminalSession());
     }
 
     private void OnPromptVorlageGesendet()
@@ -98,7 +104,10 @@ public sealed partial class TaskDetailView : UserControl
         if (!ShouldFocusTerminalFromScrollViewerMouseSource(e.OriginalSource))
             return;
 
-        e.Handled = true;
+        // Der ScrollViewer sorgt nur dafür, dass nach einem Klick der Terminal-Renderer
+        // den Tastaturfokus erhält. Das Ereignis darf dabei nicht konsumiert werden:
+        // TerminalControl.OnMouseDown muss denselben Klick anschließend erhalten, um
+        // den Auswahlanker zu setzen und die Maus zu capturen.
         FocusTerminalConsole();
 
         _ = Dispatcher.InvokeAsync(
@@ -139,37 +148,27 @@ public sealed partial class TaskDetailView : UserControl
         return LogicalTreeHelper.GetParent(current);
     }
 
-    /// <summary>Setzt die im TerminalControl angezeigte Sitzung und legt deren Prozess-ID zu Testzwecken als AutomationProperties.HelpText ab (siehe E2E_TaskWechselUeberMenue).</summary>
+    /// <summary>Setzt die im TerminalControl angezeigte Sitzung und legt die zugehörige Aufgaben-ID
+    /// zu Testzwecken als AutomationProperties.HelpText ab (siehe E2E_TaskWechselUeberMenue).</summary>
     /// <param name="session">Die anzuzeigende CLI-Sitzung, oder <c>null</c>, wenn keine Sitzung eingebettet werden soll.</param>
     private void SetTerminalSession(ITerminalSession? session)
     {
         TerminalConsole.Session = session;
-        AutomationProperties.SetHelpText(TerminalConsole, TryGetProcessId(session));
+        AutomationProperties.SetHelpText(TerminalConsole, GetTerminalTaskId(session));
     }
 
     /// <summary>
-    /// Liest die Prozess-ID einer Sitzung robust aus. <see cref="ITerminalSession.Process"/> stammt
-    /// bei ConPTY-Sitzungen aus <see cref="System.Diagnostics.Process.GetProcessById(int)"/> - ist der
-    /// zugrunde liegende Prozess bereits beendet (z. B. sehr kurzlebige ConPTY-Kindprozesse), kann jeder
-    /// Zugriff darauf mit <see cref="InvalidOperationException"/> ("No process is associated with this
-    /// object") fehlschlagen, siehe KiAusfuehrungsService.TryGetExitCode für denselben Fehlermodus. Da
-    /// dieser Wert nur diagnostisch (E2E-Test-HelpText) ist, darf ein solcher Fehler die UI nicht
-    /// beeinträchtigen.
+    /// Liefert die Aufgaben-ID der aktuell eingebetteten Sitzung für die E2E-Diagnose. Die vorher
+    /// verwendete Prozess-ID existiert bei dem im E2E-Testmodus vorgesehenen Pipe-Backend nicht und
+    /// konnte deshalb die Zuordnung einer Sitzung zu ihrer Aufgabe nicht zuverlässig abbilden.
     /// </summary>
-    /// <param name="session">Die Sitzung, deren Prozess-ID gelesen werden soll, oder <c>null</c>.</param>
-    /// <returns>Die Prozess-ID als String, oder ein leerer String, wenn keine Sitzung vorhanden ist oder die ID nicht (mehr) gelesen werden kann.</returns>
-    private static string TryGetProcessId(ITerminalSession? session)
+    /// <param name="session">Die anzuzeigende Sitzung, oder <c>null</c>.</param>
+    /// <returns>Die Aufgaben-ID als String, oder ein leerer String, wenn keine Sitzung oder Aufgabe vorhanden ist.</returns>
+    private string GetTerminalTaskId(ITerminalSession? session)
     {
-        if (session is null)
+        if (session is null || _subscribedViewModel?.AufgabeId is not { } aufgabeId || aufgabeId == Guid.Empty)
             return string.Empty;
 
-        try
-        {
-            return session.Process.Id.ToString();
-        }
-        catch (InvalidOperationException)
-        {
-            return string.Empty;
-        }
+        return aufgabeId.ToString("D");
     }
 }

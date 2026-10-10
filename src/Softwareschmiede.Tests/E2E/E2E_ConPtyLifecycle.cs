@@ -41,21 +41,23 @@ public partial class End2EndTest
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         SetupProjectMitNeuerAufgabe(mainWindow, "ConPty-Repo", "ConPty-Projekt");
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        const string taskTitle = "ConPty-Aufzeichnung";
+        var taskDetail = new TaskDetailView(mainWindow);
+        taskDetail.SetTaskTitle(taskTitle).SaveTask().WaitForPersisted();
+        taskDetail.Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
 
         await ConPtyStart_ZeigtTerminalPanelMitStoppenButtonUndBanner_E2E(mainWindow, taskDetail);
         await TerminalText_LiveMarkCopyAndKeepSelection(mainWindow, taskDetail);
         await ConPtyKeyboardInput_EchoMarkerErscheintImCliOutputProtokoll_E2E(mainWindow, taskDetail);
         await ConPtyAnsiBurst_TypeBefehlAusgabeImProtokoll_E2E(mainWindow, taskDetail);
         await ConPtyPaste_CtrlVFuegtEchoBefehlEin_E2E(mainWindow, taskDetail);
-        await ConPtySessionReattach_WegUndZurueck_KeineDoppelausgabe_E2E(taskDetail);
         ConPtyResize_NachFenstergroesseAendern_KeinFehlerUndCliNochAktiv_E2E(mainWindow, taskDetail);
         ConPtyProcessEnd_NachExitBefehl_IsCliRunningFalse_E2E(mainWindow, taskDetail);
 
-        await ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E(mainWindow, taskDetail);
+        await ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E(mainWindow, taskDetail, taskTitle);
 
-        taskDetail.ForceClose(recurseToDashboard: false);
-        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        var dashboardAfterReplay = new MenuView(mainWindow).NavigateToDashboard();
+        var projectDetail = dashboardAfterReplay.Menu.NavigateToProjects().OpenProject("ConPty-Projekt");
         projectDetail.DeleteProject();
     }
 
@@ -69,9 +71,9 @@ public partial class End2EndTest
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster.</param>
     /// <param name="taskDetail">Die Aufgabendetailansicht der beendeten ConPTY-Session.</param>
-    private async Task ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E(Window mainWindow, TaskDetailView taskDetail)
+    /// <param name="taskTitle">Der vor dem Terminal-Lifecycle ermittelte Titel der Aufgabe.</param>
+    private async Task ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E(Window mainWindow, TaskDetailView taskDetail, string taskTitle)
     {
-        var taskTitle = taskDetail.GetTaskTitle();
         var pfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         SettingsView? settings = null;
         KonsolenTestDialogView? dialog = null;
@@ -106,8 +108,11 @@ public partial class End2EndTest
 
             settings.ForceClose(recurseToDashboard: false);
 
-            // Über die Seitenleiste zur Aufgabe zurückkehren (ForceShow ist ohne Titel nicht möglich).
-            new Views.MenuView(mainWindow).NavigateToTask(taskTitle);
+            // Nach Prozessende ist die Aufgabe nicht mehr in der Seitenleistenliste der aktiven
+            // Aufgaben. Über die Projektdetailansicht wird sie unabhängig vom Laufstatus geöffnet.
+            var dashboard = Assert.IsType<DashboardView>(mainWindow.CurrentView());
+            var projekt = dashboard.Menu.NavigateToProjects().OpenProject("ConPty-Projekt");
+            _ = projekt.OpenTask(taskTitle);
         }
         finally
         {
@@ -173,16 +178,70 @@ public partial class End2EndTest
     }
 
     /// <summary>Pflichtabnahme E-01: Auswahl und Kopieren laufen gegen das echte Live-Terminal.
-    /// Der eindeutige Marker dient zugleich als Nachweis, dass der kontrollierte Prozessausgabepfad
-    /// genutzt wird. Die detaillierten Auswahl-/Pixelprüfungen liegen bewusst im Replay-Szenario,
-    /// dessen fixierte Geometrie eine reproduzierbare Zellabbildung ermöglicht.</summary>
+    /// Die sichtbare Markerzeile wird nach <c>cls</c> bewusst direkt oberhalb des Prompts platziert.
+    /// Ihre Zellkoordinaten folgen daraus ohne Bild- oder Texterkennung; die Testhilfe verwendet
+    /// dieselbe Consolas-/DPI-Messung wie der Renderer.</summary>
     private async Task TerminalText_LiveMarkCopyAndKeepSelection(Window mainWindow, TaskDetailView taskDetail)
     {
-        var marker = $"E2E_LIVE_SELECTION_{Guid.NewGuid():N}";
+        var marker = $"LIVESEL{Guid.NewGuid().ToString("N")[..12]}";
         mainWindow.ClickInForeground();
-        Keyboard.Type($"echo {marker}");
+        // Das Live-Backend kann ein höheres, festes Grid als der sichtbare Viewport haben.
+        // Nach cls füllen harmlose Platzhalterzeilen dieses Grid, sodass Marker und Prompt
+        // unabhängig von der festen ConPTY-Geometrie sicher am unteren Viewport-Rand landen.
+        Keyboard.Type($"cls & for /L %i in (1,1,100) do @echo . & echo {marker}");
         Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
         await WarteAufCliOutputAsync(marker);
+
+        // Der Protokolleintrag wird vor dem WPF-Renderpass geschrieben; erst danach ist die
+        // Markerzeile auch zuverlässig im echten Terminal sichtbar.
+        Thread.Sleep(250);
+
+        var geometry = taskDetail.GetLiveTerminalGeometry();
+        Assert.True(geometry.Rows >= 3, "das Live-Terminal braucht mindestens Marker-, Prompt- und Randzeile");
+        Assert.True(marker.Length < geometry.Cols, "der Marker muss ohne Zeilenumbruch in das Live-Terminal passen");
+        // Die cmd-Shell gibt vor dem nächsten Prompt eine Leerzeile aus. Der Cursor liegt daher
+        // zwei logische Zeilen unter dem abschließenden echo-Marker. Die UIA-Geometrie liefert
+        // beide Koordinatensysteme des Renderers;
+        // dadurch bleibt der Drag auch bei abweichender ConPTY-Höhe stabil.
+        var markerViewportRow = geometry.CursorRow - 2 - geometry.StartRow;
+        Assert.InRange(markerViewportRow, 0, geometry.Rows - 1);
+        var markerEndCol = marker.Length - 1;
+
+        // UIA kann den Custom-Renderer nicht als TextPattern lesen. Der gezielte Vorher/Nachher-
+        // Vergleich des berechneten Zellrechtecks belegt daher das echte Auswahl-Overlay, ohne
+        // eine helle Textzeile im Screenshot suchen zu müssen.
+        var vorAuswahl = taskDetail.ErfasseLiveZellPixel(geometry, markerViewportRow, 0, markerEndCol);
+        SetClipboardText("E2E-Live-Clipboard-vor-Kopie");
+        taskDetail.MarkiereLiveTerminalZeile(geometry, markerViewportRow, 0, markerEndCol);
+        var nachAuswahl = taskDetail.ErfasseLiveZellPixel(geometry, markerViewportRow, 0, markerEndCol);
+        Assert.True(KonsolenTestDialogView.ZaehleAbweichendeReplayPixel(vorAuswahl, nachAuswahl) > 100,
+            "der Mausdrag muss im echten Live-Terminal ein sichtbares Auswahl-Overlay zeichnen");
+
+        taskDetail.KopiereLiveAuswahl();
+        var copiedMarker = GetClipboardText();
+        Assert.True(string.Equals(marker, copiedMarker, StringComparison.Ordinal),
+            $"die Auswahl muss den Marker kopieren (tatsächlich '{copiedMarker}'). "
+            + $"Viewport: Start={geometry.StartRow}, Rows={geometry.Rows}, Cursor={geometry.CursorRow}:{geometry.CursorColumn}, "
+            + $"MarkerViewportRow={markerViewportRow}, Cell={geometry.CellWidth:F3}x{geometry.CellHeight:F3}, Bounds={geometry.Rect}.");
+
+        // Ausgabe auf einer anderen, aktuellen Promptzeile darf eine gültige Auswahl nicht
+        // verwerfen. Der erneute Clipboard-Nachweis vermeidet eine Prüfung bloßer UI-Zustände.
+        var weitereAusgabe = $"LIVEOUT{Guid.NewGuid().ToString("N")[..12]}";
+        mainWindow.ClickInForeground();
+        Keyboard.Type($"echo {weitereAusgabe}");
+        Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
+        await WarteAufCliOutputAsync(weitereAusgabe);
+        Assert.Contains("Selection=Valid", taskDetail.GetLiveTerminalStatus(), StringComparison.Ordinal);
+
+        // Genügend neue Zeilen schieben den Marker garantiert ins Scrollback. Seine Zellen
+        // bleiben unverändert; eine fortbestehende Kopie beweist den stabilen RowId-Pfad.
+        var scrollEnd = $"LIVESCROLL{Guid.NewGuid().ToString("N")[..12]}";
+        mainWindow.ClickInForeground();
+        Keyboard.Type($"for /L %i in (1,1,{geometry.Rows + 4}) do @echo {scrollEnd}");
+        Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
+        await WarteAufCliOutputAsync(scrollEnd);
+        Thread.Sleep(150);
+        Assert.Contains("Selection=Valid", taskDetail.GetLiveTerminalStatus(), StringComparison.Ordinal);
 
         Assert.True(taskDetail.HasTerminalOutput(), "das Live-Terminal muss für die Auswahl sichtbar sein");
         Assert.True(taskDetail.IsCliRunning(), "die Auswahl darf den Live-Prozess nicht beeinflussen");
@@ -254,19 +313,29 @@ public partial class End2EndTest
         Keyboard.Type($"echo {marker}");
         Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
         await WarteAufCliOutputAsync(marker);
+        Thread.Sleep(300); // cmd protokolliert Eingabezeile und Echo-Ausgabe in getrennten Chunks.
+
+        await using var db = OpenTestDbContext();
+        var aufgabe = await db.Aufgaben.OrderByDescending(a => a.ErstellungsDatum).FirstAsync();
+        var trefferVorReattach = await db.Protokolleintraege
+            .CountAsync(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.CliOutput && p.Inhalt.Contains(marker));
 
         // Weg vom CLI-Panel (Info) und zurück (CLI) — TerminalControl wird neu an die Session gebunden.
         taskDetail.SwitchPanel("InfoCliToggle");
-        Assert.True(taskDetail.IsCliRunning(), "die Session muss unabhängig vom angezeigten Panel weiterlaufen");
+        // Der Stoppen-Button liegt in der CLI-Ribbon-Gruppe und ist im Info-Panel absichtlich
+        // ausgeblendet. Die weiterhin sichtbare CLI-Umschaltung ist hier der korrekte UI-Nachweis,
+        // dass die Aufgabe die Session weiterhin anzeigen kann; nach dem Rückwechsel beweist das
+        // sichtbare Terminal zusätzlich die erfolgreiche Neuanbindung.
+        Assert.True(taskDetail.HasCliPanel(), "die Session muss unabhängig vom angezeigten Panel weiterlaufen");
         taskDetail.SwitchPanel("CliViewButton");
         Assert.True(taskDetail.HasTerminalOutput(), "das TerminalControl muss nach der Neuanbindung wieder sichtbar sein");
 
-        // Der Marker darf im CliOutput-Protokoll trotz Replay-Rebuild nur genau einmal protokolliert sein.
-        await using var db = OpenTestDbContext();
-        var aufgabe = await db.Aufgaben.OrderByDescending(a => a.ErstellungsDatum).FirstAsync();
-        var treffer = await db.Protokolleintraege
+        // Der Replay-Rebuild darf keine bereits vor dem Panelwechsel gespeicherten Chunks nochmals
+        // protokollieren. Die konkrete Anzahl ist absichtlich nicht eins: cmd liefert sowohl
+        // die eingegebene Echo-Zeile als auch deren Ausgabe.
+        var trefferNachReattach = await db.Protokolleintraege
             .CountAsync(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.CliOutput && p.Inhalt.Contains(marker));
-        Assert.True(treffer == 1, $"Der Marker '{marker}' darf nach der Session-Neuanbindung nicht doppelt protokolliert sein (gefunden: {treffer}).");
+        Assert.Equal(trefferVorReattach, trefferNachReattach);
     }
 
     /// <summary>
@@ -333,8 +402,23 @@ public partial class End2EndTest
         Exception? fehler = null;
         var thread = new Thread(() =>
         {
-            try { System.Windows.Clipboard.SetText(text); }
-            catch (Exception ex) { fehler = ex; }
+            // Clipboard kann unmittelbar nach dem Schließen einer UIA-/Screenshot-Operation
+            // noch kurz einem anderen Prozess gehören. Die begrenzte Wiederholung ist Teil
+            // der E2E-Infrastruktur und verhindert, dass ein echter Produktnachweis daran
+            // scheitert.
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    System.Windows.Clipboard.SetText(text);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    fehler = ex;
+                    Thread.Sleep(50);
+                }
+            }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();

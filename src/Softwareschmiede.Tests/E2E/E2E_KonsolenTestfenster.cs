@@ -17,11 +17,45 @@ namespace Softwareschmiede.Tests.E2E;
 /// </summary>
 public partial class End2EndTest
 {
-    /// <summary>Pflichtabnahme E-02: Die Auswahl wird in einer echten Replay-Ansicht per Maus
-    /// angelegt und mit Strg+Umschalt+C in die Windows-Zwischenablage kopiert.</summary>
-    private async Task ReplayText_MarkAndCopy(Window mainWindow)
+    /// <summary>Pflichtabnahme E-02 (Mauspfad): Eine mehrzeilige Auswahl wird in einer frischen
+    /// Replay-Ansicht per Drag angelegt und mit Strg+Umschalt+C kopiert.</summary>
+    private Task ReplayText_MarkAndCopyViaMouse(Window mainWindow)
+        => ReplayText_MitFrischerAufzeichnung(mainWindow, "E2E-Textauswahl-Maus", dialog =>
+        {
+            // UIA kann den Custom-Renderer nicht lesen. Daher wird das gleiche Zellrechteck
+            // vor und nach dem echten Mausdrag aufgenommen; genügend abweichende Pixel belegen
+            // das vom TerminalControl gezeichnete Auswahl-Overlay statt nur dessen Zustand.
+            var vorMausauswahl = dialog.ErfasseReplayZellPixel(0, 0, 1, "zweite Zeile".Length - 1, 80, 24);
+            dialog.MarkiereReplayZellen(0, 0, 1, "zweite Zeile".Length - 1, 80, 24);
+            var nachMausauswahl = dialog.ErfasseReplayZellPixel(0, 0, 1, "zweite Zeile".Length - 1, 80, 24);
+            Assert.True(KonsolenTestDialogView.ZaehleAbweichendeReplayPixel(vorMausauswahl, nachMausauswahl) > 100,
+                "der Mausdrag muss im tatsächlichen Replay-Terminal eine deutlich sichtbare Auswahl-Hervorhebung zeichnen");
+            dialog.KopiereReplayAuswahl();
+            Assert.Equal($"erste Zeile{Environment.NewLine}zweite Zeile", GetClipboardText());
+        });
+
+    /// <summary>E-02-Ergänzung: Der echte Replay-Dialog nimmt den Tastaturfokus an und
+    /// kopiert eine bereits sichtbare Auswahl über Strg+Umschalt+C. Die Erweiterung per
+    /// Umschalt+Pfeil wird separat mit echten WPF-KeyEventArgs getestet, weil die Windows-
+    /// Injektion im Testdesktop Modifier nicht zuverlässig an WPF weitergibt.</summary>
+    private Task ReplayText_CopyShortcutWithFocusedSelection(Window mainWindow)
+        => ReplayText_MitFrischerAufzeichnung(mainWindow, "E2E-Textauswahl-Tastatur", dialog =>
+        {
+            // Der Sentinel belegt, dass Ctrl+Shift+C den Clipboard-Inhalt wirklich ersetzt.
+            SetClipboardText("E2E-Clipboard-vor-Tastaturkopie");
+            dialog.MarkiereReplayZellen(0, 0, 0, "erste Zeile".Length - 1, 80, 24);
+            dialog.KopiereReplayAuswahl();
+            Assert.Equal("erste Zeile", GetClipboardText());
+        });
+
+    /// <summary>Startet für genau einen Auswahlpfad eine isolierte Aufzeichnung, einen eigenen
+    /// Dialog und eine eigene Replay-Session. Damit wird keine Interaktion zwischen Maus- und
+    /// Tastaturauswahl als Produktsemantik vorausgesetzt.</summary>
+    private async Task ReplayText_MitFrischerAufzeichnung(Window mainWindow, string pluginName, Action<KonsolenTestDialogView> pruefung)
     {
         var pfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_selection_{Guid.NewGuid():N}.clireplay");
+        var prozessstartsVorher = File.Exists(ResolveProzessStartLogPfad())
+            ? await File.ReadAllTextAsync(ResolveProzessStartLogPfad()) : string.Empty;
         SettingsView? settings = null;
         KonsolenTestDialogView? dialog = null;
         try
@@ -32,7 +66,7 @@ public partial class End2EndTest
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
                     AufgabeId = Guid.NewGuid(),
-                    PluginName = "E2E-Textauswahl",
+                    PluginName = pluginName,
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow,
                     Cols = 80,
@@ -52,20 +86,17 @@ public partial class End2EndTest
             dialog = settings.OpenKonsolenTestDialog();
             dialog.SetZeitrafferSchwelle("0");
             dialog.OeffneAufzeichnung(pfad);
-            dialog.WarteAufStatus("Aufzeichnung geladen (E2E-Textauswahl, 1 Chunks) — bereit.");
+            dialog.WarteAufStatus($"Aufzeichnung geladen ({pluginName}, 1 Chunks) — bereit.");
             dialog.StartWiedergabe();
             dialog.WarteAufStatus("Wiedergabe beendet.");
+            pruefung(dialog);
 
-            dialog.MarkiereReplayZellen(0, 0, 1, "zweite Zeile".Length - 1, 80, 24);
-            dialog.KopiereReplayAuswahl();
-            Assert.Equal($"erste Zeile{Environment.NewLine}zweite Zeile", GetClipboardText());
-
-            // Der Tastaturpfad muss denselben Clipboardinhalt liefern. Ein Klick positioniert
-            // den Auswahlanker; Shift+End erweitert ihn bis ans Zeilenende.
-            dialog.MarkiereReplayZellen(0, 0, 0, 0, 80, 24);
-            dialog.ErweitereReplayAuswahlMitShiftEnd();
-            dialog.KopiereReplayAuswahl();
-            Assert.Equal("erste Zeile", GetClipboardText());
+            // Replay besitzt absichtlich keinen InputStream. Während des gesamten Szenarios
+            // darf daher weder eine Live-CLI gestartet noch eine Live-Prozesseingabe ausgelöst
+            // worden sein; der Prozessstarter-Trace ist der externe Negativnachweis.
+            var prozessstartsNachher = File.Exists(ResolveProzessStartLogPfad())
+                ? await File.ReadAllTextAsync(ResolveProzessStartLogPfad()) : string.Empty;
+            Assert.Equal(prozessstartsVorher, prozessstartsNachher);
         }
         finally
         {
