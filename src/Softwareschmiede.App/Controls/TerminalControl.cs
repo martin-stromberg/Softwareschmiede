@@ -1,5 +1,7 @@
 using System.IO;
+using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -34,9 +36,12 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     private double _horizontalOffset;
     private bool _canHorizontallyScroll;
     private bool _isFollowingEnd = true;
+    private TerminalSelection? _selection;
+    private bool _isSelecting;
 
     private static readonly SolidColorBrush BlackBrush = CreateFrozenBrush(Colors.Black);
     private static readonly SolidColorBrush CursorBrush = CreateFrozenBrush(Color.FromArgb(180, 255, 255, 255));
+    private static readonly SolidColorBrush SelectionBrush = CreateFrozenBrush(Color.FromArgb(150, 51, 153, 255));
     private readonly Dictionary<Color, SolidColorBrush> _brushCache = new();
 
     /// <summary>Dependency Property für die aktive <see cref="ITerminalSession"/>.</summary>
@@ -102,6 +107,16 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     public TerminalControl()
     {
         Focusable = true;
+        var copyItem = new MenuItem
+        {
+            Header = "Kopieren",
+            InputGestureText = "Strg+Umschalt+C",
+        };
+        copyItem.Click += (_, _) => CopySelectionToClipboard();
+        var contextMenu = new ContextMenu();
+        contextMenu.Items.Add(copyItem);
+        contextMenu.Opened += (_, _) => copyItem.IsEnabled = HasValidSelection();
+        ContextMenu = contextMenu;
         MeasureCellSize();
     }
 
@@ -120,6 +135,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
 
         if (session == null)
         {
+            ClearSelection();
             _buffer = null;
             _verticalOffset = 0;
             _horizontalOffset = 0;
@@ -127,11 +143,13 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             _viewportHeight = 0;
             _isFollowingEnd = true;
             ScrollOwner?.InvalidateScrollInfo();
+            UpdateViewportAutomationInfo();
             InvalidateVisual();
             return;
         }
 
         MeasureCellSize();
+        ClearSelection();
 
         // Vor dem Rebuild subscribieren: Ein Output-Chunk, der die Leseschleife zwischen
         // RebuildBufferFromReplay und der Registrierung trifft, läge sonst zwar korrekt im Buffer,
@@ -161,6 +179,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     {
         _ = Dispatcher.InvokeAsync(() =>
         {
+            ValidateSelection();
             UpdateScrollInfo(followEndIfNeeded: true);
             InvalidateVisual();
         });
@@ -246,6 +265,8 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
 
                 dc.DrawText(ft, new Point(c * _cellWidth, y));
             }
+
+            DrawSelection(dc, snapshot, logicalRow, y, firstVisibleCol, lastVisibleCol);
         }
 
         var cursorLogicalRow = snapshot.ScrollbackCount + snapshot.CursorRow;
@@ -284,8 +305,29 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         var session = Session;
+        var modifiers = e.KeyboardDevice.Modifiers;
 
-        if (e.Key == Key.V && (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0)
+        if (e.Key == Key.C && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            if (_selection is not null)
+            {
+                e.Handled = true;
+                CopySelectionToClipboard();
+            }
+            return;
+        }
+
+        if ((modifiers & ModifierKeys.Shift) != 0 && IsSelectionNavigationKey(e.Key))
+        {
+            ExtendSelection(e.Key);
+            e.Handled = true;
+            return;
+        }
+
+        // Ctrl+V und Ctrl+Shift+V fügen beide ein. Ctrl+Shift+C wird weiter oben
+        // exklusiv für die Auswahlkopie behandelt und kann daher nicht hierher fallen.
+        if (e.Key == Key.V &&
+            (modifiers == ModifierKeys.Control || modifiers == (ModifierKeys.Control | ModifierKeys.Shift)))
         {
             if (session?.InputStream != null)
             {
@@ -355,11 +397,46 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         Key.Left or Key.Right or Key.Up or Key.Down
         or Key.PageUp or Key.PageDown or Key.Home or Key.End;
 
+    private static bool IsSelectionNavigationKey(Key key) => key is
+        Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End;
+
     /// <inheritdoc/>
     protected override void OnMouseDown(MouseButtonEventArgs e)
     {
         Keyboard.Focus(this);
+        if (e.ChangedButton == MouseButton.Left && TryGetCellAt(e.GetPosition(this), out var point))
+        {
+            _selection = CreateSelection(point, point);
+            _isSelecting = true;
+            CaptureMouse();
+            e.Handled = true;
+            InvalidateVisual();
+        }
         base.OnMouseDown(e);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (_isSelecting && _selection is not null && TryGetCellAt(e.GetPosition(this), out var point))
+        {
+            _selection = CreateSelection(_selection.Anchor, point);
+            InvalidateVisual();
+            e.Handled = true;
+        }
+        base.OnMouseMove(e);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnMouseUp(MouseButtonEventArgs e)
+    {
+        if (_isSelecting && e.ChangedButton == MouseButton.Left)
+        {
+            _isSelecting = false;
+            ReleaseMouseCapture();
+            e.Handled = true;
+        }
+        base.OnMouseUp(e);
     }
 
     /// <inheritdoc/>
@@ -374,8 +451,16 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             {
                 var cols = CalculateCols();
                 var rows = CalculateRows();
-                buffer.Resize(cols, rows);
-                session.Resize(cols, rows);
+                // Layout kann sich ändern, ohne dass sich die Terminalgeometrie ändert
+                // (z. B. durch einen Scrollbar- oder Fokuswechsel). In diesem Fall bleiben
+                // die Zellen und damit eine bestehende Auswahl unverändert; sie darf nicht
+                // allein wegen eines Renderpasses verloren gehen.
+                if (cols != buffer.Cols || rows != buffer.Rows)
+                {
+                    buffer.Resize(cols, rows);
+                    session.Resize(cols, rows);
+                    ClearSelection();
+                }
             }
 
             UpdateScrollInfo(followEndIfNeeded: true);
@@ -478,6 +563,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     {
         _horizontalOffset = ClampOffset(offset, ScrollableWidth);
         ScrollOwner?.InvalidateScrollInfo();
+        UpdateViewportAutomationInfo();
         InvalidateVisual();
     }
 
@@ -491,6 +577,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             _verticalOffset = 0;
             _isFollowingEnd = true;
             ScrollOwner?.InvalidateScrollInfo();
+            UpdateViewportAutomationInfo();
             return;
         }
 
@@ -498,6 +585,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         _verticalOffset = clamped;
         _isFollowingEnd = clamped >= ScrollableHeight - ScrollEndEpsilon;
         ScrollOwner?.InvalidateScrollInfo();
+        UpdateViewportAutomationInfo();
         InvalidateVisual();
     }
 
@@ -540,6 +628,44 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         _horizontalOffset = ClampOffset(_horizontalOffset, ScrollableWidth);
 
         ScrollOwner?.InvalidateScrollInfo();
+        UpdateViewportAutomationInfo();
+    }
+
+    /// <summary>
+    /// Veröffentlicht die aktuell sichtbare Terminalgeometrie über die standardisierte UI-Automation-
+    /// Eigenschaft <see cref="AutomationProperties.ItemStatusProperty"/>. Der Wert ist ausschließlich
+    /// diagnostisch und schreibgeschützt: UIA-Clients können damit eine sichtbare Bufferzeile gezielt
+    /// ansteuern, ohne den gerenderten Text per Screenshot oder OCR erraten zu müssen.
+    /// </summary>
+    /// <remarks>
+    /// Alle Größen außer den logischen Zeilen-/Spaltennummern sind physische Bildschirmpixel und
+    /// lassen sich deshalb direkt mit <c>BoundingRectangle</c> aus UIA kombinieren. Die Information
+    /// wird bei Ausgabe, Resize und beiden Scrollrichtungen erneuert.
+    /// </remarks>
+    private void UpdateViewportAutomationInfo()
+    {
+        var snapshot = _buffer?.GetSnapshot();
+        if (snapshot is null || ActualWidth <= 0 || ActualHeight <= 0)
+        {
+            AutomationProperties.SetItemStatus(this, "TerminalViewport;State=Empty");
+            return;
+        }
+
+        MeasureCellSize();
+        var visibleRows = CalculateRows();
+        var visibleStart = _isFollowingEnd
+            ? Math.Max(0, snapshot.TotalRows - visibleRows)
+            : Clamp((int)Math.Round(_verticalOffset), 0, Math.Max(0, snapshot.TotalRows - visibleRows));
+        var firstVisibleCol = Clamp((int)(_horizontalOffset / _cellWidth), 0, snapshot.Cols);
+        var lastVisibleCol = Clamp((int)Math.Ceiling((_horizontalOffset + ActualWidth) / _cellWidth), 0, snapshot.Cols);
+        var cursorRow = snapshot.ScrollbackCount + snapshot.CursorRow;
+        var dpi = VisualTreeHelper.GetDpi(this);
+
+        // ItemStatus ist ein Standard-UIA-Kanal für dynamische Statusinformationen. Das knappe,
+        // kulturinvariante Format bleibt bewusst maschinenlesbar und enthält keinen Terminalinhalt.
+        var selectionState = _selection is null ? "None" : HasValidSelection() ? "Valid" : "Invalid";
+        AutomationProperties.SetItemStatus(this, string.Create(CultureInfo.InvariantCulture,
+            $"TerminalViewport;State=Ready;Selection={selectionState};StartRow={visibleStart};Rows={visibleRows};FirstColumn={firstVisibleCol};Columns={lastVisibleCol - firstVisibleCol};CursorRow={cursorRow};CursorColumn={snapshot.CursorCol};CellWidth={_cellWidth * dpi.DpiScaleX:F3};CellHeight={_cellHeight * dpi.DpiScaleY:F3}"));
     }
 
     private static TerminalCell GetSnapshotCell(TerminalBufferSnapshot snapshot, int logicalRow, int col)
@@ -551,6 +677,204 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             return snapshot.ScrollbackRows[logicalRow][col];
 
         return snapshot.Grid[logicalRow - snapshot.ScrollbackCount, col];
+    }
+
+    private static long GetRowId(TerminalBufferSnapshot snapshot, int logicalRow)
+        => logicalRow < snapshot.ScrollbackCount
+            ? snapshot.ScrollbackRowIds[logicalRow]
+            : snapshot.GridRowIds[logicalRow - snapshot.ScrollbackCount];
+
+    private static long GetCellVersion(TerminalBufferSnapshot snapshot, int logicalRow, int col)
+        => logicalRow < snapshot.ScrollbackCount
+            ? snapshot.ScrollbackCellVersions[logicalRow][col]
+            : snapshot.GridCellVersions[logicalRow - snapshot.ScrollbackCount, col];
+
+    private bool TryGetCellAt(Point position, out TerminalSelectionPoint point)
+    {
+        point = default;
+        var buffer = _buffer;
+        if (buffer is null || position.X < 0 || position.Y < 0 || position.X >= ActualWidth || position.Y >= ActualHeight)
+            return false;
+
+        var snapshot = buffer.GetSnapshot();
+        var visibleRows = CalculateRows();
+        var visibleStart = _isFollowingEnd
+            ? Math.Max(0, snapshot.TotalRows - visibleRows)
+            : Clamp((int)Math.Round(_verticalOffset), 0, Math.Max(0, snapshot.TotalRows - visibleRows));
+        var row = visibleStart + Clamp((int)(position.Y / _cellHeight), 0, visibleRows - 1);
+        var col = Clamp((int)((position.X + _horizontalOffset) / _cellWidth), 0, snapshot.Cols - 1);
+        if (row >= snapshot.TotalRows)
+            return false;
+
+        point = new TerminalSelectionPoint(GetRowId(snapshot, row), col, GetCellVersion(snapshot, row, col));
+        return true;
+    }
+
+    private TerminalSelection CreateSelection(TerminalSelectionPoint anchor, TerminalSelectionPoint end)
+    {
+        var snapshot = _buffer?.GetSnapshot();
+        return snapshot is null
+            ? new TerminalSelection(anchor, end, new Dictionary<(long RowId, int Column), long>())
+            : new TerminalSelection(anchor, end, CaptureCellVersions(snapshot, anchor, end));
+    }
+
+    private void ExtendSelection(Key key)
+    {
+        var snapshot = _buffer?.GetSnapshot();
+        if (snapshot is null || snapshot.TotalRows == 0)
+            return;
+
+        var current = _selection?.End;
+        var row = current is null ? snapshot.ScrollbackCount + snapshot.CursorRow : FindLogicalRow(snapshot, current.Value.RowId);
+        // Nach dem Schreiben in die letzte Spalte kann der Cursor hinter dem Grid
+        // stehen. Auswahlpunkte dürfen dagegen nur echte Zellen referenzieren.
+        var col = Clamp(current?.Column ?? snapshot.CursorCol, 0, snapshot.Cols - 1);
+        if (row < 0) return;
+
+        // Bei der ersten Tastatur-Erweiterung ist die Cursorzelle der Anker, nicht
+        // das bereits verschobene Ende. Dadurch entspricht Shift+Home/Up dem
+        // etablierten Textauswahlverhalten.
+        var anchor = _selection?.Anchor ?? new TerminalSelectionPoint(
+            GetRowId(snapshot, row), col, GetCellVersion(snapshot, row, col));
+        switch (key)
+        {
+            case Key.Left: col = Math.Max(0, col - 1); break;
+            case Key.Right: col = Math.Min(snapshot.Cols - 1, col + 1); break;
+            case Key.Up: row = Math.Max(0, row - 1); break;
+            case Key.Down: row = Math.Min(snapshot.TotalRows - 1, row + 1); break;
+            case Key.Home: col = 0; break;
+            case Key.End: col = snapshot.Cols - 1; break;
+        }
+        var end = new TerminalSelectionPoint(GetRowId(snapshot, row), col, GetCellVersion(snapshot, row, col));
+        _selection = CreateSelection(anchor, end);
+        EnsureSelectionEndVisible(snapshot, row, col);
+        InvalidateVisual();
+    }
+
+    private void EnsureSelectionEndVisible(TerminalBufferSnapshot snapshot, int row, int col)
+    {
+        UpdateScrollInfo(followEndIfNeeded: false);
+        var visibleRows = CalculateRows();
+        var visibleStart = _isFollowingEnd
+            ? Math.Max(0, snapshot.TotalRows - visibleRows)
+            : Clamp((int)Math.Round(_verticalOffset), 0, Math.Max(0, snapshot.TotalRows - visibleRows));
+        if (row < visibleStart)
+            SetVerticalOffset(row);
+        else if (row >= visibleStart + visibleRows)
+            SetVerticalOffset(row - visibleRows + 1);
+
+        var colLeft = _horizontalOffset / _cellWidth;
+        var visibleCols = Math.Max(1, ActualWidth / _cellWidth);
+        if (col < colLeft)
+            SetHorizontalOffset(col * _cellWidth);
+        else if (col >= colLeft + visibleCols)
+            SetHorizontalOffset((col - visibleCols + 1) * _cellWidth);
+    }
+
+    private bool HasValidSelection()
+    {
+        var snapshot = _buffer?.GetSnapshot();
+        return snapshot is not null && _selection is not null &&
+            TryNormalizeSelection(snapshot, _selection, out _, out _, out _, out _);
+    }
+
+    private void ValidateSelection()
+    {
+        if (_selection is null) return;
+        var snapshot = _buffer?.GetSnapshot();
+        if (snapshot is null || !TryNormalizeSelection(snapshot, _selection, out _, out _, out _, out _))
+            ClearSelection();
+    }
+
+    private static bool TryNormalizeSelection(TerminalBufferSnapshot snapshot, TerminalSelection selection,
+        out int firstRow, out int firstCol, out int lastRow, out int lastCol)
+    {
+        firstRow = FindLogicalRow(snapshot, selection.Anchor.RowId);
+        lastRow = FindLogicalRow(snapshot, selection.End.RowId);
+        firstCol = selection.Anchor.Column;
+        lastCol = selection.End.Column;
+        // Die Buffer-Generation ändert sich bei jeder Ausgabe. Sie ist daher kein
+        // Auswahlkriterium: Ausgabe außerhalb der Auswahl darf eine Markierung nicht
+        // verlieren. Stabile Zeilen-IDs und Zellversionen prüfen dagegen präzise,
+        // ob die gewählten Zellen noch existieren und unverändert sind. Reset, Resize
+        // und Screenwechsel erzeugen neue IDs bzw. Versionen und invalidieren damit
+        // weiterhin zuverlässig.
+        if (firstRow < 0 || lastRow < 0 ||
+            GetCellVersion(snapshot, firstRow, firstCol) != selection.Anchor.CellVersion ||
+            GetCellVersion(snapshot, lastRow, lastCol) != selection.End.CellVersion)
+            return false;
+        if (firstRow > lastRow || (firstRow == lastRow && firstCol > lastCol))
+            (firstRow, lastRow, firstCol, lastCol) = (lastRow, firstRow, lastCol, firstCol);
+        return selection.CellVersions.All(entry =>
+        {
+            var row = FindLogicalRow(snapshot, entry.Key.RowId);
+            return row >= 0 && entry.Key.Column >= 0 && entry.Key.Column < snapshot.Cols &&
+                GetCellVersion(snapshot, row, entry.Key.Column) == entry.Value;
+        });
+    }
+
+    private static Dictionary<(long RowId, int Column), long> CaptureCellVersions(
+        TerminalBufferSnapshot snapshot, TerminalSelectionPoint anchor, TerminalSelectionPoint end)
+    {
+        var firstRow = FindLogicalRow(snapshot, anchor.RowId);
+        var lastRow = FindLogicalRow(snapshot, end.RowId);
+        var firstCol = anchor.Column;
+        var lastCol = end.Column;
+        var result = new Dictionary<(long RowId, int Column), long>();
+        if (firstRow < 0 || lastRow < 0) return result;
+        if (firstRow > lastRow || (firstRow == lastRow && firstCol > lastCol))
+            (firstRow, lastRow, firstCol, lastCol) = (lastRow, firstRow, lastCol, firstCol);
+        for (var row = firstRow; row <= lastRow; row++)
+            for (var col = row == firstRow ? firstCol : 0; col <= (row == lastRow ? lastCol : snapshot.Cols - 1); col++)
+                result[(GetRowId(snapshot, row), col)] = GetCellVersion(snapshot, row, col);
+        return result;
+    }
+
+    private static int FindLogicalRow(TerminalBufferSnapshot snapshot, long rowId)
+    {
+        for (var row = 0; row < snapshot.TotalRows; row++)
+            if (GetRowId(snapshot, row) == rowId) return row;
+        return -1;
+    }
+
+    private void DrawSelection(DrawingContext dc, TerminalBufferSnapshot snapshot, int logicalRow, double y, int firstVisibleCol, int lastVisibleCol)
+    {
+        if (_selection is null || !TryNormalizeSelection(snapshot, _selection, out var firstRow, out var firstCol, out var lastRow, out var lastCol) ||
+            logicalRow < firstRow || logicalRow > lastRow)
+            return;
+        var start = logicalRow == firstRow ? firstCol : 0;
+        var end = logicalRow == lastRow ? lastCol : snapshot.Cols - 1;
+        start = Math.Max(start, firstVisibleCol);
+        end = Math.Min(end, lastVisibleCol - 1);
+        if (start <= end)
+            dc.DrawRectangle(SelectionBrush, null, new Rect(start * _cellWidth, y, (end - start + 1) * _cellWidth, _cellHeight));
+    }
+
+    private void CopySelectionToClipboard()
+    {
+        var snapshot = _buffer?.GetSnapshot();
+        if (snapshot is null || _selection is null || !TryNormalizeSelection(snapshot, _selection, out var firstRow, out var firstCol, out var lastRow, out var lastCol))
+        {
+            ClearSelection();
+            return;
+        }
+        var lines = new List<string>();
+        for (var row = firstRow; row <= lastRow; row++)
+        {
+            var start = row == firstRow ? firstCol : 0;
+            var end = row == lastRow ? lastCol : snapshot.Cols - 1;
+            var characters = new char[end - start + 1];
+            for (var col = start; col <= end; col++) characters[col - start] = GetSnapshotCell(snapshot, row, col).Character;
+            lines.Add(new string(characters).TrimEnd(' ', '\0'));
+        }
+        try { Clipboard.SetText(string.Join(Environment.NewLine, lines)); }
+        catch (Exception ex) { _logger.LogWarning(ex, "Fehler beim Kopieren der Terminalauswahl in die Zwischenablage"); }
+    }
+
+    private void ClearSelection()
+    {
+        _selection = null;
+        _isSelecting = false;
     }
 
     private static int Clamp(int value, int min, int max)
@@ -574,7 +898,8 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             return;
 
         var bytes = KeyToVt100Encoder.EncodeClipboardText(text);
-        await WriteToInputStreamAsync(session, bytes, "Fehler beim Einfügen aus der Zwischenablage in den Terminal-Input-Stream").ConfigureAwait(false);
+        if (await WriteToInputStreamAsync(session, bytes, "Fehler beim Einfügen aus der Zwischenablage in den Terminal-Input-Stream").ConfigureAwait(false))
+            session.MarkInputActivity();
     }
 
     /// <summary>Schreibt Bytes asynchron in den Input-Stream der aktuellen Session und protokolliert Schreibfehler
@@ -583,15 +908,17 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     /// <param name="session">Die Zielsession für den Schreibvorgang.</param>
     /// <param name="bytes">Die zu schreibenden Bytes.</param>
     /// <param name="errorMessage">Die Log-Nachricht bei einem Schreibfehler.</param>
-    private async Task WriteToInputStreamAsync(ITerminalSession session, byte[] bytes, string errorMessage)
+    private async Task<bool> WriteToInputStreamAsync(ITerminalSession session, byte[] bytes, string errorMessage)
     {
         try
         {
             await session.WriteInputAsync(bytes).ConfigureAwait(false);
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, errorMessage);
+            return false;
         }
     }
 
@@ -609,4 +936,11 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             return string.Empty;
         }
     }
+
+    private readonly record struct TerminalSelectionPoint(long RowId, int Column, long CellVersion);
+
+    private sealed record TerminalSelection(
+        TerminalSelectionPoint Anchor,
+        TerminalSelectionPoint End,
+        IReadOnlyDictionary<(long RowId, int Column), long> CellVersions);
 }

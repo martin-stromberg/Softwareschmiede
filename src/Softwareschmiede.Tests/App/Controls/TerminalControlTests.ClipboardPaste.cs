@@ -11,7 +11,7 @@ using static Softwareschmiede.Tests.Helpers.WpfUnitTestHelpers;
 
 namespace Softwareschmiede.Tests.App.Controls;
 
-/// <summary>Unit-Tests für die Clipboard-Paste-Funktionalität (<c>Ctrl+V</c>) von <see cref="TerminalControl"/>:
+/// <summary>Unit-Tests für die Clipboard-Paste-Funktionalität (<c>Ctrl+V</c> und <c>Ctrl+Shift+V</c>) von <see cref="TerminalControl"/>:
 /// Tastatur-Handling, Zwischenablage-Zugriff und Schreiben in den Input-Stream der Session.</summary>
 public sealed partial class TerminalControlTests
 {
@@ -36,13 +36,23 @@ public sealed partial class TerminalControlTests
             try
             {
                 System.Windows.Clipboard.SetText(text);
-                return;
+
+                // Ein erfolgreiches SetText bedeutet noch nicht, dass die systemweite
+                // Zwischenablage für den unmittelbar folgenden Produktaufruf wieder
+                // lesbar ist. Erst der Read-back bestätigt eine stabile Testvorbedingung.
+                if (System.Windows.Clipboard.ContainsText()
+                    && System.Windows.Clipboard.GetText() == text)
+                    return;
             }
             catch (COMException) when (attempt < maxAttempts)
             {
-                Thread.Sleep(100 * attempt);
             }
+
+            if (attempt < maxAttempts)
+                Thread.Sleep(100 * attempt);
         }
+
+        throw new InvalidOperationException("Die Windows-Zwischenablage konnte nicht stabil mit dem erwarteten Text vorbereitet werden.");
     }
 
     /// <summary>Leert die Windows-Zwischenablage mit Retry - Begründung siehe <see cref="SetClipboardTextWithRetry"/>.</summary>
@@ -106,6 +116,45 @@ public sealed partial class TerminalControlTests
         });
     }
 
+    /// <summary>Ctrl+Shift+V ist neben Ctrl+V ein Paste-Shortcut und darf deshalb nicht zum
+    /// Tastatur-Encoder weitergereicht werden.</summary>
+    [OsInterfaceFact]
+    public void OnPreviewKeyDown_CtrlShiftV_SetsHandledTrue()
+    {
+        RunOnSta(() =>
+        {
+            var control = new TerminalControl();
+            using var session = CreateSession(new ImmediateEofStream());
+            control.Session = session;
+
+            var args = InvokeCtrlShiftV(control);
+
+            args.Handled.Should().BeTrue("Ctrl+Shift+V muss das Tastaturereignis als Paste behandeln");
+        });
+    }
+
+    /// <summary>Ctrl+Shift+V muss denselben Clipboard-Pastepfad wie Ctrl+V auslösen.</summary>
+    [OsInterfaceFact]
+    public void OnPreviewKeyDown_CtrlShiftV_CallsReadClipboardAndInsertAsync()
+    {
+        RunOnSta(() =>
+        {
+            var control = new TerminalControl();
+            var inputStream = new MemoryStream();
+            using var session = CreateSession(inputStream, new ImmediateEofStream());
+            control.Session = session;
+            SetClipboardTextWithRetry("shift-pasted");
+
+            InvokeCtrlShiftV(control);
+
+            var expected = KeyToVt100Encoder.EncodeClipboardText("shift-pasted");
+            WaitForBytes(inputStream, expected.Length, TimeSpan.FromSeconds(5));
+            inputStream.ToArray().Should().Equal(
+                expected,
+                "Ctrl+Shift+V muss ReadClipboardAndInsertAsync auslösen und den Zwischenablage-Text in den Input-Stream schreiben");
+        });
+    }
+
     /// <summary>Ein erfolgreicher Zwischenablage-Read schreibt die newline-normalisierten UTF-8-Bytes des
     /// Textes in den Input-Stream der Session.</summary>
     [OsInterfaceFact]
@@ -121,7 +170,8 @@ public sealed partial class TerminalControlTests
             var text = "Hi\nThere";
             var expected = KeyToVt100Encoder.EncodeClipboardText("Hi\nThere");
 
-            InvokeReadClipboardAndInsertAsyncWithClipboardRetry(control, text, inputStream, expected);
+            SetClipboardTextWithRetry(text);
+            InvokeReadClipboardAndInsertAsync(control);
 
             inputStream.ToArray().Should().Equal(expected);
         });
@@ -143,6 +193,7 @@ public sealed partial class TerminalControlTests
             InvokeReadClipboardAndInsertAsync(control);
 
             inputStream.ToArray().Should().BeEmpty("bei leerer Zwischenablage darf ReadClipboardAndInsertAsync keine Bytes schreiben");
+            GetLastInputActivity(session).Should().BeNull("eine leere Zwischenablage darf keine Eingabeaktivität vortäuschen");
         });
     }
 
@@ -165,6 +216,7 @@ public sealed partial class TerminalControlTests
             var act = () => InvokeReadClipboardAndInsertAsync(control);
 
             act.Should().NotThrow("ein Fehler beim Einfügen aus der Zwischenablage darf nicht propagieren");
+            GetLastInputActivity(session).Should().BeNull("ein fehlgeschlagenes Schreiben darf keine Eingabeaktivität melden");
         });
 
         loggerMock.Verify(
@@ -193,10 +245,7 @@ public sealed partial class TerminalControlTests
 
             InvokeReadClipboardAndInsertAsync(control);
 
-            var field = typeof(PseudoConsoleSession).GetField("_lastInputUtc", BindingFlags.NonPublic | BindingFlags.Instance)!;
-            var lastInputUtc = (DateTimeOffset?)field.GetValue(session);
-
-            lastInputUtc.Should().NotBeNull("ReadClipboardAndInsertAsync muss nach erfolgreichem Schreiben MarkInputActivity() aufrufen");
+            GetLastInputActivity(session).Should().NotBeNull("ReadClipboardAndInsertAsync muss nach erfolgreichem Schreiben MarkInputActivity() aufrufen");
         });
     }
 
@@ -215,7 +264,8 @@ public sealed partial class TerminalControlTests
 
             var expected = KeyToVt100Encoder.EncodeClipboardText(text);
 
-            InvokeReadClipboardAndInsertAsyncWithClipboardRetry(control, text, inputStream, expected);
+            SetClipboardTextWithRetry(text);
+            InvokeReadClipboardAndInsertAsync(control);
 
             inputStream.ToArray().Should().Equal(expected);
         });
@@ -289,13 +339,19 @@ public sealed partial class TerminalControlTests
     }
 
     private static KeyEventArgs InvokeCtrlV(TerminalControl control)
+        => InvokePasteShortcut(control, Key.LeftCtrl);
+
+    private static KeyEventArgs InvokeCtrlShiftV(TerminalControl control)
+        => InvokePasteShortcut(control, Key.LeftCtrl, Key.LeftShift);
+
+    private static KeyEventArgs InvokePasteShortcut(TerminalControl control, params Key[] pressedKeys)
     {
         var method = typeof(TerminalControl).GetMethod("OnPreviewKeyDown", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         // KeyEventArgs erfordert eine nicht-null PresentationSource; ein reales (unsichtbares) HwndSource-Fenster
         // dient hier nur zur Erfüllung dieser Konstruktor-Anforderung, wird vom Control-Code nicht angesprochen.
         using var hwndSource = new HwndSource(new HwndSourceParameters("TerminalControlTests_ClipboardPaste"));
-        var keyboard = new TestKeyboardDevice(Key.LeftCtrl);
+        var keyboard = new TestKeyboardDevice(pressedKeys);
         var args = new KeyEventArgs(keyboard, hwndSource, 0, Key.V)
         {
             RoutedEvent = Keyboard.PreviewKeyDownEvent,
@@ -309,27 +365,6 @@ public sealed partial class TerminalControlTests
     private static void InvokeReadClipboardAndInsertAsync(TerminalControl control)
         => InvokeReadClipboardAndInsertAsync(control, control.Session!);
 
-    private static void InvokeReadClipboardAndInsertAsyncWithClipboardRetry(
-        TerminalControl control,
-        string clipboardText,
-        MemoryStream inputStream,
-        byte[] expectedBytes)
-    {
-        const int maxAttempts = 5;
-
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            inputStream.SetLength(0);
-            SetClipboardTextWithRetry(clipboardText);
-            InvokeReadClipboardAndInsertAsync(control);
-
-            if (inputStream.ToArray().SequenceEqual(expectedBytes))
-                return;
-
-            Thread.Sleep(100 * attempt);
-        }
-    }
-
     private static void InvokeReadClipboardAndInsertAsync(TerminalControl control, ITerminalSession session)
     {
         var method = typeof(TerminalControl).GetMethod(
@@ -340,6 +375,12 @@ public sealed partial class TerminalControlTests
             null)!;
         var task = (Task)method.Invoke(control, [session])!;
         task.GetAwaiter().GetResult();
+    }
+
+    private static DateTimeOffset? GetLastInputActivity(PseudoConsoleSession session)
+    {
+        var field = typeof(PseudoConsoleSession).GetField("_lastInputUtc", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        return (DateTimeOffset?)field.GetValue(session);
     }
 
     private static string InvokeGetClipboardText(TerminalControl control)

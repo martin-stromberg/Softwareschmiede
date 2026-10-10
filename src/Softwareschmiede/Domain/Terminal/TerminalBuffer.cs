@@ -8,12 +8,17 @@ public sealed class TerminalBuffer
 {
     private readonly object _lock = new();
     private TerminalCell[,] _grid;
+    private long[,] _cellVersions;
+    private long[] _rowIds;
     private int _cols;
     private int _rows;
     private int _cursorRow;
     private int _cursorCol;
-    private readonly Queue<TerminalCell[]> _scrollback = new();
+    private readonly Queue<TerminalRow> _scrollback = new();
     private const int MaxScrollbackLines = 1000;
+    private long _nextRowId;
+    private long _nextCellVersion;
+    private long _generation;
 
     private int _scrollTop;
     private int _scrollBottom;
@@ -21,6 +26,8 @@ public sealed class TerminalBuffer
     private int _savedCursorCol;
     private bool _isAlternateScreen;
     private TerminalCell[,]? _mainScreenGrid;
+    private long[,]? _mainScreenCellVersions;
+    private long[]? _mainScreenRowIds;
 
     private Color _currentForeground = Color.FromArgb(229, 229, 229);
     private Color _currentBackground = Color.Black;
@@ -36,6 +43,8 @@ public sealed class TerminalBuffer
         _cols = Math.Max(1, cols);
         _rows = Math.Max(1, rows);
         _grid = new TerminalCell[_rows, _cols];
+        _cellVersions = new long[_rows, _cols];
+        _rowIds = CreateRowIds(_rows);
         _scrollBottom = _rows - 1;
         FillGrid(_grid, _rows, _cols);
     }
@@ -68,6 +77,12 @@ public sealed class TerminalBuffer
     public int CursorCol
     {
         get { lock (_lock) return _cursorCol; }
+    }
+
+    /// <summary>Monoton steigende Identität des aktuellen Bildschirm-/Geometriezustands.</summary>
+    public long Generation
+    {
+        get { lock (_lock) return _generation; }
     }
 
     /// <summary>Anzahl der aktuell im Scrollback-Ringpuffer gehaltenen Zeilen. Nur für Tests sichtbar.</summary>
@@ -144,6 +159,9 @@ public sealed class TerminalBuffer
                     else if (e.DeltaRows < 0)
                         ScrollRangeDown(_scrollTop, _scrollBottom, -e.DeltaRows);
                     break;
+                case TerminalResizedEvent e:
+                    Resize(e.Cols, e.Rows);
+                    break;
                 case CursorSavedEvent e:
                     ApplyCursorSaved(e.Restored);
                     break;
@@ -162,6 +180,8 @@ public sealed class TerminalBuffer
         {
             _isAlternateScreen = false;
             _mainScreenGrid = null;
+            _mainScreenCellVersions = null;
+            _mainScreenRowIds = null;
             _cursorRow = 0;
             _cursorCol = 0;
             _savedCursorRow = 0;
@@ -174,6 +194,7 @@ public sealed class TerminalBuffer
             _currentDim = false;
             _currentUnderline = false;
             ClearAllCells();
+            _generation++;
         }
     }
 
@@ -186,6 +207,7 @@ public sealed class TerminalBuffer
         {
             cols = Math.Max(1, cols);
             rows = Math.Max(1, rows);
+            var hadFullScrollRegion = IsFullScrollRegion();
 
             var newGrid = new TerminalCell[rows, cols];
             FillGrid(newGrid, rows, cols);
@@ -217,16 +239,31 @@ public sealed class TerminalBuffer
             }
 
             _grid = newGrid;
+            _cellVersions = new long[rows, cols];
+            _rowIds = CreateRowIds(rows);
             _cols = cols;
             _rows = rows;
             _cursorCol = Clamp(_cursorCol, 0, _cols - 1);
-            _scrollTop = Clamp(_scrollTop, 0, _rows - 1);
-            _scrollBottom = Clamp(_scrollBottom, 0, _rows - 1);
-            if (_scrollBottom <= _scrollTop)
+            if (hadFullScrollRegion)
             {
+                // Eine zuvor bildschirmfüllende Scroll-Region muss mit der neuen
+                // Bildschirmhöhe wachsen. Andernfalls würde ein Zeilenumbruch nach
+                // einer Vergrößerung nur im alten Ausschnitt scrollen und dessen
+                // herausfallende Zeilen fälschlich nicht ins Scrollback übernehmen.
                 _scrollTop = 0;
                 _scrollBottom = _rows - 1;
             }
+            else
+            {
+                _scrollTop = Clamp(_scrollTop, 0, _rows - 1);
+                _scrollBottom = Clamp(_scrollBottom, 0, _rows - 1);
+                if (_scrollBottom <= _scrollTop)
+                {
+                    _scrollTop = 0;
+                    _scrollBottom = _rows - 1;
+                }
+            }
+            _generation++;
         }
     }
 
@@ -270,7 +307,7 @@ public sealed class TerminalBuffer
                 default:
                     if (_cursorCol >= _cols)
                         NewLine();
-                    _grid[_cursorRow, _cursorCol] = new TerminalCell
+                    SetCell(_cursorRow, _cursorCol, new TerminalCell
                     {
                         Character = ch,
                         Foreground = _currentForeground,
@@ -278,7 +315,7 @@ public sealed class TerminalBuffer
                         Bold = _currentBold,
                         Dim = _currentDim,
                         Underline = _currentUnderline,
-                    };
+                    });
                     _cursorCol++;
                     break;
             }
@@ -321,11 +358,24 @@ public sealed class TerminalBuffer
 
         for (var r = rangeTop; r <= rangeBottom - count; r++)
             for (var c = 0; c < _cols; c++)
-                _grid[r, c] = _grid[r + count, c];
+            {
+                // Beim normalen Vollbild-Scrollen verschiebt sich eine vollständige
+                // logische Zeile nur im Buffer. Ihre Zellidentität bleibt daher
+                // erhalten, damit eine daran gebundene Auswahl nachgeführt werden kann.
+                // Insert/Delete-Zeilen dagegen verändern Zielpositionen semantisch und
+                // müssen weiterhin neue Versionen erhalten.
+                CopyCell(r + count, c, r, c, preserveSourceVersion: pushToScrollback);
+            }
 
         for (var r = rangeBottom - count + 1; r <= rangeBottom; r++)
             for (var c = 0; c < _cols; c++)
-                _grid[r, c] = TerminalCell.Default;
+            {
+                SetCell(r, c, TerminalCell.Default);
+            }
+        for (var r = rangeTop; r <= rangeBottom - count; r++)
+            _rowIds[r] = _rowIds[r + count];
+        for (var r = rangeBottom - count + 1; r <= rangeBottom; r++)
+            _rowIds[r] = NextRowId();
     }
 
     private void ScrollRangeDown(int rangeTop, int rangeBottom, int count)
@@ -337,11 +387,19 @@ public sealed class TerminalBuffer
 
         for (var r = rangeBottom; r >= rangeTop + count; r--)
             for (var c = 0; c < _cols; c++)
-                _grid[r, c] = _grid[r - count, c];
+            {
+                CopyCell(r - count, c, r, c);
+            }
 
         for (var r = rangeTop; r < rangeTop + count; r++)
             for (var c = 0; c < _cols; c++)
-                _grid[r, c] = TerminalCell.Default;
+            {
+                SetCell(r, c, TerminalCell.Default);
+            }
+        for (var r = rangeBottom; r >= rangeTop + count; r--)
+            _rowIds[r] = _rowIds[r - count];
+        for (var r = rangeTop; r < rangeTop + count; r++)
+            _rowIds[r] = NextRowId();
     }
 
     private void ApplyInsertLines(int count)
@@ -365,25 +423,25 @@ public sealed class TerminalBuffer
     {
         count = Math.Min(Math.Max(1, count), _cols - _cursorCol);
         for (var c = _cols - 1; c >= _cursorCol + count; c--)
-            _grid[_cursorRow, c] = _grid[_cursorRow, c - count];
+            CopyCell(_cursorRow, c - count, _cursorRow, c);
         for (var c = _cursorCol; c < _cursorCol + count; c++)
-            _grid[_cursorRow, c] = TerminalCell.Default;
+            SetCell(_cursorRow, c, TerminalCell.Default);
     }
 
     private void ApplyDeleteChars(int count)
     {
         count = Math.Min(Math.Max(1, count), _cols - _cursorCol);
         for (var c = _cursorCol; c <= _cols - 1 - count; c++)
-            _grid[_cursorRow, c] = _grid[_cursorRow, c + count];
+            CopyCell(_cursorRow, c + count, _cursorRow, c);
         for (var c = _cols - count; c < _cols; c++)
-            _grid[_cursorRow, c] = TerminalCell.Default;
+            SetCell(_cursorRow, c, TerminalCell.Default);
     }
 
     private void ApplyEraseChars(int count)
     {
         count = Math.Min(Math.Max(1, count), _cols - _cursorCol);
         for (var c = _cursorCol; c < _cursorCol + count; c++)
-            _grid[_cursorRow, c] = TerminalCell.Default;
+            SetCell(_cursorRow, c, TerminalCell.Default);
     }
 
     private void ApplyScrollRegion(int top, int bottom)
@@ -419,9 +477,14 @@ public sealed class TerminalBuffer
         if (enabled)
         {
             _mainScreenGrid = _grid;
+            _mainScreenCellVersions = _cellVersions;
+            _mainScreenRowIds = _rowIds;
             _grid = new TerminalCell[_rows, _cols];
+            _cellVersions = new long[_rows, _cols];
+            _rowIds = CreateRowIds(_rows);
             FillGrid(_grid, _rows, _cols);
             _isAlternateScreen = true;
+            _generation++;
         }
         else
         {
@@ -431,9 +494,14 @@ public sealed class TerminalBuffer
                 && _mainScreenGrid.GetLength(1) == _cols)
             {
                 _grid = _mainScreenGrid;
+                _cellVersions = _mainScreenCellVersions!;
+                _rowIds = _mainScreenRowIds!;
             }
             _mainScreenGrid = null;
+            _mainScreenCellVersions = null;
+            _mainScreenRowIds = null;
             _isAlternateScreen = false;
+            _generation++;
         }
 
         _scrollTop = 0;
@@ -442,15 +510,18 @@ public sealed class TerminalBuffer
         _cursorCol = 0;
     }
 
-    private TerminalCell[] CaptureRow(int rowIndex)
+    private TerminalRow CaptureRow(int rowIndex)
     {
         var row = new TerminalCell[_cols];
         for (var c = 0; c < _cols; c++)
             row[c] = _grid[rowIndex, c];
-        return row;
+        var versions = new long[_cols];
+        for (var c = 0; c < _cols; c++)
+            versions[c] = _cellVersions[rowIndex, c];
+        return new TerminalRow(row, versions, _rowIds[rowIndex]);
     }
 
-    private void PushToScrollback(TerminalCell[] row)
+    private void PushToScrollback(TerminalRow row)
     {
         if (_scrollback.Count >= MaxScrollbackLines)
             _scrollback.Dequeue();
@@ -482,17 +553,17 @@ public sealed class TerminalBuffer
         {
             case 0:
                 for (var c = _cursorCol; c < _cols; c++)
-                    _grid[_cursorRow, c] = TerminalCell.Default;
+                    SetCell(_cursorRow, c, TerminalCell.Default);
                 for (var r = _cursorRow + 1; r < _rows; r++)
                     for (var c = 0; c < _cols; c++)
-                        _grid[r, c] = TerminalCell.Default;
+                        SetCell(r, c, TerminalCell.Default);
                 break;
             case 1:
                 for (var r = 0; r < _cursorRow; r++)
                     for (var c = 0; c < _cols; c++)
-                        _grid[r, c] = TerminalCell.Default;
+                        SetCell(r, c, TerminalCell.Default);
                 for (var c = 0; c <= _cursorCol; c++)
-                    _grid[_cursorRow, c] = TerminalCell.Default;
+                    SetCell(_cursorRow, c, TerminalCell.Default);
                 break;
             default:
                 ClearAllCells();
@@ -508,15 +579,15 @@ public sealed class TerminalBuffer
         {
             case 0:
                 for (var c = _cursorCol; c < _cols; c++)
-                    _grid[_cursorRow, c] = TerminalCell.Default;
+                    SetCell(_cursorRow, c, TerminalCell.Default);
                 break;
             case 1:
                 for (var c = 0; c <= _cursorCol; c++)
-                    _grid[_cursorRow, c] = TerminalCell.Default;
+                    SetCell(_cursorRow, c, TerminalCell.Default);
                 break;
             default:
                 for (var c = 0; c < _cols; c++)
-                    _grid[_cursorRow, c] = TerminalCell.Default;
+                    SetCell(_cursorRow, c, TerminalCell.Default);
                 break;
         }
     }
@@ -547,27 +618,76 @@ public sealed class TerminalBuffer
             var scrollbackCount = _isAlternateScreen ? 0 : _scrollback.Count;
             var scrollbackRows = new TerminalCell[scrollbackCount][];
             var index = 0;
+            var scrollbackRowIds = new long[scrollbackCount];
+            var scrollbackCellVersions = new long[scrollbackCount][];
             foreach (var row in _scrollback)
             {
                 if (index >= scrollbackCount)
                     break;
                 var rowCopy = new TerminalCell[_cols];
-                Array.Copy(row, rowCopy, Math.Min(row.Length, _cols));
-                if (row.Length < _cols)
-                    Array.Fill(rowCopy, TerminalCell.Default, row.Length, _cols - row.Length);
+                Array.Copy(row.Cells, rowCopy, Math.Min(row.Cells.Length, _cols));
+                if (row.Cells.Length < _cols)
+                    Array.Fill(rowCopy, TerminalCell.Default, row.Cells.Length, _cols - row.Cells.Length);
                 scrollbackRows[index++] = rowCopy;
+                scrollbackRowIds[index - 1] = row.Id;
+                // Scrollback-Zeilen können nach einem Resize noch ihre frühere Breite
+                // haben. Der Snapshot hat dagegen stets die aktuelle Geometrie. Die
+                // Identitätsdaten müssen deshalb dieselbe Breite wie die Zellkopie
+                // besitzen, sonst kann eine Auswahl rechts der alten Breite beim
+                // Lesen ihrer Schreibversion aus dem Array laufen.
+                var scrollbackVersionCopy = new long[_cols];
+                Array.Copy(row.Versions, scrollbackVersionCopy, Math.Min(row.Versions.Length, _cols));
+                scrollbackCellVersions[index - 1] = scrollbackVersionCopy;
             }
 
-            return new TerminalBufferSnapshot(gridCopy, _rows, _cols, _cursorRow, _cursorCol, scrollbackRows);
+            var versionCopy = new long[_rows, _cols];
+            Array.Copy(_cellVersions, versionCopy, _cellVersions.Length);
+            return new TerminalBufferSnapshot(gridCopy, _rows, _cols, _cursorRow, _cursorCol, scrollbackRows,
+                _rowIds.ToArray(), versionCopy, scrollbackRowIds, scrollbackCellVersions, _generation);
         }
     }
 
     private void ClearAllCells()
     {
         FillGrid(_grid, _rows, _cols);
+        _cellVersions = new long[_rows, _cols];
+        _rowIds = CreateRowIds(_rows);
         _scrollback.Clear();
     }
+
+    private long[] CreateRowIds(int count)
+    {
+        var ids = new long[count];
+        for (var i = 0; i < count; i++) ids[i] = NextRowId();
+        return ids;
+    }
+
+    private long NextRowId() => ++_nextRowId;
+
+    private void SetCell(int row, int col, TerminalCell cell)
+    {
+        _grid[row, col] = cell;
+        _cellVersions[row, col] = ++_nextCellVersion;
+    }
+
+    private void CopyCell(int sourceRow, int sourceCol, int destinationRow, int destinationCol,
+        bool preserveSourceVersion = false)
+    {
+        _grid[destinationRow, destinationCol] = _grid[sourceRow, sourceCol];
+        if (preserveSourceVersion)
+        {
+            _cellVersions[destinationRow, destinationCol] = _cellVersions[sourceRow, sourceCol];
+            return;
+        }
+
+        // Eine Kopie verändert die Zielzelle. Die Quellversion darf nicht übernommen
+        // werden, weil eine bestehende Auswahl sonst unbemerkt an den verschobenen
+        // Inhalt der Zielzelle gebunden bliebe.
+        _cellVersions[destinationRow, destinationCol] = ++_nextCellVersion;
+    }
 }
+
+internal sealed record TerminalRow(TerminalCell[] Cells, long[] Versions, long Id);
 
 /// <summary>Konsistenter Snapshot des Zustands eines <see cref="TerminalBuffer"/>, unter einem einzigen Lock
 /// erstellt über <see cref="TerminalBuffer.GetSnapshot"/>.</summary>
@@ -577,6 +697,11 @@ public sealed class TerminalBuffer
 /// <param name="CursorRow">Cursor-Zeile zum Snapshot-Zeitpunkt.</param>
 /// <param name="CursorCol">Cursor-Spalte zum Snapshot-Zeitpunkt.</param>
 /// <param name="ScrollbackRows">Kopie der Scrollback-Zeilen, älteste Zeile zuerst.</param>
+/// <param name="GridRowIds">Stabile Identitäten der sichtbaren Grid-Zeilen.</param>
+/// <param name="GridCellVersions">Schreibversionen der sichtbaren Grid-Zellen.</param>
+/// <param name="ScrollbackRowIds">Stabile Identitäten der Scrollback-Zeilen.</param>
+/// <param name="ScrollbackCellVersions">Schreibversionen der Scrollback-Zellen.</param>
+/// <param name="Generation">Identität des aktuellen Buffer-/Screen-Zustands.</param>
 /// <returns>Eine neue <see cref="TerminalBufferSnapshot"/>-Instanz.</returns>
 public sealed record TerminalBufferSnapshot(
     TerminalCell[,] Grid,
@@ -584,7 +709,12 @@ public sealed record TerminalBufferSnapshot(
     int Cols,
     int CursorRow,
     int CursorCol,
-    TerminalCell[][] ScrollbackRows)
+    TerminalCell[][] ScrollbackRows,
+    long[] GridRowIds,
+    long[,] GridCellVersions,
+    long[] ScrollbackRowIds,
+    long[][] ScrollbackCellVersions,
+    long Generation)
 {
     /// <summary>Anzahl der Scrollback-Zeilen im Snapshot.</summary>
     public int ScrollbackCount => ScrollbackRows.Length;

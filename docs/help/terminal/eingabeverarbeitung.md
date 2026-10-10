@@ -2,13 +2,13 @@
 
 # Terminal-Eingabeverarbeitung
 
-Die Terminal-Komponente verarbeitet Tastaturereignisse, Zwischenablage-Inhalte und Standard-VT100-Sequenzen für die Kommunikation mit CLI-Prozessen. Dieses Dokument behandelt die Eingabeverarbeitung speziell für Alt Gr-Sonderzeichen, wortweise Cursor-Navigation und robustes Copy & Paste in Pseudokonsolen-Sitzungen.
+Die Terminal-Komponente verarbeitet Tastaturereignisse, Zwischenablage-Inhalte und Standard-VT100-Sequenzen für die Kommunikation mit CLI-Prozessen. Dieses Dokument behandelt Alt Gr-Sonderzeichen, wortweise Cursor-Navigation, das Kopieren markierter Terminalausgabe und robustes Einfügen in Pseudokonsolen-Sitzungen.
 
 ## Beschreibung
 
 ### Zweck
 
-Ermöglichung der Eingabe von Sonderzeichen über Alt Gr (z. B. "@", "{", "}", "|", "~", "`" auf deutschem Tastaturlayout), wortweiser Cursor-Navigation mit Ctrl+Pfeiltasten und vollständiger Übertragung langer mehrzeiliger Clipboard-Inhalte in CLI-Prozessen.
+Ermöglichung der Eingabe von Sonderzeichen über Alt Gr (z. B. "@", "{", "}", "|", "~", "`" auf deutschem Tastaturlayout), wortweiser Cursor-Navigation mit Ctrl+Pfeiltasten, Kopieren markierter Terminalzellen sowie vollständiger Übertragung langer mehrzeiliger Clipboard-Inhalte in CLI-Prozessen.
 
 ### Funktionsweise
 
@@ -44,6 +44,14 @@ Mit **Ctrl+Links** und **Ctrl+Rechts** kann der Cursor im CLI um ein ganzes Wort
 Diese Sequenzen sind in den meisten POSIX-Shells und modernen CLI-Tools standardisiert und werden automatisch als wortweise Navigation interpretiert.
 
 ### Robustes Copy & Paste
+
+#### Terminalausgabe kopieren
+
+Text lässt sich im Terminal mit der Maus markieren. Während der Auswahl erweitert **Shift+Pfeil links/rechts/auf/ab** die Markierung zellweise; **Shift+Home/End** erweitert sie bis zum Zeilenanfang beziehungsweise -ende. **Ctrl+Shift+C** kopiert den ausgewählten Bereich, alternativ steht im Kontextmenü **Kopieren** zur Verfügung. Bei der Extraktion werden die ausgewählten Zellen zeilenweise verbunden: Zwischen den Zeilen steht `Environment.NewLine`, Leerzeichen innerhalb des ausgewählten Texts und leere Zeilen bleiben erhalten, terminalbreite Endleerzeichen werden entfernt.
+
+**Ctrl+C** wird nicht als Kopierbefehl abgefangen und bleibt für die CLI verfügbar. **Ctrl+Shift+C** ohne gültige Auswahl verändert die Zwischenablage nicht und sendet keine Eingabe an den Prozess. Clipboard-Schreibfehler werden abgefangen.
+
+Die Auswahl ist an logische Buffer-Zeilen und deren Zellen gebunden. Gewöhnliche Ausgabe soll die Markierung daher erhalten; entfernte oder geänderte ausgewählte Zellen sowie Reset, Größen- oder Bildschirmwechsel heben sie auf. Derzeit ist der Erhalt bei Scrollback-Verschiebung noch ein offener Fehler (siehe Feature-Nacharbeit); vollständige Live- und Replay-E2E-Abnahmen liegen noch nicht vor.
 
 Mit **Ctrl+V** fügt das Terminal den aktuellen Text aus der Windows-Zwischenablage in die aktive CLI-Sitzung ein. Der Text wird vor dem asynchronen Schreiben als stabile Momentaufnahme gelesen; gleichzeitig wird die Zielsession festgehalten, damit ein laufender Paste-Vorgang nicht versehentlich in eine inzwischen angezeigte andere Sitzung schreibt.
 
@@ -182,6 +190,10 @@ flowchart TD
     B -->|Ctrl+V| L["Clipboard lesen und EncodeClipboardText"]
     L --> I["ITerminalSession.WriteInputAsync"]
     I --> M
+
+    B -->|Ctrl+Shift+C mit Auswahl| N["Auswahl aus Buffer-Snapshot extrahieren"]
+    N --> O["Windows-Zwischenablage setzen"]
+    B -->|Shift+Pfeil / Shift+Home / End| P["Auswahl im Terminal-Control erweitern"]
 ```
 
 ## Beteiligte Klassen

@@ -284,6 +284,34 @@ public sealed class AnsiSequenceParserTests
         ((ScreenScrolledEvent)events[0]).DeltaRows.Should().Be(expectedDelta);
     }
 
+    /// <summary>Die xterm-Window-Manipulation CSI 8;Zeilen;Spalten t passt nur die
+    /// Terminal-Textfläche an; Zeilen und Spalten sind gegenüber der Sequenz bewusst vertauscht.</summary>
+    [Fact]
+    public void Parse_Csi8TextflaechenResize_ErgibtTerminalResizedEvent()
+    {
+        var sut = new AnsiSequenceParser();
+
+        var events = sut.Parse(Encode("\x1b[8;73;142t")).ToList();
+
+        events.Should().ContainSingle(e => e is TerminalResizedEvent);
+        var resize = (TerminalResizedEvent)events[0];
+        resize.Rows.Should().Be(73);
+        resize.Cols.Should().Be(142);
+    }
+
+    /// <summary>Andere CSI-t-Window-Manipulationen und unvollständige Größen dürfen den
+    /// Zeichenbuffer nicht versehentlich umkonfigurieren.</summary>
+    [Theory]
+    [InlineData("\x1b[18t")]
+    [InlineData("\x1b[8;0;142t")]
+    [InlineData("\x1b[8;73;0t")]
+    public void Parse_AndereCsiTSequenzen_ErzeugenKeinResizeEvent(string sequence)
+    {
+        var sut = new AnsiSequenceParser();
+
+        sut.Parse(Encode(sequence)).Should().NotContain(e => e is TerminalResizedEvent);
+    }
+
     /// <summary>Regression: Ein ESC mitten in einer CSI-Sequenz bricht die unvollständige Sequenz ab —
     /// das ESC beginnt die nächste Sequenz, statt dass das folgende '[' fälschlich als Final-Byte
     /// interpretiert und der Rest der echten Sequenz als Text ausgegeben wird.</summary>
