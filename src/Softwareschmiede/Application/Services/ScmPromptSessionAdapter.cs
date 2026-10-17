@@ -14,6 +14,8 @@ public enum ScmPromptReadyStatus
     Ready,
     /// <summary>Ein Turn oder eine Benutzereingabe läuft.</summary>
     Busy,
+    /// <summary>Die CLI wartet auf eine Vertrauensentscheidung für das Arbeitsverzeichnis.</summary>
+    TrustPrompt,
     /// <summary>Der gebundene Lauf ist beendet oder fehlgeschlagen.</summary>
     Exited,
 }
@@ -51,14 +53,28 @@ public interface IScmPromptSessionAdapter
 /// </summary>
 public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposable
 {
+    /// <summary>Frist, nach der eine unbeantwortete Kanalprobe bei sichtbarer Bereitschaft erneut zugestellt wird.</summary>
+    private static readonly TimeSpan AccessProbeResendDelay = TimeSpan.FromSeconds(60);
+    /// <summary>Maximale Anzahl von Kanalprobe-Sendungen pro gebundenem Lauf.</summary>
+    private const int AccessProbeMaxSends = 3;
+    /// <summary>Bewusst gepinnte Blockierdialog-Texte; unbekannte Dialoge bleiben wie bisher Unknown.</summary>
+    private static readonly string[] TrustDialogMarkers =
+    [
+        "do you trust the files in this folder",
+        "is this a project you created or one you trust",
+        "do you trust the contents of this directory",
+    ];
     private readonly Guid _taskId;
     private readonly ScmExchangeAccess _access;
     private readonly IReadOnlyList<ScmCliConfigurationFile> _files;
     private readonly Func<bool> _isCurrent;
+    private readonly TimeProvider _time;
     private readonly object _sync = new();
     private readonly StringBuilder _startupOutput = new();
     private readonly ScmEventExchangeProtocol _probeProtocol = new();
     private ScmExchangeAccessProbe? _accessProbe;
+    private DateTimeOffset _accessProbeSentUtc;
+    private int _accessProbeSends;
     private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private ScmPromptReadyStatus _ready;
     private bool _recognizedCli;
@@ -68,7 +84,8 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
 
     /// <summary>Bindet StartSpec, erfasste Dateirechte und eine Session ohne zusätzliche Freigaben.</summary>
     public ScmPromptSessionAdapter(Guid taskId, Guid runId, string pluginPrefix, TerminalSessionStartSpec spec,
-        ITerminalSession session, IReadOnlyList<ScmCliConfigurationFile> files, Func<bool> isCurrent)
+        ITerminalSession session, IReadOnlyList<ScmCliConfigurationFile> files, Func<bool> isCurrent,
+        TimeProvider? timeProvider = null)
     {
         _taskId = taskId;
         CliRunId = runId;
@@ -77,6 +94,7 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
         WorkingDirectory = string.IsNullOrWhiteSpace(spec.WorkingDirectory) ? string.Empty : Path.GetFullPath(spec.WorkingDirectory);
         _files = files;
         _isCurrent = isCurrent;
+        _time = timeProvider ?? TimeProvider.System;
         _access = ScmCliAccessEvaluator.Evaluate(pluginPrefix, spec, runId, files);
         session.OutputChunk += OnOutput;
         session.BufferChanged += OnBufferChanged;
@@ -162,11 +180,25 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
                                     WorkingDirectory, capabilities, ct).ConfigureAwait(false);
                                 if (!IsAlive || ReadyStatus != ScmPromptReadyStatus.Ready)
                                     return access with { Status = ScmExchangeAccessStatus.Unknown, Reason = "CLI ist vor der Dateitool-Probe nicht mehr eingabebereit; regulärer Neustart erforderlich." };
-                                MarkInputStarted();
-                                // No event text, event acknowledgement or external action is sent before proof.
-                                await Session.WritePromptAsync(ScmEventExchangeProtocol.BuildAccessProbePrompt(_accessProbe), ct).ConfigureAwait(false);
+                                await SendAccessProbeAsync(ct).ConfigureAwait(false);
                             }
-                            access = access with { Status = ScmExchangeAccessStatus.Unknown, Reason = "Nachweis des tatsächlichen Dateitool-Zugriffs steht aus; separate lokale Kanalprobe muss erfolgreich abgeschlossen werden." };
+                            else if (_accessProbe is not null && ReadyStatus == ScmPromptReadyStatus.Ready &&
+                                _accessProbeSends < AccessProbeMaxSends &&
+                                _time.GetUtcNow() - _accessProbeSentUtc >= AccessProbeResendDelay)
+                            {
+                                // A probe swallowed by a blocking dialog (for example the workspace trust
+                                // prompt) never reaches the file tool. The identical challenge is sent
+                                // again only while a real input prompt is visibly ready — still without
+                                // any event content before the channel proof.
+                                await SendAccessProbeAsync(ct).ConfigureAwait(false);
+                            }
+                            access = access with
+                            {
+                                Status = ScmExchangeAccessStatus.Unknown,
+                                Reason = _accessProbeSends >= AccessProbeMaxSends
+                                ? "Nachweis des tatsächlichen Dateitool-Zugriffs steht aus; die lokale Kanalprobe wurde wiederholt ohne Nachweis gesendet. CLI-Sitzung regulär neu starten."
+                                : "Nachweis des tatsächlichen Dateitool-Zugriffs steht aus; separate lokale Kanalprobe muss erfolgreich abgeschlossen werden."
+                            };
                         }
                     }
                 }
@@ -177,14 +209,26 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
         return access;
     }
 
+    /// <summary>Sendet die ausstehende Kanalprobe; der Probe-Prompt enthält niemals Ereignisinhalte.</summary>
+    private async Task SendAccessProbeAsync(CancellationToken ct)
+    {
+        MarkInputStarted();
+        // No event text, event acknowledgement or external action is sent before proof.
+        await Session.WritePromptAsync(ScmEventExchangeProtocol.BuildAccessProbePrompt(_accessProbe!), ct).ConfigureAwait(false);
+        _accessProbeSends++;
+        _accessProbeSentUtc = _time.GetUtcNow();
+    }
+
     /// <inheritdoc/>
     public bool ConfirmReady(Guid runId)
     {
         if (runId != CliRunId || !IsAlive) return false;
         lock (_sync)
         {
-            // Confirmation cannot turn a shell, unknown adapter or known busy turn into an AI prompt.
-            if (!_recognizedCli || _ready == ScmPromptReadyStatus.Busy) return false;
+            RefreshScreen();
+            // Confirmation cannot turn a shell, unknown adapter, blocking dialog or known busy
+            // turn into an AI prompt.
+            if (!_recognizedCli || _ready is ScmPromptReadyStatus.Busy or ScmPromptReadyStatus.TrustPrompt) return false;
             _manuallyConfirmed = true;
             SetReady(ScmPromptReadyStatus.Ready);
             return true;
@@ -246,7 +290,13 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
             if (_inputRevision == _outputRevision) return;
             var prompt = lines[Math.Clamp(Session.Buffer.CursorRow, 0, lines.Length - 1)].Trim();
             var busy = screen.Contains("esc to interrupt", StringComparison.OrdinalIgnoreCase) || screen.Contains("Esc to cancel", StringComparison.OrdinalIgnoreCase);
-            if (PluginPrefix == "Softwareschmiede.KiSimulator")
+            if (TrustDialogMarkers.Any(marker => screen.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+            {
+                // A blocking trust dialog swallows submitted text; it is a distinct, resolvable
+                // wait state rather than an unknown or ready prompt.
+                SetReady(ScmPromptReadyStatus.TrustPrompt);
+            }
+            else if (PluginPrefix == "Softwareschmiede.KiSimulator")
             {
                 // Only the current cursor line is authoritative; old READY rows remain in scrollback.
                 if (prompt == "SCM_READY_V1") SetReady(ScmPromptReadyStatus.Ready);
