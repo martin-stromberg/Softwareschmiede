@@ -4,17 +4,19 @@
 
 ## Übersicht
 
-`ScmEventMonitoringService` fragt regelmäßig die lokal verknüpften SCM-Referenzen ab. `GitHubPlugin` liest Quelltexte und Metadaten, `ScmEventStore` persistiert Beobachtungen und `ScmEventOrchestrator` validiert und verteilt gültige Einträge. Die Queue-Oberfläche verwendet denselben Orchestrator für manuelle Aktionen und Sitzungswahl.
+`ScmEventMonitoringService` fragt regelmäßig die lokal verknüpften SCM-Referenzen sowie repository-weit alle Referenzen aktivierter Projekt-Repositories ab. `GitHubPlugin` liest Quelltexte und Metadaten, `ScmEventStore` persistiert Beobachtungen und `ScmEventOrchestrator` validiert und verteilt gültige Einträge. Die Queue-Oberfläche verwendet denselben Orchestrator für manuelle Aktionen und Sitzungswahl.
 
 ## Ablauf
 
 ### 1. Referenzen und Quellen abfragen
 
-Der Monitor lädt aktive lokale Aufgaben samt Repository, Issue-Referenz und Pull Requests. Er überspringt Provider ohne `IScmEventSource`. Für GitHub werden Beschreibung, Issue-/PR-Kommentare, PR-Zeilenkommentare und veröffentlichte Reviews gelesen. REST-Seiten und GraphQL-Verbindungen werden vollständig abgearbeitet; Quell-Checkpoints führen den jeweiligen Wasserstand.
+Der Monitor lädt aktive lokale Aufgaben samt Repository, Issue-Referenz und Pull Requests sowie alle aktivierten, an Projekten erfassten `GitRepository`-Einträge. Er überspringt Provider ohne `IScmEventSource`. Jede lokale Alias-Adresse wird über `GetEventRepositoryAsync` in die kanonische Repository-Identität aufgelöst; erst bei vollständig gelungener Auflösung werden Ereignisse gelesen. Anschließend enumeriert `GitHubPlugin.EnumerateReferencesAsync` jedes aufgelöste Repository: offene Issues und Pull Requests immer, geschlossene nur bei `updatedAt` innerhalb des Aktivitätsfensters (`enumeration/`-Checkpoint, Watermark abzüglich zweier Poll-Intervalle). Alle Referenzen — aufgabenverknüpft wie enumeriert — durchlaufen danach denselben `ReadEventsAsync`-Pfad. Für GitHub werden Beschreibung, Issue-/PR-Kommentare, PR-Zeilenkommentare und veröffentlichte Reviews gelesen. REST-Seiten und GraphQL-Verbindungen werden vollständig abgearbeitet; Quell-Checkpoints führen den jeweiligen Wasserstand.
 
 Beteiligte Komponenten:
-- `ScmEventMonitoringService.RunOnceAsync` — ermittelt verknüpfte Referenzen, fragt Quellen ab und startet Dispatches.
+- `ScmEventMonitoringService.RunOnceAsync` — ermittelt verknüpfte und repository-weite Referenzen, fragt Quellen ab und startet Dispatches.
+- `ScmEventMonitoringService.EnumerateRepositoryAsync` — Repository-Enumeration mit eigenem `enumeration/`-Checkpoint und Backoff; Fehler blockieren aufgabenverknüpfte Referenzen nicht.
 - `GitHubPlugin.GetEventRepositoryAsync` — löst Repository, angemeldeten Benutzer und Schreibberechtigung auf.
+- `GitHubPlugin.EnumerateReferencesAsync` — listet offene und im Aktivitätsfenster bewegte geschlossene Referenzen.
 - `GitHubPlugin.ReadEventsAsync` — liest Textstände und Versionsmetadaten.
 
 ### 2. Version und Identität prüfen

@@ -8,7 +8,7 @@ Ein Text ist nur gültig, wenn er `$Softwareschmiede` ohne Beachtung der Groß-/
 
 ## Eindeutige Aufgabenreferenz
 
-Nur lokal verknüpfte aktive Repository-Referenzen werden beobachtet. Eine Remote-Referenz, die mehreren Aufgaben zugeordnet ist, wird nicht willkürlich zugestellt; der Konflikt bleibt als Diagnose sichtbar.
+Beobachtet werden alle Referenzen aktivierter Projekt-Repositories (`GitRepository.Aktiv`) sowie die an Aufgaben verknüpften Referenzen. Eine Remote-Referenz, die mehreren Aufgaben zugeordnet ist („Mehrdeutige Zuordnung zu Aufgaben"), wird nicht willkürlich zugestellt; der Konflikt bleibt als Diagnose sichtbar. Referenzen ohne zuordenbare Aufgabe erhalten die Diagnose „Keine Aufgabe zugeordnet" und erzeugen keinen zustellbaren Eintrag; die Beobachtung wird weitergeführt, damit eine später entstehende Aufgabenverknüpfung nahtlos greift.
 
 ## Aufgabenstatus und CLI
 

@@ -10,7 +10,7 @@ Enthält den dauerhaft angenommenen Ereignistext und Ursprung, Aufgabe, Status, 
 
 ### `ScmObservationCheckpoint`
 
-Speichert Wasserstand, Fehlerzahl, nächste Prüfzeit und Diagnose je Repository-/Referenz-/Quellenart.
+Speichert Wasserstand, Fehlerzahl, nächste Prüfzeit und Diagnose je Quelle. `SourceKey` kennt drei Namensräume: `repository/{provider}/{alias}` (Auflösung lokaler Repository-Adressen), `enumeration/{provider}/{host}/{repoId}` (repository-weite Referenzermittlung) und `{provider}/{host}/{repoId}/{kind}/{number}/{contentKind}` (einzelne Textquellen).
 
 ### `ScmContentSnapshot`
 
