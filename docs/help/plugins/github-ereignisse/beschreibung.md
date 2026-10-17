@@ -8,7 +8,7 @@ Anfragen aus GitHub-Issues und Pull Requests können einer vorhandenen Aufgabe z
 
 ## Funktionsweise
 
-Die Anwendung prüft regelmäßig Texte in GitHub-Issues und Pull Requests, die lokal mit einer Aufgabe verknüpft sind. Dazu zählen Beschreibungen, Kommentare, Review-Kommentare und veröffentlichte Pull-Request-Reviews. Ein Text wird nur angenommen, wenn er `$Softwareschmiede` enthält und sein Autor beziehungsweise bei einer Bearbeitung der Bearbeiter der angemeldete Repository-Owner ist.
+Die Anwendung prüft regelmäßig Texte in GitHub-Issues und Pull Requests. Überwacht werden repository-weit alle offenen Issues und Pull Requests jedes aktivierten Projekt-Repositories; geschlossene Referenzen kommen hinzu, sobald sie seit der letzten Prüfung Aktivität zeigen. Dazu zählen Beschreibungen, Kommentare, Review-Kommentare und veröffentlichte Pull-Request-Reviews. Ein Text wird nur angenommen, wenn er `$Softwareschmiede` enthält und sein Autor beziehungsweise bei einer Bearbeitung der Bearbeiter der angemeldete Repository-Owner ist.
 
 Eingehende Texte erscheinen unter **SCM-Ereignisse**. Angenommene Kommentare und veröffentlichte Pull-Request-Reviews erhalten eine 👀-Reaktion; Beschreibungen nicht. Wenn keine CLI zur Verarbeitung bereitsteht, bleibt der Eintrag dort sichtbar und GitHub erhält einen kurzen Wartehinweis. Die KI kann die passende Antwort im ursprünglichen Issue oder Pull Request selbst wählen.
 
@@ -23,6 +23,6 @@ Für die CLI-Verarbeitung unterstützt die Anwendung aktuell Codex CLI und Claud
 ## Einschränkungen
 
 - Derzeit überwacht nur das GitHub-SCM-Plugin Ereignisse. Andere SCM-Plugins erhalten dadurch keine Ereignisüberwachung.
-- Es werden nur lokal mit Aufgaben verknüpfte Issue- und Pull-Request-Referenzen geprüft. Nicht verknüpfte GitHub-Inhalte werden nicht erfasst.
+- Es werden nur Repositories überwacht, die an einem Projekt erfasst und aktiviert sind. Texte an Referenzen ohne zuordenbare lokale Aufgabe werden zwar erkannt und gespeichert, erscheinen aber derzeit nicht als zustellbare Einträge in der Queue — erst nach Verknüpfung mit einer Aufgabe werden sie wirksam. Geschlossene Referenzen werden nur dann einbezogen, wenn sie innerhalb des laufenden Aktivitätsfensters geändert wurden.
 - Polling sieht den bei einer Abfrage aktuellen Textstand. Zwischenzeitlich überschriebene oder gelöschte Textfassungen können nicht rekonstruiert werden.
 - Die Ereignisverarbeitung erfordert eine gültige GitHub-Anmeldung und passende Repository-Berechtigungen. Auch mit Codex oder Claude CLI kann ein Eintrag wartend bleiben, wenn Version, Berechtigungen oder Zugriff auf den geprüften Antwortkanal nicht unterstützt werden.

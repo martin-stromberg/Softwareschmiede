@@ -309,6 +309,60 @@ public sealed class GitHubEventSourceTests
         Assert.Equal("repos/owner/repo/pulls", api.Requests.Last().Endpoint);
     }
 
+    /// <summary>Repository-weite Erkennung listet offene Issues und Pull Requests über alle Seiten.</summary>
+    [Fact]
+    public async Task Enumeration_ReturnsOpenReferencesAcrossPages()
+    {
+        var api = new FakeApi();
+        api.AddGraph(new { repository = new { issues = Page(new[] { Ref(7), Ref(8) }, true, "c1") } });
+        api.AddGraph(new { repository = new { issues = Page(new[] { Ref(9) }, false, null) } });
+        api.AddGraph(new { repository = new { pullRequests = Page(new[] { Ref(3) }, false, null) } });
+        var result = await Plugin(api).EnumerateReferencesAsync(Repository, null);
+        Assert.Equal(new[]
+        {
+            new ScmEventReference(Repository, ScmReferenceKind.Issue, 7),
+            new ScmEventReference(Repository, ScmReferenceKind.Issue, 8),
+            new ScmEventReference(Repository, ScmReferenceKind.Issue, 9),
+            new ScmEventReference(Repository, ScmReferenceKind.PullRequest, 3)
+        }, result);
+        Assert.Equal(3, api.Requests.Count);
+        Assert.All(api.Requests, request => Assert.Contains("states:[OPEN]", request.JsonBody));
+        Assert.Contains("c1", api.Requests[1].JsonBody);
+        api.AssertComplete();
+    }
+
+    /// <summary>Im Aktivitätsfenster ergänzen zuletzt bewegte geschlossene Referenzen die offene Menge.</summary>
+    [Fact]
+    public async Task Enumeration_SinceWindow_AddsOnlyRecentlyUpdatedClosedReferences()
+    {
+        var api = new FakeApi();
+        api.AddGraph(new { repository = new { issues = Page(new[] { Ref(7) }, false, null) } });
+        api.AddGraph(new { repository = new { pullRequests = Page(new[] { Ref(3) }, false, null) } });
+        api.AddGraph(new { repository = new { issues = Page(new[] { Ref(5, Created), Ref(4, Created.AddHours(-1)) }, false, null) } });
+        api.AddGraph(new { repository = new { pullRequests = Page(new[] { Ref(2, Created.AddMinutes(1)), Ref(1, Created.AddDays(-1)) }, false, null) } });
+        var result = await Plugin(api).EnumerateReferencesAsync(Repository, Created);
+        Assert.Equal(new[]
+        {
+            new ScmEventReference(Repository, ScmReferenceKind.Issue, 7),
+            new ScmEventReference(Repository, ScmReferenceKind.PullRequest, 3),
+            new ScmEventReference(Repository, ScmReferenceKind.Issue, 5),
+            new ScmEventReference(Repository, ScmReferenceKind.PullRequest, 2)
+        }, result);
+        Assert.Contains("states:[CLOSED]", api.Requests[2].JsonBody);
+        Assert.Contains("states:[CLOSED,MERGED]", api.Requests[3].JsonBody);
+        api.AssertComplete();
+    }
+
+    /// <summary>Transportfehler der Enumeration bleiben typisierte Providerfehler für den Backoff-Pfad.</summary>
+    [Fact]
+    public async Task Enumeration_Failure_RemainsTypedProviderError()
+    {
+        var api = new FakeApi();
+        api.AddStatus("graphql", 503);
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).EnumerateReferencesAsync(Repository, null));
+        Assert.Equal(ScmProviderFailureKind.Temporary, error.FailureKind);
+    }
+
     /// <summary>gh erhält JSON ausschließlich in einer kurzlebigen Inputdatei und Tokens nur im Environment.</summary>
     [Fact]
     public async Task GhTransport_UsesArgumentListAndJsonFile_NotBodyOrTokenArguments()
@@ -365,6 +419,13 @@ public sealed class GitHubEventSourceTests
     }
     private static object Reviews(object nodes, bool hasNextPage, string? endCursor) =>
         new { repository = new { pullRequest = new { reviews = new { nodes, pageInfo = new { hasNextPage, endCursor } } } } };
+    private static Dictionary<string, object?> Ref(int number, DateTimeOffset? updated = null) => new()
+        {
+            ["number"] = number,
+            ["updatedAt"] = updated ?? Created
+        };
+    private static object Page(object nodes, bool hasNextPage, string? endCursor) =>
+        new { nodes, pageInfo = new { hasNextPage, endCursor } };
 
     private sealed class FakeApi : IGitHubEventApiClient
     {

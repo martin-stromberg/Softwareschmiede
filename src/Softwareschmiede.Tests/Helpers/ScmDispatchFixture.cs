@@ -43,6 +43,8 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>())).ReturnsAsync(Repository);
         Git.As<IScmEventSource>().Setup(x => x.ReadEventsAsync(It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()))
             .Returns((ScmEventReadRequest request, CancellationToken _) => Task.FromResult(new ScmEventBatch(request, [])));
+        Git.As<IScmEventSource>().Setup(x => x.EnumerateReferencesAsync(It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<ScmEventReference>());
         Git.As<IScmEventResponder>().Setup(x => x.ExecuteResponseAsync(It.IsAny<ScmResponseRequest>(), It.IsAny<CancellationToken>()))
             .Returns((ScmResponseRequest request, CancellationToken _) => { Responses.Add(request); return Task.FromResult(new ScmResponseResult("remote", null, false)); });
         Git.Setup(x => x.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))

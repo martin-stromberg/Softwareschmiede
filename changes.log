@@ -1,3 +1,10 @@
+## 2026-10-17 — Repository-weite GitHub-Ereigniserkennung
+
+- Die SCM-Ereignisüberwachung erkennt jetzt repository-weit alle offenen Issues und Pull Requests aktivierter Projekt-Repositories (`IScmEventSource.EnumerateReferencesAsync`, `GitHubPlugin`), nicht mehr nur aufgabenverknüpfte Referenzen. Geschlossene Referenzen werden einbezogen, sobald sie innerhalb des Aktivitätsfensters (letzter Enumerations-Watermark minus zwei Poll-Intervalle) geändert wurden.
+- Neu erkannte Referenzen durchlaufen denselben `ReadEventsAsync`-Pfad mit identischen Metadaten, Validierung, Dedup und Checkpoints; ein eigener `enumeration/`-Checkpoint führt Wasserstand und Backoff, ohne die übrige Provider-Runde zu blockieren.
+- Ereignisse ohne zuordenbare lokale Aufgabe werden mit der Diagnose „Keine Aufgabe zugeordnet" als Snapshots gespeichert, erzeugen aber noch keine zustellbaren Inbox-Einträge (Übergangsstufe; die automatische Aufgabenzuordnung folgt in einem späteren Schritt).
+- Hilfedokumentation unter `docs/help/plugins/github-ereignisse/` entsprechend aktualisiert.
+
 ## 2026-10-17 — GitHub-Ereignisüberwachung
 
 - Die Softwareschmiede prüft lokal verknüpfte GitHub-Issues und Pull Requests auf neue oder geänderte Texte mit dem Trigger `$Softwareschmiede`. Verarbeitet werden nur Texte, deren tatsächlicher Autor beziehungsweise Bearbeiter dem angemeldeten Repository-Owner entspricht.

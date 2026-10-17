@@ -34,7 +34,7 @@ public sealed class ScmEventDispatchTests
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync());
         Assert.All(await db.Aufgaben.ToListAsync(), task => Assert.Equal(AufgabeStatus.Neu, task.Status));
-        var checkpoints = await db.ScmObservationCheckpoints.ToListAsync();
+        var checkpoints = await db.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync();
         Assert.Equal(kind == ScmReferenceKind.Issue ? 2 : 4, checkpoints.Count);
         Assert.All(checkpoints, checkpoint => Assert.Equal("Mehrdeutige Zuordnung zu Aufgaben", checkpoint.Diagnostic));
         Assert.All(await db.ScmContentSnapshots.ToListAsync(), snapshot => Assert.Equal("Mehrdeutige Zuordnung zu Aufgaben", snapshot.Diagnostic));
@@ -85,7 +85,7 @@ public sealed class ScmEventDispatchTests
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
             Assert.Empty(await db.ScmIncomingEvents.ToListAsync());
-            var checkpoint = Assert.Single(await db.ScmObservationCheckpoints.ToListAsync());
+            var checkpoint = Assert.Single(await db.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync());
             Assert.Equal("Authentication", checkpoint.ErrorCode);
             Assert.Equal(long.MaxValue, checkpoint.NextAttemptUtc);
             checkpoint.NextAttemptUtc = null;
@@ -97,7 +97,8 @@ public sealed class ScmEventDispatchTests
         using var verification = fixture.Services.CreateScope();
         var verifiedDb = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         Assert.Empty(await verifiedDb.ScmIncomingEvents.ToListAsync());
-        Assert.All(await verifiedDb.ScmObservationCheckpoints.ToListAsync(), checkpoint => Assert.Equal("Mehrdeutige Zuordnung zu Aufgaben", checkpoint.Diagnostic));
+        Assert.All(await verifiedDb.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync(),
+            checkpoint => Assert.Equal("Mehrdeutige Zuordnung zu Aufgaben", checkpoint.Diagnostic));
     }
 
     /// <summary>Older waiting tasks do not starve event 101 for a different start-ready task.</summary>
