@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Infrastructure.Plugins;
@@ -110,6 +111,38 @@ public sealed partial class GitHubPlugin
             await CollectReferencesAsync(repository, ScmReferenceKind.PullRequest, "pullRequests", "[CLOSED,MERGED]", since, references, ct);
         }
         return references;
+    }
+
+    /// <inheritdoc />
+    public async Task<Issue?> ReadIssueAsync(ScmEventReference reference, CancellationToken ct = default)
+    {
+        ValidateReference(reference);
+        if (reference.Kind != ScmReferenceKind.Issue) throw Permanent("Issue-Anlagedaten benötigen eine Issue-Referenz.");
+        var repository = reference.Repository;
+        var element = await EventApiAsync(repository.Host, "GET", $"{RepositoryEndpoint(repository)}/issues/{reference.Number}", null, false, ct);
+        if (element.ValueKind != JsonValueKind.Object) throw Permanent("Unvollständige GitHub-Antwort.");
+        // Der Issues-Endpunkt liefert auch Pull Requests; eine fremde Referenzart ist nicht anlegbar.
+        if (Object(element, "pull_request").ValueKind == JsonValueKind.Object) return null;
+        var labels = Object(element, "labels").ValueKind == JsonValueKind.Array
+            ? element.GetProperty("labels").EnumerateArray().Select(x => String(x, "name"))
+                .Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!).ToArray()
+            : Array.Empty<string>();
+        return new Issue(int.Parse(Required(element, "number"), CultureInfo.InvariantCulture),
+            String(element, "title") ?? string.Empty, String(element, "body"), labels,
+            String(Object(element, "milestone"), "title"), String(element, "html_url") ?? String(element, "url"));
+    }
+
+    /// <inheritdoc />
+    public async Task<PullRequest?> ReadPullRequestAsync(ScmEventReference reference, CancellationToken ct = default)
+    {
+        ValidateReference(reference);
+        if (reference.Kind != ScmReferenceKind.PullRequest) throw Permanent("Pull-Request-Anlagedaten benötigen eine Pull-Request-Referenz.");
+        var repository = reference.Repository;
+        var repositoryId = PullRequestRepositoryId.Normalize(PullRequestProvider.GitHub, $"{repository.Owner}/{repository.Name}");
+        var element = await EventApiAsync(repository.Host, "GET", $"{RepositoryEndpoint(repository)}/pulls/{reference.Number}", null, false, ct);
+        if (element.ValueKind != JsonValueKind.Object) throw Permanent("Unvollständige GitHub-Antwort.");
+        var pullRequest = ParsePullRequest(element, repositoryId);
+        return pullRequest is not null && pullRequest.Nummer == reference.Number ? pullRequest : null;
     }
 
     /// <summary>Liest eine paginierte Referenzliste; jüngste Aktivität zuerst, Abbruch am <paramref name="cutoff"/>.</summary>

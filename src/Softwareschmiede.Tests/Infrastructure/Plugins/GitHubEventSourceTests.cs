@@ -390,6 +390,79 @@ public sealed class GitHubEventSourceTests
         Assert.False(File.Exists(inputPath));
     }
 
+    /// <summary>Issue-Anlagedaten liefern Titel, Text, Labels, Milestone und kanonische URL.</summary>
+    [Fact]
+    public async Task ReadIssue_ReturnsCreationFields()
+    {
+        var api = new FakeApi();
+        api.Add("issues/7", new
+        {
+            number = 7,
+            title = "Fehler im Import",
+            body = "Beschreibung",
+            labels = new[] { new { name = "bug" }, new { name = "prio" } },
+            milestone = new { title = "v1" },
+            html_url = "https://github.com/owner/repo/issues/7"
+        });
+        var result = await Plugin(api).ReadIssueAsync(Issue);
+        Assert.NotNull(result);
+        Assert.Equal(7, result!.Nummer);
+        Assert.Equal("Fehler im Import", result.Titel);
+        Assert.Equal("Beschreibung", result.Body);
+        Assert.Equal(new[] { "bug", "prio" }, result.Labels);
+        Assert.Equal("v1", result.Milestone);
+        Assert.Equal("https://github.com/owner/repo/issues/7", result.IssueUrl);
+        api.AssertComplete();
+    }
+
+    /// <summary>Eine Pull-Request-Antwort am Issue-Endpunkt ist nicht anlegbar und liefert null.</summary>
+    [Fact]
+    public async Task ReadIssue_PullRequestResponse_ReturnsNull()
+    {
+        var api = new FakeApi();
+        api.Add("issues/7", new { number = 7, title = "PR", pull_request = new { url = "x" } });
+        Assert.Null(await Plugin(api).ReadIssueAsync(Issue));
+        api.AssertComplete();
+    }
+
+    /// <summary>Pull-Request-Anlagedaten liefern Quell- und Ziel-Branch sowie Quell-Repository.</summary>
+    [Fact]
+    public async Task ReadPullRequest_ReturnsCheckoutFields()
+    {
+        var api = new FakeApi();
+        api.Add("pulls/8", new
+        {
+            number = 8,
+            title = "Feature",
+            body = "PR-Text",
+            html_url = "https://github.com/owner/repo/pull/8",
+            state = "open",
+            node_id = "PR_node",
+            head = new { @ref = "feature/x", sha = "abc", repo = new { full_name = "owner/repo", clone_url = "https://github.com/owner/repo.git" } },
+            @base = new { @ref = "main" }
+        });
+        var result = await Plugin(api).ReadPullRequestAsync(PullRequest);
+        Assert.NotNull(result);
+        Assert.Equal(8, result!.Nummer);
+        Assert.Equal("feature/x", result.BranchName);
+        Assert.Equal("main", result.TargetBranch);
+        Assert.Equal("abc", result.HeadSha);
+        Assert.Equal("owner/repo", result.RepositoryId);
+        Assert.Equal("https://github.com/owner/repo.git", result.SourceRepositoryUrl);
+        Assert.Equal("refs/heads/feature/x", result.SourceRef);
+        api.AssertComplete();
+    }
+
+    /// <summary>Detail-Fehler bleiben typisierte Providerfehler.</summary>
+    [Fact]
+    public async Task ReadIssue_NotFound_RemainsTypedProviderError()
+    {
+        var api = new FakeApi();
+        api.AddStatus("issues/7", 404);
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadIssueAsync(Issue));
+        Assert.Equal(ScmProviderFailureKind.Permanent, error.FailureKind);
+    }
+
     private static GitHubPlugin Plugin(FakeApi api) => new(Mock.Of<ICliRunner>(), Mock.Of<ICredentialStore>(), NullLogger<GitHubPlugin>.Instance, api);
     private static ScmEventReadRequest Read(ScmEventReference reference, ScmContentKind kind) => new(reference, kind, null, Created.AddHours(1));
     private static void Identity(FakeApi api, string viewer = "U_1")

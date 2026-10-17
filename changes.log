@@ -1,3 +1,10 @@
+## 2026-10-17 — Automatische Aufgabenanlage aus qualifizierten SCM-Ereignissen
+
+- Qualifizierte Ereignisse (Trigger `$Softwareschmiede`, Owner = Bearbeiter, keine eigene Antwort) an Referenzen ohne lokale Aufgabe legen jetzt automatisch genau eine passende Aufgabe an — Projekt aus dem überwachten `GitRepository`, Titel und Auftragstext aus den Ereignisdaten samt Herkunftsverweis — oder verwenden eine eindeutig vorhandene wieder.
+- Neuer servicenaher Auflösungsschritt `ScmEventTaskResolver` vor der Inbox-Aufnahme; Anlagedaten über die neuen `IScmEventSource`-Methoden `ReadIssueAsync`/`ReadPullRequestAsync` (`GitHubPlugin`). Mehrdeutige Zuordnung bleibt Diagnose ohne Inbox-Eintrag; nicht qualifizierte Ereignisse erzeugen weiterhin weder Aufgabe noch Eintrag.
+- Duplikatschutz: Issues über neuen kanonischen `IssueReferenz.SourceKey` mit Unique-Index (Migration `AddIssueReferenzSourceKey`), Pull Requests über den bestehenden `(Provider, RepositoryId, PullRequestNumber)`-Index — bei Anlagerennen gewinnt die bestehende Anlage.
+- Hilfedokumentation unter `docs/help/plugins/github-ereignisse/` aktualisiert.
+
 ## 2026-10-17 — Repository-weite GitHub-Ereigniserkennung
 
 - Die SCM-Ereignisüberwachung erkennt jetzt repository-weit alle offenen Issues und Pull Requests aktivierter Projekt-Repositories (`IScmEventSource.EnumerateReferencesAsync`, `GitHubPlugin`), nicht mehr nur aufgabenverknüpfte Referenzen. Geschlossene Referenzen werden einbezogen, sobald sie innerhalb des Aktivitätsfensters (letzter Enumerations-Watermark minus zwei Poll-Intervalle) geändert wurden.

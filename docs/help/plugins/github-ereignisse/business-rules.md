@@ -8,7 +8,9 @@ Ein Text ist nur gültig, wenn er `$Softwareschmiede` ohne Beachtung der Groß-/
 
 ## Eindeutige Aufgabenreferenz
 
-Beobachtet werden alle Referenzen aktivierter Projekt-Repositories (`GitRepository.Aktiv`) sowie die an Aufgaben verknüpften Referenzen. Eine Remote-Referenz, die mehreren Aufgaben zugeordnet ist („Mehrdeutige Zuordnung zu Aufgaben"), wird nicht willkürlich zugestellt; der Konflikt bleibt als Diagnose sichtbar. Referenzen ohne zuordenbare Aufgabe erhalten die Diagnose „Keine Aufgabe zugeordnet" und erzeugen keinen zustellbaren Eintrag; die Beobachtung wird weitergeführt, damit eine später entstehende Aufgabenverknüpfung nahtlos greift.
+Beobachtet werden alle Referenzen aktivierter Projekt-Repositories (`GitRepository.Aktiv`) sowie die an Aufgaben verknüpften Referenzen. Eine Remote-Referenz, die mehreren Aufgaben zugeordnet ist („Mehrdeutige Zuordnung zu Aufgaben"), wird nicht willkürlich zugestellt; der Konflikt bleibt als Diagnose sichtbar.
+
+Referenzen ohne zuordenbare Aufgabe durchlaufen bei einem qualifizierten Ereignis die Aufgabenauflösung (`ScmEventTaskResolver`): Gehört die Referenz zu genau einer Aufgabe, wird diese wiederverwendet; existiert keine, wird sie aus den Ereignisdaten angelegt — Issue-Anlagen über `IssueNummer` plus kanonischem `IssueReferenz.SourceKey`-Dedupschlüssel, Pull-Request-Anlagen über den Referenzschlüssel `Provider` + `RepositoryId` + `PullRequestNumber` mit dem bestehenden Unique-Index. Wiederholte Polls, erneut eintreffende Ereignisse und Anlagerennen erzeugen keine Duplikate. Referenzen, zu denen sich keine Aufgabe anlegen lässt (z. B. remote verschwunden), erhalten weiterhin die Diagnose „Keine Aufgabe zugeordnet".
 
 ## Aufgabenstatus und CLI
 

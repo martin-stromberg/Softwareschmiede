@@ -61,6 +61,7 @@ internal sealed class ScmE2EText
     public string Kind { get; set; } = "IssueComment";
     public bool PullRequest { get; set; }
     public long Id { get; set; }
+    public string? Titel { get; set; }
     public string Body { get; set; } = string.Empty;
     public string Author { get; set; } = "scm-owner";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow.AddMinutes(-1);

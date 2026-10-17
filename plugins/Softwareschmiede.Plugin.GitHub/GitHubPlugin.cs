@@ -781,9 +781,17 @@ password {token}
         if (!string.IsNullOrWhiteSpace(state) && !string.Equals(state, "open", StringComparison.OrdinalIgnoreCase))
             return;
 
+        if (ParsePullRequest(element, repositoryId) is { } pullRequest)
+            list.Add(pullRequest);
+    }
+
+    /// <summary>Bildet ein Pull-Request-Element auf das <see cref="PullRequest"/>-Objekt ab;
+    /// <c>null</c> bei fehlender oder ungültiger Nummer.</summary>
+    private static PullRequest? ParsePullRequest(JsonElement element, string repositoryId)
+    {
         var number = GetInt32OrDefault(element, "number");
         if (number <= 0)
-            return;
+            return null;
 
         var title = GetStringOrNull(element, "title") ?? string.Empty;
         var body = GetStringOrNull(element, "body");
@@ -811,7 +819,7 @@ password {token}
 
         var targetBranch = @base is null ? null : GetStringOrNull(@base.Value, "ref");
 
-        list.Add(new PullRequest(
+        return new PullRequest(
             number,
             title,
             url,
@@ -824,7 +832,7 @@ password {token}
             sourceRepositoryId,
             sourceRepositoryUrl,
             $"refs/heads/{sourceBranch}",
-            body));
+            body);
     }
 
     /// <inheritdoc/>
