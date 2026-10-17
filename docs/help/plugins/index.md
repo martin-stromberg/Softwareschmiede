@@ -12,4 +12,5 @@ Jedes Plugin kann einzeln aktiviert oder deaktiviert werden — deaktivierte Plu
 - [Technischer Ablauf](ablauf-technisch.md)
 - [API](api.md)
 - [Installation & Konfiguration](installation.md)
+- [GitHub-Ereignisüberwachung](github-ereignisse/index.md)
 - [Devin-Plugin](devin-plugin/index.md)

@@ -77,6 +77,8 @@ public sealed class ProjectListView : BaseWindowView
         projectView.SetProjectName(name);
         projectView.SaveChanges();
 
+        WaitUntilGone(Window, cf => cf.ByName("ProjektName"), Medium);
+        WaitForElement(GetProjectTilesContainer(), cf => cf.ByName(name), Medium);
         Assert.True(IsVisible, "Projektlisten-Ansicht sollte nach Speichern des neuen Projekts sichtbar sein.");
         Assert.Contains(name, GetProjectNames());
         return this;

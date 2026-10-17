@@ -1,3 +1,10 @@
+## 2026-10-17 — GitHub-Ereignisüberwachung
+
+- Die Softwareschmiede prüft lokal verknüpfte GitHub-Issues und Pull Requests auf neue oder geänderte Texte mit dem Trigger `$Softwareschmiede`. Verarbeitet werden nur Texte, deren tatsächlicher Autor beziehungsweise Bearbeiter dem angemeldeten Repository-Owner entspricht.
+- Eine neue Seite **„SCM-Ereignisse“** zeigt Eingang, Ursprung, Inhalt und Status. Ereignisse werden dauerhaft gespeichert und an eine geeignete laufende oder konfigurierte CLI zugestellt; ohne verfügbare CLI bleiben sie sichtbar wartend.
+- Unsichere Zustellungen werden nicht automatisch erneut gesendet. Die Oberfläche bietet Statusprüfung und einen ausdrücklich bestätigten Neuversand mit Warnung vor möglicher Doppelbearbeitung.
+- Anwenderhilfe und technische Details wurden unter `docs/help/plugins/github-ereignisse/` ergänzt. Die Ereignisfähigkeit ist derzeit nur für GitHub implementiert.
+
 ## 2026-09-28 — Konsolentestfenster: Einzelschritt-Wiedergabe (vorwärts/rückwärts)
 
 - Das Konsolentestfenster erhält einen Schrittmodus: **„Schritt vor"** wendet den nächsten aufgezeichneten Chunk zeitstempel-unabhängig an (keine Inter-Chunk-Pause, keine Zeitraffer-Wirkung), **„Schritt zurück"** stellt den gerenderten Zustand vor dem zuletzt angewendeten Chunk wieder her. Die Rückwärts-Operation ist ein deterministischer Neuaufbau aus dem verbleibenden Chunk-Präfix (`TerminalReplaySession.SchrittVor`/`SchrittZurueck`, gemeinsamer Helper `BaueBufferUndParserAusPraefixNeuAuf` mit `AnsiSequenceParser.Reset()`, sodass Buffer- und Parser-Zustand kohärent bleiben).

@@ -1,7 +1,5 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
-using FlaUI.Core.Input;
-using FlaUI.Core.WindowsAPI;
 using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E.Views;
@@ -128,16 +126,12 @@ public sealed class ProjectDetailView : BaseWindowView
     }
 
 
-    /// <summary>Setzt den Projektnamen. Markiert zuvor den vorhandenen Inhalt (Strg+A), damit ein bereits
-    /// vorhandener Name (z. B. beim erneuten Bearbeiten eines bestehenden Projekts) ersetzt statt an der
-    /// Cursorposition eingefügt wird.</summary>
+    /// <summary>Ersetzt den Projektnamen und prüft den vollständigen Feldwert vor dem Speichern.</summary>
     /// <param name="name">Der neue Projektname.</param>
     public void SetProjectName(string name)
     {
         var nameBox = WaitForElement(Window, cf => cf.ByName("ProjektName"), Short);
-        nameBox.ClickInForeground();
-        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
-        Keyboard.Type(name);
+        ElementWaitHelper.ReplaceTextBoxText(nameBox, name);
     }
 
     /// <summary>
@@ -158,7 +152,8 @@ public sealed class ProjectDetailView : BaseWindowView
     {
         var expectedName = GetProjectName().Trim();
 
-        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().ClickInForeground();
+        ElementWaitHelper.WaitForElement(Window, cf => cf.ByName("Speichern"), Short,
+            element => !element.IsOffscreen && element.IsEnabled).AsButton().ClickInForeground();
 
         var deadline = DateTime.UtcNow + Medium;
         while (DateTime.UtcNow < deadline)

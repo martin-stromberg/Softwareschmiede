@@ -26,6 +26,9 @@
         <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
             <views:SettingsView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ScmEventQueueViewModel}">
+            <views:ScmEventQueueView />
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
@@ -85,6 +88,19 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="📁" FontSize="16" VerticalAlignment="Center" />
                             <TextBlock Text=" Projekte" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding NavigateToScmEventQueueCommand}"
+                            AutomationProperties.AutomationId="ScmEventQueueNavigation"
+                            AutomationProperties.Name="SCM-Ereignisse"
+                            ToolTip="{Binding ScmEventQueueLabel}"
+                            Margin="4,2" Padding="8,8" Background="Transparent" BorderThickness="0"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⇥" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding ScmEventQueueLabel}" Margin="4,0,0,0"
+                                       Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
 

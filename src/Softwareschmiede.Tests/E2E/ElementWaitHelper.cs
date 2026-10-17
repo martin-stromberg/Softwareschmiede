@@ -1,5 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
+using FlaUI.Core.Input;
+using FlaUI.Core.WindowsAPI;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -127,6 +129,62 @@ internal static class ElementWaitHelper
         return element;
     }
 
+    /// <summary>Ersetzt den ausgewählten Text durch Unicode-Eingabe, verlässt das Feld mit Tab und prüft den Feldwert.</summary>
+    internal static void ReplaceTextBoxText(AutomationElement element, string text)
+    {
+        element.ClickInForeground();
+        element.Focus();
+        Assert.True(element.Properties.HasKeyboardFocus.Value,
+            $"TextBox '{element.Name}' hat vor der Eingabe keinen Tastaturfokus.");
+        element.Patterns.Text.Pattern.DocumentRange.Select();
+        var deadline = DateTime.UtcNow + Short;
+
+        if (text.Length == 0)
+        {
+            Keyboard.Type(VirtualKeyShort.DELETE);
+            WaitForText(text);
+        }
+        else
+        {
+            var enteredText = string.Empty;
+            foreach (var rune in text.EnumerateRunes())
+            {
+                var runeText = rune.ToString();
+                var input = runeText.SelectMany(character => new[]
+                {
+                    INPUT.KeyboardInput(new KEYBDINPUT { wScan = character, dwFlags = KeyEventFlags.KEYEVENTF_UNICODE }),
+                    INPUT.KeyboardInput(new KEYBDINPUT { wScan = character, dwFlags = KeyEventFlags.KEYEVENTF_UNICODE | KeyEventFlags.KEYEVENTF_KEYUP })
+                }).ToArray();
+                Assert.Equal((uint)input.Length, User32.SendInput((uint)input.Length, input, INPUT.Size));
+                enteredText += runeText;
+                WaitForText(enteredText);
+            }
+        }
+
+        Keyboard.Type(VirtualKeyShort.TAB);
+        while (element.Properties.HasKeyboardFocus.Value && DateTime.UtcNow < deadline)
+            Thread.Sleep(20);
+
+        Assert.False(element.Properties.HasKeyboardFocus.Value,
+            $"TextBox '{element.Name}' hat nach Tab weiterhin Tastaturfokus.");
+        Assert.Equal(text, element.AsTextBox().Text);
+
+        void WaitForText(string expectedText)
+        {
+            string actualText;
+            do
+            {
+                actualText = element.AsTextBox().Text;
+                if (string.Equals(expectedText, actualText, StringComparison.Ordinal))
+                    return;
+                Thread.Sleep(20);
+            }
+            while (DateTime.UtcNow < deadline);
+
+            Assert.Fail($"TextBox '{element.Name}' enthält nach der Eingabe nicht den erwarteten Text. Erwartet: '{expectedText}', tatsächlich: '{actualText}'.");
+        }
+    }
+
     /// <summary>
     /// Wählt einen Eintrag in einer ComboBox per Klick auf das ComboBoxItem aus (robuster als FlaUI's
     /// <c>Select(string)</c>, das bei manchen TwoWay-Bindings das Binding nicht zuverlässig aktualisiert).
@@ -177,6 +235,14 @@ internal static class ElementWaitHelper
     internal static void DoubleClickInForeground(this AutomationElement element)
         => KlickInVordergrund(element, e => e.DoubleClick());
 
+    internal static string DescribeClickTarget(this AutomationElement element)
+    {
+        var target = $"Name={element.Name}, Type={element.ControlType}, Enabled={element.IsEnabled}, Offscreen={element.IsOffscreen}, Bounds={element.BoundingRectangle}, PID={element.Properties.ProcessId.ValueOrDefault}, Handle={element.Properties.NativeWindowHandle.ValueOrDefault}";
+        if (!HatKlickbarenPunkt(element, out var point)) return target + "; no clickable point";
+        var hit = element.Automation.FromPoint(point);
+        return target + $"; Point={point}, HitType={hit?.ControlType}, HitPID={hit?.Properties.ProcessId.ValueOrDefault}, HitHandle={hit?.Properties.NativeWindowHandle.ValueOrDefault}, HitName={(hit?.Properties.ProcessId.ValueOrDefault == element.Properties.ProcessId.ValueOrDefault ? hit?.Name : "other process")}";
+    }
+
     private static void KlickInVordergrund(AutomationElement element, Action<AutomationElement> klick)
     {
         try
@@ -201,7 +267,11 @@ internal static class ElementWaitHelper
             return;
         }
 
-        klick(element);
+        try { klick(element); }
+        catch (FlaUI.Core.Exceptions.NoClickablePointException ex)
+        {
+            throw new InvalidOperationException(element.DescribeClickTarget(), ex);
+        }
     }
 
     private static bool HatKlickbarenPunkt(AutomationElement element, out System.Drawing.Point punkt)

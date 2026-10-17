@@ -28,11 +28,14 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="..\Softwareschmiede.Tests\Helpers\ScmDispatchFixture.cs" Link="Infrastructure\ScmDispatchFixture.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Softwareschmiede\Softwareschmiede.csproj" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\Softwareschmiede.Plugin.LocalDirectory.csproj" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.Codex\Softwareschmiede.Plugin.Codex.csproj" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\Softwareschmiede.Plugin.ClaudeCli.csproj" />
   </ItemGroup>
 
 </Project>

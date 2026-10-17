@@ -86,18 +86,24 @@ public sealed class EntwicklungsprozessService
     /// <param name="basisBranchName">Optionaler Basis-Branch; wird ein neuer Task-Branch angelegt, wenn er dem Default-Branch entspricht.</param>
     /// <param name="selectedScmPluginPrefix">Optionaler Prefix des zu verwendenden SCM-Plugins.</param>
     /// <param name="ct">Abbruch-Token.</param>
-    public async Task ProzessStartenAsync(
+    public Task ProzessStartenAsync(
         Guid aufgabeId,
         string repositoryUrl,
         string? basisBranchName = null,
         string? selectedScmPluginPrefix = null,
         CancellationToken ct = default)
+        => ScmTaskCoordinator.Shared.RunAsync(aufgabeId,
+            () => ProzessStartenCoordinatedAsync(aufgabeId, repositoryUrl, basisBranchName, selectedScmPluginPrefix, ct), ct);
+
+    private async Task ProzessStartenCoordinatedAsync(Guid aufgabeId, string repositoryUrl,
+        string? basisBranchName, string? selectedScmPluginPrefix, CancellationToken ct)
     {
         _logger.LogInformation("Repository-Setup für Aufgabe {AufgabeId} starten.", aufgabeId);
 
         var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
         WirfWennPausiert(aufgabe);
+        if (!string.IsNullOrWhiteSpace(aufgabe.LokalerKlonPfad)) return;
         await ProzessStartenCoreAsync(aufgabeId, aufgabe, repositoryUrl, basisBranchName, selectedScmPluginPrefix, ct);
 
         _logger.LogInformation("Repository-Setup für Aufgabe {AufgabeId} abgeschlossen.", aufgabeId);
@@ -113,12 +119,21 @@ public sealed class EntwicklungsprozessService
     /// <param name="basisBranchName">Optionaler Basis-Branch.</param>
     /// <param name="kiPluginPrefix">Optionaler Prefix des zu verwendenden KI-Plugins.</param>
     /// <param name="ct">Abbruch-Token.</param>
-    public async Task ProzessStartenUndCliStartenAsync(
+    /// <param name="strictPluginSelection">Verhindert Ersatzplugins bei automatischer SCM-Zustellung.</param>
+    /// <param name="optionalParameters">Explizite Startparameter des gewählten Plugins.</param>
+    public Task ProzessStartenUndCliStartenAsync(
         Guid aufgabeId,
         string repositoryUrl,
         string? basisBranchName,
         string? kiPluginPrefix,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool strictPluginSelection = false,
+        string? optionalParameters = null)
+        => ScmTaskCoordinator.Shared.RunAsync(aufgabeId,
+            () => ProzessUndCliCoordinatedAsync(aufgabeId, repositoryUrl, basisBranchName, kiPluginPrefix, ct, strictPluginSelection, optionalParameters), ct);
+
+    private async Task ProzessUndCliCoordinatedAsync(Guid aufgabeId, string repositoryUrl,
+        string? basisBranchName, string? kiPluginPrefix, CancellationToken ct, bool strictPluginSelection, string? optionalParameters)
     {
         if (_options.KiAusfuehrungsService is null)
         {
@@ -131,12 +146,26 @@ public sealed class EntwicklungsprozessService
         var vorabAufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
         WirfWennPausiert(vorabAufgabe);
+        if (vorabAufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+            throw new InvalidOperationException("Beendete oder archivierte Aufgaben können nicht gestartet werden.");
+        // A competing automatic/manual start may have completed while we waited for the task gate.
+        // Reuse that workspace before entering setup or its rollback scope.
+        if (!string.IsNullOrWhiteSpace(vorabAufgabe.LokalerKlonPfad))
+        {
+            await CliNeustartenAsync(aufgabeId, kiPluginPrefix, optionalParameters, ct, strictPluginSelection);
+            return;
+        }
+        var previousClone = vorabAufgabe.LokalerKlonPfad;
+        var previousStatus = vorabAufgabe.Status;
+        var strictPlugin = strictPluginSelection
+            ? await _pluginSelectionService.ResolveDevelopmentAutomationPluginStrictAsync(kiPluginPrefix!, ct)
+            : null;
 
         try
         {
             var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
                 ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
-            var (repository, gitPlugin) = await ProzessStartenCoreAsync(aufgabeId, aufgabe, repositoryUrl, basisBranchName, null, ct);
+            var (repository, gitPlugin) = await ProzessStartenCoreAsync(aufgabeId, aufgabe, repositoryUrl, basisBranchName, null, ct, strictPluginSelection);
 
             aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
                 ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
@@ -146,7 +175,9 @@ public sealed class EntwicklungsprozessService
                 throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
             }
 
-            var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
+            var kiPlugin = strictPlugin is not null
+                ? await _pluginSelectionService.ResolveDevelopmentAutomationPluginStrictAsync(strictPlugin.PluginPrefix, ct)
+                : await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
             await _aufgabeService.UpdateAsync(
                 aufgabeId,
                 aufgabe.Titel,
@@ -155,18 +186,18 @@ public sealed class EntwicklungsprozessService
                 ct);
 
             await _options.KiAusfuehrungsService.StartTerminalSessionAsync(
-                aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, null, ct, repository.StartKonfiguration, gitPlugin);
+                aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, optionalParameters, ct, repository.StartKonfiguration, gitPlugin);
         }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("CLI-Start für Aufgabe {AufgabeId} abgebrochen, Rollback wird durchgeführt.", aufgabeId);
-            await RollbackStartAsync(aufgabeId, CancellationToken.None);
+            await RollbackStartAsync(aufgabeId, CancellationToken.None, previousClone, strictPluginSelection ? previousStatus : null);
             throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "CLI-Start für Aufgabe {AufgabeId} fehlgeschlagen, Rollback wird durchgeführt.", aufgabeId);
-            await RollbackStartAsync(aufgabeId, CancellationToken.None);
+            await RollbackStartAsync(aufgabeId, CancellationToken.None, previousClone, strictPluginSelection ? previousStatus : null);
             throw;
         }
     }
@@ -177,14 +208,15 @@ public sealed class EntwicklungsprozessService
         string repositoryUrl,
         string? basisBranchName,
         string? selectedScmPluginPrefix,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool preserveExistingDirectory = false)
     {
         var repository = await ResolveRepositoryAsync(aufgabe, repositoryUrl, ct);
         var gitPlugin = await ResolvePluginAsync(repository, selectedScmPluginPrefix, aufgabeId, ct);
 
         await ValidateBaseBranchExistsAsync(repository, gitPlugin, ct);
 
-        var lokalerKlonPfad = await PrepareCloneDirectoryAsync(gitPlugin, repository.RepositoryUrl, aufgabeId, ct);
+        var lokalerKlonPfad = await PrepareCloneDirectoryAsync(gitPlugin, repository.RepositoryUrl, aufgabeId, ct, preserveExistingDirectory);
 
         if (_options.GitOrchestrationService is not null)
         {
@@ -198,11 +230,17 @@ public sealed class EntwicklungsprozessService
     }
 
     /// <summary>Startet die KI-CLI erneut im bereits vorbereiteten Klon einer Aufgabe.</summary>
-    public async Task CliNeustartenAsync(
+    public Task CliNeustartenAsync(
         Guid aufgabeId,
         string? kiPluginPrefix,
         string? optionalParameters,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool strictPluginSelection = false)
+        => ScmTaskCoordinator.Shared.RunAsync(aufgabeId,
+            () => CliNeustartenCoordinatedAsync(aufgabeId, kiPluginPrefix, optionalParameters, ct, strictPluginSelection), ct);
+
+    private async Task CliNeustartenCoordinatedAsync(Guid aufgabeId, string? kiPluginPrefix,
+        string? optionalParameters, CancellationToken ct, bool strictPluginSelection)
     {
         if (_options.KiAusfuehrungsService is null)
         {
@@ -220,12 +258,21 @@ public sealed class EntwicklungsprozessService
         // Deckt auch den Plugin-Wechsel-Pfad (PluginWechselAsync → CliNeustartenAsync) ab.
         WirfWennPausiert(aufgabe);
 
+        var current = _options.KiAusfuehrungsService.GetTerminalSession(aufgabeId);
+        if (current is not null)
+        {
+            try { if (current.ExitCode is null && current.Failure is null && !current.Process.HasExited) return; }
+            catch (InvalidOperationException) { }
+        }
+
         if (string.IsNullOrWhiteSpace(aufgabe.LokalerKlonPfad))
         {
             throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
         }
 
-        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
+        var kiPlugin = strictPluginSelection
+            ? await _pluginSelectionService.ResolveDevelopmentAutomationPluginStrictAsync(kiPluginPrefix!, ct)
+            : await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
         await _aufgabeService.UpdateAsync(
             aufgabeId,
             aufgabe.Titel,
@@ -438,7 +485,7 @@ public sealed class EntwicklungsprozessService
         return "Startskript erfolgreich ausgeführt.";
     }
 
-    private async Task RollbackStartAsync(Guid aufgabeId, CancellationToken ct)
+    private async Task RollbackStartAsync(Guid aufgabeId, CancellationToken ct, string? previousClone = null, AufgabeStatus? previousStatus = null)
     {
         var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct);
         if (aufgabe is null)
@@ -446,12 +493,14 @@ public sealed class EntwicklungsprozessService
             return;
         }
 
-        if (!string.IsNullOrEmpty(aufgabe.LokalerKlonPfad) && Directory.Exists(aufgabe.LokalerKlonPfad))
+        if (string.IsNullOrEmpty(previousClone) && !string.IsNullOrEmpty(aufgabe.LokalerKlonPfad) && Directory.Exists(aufgabe.LokalerKlonPfad))
         {
             DeleteDirectoryForce(aufgabe.LokalerKlonPfad);
         }
 
         await _aufgabeService.StartZuruecksetzenAsync(aufgabeId, ct);
+        if (previousStatus is not null && previousStatus != AufgabeStatus.Neu)
+            await _aufgabeService.SetStatusAsync(aufgabeId, previousStatus.Value, ct);
     }
 
     private async Task<IGitPlugin> ResolvePluginAsync(
@@ -476,7 +525,8 @@ public sealed class EntwicklungsprozessService
         IGitPlugin gitPlugin,
         string repositoryUrl,
         Guid aufgabeId,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool preserveExistingDirectory = false)
     {
         var workdirResult = await _arbeitsverzeichnisResolver.ResolveAsync(ct);
         var lokalerKlonPfad = Path.Combine(workdirResult.ResolvedPath, KlonBasisVerzeichnis, aufgabeId.ToString());
@@ -492,6 +542,8 @@ public sealed class EntwicklungsprozessService
 
         if (Directory.Exists(lokalerKlonPfad))
         {
+            if (preserveExistingDirectory)
+                throw new InvalidOperationException("Der Zielarbeitsbereich ist bereits belegt. Bitte den vorhandenen Klon regulär zuordnen.");
             _logger.LogInformation("Zielverzeichnis '{KlonPfad}' existiert bereits, wird gelöscht.", lokalerKlonPfad);
             DeleteDirectoryForce(lokalerKlonPfad);
         }

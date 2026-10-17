@@ -12,7 +12,7 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// GitHub Plugin – nutzt gh CLI und git CLI für alle GitHub-Operationen.
 /// Der GitHub-Token wird als GH_TOKEN Umgebungsvariable übergeben, niemals als CLI-Argument.
 /// </summary>
-public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
+public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEventSource, IScmEventResponder
 {
     private const string GitHubTokenCredentialKey = "Softwareschmiede.GitHub.Token";
     private const string RepositoryUrlKey = "RepositoryUrl";
@@ -96,11 +96,19 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
 
     /// <summary>Erstellt eine neue Instanz des <see cref="GitHubPlugin"/>.</summary>
     public GitHubPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<GitHubPlugin> logger)
+        : this(cliRunner, credentialStore, logger, null)
+    {
+    }
+
+    /// <summary>Erstellt den Provider mit austauschbarem Ereignis-API-Transport.</summary>
+    public GitHubPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<GitHubPlugin> logger,
+        IGitHubEventApiClient? eventApiClient)
         : base(cliRunner)
     {
         _cliRunner = cliRunner;
         _credentialStore = credentialStore;
         _logger = logger;
+        _eventApiClient = eventApiClient ?? new GhEventApiClient(cliRunner, GetGhEnvironment);
     }
 
     private IDictionary<string, string> GetGhEnvironment()

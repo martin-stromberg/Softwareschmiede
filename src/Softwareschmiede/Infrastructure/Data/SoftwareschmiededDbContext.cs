@@ -96,10 +96,39 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>Skill-Definitionen von Autonomen Aufgaben.</summary>
     public DbSet<SkillDefinition> SkillDefinitionen => Set<SkillDefinition>();
 
+    /// <summary>Dauerhafte SCM-Eingangsqueue.</summary>
+    public DbSet<ScmIncomingEvent> ScmIncomingEvents => Set<ScmIncomingEvent>();
+    /// <summary>Beobachtete SCM-Textstände.</summary>
+    public DbSet<ScmContentSnapshot> ScmContentSnapshots => Set<ScmContentSnapshot>();
+    /// <summary>Quellenspezifische Abfragestände.</summary>
+    public DbSet<ScmObservationCheckpoint> ScmObservationCheckpoints => Set<ScmObservationCheckpoint>();
+    /// <summary>Dauerhafte ausgehende SCM-Aktionen.</summary>
+    public DbSet<ScmOutgoingAction> ScmOutgoingActions => Set<ScmOutgoingAction>();
+    /// <summary>Instanzübergreifende Aufgabenleases.</summary>
+    public DbSet<ScmTaskLease> ScmTaskLeases => Set<ScmTaskLease>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ScmIncomingEvent>(e =>
+        {
+            e.HasKey(x => x.Sequence);
+            e.Property(x => x.Sequence).ValueGeneratedOnAdd();
+            e.HasIndex(x => x.Id).IsUnique();
+            e.HasIndex(x => x.EventKey).IsUnique();
+            e.HasIndex(x => new { x.AufgabeId, x.Sequence });
+            e.HasIndex(x => new { x.Status, x.NextAttemptUtc });
+        });
+        modelBuilder.Entity<ScmContentSnapshot>().HasKey(x => x.ContentKey);
+        modelBuilder.Entity<ScmObservationCheckpoint>().HasKey(x => x.SourceKey);
+        modelBuilder.Entity<ScmTaskLease>().HasKey(x => x.AufgabeId);
+        modelBuilder.Entity<ScmOutgoingAction>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.EventId, x.Status });
+        });
 
         // Projekt
         modelBuilder.Entity<Projekt>(e =>

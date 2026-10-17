@@ -1,6 +1,5 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
-using FlaUI.Core.Input;
 using FlaUI.UIA3;
 using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.App.Views;
@@ -1027,7 +1026,7 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Fokussiert das "EditTitel"-Feld, markiert dessen Inhalt (Strg+A) und tippt <paramref name="titel"/>.
+    /// Ersetzt das "EditTitel"-Feld durch <paramref name="titel"/> und prüft dessen vollständigen Wert.
     /// Voraussetzung: <c>TaskDetailView</c> im Edit-Modus sichtbar (z. B. nach <see cref="NeueAufgabeAnlegen"/>).
     /// </summary>
     protected void AufgabeTitelSetzen(AutomationElement mainWindow, string titel)
@@ -1121,7 +1120,7 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Fokussiert das "ProjektName"-Feld, markiert dessen Inhalt (Strg+A), tippt <paramref name="neuerName"/>
+    /// Ersetzt und prüft das "ProjektName"-Feld mit <paramref name="neuerName"/>
     /// und klickt "Speichern" (UpdateAsync-Pfad, bleibt in der Detailansicht). Der "Speichern"-Button
     /// verschwindet in diesem Pfad nicht (im Gegensatz zur Neuanlage) - als echtes Synchronisationssignal
     /// für den Abschluss von Speichern + anschließendem Reload wird stattdessen gewartet, bis das
@@ -1172,13 +1171,8 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Fokussiert <paramref name="box"/> per Klick, markiert dessen Inhalt (Strg+A) und ersetzt ihn
-    /// durch <paramref name="text"/>.
+    /// Ersetzt <paramref name="box"/> durch <paramref name="text"/> und prüft dessen vollständigen Wert.
     /// </summary>
     private static void FeldInhaltErsetzen(AutomationElement box, string text)
-    {
-        box.ClickInForeground();
-        Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_A);
-        Keyboard.Type(text);
-    }
+        => ElementWaitHelper.ReplaceTextBoxText(box, text);
 }
