@@ -42,6 +42,7 @@ public sealed class ScmEventMonitoringService(
                 continue;
             var resolved = new List<(Guid? TaskId, ScmEventReference Reference)>();
             var repositoriesForEnumeration = new List<ScmEventRepository>();
+            var localRepositories = new Dictionary<ScmEventRepository, List<GitRepository>>();
             var complete = true;
             // Resolve the entire local reference set before assigning any incoming event.
             // Raw HTTPS/SSH addresses and plugin display names are not repository identities.
@@ -67,6 +68,10 @@ public sealed class ScmEventMonitoringService(
                 {
                     var repository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(aliasGroup.Repository.Id, plugin.PluginPrefix, alias), ct);
                     resolved.AddRange(aliasGroup.Linked.Select(x => ((Guid?)x.TaskId, new ScmEventReference(repository, x.Kind, x.Number))));
+                    if (!localRepositories.TryGetValue(repository, out var candidates))
+                        localRepositories[repository] = candidates = [];
+                    if (candidates.All(x => x.Id != aliasGroup.Repository.Id))
+                        candidates.Add(aliasGroup.Repository);
                     if (checkpoint is not null)
                     {
                         resolutionDb.Remove(checkpoint);
@@ -119,8 +124,18 @@ public sealed class ScmEventMonitoringService(
                                 || x.Diagnostic == ScmEventStore.UnassignedDiagnostic), ct))
                             request = request with { SinceUtc = null };
                         var batch = await source.ReadEventsAsync(request, ct);
+                        var aufgabeId = taskIds.Length == 1 ? taskIds[0] : (Guid?)null;
+                        var unassigned = taskIds.Length == 0;
+                        if (unassigned && localRepositories.TryGetValue(reference.Repository, out var candidates)
+                            && batch.Observations.FirstOrDefault(x => ScmEventValidationService.GetRejection(x) is null) is { } trigger)
+                        {
+                            var resolution = await batchScope.ServiceProvider.GetRequiredService<ScmEventTaskResolver>()
+                                .ResolveAsync(reference, source, trigger, candidates, ct);
+                            aufgabeId = resolution.AufgabeId;
+                            unassigned = resolution.Kind == ScmTaskResolutionKind.Unassigned;
+                        }
                         await batchScope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(
-                            taskIds.Length == 1 ? taskIds[0] : null, sourceKey, batch, taskIds.Length == 0, ct);
+                            aufgabeId, sourceKey, batch, unassigned, ct);
                     }
                     catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                     catch (Exception ex)

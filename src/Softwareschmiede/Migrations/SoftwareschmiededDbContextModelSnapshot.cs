@@ -635,6 +635,10 @@ namespace Softwareschmiede.Migrations
                     b.Property<string>("Milestone")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("SourceKey")
+                        .HasMaxLength(700)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Titel")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -642,6 +646,9 @@ namespace Softwareschmiede.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AufgabeId")
+                        .IsUnique();
+
+                    b.HasIndex("SourceKey")
                         .IsUnique();
 
                     b.ToTable("IssueReferenzen");

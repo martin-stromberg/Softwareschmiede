@@ -21,6 +21,8 @@ Beteiligte Komponenten:
 
 ### 2. Version und Identität prüfen
 
+Gehört eine Referenz zu keiner lokalen Aufgabe und enthält der gelesene Batch mindestens eine qualifizierte Beobachtung, löst `ScmEventTaskResolver.ResolveAsync` die Aufgabe auf: Es lädt die Anlagedaten über `IScmEventSource.ReadIssueAsync`/`ReadPullRequestAsync`, sucht vorhandene Aufgaben über die Referenzschlüssel und legt bei Fehlschlag genau eine Aufgabe im Projekt des aufgelösten `GitRepository` an (`CreateFromIssueEventAsync` mit `SourceKey`-Unique-Index bzw. `CreateFromPullRequestAsync` mit dem `(Provider, RepositoryId, PullRequestNumber)`-Index — bei Anlagerennen gewinnt die bestehende Anlage). Auflösungsfehler laufen in den Quell-Checkpoint-Backoff.
+
 `ScmEventStore.AcceptBatchAsync` vergleicht Inhaltshashes und Revisionen, ordnet Beobachtungen einer eindeutigen Aufgabe zu und speichert Inbox-Eintrag, Snapshot und Checkpoint. `ScmEventValidationService.GetRejection` verlangt den case-insensitiven Trigger `$Softwareschmiede`, die Übereinstimmung des angemeldeten Nutzers mit dem Repository-Owner und die Übereinstimmung des tatsächlichen Autors/Bearbeiters mit diesem Nutzer. Ein nicht bestimmbarer Editor oder eine mehrdeutige lokale Zuordnung erzeugt keinen frei zugeordneten Auftrag.
 
 ### 3. Bestätigung und CLI-Zustellung

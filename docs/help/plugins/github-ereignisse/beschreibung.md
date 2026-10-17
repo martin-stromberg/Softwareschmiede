@@ -23,6 +23,6 @@ Für die CLI-Verarbeitung unterstützt die Anwendung aktuell Codex CLI und Claud
 ## Einschränkungen
 
 - Derzeit überwacht nur das GitHub-SCM-Plugin Ereignisse. Andere SCM-Plugins erhalten dadurch keine Ereignisüberwachung.
-- Es werden nur Repositories überwacht, die an einem Projekt erfasst und aktiviert sind. Texte an Referenzen ohne zuordenbare lokale Aufgabe werden zwar erkannt und gespeichert, erscheinen aber derzeit nicht als zustellbare Einträge in der Queue — erst nach Verknüpfung mit einer Aufgabe werden sie wirksam. Geschlossene Referenzen werden nur dann einbezogen, wenn sie innerhalb des laufenden Aktivitätsfensters geändert wurden.
+- Es werden nur Repositories überwacht, die an einem Projekt erfasst und aktiviert sind. Trifft ein qualifizierter Text an einer Referenz ohne lokale Aufgabe ein, wird die passende Aufgabe automatisch angelegt (Projekt aus dem überwachten Repository, Titel und Auftragstext aus den Ereignisdaten samt Quellverweis) und das Ereignis regulär verarbeitet. Geschlossene Referenzen werden nur dann einbezogen, wenn sie innerhalb des laufenden Aktivitätsfensters geändert wurden.
 - Polling sieht den bei einer Abfrage aktuellen Textstand. Zwischenzeitlich überschriebene oder gelöschte Textfassungen können nicht rekonstruiert werden.
 - Die Ereignisverarbeitung erfordert eine gültige GitHub-Anmeldung und passende Repository-Berechtigungen. Auch mit Codex oder Claude CLI kann ein Eintrag wartend bleiben, wenn Version, Berechtigungen oder Zugriff auf den geprüften Antwortkanal nicht unterstützt werden.

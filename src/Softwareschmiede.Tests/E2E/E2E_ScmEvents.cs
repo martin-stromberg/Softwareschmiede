@@ -1,6 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Tests.E2E.Views.Dialogs;
 using Softwareschmiede.Tests.E2E.Views;
@@ -290,6 +291,28 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Equal(current.DeliveryAttemptId, late.DeliveryAttemptId);
         Assert.Equal(promptCount + 2, fixture.Prompts().Count);
         output.WriteLine("E3-Ungewissheit: late valid completion of still-current attempt resolves without any resend.");
+
+        fixture.AddText(20, 2001, "$Softwareschmiede Aufgabe anlegen");
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        Aufgabe? created = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            await using var db = fixture.OpenDatabase();
+            created = await db.Aufgaben.Include(x => x.IssueReferenz)
+                .SingleOrDefaultAsync(x => x.IssueReferenz != null && x.IssueReferenz.IssueNummer == 20);
+            if (created is not null) break;
+            await Task.Delay(200);
+        }
+        Assert.NotNull(created);
+        Assert.Equal("SCM Referenz 20", created!.Titel);
+        Assert.Contains("$Softwareschmiede Aufgabe anlegen", created.AnforderungsBeschreibung);
+        await using (var db = fixture.OpenDatabase())
+        {
+            Assert.Equal(18, await db.Aufgaben.CountAsync());
+            var item = Assert.Single(await db.ScmIncomingEvents.Where(x => x.AufgabeId == created.Id).ToListAsync());
+            Assert.Equal(20, ScmEventStore.Observation(item).Reference.Number);
+        }
+        output.WriteLine("E7-Anlage: qualified event on unassigned reference creates exactly one task with issue reference and inbox entry.");
     }
 
     private async Task MissingVariantsAsync(Window window, ScmE2EFixture fixture)

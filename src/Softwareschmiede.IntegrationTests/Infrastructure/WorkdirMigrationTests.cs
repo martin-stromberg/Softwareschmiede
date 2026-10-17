@@ -13,6 +13,25 @@ public sealed class WorkdirMigrationTests
     private const string PreviousBeforeKiPluginPrefixMigration = "20260523113807_AddKiTaskNotifications";
     private const string AddAufgabeAusfuehrungsStatusMigration = "20260816193940_AddAufgabeAusfuehrungsStatus";
     private const string PreviousBeforeAusfuehrungsStatusMigration = "20260805163701_AddTodoEntity";
+    private const string AddIssueReferenzSourceKeyMigration = "20261017195348_AddIssueReferenzSourceKey";
+    private const string PreviousBeforeIssueReferenzSourceKeyMigration = "20261011045239_AddScmEventInbox";
+
+    /// <summary>Prüft, dass die SourceKey-Spalte nullable hinzugefügt und wieder entfernt werden kann.</summary>
+    [Fact]
+    public async Task MigrateAsync_ShouldApplyAndRollbackIssueReferenzSourceKeyMigration()
+    {
+        await using var db = await DatabaseFixture.CreateAsync();
+
+        (await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey")).Should().NotBeNull();
+
+        await db.Context.Database.MigrateAsync(PreviousBeforeIssueReferenzSourceKeyMigration);
+        (await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey")).Should().BeNull();
+
+        await db.Context.Database.MigrateAsync(AddIssueReferenzSourceKeyMigration);
+        var column = await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey");
+        column.Should().NotBeNull();
+        column!.NotNull.Should().BeFalse("Migration muss rückwärtskompatibel als nullable sein.");
+    }
 
     /// <summary>Prüft, dass die Workdir-Migration angewendet und zurückgerollt werden kann.</summary>
     [Fact]
