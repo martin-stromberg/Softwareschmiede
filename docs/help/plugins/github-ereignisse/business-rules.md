@@ -14,7 +14,11 @@ Referenzen ohne zuordenbare Aufgabe durchlaufen bei einem qualifizierten Ereigni
 
 ## Aufgabenstatus und CLI
 
-Beendete, archivierte und pausierte Aufgaben werden nicht automatisch aktiviert. Eine lebende unterstützte CLI hat Vorrang vor einem Standard. Ohne Sitzung wird die konfigurierte Aufgaben-, Projekt- oder globale CLI verwendet; fehlt eine geeignete CLI, bleibt das Ereignis wartend. Die manuelle Queue-Auswahl kann eine neue, nicht beendete Aufgabe aktivieren.
+Beendete, archivierte und pausierte Aufgaben werden nicht automatisch aktiviert — das gilt auch für wiederverwendete Aufgaben im automatischen Pfad; ihr Ereignis bleibt mit Grund wartend. Neue, nicht blockierte Aufgaben werden pro Zustellversuch automatisch gestartet (`Neu` → `Gestartet`; Klon, Branch und CLI-Start über `EntwicklungsprozessService`). Eine lebende unterstützte CLI hat Vorrang vor einem Standard. Ohne Sitzung wird die konfigurierte Aufgaben-, Projekt- oder globale CLI verwendet; fehlt eine geeignete CLI, bleibt das Ereignis wartend. Die manuelle Queue-Auswahl kann eine neue, nicht beendete Aufgabe aktivieren.
+
+## Anlage bei fehlender Standard-CLI
+
+Die automatische Aufgabenanlage erfolgt **auch dann, wenn keine Standard-CLI auflösbar ist** (fachliche Entscheidung): Die Aufgabe ist sofort in der Aufgabenverwaltung sichtbar, das Ereignis bleibt mit der Aufforderung „Keine Standard-CLI konfiguriert. Ereignis öffnen und CLI auswählen." wartend und wird nach CLI-Auswahl oder -Konfiguration (plus „Erneut prüfen" oder dem nächsten Poll) zugestellt. `SourceKey`-/Referenz-Dedup verhindert Duplikatanlagen über die Wartezeit hinweg; Ereignisse gehen nicht verloren.
 
 ## Zustellung und Abschluss
 
