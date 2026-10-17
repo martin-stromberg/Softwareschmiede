@@ -37,34 +37,45 @@ public sealed partial class ScmEventCliExchangeAccessTests
         var directory = Path.Combine(workspace, ScmEventExchangeProtocol.DirectoryName, request.CliRunId.ToString("D"), request.AttemptId.ToString("D"));
         var actionId = Guid.NewGuid();
         var diagnostic = Path.Combine(workspace, "child-error.txt");
+        var progress = Path.Combine(workspace, "child-progress.txt");
         static string Quote(string value) => "'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
         var command = $$"""
             $ErrorActionPreference = 'Stop'
             $channel = {{Quote(directory)}}
             $workspace = {{Quote(workspace)}}
+            function TracePhase($phase) { [IO.File]::WriteAllText({{Quote(progress)}}, $phase) }
             try {
+              TracePhase 'Loading framework JSON serializer'
+              $null = [Reflection.Assembly]::Load('System.Web.Extensions, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35')
+              $serializer = [System.Web.Script.Serialization.JavaScriptSerializer]::new()
               $deadline = [DateTime]::UtcNow.AddSeconds(60)
               $probePromptPath = [IO.Path]::Combine($workspace, 'probe-prompt.json')
+              TracePhase 'Waiting for host probe prompt'
               while (-not [IO.File]::Exists($probePromptPath)) {
                 if ([DateTime]::UtcNow -gt $deadline) { throw 'Host did not request file-tool probe' }
-                Start-Sleep -Milliseconds 25
+                [Threading.Thread]::Sleep(25)
               }
-              $probe = [IO.File]::ReadAllText($probePromptPath) | ConvertFrom-Json
+              TracePhase 'Reading probe challenge'
+              $probe = $serializer.DeserializeObject([IO.File]::ReadAllText($probePromptPath))
               $challenge = [IO.File]::ReadAllBytes($probe.challengePath)
+              TracePhase 'Publishing probe proof'
               [IO.File]::WriteAllBytes($probe.temporaryProofPath, $challenge)
               [IO.File]::Move($probe.temporaryProofPath, $probe.proofPath)
               [IO.File]::Move($probe.challengePath, $probe.readChallengePath)
+              TracePhase 'Waiting for host channel'
               while (-not [IO.File]::Exists([IO.Path]::Combine($workspace, 'go'))) {
                 if ([DateTime]::UtcNow -gt $deadline) { throw 'Host did not prepare channel' }
-                Start-Sleep -Milliseconds 25
+                [Threading.Thread]::Sleep(25)
               }
+              TracePhase 'Checking app-data write denial'
               $denied = $false
               try { [IO.File]::WriteAllText({{Quote(Path.Combine(appData, "forbidden.txt"))}}, 'must fail') }
               catch [System.UnauthorizedAccessException] { $denied = $true }
               if (-not $denied) { throw 'Restriction NOT enforced against app-data' }
-              $req = [IO.File]::ReadAllText([IO.Path]::Combine($channel, 'request.json')) | ConvertFrom-Json
+              TracePhase 'Reading channel request'
+              $req = $serializer.DeserializeObject([IO.File]::ReadAllText([IO.Path]::Combine($channel, 'request.json')))
               function Publish($path, $value) {
-                $json = $value | ConvertTo-Json -Depth 10 -Compress
+                $json = $serializer.Serialize($value)
                 if ({{(rename ? "$true" : "$false")}}) {
                   [IO.File]::WriteAllText($path + '.tmp', $json)
                   [IO.File]::Move($path + '.tmp', $path)
@@ -78,16 +89,18 @@ public sealed partial class ScmEventCliExchangeAccessTests
               $action.body = 'Restricted process reply'
               Publish ([IO.Path]::Combine($channel, 'actions', '{{actionId}}.json')) $action
               $resultPath = [IO.Path]::Combine($channel, 'results', '{{actionId}}.json')
+              TracePhase 'Waiting for host action result'
               while (-not [IO.File]::Exists($resultPath)) {
                 if ([DateTime]::UtcNow -gt $deadline) { throw 'Host did not acknowledge remote action' }
-                Start-Sleep -Milliseconds 25
+                [Threading.Thread]::Sleep(25)
               }
-              $result = [IO.File]::ReadAllText($resultPath) | ConvertFrom-Json
+              $result = $serializer.DeserializeObject([IO.File]::ReadAllText($resultPath))
               if (-not $result.success -or $result.eventId -ne $req.eventId) { throw 'Host action failed' }
               $complete = $accepted.Clone()
               $complete.actionIds = @('{{actionId}}')
               $complete.noRemoteAction = $false
               Publish ([IO.Path]::Combine($channel, 'complete.json')) $complete
+              TracePhase 'Completed'
               exit 0
             } catch {
               [IO.File]::WriteAllText({{Quote(diagnostic)}}, $_.Exception.ToString())
@@ -97,13 +110,19 @@ public sealed partial class ScmEventCliExchangeAccessTests
         using var process = ScmRestrictedWindowsProcess.Start(workspace, command, sid);
         try
         {
+            ScmRestrictedProcessAccess.Capture(process).Should().ContainSingle().Which.Should().Be(sid);
             var (prefix, originalSpec) = await Spec(provider, provider == "Codex" ? "--sandbox workspace-write" : "--permission-mode acceptEdits");
             var spec = originalSpec with { WorkingDirectory = workspace };
             var session = Session(provider == "Codex" ? "OpenAI Codex (v0.114.0)" : "Claude Code v2.1.0", provider == "Codex" ? "›" : "❯");
             session.Object.Process.Id.Should().NotBe(process.Id, "the CLI parent is distinct from the restricted tool child");
             ScmRestrictedProcessAccess.Capture(session.Object.Process).Should().BeEmpty("the normal parent cannot prove the tool token");
             session.Setup(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .Returns((string prompt, CancellationToken token) => File.WriteAllTextAsync(Path.Combine(workspace, "probe-prompt.json"), prompt, token));
+                .Returns(async (string prompt, CancellationToken token) =>
+                {
+                    var promptPath = Path.Combine(workspace, "probe-prompt.json");
+                    await File.WriteAllTextAsync(promptPath + ".tmp", prompt, token);
+                    File.Move(promptPath + ".tmp", promptPath);
+                });
             using var adapter = new ScmPromptSessionAdapter(request.AufgabeId, request.CliRunId, prefix, spec, session.Object, [], () => !process.HasExited);
             var access = await adapter.CheckExchangeAccessAsync(directory);
             access.Status.Should().Be(ScmExchangeAccessStatus.Unknown, "only the real file tool may complete the probe");
@@ -113,7 +132,11 @@ public sealed partial class ScmEventCliExchangeAccessTests
                 await Task.Delay(25);
                 access = await adapter.CheckExchangeAccessAsync(directory);
             }
-            access.Status.Should().Be(ScmExchangeAccessStatus.Supported, access.Reason);
+            var phase = File.Exists(progress) ? await File.ReadAllTextAsync(progress) : "child script has not started";
+            var childError = File.Exists(diagnostic) ? await File.ReadAllTextAsync(diagnostic) : "no child error reported";
+            access.Status.Should().Be(ScmExchangeAccessStatus.Supported,
+                "{0}; child phase: {1}; child state: {2}; {3}", access.Reason, phase,
+                process.HasExited ? $"exited ({process.ExitCode})" : "running", childError);
             access.RestrictedWriteSids.Should().ContainSingle().Which.Should().Be(sid);
             session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
             adapter.ReadyStatus.Should().Be(ScmPromptReadyStatus.Ready);

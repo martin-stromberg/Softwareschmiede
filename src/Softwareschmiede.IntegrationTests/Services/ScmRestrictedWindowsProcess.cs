@@ -16,6 +16,10 @@ internal static class ScmRestrictedWindowsProcess
     internal static Process Start(string workspace, string command, string capabilitySid)
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("The mandatory restricted process evidence requires Windows.");
+        // The probe uses only language constructs and .NET APIs. Module discovery can
+        // access the runner's profile/cache before our file-tool script makes progress.
+        // Disable it instead of granting the restricted token access to that profile.
+        command = "$PSModuleAutoLoadingPreference = 'None'\n" + command;
         if (!OpenProcessToken(Process.GetCurrentProcess().Handle, 0x0002 | 0x0008 | 0x0001 | 0x0080, out var original))
             throw new Win32Exception(Marshal.GetLastWin32Error());
         using (original)
@@ -44,7 +48,7 @@ internal static class ScmRestrictedWindowsProcess
                     var arguments = new StringBuilder('"' + executable + "\" -NoLogo -NoProfile -NonInteractive -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(command)));
                     var startup = new StartupInfo { Size = Marshal.SizeOf<StartupInfo>() };
                     var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-                    var environment = Marshal.StringToHGlobalUni($"PATH={windows}\\System32\0SystemRoot={windows}\0TEMP={workspace}\0TMP={workspace}\0WINDIR={windows}\0\0");
+                    var environment = Marshal.StringToHGlobalUni($"PATH={windows}\\System32\0PSModuleAnalysisCachePath=NUL\0SystemRoot={windows}\0TEMP={workspace}\0TMP={workspace}\0WINDIR={windows}\0\0");
                     try
                     {
                         if (!CreateProcessAsUser(restricted, executable, arguments, IntPtr.Zero, IntPtr.Zero, false, 0x08000400,
