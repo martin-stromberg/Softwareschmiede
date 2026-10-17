@@ -236,6 +236,13 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             var effectiveWorkdir = await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(localRepoPath, startConfig, gitPlugin, ct).ConfigureAwait(false);
 
             var spec = await kiPlugin.GetTerminalStartSpecAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
+            try { ScmCliWorkspaceTrust.EnsureTrusted(kiPlugin.PluginPrefix, spec); }
+            catch (Exception ex)
+            {
+                // Eine nicht vorbereitete Vertrauensentscheidung darf den CLI-Start nie blockieren;
+                // der Adapter erkennt den Dialog anschließend als eigenen Wartezustand.
+                _logger.LogWarning(ex, "Vertrauensstatus des CLI-Arbeitsverzeichnisses konnte nicht vorbereitet werden.");
+            }
             IReadOnlyList<ScmCliConfigurationFile> scmConfiguration;
             try { scmConfiguration = ScmCliAccessEvaluator.Capture(kiPlugin.PluginPrefix, spec); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
@@ -298,7 +305,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             _handles[aufgabeId] = handle;
 
             handle.ScmPromptSession = new ScmPromptSessionAdapter(aufgabeId, handle.CliRunId, kiPlugin.PluginPrefix,
-                spec, session, scmConfiguration, () => _handles.TryGetValue(aufgabeId, out var active) && ReferenceEquals(active, handle));
+                spec, session, scmConfiguration, () => _handles.TryGetValue(aufgabeId, out var active) && ReferenceEquals(active, handle), _timeProvider);
             session.InputStarted = handle.ScmPromptSession.MarkInputStarted;
 
             session.Exited += (_, e) => HandleSessionEndedAsync(aufgabeId, handle, e.ExitCode, "Terminal").SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionEndedAsync");

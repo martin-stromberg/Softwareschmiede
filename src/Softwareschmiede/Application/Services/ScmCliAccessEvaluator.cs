@@ -110,7 +110,8 @@ public static class ScmCliAccessEvaluator
                         if (line.StartsWith('['))
                         {
                             section = line;
-                            if (section is not ("[sandbox_workspace_write]" or "[features]"))
+                            if (section is not ("[sandbox_workspace_write]" or "[features]") &&
+                                !section.StartsWith("[projects.", StringComparison.Ordinal))
                                 return Result(ScmExchangeAccessStatus.Unknown, "Codex-Profil oder Konfigurationsabschnitt ist nicht auflösbar.");
                             continue;
                         }
@@ -132,6 +133,12 @@ public static class ScmCliAccessEvaluator
                         {
                             if (key is not ("network_access" or "exclude_tmpdir_env_var" or "exclude_slash_tmp"))
                                 return Result(ScmExchangeAccessStatus.Unknown, "Unbekannte Codex-Schreibwurzel oder Sandbox-Regel.");
+                        }
+                        else if (section.StartsWith("[projects.", StringComparison.Ordinal))
+                        {
+                            // Per-directory trust decisions never change the effective sandbox rights.
+                            if (key != "trust_level" || value is not ("trusted" or "untrusted"))
+                                return Result(ScmExchangeAccessStatus.Unknown, "Codex-Projektvertrauen ist nicht sicher auflösbar.");
                         }
                         else if (key == "sandbox_mode")
                         {

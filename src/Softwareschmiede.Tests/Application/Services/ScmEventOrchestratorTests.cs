@@ -104,4 +104,57 @@ public sealed class ScmEventOrchestratorTests
         Assert.Empty(fixture.Prompts);
         Assert.Equal(adapter.CliRunId.ToString("D"), item.CliRunId);
     }
+
+    /// <summary>A workspace trust dialog is its own wait state: no prompt is sent, the confirm action stays
+    /// unavailable, and delivery resumes automatically once the user answers in the terminal.</summary>
+    [Fact]
+    public async Task TrustDialog_BlocksUntilAnswered_ThenDeliversAutomatically()
+    {
+        await using var fixture = new ScmDispatchFixture { Prompt = "Do you trust the contents of this directory?" };
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(eventId);
+        var cli = fixture.Services.GetRequiredService<KiAusfuehrungsService>();
+        var adapter = cli.GetScmPromptSession(taskId)!;
+        Assert.Equal(ScmPromptReadyStatus.TrustPrompt, adapter.ReadyStatus);
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("Wartend", item.Status);
+        Assert.Contains("Vertrauenswürdigkeit", item.Reason);
+        Assert.DoesNotContain("Eingabebereitschaft unbekannt", item.Reason);
+        Assert.Null(item.DeliveryAttemptId);
+        Assert.Empty(fixture.Prompts);
+        using (var scope = fixture.Services.CreateScope())
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D")));
+        Assert.Empty(fixture.Prompts);
+        fixture.SetPrompt(taskId, "SCM_READY_V1");
+        await fixture.DispatchAsync(eventId);
+        item = await fixture.EventAsync(eventId);
+        Assert.Equal("Zugestellt", item.Status);
+        Assert.NotNull(item.DeliveryAttemptId);
+        Assert.Single(fixture.Prompts);
+    }
+
+    /// <summary>A deliberate ready confirmation is an explicit retry and lifts an earlier hard stop.</summary>
+    [Fact]
+    public async Task ConfirmReady_LiftsNextAttemptLock()
+    {
+        await using var fixture = new ScmDispatchFixture { Prompt = "SCM_UNKNOWN_V1" };
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(eventId);
+        var cli = fixture.Services.GetRequiredService<KiAusfuehrungsService>();
+        var adapter = cli.GetScmPromptSession(taskId)!;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            await db.ScmIncomingEvents.ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)long.MaxValue));
+        }
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"));
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("Zugestellt", item.Status);
+        Assert.NotNull(item.DeliveryAttemptId);
+        Assert.Single(fixture.Prompts);
+    }
 }
