@@ -12,9 +12,9 @@ Issue: #283
 - [x] Bestandsaufnahme (`inventory.md` + `inventory/`-Detaildateien)
 - [x] Projektplan (`project-plan.md`, 4 Schritte)
 - [x] Offene Punkte geklärt (Q1–Q7 + Zusatz: begründete Vorschläge aus Anforderung/Bestand ableitbar, als Annahmen dokumentiert; keine entscheidungsbedürftigen Restfragen)
-- [ ] Planprüfung (`project-plan-check.md`, Status „vollständig")
-- [ ] Planungscommit
-- [ ] Entwicklungsschritte-Tracking (`steps.md`, `status.html`)
-- [ ] Entwicklungsschleife (Lifecycle je Schritt, Abnahme, Merge)
+- [x] Planprüfung (`project-plan-check.md`, Status „vollständig")
+- [x] Planungscommit
+- [x] Entwicklungsschritte-Tracking (`steps.md`, `status.html`)
+- [x] Entwicklungsschleife (Lifecycle je Schritt, Abnahme, Merge — alle 4 Schritte abgenommen und gemergt; Integrationsprüfung: Build 0 Fehler, 1986/1987 Unit + 147/147 Integration grün)
 - [ ] Aufräumen (Projektverzeichnis entfernt)
 - [ ] Abschlusscommit
