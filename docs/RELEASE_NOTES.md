@@ -7,6 +7,7 @@
 
 ## What's New
 
+- GitHub issue and pull request text can now be monitored for locally linked tasks: `$Softwareschmiede` requests authored or edited by the repository owner enter a persistent SCM Events queue for controlled CLI delivery. Codex and Claude are eligible only after version, permission, and reply-channel access are verified; Copilot and Devin are not supported for event responses.
 - Terminal output can now be selected with the mouse or keyboard (Shift+arrow keys, Home/End) and copied with the context menu or Ctrl+Shift+C. Ctrl+C continues to go to the active CLI. Ordinary output outside the selection keeps it selected; selection behavior across scrollback movement and full live/replay E2E verification remain open follow-up work.
 - The console test window now plays `.clireplay` recordings back in the terminal geometry stored in the recording header (Cols×Rows) instead of the window size — fixed: line-wrap and offset artifacts in recordings wider than the window, where absolute cursor positioning landed in the wrong places.
 - Recordings wider than the window are reachable via a horizontal scrollbar (clip/scroll instead of wrap); live sessions in the task view keep resizing to the window as before.
@@ -35,6 +36,7 @@
 
 ## Neuerungen
 
+- Texte in GitHub-Issues und Pull Requests können jetzt für lokal verknüpfte Aufgaben überwacht werden: Mit `$Softwareschmiede` markierte Anfragen, die vom Repository-Owner verfasst oder bearbeitet wurden, gelangen zur kontrollierten CLI-Zustellung in eine dauerhafte SCM-Ereignisqueue. Codex und Claude sind nur nach erfolgreichem Nachweis von Version, Berechtigungen und Zugriff auf den Antwortkanal zugelassen; Copilot und Devin werden für Ereignisantworten nicht unterstützt.
 - Terminalausgaben lassen sich jetzt per Maus oder Tastatur (Umschalt+Pfeiltasten, Pos1/Ende) markieren und über das Kontextmenü oder Ctrl+Shift+C kopieren. Ctrl+C wird weiterhin an die aktive CLI weitergegeben. Normale Ausgabe außerhalb der Auswahl hebt diese nicht auf; das Verhalten bei Scrollback-Verschiebungen und die vollständige Live-/Replay-E2E-Abnahme sind noch offene Nacharbeiten.
 - Das Konsolentestfenster spielt `.clireplay`-Aufzeichnungen jetzt in der im Aufzeichnungs-Header gespeicherten Terminal-Geometrie (Cols×Rows) ab statt in der Fenstergröße — behoben: Zeilenumbruch- und Versatz-Artefakte bei Aufzeichnungen, die breiter als das Fenster sind, bei denen absolute Cursorpositionierungen an falschen Stellen landeten.
 - Aufzeichnungen, die breiter als das Fenster sind, sind über eine horizontale Scrollbar erreichbar (abschneiden/scrollen statt umbrechen); Live-Sitzungen in der Aufgabenansicht passen sich weiterhin an die Fenstergröße an.

@@ -60,9 +60,7 @@ public sealed class TaskDetailView : BaseWindowView
     public TaskDetailView SetTaskTitle(string title)
     {
         var box = WaitForElement(Window, cf => cf.ByName("EditTitel"), Short);
-        box.ClickInForeground();
-        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
-        Keyboard.Type(title);
+        ElementWaitHelper.ReplaceTextBoxText(box, title);
 
         return this;
     }

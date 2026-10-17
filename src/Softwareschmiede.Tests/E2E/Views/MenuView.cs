@@ -360,7 +360,8 @@ public sealed class MenuView : BaseWindowView
             Thread.Sleep(200);
         }
 
-        Assert.True(zielSichtbar(), fehlertext);
+        Assert.True(zielSichtbar(), fehlertext + " " + TryFindNavigationButton(buttonNamen)?.DescribeClickTarget()
+            + "; Window=" + Window.BoundingRectangle + "; Children=" + string.Join(" | ", Window.FindAllChildren().Select(e => e.ControlType + ":" + e.Name)));
     }
 
     private AutomationElement WaitForNavigationButton(IReadOnlyList<string> names, TimeSpan timeout)

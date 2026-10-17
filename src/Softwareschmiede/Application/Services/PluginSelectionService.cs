@@ -84,6 +84,15 @@ public sealed class PluginSelectionService
         return resolved;
     }
 
+    /// <summary>Löst ausschließlich ein explizites, weiterhin aktiviertes KI-Plugin auf.</summary>
+    public async Task<IKiPlugin> ResolveDevelopmentAutomationPluginStrictAsync(string pluginPrefix, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginPrefix);
+        var plugins = await _pluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync(ct);
+        return plugins.FirstOrDefault(x => string.Equals(x.PluginPrefix, pluginPrefix, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("Die ausgewählte CLI ist nicht mehr installiert oder aktiviert.");
+    }
+
     /// <summary>
     /// Löst das KI-Plugin-Prefix mit Projekt-Kontext auf: Aufgaben-Plugin → Projekt-Default → Global-Default.
     /// Wird nichts gefunden, gibt die Methode <c>null</c> zurück; der Aufrufer muss in diesem Fall

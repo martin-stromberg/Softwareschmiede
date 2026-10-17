@@ -24,7 +24,8 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 - **Plugin-basierte KI-Ausführung** über eingebettete interaktive CLI-Terminal-Sitzungen (ConPTY mit diagnostiziertem Pipe-Fallback)
 - **IDE-Integration** mit Visual Studio für `.sln`/`.slnx` und Visual Studio Code als Fallback
 - **Dateiexplorer und Diff-Ansicht** direkt in der Aufgabendetailansicht
-- **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Monitoring
+- **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Ereignisüberwachung
+- **GitHub-Ereignisüberwachung** für lokal verknüpfte Issues und Pull Requests mit persistenter Queue und kontrollierter CLI-Zustellung
 - **Autonome Aufgaben** mit Projektleiter-Agent und Unteragenten-Orchestrierung
 - **Pausierbare Aufgaben** mit manueller Pause und automatischer Pausierung bei erkannten KI-Session-Limits
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases mit konfigurierbarem Update-Modus und optionaler Prerelease-Berücksichtigung
@@ -119,6 +120,12 @@ Zusätzlich aktiviert die Checkbox **„Prerelease-Versionen laden"** die Berüc
 Beide Werte werden in der SQLite-Einstellungstabelle unter den Schlüsseln `updates.mode` und `updates.includePrereleases` gespeichert (`AppEinstellungService.GetUpdateSettingsAsync`/`SetUpdateSettingsAsync`). Beim Speichern löst `SettingsViewModel` das Event `UpdateSettingsSaved` aus: `MainWindowViewModel` invalidiert ein bestehendes Update-Angebot und bricht einen noch nicht übergebenen Update-Vorgang ab. Vor jeder Prüfung und vor dem Updater-Start werden die gespeicherten Werte erneut gelesen.
 
 Die Implementierung liegt in `UpdateService`, `GitHubReleaseClient`, `UpdateVersionComparer`/`SemanticUpdateVersion`, `AppEinstellungService`, `SettingsViewModel` und `MainWindowViewModel` (einmalige Startprüfung über `MainWindow.ContentRendered` → `InitializeUpdatesAfterWindowReadyAsync`). Abgedeckt wird das Feature u. a. durch `AppEinstellungServiceTests_UpdateSettings`, `UpdateServiceTests_Options`, `UpdateServiceTests_PrereleaseChain`, `UpdateVersionComparerTests_SemVer`, `GitHubReleaseClientTests_Filters`, `GitHubReleaseClientTests_Pagination`, `MainWindowViewModelTests_UpdateStartup`, `MainWindowViewModelTests_UpdateSettingsReadFailure` und `E2E_UpdateSettings`.
+
+## GitHub-Ereignisüberwachung
+
+Die Anwendung pollt regelmäßig Issue- und Pull-Request-Texte für lokal mit Aufgaben verknüpfte GitHub-Referenzen. Texte mit `$Softwareschmiede` werden nur angenommen, wenn der Autor beziehungsweise bei einer Bearbeitung der Bearbeiter dem angemeldeten Repository-Owner entspricht. Angenommene Ereignisse werden dauerhaft gespeichert und unter **SCM-Ereignisse** nachverfolgbar; Kommentare und veröffentlichte PR-Reviews erhalten eine 👀-Reaktion, und nicht sofort zustellbare Ereignisse bleiben in der Queue. Die Zustellung an eine CLI erfolgt kontrolliert und ein ungewisser Zustellstatus wird nicht automatisch erneut gesendet.
+
+Die CLI-Unterstützung ist eingeschränkt: Codex CLI und Claude CLI werden nur verwendet, wenn Version, Berechtigungen und der konkrete Zugriff auf den geprüften Antwortkanal erfolgreich nachgewiesen sind. Der KI-Simulator funktioniert nur im eigens gestarteten SCM-Modus. GitHub Copilot CLI, Devin und andere Plugins werden für diese Ereigniszustellung derzeit nicht unterstützt. Details und Grenzen stehen in der [Dokumentation zur GitHub-Ereignisüberwachung](docs/help/plugins/github-ereignisse/index.md).
 
 ## Aufgaben pausieren und Session-Limits erkennen
 

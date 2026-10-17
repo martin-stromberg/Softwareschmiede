@@ -3,6 +3,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.App.Extensions;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
@@ -41,6 +42,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private string _title = "Softwareschmiede";
     private string? _currentVersion;
     private bool _disposed;
+    private readonly ScmEventChangeNotifier? _scmNotifier;
+    private int _scmWaitingCount;
+    private ScmEventQueueViewModel? _scmQueue;
 
     /// <summary>Gibt den Fenstertitel zurück.</summary>
     public string Title
@@ -107,6 +111,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Navigiert zu den Einstellungen.</summary>
     public ICommand NavigateToSettingsCommand { get; }
 
+    /// <summary>Navigiert zur dauerhaften SCM-Ereignisübersicht.</summary>
+    public ICommand NavigateToScmEventQueueCommand { get; }
+
+    /// <summary>Navigationstext einschließlich noch nicht abgeschlossener Ereignisse.</summary>
+    public string ScmEventQueueLabel => $"SCM-Ereignisse ({_scmWaitingCount})";
+
     /// <summary>Schaltet den Dark-Mode um.</summary>
     public ICommand ToggleDarkModeCommand { get; }
 
@@ -144,6 +154,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _versionProvider = optionaleDienste?.VersionProvider;
         _laufdatenChangedNotifier = optionaleDienste?.LaufdatenChangedNotifier;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
+        _scmNotifier = serviceProvider.GetService<ScmEventChangeNotifier>();
         _dispatcherInvoke = DispatcherInvokeFactory.Create(optionaleDienste?.DispatcherInvoke);
         _updateFlow = new MainWindowUpdateFlow(
             serviceProvider, logger, optionaleDienste?.UpdateDienste, optionaleDienste?.DialogService);
@@ -152,6 +163,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         NavigateToDashboardCommand = new RelayCommand(NavigateToDashboard);
         NavigateToProjectListCommand = new RelayCommand(NavigateToProjectList);
         NavigateToSettingsCommand = new RelayCommand(NavigateToSettings);
+        NavigateToScmEventQueueCommand = new RelayCommand(NavigateToScmEventQueue);
         ToggleDarkModeCommand = new AsyncRelayCommand(async ct =>
             await _darkModeService.SetModeAsync(_darkModeService.Current == "Dark" ? "Light" : "Dark", ct));
         ToggleNavigationCommand = new RelayCommand(() => IsNavigationExpanded = !IsNavigationExpanded);
@@ -160,6 +172,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         UpdateStartenCommand = new AsyncRelayCommand(_updateFlow.StartenAsync, _updateFlow.KannStarten);
 
         _runningStatusSource.RunningCountChanged += OnRunningCountChanged;
+        if (_scmNotifier is not null) _scmNotifier.Changed += OnScmChanged;
         if (_laufdatenChangedNotifier is not null)
         {
             _laufdatenChangedNotifier.LaufdatenChanged += OnLaufdatenChanged;
@@ -174,6 +187,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         NavigateToDashboard();
         VersionLadenImHintergrund();
+        OnScmChanged();
     }
 
     private DashboardViewModel? _dashboardViewModel;
@@ -226,6 +240,43 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     private SettingsViewModel? _settingsViewModel;
+
+    private void NavigateToScmEventQueue()
+    {
+        if (_scmQueue is null)
+        {
+            _scmQueue = _serviceProvider.GetRequiredService<ScmEventQueueViewModel>();
+            _scmQueue.BackAction = NavigateToDashboard;
+            _scmQueue.NavigateToSettingsAction = NavigateToSettings;
+            _scmQueue.NavigateToTaskAction = id =>
+            {
+                NavigateZuAufgabe(id);
+                if (CurrentView is TaskDetailViewModel task) task.ZurueckAction = NavigateToScmEventQueue;
+            };
+        }
+        CurrentView = _scmQueue;
+        Title = "Softwareschmiede – SCM-Ereignisse";
+        _scmQueue.RefreshAsync().SafeFireAndForget(_logger, "SCM-Ereignisse laden");
+    }
+
+    private void OnScmChanged()
+    {
+        if (_disposed || _scmNotifier is null) return;
+        RefreshScmCountAsync().SafeFireAndForget(_logger, "SCM-Ereignisanzahl laden");
+    }
+
+    private async Task RefreshScmCountAsync()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var count = await scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>()
+            .ScmIncomingEvents.CountAsync(x => x.Status != "Verarbeitet");
+        _dispatcherInvoke(() =>
+        {
+            if (_disposed) return;
+            _scmWaitingCount = count;
+            OnPropertyChanged(nameof(ScmEventQueueLabel));
+        });
+    }
 
     private void NavigateToSettings()
     {
@@ -388,6 +439,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _aktualisierungsTimer.Stop();
         _aktualisierungsTimer.Tick -= OnAktualisierungsTimerTick;
         _runningStatusSource.RunningCountChanged -= OnRunningCountChanged;
+        if (_scmNotifier is not null) _scmNotifier.Changed -= OnScmChanged;
+        _scmQueue?.Dispose();
         if (_laufdatenChangedNotifier is not null)
         {
             _laufdatenChangedNotifier.LaufdatenChanged -= OnLaufdatenChanged;
