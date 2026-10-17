@@ -1,3 +1,11 @@
+## 2026-10-18 — Durchgängiger Auto-Start und Zustellung angelegter Aufgaben (Schritt 4)
+
+- Aus SCM-Ereignissen automatisch angelegte oder wiederverwendete Aufgaben durchlaufen nachweisbar denselben Start- und Zustellungspfad wie aufgabenverknüpfte Ereignisse: erneute Repository-/CanWrite-/Owner-Prüfungen, `Neu` → `Gestartet`, Klon/Branch/CLI-Start über `EntwicklungsprozessService` und Zustellung an die aufgelöste Standard-CLI (Aufgabe → Projekt-Default → globaler Default).
+- Fachliche Entscheidung dokumentiert: Die Aufgabenanlage erfolgt auch ohne auflösbare Standard-CLI; das Ereignis bleibt mit „Keine Standard-CLI konfiguriert. Ereignis öffnen und CLI auswählen." wartend und wird nach CLI-Auswahl/-Konfiguration zugestellt — ohne Duplikate oder verlorene Ereignisse.
+- Blockierte Aufgaben (beendet, archiviert, pausiert) werden auch im neuen Pfad nicht automatisch gestartet; ihr Ereignis bleibt mit Grund wartend.
+- Neue Absicherung: `ScmEventMonitoringServiceTests_AutoStartDelivery` (6 Fälle) und E8-Abschnitt in der konsolidierten SCM-E2E-Methode (Anlage → wartend → CLI-Auswahl → Klon/Start → Verarbeitet); `ScmE2EFixture.WaitEventForTaskAsync` ergänzt.
+- Hilfedokumentation unter `docs/help/plugins/github-ereignisse/` aktualisiert.
+
 ## 2026-10-17 — Automatische Aufgabenanlage aus qualifizierten SCM-Ereignissen
 
 - Qualifizierte Ereignisse (Trigger `$Softwareschmiede`, Owner = Bearbeiter, keine eigene Antwort) an Referenzen ohne lokale Aufgabe legen jetzt automatisch genau eine passende Aufgabe an — Projekt aus dem überwachten `GitRepository`, Titel und Auftragstext aus den Ereignisdaten samt Herkunftsverweis — oder verwenden eine eindeutig vorhandene wieder.
