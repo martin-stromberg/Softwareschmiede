@@ -1,3 +1,7 @@
+## 2026-10-18 — Devin CLI im SCM-Antwortkanal
+
+- Devin CLI (`Softwareschmiede.Devin`) wird im SCM-Ereignis-Antwortkanal unterstützt: `ScmCliAccessEvaluator` wertet Devins Startvertrag (`--permission-mode accept-edits`/`dangerous`/`bypass`, `DEVIN_PERMISSION_MODE`, `--respect-workspace-trust`, `--model`, `--continue`, `--resume`, `--sandbox` sowie Devin-`config.json`-Berechtigungsregeln) aus; `ScmPromptSessionAdapter` erkennt Devin-Banner `v3000.11.92`, `❭`-Prompt, Busy-Hinweise und den Trust-Dialog. Der tatsächliche Dateizugriff wird weiterhin ausschließlich über die rungebundene Dateitool-Probe nachgewiesen.
+
 ## 2026-10-18 — CI: OS-Interface-Tests in eigenen Job ausgelagert
 
 - Die nicht-blockierenden `OsInterface`-Tests (FlaUI-E2E, ConPTY, Zwischenablage, echte Prozessstarts) laufen in `staging-ci.yml` und `pr-staging-ci.yml` jetzt in einem eigenen parallelen Job `os-interface tests` statt innerhalb von `build & test`.

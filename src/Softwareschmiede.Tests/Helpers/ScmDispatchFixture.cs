@@ -16,10 +16,26 @@ using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.TestSupport;
 
+/// <summary>Terminal-Profil der gemockten KI-CLI: Prefix, Startargumente, Banner und Eingabezeile.</summary>
+internal sealed record ScmKiProfile(string Prefix, string Arguments, string Banner, string Prompt,
+    IReadOnlyDictionary<string, string?> EnvironmentVariables, Func<string, Task>? OnWritePrompt = null)
+{
+    /// <summary>Bisheriges Verhalten: deterministischer JSON-Simulator im SCM-Modus.</summary>
+    internal static ScmKiProfile Simulator => new("Softwareschmiede.KiSimulator", string.Empty,
+        "SCM_SIMULATOR_PROTOCOL_V1", "SCM_READY_V1",
+        new Dictionary<string, string?> { ["SOFTWARESCHMIEDE_SCM_SIMULATOR"] = "1" });
+
+    /// <summary>Devin-Startvertrag und Promptformat der gepinnten Version v3000.11.92.</summary>
+    internal static ScmKiProfile Devin(string arguments = "--permission-mode accept-edits --respect-workspace-trust false",
+        Func<string, Task>? onWritePrompt = null) => new("Softwareschmiede.Devin", arguments,
+        "Devin CLI\nv3000.11.92", "❭", new Dictionary<string, string?>(), onWritePrompt);
+}
+
 /// <summary>Real SQLite and services with isolated SCM transport and deterministic terminal boundary.</summary>
 internal sealed class ScmDispatchFixture : IAsyncDisposable
 {
     internal const string KiPrefix = "Softwareschmiede.KiSimulator";
+    internal readonly ScmKiProfile KiProfile;
     internal readonly string Root;
     internal readonly Mock<IGitPlugin> Git = new();
     internal readonly Mock<IKiPlugin> Ki = new();
@@ -29,12 +45,14 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal readonly ScmEventRepository Repository = new("test-scm", "github.com", "R_1", "owner", "repo", "U_1", "U_1", "owner", true);
     internal ServiceProvider Services { get; }
     internal Func<Task>? CloneGate { get; set; }
-    internal string Prompt { get; set; } = "SCM_READY_V1";
+    internal string Prompt { get; set; }
     private readonly List<Process> _processes = [];
     private readonly bool _ownsRoot;
 
-    internal ScmDispatchFixture(string? root = null, TimeProvider? time = null)
+    internal ScmDispatchFixture(string? root = null, TimeProvider? time = null, ScmKiProfile? ki = null)
     {
+        KiProfile = ki ?? ScmKiProfile.Simulator;
+        Prompt = KiProfile.Prompt;
         Root = root ?? Path.Combine(Path.GetTempPath(), "scm-dispatch-" + Guid.NewGuid().ToString("N"));
         _ownsRoot = root is null;
         Directory.CreateDirectory(Root);
@@ -58,12 +76,17 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 InitGit(directory);
                 await File.WriteAllTextAsync(Path.Combine(directory, "owned.txt"), "preserve workspace");
             });
-        Ki.SetupGet(x => x.PluginPrefix).Returns(KiPrefix);
+        Ki.SetupGet(x => x.PluginPrefix).Returns(KiProfile.Prefix);
         Ki.SetupGet(x => x.PluginName).Returns("Simulator");
         Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         Ki.Setup(x => x.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns((string directory, string? _, CancellationToken _) => Task.FromResult(new TerminalSessionStartSpec
-            { FileName = "fixture", WorkingDirectory = directory, EnvironmentVariables = new Dictionary<string, string?> { ["SOFTWARESCHMIEDE_SCM_SIMULATOR"] = "1" } }));
+            {
+                FileName = "fixture",
+                Arguments = KiProfile.Arguments,
+                WorkingDirectory = directory,
+                EnvironmentVariables = KiProfile.EnvironmentVariables
+            }));
         var plugins = new Mock<IPluginManager>();
         plugins.Setup(x => x.GetSourceCodeManagementPlugins()).Returns([Git.Object]);
         plugins.Setup(x => x.GetDefaultSourceCodeManagementPlugin()).Returns(Git.Object);
@@ -78,9 +101,13 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 _processes.Add(process);
                 var session = new Mock<ITerminalSession>();
                 session.SetupGet(x => x.Process).Returns(process);
-                session.SetupGet(x => x.Buffer).Returns(Screen(Prompt));
+                session.SetupGet(x => x.Buffer).Returns(Screen(KiProfile.Banner, Prompt));
                 session.Setup(x => x.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                    .Returns((string prompt, CancellationToken _) => { Prompts.Add(prompt); return Task.CompletedTask; });
+                    .Returns(async (string prompt, CancellationToken _) =>
+                    {
+                        if (KiProfile.OnWritePrompt is { } handler) await handler(prompt);
+                        else Prompts.Add(prompt);
+                    });
                 Sessions.Add(taskId, session);
                 return Task.FromResult(new TerminalSessionStartResult(process, session.Object, false));
             });
@@ -129,7 +156,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         var project = new Projekt { Id = Guid.NewGuid(), Name = "SCM" };
         var repository = new GitRepository { Id = Guid.NewGuid(), ProjektId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginTyp = Repository.ProviderPrefix, RepositoryName = "repo" };
-        var task = new Aufgabe { Id = Guid.NewGuid(), Titel = "SCM task", ProjektId = project.Id, GitRepositoryId = repository.Id, Status = status, KiPluginPrefix = configured ? KiPrefix : null };
+        var task = new Aufgabe { Id = Guid.NewGuid(), Titel = "SCM task", ProjektId = project.Id, GitRepositoryId = repository.Id, Status = status, KiPluginPrefix = configured ? KiProfile.Prefix : null };
         if (cloned) { task.LokalerKlonPfad = Path.Combine(Root, task.Id.ToString("N")); InitGit(task.LokalerKlonPfad); }
         db.AddRange(project, repository, task);
         await db.SaveChangesAsync();
@@ -154,14 +181,14 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
 
     internal void SetPrompt(Guid task, string prompt)
     {
-        Sessions[task].SetupGet(x => x.Buffer).Returns(Screen(prompt));
+        Sessions[task].SetupGet(x => x.Buffer).Returns(Screen(KiProfile.Banner, prompt));
         Sessions[task].Raise(x => x.BufferChanged += null, EventArgs.Empty);
     }
 
-    private static TerminalBuffer Screen(string prompt)
+    private static TerminalBuffer Screen(string banner, string prompt)
     {
         var buffer = new TerminalBuffer(120, 10);
-        buffer.Apply(new TextWrittenEvent("SCM_SIMULATOR_PROTOCOL_V1"));
+        buffer.Apply(new TextWrittenEvent(banner));
         buffer.Apply(new CursorMovedEvent(2, 0, true));
         buffer.Apply(new TextWrittenEvent(prompt));
         return buffer;
