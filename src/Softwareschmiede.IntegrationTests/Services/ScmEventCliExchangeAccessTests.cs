@@ -49,6 +49,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
     [Theory]
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.114.0)", "›")]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.1.0", "❯")]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3000.11.92", "❭")]
     public async Task ActualStartSpec_AllowsWorkspaceChannelWithoutAddingBypass(string provider, string arguments, string banner, string prompt)
     {
         var (prefix, spec) = await Spec(provider, arguments);
@@ -86,6 +87,27 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
     [InlineData("ClaudeCli", "--permission-mode acceptEdits --tools Read", ScmExchangeAccessStatus.Unknown)]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits --settings unknown.json", ScmExchangeAccessStatus.Unknown)]
     [InlineData("ClaudeCli", "--permission-mode bypassPermissions", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", ScmExchangeAccessStatus.Supported)]
+    [InlineData("Devin", "--permission-mode dangerous", ScmExchangeAccessStatus.Supported)]
+    [InlineData("Devin", "--permission-mode bypass", ScmExchangeAccessStatus.Supported)]
+    [InlineData("Devin", "--permission-mode=dangerous", ScmExchangeAccessStatus.Supported)]
+    [InlineData("Devin", "--continue --permission-mode accept-edits", ScmExchangeAccessStatus.Supported)]
+    [InlineData("Devin", "--resume=session-123 --permission-mode accept-edits", ScmExchangeAccessStatus.Supported)]
+    [InlineData("Devin", "--sandbox --permission-mode accept-edits", ScmExchangeAccessStatus.Supported)]
+    [InlineData("Devin", "--model opus --permission-mode accept-edits", ScmExchangeAccessStatus.Supported)]
+    [InlineData("Devin", "--permission-mode auto", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--permission-mode smart", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--permission-mode unknown-mode", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--permission-mode accept-edits --config other.json", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--permission-mode accept-edits --cloud", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--permission-mode accept-edits --print", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--permission-mode accept-edits --export out.json", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--prompt-file prompt.md --permission-mode accept-edits", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust maybe", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--permission-mode accept-edits --resume session-123", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "--permission-mode accept-edits freeform-path", ScmExchangeAccessStatus.Unknown)]
     public async Task ActualStartSpec_RejectsOverridesWithoutMutatingThem(string provider, string arguments, ScmExchangeAccessStatus expected)
     {
         var (prefix, spec) = await Spec(provider, arguments);
@@ -108,6 +130,15 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
     [InlineData("ClaudeCli", "settings.json", "{\"permissions\":{\"defaultMode\":\"acceptEdits\",\"deny\":[\"Write\"]}}", ScmExchangeAccessStatus.Denied)]
     [InlineData("ClaudeCli", "settings.json", "{\"permissions\":{\"defaultMode\":\"acceptEdits\",\"ask\":[\"Edit\"]}}", ScmExchangeAccessStatus.Denied)]
     [InlineData("ClaudeCli", "managed-settings.json", "{\"permissions\":{\"defaultMode\":\"acceptEdits\"}}", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "config.json", "{\"permissions\":{\"defaultMode\":\"accept-edits\"}}", ScmExchangeAccessStatus.Supported)]
+    [InlineData("Devin", "config.json", "{\"permissionMode\":\"dangerous\"}", ScmExchangeAccessStatus.Supported)]
+    [InlineData("Devin", "config.json", "{\"permissions\":{\"defaultMode\":\"accept-edits\",\"deny\":[\"Write\"]}}", ScmExchangeAccessStatus.Denied)]
+    [InlineData("Devin", "config.json", "{\"permissions\":{\"defaultMode\":\"accept-edits\",\"ask\":[\"Edit\"]}}", ScmExchangeAccessStatus.Denied)]
+    [InlineData("Devin", "config.json", "{\"permissions\":{\"defaultMode\":\"auto\"}}", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "config.json", "{\"hooks\":{\"pre-commit\":\"x\"},\"encoding\":{\"enforced\":\"UTF-8\"}}", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "config.json", "not json", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "config.json", "[1,2]", ScmExchangeAccessStatus.Unknown)]
+    [InlineData("Devin", "managed-config.json", "{\"permissionMode\":\"dangerous\"}", ScmExchangeAccessStatus.Unknown)]
     public async Task ConfigurationFixtures_EnforceRestrictionsAndPreserveFiles(string provider, string fileName, string content, ScmExchangeAccessStatus expected)
     {
         var (prefix, spec) = await Spec(provider, "");
@@ -123,10 +154,11 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
     [Theory]
     [InlineData("Codex", "sandbox_mode = \"workspace-write\"", "OpenAI Codex (v0.114.0)", "›")]
     [InlineData("ClaudeCli", "{\"permissions\":{\"defaultMode\":\"acceptEdits\"}}", "Claude Code v2.1.0", "❯")]
+    [InlineData("Devin", "{\"permissions\":{\"defaultMode\":\"accept-edits\"}}", "Devin CLI\nv3000.11.92", "❭")]
     public async Task LivingRun_RequiresUnchangedCapturedConfiguration(string provider, string content, string banner, string prompt)
     {
         var (prefix, spec) = await Spec(provider, "");
-        var path = Path.Combine(_root, provider == "Codex" ? "config.toml" : "settings.json");
+        var path = Path.Combine(_root, provider == "Codex" ? "config.toml" : provider == "Devin" ? "config.json" : "settings.json");
         await File.WriteAllTextAsync(path, content);
         await GitInit(_root);
         var current = true;
@@ -166,9 +198,12 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         var credentials = new Mock<ICredentialStore>(MockBehavior.Strict);
         credentials.Setup(value => value.GetCredential(It.IsAny<string>())).Returns((string?)null);
         credentials.Setup(value => value.GetCredential("Softwareschmiede." + provider + ".CommandLineParameters")).Returns(arguments);
-        IKiPlugin plugin = provider == "Codex"
-            ? new CodexPlugin(credentials.Object, NullLogger<CodexPlugin>.Instance)
-            : new ClaudeCliPlugin(credentials.Object, NullLogger<ClaudeCliPlugin>.Instance);
+        IKiPlugin plugin = provider switch
+        {
+            "Codex" => new CodexPlugin(credentials.Object, NullLogger<CodexPlugin>.Instance),
+            "Devin" => new DevinPlugin(credentials.Object, NullLogger<DevinPlugin>.Instance),
+            _ => new ClaudeCliPlugin(credentials.Object, NullLogger<ClaudeCliPlugin>.Instance),
+        };
         return (plugin.PluginPrefix, await plugin.GetTerminalStartSpecAsync(_root));
     }
 

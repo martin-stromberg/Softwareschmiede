@@ -25,7 +25,7 @@ public sealed class WpfE2ETests : WpfTestBase
     /// <summary>
     /// Führt die einfachen WPF-E2E-Szenarien für Projekt/Aufgabe und Einstellungen in einem App-Lifecycle aus.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void WpfBasisSzenarien()
     {
         SetLocalDirectoryWorkspaceMode("SeparateWorkingDirectory");

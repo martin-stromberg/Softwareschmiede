@@ -36,6 +36,7 @@
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\Softwareschmiede.Plugin.LocalDirectory.csproj" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.Codex\Softwareschmiede.Plugin.Codex.csproj" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\Softwareschmiede.Plugin.ClaudeCli.csproj" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.Devin\Softwareschmiede.Plugin.Devin.csproj" />
   </ItemGroup>
 
 </Project>

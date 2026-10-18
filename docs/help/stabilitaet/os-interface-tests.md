@@ -64,6 +64,8 @@ Regulaere Fehler gelten als Regressionsfehler. OS-Schnittstellen-Fehler werden s
 
 `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` bleibt fuer automatisierte Sandbox-Laeufe erhalten, in denen echte ConPTY-Isolation nicht funktioniert.
 
+`SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1` ueberspringt alle echten Fenster-E2E-Tests (FlaUI treibt ein reales WPF-Hauptfenster; Pruefung zentral in `WpfTestBase.LaunchApp` via `WpfE2EEnvironmentProbe`). Beide Flags sind im Job `os-interface tests` von `staging-ci.yml` und `pr-staging-ci.yml` gesetzt, weil GitHub-gehostete Runner keine interaktive Desktop-Session haben; lokal bleiben sie ungesetzt, damit die Lane die volle Breite abdeckt.
+
 Retry ist nicht zur Stabilisierung regulaerer Tests vorgesehen. Das Einzeltest-Skript wiederholt nur erkannte Infrastruktur-/Ausfuehrungsfehler nach Rebuild-Recovery. Fachliche Assertion-Fehler regulaerer Tests werden nicht kaschiert. OS-Schnittstellen-Fehler duerfen separat dokumentiert und bei bekannter Umgebungsflakiness getrennt bewertet werden.
 
 ## Externe Runner

@@ -21,6 +21,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
     [Theory]
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.114.0)", "›")]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.1.0", "❯")]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3000.11.92", "❭")]
     public async Task PendingProbe_ResendsAfterDelay_UpToCap(string provider, string arguments, string banner, string prompt)
     {
         var (prefix, spec) = await Spec(provider, arguments);
@@ -54,6 +55,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
     [Theory]
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.114.0)", "›", "Do you trust the contents of this directory?")]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.1.0", "❯", "Do you trust the files in this folder?")]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust true", "Devin CLI\nv3000.11.92", "❭", "Do you trust the authors of this directory?")]
     public async Task ProbeLostToTrustDialog_ResumesAfterAnswer(string provider, string arguments, string banner, string prompt, string trust)
     {
         var (prefix, spec) = await Spec(provider, arguments);
@@ -91,6 +93,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
     [Theory]
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.114.0)", "Do you trust the contents of this directory?")]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.1.0", "Is this a project you created or one you trust?")]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust true", "Devin CLI\nv3000.11.92", "Do you trust the authors of this directory?")]
     public async Task TrustPrompt_NeverReceivesProbeOrConfirmation(string provider, string arguments, string banner, string trust)
     {
         var (prefix, spec) = await Spec(provider, arguments);

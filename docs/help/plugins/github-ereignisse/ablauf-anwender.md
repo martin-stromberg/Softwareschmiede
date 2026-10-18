@@ -7,7 +7,7 @@
 - Das GitHub-Repository ist mit einer Aufgabe verknüpft; die Aufgabe enthält eine Issue- oder Pull-Request-Referenz.
 - In **Einstellungen → Plugins → GitHub → Authentifizierung** ist ein gültiger **Personal Access Token** gespeichert, der auf das Repository zugreifen darf.
 - Der Text enthält `$Softwareschmiede` und stammt vom Repository-Owner. Bei einer bearbeiteten Textfassung muss der Owner auch als Bearbeiter erkennbar sein.
-- Für die automatische CLI-Verarbeitung werden derzeit Codex CLI oder Claude CLI nur mit einem unterstützten, tatsächlich geprüften Schreibzugriff verwendet. Andere ausgewählte KI-Plugins können in der Ereignisverarbeitung wartend bleiben.
+- Für die automatische CLI-Verarbeitung werden derzeit Codex CLI, Claude CLI oder Devin CLI nur mit einem unterstützten, tatsächlich geprüften Schreibzugriff verwendet. Andere ausgewählte KI-Plugins können in der Ereignisverarbeitung wartend bleiben.
 
 ## Schritt-für-Schritt-Anleitung
 

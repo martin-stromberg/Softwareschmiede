@@ -60,6 +60,14 @@ public static class ScmCliAccessEvaluator
             paths.Add(Path.Combine(managed, "managed-settings.json"));
             paths.Add(Path.Combine(configHome, "managed-settings.json"));
         }
+        else if (prefix == "Softwareschmiede.Devin")
+        {
+            paths.Add(Path.Combine(userDirectory, ".devin", "config.json"));
+            var xdgHome = EnvironmentValue("XDG_CONFIG_HOME") ?? Path.Combine(userDirectory, ".config");
+            paths.Add(Path.Combine(xdgHome, "devin", "config.json"));
+            if (Path.IsPathFullyQualified(spec.WorkingDirectory))
+                paths.Add(Path.Combine(spec.WorkingDirectory, ".devin", "config.json"));
+        }
         return paths.Select(path => new ScmCliConfigurationFile(Path.GetFullPath(path), ReadConfiguration(path))).ToArray();
     }
 
@@ -91,7 +99,7 @@ public static class ScmCliAccessEvaluator
                     ? Result(ScmExchangeAccessStatus.Supported, "Deterministischer JSON-Simulator im gestarteten Arbeitsbereich.")
                     : Result(ScmExchangeAccessStatus.Unknown, "Diese Simulator-Sitzung ist eine Shell und kein KI-Eingabekanal.");
             }
-            if (prefix is not ("Softwareschmiede.Codex" or "Softwareschmiede.ClaudeCli"))
+            if (prefix is not ("Softwareschmiede.Codex" or "Softwareschmiede.ClaudeCli" or "Softwareschmiede.Devin"))
                 return Result(ScmExchangeAccessStatus.Unknown, "Für diese CLI ist kein Antwortkanal-Adapter verfügbar.");
             var tokens = Tokenize(spec.Arguments);
             string? mode = null;
@@ -149,7 +157,7 @@ public static class ScmCliAccessEvaluator
                             return Result(ScmExchangeAccessStatus.Unknown, "Codex-Konfigurationsvorgabe ist nicht unterstützt.");
                     }
                 }
-                else
+                else if (prefix == "Softwareschmiede.ClaudeCli")
                 {
                     using var document = JsonDocument.Parse(file.Content!);
                     foreach (var field in document.RootElement.EnumerateObject())
@@ -167,6 +175,37 @@ public static class ScmCliAccessEvaluator
                             }
                             else if (rule.Name == "allow") { /* acceptEdits still required; allow never cancels deny. */ }
                             else return Result(ScmExchangeAccessStatus.Unknown, "Unbekannte Claude-Berechtigungsvorgabe.");
+                        }
+                    }
+                }
+                else
+                {
+                    // Devin: config.json has no fully documented schema and may hold free-form keys.
+                    // Only rights-relevant fields are evaluated; the file-tool probe remains the
+                    // actual proof, so tolerant unknown keys cannot widen the channel grant.
+                    using var document = JsonDocument.Parse(file.Content!);
+                    if (document.RootElement.ValueKind != JsonValueKind.Object)
+                        return Result(ScmExchangeAccessStatus.Unknown, "Devin-Konfiguration ist nicht sicher auflösbar.");
+                    foreach (var field in document.RootElement.EnumerateObject())
+                    {
+                        if (field.Name is "permissionMode" or "permission_mode")
+                        {
+                            if (field.Value.ValueKind != JsonValueKind.String)
+                                return Result(ScmExchangeAccessStatus.Unknown, "Devin-Berechtigungsvorgabe ist nicht sicher auflösbar.");
+                            mode = field.Value.GetString();
+                        }
+                        else if (field.Name == "permissions")
+                        {
+                            if (field.Value.ValueKind != JsonValueKind.Object)
+                                return Result(ScmExchangeAccessStatus.Unknown, "Devin-Berechtigungsvorgabe ist nicht sicher auflösbar.");
+                            foreach (var rule in field.Value.EnumerateObject())
+                            {
+                                if (rule.Name is "deny" or "ask" &&
+                                    rule.Value.ValueKind == JsonValueKind.Array && rule.Value.GetArrayLength() != 0)
+                                    return Result(ScmExchangeAccessStatus.Denied, "Devin-Dateitoolzugriff ist durch Deny-/Ask-Regeln eingeschränkt.");
+                                if (rule.Name is "defaultMode" or "mode" && rule.Value.ValueKind == JsonValueKind.String)
+                                    mode = rule.Value.GetString();
+                            }
                         }
                     }
                 }
@@ -189,18 +228,54 @@ public static class ScmCliAccessEvaluator
                     }
                     continue;
                 }
-                if (prefix == "Softwareschmiede.ClaudeCli" && key == "--permission-mode")
+                if (prefix is "Softwareschmiede.ClaudeCli" or "Softwareschmiede.Devin" && key == "--permission-mode")
                 {
-                    if (++index >= tokens.Count) return Result(ScmExchangeAccessStatus.Unknown, "Claude-Permission-Modus fehlt.");
+                    if (++index >= tokens.Count) return Result(ScmExchangeAccessStatus.Unknown, "CLI-Permission-Modus fehlt.");
                     mode = tokens[index];
                     continue;
                 }
+                if (prefix == "Softwareschmiede.Devin")
+                {
+                    if (key.StartsWith("--permission-mode=", StringComparison.Ordinal))
+                    {
+                        mode = key["--permission-mode=".Length..];
+                        continue;
+                    }
+                    if (key == "--respect-workspace-trust")
+                    {
+                        // The documented optional value is accepted only explicitly; a bare flag
+                        // leaves the effective trust handling unresolvable.
+                        if (++index >= tokens.Count || tokens[index] is not ("true" or "false"))
+                            return Result(ScmExchangeAccessStatus.Unknown, "Devin-Workspace-Trust-Parameter ist unvollständig.");
+                        continue;
+                    }
+                    if (key.StartsWith("--respect-workspace-trust=", StringComparison.Ordinal))
+                    {
+                        if (key["--respect-workspace-trust=".Length..] is not ("true" or "false"))
+                            return Result(ScmExchangeAccessStatus.Unknown, "Devin-Workspace-Trust-Parameter ist nicht sicher auflösbar.");
+                        continue;
+                    }
+                    if (key is "-c" or "--continue" or "-r" or "--resume" or "--sandbox") continue;
+                    if (key.StartsWith("--resume=", StringComparison.Ordinal) && key.Length > "--resume=".Length) continue;
+                }
                 return Result(ScmExchangeAccessStatus.Unknown, "Freie CLI-Parameter, Profile, Arbeitsverzeichnis- oder Tool-Overrides sind nicht sicher auflösbar.");
             }
-            var supported = prefix == "Softwareschmiede.Codex" ? mode == "workspace-write" : mode == "acceptEdits";
+            if (prefix == "Softwareschmiede.Devin" && mode is null &&
+                spec.EnvironmentVariables.TryGetValue("DEVIN_PERMISSION_MODE", out var envMode) &&
+                !string.IsNullOrWhiteSpace(envMode))
+                mode = envMode;
+            var supported = prefix switch
+            {
+                "Softwareschmiede.Codex" => mode == "workspace-write",
+                // The classification only allows sending the content-free probe; the file tool
+                // must still prove actual channel I/O. accept-edits auto-approves workspace edits,
+                // dangerous/bypass additionally auto-approve other tools.
+                "Softwareschmiede.Devin" => mode is "accept-edits" or "dangerous" or "bypass",
+                _ => mode == "acceptEdits",
+            };
             return supported
                 ? Result(ScmExchangeAccessStatus.Supported, "Erfasste CLI-Konfiguration erlaubt Read/Write im tatsächlichen Arbeitsverzeichnis.")
-                : Result(ScmExchangeAccessStatus.Unknown, "Keine unterstützte automatische Dateifreigabe (Codex workspace-write / Claude acceptEdits) erfasst.");
+                : Result(ScmExchangeAccessStatus.Unknown, "Keine unterstützte automatische Dateifreigabe (Codex workspace-write / Claude acceptEdits / Devin accept-edits, dangerous oder bypass) erfasst.");
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {

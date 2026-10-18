@@ -48,7 +48,7 @@ public interface IScmPromptSessionAdapter
 }
 
 /// <summary>
-/// Adapter für die getesteten Codex-/Claude-Promptformate und den deterministischen JSON-Simulator.
+/// Adapter für die getesteten Codex-/Claude-/Devin-Promptformate und den deterministischen JSON-Simulator.
 /// Shells, Alt-Sessions und unbekannte CLI-Versionen bleiben sichtbar ungeklärt.
 /// </summary>
 public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposable
@@ -63,6 +63,7 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
         "do you trust the files in this folder",
         "is this a project you created or one you trust",
         "do you trust the contents of this directory",
+        "do you trust the authors of this directory",
     ];
     private readonly Guid _taskId;
     private readonly ScmExchangeAccess _access;
@@ -273,6 +274,8 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
         // Supported transcript versions are deliberately explicit. New/changed formats require a fixture.
         if (PluginPrefix == "Softwareschmiede.Codex" && text.Contains("OpenAI Codex (v0.114.0)", StringComparison.Ordinal)) _recognizedCli = true;
         if (PluginPrefix == "Softwareschmiede.ClaudeCli" && text.Contains("Claude Code v2.1.0", StringComparison.Ordinal)) _recognizedCli = true;
+        if (PluginPrefix == "Softwareschmiede.Devin" && text.Contains("Devin CLI", StringComparison.Ordinal) &&
+            text.Contains("v3000.11.92", StringComparison.Ordinal)) _recognizedCli = true;
         if (PluginPrefix == "Softwareschmiede.KiSimulator" && text.Contains("SCM_SIMULATOR_PROTOCOL_V1", StringComparison.Ordinal) &&
             _access.Status is ScmExchangeAccessStatus.Supported or ScmExchangeAccessStatus.Denied) _recognizedCli = true;
     }
@@ -289,7 +292,10 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
             if (_manuallyConfirmed) return;
             if (_inputRevision == _outputRevision) return;
             var prompt = lines[Math.Clamp(Session.Buffer.CursorRow, 0, lines.Length - 1)].Trim();
-            var busy = screen.Contains("esc to interrupt", StringComparison.OrdinalIgnoreCase) || screen.Contains("Esc to cancel", StringComparison.OrdinalIgnoreCase);
+            var busy = screen.Contains("esc to interrupt", StringComparison.OrdinalIgnoreCase) ||
+                screen.Contains("Esc to cancel", StringComparison.OrdinalIgnoreCase) ||
+                screen.Contains("esc twice to interrupt", StringComparison.OrdinalIgnoreCase) ||
+                screen.Contains("esc again to interrupt", StringComparison.OrdinalIgnoreCase);
             if (TrustDialogMarkers.Any(marker => screen.Contains(marker, StringComparison.OrdinalIgnoreCase)))
             {
                 // A blocking trust dialog swallows submitted text; it is a distinct, resolvable
@@ -305,7 +311,8 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
             }
             else if (busy) SetReady(ScmPromptReadyStatus.Busy);
             else if ((PluginPrefix == "Softwareschmiede.Codex" && prompt is "›" or "› Implement {feature}" or "› Explain this codebase") ||
-                     (PluginPrefix == "Softwareschmiede.ClaudeCli" && prompt == "❯"))
+                     (PluginPrefix == "Softwareschmiede.ClaudeCli" && prompt == "❯") ||
+                     (PluginPrefix == "Softwareschmiede.Devin" && (prompt == "❭" || prompt.StartsWith("❭ ", StringComparison.Ordinal))))
                 SetReady(ScmPromptReadyStatus.Ready);
             else SetReady(ScmPromptReadyStatus.Unknown);
         }

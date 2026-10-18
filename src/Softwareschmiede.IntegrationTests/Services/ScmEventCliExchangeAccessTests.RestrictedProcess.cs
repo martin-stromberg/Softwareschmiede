@@ -19,6 +19,8 @@ public sealed partial class ScmEventCliExchangeAccessTests
     [InlineData("Codex", false)]
     [InlineData("ClaudeCli", true)]
     [InlineData("ClaudeCli", false)]
+    [InlineData("Devin", true)]
+    [InlineData("Devin", false)]
     public async Task RestrictedWindowsProcess_ReadsWritesAndCompletesChannel_ButCannotWriteAppData(string provider, bool rename)
     {
         if (!OperatingSystem.IsWindows())
@@ -111,9 +113,9 @@ public sealed partial class ScmEventCliExchangeAccessTests
         try
         {
             ScmRestrictedProcessAccess.Capture(process).Should().ContainSingle().Which.Should().Be(sid);
-            var (prefix, originalSpec) = await Spec(provider, provider == "Codex" ? "--sandbox workspace-write" : "--permission-mode acceptEdits");
+            var (prefix, originalSpec) = await Spec(provider, GrantingArguments(provider));
             var spec = originalSpec with { WorkingDirectory = workspace };
-            var session = Session(provider == "Codex" ? "OpenAI Codex (v0.114.0)" : "Claude Code v2.1.0", provider == "Codex" ? "›" : "❯");
+            var session = Session(Banner(provider), PromptGlyph(provider));
             session.Object.Process.Id.Should().NotBe(process.Id, "the CLI parent is distinct from the restricted tool child");
             ScmRestrictedProcessAccess.Capture(session.Object.Process).Should().BeEmpty("the normal parent cannot prove the tool token");
             session.Setup(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -191,6 +193,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
     [Theory]
     [InlineData("Codex")]
     [InlineData("ClaudeCli")]
+    [InlineData("Devin")]
     public async Task RestrictedWindowsProcess_WithoutDedicatedCapability_DeniesChannel(string provider)
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("The restricted process proof requires Windows.");
@@ -199,8 +202,8 @@ public sealed partial class ScmEventCliExchangeAccessTests
         // The child may initialize in this workspace, but its non-inheritable right must never
         // be promoted into an explicit grant on the private channel's descendants.
         RestrictDirectory(_root, sid, inheritCapability: false);
-        var (prefix, spec) = await Spec(provider, provider == "Codex" ? "--sandbox workspace-write" : "--permission-mode acceptEdits");
-        var session = Session(provider == "Codex" ? "OpenAI Codex (v0.114.0)" : "Claude Code v2.1.0", provider == "Codex" ? "›" : "❯");
+        var (prefix, spec) = await Spec(provider, GrantingArguments(provider));
+        var session = Session(Banner(provider), PromptGlyph(provider));
         using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), Guid.NewGuid(), prefix, spec, session.Object, [], () => true);
         var channel = Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName);
         (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
@@ -236,6 +239,30 @@ public sealed partial class ScmEventCliExchangeAccessTests
             if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(); }
         }
     }
+
+    /// <summary>Whitelisted granting start contract per provider used throughout the channel tests.</summary>
+    private static string GrantingArguments(string provider) => provider switch
+    {
+        "Codex" => "--sandbox workspace-write",
+        "Devin" => "--permission-mode accept-edits --respect-workspace-trust false",
+        _ => "--permission-mode acceptEdits",
+    };
+
+    /// <summary>Pinned startup banner per provider as emitted by the supported CLI versions.</summary>
+    private static string Banner(string provider) => provider switch
+    {
+        "Codex" => "OpenAI Codex (v0.114.0)",
+        "Devin" => "Devin CLI\nv3000.11.92",
+        _ => "Claude Code v2.1.0",
+    };
+
+    /// <summary>Pinned ready-prompt glyph per provider.</summary>
+    private static string PromptGlyph(string provider) => provider switch
+    {
+        "Codex" => "›",
+        "Devin" => "❭",
+        _ => "❯",
+    };
 
     [SupportedOSPlatform("windows")]
     private static void RestrictDirectory(string path, string? restrictedSid = null, bool inheritCapability = true)

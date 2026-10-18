@@ -36,7 +36,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// und filtern, Repository-Dialog prüfen, Trennung offener/beendeter Aufgaben, sowie Löschen.
     /// Jede Phase räumt ihr Projekt auf, bevor die nächste beginnt.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ProjektDetailSzenarien()
     {
         var mainWindow = LaunchAppAndGetMainWindow();
