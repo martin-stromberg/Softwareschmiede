@@ -5,11 +5,14 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Prüft Trigger und tatsächlichen Bearbeiter, bevor fachliche Aufträge entstehen.</summary>
 public sealed class ScmEventValidationService
 {
+    private const string Trigger = "$Softwareschmiede";
+    private const string QuoteChars = "'\"`´‚‘’„“”«»";
+
     /// <summary>Prüft die vertrauenswürdige Provideridentität der beobachteten Textversion.</summary>
     public static string? GetRejection(ScmEventObservation observation)
     {
         var repository = observation.Reference.Repository;
-        if (!observation.Body.Contains("$Softwareschmiede", StringComparison.OrdinalIgnoreCase))
+        if (!HasFreeStandingTrigger(observation.Body))
             return "Kein Trigger";
         if (!SameIdentity(repository.OwnerId, repository.Owner, repository.ViewerId, repository.ViewerLogin))
             return "Angemeldeter Benutzer ist nicht Repository-Owner";
@@ -23,6 +26,21 @@ public sealed class ScmEventValidationService
         if (observation.Body.Contains("<!-- softwareschmiede:", StringComparison.Ordinal))
             return "Eigene Antwort";
         return null;
+    }
+
+    /// <summary>Der Trigger zählt nur frei stehend; unmittelbar zitierte Vorkommen lösen nichts aus.</summary>
+    private static bool HasFreeStandingTrigger(string body)
+    {
+        var index = -1;
+        while ((index = body.IndexOf(Trigger, index + 1, StringComparison.OrdinalIgnoreCase)) >= 0)
+        {
+            var before = index > 0 ? body[index - 1] : '\0';
+            var afterIndex = index + Trigger.Length;
+            var after = afterIndex < body.Length ? body[afterIndex] : '\0';
+            if (!QuoteChars.Contains(before) && !QuoteChars.Contains(after))
+                return true;
+        }
+        return false;
     }
 
     private static bool SameIdentity(string? leftId, string? leftLogin, string? rightId, string? rightLogin)

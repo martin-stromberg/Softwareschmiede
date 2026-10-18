@@ -20,6 +20,30 @@ public sealed class ScmEventValidationServiceTests
         Assert.Equal(valid, ScmEventValidationService.GetRejection(observation) is null);
     }
 
+    /// <summary>Der Trigger zählt nur frei stehend; von Zitatzeichen flankierte Vorkommen lösen nichts aus.</summary>
+    [Theory]
+    [InlineData("$Softwareschmiede bitte", true)]
+    [InlineData("Bitte $softwareschmiede das übernehmen.", true)]
+    [InlineData("($Softwareschmiede)", true)]
+    [InlineData("Trigger: $SOFTWARESCHMIEDE!", true)]
+    [InlineData("$Softwareschmiede\nZweite Zeile", true)]
+    [InlineData("'$Softwareschmiede'", false)]
+    [InlineData("\"$Softwareschmiede\"", false)]
+    [InlineData("`$Softwareschmiede`", false)]
+    [InlineData("´$Softwareschmiede", false)]
+    [InlineData("‚$Softwareschmiede‘", false)]
+    [InlineData("„$Softwareschmiede“", false)]
+    [InlineData("«$Softwareschmiede»", false)]
+    [InlineData("$Softwareschmiede's Trigger", false)]
+    [InlineData("Der Auslöser ‚$Softwareschmiede‘ soll nur frei stehend gelten.", false)]
+    [InlineData("Der Trigger „$Softwareschmiede“ legt keine Aufgabe an, wenn er zitiert wird.", false)]
+    [InlineData("Zitiert ‚$Softwareschmiede‘, ruft aber frei $Softwareschmiede auf.", true)]
+    public void TriggerMustBeFreeStanding(string body, bool valid)
+    {
+        var observation = Observe(body, "42", null, false);
+        Assert.Equal(valid, ScmEventValidationService.GetRejection(observation) is null);
+    }
+
     /// <summary>Bekannte IDs haben Vorrang vor ähnlich geschriebenen Logins.</summary>
     [Fact]
     public void LoginCannotOverrideDifferentIds()

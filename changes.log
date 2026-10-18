@@ -1,3 +1,7 @@
+## 2026-10-18 — SCM-Trigger nur bei frei stehendem $Softwareschmiede
+
+- `ScmEventValidationService` wertet den Trigger `$Softwareschmiede` (weiterhin case-insensitiv) nur noch dann, wenn ein Vorkommen nicht unmittelbar von einem Zitatzeichen flankiert ist (`'`, `"`, `` ` ``, `´`, `‚`, `‘`, `’`, `„`, `“`, `”`, `«`, `»`). Implementierungs-/Dokutexte, die den Trigger nur zitieren (z. B. `‚$Softwareschmiede‘`, „$Softwareschmiede“), legen damit keine Aufgaben mehr an; ein einziges frei stehendes Vorkommen im Mischtext genügt weiterhin.
+
 ## 2026-10-18 — Devin CLI im SCM-Antwortkanal
 
 - Devin CLI (`Softwareschmiede.Devin`) wird im SCM-Ereignis-Antwortkanal unterstützt: `ScmCliAccessEvaluator` wertet Devins Startvertrag (`--permission-mode accept-edits`/`dangerous`/`bypass`, `DEVIN_PERMISSION_MODE`, `--respect-workspace-trust`, `--model`, `--continue`, `--resume`, `--sandbox` sowie Devin-`config.json`-Berechtigungsregeln) aus; `ScmPromptSessionAdapter` erkennt Devin-Banner `v3000.11.92`, `❭`-Prompt, Busy-Hinweise und den Trust-Dialog. Der tatsächliche Dateizugriff wird weiterhin ausschließlich über die rungebundene Dateitool-Probe nachgewiesen.
