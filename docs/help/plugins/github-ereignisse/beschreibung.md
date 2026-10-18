@@ -8,9 +8,9 @@ Anfragen aus GitHub-Issues und Pull Requests können einer vorhandenen Aufgabe z
 
 ## Funktionsweise
 
-Die Anwendung prüft regelmäßig Texte in GitHub-Issues und Pull Requests, die lokal mit einer Aufgabe verknüpft sind. Dazu zählen Beschreibungen, Kommentare, Review-Kommentare und veröffentlichte Pull-Request-Reviews. Ein Text wird nur angenommen, wenn er `$Softwareschmiede` enthält und sein Autor beziehungsweise bei einer Bearbeitung der Bearbeiter der angemeldete Repository-Owner ist.
+Die Anwendung prüft regelmäßig Texte in GitHub-Issues und Pull Requests. Überwacht werden repository-weit alle offenen Issues und Pull Requests jedes aktivierten Projekt-Repositories; geschlossene Referenzen kommen hinzu, sobald sie seit der letzten Prüfung Aktivität zeigen. Dazu zählen Beschreibungen, Kommentare, Review-Kommentare und veröffentlichte Pull-Request-Reviews. Ein Text wird nur angenommen, wenn er `$Softwareschmiede` enthält und sein Autor beziehungsweise bei einer Bearbeitung der Bearbeiter der angemeldete Repository-Owner ist.
 
-Eingehende Texte erscheinen unter **SCM-Ereignisse**. Angenommene Kommentare und veröffentlichte Pull-Request-Reviews erhalten eine 👀-Reaktion; Beschreibungen nicht. Wenn keine CLI zur Verarbeitung bereitsteht, bleibt der Eintrag dort sichtbar und GitHub erhält einen kurzen Wartehinweis. Die KI kann die passende Antwort im ursprünglichen Issue oder Pull Request selbst wählen.
+Eingehende Texte erscheinen unter **SCM-Ereignisse**. Angenommene Kommentare und veröffentlichte Pull-Request-Reviews erhalten eine 👀-Reaktion; Beschreibungen nicht. Nach den Sicherheits- und Owner-Prüfungen wird die zugehörige Aufgabe automatisch gestartet — einschließlich der aus einem Ereignis neu angelegten Aufgaben: Die Anwendung klont das Repository, legt den Aufgaben-Branch an und startet die aufgelöste Standard-CLI (Aufgaben-, Projekt- oder globaler Standard). Wenn keine CLI zur Verarbeitung bereitsteht, bleibt der Eintrag dort sichtbar und GitHub erhält einen kurzen Wartehinweis. Die KI kann die passende Antwort im ursprünglichen Issue oder Pull Request selbst wählen.
 
 Für die CLI-Verarbeitung unterstützt die Anwendung aktuell Codex CLI und Claude CLI nur dann, wenn deren erkannte Version, Schreibberechtigungen und tatsächlicher Zugriff auf den privaten Antwortkanal geprüft werden können. Die Anwendung ändert diese Berechtigungen nicht. Der KI-Simulator funktioniert nur, wenn die Anwendung ihn eigens im SCM-Modus startet. GitHub Copilot CLI, Devin und andere Plugins können derzeit nicht für diese Ereigniszustellung verwendet werden; ein Plugin in der Auswahlliste bedeutet nicht automatisch, dass es diesen Kanal unterstützt.
 
@@ -23,6 +23,6 @@ Für die CLI-Verarbeitung unterstützt die Anwendung aktuell Codex CLI und Claud
 ## Einschränkungen
 
 - Derzeit überwacht nur das GitHub-SCM-Plugin Ereignisse. Andere SCM-Plugins erhalten dadurch keine Ereignisüberwachung.
-- Es werden nur lokal mit Aufgaben verknüpfte Issue- und Pull-Request-Referenzen geprüft. Nicht verknüpfte GitHub-Inhalte werden nicht erfasst.
+- Es werden nur Repositories überwacht, die an einem Projekt erfasst und aktiviert sind. Trifft ein qualifizierter Text an einer Referenz ohne lokale Aufgabe ein, wird die passende Aufgabe automatisch angelegt (Projekt aus dem überwachten Repository, Titel und Auftragstext aus den Ereignisdaten samt Quellverweis) und das Ereignis regulär verarbeitet. Geschlossene Referenzen werden nur dann einbezogen, wenn sie innerhalb des laufenden Aktivitätsfensters geändert wurden.
 - Polling sieht den bei einer Abfrage aktuellen Textstand. Zwischenzeitlich überschriebene oder gelöschte Textfassungen können nicht rekonstruiert werden.
 - Die Ereignisverarbeitung erfordert eine gültige GitHub-Anmeldung und passende Repository-Berechtigungen. Auch mit Codex oder Claude CLI kann ein Eintrag wartend bleiben, wenn Version, Berechtigungen oder Zugriff auf den geprüften Antwortkanal nicht unterstützt werden.

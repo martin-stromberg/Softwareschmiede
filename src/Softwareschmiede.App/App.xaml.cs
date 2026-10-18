@@ -259,6 +259,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ScmEventStore>();
         services.AddScoped<ScmEventOutbox>();
         services.AddScoped<ScmEventOrchestrator>();
+        services.AddScoped<ScmEventTaskResolver>();
         services.AddSingleton<ScmEventMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmEventMonitoringService>());
         services.AddSingleton<ScmEventExchangeService>();

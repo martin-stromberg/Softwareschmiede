@@ -9,7 +9,8 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Application.Services;
 
-/// <summary>Beobachtet ausschließlich lokal verknüpfte SCM-Referenzen und persistiert vollständige Quellen.</summary>
+/// <summary>Beobachtet lokal verknüpfte SCM-Referenzen sowie repository-weit alle Referenzen aktiver
+/// Projekt-Repositories und persistiert vollständige Quellen.</summary>
 public sealed class ScmEventMonitoringService(
     IServiceScopeFactory scopes, TimeProvider time, IOptions<ScmEventOptions> options,
     ScmEventStartupGate startup, ILogger<ScmEventMonitoringService> logger)
@@ -24,6 +25,7 @@ public sealed class ScmEventMonitoringService(
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         var tasks = await db.Aufgaben.AsNoTracking().Include(x => x.GitRepository).Include(x => x.IssueReferenz)
             .Include(x => x.PullRequests).Where(x => x.GitRepository != null && x.GitRepository.Aktiv).ToListAsync(ct);
+        var repositories = await db.GitRepositories.AsNoTracking().Where(x => x.Aktiv).ToListAsync(ct);
         var plugins = scope.ServiceProvider.GetRequiredService<IPluginManager>().GetSourceCodeManagementPlugins();
         var linked = new List<(Guid TaskId, GitRepository Repository, ScmReferenceKind Kind, int Number, string RepositoryId)>();
         foreach (var task in tasks)
@@ -38,19 +40,24 @@ public sealed class ScmEventMonitoringService(
         {
             if (plugin is not IScmEventSource source)
                 continue;
-            var resolved = new List<(Guid TaskId, ScmEventReference Reference)>();
+            var resolved = new List<(Guid? TaskId, ScmEventReference Reference)>();
+            var repositoriesForEnumeration = new List<ScmEventRepository>();
+            var localRepositories = new Dictionary<ScmEventRepository, List<GitRepository>>();
             var complete = true;
             // Resolve the entire local reference set before assigning any incoming event.
             // Raw HTTPS/SSH addresses and plugin display names are not repository identities.
-            foreach (var aliases in linked.Where(x =>
-                string.Equals(plugin.PluginPrefix, x.Repository.PluginTyp, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(plugin.PluginName, x.Repository.PluginTyp, StringComparison.OrdinalIgnoreCase))
-                .GroupBy(x => x.RepositoryId, StringComparer.OrdinalIgnoreCase))
+            var aliasGroups = linked.Where(x => MatchesPlugin(plugin, x.Repository))
+                .GroupBy(x => x.RepositoryId, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(x => x.Key, x => (Repository: x.First().Repository, Linked: x.ToList()), StringComparer.OrdinalIgnoreCase);
+            foreach (var repository in repositories.Where(x => MatchesPlugin(plugin, x)
+                && !string.IsNullOrWhiteSpace(x.RepositoryUrl)))
+                if (!aliasGroups.ContainsKey(repository.RepositoryUrl))
+                    aliasGroups[repository.RepositoryUrl] = (repository, []);
+            foreach (var (alias, aliasGroup) in aliasGroups)
             {
                 using var resolutionScope = scopes.CreateScope();
                 var resolutionDb = resolutionScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-                var local = aliases.First();
-                var resolutionKey = $"repository/{plugin.PluginPrefix.ToLowerInvariant()}/{Uri.EscapeDataString(aliases.Key.ToLowerInvariant())}";
+                var resolutionKey = $"repository/{plugin.PluginPrefix.ToLowerInvariant()}/{Uri.EscapeDataString(alias.ToLowerInvariant())}";
                 var checkpoint = await resolutionDb.ScmObservationCheckpoints.FindAsync([resolutionKey], ct);
                 if (checkpoint?.NextAttemptUtc > _time.GetUtcNow().ToUnixTimeMilliseconds())
                 {
@@ -59,14 +66,19 @@ public sealed class ScmEventMonitoringService(
                 }
                 try
                 {
-                    var repository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(local.Repository.Id, plugin.PluginPrefix, local.RepositoryId), ct);
-                    resolved.AddRange(aliases.Select(x => (x.TaskId, new ScmEventReference(repository, x.Kind, x.Number))));
+                    var repository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(aliasGroup.Repository.Id, plugin.PluginPrefix, alias), ct);
+                    resolved.AddRange(aliasGroup.Linked.Select(x => ((Guid?)x.TaskId, new ScmEventReference(repository, x.Kind, x.Number))));
+                    if (!localRepositories.TryGetValue(repository, out var candidates))
+                        localRepositories[repository] = candidates = [];
+                    if (candidates.All(x => x.Id != aliasGroup.Repository.Id))
+                        candidates.Add(aliasGroup.Repository);
                     if (checkpoint is not null)
                     {
                         resolutionDb.Remove(checkpoint);
                         await resolutionDb.SaveChangesAsync(ct);
                         resolutionScope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>().Notify();
                     }
+                    repositoriesForEnumeration.Add(repository);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception ex)
@@ -78,6 +90,14 @@ public sealed class ScmEventMonitoringService(
             }
             // An unresolved alias could name any of the resolved repositories. Do not guess an assignment.
             if (!complete) continue;
+            var enumerated = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var repository in repositoriesForEnumeration)
+            {
+                using var enumerationScope = scopes.CreateScope();
+                await EnumerateRepositoryAsync(source, repository,
+                    enumerationScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>(), enumerated,
+                    enumerationScope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>(), resolved, ct);
+            }
             foreach (var group in resolved.GroupBy(x => (Provider: x.Reference.Repository.ProviderPrefix.ToLowerInvariant(),
                 Host: x.Reference.Repository.Host.ToLowerInvariant(), x.Reference.Repository.RepositoryId, x.Reference.Kind, x.Reference.Number)))
             {
@@ -85,7 +105,7 @@ public sealed class ScmEventMonitoringService(
                 var kinds = reference.Kind == ScmReferenceKind.Issue
                     ? new[] { ScmContentKind.Description, ScmContentKind.IssueComment }
                     : new[] { ScmContentKind.Description, ScmContentKind.IssueComment, ScmContentKind.ReviewComment, ScmContentKind.PullRequestReview };
-                var taskIds = group.Select(x => x.TaskId).Distinct().ToArray();
+                var taskIds = group.Select(x => x.TaskId).OfType<Guid>().Distinct().ToArray();
                 foreach (var kind in kinds)
                 {
                     using var batchScope = scopes.CreateScope();
@@ -100,10 +120,22 @@ public sealed class ScmEventMonitoringService(
                         var request = new ScmEventReadRequest(reference, kind,
                             checkpoint?.WatermarkUtc is long watermark ? DateTimeOffset.FromUnixTimeMilliseconds(watermark) - options.Value.PollInterval * 2 : null, now);
                         if (await batchDb.ScmContentSnapshots.AnyAsync(x => x.ContentKey.StartsWith(sourceKey + "/")
-                            && (!x.IdentityResolved || x.Diagnostic == "Mehrdeutige Zuordnung zu Aufgaben"), ct))
+                            && (!x.IdentityResolved || x.Diagnostic == ScmEventStore.AmbiguousAssignmentDiagnostic
+                                || x.Diagnostic == ScmEventStore.UnassignedDiagnostic), ct))
                             request = request with { SinceUtc = null };
                         var batch = await source.ReadEventsAsync(request, ct);
-                        await batchScope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(taskIds.Length == 1 ? taskIds[0] : null, sourceKey, batch, ct);
+                        var aufgabeId = taskIds.Length == 1 ? taskIds[0] : (Guid?)null;
+                        var unassigned = taskIds.Length == 0;
+                        if (unassigned && localRepositories.TryGetValue(reference.Repository, out var candidates)
+                            && batch.Observations.FirstOrDefault(x => ScmEventValidationService.GetRejection(x) is null) is { } trigger)
+                        {
+                            var resolution = await batchScope.ServiceProvider.GetRequiredService<ScmEventTaskResolver>()
+                                .ResolveAsync(reference, source, trigger, candidates, ct);
+                            aufgabeId = resolution.AufgabeId;
+                            unassigned = resolution.Kind == ScmTaskResolutionKind.Unassigned;
+                        }
+                        await batchScope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(
+                            aufgabeId, sourceKey, batch, unassigned, ct);
                     }
                     catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                     catch (Exception ex)
@@ -130,6 +162,49 @@ public sealed class ScmEventMonitoringService(
                 using var dispatchScope = scopes.CreateScope();
                 await dispatchScope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(item.Id, ct: ct);
             }
+        }
+    }
+
+    private static bool MatchesPlugin(IGitPlugin plugin, GitRepository repository)
+        => string.Equals(plugin.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(plugin.PluginName, repository.PluginTyp, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Enumeriert ein kanonisch aufgelöstes Repository einmal pro Lauf und verwaltet dessen
+    /// eigenen Watermark-/Backoff-Checkpoint. Enumerationsfehler blockieren die Provider-Runde nicht.</summary>
+    private async Task EnumerateRepositoryAsync(IScmEventSource source, ScmEventRepository repository,
+        SoftwareschmiededDbContext db, HashSet<string> enumerated, ScmEventChangeNotifier notifier,
+        List<(Guid? TaskId, ScmEventReference Reference)> resolved, CancellationToken ct)
+    {
+        var enumerationKey = string.Join('/', new[] { "enumeration", repository.ProviderPrefix.ToLowerInvariant(),
+            repository.Host.ToLowerInvariant(), repository.RepositoryId }.Select(Uri.EscapeDataString));
+        if (!enumerated.Add(enumerationKey)) return;
+        var checkpoint = await db.ScmObservationCheckpoints.FindAsync([enumerationKey], ct);
+        var now = _time.GetUtcNow();
+        if (checkpoint?.NextAttemptUtc > now.ToUnixTimeMilliseconds()) return;
+        try
+        {
+            var sinceUtc = checkpoint?.WatermarkUtc is long watermark
+                ? DateTimeOffset.FromUnixTimeMilliseconds(watermark) - options.Value.PollInterval * 2
+                : (DateTimeOffset?)null;
+            var discovered = await source.EnumerateReferencesAsync(repository, sinceUtc, ct);
+            resolved.AddRange(discovered.Select(x => ((Guid?)null, x)));
+            if (checkpoint is null)
+            {
+                checkpoint = new ScmObservationCheckpoint { SourceKey = enumerationKey };
+                db.Add(checkpoint);
+            }
+            checkpoint.WatermarkUtc = now.ToUnixTimeMilliseconds();
+            checkpoint.Failures = 0;
+            checkpoint.NextAttemptUtc = null;
+            checkpoint.ErrorCode = null;
+            checkpoint.Diagnostic = null;
+            await db.SaveChangesAsync(ct);
+            notifier.Notify();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            await RecordFailureAsync(enumerationKey, ex, ct);
         }
     }
 

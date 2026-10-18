@@ -45,7 +45,17 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration) : I
                     return Json(new { data = new { node = Node(new ScmE2EText { Id = response.Id, Body = response.Body }, "RESPONSE_" + response.Id) } });
                 return Json(new { data = new { node = (object?)null } });
             }
-            var number = variables.GetProperty("number").GetInt32();
+            if (!variables.TryGetProperty("number", out var numberProperty))
+            {
+                // Enumeration: offene Referenzen aus den Szenario-Texten; geschlossene liefern nichts.
+                var field = query.Contains("pullRequests(", StringComparison.Ordinal) ? "pullRequests" : "issues";
+                var prKind = field == "pullRequests";
+                object[] nodes = query.Contains("[CLOSED", StringComparison.Ordinal) ? []
+                    : scenario.Texts.Where(x => x.PullRequest == prKind).Select(x => x.Number).Distinct()
+                        .Select(n => (object)new { number = n, updatedAt = DateTimeOffset.UtcNow }).ToArray();
+                return Json(new { data = new { repository = new Dictionary<string, object> { [field] = new { nodes, pageInfo = new { hasNextPage = false, endCursor = (string?)null } } } } });
+            }
+            var number = numberProperty.GetInt32();
             var pr = query.Contains("pullRequest(", StringComparison.Ordinal);
             if (query.Contains("reviews(", StringComparison.Ordinal))
                 return Json(new { data = new { repository = new { pullRequest = new { reviews = new { nodes = Array.Empty<object>(), pageInfo = new { hasNextPage = false, endCursor = (string?)null } } } } } });
@@ -69,6 +79,42 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration) : I
         }
         if (request.Method == "GET" && path.EndsWith("/reactions", StringComparison.Ordinal))
             return Json(responses.Where(x => x.Endpoint == path).Select(Remote));
+        var detail = Regex.Match(path, "^" + Repository + @"/(issues|pulls)/(\d+)$");
+        if (request.Method == "GET" && detail.Success)
+        {
+            var detailNumber = int.Parse(detail.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+            var detailPr = detail.Groups[1].Value == "pulls";
+            var title = scenario.Texts.FirstOrDefault(x => x.Number == detailNumber && x.PullRequest == detailPr)?.Titel
+                ?? $"SCM Referenz {detailNumber}";
+            var body = scenario.Texts.FirstOrDefault(x => x.Number == detailNumber && x.PullRequest == detailPr
+                && x.Kind == "Description")?.Body ?? string.Empty;
+            if (!detailPr)
+                return Json(new
+                {
+                    number = detailNumber,
+                    title,
+                    body,
+                    labels = Array.Empty<object>(),
+                    milestone = (object?)null,
+                    html_url = $"https://github.com/scm-owner/scm-e2e/issues/{detailNumber}"
+                });
+            return Json(new
+            {
+                number = detailNumber,
+                title,
+                body,
+                state = "open",
+                node_id = "PR_" + detailNumber,
+                html_url = $"https://github.com/scm-owner/scm-e2e/pull/{detailNumber}",
+                head = new
+                {
+                    @ref = $"scm-branch-{detailNumber}",
+                    sha = "sha" + detailNumber,
+                    repo = new { full_name = "scm-owner/scm-e2e", clone_url = "https://github.com/scm-owner/scm-e2e.git" }
+                },
+                @base = new { @ref = "main" }
+            });
+        }
         var match = Regex.Match(path, "^" + Repository + @"/(issues|pulls)/(\d+)/comments$");
         if (request.Method == "GET" && match.Success)
         {

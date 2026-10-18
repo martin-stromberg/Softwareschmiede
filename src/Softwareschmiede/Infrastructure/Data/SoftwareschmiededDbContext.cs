@@ -307,6 +307,8 @@ public sealed class SoftwareschmiededDbContext : DbContext
         modelBuilder.Entity<IssueReferenz>(e =>
         {
             e.HasKey(i => i.Id);
+            e.Property(i => i.SourceKey).HasMaxLength(700);
+            e.HasIndex(i => i.SourceKey).IsUnique();
         });
 
         // AlertReferenz

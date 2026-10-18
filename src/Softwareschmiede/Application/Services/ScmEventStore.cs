@@ -11,6 +11,10 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Atomare Inboxaufnahme, Wiederholungsplanung und instanzübergreifende Aufgabenleases.</summary>
 public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeNotifier notifier, TimeProvider time)
 {
+    /// <summary>Diagnose für Referenzen, die mehreren Aufgaben zugeordnet werden könnten.</summary>
+    public const string AmbiguousAssignmentDiagnostic = "Mehrdeutige Zuordnung zu Aufgaben";
+    /// <summary>Diagnose für Referenzen ohne zuordenbare lokale Aufgabe.</summary>
+    public const string UnassignedDiagnostic = "Keine Aufgabe zugeordnet";
     /// <summary>Serialisierungsregeln für die unveränderlichen Providerdaten.</summary>
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     /// <summary>Liest den unveränderlichen Ursprung.</summary>
@@ -24,7 +28,8 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
         => retryAfter?.ToUnixTimeMilliseconds() ?? now + (failures switch { <= 1 => 30_000L, 2 => 120_000L, 3 => 600_000L, _ => 1_800_000L }) + Random.Shared.Next(0, 3000);
 
     /// <summary>Speichert eine vollständig gelesene Quelle und ihren Watermark gemeinsam.</summary>
-    public async Task AcceptBatchAsync(Guid? aufgabeId, string sourceKey, ScmEventBatch batch, CancellationToken ct = default)
+    public async Task AcceptBatchAsync(Guid? aufgabeId, string sourceKey, ScmEventBatch batch,
+        bool unassigned = false, CancellationToken ct = default)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var checkpoint = await db.ScmObservationCheckpoints.FindAsync([sourceKey], ct);
@@ -40,13 +45,14 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
             reference.Number.ToString(System.Globalization.CultureInfo.InvariantCulture), batch.Request.ContentKind.ToString() }
             .Select(Uri.EscapeDataString)) + "/";
         var sourceSnapshots = await db.ScmContentSnapshots.Where(x => x.ContentKey.StartsWith(contentPrefix)).ToListAsync(ct);
+        var unassignedDiagnostic = unassigned ? UnassignedDiagnostic : AmbiguousAssignmentDiagnostic;
         foreach (var observation in batch.Observations.OrderBy(x => x.Revision).ThenBy(x => x.EventKey, StringComparer.Ordinal))
         {
             var snapshot = await db.ScmContentSnapshots.FindAsync([observation.ContentKey], ct);
-            var rejection = aufgabeId is null ? "Mehrdeutige Zuordnung zu Aufgaben" : ScmEventValidationService.GetRejection(observation);
+            var rejection = aufgabeId is null ? unassignedDiagnostic : ScmEventValidationService.GetRejection(observation);
             var resolved = aufgabeId is not null && rejection != "Bearbeiter nicht bestimmbar";
             if (snapshot is not null && snapshot.BodyHash == observation.BodyHash && snapshot.IdentityResolved
-                && snapshot.Diagnostic != "Mehrdeutige Zuordnung zu Aufgaben")
+                && snapshot.Diagnostic != AmbiguousAssignmentDiagnostic && snapshot.Diagnostic != UnassignedDiagnostic)
                 continue;
             if (snapshot is null)
             {
@@ -73,8 +79,9 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
         checkpoint.Failures = 0;
         checkpoint.NextAttemptUtc = null;
         checkpoint.ErrorCode = null;
-        checkpoint.Diagnostic = aufgabeId is null || sourceSnapshots.Any(x => x.Diagnostic == "Mehrdeutige Zuordnung zu Aufgaben")
-            ? "Mehrdeutige Zuordnung zu Aufgaben" : null;
+        checkpoint.Diagnostic = aufgabeId is null ? unassignedDiagnostic
+            : sourceSnapshots.Any(x => x.Diagnostic == AmbiguousAssignmentDiagnostic) ? AmbiguousAssignmentDiagnostic
+            : sourceSnapshots.Any(x => x.Diagnostic == UnassignedDiagnostic) ? UnassignedDiagnostic : null;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         if (visibleChange || checkpoint.Diagnostic is not null) notifier.Notify();

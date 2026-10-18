@@ -125,19 +125,25 @@ internal sealed class ScmE2EFixture
 
     public SoftwareschmiededDbContext OpenDatabase() => new(new DbContextOptionsBuilder<SoftwareschmiededDbContext>().UseSqlite($"Data Source={DatabasePath}").Options);
 
-    public async Task<ScmIncomingEvent> WaitEventAsync(int number, string status, long? remoteId = null)
+    public Task<ScmIncomingEvent> WaitEventAsync(int number, string status, long? remoteId = null)
+        => WaitEventCoreAsync(TaskIds[number], status, remoteId, "SCM Aufgabe " + number);
+
+    public Task<ScmIncomingEvent> WaitEventForTaskAsync(Guid taskId, string status, long? remoteId = null)
+        => WaitEventCoreAsync(taskId, status, remoteId, "Aufgabe " + taskId);
+
+    private async Task<ScmIncomingEvent> WaitEventCoreAsync(Guid taskId, string status, long? remoteId, string label)
     {
         ScmIncomingEvent? last = null;
         var deadline = DateTime.UtcNow.AddSeconds(60);
         while (DateTime.UtcNow < deadline)
         {
             await using var db = OpenDatabase();
-            var events = await db.ScmIncomingEvents.AsNoTracking().Where(x => x.AufgabeId == TaskIds[number]).OrderBy(x => x.Sequence).ToListAsync();
+            var events = await db.ScmIncomingEvents.AsNoTracking().Where(x => x.AufgabeId == taskId).OrderBy(x => x.Sequence).ToListAsync();
             last = remoteId is null ? events.LastOrDefault() : events.SingleOrDefault(x => ScmEventStore.Observation(x).RemoteNodeId.EndsWith("_" + remoteId, StringComparison.Ordinal));
             if (last?.Status == status) return last;
             await Task.Delay(100);
         }
-        throw new TimeoutException($"SCM Aufgabe {number}: erwartet {status}, tatsächlich {last?.Status}: {last?.Reason}. Fixture: {Configuration.TestRoot}");
+        throw new TimeoutException($"{label}: erwartet {status}, tatsächlich {last?.Status}: {last?.Reason}. Fixture: {Configuration.TestRoot}");
     }
 
     public async Task WaitForPollAsync()

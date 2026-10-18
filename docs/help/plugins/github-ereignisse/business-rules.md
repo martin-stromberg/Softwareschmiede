@@ -8,11 +8,17 @@ Ein Text ist nur gültig, wenn er `$Softwareschmiede` ohne Beachtung der Groß-/
 
 ## Eindeutige Aufgabenreferenz
 
-Nur lokal verknüpfte aktive Repository-Referenzen werden beobachtet. Eine Remote-Referenz, die mehreren Aufgaben zugeordnet ist, wird nicht willkürlich zugestellt; der Konflikt bleibt als Diagnose sichtbar.
+Beobachtet werden alle Referenzen aktivierter Projekt-Repositories (`GitRepository.Aktiv`) sowie die an Aufgaben verknüpften Referenzen. Eine Remote-Referenz, die mehreren Aufgaben zugeordnet ist („Mehrdeutige Zuordnung zu Aufgaben"), wird nicht willkürlich zugestellt; der Konflikt bleibt als Diagnose sichtbar.
+
+Referenzen ohne zuordenbare Aufgabe durchlaufen bei einem qualifizierten Ereignis die Aufgabenauflösung (`ScmEventTaskResolver`): Gehört die Referenz zu genau einer Aufgabe, wird diese wiederverwendet; existiert keine, wird sie aus den Ereignisdaten angelegt — Issue-Anlagen über `IssueNummer` plus kanonischem `IssueReferenz.SourceKey`-Dedupschlüssel, Pull-Request-Anlagen über den Referenzschlüssel `Provider` + `RepositoryId` + `PullRequestNumber` mit dem bestehenden Unique-Index. Wiederholte Polls, erneut eintreffende Ereignisse und Anlagerennen erzeugen keine Duplikate. Referenzen, zu denen sich keine Aufgabe anlegen lässt (z. B. remote verschwunden), erhalten weiterhin die Diagnose „Keine Aufgabe zugeordnet".
 
 ## Aufgabenstatus und CLI
 
-Beendete, archivierte und pausierte Aufgaben werden nicht automatisch aktiviert. Eine lebende unterstützte CLI hat Vorrang vor einem Standard. Ohne Sitzung wird die konfigurierte Aufgaben-, Projekt- oder globale CLI verwendet; fehlt eine geeignete CLI, bleibt das Ereignis wartend. Die manuelle Queue-Auswahl kann eine neue, nicht beendete Aufgabe aktivieren.
+Beendete, archivierte und pausierte Aufgaben werden nicht automatisch aktiviert — das gilt auch für wiederverwendete Aufgaben im automatischen Pfad; ihr Ereignis bleibt mit Grund wartend. Neue, nicht blockierte Aufgaben werden pro Zustellversuch automatisch gestartet (`Neu` → `Gestartet`; Klon, Branch und CLI-Start über `EntwicklungsprozessService`). Eine lebende unterstützte CLI hat Vorrang vor einem Standard. Ohne Sitzung wird die konfigurierte Aufgaben-, Projekt- oder globale CLI verwendet; fehlt eine geeignete CLI, bleibt das Ereignis wartend. Die manuelle Queue-Auswahl kann eine neue, nicht beendete Aufgabe aktivieren.
+
+## Anlage bei fehlender Standard-CLI
+
+Die automatische Aufgabenanlage erfolgt **auch dann, wenn keine Standard-CLI auflösbar ist** (fachliche Entscheidung): Die Aufgabe ist sofort in der Aufgabenverwaltung sichtbar, das Ereignis bleibt mit der Aufforderung „Keine Standard-CLI konfiguriert. Ereignis öffnen und CLI auswählen." wartend und wird nach CLI-Auswahl oder -Konfiguration (plus „Erneut prüfen" oder dem nächsten Poll) zugestellt. `SourceKey`-/Referenz-Dedup verhindert Duplikatanlagen über die Wartezeit hinweg; Ereignisse gehen nicht verloren.
 
 ## Zustellung und Abschluss
 

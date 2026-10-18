@@ -1,6 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Tests.E2E.Views.Dialogs;
 using Softwareschmiede.Tests.E2E.Views;
@@ -290,6 +291,51 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Equal(current.DeliveryAttemptId, late.DeliveryAttemptId);
         Assert.Equal(promptCount + 2, fixture.Prompts().Count);
         output.WriteLine("E3-Ungewissheit: late valid completion of still-current attempt resolves without any resend.");
+
+        fixture.AddText(20, 2001, "$Softwareschmiede Aufgabe anlegen");
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        Aufgabe? created = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            await using var db = fixture.OpenDatabase();
+            created = await db.Aufgaben.Include(x => x.IssueReferenz)
+                .SingleOrDefaultAsync(x => x.IssueReferenz != null && x.IssueReferenz.IssueNummer == 20);
+            if (created is not null) break;
+            await Task.Delay(200);
+        }
+        Assert.NotNull(created);
+        Assert.Equal("SCM Referenz 20", created!.Titel);
+        Assert.Contains("$Softwareschmiede Aufgabe anlegen", created.AnforderungsBeschreibung);
+        await using (var db = fixture.OpenDatabase())
+        {
+            Assert.Equal(18, await db.Aufgaben.CountAsync());
+            var item = Assert.Single(await db.ScmIncomingEvents.Where(x => x.AufgabeId == created.Id).ToListAsync());
+            Assert.Equal(20, ScmEventStore.Observation(item).Reference.Number);
+        }
+        output.WriteLine("E7-Anlage: qualified event on unassigned reference creates exactly one task with issue reference and inbox entry.");
+
+        // The auto-created task has no default CLI, so its event waits with an actionable reason.
+        var waiting = await fixture.WaitEventForTaskAsync(created.Id, "Wartend");
+        Assert.Contains("Keine Standard-CLI", waiting.Reason);
+        promptCount = fixture.Prompts().Count;
+        SelectEventByTitle(window, "SCM Referenz 20", "/issues/20");
+        Assert.Contains("Keine Standard-CLI", Element(window, "ScmEventReason").Name);
+        StartSelected(window);
+        await fixture.WaitEventForTaskAsync(created.Id, "Verarbeitet");
+        await using (var db = fixture.OpenDatabase())
+        {
+            var deliveredTask = (await db.Aufgaben.FindAsync(created.Id))!;
+            Assert.Equal(AufgabeStatus.Gestartet, deliveredTask.Status);
+            Assert.NotNull(deliveredTask.LokalerKlonPfad);
+            Assert.StartsWith(fixture.Configuration.TestRoot, deliveredTask.LokalerKlonPfad);
+            Assert.True(System.IO.Directory.Exists(System.IO.Path.Combine(deliveredTask.LokalerKlonPfad, ".git")));
+            Assert.StartsWith("task/issue-20-", deliveredTask.BranchName);
+            Assert.Equal("Softwareschmiede.KiSimulator", deliveredTask.KiPluginPrefix);
+        }
+        Assert.Equal(promptCount + 1, fixture.Prompts().Count);
+        Assert.Equal("$Softwareschmiede Aufgabe anlegen",
+            fixture.Prompts().Last().GetProperty("request").GetProperty("body").GetString());
+        output.WriteLine("E8: auto-created task waits actionably without default CLI; queue selection starts clone/CLI and delivers exactly once.");
     }
 
     private async Task MissingVariantsAsync(Window window, ScmE2EFixture fixture)
@@ -468,22 +514,25 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
     }
 
     private static void SelectEvent(Window window, int number)
+        => SelectEventByTitle(window, "SCM Aufgabe " + number, "/" + number);
+
+    private static void SelectEventByTitle(Window window, string title, string originSuffix)
     {
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
             var rows = Element(window, "ScmEventList").AsDataGridView().Rows;
-            var row = rows.FirstOrDefault(x => x.Cells.Length > 0 && x.Cells[0].Value == "SCM Aufgabe " + number);
+            var row = rows.FirstOrDefault(x => x.Cells.Length > 0 && x.Cells[0].Value == title);
             if (row is not null)
             {
                 row.Patterns.SelectionItem.Pattern.Select();
                 var origin = window.FindFirstDescendant(cf => cf.ByAutomationId("ScmEventOrigin"))?.AsTextBox().Text;
                 if (Uri.TryCreate(origin, UriKind.Absolute, out var uri)
-                    && uri.AbsolutePath.EndsWith("/" + number, StringComparison.Ordinal)) return;
+                    && uri.AbsolutePath.EndsWith(originSuffix, StringComparison.Ordinal)) return;
             }
             Thread.Sleep(100);
         }
-        throw new TimeoutException("SCM-Ereigniszeile fehlt: " + number);
+        throw new TimeoutException("SCM-Ereigniszeile fehlt: " + title);
     }
 
     private static void StartSelected(Window window)

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Infrastructure.Plugins;
@@ -90,6 +91,89 @@ public sealed partial class GitHubPlugin
             }
         }
         return new(request, observations.OrderBy(x => x.Revision).ThenBy(x => x.EventKey, StringComparer.Ordinal).ToArray());
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ScmEventReference>> EnumerateReferencesAsync(ScmEventRepository repository,
+        DateTimeOffset? sinceUtc, CancellationToken ct = default)
+    {
+        if (!repository.ProviderPrefix.Equals(PluginPrefix, StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(repository.RepositoryId)
+            || !ParseEventRepository($"https://{repository.Host}/{repository.Owner}/{repository.Name}").Host
+                .Equals(repository.Host, StringComparison.OrdinalIgnoreCase))
+            throw Permanent("Ungültiger GitHub-Ereignisursprung.");
+        var references = new List<ScmEventReference>();
+        await CollectReferencesAsync(repository, ScmReferenceKind.Issue, "issues", "[OPEN]", null, references, ct);
+        await CollectReferencesAsync(repository, ScmReferenceKind.PullRequest, "pullRequests", "[OPEN]", null, references, ct);
+        if (sinceUtc is { } since)
+        {
+            await CollectReferencesAsync(repository, ScmReferenceKind.Issue, "issues", "[CLOSED]", since, references, ct);
+            await CollectReferencesAsync(repository, ScmReferenceKind.PullRequest, "pullRequests", "[CLOSED,MERGED]", since, references, ct);
+        }
+        return references;
+    }
+
+    /// <inheritdoc />
+    public async Task<Issue?> ReadIssueAsync(ScmEventReference reference, CancellationToken ct = default)
+    {
+        ValidateReference(reference);
+        if (reference.Kind != ScmReferenceKind.Issue) throw Permanent("Issue-Anlagedaten benötigen eine Issue-Referenz.");
+        var repository = reference.Repository;
+        var element = await EventApiAsync(repository.Host, "GET", $"{RepositoryEndpoint(repository)}/issues/{reference.Number}", null, false, ct);
+        if (element.ValueKind != JsonValueKind.Object) throw Permanent("Unvollständige GitHub-Antwort.");
+        // Der Issues-Endpunkt liefert auch Pull Requests; eine fremde Referenzart ist nicht anlegbar.
+        if (Object(element, "pull_request").ValueKind == JsonValueKind.Object) return null;
+        var labels = Object(element, "labels").ValueKind == JsonValueKind.Array
+            ? element.GetProperty("labels").EnumerateArray().Select(x => String(x, "name"))
+                .Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!).ToArray()
+            : Array.Empty<string>();
+        return new Issue(int.Parse(Required(element, "number"), CultureInfo.InvariantCulture),
+            String(element, "title") ?? string.Empty, String(element, "body"), labels,
+            String(Object(element, "milestone"), "title"), String(element, "html_url") ?? String(element, "url"));
+    }
+
+    /// <inheritdoc />
+    public async Task<PullRequest?> ReadPullRequestAsync(ScmEventReference reference, CancellationToken ct = default)
+    {
+        ValidateReference(reference);
+        if (reference.Kind != ScmReferenceKind.PullRequest) throw Permanent("Pull-Request-Anlagedaten benötigen eine Pull-Request-Referenz.");
+        var repository = reference.Repository;
+        var repositoryId = PullRequestRepositoryId.Normalize(PullRequestProvider.GitHub, $"{repository.Owner}/{repository.Name}");
+        var element = await EventApiAsync(repository.Host, "GET", $"{RepositoryEndpoint(repository)}/pulls/{reference.Number}", null, false, ct);
+        if (element.ValueKind != JsonValueKind.Object) throw Permanent("Unvollständige GitHub-Antwort.");
+        var pullRequest = ParsePullRequest(element, repositoryId);
+        return pullRequest is not null && pullRequest.Nummer == reference.Number ? pullRequest : null;
+    }
+
+    /// <summary>Liest eine paginierte Referenzliste; jüngste Aktivität zuerst, Abbruch am <paramref name="cutoff"/>.</summary>
+    private async Task CollectReferencesAsync(ScmEventRepository repository, ScmReferenceKind kind, string field,
+        string states, DateTimeOffset? cutoff, List<ScmEventReference> target, CancellationToken ct)
+    {
+        var variables = new Dictionary<string, object?> { ["owner"] = repository.Owner, ["name"] = repository.Name };
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        string? cursor = null;
+        do
+        {
+            variables["cursor"] = cursor;
+            var data = await GraphAsync(repository.Host,
+                "query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){" + field
+                + "(first:100,states:" + states + ",orderBy:{field:UPDATED_AT,direction:DESC},after:$cursor){nodes{number updatedAt} pageInfo{hasNextPage endCursor}}}}",
+                variables, false, ct);
+            var connection = Object(Object(data, "repository"), field);
+            var reachedCutoff = false;
+            foreach (var node in RequiredArray(connection, "nodes"))
+            {
+                if (cutoff is not null && Date(node, "updatedAt") is { } updated && updated < cutoff)
+                {
+                    reachedCutoff = true;
+                    break;
+                }
+                if (!int.TryParse(String(node, "number"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) || number <= 0)
+                    throw Permanent("Unvollständige GitHub-Antwort.");
+                target.Add(new ScmEventReference(repository, kind, number));
+            }
+            cursor = reachedCutoff ? null : NextCursor(connection, visited);
+        } while (cursor is not null);
     }
 
     private static void AddObservation(ScmEventReadRequest request, JsonElement node, string? remoteId, List<ScmEventObservation> target)
