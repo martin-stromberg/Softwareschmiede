@@ -35,6 +35,44 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         Git("status", "--porcelain").Should().BeEmpty();
     }
 
+    /// <summary>Ein konfigurierter Anhang erscheint als eigenes promptSuffix-Feld nur im Prompt —
+    /// request.json und der unveränderliche Auftrag bleiben frei davon; Zeilenumbrüche bleiben JSON-Daten.</summary>
+    [Fact]
+    public async Task Prepare_PromptSuffixAppearsOnlyInPrompt_NotInStoredRequest()
+    {
+        var suffix = "Bearbeitungsregeln:\nImmer Tests ausführen.";
+        var request = Request();
+        var attempt = await _protocol.PrepareAsync(request, _root, promptSuffix: suffix);
+        attempt.PromptSuffix.Should().Be(suffix);
+        attempt.Prompt.Any(char.IsControl).Should().BeFalse("der Anhang muss einzeilig im JSON-Prompt kodiert bleiben");
+        using var document = JsonDocument.Parse(attempt.Prompt);
+        document.RootElement.GetProperty("promptSuffix").GetString().Should().Be(suffix);
+        document.RootElement.GetProperty("request").GetProperty("body").GetString().Should().Be(request.Body);
+        JsonSerializer.Deserialize<ScmExchangeRequest>(await File.ReadAllTextAsync(attempt.RequestPath), Json).Should().Be(request);
+    }
+
+    /// <summary>Ohne Anhang bleibt der Prompt unverändert: Es gibt kein leeres promptSuffix-Feld.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Prepare_EmptyPromptSuffix_OmitsField(string? suffix)
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root, promptSuffix: suffix);
+        using var document = JsonDocument.Parse(attempt.Prompt);
+        document.RootElement.TryGetProperty("promptSuffix", out _).Should().BeFalse();
+    }
+
+    /// <summary>Die lokale Kanalprobe ist kein SCM-Ereignis und erhält grundsätzlich keinen Anhang.</summary>
+    [Fact]
+    public void AccessProbePrompt_NeverCarriesAPromptSuffix()
+    {
+        var probe = new ScmExchangeAccessProbe(Guid.NewGuid(), "nonce", "fingerprint",
+            Path.Combine(_root, "probe"), []);
+        using var document = JsonDocument.Parse(ScmEventExchangeProtocol.BuildAccessProbePrompt(probe));
+        document.RootElement.TryGetProperty("promptSuffix", out _).Should().BeFalse();
+    }
+
     /// <summary>An occupied or tracked channel is never overwritten.</summary>
     [Theory]
     [InlineData(false)]

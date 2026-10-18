@@ -183,8 +183,12 @@ public sealed class ScmEventOrchestrator(
                 if (access.Status != ScmExchangeAccessStatus.Supported)
                 { await WaitWithCommentAsync(item, observation, responder, "Antwortkanal für diese CLI nicht verfügbar: " + access.Reason, ct); return; }
                 var attemptId = Guid.NewGuid();
+                // Konfigurierte Prompt-Anhänge werden erst hier — bei der tatsächlichen Zustellung —
+                // aufgelöst und nur in den Prompt eingefügt: Der gespeicherte Ereignistext, die
+                // Trigger-Gegenprüfung, Dedup/BodyHash und request.json bleiben unverändert.
+                var promptSuffix = ScmPromptAppendix.Resolve(observation, await einstellungen.GetScmPromptAppendicesAsync(ct));
                 var attempt = await exchange.PrepareAsync(new(item.Id, attemptId, adapter.CliRunId, task.Id, observation.Body,
-                    observation.ContentKind.ToString(), $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url), adapter.WorkingDirectory, ct, access.RestrictedWriteSids);
+                    observation.ContentKind.ToString(), $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url), adapter.WorkingDirectory, ct, access.RestrictedWriteSids, promptSuffix);
                 if (!ReferenceEquals(adapter, cli.GetScmPromptSession(task.Id)) || !adapter.IsAlive)
                 { await WaitAsync(item, "CLI-Sitzung hat sich geändert. Erneut prüfen.", ct); return; }
                 // A cancellation between preparation and write wins over the tracked delivery state.
