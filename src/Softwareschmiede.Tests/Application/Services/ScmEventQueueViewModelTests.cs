@@ -154,6 +154,51 @@ public sealed class ScmEventQueueViewModelTests
         Assert.Null(view.MonitoringNotice);
     }
 
+    /// <summary>Unassigned references are the expected repo-wide state: no interruption banner and no
+    /// diagnostics entry, while real observation errors on other sources still alarm.</summary>
+    [Fact]
+    public async Task UnassignedSources_NeitherBannerNorDiagnostics_RealErrorsStillAlarm()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
+            {
+                SourceKey = "github/github.com/owner%2Frepo/Issue/1/Description",
+                Diagnostic = ScmEventStore.UnassignedDiagnostic
+            });
+            db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
+            {
+                SourceKey = "github/github.com/owner%2Frepo/PullRequest/2/ReviewComment",
+                Diagnostic = ScmEventStore.UnassignedDiagnostic
+            });
+            await db.SaveChangesAsync();
+        }
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+        await view.RefreshAsync();
+        Assert.Null(view.MonitoringNotice);
+        Assert.DoesNotContain(ScmEventStore.UnassignedDiagnostic, view.Diagnostics ?? string.Empty);
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
+            {
+                SourceKey = "repository/github/owner%2Frepo",
+                ErrorCode = "Authentication",
+                Diagnostic = "GitHub-Anmeldung ungültig. Bitte erneut anmelden und anschließend Quellen erneut prüfen.",
+                NextAttemptUtc = long.MaxValue
+            });
+            await db.SaveChangesAsync();
+        }
+        await view.RefreshAsync();
+        Assert.Contains("neue Anfragen können fehlen", view.MonitoringNotice);
+        Assert.Contains("erneut anmelden", view.MonitoringNotice);
+        Assert.DoesNotContain(ScmEventStore.UnassignedDiagnostic, view.Diagnostics ?? string.Empty);
+        Assert.Contains("GitHub-Anmeldung ungültig", view.Diagnostics);
+    }
+
     private static ScmEventQueueViewModel View(IServiceScopeFactory scopes, ScmDispatchFixture fixture)
         => new(scopes, fixture.Services.GetRequiredService<ScmEventChangeNotifier>(), Mock.Of<IDialogService>(), NullLogger<ScmEventQueueViewModel>.Instance);
 
