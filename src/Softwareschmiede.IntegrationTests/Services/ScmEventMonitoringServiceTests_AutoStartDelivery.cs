@@ -52,6 +52,44 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         Assert.Single(fixture.Prompts);
     }
 
+    /// <summary>Ohne Aufgaben- und Projekt-Plugin nutzt die automatisch angelegte Aufgabe die in den
+    /// Einstellungen konfigurierte Standard-CLI (ki.plugin.default, gespeicherter PluginName) und das
+    /// Ereignis wird im selben Lauf zugestellt.</summary>
+    [Fact]
+    public async Task Monitor_CreatedTaskWithSettingsDefaultCli_StartsAndDelivers()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var repositoryId = await AddRepositoryAsync(fixture);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureObservations(fixture);
+        ConfigureIssue(fixture, 9);
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
+                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator");
+
+        await Monitor(fixture).RunOnceAsync();
+
+        using var verification = fixture.Services.CreateScope();
+        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var task = Assert.Single(await db.Aufgaben.Include(x => x.IssueReferenz).ToListAsync());
+        Assert.Equal(AufgabeStatus.Gestartet, task.Status);
+        Assert.Equal(AufgabeAusfuehrungsStatus.Aktiv, task.AusfuehrungsStatus);
+        Assert.Equal(repositoryId, task.GitRepositoryId);
+        Assert.Equal(ScmDispatchFixture.KiPrefix, task.KiPluginPrefix);
+        Assert.NotNull(task.LokalerKlonPfad);
+        Assert.StartsWith(fixture.Root, task.LokalerKlonPfad);
+        Assert.NotNull(task.BranchName);
+        Assert.StartsWith("task/issue-9-", task.BranchName);
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        Assert.Equal(task.Id, item.AufgabeId);
+        Assert.Equal("Zugestellt", item.Status);
+        Assert.NotNull(item.DeliveryAttemptId);
+        Assert.NotNull(item.CliRunId);
+        Assert.Single(fixture.Sessions);
+        Assert.Single(fixture.Prompts);
+    }
+
     /// <summary>Ohne Standard-CLI wird die Aufgabe dennoch angelegt (Entscheidung) und das Ereignis
     /// bleibt mit bedienbarer Aufforderung wartend — ohne Duplikat bei Folgeläufen. Nach der
     /// CLI-Konfiguration führt „Erneut prüfen" zur Zustellung.</summary>
