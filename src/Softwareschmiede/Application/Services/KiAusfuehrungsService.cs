@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.Application.Services;
@@ -236,6 +237,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             var effectiveWorkdir = await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(localRepoPath, startConfig, gitPlugin, ct).ConfigureAwait(false);
 
             var spec = await kiPlugin.GetTerminalStartSpecAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
+            spec = await WithScmAgentEnvironmentAsync(spec, gitPlugin, ct).ConfigureAwait(false);
             try { ScmCliWorkspaceTrust.EnsureTrusted(kiPlugin.PluginPrefix, spec); }
             catch (Exception ex)
             {
@@ -352,6 +354,46 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         {
             _startLock.Release();
         }
+    }
+
+    /// <summary>Ergänzt die vom Repository-SCM-Plugin bereitgestellte Agenten-Anbindung (z. B.
+    /// <c>GH_TOKEN</c> der <c>gh</c>-CLI) in der Prozessumgebung des CLI-Starts: Erlaubte
+    /// Issue-/PR-Aktionen führt der Agent im Arbeitsverzeichnis selbst aus und arbeitet dafür
+    /// mit denselben Berechtigungen wie der Host. Die Werte können Geheimnisse enthalten;
+    /// sie werden ausschließlich in <see cref="TerminalSessionStartSpec.EnvironmentVariables"/>
+    /// übergeben und niemals protokolliert — sie sind bewusst auch kein Bestandteil des
+    /// <see cref="ScmCliAccessEvaluator"/>-Fingerprints. Eine fehlende oder fehlschlagende
+    /// Anbindung blockiert den regulären CLI-Start nicht.</summary>
+    private async Task<TerminalSessionStartSpec> WithScmAgentEnvironmentAsync(
+        TerminalSessionStartSpec spec, IGitPlugin? gitPlugin, CancellationToken ct)
+    {
+        if (gitPlugin is not IScmAgentAccess agentAccess)
+        {
+            return spec;
+        }
+
+        IReadOnlyDictionary<string, string?> agentEnvironment;
+        try
+        {
+            agentEnvironment = await agentAccess.GetAgentEnvironmentAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "SCM-Anbindung für die Agenten-Sitzung konnte nicht aufgelöst werden; der CLI-Start erfolgt ohne sie.");
+            return spec;
+        }
+
+        if (agentEnvironment.Count == 0)
+        {
+            return spec;
+        }
+
+        var environment = new Dictionary<string, string?>(spec.EnvironmentVariables, StringComparer.Ordinal);
+        foreach (var entry in agentEnvironment)
+        {
+            environment[entry.Key] = entry.Value;
+        }
+        return spec with { EnvironmentVariables = environment };
     }
 
     /// <summary>Gibt die <see cref="ITerminalSession"/> für eine Aufgabe zurück, oder null wenn keine vorhanden.</summary>

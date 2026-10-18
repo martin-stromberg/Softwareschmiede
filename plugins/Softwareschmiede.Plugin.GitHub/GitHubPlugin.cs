@@ -12,7 +12,7 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// GitHub Plugin – nutzt gh CLI und git CLI für alle GitHub-Operationen.
 /// Der GitHub-Token wird als GH_TOKEN Umgebungsvariable übergeben, niemals als CLI-Argument.
 /// </summary>
-public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEventSource, IScmEventResponder
+public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEventSource, IScmEventResponder, IScmAgentAccess
 {
     private const string GitHubTokenCredentialKey = "Softwareschmiede.GitHub.Token";
     private const string RepositoryUrlKey = "RepositoryUrl";
@@ -120,6 +120,38 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             env["GH_TOKEN"] = token;
         }
         return env;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Stellt dem Agenten dieselbe gh-/git-Anmeldung zur Verfügung, die der Host für seine
+    /// eigenen Aufrufe nutzt (<see cref="GetGhEnvironment"/>): <c>GH_TOKEN</c> für die
+    /// <c>gh</c>-CLI, ein <c>http.extraheader</c>-Eintrag für HTTPS-git-Operationen gegen
+    /// github.com (z. B. Push nach lokal behobenem Konflikt) sowie
+    /// <c>GIT_TERMINAL_PROMPT=0</c>, damit git bei fehlenden Credentials sauber fehlschlägt
+    /// statt interaktiv zu blockieren. Die Werte werden ausschließlich als Prozessumgebung
+    /// des CLI-Kindprozesses gesetzt — niemals in Prompts, Logs oder Persistenz.
+    /// </remarks>
+    public Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(CancellationToken ct = default)
+    {
+        var environment = new Dictionary<string, string?>
+        {
+            // Kein interaktives Credential-Prompt: git schlägt ohne verwertbare Anmeldung fehl,
+            // statt die Agenten-Sitzung zu blockieren.
+            ["GIT_TERMINAL_PROMPT"] = "0",
+        };
+        var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
+        if (!string.IsNullOrEmpty(token))
+        {
+            environment["GH_TOKEN"] = token;
+            // HTTPS-git-Auth für github.com ohne eingebettetes Token in der Remote-URL:
+            // derselbe Basic-Authorization-Header, den GitHub-Actions-Checkouts verwenden.
+            var credentials = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("x-access-token:" + token));
+            environment["GIT_CONFIG_COUNT"] = "1";
+            environment["GIT_CONFIG_KEY_0"] = "http.https://github.com/.extraheader";
+            environment["GIT_CONFIG_VALUE_0"] = "AUTHORIZATION: basic " + credentials;
+        }
+        return Task.FromResult<IReadOnlyDictionary<string, string?>>(environment);
     }
 
     private IDictionary<string, string> GetGitEnvironment(string? token = null)
