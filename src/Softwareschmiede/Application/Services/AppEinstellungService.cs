@@ -41,6 +41,12 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für das Feature-Flag "Autonome Aufgaben aktiviert".</summary>
     public const string AutonomAufgabenEnabledKey = "autonomeaufgaben.enabled";
 
+    /// <summary>Schlüssel für den Laufzeit-Schalter "SCM-Ereignisüberwachung aktiviert".</summary>
+    public const string ScmMonitoringEnabledKey = "scm.monitoring.enabled";
+
+    /// <summary>Schlüssel für das konfigurierbare SCM-Trigger-Keyword.</summary>
+    public const string ScmTriggerKeywordKey = "scm.trigger.keyword";
+
     /// <summary>Schlüssel für den Update-Modus (<see cref="UpdateMode"/>-Wert als Zahl gespeichert).</summary>
     public const string UpdateModeKey = "updates.mode";
 
@@ -138,6 +144,28 @@ public sealed class AppEinstellungService
         var dbWert = await GetBoolSettingAsync(AutonomAufgabenEnabledKey, ct);
         return dbWert ?? deploymentDefault;
     }
+
+    /// <summary>
+    /// Ermittelt, ob die SCM-Ereignisüberwachung aktuell aktiv ist. Der über
+    /// <see cref="SetBoolSettingAsync"/> unter <see cref="ScmMonitoringEnabledKey"/> persistierte
+    /// Laufzeit-Schalter (GUI-Einstellung) gilt ohne Neustart; ohne gespeicherten Eintrag ist die
+    /// Überwachung aktiviert (<see langword="true"/>).
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn die SCM-Ereignisüberwachung aktiv ist.</returns>
+    public async Task<bool> GetScmMonitoringEnabledAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(ScmMonitoringEnabledKey, ct) ?? true;
+
+    /// <summary>
+    /// Liest das konfigurierte SCM-Trigger-Keyword unter <see cref="ScmTriggerKeywordKey"/>.
+    /// Fehlende oder ungültige (leere bzw. nur aus Leerraum bestehende) Werte fallen auf
+    /// <see cref="ScmEventValidationService.DefaultTriggerKeyword"/> zurück; gespeicherte Werte
+    /// werden getrimmt zurückgegeben.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Das effektive Trigger-Keyword.</returns>
+    public async Task<string> GetScmTriggerKeywordAsync(CancellationToken ct = default)
+        => ScmEventValidationService.NormalizeTriggerKeyword(await GetSettingAsync(ScmTriggerKeywordKey, ct));
 
     /// <summary>Liest die Werte mehrerer Einstellungen anhand ihrer Schlüssel in einer einzigen Datenbankabfrage.</summary>
     /// <param name="schluessel">Die zu lesenden Schlüssel.</param>

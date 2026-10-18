@@ -22,6 +22,16 @@ public sealed class ScmEventMonitoringService(
     {
         await startup.WaitAsync(ct);
         using var scope = scopes.CreateScope();
+        var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+        // Laufzeit-Schalter (Einstellungen → Allgemein → SCM-Ereignisse): Bei deaktivierter
+        // Überwachung wird weder beobachtet/enumeriert noch automatisch zugestellt. Bereits in
+        // der Inbox vorhandene Ereignisse und alle Checkpoints bleiben unverändert bestehen.
+        if (!await einstellungen.GetScmMonitoringEnabledAsync(ct))
+        {
+            logger.LogDebug("SCM-Ereignisüberwachung ist deaktiviert; Durchlauf wird übersprungen.");
+            return;
+        }
+        var triggerKeyword = await einstellungen.GetScmTriggerKeywordAsync(ct);
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         var tasks = await db.Aufgaben.AsNoTracking().Include(x => x.GitRepository).Include(x => x.IssueReferenz)
             .Include(x => x.PullRequests).Where(x => x.GitRepository != null && x.GitRepository.Aktiv).ToListAsync(ct);
@@ -127,7 +137,7 @@ public sealed class ScmEventMonitoringService(
                         var aufgabeId = taskIds.Length == 1 ? taskIds[0] : (Guid?)null;
                         var unassigned = taskIds.Length == 0;
                         if (unassigned && localRepositories.TryGetValue(reference.Repository, out var candidates)
-                            && batch.Observations.FirstOrDefault(x => ScmEventValidationService.GetRejection(x) is null) is { } trigger)
+                            && batch.Observations.FirstOrDefault(x => ScmEventValidationService.GetRejection(x, triggerKeyword) is null) is { } trigger)
                         {
                             var resolution = await batchScope.ServiceProvider.GetRequiredService<ScmEventTaskResolver>()
                                 .ResolveAsync(reference, source, trigger, candidates, ct);
@@ -135,7 +145,7 @@ public sealed class ScmEventMonitoringService(
                             unassigned = resolution.Kind == ScmTaskResolutionKind.Unassigned;
                         }
                         await batchScope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(
-                            aufgabeId, sourceKey, batch, unassigned, ct);
+                            aufgabeId, sourceKey, batch, unassigned, triggerKeyword, ct);
                     }
                     catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                     catch (Exception ex)

@@ -44,6 +44,36 @@ public sealed class ScmEventValidationServiceTests
         Assert.Equal(valid, ScmEventValidationService.GetRejection(observation) is null);
     }
 
+    /// <summary>Ein konfiguriertes Keyword ersetzt den Standard-Trigger vollständig; die
+    /// Frei-stehend-Regel und die Case-insensitive-Prüfung gelten unverändert.</summary>
+    [Theory]
+    [InlineData("!Bearbeite das bitte", "!Bearbeite", true)]
+    [InlineData("Bitte !bearbeite das übernehmen.", "!Bearbeite", true)]
+    [InlineData("$Softwareschmiede bitte", "!Bearbeite", false)]
+    [InlineData("'!Bearbeite'", "!Bearbeite", false)]
+    [InlineData("Zitiert ‚!Bearbeite‘, ruft aber frei !Bearbeite auf.", "!Bearbeite", true)]
+    public void ConfiguredTriggerKeyword_ReplacesDefaultAndStaysFreeStanding(string body, string keyword, bool valid)
+    {
+        var observation = Observe(body, "42", null, false);
+        Assert.Equal(valid, ScmEventValidationService.GetRejection(observation, keyword) is null);
+    }
+
+    /// <summary>Fehlende oder leere Keyword-Werte fallen auf den Standard-Trigger zurück.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void MissingTriggerKeyword_FallsBackToDefault(string? keyword)
+    {
+        Assert.Null(ScmEventValidationService.GetRejection(Observe("$Softwareschmiede bitte", "42", null, false), keyword));
+        Assert.NotNull(ScmEventValidationService.GetRejection(Observe("!Bearbeite bitte", "42", null, false), keyword));
+    }
+
+    /// <summary>Konfigurierte Keyword-Werte werden vor der Prüfung getrimmt.</summary>
+    [Fact]
+    public void TriggerKeyword_IsTrimmedBeforeMatching()
+        => Assert.Null(ScmEventValidationService.GetRejection(Observe("!Bearbeite bitte", "42", null, false), "  !Bearbeite  "));
+
     /// <summary>Bekannte IDs haben Vorrang vor ähnlich geschriebenen Logins.</summary>
     [Fact]
     public void LoginCannotOverrideDifferentIds()

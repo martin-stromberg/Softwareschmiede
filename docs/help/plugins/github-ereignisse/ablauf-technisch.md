@@ -6,6 +6,8 @@
 
 `ScmEventMonitoringService` fragt regelmäßig die lokal verknüpften SCM-Referenzen sowie repository-weit alle Referenzen aktivierter Projekt-Repositories ab. `GitHubPlugin` liest Quelltexte und Metadaten, `ScmEventStore` persistiert Beobachtungen und `ScmEventOrchestrator` validiert und verteilt gültige Einträge. Die Queue-Oberfläche verwendet denselben Orchestrator für manuelle Aktionen und Sitzungswahl.
 
+Der Laufzeit-Schalter `scm.monitoring.enabled` (`AppEinstellungService.ScmMonitoringEnabledKey`, GUI: Einstellungen → Allgemein → SCM-Ereignisse, Standard `true`) wird von beiden Hintergrunddiensten pro Poll-Zyklus gelesen: Ist die Überwachung deaktiviert, beendet `ScmEventMonitoringService.RunOnceAsync` den Durchlauf vor jeder Quell- oder Repositoryabfrage — einschließlich der abschließenden Dispatch-Schleife — und `ScmEventExchangeService.RunOnceAsync` überspringt die Abholung offener Versuche. Der Orchestrator selbst bleibt ungeschützt, damit explizite UI-Aktionen (Öffnen, Erneut prüfen, Status prüfen, Neu senden, Abbrechen) weiterhin ausdrücklich zugestellt werden können. Das konfigurierte Trigger-Keyword (`scm.trigger.keyword`, `AppEinstellungService.ScmTriggerKeywordKey`, Standard `ScmEventValidationService.DefaultTriggerKeyword`) liest der Monitor einmal pro Durchlauf und reicht es an `ScmEventStore.AcceptBatchAsync` und die Kandidatenprüfung weiter; der Orchestrator liest es bei der Zustellungs-Gegenprüfung über `AppEinstellungService.GetScmTriggerKeywordAsync`.
+
 ## Ablauf
 
 ### 1. Referenzen und Quellen abfragen
@@ -23,7 +25,7 @@ Beteiligte Komponenten:
 
 Gehört eine Referenz zu keiner lokalen Aufgabe und enthält der gelesene Batch mindestens eine qualifizierte Beobachtung, löst `ScmEventTaskResolver.ResolveAsync` die Aufgabe auf: Es lädt die Anlagedaten über `IScmEventSource.ReadIssueAsync`/`ReadPullRequestAsync`, sucht vorhandene Aufgaben über die Referenzschlüssel und legt bei Fehlschlag genau eine Aufgabe im Projekt des aufgelösten `GitRepository` an (`CreateFromIssueEventAsync` mit `SourceKey`-Unique-Index bzw. `CreateFromPullRequestAsync` mit dem `(Provider, RepositoryId, PullRequestNumber)`-Index — bei Anlagerennen gewinnt die bestehende Anlage). Auflösungsfehler laufen in den Quell-Checkpoint-Backoff.
 
-`ScmEventStore.AcceptBatchAsync` vergleicht Inhaltshashes und Revisionen, ordnet Beobachtungen einer eindeutigen Aufgabe zu und speichert Inbox-Eintrag, Snapshot und Checkpoint. `ScmEventValidationService.GetRejection` verlangt den case-insensitiven Trigger `$Softwareschmiede`, die Übereinstimmung des angemeldeten Nutzers mit dem Repository-Owner und die Übereinstimmung des tatsächlichen Autors/Bearbeiters mit diesem Nutzer. Ein nicht bestimmbarer Editor oder eine mehrdeutige lokale Zuordnung erzeugt keinen frei zugeordneten Auftrag.
+`ScmEventStore.AcceptBatchAsync` vergleicht Inhaltshashes und Revisionen, ordnet Beobachtungen einer eindeutigen Aufgabe zu und speichert Inbox-Eintrag, Snapshot und Checkpoint. `ScmEventValidationService.GetRejection` verlangt das konfigurierte, case-insensitive Trigger-Keyword (Standard `$Softwareschmiede`), die Übereinstimmung des angemeldeten Nutzers mit dem Repository-Owner und die Übereinstimmung des tatsächlichen Autors/Bearbeiters mit diesem Nutzer. Ein nicht bestimmbarer Editor oder eine mehrdeutige lokale Zuordnung erzeugt keinen frei zugeordneten Auftrag.
 
 ### 3. Bestätigung und CLI-Zustellung
 

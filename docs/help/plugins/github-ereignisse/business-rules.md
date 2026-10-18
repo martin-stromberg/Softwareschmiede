@@ -2,9 +2,13 @@
 
 # GitHub-Ereignisüberwachung — Business Rules
 
+## Überwachung ein- und ausschalten
+
+Die SCM-Ereignisüberwachung lässt sich unter **Einstellungen → Allgemein → SCM-Ereignisse** global deaktivieren (Einstellung `scm.monitoring.enabled`, Standard aktiviert; wirkt ohne Neustart). Im deaktivierten Zustand werden keine Quellen beobachtet oder enumeriert — also keine GitHub-Abfragen und keine `gh`-Aufrufe — und keine Ereignisse automatisch zugestellt oder abgeglichen (keine CLI-Starts, keine Prompts, keine GitHub-Kommentare/-Reaktionen aus den Hintergrunddiensten `ScmEventMonitoringService` und `ScmEventExchangeService`). Bereits in der Inbox vorhandene Ereignisse behalten ihren Status; Checkpoints und Deduplikation bleiben unverändert, sodass nach der Reaktivierung alles normal weiterläuft. Explizite Benutzeraktionen in der Ereignisübersicht — Öffnen/CLI auswählen, Erneut prüfen, Status prüfen, Neu senden, Abbrechen — bleiben auch bei deaktivierter Überwachung funktionsfähig, da sie einen ausdrücklichen Benutzerwunsch darstellen. Lediglich „Quellen erneut prüfen" ist wirkungslos, solange die Überwachung aus ist: Diese Aktion löst ausschließlich eine Remote-Beobachtung aus und ist damit Teil der deaktivierten Überwachung.
+
 ## Trigger und Repository-Owner
 
-Ein Text ist nur gültig, wenn er `$Softwareschmiede` ohne Beachtung der Groß-/Kleinschreibung enthält und der authentifizierte GitHub-Nutzer der Repository-Owner ist. Bei unverändertem Inhalt zählt der Autor; bei bearbeitetem Inhalt muss der aktuelle Bearbeiter bestimmbar sein und dem Owner entsprechen. `ScmEventValidationService.GetRejection` erzwingt diese Regeln. Nicht bestimmbarer Bearbeiter und eigene Antwortmarker werden abgewiesen.
+Ein Text ist nur gültig, wenn er das konfigurierte Trigger-Keyword (Standard `$Softwareschmiede`, einstellbar unter **Einstellungen → Allgemein → SCM-Ereignisse**; Einstellung `scm.trigger.keyword`) ohne Beachtung der Groß-/Kleinschreibung enthält und der authentifizierte GitHub-Nutzer der Repository-Owner ist. Das Keyword darf nicht leer sein; ein leerer oder nur aus Leerraum bestehender gespeicherter Wert gilt nicht und es gilt der Standard. Bei unverändertem Inhalt zählt der Autor; bei bearbeitetem Inhalt muss der aktuelle Bearbeiter bestimmbar sein und dem Owner entsprechen. `ScmEventValidationService.GetRejection` erzwingt diese Regeln. Nicht bestimmbarer Bearbeiter und eigene Antwortmarker (`<!-- softwareschmiede:` — ein vom Trigger-Keyword unabhängiges Konzept) werden abgewiesen. Eine spätere Keyword-Änderung entwertet bereits angenommene Ereignisse nicht nachträglich: Bei der Zustellung wird nur die Identitätsprüfung wiederholt.
 
 ## Eindeutige Aufgabenreferenz
 

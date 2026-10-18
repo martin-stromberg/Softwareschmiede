@@ -670,6 +670,64 @@ public sealed class SettingsViewModelTests : IDisposable
             .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, false),
                 "Verwerfen darf keine Update-Werte schreiben");
     }
+
+    /// <summary>LadenCommand füllt die SCM-Einstellungen mit den Defaults: Überwachung aktiv, Standard-Trigger.</summary>
+    [Fact]
+    public async Task LadenCommand_LoadsScmMonitoringDefaults()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsScmMonitoringEnabled.Should().BeTrue();
+        sut.ScmTriggerKeyword.Should().Be(ScmEventValidationService.DefaultTriggerKeyword);
+    }
+
+    /// <summary>SpeichernCommand persistiert den Überwachungs-Schalter und das getrimmte Trigger-Keyword.</summary>
+    [Fact]
+    public async Task SpeichernCommand_PersistsScmMonitoringSettings()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsScmMonitoringEnabled = false;
+        sut.ScmTriggerKeyword = "  !Bearbeite  ";
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        (await _einstellungService.GetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey))
+            .Should().BeFalse();
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey))
+            .Should().Be("!Bearbeite");
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.IsScmMonitoringEnabled.Should().BeFalse();
+        sut.ScmTriggerKeyword.Should().Be("!Bearbeite");
+    }
+
+    /// <summary>Ein leeres Trigger-Keyword wird abgelehnt und nicht gespeichert.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task SpeichernCommand_RejectsEmptyScmTriggerKeyword(string keyword)
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.ScmTriggerKeyword = keyword;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().Contain("Trigger-Keyword");
+        sut.ErfolgsMeldung.Should().BeNull();
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey))
+            .Should().BeNull("ein ungültiges Keyword darf nicht persistiert werden");
+    }
 }
 
 /// <summary>In-Memory Credential Store für SettingsViewModel-Tests.</summary>

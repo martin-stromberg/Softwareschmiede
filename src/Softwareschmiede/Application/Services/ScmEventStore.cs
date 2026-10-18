@@ -28,8 +28,15 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
         => retryAfter?.ToUnixTimeMilliseconds() ?? now + (failures switch { <= 1 => 30_000L, 2 => 120_000L, 3 => 600_000L, _ => 1_800_000L }) + Random.Shared.Next(0, 3000);
 
     /// <summary>Speichert eine vollständig gelesene Quelle und ihren Watermark gemeinsam.</summary>
+    /// <param name="aufgabeId">Die eindeutig zugeordnete Aufgabe oder <see langword="null"/> für unzugeordnete Quellen.</param>
+    /// <param name="sourceKey">Der Checkpoint-Schlüssel der Quelle.</param>
+    /// <param name="batch">Der gelesene Batch samt Anfrage-Metadaten.</param>
+    /// <param name="unassigned">Kennzeichnet, ob die Quelle keiner lokalen Aufgabe zugeordnet ist.</param>
+    /// <param name="triggerKeyword">Das aktuell konfigurierte Trigger-Keyword für die
+    /// Ereignisvalidierung; leere Werte fallen auf den Standard zurück.</param>
+    /// <param name="ct">Abbruchtoken.</param>
     public async Task AcceptBatchAsync(Guid? aufgabeId, string sourceKey, ScmEventBatch batch,
-        bool unassigned = false, CancellationToken ct = default)
+        bool unassigned = false, string? triggerKeyword = null, CancellationToken ct = default)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var checkpoint = await db.ScmObservationCheckpoints.FindAsync([sourceKey], ct);
@@ -49,7 +56,7 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
         foreach (var observation in batch.Observations.OrderBy(x => x.Revision).ThenBy(x => x.EventKey, StringComparer.Ordinal))
         {
             var snapshot = await db.ScmContentSnapshots.FindAsync([observation.ContentKey], ct);
-            var rejection = aufgabeId is null ? unassignedDiagnostic : ScmEventValidationService.GetRejection(observation);
+            var rejection = aufgabeId is null ? unassignedDiagnostic : ScmEventValidationService.GetRejection(observation, triggerKeyword);
             var resolved = aufgabeId is not null && rejection != "Bearbeiter nicht bestimmbar";
             if (snapshot is not null && snapshot.BodyHash == observation.BodyHash && snapshot.IdentityResolved
                 && snapshot.Diagnostic != AmbiguousAssignmentDiagnostic && snapshot.Diagnostic != UnassignedDiagnostic)

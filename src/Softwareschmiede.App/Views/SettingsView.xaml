@@ -286,6 +286,34 @@
                                   Foreground="{DynamicResource PrimaryTextBrush}" />
                     </StackPanel>
 
+                    <!-- SCM-Ereignisse -->
+                    <StackPanel Margin="0,0,0,16" MaxWidth="600" HorizontalAlignment="Left">
+                        <TextBlock Text="SCM-Ereignisse"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,4" />
+                        <CheckBox IsChecked="{Binding IsScmMonitoringEnabled, Mode=TwoWay}"
+                                  AutomationProperties.Name="IsScmMonitoringEnabled"
+                                  Content="SCM-Ereignisüberwachung aktivieren"
+                                  Foreground="{DynamicResource PrimaryTextBrush}" />
+                        <TextBlock Text="Bei deaktivierter Überwachung werden keine SCM-Quellen abgefragt und keine Ereignisse automatisch zugestellt. Bereits eingegangene Ereignisse bleiben erhalten und können weiterhin manuell geöffnet, geprüft oder abgebrochen werden. Die Änderung wirkt ohne Neustart."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="22,4,0,0" />
+                        <TextBlock Text="Trigger-Keyword"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,12,0,4" />
+                        <TextBox Text="{Binding ScmTriggerKeyword, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="ScmTriggerKeyword"
+                                 Padding="8,6"
+                                 BorderBrush="{DynamicResource BorderBrush}" />
+                        <TextBlock Text="Schlüsselwort, mit dem SCM-Ereignisse in Issues und Pull Requests markiert werden. Nur frei stehende Vorkommen ohne direkt angrenzende Zitatzeichen lösen aus; die Groß-/Kleinschreibung wird nicht beachtet. Leer lassen ist nicht zulässig; Standard: $Softwareschmiede."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,0" />
+                    </StackPanel>
+
                     <!-- Updates -->
                     <StackPanel Margin="0,0,0,16" MaxWidth="600" HorizontalAlignment="Left">
                         <TextBlock Text="Updates"
