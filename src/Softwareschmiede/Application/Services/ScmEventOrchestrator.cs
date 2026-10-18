@@ -42,7 +42,7 @@ public sealed class ScmEventOrchestrator(
             {
                 db.ChangeTracker.Clear();
                 var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, ct);
-                if (item.Status == "Verarbeitet") return;
+                if (item.Status is "Verarbeitet" or "Abgebrochen") return;
                 if (item.DeliveryAttemptId is not null)
                 {
                     await DispatchCoreAsync(eventId, taskId, null, ct, owner);
@@ -80,6 +80,8 @@ public sealed class ScmEventOrchestrator(
         {
             db.ChangeTracker.Clear();
             var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, ct);
+            // Ein Abbruch ist endgültig: keine Hostaktionen, kein Abgleich und keine Zustellung mehr.
+            if (item.Status == "Abgebrochen") return;
             var observation = ScmEventStore.Observation(item);
             var plugin = plugins.GetSourceCodeManagementPlugins().FirstOrDefault(x => x.PluginPrefix == observation.Reference.Repository.ProviderPrefix);
             if (plugin is not IScmEventSource source || plugin is not IScmEventResponder responder)
@@ -112,7 +114,7 @@ public sealed class ScmEventOrchestrator(
             // A due receipt/waiting response can select an otherwise delayed event. Its
             // independent retry must not authorize another health check, start or prompt.
             if (item.NextAttemptUtc > time.GetUtcNow().ToUnixTimeMilliseconds()) return;
-            if (await db.ScmIncomingEvents.AnyAsync(x => x.AufgabeId == item.AufgabeId && x.Sequence < item.Sequence && x.Status != "Verarbeitet", ct))
+            if (await db.ScmIncomingEvents.AnyAsync(x => x.AufgabeId == item.AufgabeId && x.Sequence < item.Sequence && x.Status != "Verarbeitet" && x.Status != "Abgebrochen", ct))
             {
                 await WaitWithCommentAsync(item, observation, responder, "Ein früheres Ereignis dieser Aufgabe muss zuerst abgeschlossen oder geklärt werden.", ct);
                 return;
@@ -179,6 +181,8 @@ public sealed class ScmEventOrchestrator(
                     observation.ContentKind.ToString(), $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url), adapter.WorkingDirectory, ct, access.RestrictedWriteSids);
                 if (!ReferenceEquals(adapter, cli.GetScmPromptSession(task.Id)) || !adapter.IsAlive)
                 { await WaitAsync(item, "CLI-Sitzung hat sich geändert. Erneut prüfen.", ct); return; }
+                // A cancellation between preparation and write wins over the tracked delivery state.
+                if (await IsCancelledAsync(item.Id, ct)) return;
                 item.Status = "ZustellungVorbereitet";
                 item.DeliveryAttemptId = attemptId;
                 item.CliRunId = adapter.CliRunId.ToString("D");
@@ -191,11 +195,14 @@ public sealed class ScmEventOrchestrator(
                 await db.SaveChangesAsync(ct);
                 try
                 {
+                    if (await IsCancelledAsync(item.Id, ct)) return;
                     await adapter.WritePromptAsync(attempt.Prompt, ct);
+                    if (await IsCancelledAsync(item.Id, CancellationToken.None)) return;
                     item.Status = "Zugestellt";
                 }
                 catch (Exception)
                 {
+                    if (await IsCancelledAsync(item.Id, CancellationToken.None)) return;
                     item.Status = "ZustellungUngewiss";
                     item.Reason = "Der Schreibversuch wurde begonnen, konnte aber nicht sicher bestätigt werden. Keine automatische Wiederholung.";
                 }
@@ -238,6 +245,7 @@ public sealed class ScmEventOrchestrator(
     public Task RetryAsync(Guid eventId, CancellationToken ct = default)
         => MutateAndDispatchAsync(eventId, async (item, token) =>
     {
+        if (item.Status == "Abgebrochen") return false;
         item.NextAttemptUtc = null;
         item.ErrorCode = null;
         await db.ScmOutgoingActions.Where(x => x.EventId == eventId && x.Status != "Succeeded")
@@ -250,6 +258,7 @@ public sealed class ScmEventOrchestrator(
     public Task ConfirmReadyAsync(Guid eventId, string displayedRunId, CancellationToken ct = default)
         => MutateAndDispatchAsync(eventId, (item, _) =>
     {
+        if (item.Status is "Verarbeitet" or "Abgebrochen") return Task.FromResult(false);
         var session = cli.GetScmPromptSession(item.AufgabeId);
         if (session is null || !session.IsAlive || session.CliRunId.ToString("D") != displayedRunId)
             throw new InvalidOperationException("CLI-Sitzung hat sich geändert. Bitte die neue Sitzung ausdrücklich bestätigen.");
@@ -280,6 +289,22 @@ public sealed class ScmEventOrchestrator(
         item.NextAttemptUtc = null;
         return Task.FromResult(true);
     }, ct);
+
+    /// <summary>Endgültiger Benutzerabbruch eines nicht abgeschlossenen Ereignisses. Der atomare Übergang gilt
+    /// auch ohne Aufgabenlease, damit ein laufender Versuch ihn an den Prüfpunkten des Dispatchers respektiert.
+    /// Eine bereits zugestellte CLI-Verarbeitung wird nicht beendet; es folgen keinerlei weitere Zustell-,
+    /// Prüf- oder Remote-Schritte mehr. Gibt zurück, ob der Übergang ausgeführt wurde.</summary>
+    public async Task<bool> CancelAsync(Guid eventId, CancellationToken ct = default)
+    {
+        var changed = await db.ScmIncomingEvents
+            .Where(x => x.Id == eventId && x.Status != "Verarbeitet" && x.Status != "Abgebrochen")
+            .ExecuteUpdateAsync(x => x
+                .SetProperty(p => p.Status, "Abgebrochen")
+                .SetProperty(p => p.Reason, "Vom Anwender abgebrochen. Eine eventuell laufende CLI-Verarbeitung wird dadurch nicht beendet; es folgen keine weiteren Zustell- oder Prüfversuche.")
+                .SetProperty(p => p.NextAttemptUtc, (long?)null), ct);
+        if (changed != 0) notifier.Notify();
+        return changed != 0;
+    }
 
     private async Task MutateAndDispatchAsync(Guid eventId, Func<ScmIncomingEvent, CancellationToken, Task<bool>> mutation, CancellationToken ct)
     {
@@ -320,6 +345,8 @@ public sealed class ScmEventOrchestrator(
             RestrictedWriteSids = JsonSerializer.Deserialize<string[]>(item.ExchangeRestrictedWriteSidsJson ?? "[]") ?? []
         };
         var messages = await exchange.ReadAsync(attempt, ct);
+        // A user cancellation ends all reconciliation; no further remote action is created.
+        if (await IsCancelledAsync(item.Id, ct)) return;
         if (messages.Diagnostic is not null)
         {
             item.Status = "VerarbeitungUngeklärt";
@@ -332,6 +359,7 @@ public sealed class ScmEventOrchestrator(
             item.Reason = null;
             foreach (var action in messages.Actions)
             {
+                if (await IsCancelledAsync(item.Id, ct)) return;
                 var responseKind = action.Kind switch { "comment" => ScmResponseKind.Comment, "reaction" => ScmResponseKind.Reaction, _ => ScmResponseKind.PullRequest };
                 var response = new ScmResponseRequest(observation.Reference, action.ActionId.ToString("D"), responseKind,
                     action.Body, action.Reaction, observation.ContentKind, observation.RemoteCommentId, observation.RemoteNodeId, action.Title, action.Head, action.Base);
@@ -381,8 +409,14 @@ public sealed class ScmEventOrchestrator(
                 item.Reason = item.AcceptedUtc is null ? "Annahme fehlt oder CLI-Sitzung beendet. Kein automatischer Neuversand." : "Korrelierter Abschluss fehlt oder CLI-Sitzung beendet.";
             }
         }
+        if (await IsCancelledAsync(item.Id, ct)) return;
         await db.SaveChangesAsync(ct);
     }
+
+    /// <summary>Liest den persistierten Status unabhängig vom verfolgten Datensatz, damit ein während eines
+    /// Versuchs eintreffender Abbruch gegenüber den getrackten Änderungen gewinnt.</summary>
+    private async Task<bool> IsCancelledAsync(Guid eventId, CancellationToken ct)
+        => await db.ScmIncomingEvents.Where(x => x.Id == eventId).Select(x => x.Status).SingleOrDefaultAsync(ct) == "Abgebrochen";
 
     private static string? BlockReason(Aufgabe task)
         => task.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert ? "Aufgabe beendet/archiviert; Start gesperrt."

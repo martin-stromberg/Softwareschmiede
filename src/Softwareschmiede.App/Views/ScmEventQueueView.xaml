@@ -120,6 +120,8 @@
                         Visibility="{Binding SelectedEvent.CanResend, Converter={StaticResource BoolToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventCheckStatus"/>
                 <Button Content="Neu senden…" Command="{Binding ResendCommand}" Padding="10,6" Margin="0,0,6,6"
                         Visibility="{Binding SelectedEvent.CanResend, Converter={StaticResource BoolToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventResend"/>
+                <Button Content="Abbrechen…" Command="{Binding CancelCommand}" Padding="10,6" Margin="0,0,6,6"
+                        Visibility="{Binding SelectedEvent.CanCancel, Converter={StaticResource BoolToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventCancel"/>
             </WrapPanel>
         </Grid>
         <StackPanel Grid.Row="5" Margin="0,8,0,0">

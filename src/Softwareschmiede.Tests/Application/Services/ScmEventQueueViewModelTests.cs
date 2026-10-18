@@ -62,6 +62,64 @@ public sealed class ScmEventQueueViewModelTests
         Assert.Equal(attempt, view.CheckStatusCommand.CanExecute(null));
     }
 
+    /// <summary>Final states disable every mutating command; all other states stay cancellable.</summary>
+    [Theory]
+    [InlineData("Aufgenommen", true)]
+    [InlineData("Wartend", true)]
+    [InlineData("Zugestellt", true)]
+    [InlineData("VerarbeitungUngeklärt", true)]
+    [InlineData("Verarbeitet", false)]
+    [InlineData("Abgebrochen", false)]
+    public async Task CancelCommand_EnabledOnlyForNonFinalEvents(string status, bool enabled)
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+        view.SelectedEvent = new(Guid.NewGuid(), Guid.NewGuid(), "task", "owner/repo", "Issue #1", "Kommentar", "now", status,
+            status, "body", "origin", null, null, null, false);
+        Assert.Equal(enabled, view.CancelCommand.CanExecute(null));
+        Assert.Equal(enabled, view.RetryCommand.CanExecute(null));
+        Assert.Equal(enabled, view.OpenEventCommand.CanExecute(null));
+    }
+
+    /// <summary>A cancelled event keeps its attempt identity but disables check, retry, open and cancel.</summary>
+    [Fact]
+    public async Task CancelledEvent_DisablesAllMutatingCommands()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+        view.SelectedEvent = new(Guid.NewGuid(), Guid.NewGuid(), "task", "owner/repo", "Issue #1", "Kommentar", "now", "Abgebrochen",
+            "Abgebrochen", "body", "origin", "Vom Anwender abgebrochen.", Guid.NewGuid().ToString("D"), Guid.NewGuid(), false);
+        Assert.False(view.CancelCommand.CanExecute(null));
+        Assert.False(view.CheckStatusCommand.CanExecute(null));
+        Assert.False(view.RetryCommand.CanExecute(null));
+        Assert.False(view.OpenEventCommand.CanExecute(null));
+        Assert.False(view.ResendCommand.CanExecute(null));
+    }
+
+    /// <summary>The dedicated filter and "Alle" keep cancelled entries visible; "Wartend" hides them.</summary>
+    [Fact]
+    public async Task CancelledEvent_ListsUnderAbgebrochenAndAlle_NotWartend()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (_, eventId) = await fixture.AddAsync();
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId);
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+        view.SelectedFilter = "Wartend";
+        await view.RefreshAsync();
+        Assert.Empty(view.Events);
+        view.SelectedFilter = "Abgebrochen";
+        await view.RefreshAsync();
+        var item = Assert.Single(view.Events);
+        Assert.Equal("Abgebrochen", item.Status);
+        view.SelectedFilter = "Alle";
+        await view.RefreshAsync();
+        Assert.Single(view.Events);
+    }
+
     /// <summary>A halted source is visible even with no event; correcting the source clears the notice.</summary>
     [Fact]
     public async Task SourceAuthenticationFailure_IsVisibleWithoutEvents_AndClearsAfterRecovery()

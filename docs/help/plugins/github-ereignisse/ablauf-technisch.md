@@ -35,7 +35,9 @@ Vor dem Schreiben prüft der `IScmPromptSessionAdapter` Eingabebereitschaft und 
 
 ### 4. UI-Aktionen und Wiederaufnahme
 
-`ScmEventQueueViewModel` lädt gespeicherte Ereignisse und bietet Öffnen, erneute Prüfung, Bereitschaftsbestätigung, Statusprüfung und bestätigten Neuversand an. Fehlgeschlagene Remoteaktionen können separat erneut versucht werden. Zustellung mit ungewissem Ergebnis löst keinen automatischen Prompt-Neuversand aus.
+`ScmEventQueueViewModel` lädt gespeicherte Ereignisse und bietet Öffnen, erneute Prüfung, Bereitschaftsbestätigung, Statusprüfung, bestätigten Neuversand und bestätigten Abbruch an. Fehlgeschlagene Remoteaktionen können separat erneut versucht werden. Zustellung mit ungewissem Ergebnis löst keinen automatischen Prompt-Neuversand aus.
+
+`ScmEventOrchestrator.CancelAsync` setzt ein nicht abgeschlossenes Ereignis atomar auf den Endstatus `Abgebrochen` — bewusst ohne Aufgabenlease, damit der Übergang auch während eines laufenden Versuchs gilt. `DispatchCoreAsync` und `ReconcileAttemptAsync` prüfen den persistierten Status an den entscheidenden Punkten (vor den Hostaktionen, vor und nach dem Prompt-Schreiben, im Aktionsabgleich und vor dem finalen Speichern); ein so erkannter Abbruch beendet den Versuch ohne den Endstatus zu überschreiben. Der Polling-Dispatch und der lokale Antwortkanal (`ScmEventMonitoringService`, `ScmEventExchangeService`) wählen abgebrochene Ereignisse gar nicht erst aus — auch nicht zum Nachholen noch ausstehender Outbox-Aktionen — und die Vorgängerprüfung der Warteschlange behandelt `Abgebrochen` wie `Verarbeitet`. Eine bereits zugestellte CLI-Verarbeitung wird nicht beendet.
 
 ## Diagramm
 
