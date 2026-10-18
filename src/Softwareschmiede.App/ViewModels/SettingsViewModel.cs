@@ -50,6 +50,11 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private bool _isAutonomAufgabenEnabled = true;
     private bool _isScmMonitoringEnabled = true;
     private string _scmTriggerKeyword = ScmEventValidationService.DefaultTriggerKeyword;
+    private string _scmPromptAppendixGeneral = string.Empty;
+    private string _scmPromptAppendixIssue = string.Empty;
+    private string _scmPromptAppendixIssueComment = string.Empty;
+    private string _scmPromptAppendixPullRequest = string.Empty;
+    private string _scmPromptAppendixPullRequestComment = string.Empty;
     private UpdateModusOption? _selectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.NurPruefen);
     private bool _includePrereleases;
 
@@ -224,6 +229,41 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _scmTriggerKeyword, value);
     }
 
+    /// <summary>Prompt-Anhang, der bei jeder SCM-Ereignisart an den Prompt angehängt wird (leer = keiner).</summary>
+    public string ScmPromptAppendixGeneral
+    {
+        get => _scmPromptAppendixGeneral;
+        set => SetProperty(ref _scmPromptAppendixGeneral, value);
+    }
+
+    /// <summary>Prompt-Anhang für SCM-Ereignisse aus Issue-Beschreibungen (leer = keiner).</summary>
+    public string ScmPromptAppendixIssue
+    {
+        get => _scmPromptAppendixIssue;
+        set => SetProperty(ref _scmPromptAppendixIssue, value);
+    }
+
+    /// <summary>Prompt-Anhang für SCM-Ereignisse aus Kommentaren auf Issues (leer = keiner).</summary>
+    public string ScmPromptAppendixIssueComment
+    {
+        get => _scmPromptAppendixIssueComment;
+        set => SetProperty(ref _scmPromptAppendixIssueComment, value);
+    }
+
+    /// <summary>Prompt-Anhang für SCM-Ereignisse aus Pull-Request-Beschreibungen (leer = keiner).</summary>
+    public string ScmPromptAppendixPullRequest
+    {
+        get => _scmPromptAppendixPullRequest;
+        set => SetProperty(ref _scmPromptAppendixPullRequest, value);
+    }
+
+    /// <summary>Prompt-Anhang für SCM-Ereignisse aus Kommentaren und Reviews auf Pull Requests (leer = keiner).</summary>
+    public string ScmPromptAppendixPullRequestComment
+    {
+        get => _scmPromptAppendixPullRequestComment;
+        set => SetProperty(ref _scmPromptAppendixPullRequestComment, value);
+    }
+
     /// <summary>Editierbare Promptvorlagen.</summary>
     public ObservableCollection<PromptVorlageEntry> PromptVorlagen { get; } = [];
 
@@ -373,6 +413,13 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             IsScmMonitoringEnabled = await _einstellungService.GetScmMonitoringEnabledAsync(ct);
             ScmTriggerKeyword = await _einstellungService.GetScmTriggerKeywordAsync(ct);
 
+            var promptAnhaenge = await _einstellungService.GetScmPromptAppendicesAsync(ct);
+            ScmPromptAppendixGeneral = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendGeneralKey) ?? string.Empty;
+            ScmPromptAppendixIssue = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendIssueKey) ?? string.Empty;
+            ScmPromptAppendixIssueComment = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendIssueCommentKey) ?? string.Empty;
+            ScmPromptAppendixPullRequest = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendPullRequestKey) ?? string.Empty;
+            ScmPromptAppendixPullRequestComment = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendPullRequestCommentKey) ?? string.Empty;
+
             var updateSettings = await _einstellungService.GetUpdateSettingsAsync(ct);
             _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Modus);
             OnPropertyChanged(nameof(SelectedUpdateMode));
@@ -435,6 +482,26 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await _einstellungService.SetSettingAsync(
                 AppEinstellungService.ScmTriggerKeywordKey,
                 ScmTriggerKeyword.Trim(),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmPromptAppendGeneralKey,
+                NullWennLeer(ScmPromptAppendixGeneral),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmPromptAppendIssueKey,
+                NullWennLeer(ScmPromptAppendixIssue),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmPromptAppendIssueCommentKey,
+                NullWennLeer(ScmPromptAppendixIssueComment),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmPromptAppendPullRequestKey,
+                NullWennLeer(ScmPromptAppendixPullRequest),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmPromptAppendPullRequestCommentKey,
+                NullWennLeer(ScmPromptAppendixPullRequestComment),
                 ct);
 
             try
@@ -633,6 +700,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             && ValidierePromptVorlagen()
             && ValidiereScmTriggerKeyword();
     }
+
+    /// <summary>Leere oder nur aus Leerraum bestehende Prompt-Anhänge werden nicht gespeichert (leer = nichts anhängen).</summary>
+    private static string? NullWennLeer(string? wert) => string.IsNullOrWhiteSpace(wert) ? null : wert;
 
     /// <summary>Das Trigger-Keyword darf nicht leer sein; der Dienst fällt sonst auf den Standard zurück.</summary>
     private bool ValidiereScmTriggerKeyword()

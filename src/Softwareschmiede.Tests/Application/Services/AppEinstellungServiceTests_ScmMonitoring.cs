@@ -59,4 +59,26 @@ public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
 
         (await _sut.GetScmTriggerKeywordAsync()).Should().Be("!Bearbeite");
     }
+
+    /// <summary>Ohne gespeicherte Einträge liefert die gebündelte Anhang-Abfrage eine leere Zuordnung.</summary>
+    [Fact]
+    public async Task GetScmPromptAppendicesAsync_WithoutEntries_ReturnsEmpty()
+        => (await _sut.GetScmPromptAppendicesAsync()).Should().BeEmpty();
+
+    /// <summary>Nur tatsächlich gespeicherte Anhang-Schlüssel erscheinen in der gebündelten Abfrage.</summary>
+    [Fact]
+    public async Task GetScmPromptAppendicesAsync_PersistedValues_AreReturned()
+    {
+        await _sut.SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "allgemein");
+        await _sut.SetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestCommentKey, "pr-kommentar\nmehrzeilig");
+        await _sut.SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "!Bearbeite");
+
+        var result = await _sut.GetScmPromptAppendicesAsync();
+
+        result.Should().HaveCount(2);
+        result[AppEinstellungService.ScmPromptAppendGeneralKey].Should().Be("allgemein");
+        result[AppEinstellungService.ScmPromptAppendPullRequestCommentKey].Should().Be("pr-kommentar\nmehrzeilig");
+        result.Should().NotContainKey(AppEinstellungService.ScmPromptAppendIssueKey);
+        result.Should().NotContainKey(AppEinstellungService.ScmTriggerKeywordKey);
+    }
 }

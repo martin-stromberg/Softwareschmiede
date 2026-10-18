@@ -150,7 +150,8 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         Services.GetRequiredService<ScmEventStartupGate>().Ready();
     }
 
-    internal async Task<(Guid TaskId, Guid EventId)> AddAsync(AufgabeStatus status = AufgabeStatus.Neu, bool configured = false, bool cloned = true)
+    internal async Task<(Guid TaskId, Guid EventId)> AddAsync(AufgabeStatus status = AufgabeStatus.Neu, bool configured = false, bool cloned = true,
+        ScmReferenceKind referenceKind = ScmReferenceKind.Issue, ScmContentKind contentKind = ScmContentKind.IssueComment, string body = "$Softwareschmiede test")
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -161,8 +162,11 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         db.AddRange(project, repository, task);
         await db.SaveChangesAsync();
         var time = DateTimeOffset.UtcNow;
-        var observation = new ScmEventObservation(new(Repository, ScmReferenceKind.Issue, 7), ScmContentKind.IssueComment, Guid.NewGuid().ToString(), "42",
-            time, time, null, "U_1", "owner", null, null, "$Softwareschmiede test", "https://github.com/owner/repo/issues/7", time);
+        var url = referenceKind == ScmReferenceKind.PullRequest
+            ? "https://github.com/owner/repo/pull/7"
+            : "https://github.com/owner/repo/issues/7";
+        var observation = new ScmEventObservation(new(Repository, referenceKind, 7), contentKind, Guid.NewGuid().ToString(), "42",
+            time, time, null, "U_1", "owner", null, null, body, url, time);
         await scope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(task.Id, task.Id.ToString(), new(new(observation.Reference, observation.ContentKind, null, time), [observation]));
         return (task.Id, await db.ScmIncomingEvents.Where(x => x.AufgabeId == task.Id).Select(x => x.Id).SingleAsync());
     }

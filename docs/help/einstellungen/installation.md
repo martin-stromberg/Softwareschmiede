@@ -73,6 +73,13 @@ Die SCM-Ereignisüberwachung wird auf der Registerkarte „Allgemein" im Abschni
 |-------------|------------------------------|--------------|---------|
 | Checkbox „SCM-Ereignisüberwachung aktivieren" (`SettingsViewModel.IsScmMonitoringEnabled`) | `scm.monitoring.enabled` (`AppEinstellungService.ScmMonitoringEnabledKey`) | `true` (Fallback, falls kein Eintrag vorhanden) | Wirkt ohne Neustart; bei `false` beobachten `ScmEventMonitoringService` und `ScmEventExchangeService` keine Quellen und stellen keine Ereignisse automatisch zu |
 | Textfeld „Trigger-Keyword" (`SettingsViewModel.ScmTriggerKeyword`) | `scm.trigger.keyword` (`AppEinstellungService.ScmTriggerKeywordKey`) | `$Softwareschmiede` (`ScmEventValidationService.DefaultTriggerKeyword`) | Wirkt ohne Neustart; leere/Leerraum-Eingaben werden in der GUI abgelehnt, ein ungültiger gespeicherter Wert fällt auf den Standard zurück |
+| Textfeld „Prompt-Anhänge → Allgemein" (`SettingsViewModel.ScmPromptAppendixGeneral`) | `scm.prompt.append.general` (`AppEinstellungService.ScmPromptAppendGeneralKey`) | leer | Wirkt ohne Neustart; wird bei jeder SCM-Ereigniszustellung dem Prompt angehängt; leer = nichts anhängen |
+| Textfeld „Prompt-Anhänge → Issue" (`SettingsViewModel.ScmPromptAppendixIssue`) | `scm.prompt.append.issue` (`AppEinstellungService.ScmPromptAppendIssueKey`) | leer | Wirkt ohne Neustart; Anhang für Ereignisse aus Issue-Beschreibungen (neuer/geänderter Issue-Text) |
+| Textfeld „Prompt-Anhänge → Issue-Kommentar" (`SettingsViewModel.ScmPromptAppendixIssueComment`) | `scm.prompt.append.issuecomment` (`AppEinstellungService.ScmPromptAppendIssueCommentKey`) | leer | Wirkt ohne Neustart; Anhang für Ereignisse aus Kommentaren auf Issues |
+| Textfeld „Prompt-Anhänge → Pull Request" (`SettingsViewModel.ScmPromptAppendixPullRequest`) | `scm.prompt.append.pr` (`AppEinstellungService.ScmPromptAppendPullRequestKey`) | leer | Wirkt ohne Neustart; Anhang für Ereignisse aus Pull-Request-Beschreibungen (neuer/geänderter PR-Text) |
+| Textfeld „Prompt-Anhänge → Pull-Request-Kommentar" (`SettingsViewModel.ScmPromptAppendixPullRequestComment`) | `scm.prompt.append.prcomment` (`AppEinstellungService.ScmPromptAppendPullRequestCommentKey`) | leer | Wirkt ohne Neustart; Anhang für Ereignisse aus Kommentaren, Zeilenkommentaren und veröffentlichten Reviews auf Pull Requests |
+
+Bei der Zustellung wird zuerst der allgemeine, dann der zur Ereignisart passende Anhang mit einer Leerzeile getrennt angehängt (als eigenes `promptSuffix`-Feld im JSON-Prompt). Die Anhänge verändern weder den gespeicherten Ereignistext noch die Trigger-Prüfung; ein leerer spezifischer Anhang ersetzt den allgemeinen nicht.
 
 ## Überprüfung
 
