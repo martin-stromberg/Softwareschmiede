@@ -5,14 +5,26 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Prüft Trigger und tatsächlichen Bearbeiter, bevor fachliche Aufträge entstehen.</summary>
 public sealed class ScmEventValidationService
 {
-    private const string Trigger = "$Softwareschmiede";
+    /// <summary>Standard-Trigger-Keyword, wenn kein abweichender Wert konfiguriert ist
+    /// (Einstellung <see cref="AppEinstellungService.ScmTriggerKeywordKey"/>).</summary>
+    public const string DefaultTriggerKeyword = "$Softwareschmiede";
+
     private const string QuoteChars = "'\"`´‚‘’„“”«»";
 
+    /// <summary>Normalisiert ein konfiguriertes Trigger-Keyword: Leere oder nur aus Leerraum
+    /// bestehende Werte fallen auf <see cref="DefaultTriggerKeyword"/> zurück, sonst wird der
+    /// getrimmte Wert verwendet.</summary>
+    public static string NormalizeTriggerKeyword(string? triggerKeyword)
+        => string.IsNullOrWhiteSpace(triggerKeyword) ? DefaultTriggerKeyword : triggerKeyword.Trim();
+
     /// <summary>Prüft die vertrauenswürdige Provideridentität der beobachteten Textversion.</summary>
-    public static string? GetRejection(ScmEventObservation observation)
+    /// <param name="observation">Die beobachtete Textversion.</param>
+    /// <param name="triggerKeyword">Das zu prüfende Trigger-Keyword; leere Werte fallen auf
+    /// <see cref="DefaultTriggerKeyword"/> zurück.</param>
+    public static string? GetRejection(ScmEventObservation observation, string? triggerKeyword = null)
     {
         var repository = observation.Reference.Repository;
-        if (!HasFreeStandingTrigger(observation.Body))
+        if (!HasFreeStandingTrigger(observation.Body, NormalizeTriggerKeyword(triggerKeyword)))
             return "Kein Trigger";
         if (!SameIdentity(repository.OwnerId, repository.Owner, repository.ViewerId, repository.ViewerLogin))
             return "Angemeldeter Benutzer ist nicht Repository-Owner";
@@ -29,13 +41,13 @@ public sealed class ScmEventValidationService
     }
 
     /// <summary>Der Trigger zählt nur frei stehend; unmittelbar zitierte Vorkommen lösen nichts aus.</summary>
-    private static bool HasFreeStandingTrigger(string body)
+    private static bool HasFreeStandingTrigger(string body, string trigger)
     {
         var index = -1;
-        while ((index = body.IndexOf(Trigger, index + 1, StringComparison.OrdinalIgnoreCase)) >= 0)
+        while ((index = body.IndexOf(trigger, index + 1, StringComparison.OrdinalIgnoreCase)) >= 0)
         {
             var before = index > 0 ? body[index - 1] : '\0';
-            var afterIndex = index + Trigger.Length;
+            var afterIndex = index + trigger.Length;
             var after = afterIndex < body.Length ? body[afterIndex] : '\0';
             if (!QuoteChars.Contains(before) && !QuoteChars.Contains(after))
                 return true;

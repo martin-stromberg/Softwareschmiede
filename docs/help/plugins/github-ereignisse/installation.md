@@ -16,11 +16,12 @@
 2. Wähle **GitHub** und trage unter **Authentifizierung** den **Personal Access Token** ein.
 3. Klicke **Speichern**.
 4. Prüfe in einer Aufgabe, dass Repository und Issue- oder Pull-Request-Referenz korrekt verknüpft sind.
-5. Schreibe als Repository-Owner einen Text mit `$Softwareschmiede` in die Beschreibung oder Diskussion und prüfe **SCM-Ereignisse**.
+5. Schreibe als Repository-Owner einen Text mit dem Trigger-Keyword (Standard `$Softwareschmiede`) in die Beschreibung oder Diskussion und prüfe **SCM-Ereignisse**.
 
 ## Hinweise
 
 - Die Ereignisüberwachung beginnt automatisch im Hintergrund; das Abfrageintervall beträgt standardmäßig 60 Sekunden.
+- Unter **Einstellungen → Allgemein → SCM-Ereignisse** lässt sich die Überwachung abschalten („SCM-Ereignisüberwachung aktivieren") und das Trigger-Keyword anpassen. Beide Änderungen wirken ohne Neustart. Ein deaktivierter Schalter stoppt alle GitHub-Abfragen und die automatische Zustellung; bereits eingegangene Ereignisse bleiben bestehen.
 - Weitere Optionen für Ereignisabfrage und Verarbeitungsfristen sind derzeit nicht in der Benutzeroberfläche konfigurierbar.
 - Standard-SCM-Plugins wie Bitbucket und Local Directory werden nicht automatisch ereignisfähig, nur weil sie in der Anwendung verfügbar sind. Derzeit implementiert ausschließlich GitHub diese Fähigkeit.
 - Bei Codex, Claude und Devin CLI genügt die Auswahl des Plugins nicht: unbekannte Versionen, nicht unterstützte Berechtigungen oder ein fehlender tatsächlicher Kanalzugriff lassen das Ereignis wartend. GitHub Copilot CLI unterstützt den Ereignis-Antwortkanal derzeit nicht. Der KI-Simulator dient nur der lokalen Entwicklung und wird für diesen Zweck im SCM-Modus gestartet.

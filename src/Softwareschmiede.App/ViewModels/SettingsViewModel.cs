@@ -48,6 +48,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private PluginActivationEntry? _selectedIdePlugin;
     private IReadOnlyList<PluginSettingGroupEntry>? _selectedIdePluginSettings;
     private bool _isAutonomAufgabenEnabled = true;
+    private bool _isScmMonitoringEnabled = true;
+    private string _scmTriggerKeyword = ScmEventValidationService.DefaultTriggerKeyword;
     private UpdateModusOption? _selectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.NurPruefen);
     private bool _includePrereleases;
 
@@ -208,6 +210,20 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _isAutonomAufgabenEnabled, value);
     }
 
+    /// <summary>Gibt an, ob die SCM-Ereignisüberwachung aktiviert ist (Laufzeit-Schalter, ohne Neustart wirksam).</summary>
+    public bool IsScmMonitoringEnabled
+    {
+        get => _isScmMonitoringEnabled;
+        set => SetProperty(ref _isScmMonitoringEnabled, value);
+    }
+
+    /// <summary>Das Trigger-Keyword, mit dem SCM-Ereignisse markiert werden (Standard: <c>$Softwareschmiede</c>).</summary>
+    public string ScmTriggerKeyword
+    {
+        get => _scmTriggerKeyword;
+        set => SetProperty(ref _scmTriggerKeyword, value);
+    }
+
     /// <summary>Editierbare Promptvorlagen.</summary>
     public ObservableCollection<PromptVorlageEntry> PromptVorlagen { get; } = [];
 
@@ -354,6 +370,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
             IsAutonomAufgabenEnabled = await _einstellungService.GetAutonomAufgabenEnabledAsync(_autonomAufgabenOptions.Value.Enabled, ct);
 
+            IsScmMonitoringEnabled = await _einstellungService.GetScmMonitoringEnabledAsync(ct);
+            ScmTriggerKeyword = await _einstellungService.GetScmTriggerKeywordAsync(ct);
+
             var updateSettings = await _einstellungService.GetUpdateSettingsAsync(ct);
             _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Modus);
             OnPropertyChanged(nameof(SelectedUpdateMode));
@@ -407,6 +426,15 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await _einstellungService.SetBoolSettingAsync(
                 AppEinstellungService.AutonomAufgabenEnabledKey,
                 IsAutonomAufgabenEnabled,
+                ct);
+
+            await _einstellungService.SetBoolSettingAsync(
+                AppEinstellungService.ScmMonitoringEnabledKey,
+                IsScmMonitoringEnabled,
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmTriggerKeywordKey,
+                ScmTriggerKeyword.Trim(),
                 ct);
 
             try
@@ -602,7 +630,20 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     {
         return ValidierePluginAktivierung()
             && ValidierePflichtfelderFuerSettings(_selectedPluginSettings)
-            && ValidierePromptVorlagen();
+            && ValidierePromptVorlagen()
+            && ValidiereScmTriggerKeyword();
+    }
+
+    /// <summary>Das Trigger-Keyword darf nicht leer sein; der Dienst fällt sonst auf den Standard zurück.</summary>
+    private bool ValidiereScmTriggerKeyword()
+    {
+        if (string.IsNullOrWhiteSpace(ScmTriggerKeyword))
+        {
+            FehlerMeldung = $"Das Trigger-Keyword für SCM-Ereignisse darf nicht leer sein. Standard: {ScmEventValidationService.DefaultTriggerKeyword}";
+            return false;
+        }
+
+        return true;
     }
 
     private bool ValidierePluginAktivierung()

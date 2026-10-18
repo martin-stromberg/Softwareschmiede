@@ -4,9 +4,9 @@
 
 ## Es erscheint kein Ereignis
 
-**Ursache:** Das Repository oder die Referenz ist nicht mit einer aktiven Aufgabe verknüpft, der Trigger fehlt, oder Autor/Bearbeiter ist nicht der angemeldete Repository-Owner.
+**Ursache:** Das Repository oder die Referenz ist nicht mit einer aktiven Aufgabe verknüpft, das konfigurierte Trigger-Keyword fehlt, Autor/Bearbeiter ist nicht der angemeldete Repository-Owner, oder die SCM-Ereignisüberwachung ist deaktiviert.
 
-**Lösung:** Prüfe die Verknüpfung und den Text in GitHub. Ergänze `$Softwareschmiede` und stelle sicher, dass der Owner die aktuelle Textfassung verfasst hat. Öffne **SCM-Ereignisse** und klicke **Aktualisieren**.
+**Lösung:** Prüfe die Verknüpfung und den Text in GitHub. Ergänze das Trigger-Keyword (Standard `$Softwareschmiede`, siehe **Einstellungen → Allgemein → SCM-Ereignisse**) und stelle sicher, dass der Owner die aktuelle Textfassung verfasst hat. Prüfe außerdem, ob die Überwachung in den Einstellungen aktiviert ist — bei deaktivierter Überwachung zeigt die Ereignisübersicht einen entsprechenden Hinweis und „Quellen erneut prüfen" ist wirkungslos. Öffne **SCM-Ereignisse** und klicke **Aktualisieren**.
 
 ## Ein Eintrag bleibt wartend
 
