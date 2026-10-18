@@ -47,6 +47,21 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für das konfigurierbare SCM-Trigger-Keyword.</summary>
     public const string ScmTriggerKeywordKey = "scm.trigger.keyword";
 
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang, der bei jeder Ereignisart angehängt wird.</summary>
+    public const string ScmPromptAppendGeneralKey = "scm.prompt.append.general";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Issue-Beschreibungen (neues/geändertes Issue).</summary>
+    public const string ScmPromptAppendIssueKey = "scm.prompt.append.issue";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Kommentaren auf Issues.</summary>
+    public const string ScmPromptAppendIssueCommentKey = "scm.prompt.append.issuecomment";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Pull-Request-Beschreibungen (neuer/geänderter PR).</summary>
+    public const string ScmPromptAppendPullRequestKey = "scm.prompt.append.pr";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Kommentaren und Reviews auf Pull Requests.</summary>
+    public const string ScmPromptAppendPullRequestCommentKey = "scm.prompt.append.prcomment";
+
     /// <summary>Schlüssel für den Update-Modus (<see cref="UpdateMode"/>-Wert als Zahl gespeichert).</summary>
     public const string UpdateModeKey = "updates.mode";
 
@@ -166,6 +181,18 @@ public sealed class AppEinstellungService
     /// <returns>Das effektive Trigger-Keyword.</returns>
     public async Task<string> GetScmTriggerKeywordAsync(CancellationToken ct = default)
         => ScmEventValidationService.NormalizeTriggerKeyword(await GetSettingAsync(ScmTriggerKeywordKey, ct));
+
+    /// <summary>
+    /// Liest alle fünf SCM-Prompt-Anhänge (<see cref="ScmPromptAppendGeneralKey"/>,
+    /// <see cref="ScmPromptAppendIssueKey"/>, <see cref="ScmPromptAppendIssueCommentKey"/>,
+    /// <see cref="ScmPromptAppendPullRequestKey"/> und <see cref="ScmPromptAppendPullRequestCommentKey"/>)
+    /// in einer einzigen Datenbankabfrage. Schlüssel ohne gespeicherten Eintrag fehlen im Ergebnis;
+    /// die fachliche Auswertung (Ereignisart-Mapping, Kombination) übernimmt <see cref="ScmPromptAppendix"/>.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Eine Zuordnung von Schlüssel zu gespeichertem Wert.</returns>
+    public async Task<IReadOnlyDictionary<string, string?>> GetScmPromptAppendicesAsync(CancellationToken ct = default)
+        => await GetSettingsAsync(ScmPromptAppendix.SettingKeys, ct);
 
     /// <summary>Liest die Werte mehrerer Einstellungen anhand ihrer Schlüssel in einer einzigen Datenbankabfrage.</summary>
     /// <param name="schluessel">Die zu lesenden Schlüssel.</param>

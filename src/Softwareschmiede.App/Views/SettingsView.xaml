@@ -312,6 +312,69 @@
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    TextWrapping="Wrap"
                                    Margin="0,4,0,0" />
+                        <TextBlock Text="Prompt-Anhänge"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,16,0,4" />
+                        <TextBlock Text="Texte, die bei der Zustellung automatisch an das SCM-Ereignis angehängt werden — z. B. Hinweise auf verfügbare Skills oder Bearbeitungsregeln, ohne sie in jedem Kommentar zu nennen. Der allgemeine Anhang wird zuerst eingefügt, danach der zur Ereignisart passende. Ein leeres Feld hängt nichts an. Die Anhänge verändern weder den gespeicherten Ereignistext noch die Trigger-Prüfung."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,8" />
+                        <TextBlock Text="Allgemein (alle Ereignisarten)"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,4" />
+                        <TextBox Text="{Binding ScmPromptAppendixGeneral, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="ScmPromptAppendixGeneral"
+                                 AcceptsReturn="True"
+                                 MinHeight="48"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Padding="8,6"
+                                 BorderBrush="{DynamicResource BorderBrush}" />
+                        <TextBlock Text="Issue"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,8,0,4" />
+                        <TextBox Text="{Binding ScmPromptAppendixIssue, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="ScmPromptAppendixIssue"
+                                 AcceptsReturn="True"
+                                 MinHeight="48"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Padding="8,6"
+                                 BorderBrush="{DynamicResource BorderBrush}" />
+                        <TextBlock Text="Issue-Kommentar"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,8,0,4" />
+                        <TextBox Text="{Binding ScmPromptAppendixIssueComment, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="ScmPromptAppendixIssueComment"
+                                 AcceptsReturn="True"
+                                 MinHeight="48"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Padding="8,6"
+                                 BorderBrush="{DynamicResource BorderBrush}" />
+                        <TextBlock Text="Pull Request"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,8,0,4" />
+                        <TextBox Text="{Binding ScmPromptAppendixPullRequest, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="ScmPromptAppendixPullRequest"
+                                 AcceptsReturn="True"
+                                 MinHeight="48"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Padding="8,6"
+                                 BorderBrush="{DynamicResource BorderBrush}" />
+                        <TextBlock Text="Pull-Request-Kommentar (inkl. Reviews)"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,8,0,4" />
+                        <TextBox Text="{Binding ScmPromptAppendixPullRequestComment, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="ScmPromptAppendixPullRequestComment"
+                                 AcceptsReturn="True"
+                                 MinHeight="48"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Padding="8,6"
+                                 BorderBrush="{DynamicResource BorderBrush}" />
                     </StackPanel>
 
                     <!-- Updates -->
