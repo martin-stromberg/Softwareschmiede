@@ -1,3 +1,9 @@
+## 2026-10-18 — CI: OS-Interface-Tests in eigenen Job ausgelagert
+
+- Die nicht-blockierenden `OsInterface`-Tests (FlaUI-E2E, ConPTY, Zwischenablage, echte Prozessstarts) laufen in `staging-ci.yml` und `pr-staging-ci.yml` jetzt in einem eigenen parallelen Job `os-interface tests` statt innerhalb von `build & test`.
+- Grund: Ihre Laufzeit zählte bisher gegen das 20-Minuten-Timeout von `build & test`; ein Abbruch dort übersprang in der Staging-Pipeline die Jobs `version`/`prerelease` und verhinderte so die Pre-Release-Erstellung, obwohl alle blockierenden Tests grün waren. In der PR-CI konnte derselbe Abbruch einen an sich grünen Check als fehlgeschlagen markieren.
+- `version`/`prerelease` benötigen den neuen Job nicht; er läuft mit `continue-on-error` (bisheriges Best-Effort-Verhalten) und eigenem 30-Minuten-Budget.
+
 ## 2026-10-18 — Durchgängiger Auto-Start und Zustellung angelegter Aufgaben (Schritt 4)
 
 - Aus SCM-Ereignissen automatisch angelegte oder wiederverwendete Aufgaben durchlaufen nachweisbar denselben Start- und Zustellungspfad wie aufgabenverknüpfte Ereignisse: erneute Repository-/CanWrite-/Owner-Prüfungen, `Neu` → `Gestartet`, Klon/Branch/CLI-Start über `EntwicklungsprozessService` und Zustellung an die aufgelöste Standard-CLI (Aufgabe → Projekt-Default → globaler Default).
