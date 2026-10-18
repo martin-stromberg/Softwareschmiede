@@ -51,6 +51,25 @@ public sealed class DevinPluginTests
         _sut.SupportsSessionContinuation().Should().BeTrue();
     }
 
+    /// <summary>Devin benötigt den verzögerten Zwei-Batch-Submit: Ein \r im selben Eingabe-Read wie der
+    /// Prompttext wird von der Devin CLI als Zeilenumbruch gewertet, nicht als Enter-Submit (empirisch
+    /// gegen devin.exe v3000.11.92 unter ConPTY verifiziert).</summary>
+    [Fact]
+    public void PromptSubmitDelay_ShouldRequireSeparateDelayedSubmit()
+    {
+        _sut.PromptSubmitDelay.Should().BeGreaterThan(TimeSpan.Zero);
+    }
+
+    /// <summary>Die Startbeschreibung trägt die Submit-Verzögerung in die Terminal-Session.</summary>
+    [Fact]
+    public async Task GetTerminalStartSpecAsync_MapsPromptSubmitDelayIntoSpec()
+    {
+        var spec = await _sut.GetTerminalStartSpecAsync("/repo");
+
+        spec.PromptSubmitDelay.Should().Be(_sut.PromptSubmitDelay);
+        spec.Capabilities.Should().HaveFlag(TerminalProviderCapabilities.RequiresPty);
+    }
+
     /// <summary>StartCliAsync uses default devin command when no path is configured.</summary>
     [Fact]
     public async Task StartCliAsync_ShouldUseDevinCommand_WhenNoPathConfigured()

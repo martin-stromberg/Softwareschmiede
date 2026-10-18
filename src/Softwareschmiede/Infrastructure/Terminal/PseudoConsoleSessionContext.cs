@@ -27,4 +27,9 @@ internal sealed record PseudoConsoleSessionContext
 
     /// <summary>Dauer ohne I/O-Aktivität, ab der der Runtime-Status <see cref="CliRuntimeStatus.WartetAufEingabe"/> angenommen wird.</summary>
     public TimeSpan WaitingThreshold { get; init; } = TimeSpan.FromSeconds(4);
+
+    /// <summary>Verzögerung, mit der <see cref="PseudoConsoleSession.WritePromptAsync"/> den
+    /// abschließenden Submit als separaten Eingabe-Batch sendet; <c>TimeSpan.Zero</c>
+    /// (Standard) schreibt Text und Submit in einem Vorgang.</summary>
+    public TimeSpan PromptSubmitDelay { get; init; } = TimeSpan.Zero;
 }

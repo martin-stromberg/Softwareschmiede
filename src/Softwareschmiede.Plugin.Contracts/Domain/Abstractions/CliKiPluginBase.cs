@@ -35,6 +35,11 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// <inheritdoc/>
     public virtual TerminalProviderCapabilities TerminalCapabilities => TerminalProviderCapabilities.SupportsPty;
 
+    /// <summary>Verzögerung, mit der der abschließende Submit eines Terminal-Prompts als separater
+    /// Eingabe-Batch hinter dem Prompttext gesendet wird (<see cref="TerminalSessionStartSpec.PromptSubmitDelay"/>).
+    /// <c>TimeSpan.Zero</c> (Standard) sendet Text und Submit in einem Schreibvorgang.</summary>
+    public virtual TimeSpan PromptSubmitDelay => TimeSpan.Zero;
+
     /// <inheritdoc/>
     public Task<TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
         => Task.FromResult(BuildTerminalStartSpec(localRepoPath, parameters));
@@ -57,6 +62,7 @@ public abstract class CliKiPluginBase : IKiPlugin
             WorkingDirectory = psi.WorkingDirectory,
             EnvironmentVariables = GetEnvironmentVariables(psi),
             Capabilities = TerminalCapabilities,
+            PromptSubmitDelay = PromptSubmitDelay,
             PluginName = PluginName,
             OptionalParameters = parameters,
         };

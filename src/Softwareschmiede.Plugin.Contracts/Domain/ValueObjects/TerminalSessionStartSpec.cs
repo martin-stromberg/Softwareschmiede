@@ -22,6 +22,14 @@ public sealed record TerminalSessionStartSpec
     /// <summary>Terminal-Fähigkeiten der CLI (PTY-Unterstützung/-Bedarf).</summary>
     public TerminalProviderCapabilities Capabilities { get; init; } = TerminalProviderCapabilities.SupportsPty;
 
+    /// <summary>Verzögerung, mit der <c>ITerminalSession.WritePromptAsync</c> den abschließenden
+    /// Submit (<c>\r</c>) als separaten Eingabe-Batch hinter dem Prompttext sendet.
+    /// <c>TimeSpan.Zero</c> (Standard): Text und Submit werden wie bisher in einem einzigen
+    /// Schreibvorgang übertragen. Werte &gt; 0 sind für CLIs gedacht, die innerhalb eines
+    /// gemeinsamen Eingabe-Batches ein <c>\r</c> nicht als Enter-Submit, sondern als
+    /// Zeilenumbruch werten (Paste-Semantik) — z. B. die Devin CLI.</summary>
+    public TimeSpan PromptSubmitDelay { get; init; } = TimeSpan.Zero;
+
     /// <summary>Anzeigename des liefernden Plugins (für Diagnose/Protokoll).</summary>
     public string PluginName { get; init; } = string.Empty;
 

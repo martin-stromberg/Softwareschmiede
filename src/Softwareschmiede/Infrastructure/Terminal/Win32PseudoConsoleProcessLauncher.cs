@@ -76,7 +76,7 @@ public sealed class Win32PseudoConsoleProcessLauncher : IPseudoConsoleProcessLau
         PseudoConsoleSession session;
         try
         {
-            session = CreatePseudoConsoleSession(aufgabeId, pseudoConsole, process, startResult.ProcessHandle, outputSink);
+            session = CreatePseudoConsoleSession(aufgabeId, pseudoConsole, process, startResult.ProcessHandle, outputSink, spec.PromptSubmitDelay);
         }
         catch
         {
@@ -93,7 +93,7 @@ public sealed class Win32PseudoConsoleProcessLauncher : IPseudoConsoleProcessLau
         return new TerminalSessionStartResult(process, session, IsPseudoTerminal: true);
     }
 
-    private PseudoConsoleSession CreatePseudoConsoleSession(Guid aufgabeId, PseudoConsole pseudoConsole, Process process, IntPtr nativeProcessHandle, ITerminalOutputSink? outputSink)
+    private PseudoConsoleSession CreatePseudoConsoleSession(Guid aufgabeId, PseudoConsole pseudoConsole, Process process, IntPtr nativeProcessHandle, ITerminalOutputSink? outputSink, TimeSpan promptSubmitDelay)
     {
         FileStream? inputStream = null;
         FileStream? outputStream = null;
@@ -123,6 +123,7 @@ public sealed class Win32PseudoConsoleProcessLauncher : IPseudoConsoleProcessLau
                     NativeProcessHandle = nativeProcessHandle,
                     Options = _options.Value,
                     IsPseudoTerminal = true,
+                    PromptSubmitDelay = promptSubmitDelay,
                 });
         }
         catch (Exception ex)

@@ -1,3 +1,10 @@
+## 2026-10-19 — Fix: Devin-Prompts wurden nicht abgesendet (nur Zeilenumbruch)
+
+- Ursache: Die Devin CLI (v3000.11.x, crossterm/chisel-TUI) wertet ein `\r`, das im selben Eingabe-Read wie der Prompttext ankommt, nicht als Enter-Submit, sondern als Zeilenumbruch (Paste-Semantik). Empirisch gegen `devin.exe` unter echtem ConPTY verifiziert: Text+`\r` in einem Write → nur Newline; `\r` als separater Write ab ~75 ms Abstand → Submit (50 ms schlägt fehl).
+- Fix: Neues `TerminalSessionStartSpec.PromptSubmitDelay` (Standard `TimeSpan.Zero` = unverändertes Ein-Batch-Verhalten). `PseudoConsoleSession.WritePromptAsync` sendet bei gesetzter Verzögerung Prompttext und Submit-`\r` als zwei getrennte, atomar unter der Eingabesperre geflushte Batches; `CliKiPluginBase.PromptSubmitDelay` ist virtuelle Plugin-Vereinbarung, `DevinPlugin` setzt 200 ms. Gilt automatisch für alle Sendepfade (Promptvorlagen, SCM-Antwortkanal, zeitversetzte Prompts, Projektleiter), ohne Codex/Claude/Simulator zu ändern.
+- Keyboard-/Clipboard-Pfade unverändert: physischer Enter ist bereits ein Einzel-Write (funktioniert); Clipboard-Paste erzeugt im Devin-Entwurf korrekte Zeilenumbrüche statt Fehl-Submits.
+- Bekannte Einschränkung: Devin deklariert conhost/ConPTY offiziell als „unsupported terminal“ (eigene Anzeige „Windows Console Host (conhost) has limited support“); die Zustellung ist damit auf den verifizierten Zwei-Batch-Submit festgelegt.
+
 ## 2026-10-18 — CI: Fenster- und ConPTY-E2E-Tests auf gehosteten Runnern übersprungen
 
 - Neue Umgebungsvariable `SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1` (Probe `WpfE2EEnvironmentProbe`, geprüft zentral in `WpfTestBase.LaunchApp`): Alle echten Fenster-E2E-Tests, die die App per FlaUI mit realem WPF-Hauptfenster fahren, melden damit kontrolliert „Skipped" statt nach dem Fenster-Timeout mit `TimeoutException` zu scheitern. Voraussetzung: Die Testmethoden in allen `WpfTestBase`-Ableitungen nutzen jetzt durchgängig `[SkippableFact]`.

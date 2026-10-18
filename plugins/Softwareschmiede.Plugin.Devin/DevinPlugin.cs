@@ -33,6 +33,14 @@ public sealed class DevinPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
     public override TerminalProviderCapabilities TerminalCapabilities =>
         TerminalProviderCapabilities.RequiresPty | TerminalProviderCapabilities.SupportsPty;
 
+    /// <summary>Empirisch ermittelte Verzögerung für den Devin-Submit: Die Devin CLI (v3000.11.x,
+    /// crossterm/chisel-TUI) wertet ein <c>\r</c>, das im selben Eingabe-Read wie der Prompttext
+    /// ankommt, als Zeilenumbruch (Paste-Semantik) — nicht als Enter-Submit. Erst ein zeitlich
+    /// getrennt gesendetes CR wird als Tastatur-Enter erkannt (gemessen: 50 ms noch im selben
+    /// Batch, ab ~75 ms separat; 200 ms als Sicherheitsmarge unter Last).</summary>
+    /// <inheritdoc/>
+    public override TimeSpan PromptSubmitDelay => TimeSpan.FromMilliseconds(200);
+
     /// <inheritdoc/>
     public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
     [
