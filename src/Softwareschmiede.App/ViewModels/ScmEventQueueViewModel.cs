@@ -51,9 +51,10 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
                 .ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)null), ct);
             await scope.ServiceProvider.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(ct);
         });
-        OpenEventCommand = Command(OpenAsync, () => SelectedEvent is { IsProcessed: false, IsBlocked: false, AttemptId: null });
-        RetryCommand = Command(ct => WithEventAsync((service, item) => service.RetryAsync(item.Id, ct), ct), () => SelectedEvent is not null);
-        CheckStatusCommand = Command(ct => WithEventAsync((service, item) => service.DispatchAsync(item.Id, ct: ct), ct), () => SelectedEvent?.AttemptId is not null);
+        OpenEventCommand = Command(OpenAsync, () => SelectedEvent is { IsFinal: false, IsBlocked: false, AttemptId: null });
+        RetryCommand = Command(ct => WithEventAsync((service, item) => service.RetryAsync(item.Id, ct), ct), () => SelectedEvent is { IsFinal: false });
+        CheckStatusCommand = Command(ct => WithEventAsync((service, item) => service.DispatchAsync(item.Id, ct: ct), ct), () => SelectedEvent is { IsFinal: false, AttemptId: not null });
+        CancelCommand = Command(CancelAsync, () => SelectedEvent is { IsFinal: false });
         ConfirmReadyCommand = Command(ct => WithEventAsync((service, item) => service.ConfirmReadyAsync(item.Id, item.CliRunId!, ct), ct),
             () => SelectedEvent is { CanConfirmReady: true });
         ResendCommand = Command(ResendAsync, () => SelectedEvent is { CanResend: true, IsBlocked: false });
@@ -72,7 +73,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
     /// <summary>Gefilterte, dauerhafte Ereignisse.</summary>
     public ObservableCollection<ScmEventQueueItem> Events { get; } = new();
     /// <summary>Verfügbare Anzeigefilter.</summary>
-    public IReadOnlyList<string> Filters { get; } = ["Wartend", "Verarbeitet", "Alle"];
+    public IReadOnlyList<string> Filters { get; } = ["Wartend", "Verarbeitet", "Abgebrochen", "Alle"];
     /// <summary>Reiner Anzeigefilter; löst keine Ereignisverarbeitung aus.</summary>
     public string SelectedFilter
     {
@@ -104,7 +105,12 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
     /// <summary>Sichtbare Auswirkung angehaltener Quellen außerhalb der technischen Details.</summary>
     public string? MonitoringNotice { get => _monitoringNotice; private set => SetProperty(ref _monitoringNotice, value); }
     /// <summary>Text des zum Filter passenden Leerzustands.</summary>
-    public string EmptyText => SelectedFilter == "Wartend" ? "Keine wartenden SCM-Ereignisse" : "Keine SCM-Ereignisse in diesem Filter";
+    public string EmptyText => SelectedFilter switch
+    {
+        "Wartend" => "Keine wartenden SCM-Ereignisse",
+        "Abgebrochen" => "Keine abgebrochenen SCM-Ereignisse",
+        _ => "Keine SCM-Ereignisse in diesem Filter"
+    };
     /// <summary>Operation/Dialog sperrt weitere verändernde Commands.</summary>
     public bool IsBusy { get => _isBusy; private set { SetProperty(ref _isBusy, value); CommandManager.InvalidateRequerySuggested(); } }
     /// <summary>Verständliche Rückmeldung der letzten Benutzeraktion.</summary>
@@ -125,6 +131,8 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
     public AsyncRelayCommand ConfirmReadyCommand { get; }
     /// <summary>Erlaubt einen bewussten Neuversand nach Warnung.</summary>
     public AsyncRelayCommand ResendCommand { get; }
+    /// <summary>Bricht ein nicht abgeschlossenes Ereignis nach Bestätigung endgültig ab.</summary>
+    public AsyncRelayCommand CancelCommand { get; }
     /// <summary>Navigation zur zugehörigen Aufgabe.</summary>
     public ICommand NavigateToTaskCommand { get; }
     /// <summary>Navigation zu den Einstellungen.</summary>
@@ -145,8 +153,9 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
             var filter = SelectedFilter;
             var query = db.ScmIncomingEvents.AsNoTracking();
-            if (filter == "Wartend") query = query.Where(x => x.Status != "Verarbeitet");
+            if (filter == "Wartend") query = query.Where(x => x.Status != "Verarbeitet" && x.Status != "Abgebrochen");
             if (filter == "Verarbeitet") query = query.Where(x => x.Status == "Verarbeitet");
+            if (filter == "Abgebrochen") query = query.Where(x => x.Status == "Abgebrochen");
             var records = await query.OrderBy(x => x.Sequence).ToListAsync(ct);
             var taskIds = records.Select(x => x.AufgabeId).Distinct().ToArray();
             var tasks = await db.Aufgaben.AsNoTracking().Where(x => taskIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
@@ -267,6 +276,20 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
         await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ResendAsync(item.Id, attempt, ct);
     }
 
+    private async Task CancelAsync(CancellationToken ct)
+    {
+        if (SelectedEvent is not { IsFinal: false } item) return;
+        var delivered = item.AttemptId is not null;
+        if (!_dialogs.BestaetigenDialog(
+                "Das Ereignis wird endgültig abgebrochen: keine weiteren Zustell- oder Prüfversuche und keine weiteren GitHub-Antworten."
+                + (delivered ? "\nEine eventuell laufende CLI-Verarbeitung wird dadurch nicht beendet." : string.Empty)
+                + "\nEreignis abbrechen?", "SCM-Ereignis abbrechen")) return;
+        using var scope = _scopes.CreateScope();
+        Message = await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(item.Id, ct)
+            ? "Das Ereignis wurde abgebrochen."
+            : "Das Ereignis ist bereits abgeschlossen und konnte nicht abgebrochen werden.";
+    }
+
     private static string ActionLabel(string purpose) => purpose == "receipt" ? "Empfangsbestätigung" : purpose == "waiting" ? "Wartehinweis" : "KI-Antwort";
     private static string NextCheck(long? next) => next == long.MaxValue ? "Erneut prüfen erforderlich" : next is > 0 ? $"nächste Prüfung {DateTimeOffset.FromUnixTimeMilliseconds(next.Value).ToLocalTime():g}" : "Prüfung ausstehend";
     private void OnChanged() => _dispatch(RefreshInBackground);
@@ -289,6 +312,10 @@ public sealed record ScmEventQueueItem(Guid Id, Guid TaskId, string TaskTitle, s
 {
     /// <summary>Der aktuelle Attempt ist abgeschlossen.</summary>
     public bool IsProcessed => Status == "Verarbeitet";
+    /// <summary>Verarbeitet und Abgebrochen sind die abschließenden Endstatus ohne weitere Verarbeitung.</summary>
+    public bool IsFinal => Status is "Verarbeitet" or "Abgebrochen";
+    /// <summary>Nur nicht abgeschlossene Ereignisse können vom Anwender endgültig abgebrochen werden.</summary>
+    public bool CanCancel => !IsFinal;
     /// <summary>Unsicherheit benötigt eine ausdrückliche Warnungsbestätigung.</summary>
     public bool CanResend => AttemptId is not null && Status is "ZustellungUngewiss" or "VerarbeitungUngeklärt";
     /// <summary>Nur eine unbekannte, noch nicht zugestellte Bereitschaft kann bestätigt werden.</summary>

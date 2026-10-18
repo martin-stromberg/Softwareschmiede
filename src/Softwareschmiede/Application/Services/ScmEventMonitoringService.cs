@@ -150,10 +150,12 @@ public sealed class ScmEventMonitoringService(
         long afterSequence = 0;
         while (afterSequence < upperSequence)
         {
+            // Abgebrochene Ereignisse sind endgültig: auch noch ausstehende Hostaktionen werden nicht mehr gesendet.
             var batch = await db.ScmIncomingEvents.AsNoTracking().Where(x => x.Sequence > afterSequence && x.Sequence <= upperSequence).Where(x =>
-                (x.Status != "Verarbeitet" && (x.NextAttemptUtc == null || x.NextAttemptUtc <= nowMilliseconds)) ||
+                x.Status != "Abgebrochen" &&
+                ((x.Status != "Verarbeitet" && (x.NextAttemptUtc == null || x.NextAttemptUtc <= nowMilliseconds)) ||
                 db.ScmOutgoingActions.Any(action => action.EventId == x.Id && action.Status != "Succeeded"
-                    && (action.NextAttemptUtc == null || action.NextAttemptUtc <= nowMilliseconds)))
+                    && (action.NextAttemptUtc == null || action.NextAttemptUtc <= nowMilliseconds))))
                 .OrderBy(x => x.Sequence).Select(x => new { x.Id, x.Sequence }).Take(100).ToListAsync(ct);
             if (batch.Count == 0) break;
             afterSequence = batch[^1].Sequence;

@@ -16,7 +16,7 @@ public sealed class ScmEventExchangeService(IServiceScopeFactory scopes, TimePro
         await startup.WaitAsync(ct);
         using var scope = scopes.CreateScope();
         var ids = await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents.AsNoTracking()
-            .Where(x => x.DeliveryAttemptId != null && x.Status != "Verarbeitet").Select(x => x.Id).ToListAsync(ct);
+            .Where(x => x.DeliveryAttemptId != null && x.Status != "Verarbeitet" && x.Status != "Abgebrochen").Select(x => x.Id).ToListAsync(ct);
         foreach (var id in ids)
         {
             using var itemScope = scopes.CreateScope();

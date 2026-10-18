@@ -27,6 +27,10 @@ Wähle den Eintrag und klicke **Öffnen / CLI auswählen** oder drücke Enter. W
 
 Bei einem unklaren Ausgang klicke zuerst **Status erneut prüfen**. **Neu senden…** startet nur nach einer zusätzlichen Bestätigung einen neuen Versuch. Der Dialog weist darauf hin, dass der vorherige Versuch bereits verarbeitet worden sein könnte.
 
+### 5. Ereignis abbrechen
+
+Ist ein Eintrag nicht mehr relevant (z. B. Anfrage hinfällig oder anderweitig erledigt), wähle ihn und klicke **Abbrechen…**. Nach einer kurzen Bestätigung erhält das Ereignis den Endstatus **Abgebrochen**: Es folgen keine weiteren Zustell- oder Prüfversuche und keine weiteren GitHub-Antworten. Eine bereits zugestellte, laufende CLI-Verarbeitung wird dadurch **nicht** beendet — sie läuft regulär weiter, nur die Ereignisverfolgung endet. Der Eintrag bleibt sichtbar und ist über den Filter **Abgebrochen** oder **Alle** auffindbar. Bereits verarbeitete oder abgebrochene Einträge können nicht erneut abgebrochen werden.
+
 ## Ergebnis
 
 Die Liste zeigt den Verarbeitungsstatus. Bei erfolgreicher Bestätigung erhalten Kommentare und veröffentlichte Pull-Request-Reviews auf GitHub 👀; für Beschreibungen wird keine Reaktion gesetzt. Wartende Einträge zeigen den Grund, soweit er bekannt ist. Die Anwendung beendet die Aufgabe nicht automatisch; sie bleibt nach der Verarbeitung in ihrem bisherigen Aufgabenstatus.
