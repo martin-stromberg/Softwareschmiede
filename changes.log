@@ -1,3 +1,9 @@
+## 2026-10-18 — Fix: Unassigned-SCM-Quellen nicht als Überwachungsfehler gemeldet
+
+- Seit der repository-weiten GitHub-Überwachung trägt jede enumerierte Referenz ohne lokale Aufgabe die Checkpoint-Diagnose „Keine Aufgabe zugeordnet" (`ScmEventStore.UnassignedDiagnostic`) — ein erwarteter Normalzustand. `ScmEventQueueViewModel.RefreshAsync` wertete bisher **jede** gesetzte Diagnose als Quellfehler und blendete dadurch massenhaft das Alarmbanner „Die GitHub-Überwachung ist für betroffene Quellen unterbrochen; neue Anfragen können fehlen" ein und listete die Einträge in den Integrationshinweisen.
+- Fix: Die Abfrage der Quellfehler schließt `ScmEventStore.UnassignedDiagnostic` gezielt aus — damit entfallen Banner und Fehlereintrag für unzugeordnete Referenzen. Echte Beobachtungsfehler (Anmeldung, Rechte, Netzwerk, Parser) und die „Mehrdeutige Zuordnung zu Aufgaben" alarmieren unverändert. Die Checkpoint-Diagnose selbst bleibt persistiert; lediglich ihre Bewertung in der Anzeige wurde korrigiert.
+- Tests: `ScmEventQueueViewModelTests.UnassignedSources_NeitherBannerNorDiagnostics_RealErrorsStillAlarm` — nur Unassigned-Diagnosen erzeugen weder Banner noch Diagnostics-Eintrag; ein zusätzlicher echter Quellfehler alarmiert weiterhin, ohne die Unassigned-Einträge zu listen.
+
 ## 2026-10-19 — SCM-Ereignisse können abgebrochen werden
 
 - Neuer Endstatus `Abgebrochen` für SCM-Ereignisse: Jedes nicht abgeschlossene Ereignis (Aufgenommen, Wartend, zugestellt/in Bearbeitung, ungewiss/ungeklärt) lässt sich in der SCM-Ereignisübersicht über **Abbrechen…** nach Bestätigung endgültig schließen. `Verarbeitet` und `Abgebrochen` sind die einzigen Endstatus.

@@ -160,7 +160,10 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             var taskIds = records.Select(x => x.AufgabeId).Distinct().ToArray();
             var tasks = await db.Aufgaben.AsNoTracking().Where(x => taskIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
             var entries = records.Select(item => ScmEventQueueItem.From(item, tasks.GetValueOrDefault(item.AufgabeId))).ToList();
-            var sourceErrors = await db.ScmObservationCheckpoints.AsNoTracking().Where(x => x.Diagnostic != null).ToListAsync(ct);
+            // "Keine Aufgabe zugeordnet" ist der erwartete Normalzustand enumerierter Referenzen ohne lokale
+            // Aufgabe und weder eine Unterbrechung noch ein Fehler — nur echte Beobachtungsfehler alarmieren.
+            var sourceErrors = await db.ScmObservationCheckpoints.AsNoTracking()
+                .Where(x => x.Diagnostic != null && x.Diagnostic != ScmEventStore.UnassignedDiagnostic).ToListAsync(ct);
             var actionErrors = await db.ScmOutgoingActions.AsNoTracking().Where(x => x.Error != null).ToListAsync(ct);
             var diagnostic = string.Join(Environment.NewLine,
                 sourceErrors.Select(x => $"Quelle {x.SourceKey}: {x.Diagnostic} ({NextCheck(x.NextAttemptUtc)})")
