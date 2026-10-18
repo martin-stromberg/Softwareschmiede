@@ -17,9 +17,12 @@ namespace Softwareschmiede.Tests.E2E;
 public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
 {
     /// <summary>Exercises queue navigation, replay, restart, selection/cancel, lifecycle, filters, blocked tasks and issue/PR replies.</summary>
-    [Fact]
+    [SkippableFact]
     public async Task ScmEvents_QueueReceptionDispatchAndReplies_UseRealPipeline()
     {
+        // Früh überspringen, bevor die Fixture ihre Git-Workspaces/DB aufbaut.
+        SkipWennWpfE2ENichtVerfuegbar();
+
         var fixture = new ScmE2EFixture();
         await fixture.InitializeAsync();
         output.WriteLine("SCM fixture and evidence: " + fixture.Configuration.TestRoot);

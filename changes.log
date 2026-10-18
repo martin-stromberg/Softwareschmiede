@@ -1,3 +1,8 @@
+## 2026-10-18 — CI: Fenster- und ConPTY-E2E-Tests auf gehosteten Runnern übersprungen
+
+- Neue Umgebungsvariable `SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1` (Probe `WpfE2EEnvironmentProbe`, geprüft zentral in `WpfTestBase.LaunchApp`): Alle echten Fenster-E2E-Tests, die die App per FlaUI mit realem WPF-Hauptfenster fahren, melden damit kontrolliert „Skipped" statt nach dem Fenster-Timeout mit `TimeoutException` zu scheitern. Voraussetzung: Die Testmethoden in allen `WpfTestBase`-Ableitungen nutzen jetzt durchgängig `[SkippableFact]`.
+- Beide Workflows (`staging-ci.yml`, `pr-staging-ci.yml`) setzen im Job `os-interface tests` zusätzlich `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1`, da die ConPTY-E2E-Tests auf GitHub-gehosteten Runnern ohne interaktive Desktop-Session ebenso deterministisch scheitern. Die übrigen OsInterface-Tests (Zwischenablage, echte Prozessstarts u. a.) laufen unverändert; lokal bleibt die Lane ohne die Flags vollständig.
+
 ## 2026-10-18 — SCM-Trigger nur bei frei stehendem $Softwareschmiede
 
 - `ScmEventValidationService` wertet den Trigger `$Softwareschmiede` (weiterhin case-insensitiv) nur noch dann, wenn ein Vorkommen nicht unmittelbar von einem Zitatzeichen flankiert ist (`'`, `"`, `` ` ``, `´`, `‚`, `‘`, `’`, `„`, `“`, `”`, `«`, `»`). Implementierungs-/Dokutexte, die den Trigger nur zitieren (z. B. `‚$Softwareschmiede‘`, „$Softwareschmiede“), legen damit keine Aufgaben mehr an; ein einziges frei stehendes Vorkommen im Mischtext genügt weiterhin.

@@ -35,7 +35,7 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
     /// Auswahl aus der Vorschlagsliste, Live-Filterung, Speichern eines nicht vorgeschlagenen Skripts, danach
     /// die nachträgliche Bearbeitung mit Abbruch.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task InitialisierungsskriptKonfiguration()
     {
         var mainWindow = LaunchAppAndGetMainWindow();

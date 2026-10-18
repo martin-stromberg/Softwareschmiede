@@ -159,6 +159,16 @@ public abstract class WpfTestBase : IDisposable
     /// Startet die Anwendung als Prozess mit einem temporären Datenbankpfad.
     /// Wartet, bis das Hauptfenster sichtbar ist.
     /// </summary>
+    /// <remarks>
+    /// Zentraler Skip-Punkt für ALLE echten Fenster-E2E-Tests: Jeder FlaUI-App-Start - auch
+    /// indirekt über <see cref="LaunchAppAndGetMainWindow"/>, <see cref="RestartAppPreservingDatabase"/>
+    /// oder die Fixture-basierten Pfade - läuft durch diese Methode. Ist
+    /// <c>SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1</c> gesetzt (<see cref="WpfE2EEnvironmentProbe"/>),
+    /// wirft der Aufruf eine <c>Xunit.SkipException</c>, bevor der Prozess überhaupt startet.
+    /// Damit das als "Skipped" statt als Fehler zählt, müssen die aufrufenden Testmethoden mit
+    /// <c>[SkippableFact]</c>/<c>[SkippableTheory]</c> annotiert sein - das gilt für sämtliche
+    /// Testmethoden in <see cref="WpfTestBase"/>-Ableitungen.
+    /// </remarks>
     /// <param name="ensureDatabaseDeleted">Gibt an, ob die Testdatenbank vor dem Start gelöscht werden soll. Sollte normalerweise auf true gesetzt werden, um sicherzustellen, dass jeder Test mit einer frischen Datenbank beginnt.</param>
     /// <param name="umgebungsVariablen">
     /// Zusätzliche prozessbezogene Umgebungsvariablen für den gestarteten App-Prozess
@@ -170,6 +180,8 @@ public abstract class WpfTestBase : IDisposable
         bool ensureDatabaseDeleted = true,
         IReadOnlyDictionary<string, string?>? umgebungsVariablen = null)
     {
+        SkipWennWpfE2ENichtVerfuegbar();
+
         // Ein expliziter Datenbankpfad in den prozessbezogenen Umgebungsvariablen (z. B. der
         // fixture-eigene DB-Pfad der Update-E2E-Umgebung) wird zum effektiven Test-DB-Pfad, damit
         // DeleteTestDatabase/OpenTestDbContext/ResolveProzessStartLogPfad konsistent bleiben.
@@ -912,6 +924,24 @@ public abstract class WpfTestBase : IDisposable
     protected static void SkipWennConPtyNichtVerfuegbar()
     {
         Skip.If(!ConPtyEnvironmentProbe.IsAvailable, ConPtyEnvironmentProbe.UnavailableReason);
+    }
+
+    /// <summary>
+    /// Überspringt den aufrufenden Test (via <c>Skip.If</c>), wenn die Umgebungsvariable
+    /// <c>SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1</c> gesetzt ist (siehe
+    /// <see cref="WpfE2EEnvironmentProbe"/>). Betrifft alle Tests, die ein echtes
+    /// WPF-Hauptfenster via FlaUI fahren - ohne interaktive Desktop-Session scheitern sie
+    /// sonst erst nach dem Fenster-Timeout mit einer nichtssagenden <see cref="TimeoutException"/>.
+    /// Dieselbe Prüfung läuft zusätzlich zentral in <see cref="LaunchApp"/>, sodass jeder
+    /// App-Start abgedeckt ist; ein direkter Aufruf als erste Zeile des Testkörpers lohnt sich
+    /// nur bei teurem Vorab-Setup (z. B. Fixture-Aufbau vor dem ersten App-Start). Erfordert,
+    /// dass die aufrufende Testmethode mit <c>[SkippableFact]</c> (statt <c>[Fact]</c>)
+    /// annotiert ist (Paket <c>Xunit.SkippableFact</c>) - nur damit erzeugt <c>Skip.If</c> ein
+    /// echtes "Skipped"-Ergebnis statt eines fehlschlagenden Tests.
+    /// </summary>
+    protected static void SkipWennWpfE2ENichtVerfuegbar()
+    {
+        Skip.If(!WpfE2EEnvironmentProbe.IsAvailable, WpfE2EEnvironmentProbe.UnavailableReason);
     }
 
     /// <summary>
