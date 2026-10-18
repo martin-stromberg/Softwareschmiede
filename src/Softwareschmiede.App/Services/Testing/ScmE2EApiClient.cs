@@ -89,14 +89,29 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration) : I
             var body = scenario.Texts.FirstOrDefault(x => x.Number == detailNumber && x.PullRequest == detailPr
                 && x.Kind == "Description")?.Body ?? string.Empty;
             if (!detailPr)
-                return Json(new { number = detailNumber, title, body, labels = Array.Empty<object>(), milestone = (object?)null,
-                    html_url = $"https://github.com/scm-owner/scm-e2e/issues/{detailNumber}" });
+                return Json(new
+                {
+                    number = detailNumber,
+                    title,
+                    body,
+                    labels = Array.Empty<object>(),
+                    milestone = (object?)null,
+                    html_url = $"https://github.com/scm-owner/scm-e2e/issues/{detailNumber}"
+                });
             return Json(new
             {
-                number = detailNumber, title, body, state = "open", node_id = "PR_" + detailNumber,
+                number = detailNumber,
+                title,
+                body,
+                state = "open",
+                node_id = "PR_" + detailNumber,
                 html_url = $"https://github.com/scm-owner/scm-e2e/pull/{detailNumber}",
-                head = new { @ref = $"scm-branch-{detailNumber}", sha = "sha" + detailNumber,
-                    repo = new { full_name = "scm-owner/scm-e2e", clone_url = "https://github.com/scm-owner/scm-e2e.git" } },
+                head = new
+                {
+                    @ref = $"scm-branch-{detailNumber}",
+                    sha = "sha" + detailNumber,
+                    repo = new { full_name = "scm-owner/scm-e2e", clone_url = "https://github.com/scm-owner/scm-e2e.git" }
+                },
                 @base = new { @ref = "main" }
             });
         }

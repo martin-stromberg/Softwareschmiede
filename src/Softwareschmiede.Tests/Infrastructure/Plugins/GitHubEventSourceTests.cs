@@ -493,10 +493,10 @@ public sealed class GitHubEventSourceTests
     private static object Reviews(object nodes, bool hasNextPage, string? endCursor) =>
         new { repository = new { pullRequest = new { reviews = new { nodes, pageInfo = new { hasNextPage, endCursor } } } } };
     private static Dictionary<string, object?> Ref(int number, DateTimeOffset? updated = null) => new()
-        {
-            ["number"] = number,
-            ["updatedAt"] = updated ?? Created
-        };
+    {
+        ["number"] = number,
+        ["updatedAt"] = updated ?? Created
+    };
     private static object Page(object nodes, bool hasNextPage, string? endCursor) =>
         new { nodes, pageInfo = new { hasNextPage, endCursor } };
 
