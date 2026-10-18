@@ -41,6 +41,7 @@ public sealed class PseudoConsoleSession : ITerminalSession
     private CliRuntimeStatus _runtimeStatus = CliRuntimeStatus.Laeuft;
     private DateTimeOffset? _lastOutputUtc;
     private DateTimeOffset? _lastInputUtc;
+    private readonly TimeSpan _promptSubmitDelay;
 
     /// <summary>Schreibbarer Stream für Tastatureingaben an den Prozess.</summary>
     public Stream InputStream { get; }
@@ -123,6 +124,7 @@ public sealed class PseudoConsoleSession : ITerminalSession
         _startedUtc = _timeProvider.GetUtcNow();
         _logger = context?.Logger ?? NullLogger.Instance;
         _outputSink = context?.OutputSink;
+        _promptSubmitDelay = context?.PromptSubmitDelay ?? TimeSpan.Zero;
         IsPseudoTerminal = context?.IsPseudoTerminal ?? false;
         Buffer = new TerminalBuffer(effectiveOptions.DefaultCols, effectiveOptions.DefaultRows);
         _replayBuffer = new TerminalReplayBuffer(effectiveOptions.ReplayBufferByteBudget);
@@ -492,13 +494,49 @@ public sealed class PseudoConsoleSession : ITerminalSession
     /// <c>KeyToVt100Encoder.EncodeClipboardText</c> aus demselben Grund auf <c>\r</c> normalisiert. Ein
     /// zusätzliches <c>\n</c> nach dem CR wird von der CLI nicht wie ein normaler Tastatur-Enter interpretiert
     /// und kann den Submit der Zeile verhindern.</summary>
+    /// <remarks>Ist <see cref="PseudoConsoleSessionContext.PromptSubmitDelay"/> gesetzt, wird der Submit-<c>\r</c>
+    /// erst nach dieser Verzögerung als eigener, separat geflusher Eingabe-Batch gesendet: CLIs wie die
+    /// Devin CLI werten ein <c>\r</c>, das im selben Eingabe-Read wie der Prompttext ankommt, nicht als
+    /// Enter-Submit, sondern als Zeilenumbruch (Paste-Semantik); erst ein zeitlich getrenntes CR wird als
+    /// Tastatur-Enter erkannt. Die Eingabesperre wird über beide Schreibvorgänge und die Verzögerung
+    /// gehalten, damit kein Fremdinput zwischen Text und Submit rutschen kann.</remarks>
     /// <param name="prompt">Der zu sendende Prompttext.</param>
     /// <param name="ct">Abbruch-Token.</param>
     public async Task WritePromptAsync(string prompt, CancellationToken ct)
     {
-        var bytes = Encoding.UTF8.GetBytes(NormalizeToCarriageReturn(prompt).TrimEnd('\r') + "\r");
-        await WriteInputAsync(bytes, ct).ConfigureAwait(false);
+        var text = NormalizeToCarriageReturn(prompt).TrimEnd('\r');
+        if (_promptSubmitDelay <= TimeSpan.Zero)
+        {
+            var bytes = Encoding.UTF8.GetBytes(text + "\r");
+            await WriteInputAsync(bytes, ct).ConfigureAwait(false);
+            return;
+        }
+
+        var textBytes = Encoding.UTF8.GetBytes(text);
+        await _inputWriteLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+                throw new ObjectDisposedException(nameof(PseudoConsoleSession));
+
+            await WriteInputChunksCoreAsync(textBytes, ct).ConfigureAwait(false);
+            await Task.Delay(_promptSubmitDelay, ct).ConfigureAwait(false);
+            await WriteInputChunksCoreAsync(SubmitBytes, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Fehler beim Schreiben des Prompts in den Terminal-Input-Stream.");
+            if (ex is not ObjectDisposedException)
+                RaiseFailed(ex, "Write");
+            throw;
+        }
+        finally
+        {
+            _inputWriteLock.Release();
+        }
     }
+
+    private static readonly byte[] SubmitBytes = [(byte)'\r'];
 
     /// <summary>Schreibt bereits kodierte Eingabebytes serialisiert in den Input-Stream der Sitzung. Große
     /// Eingaben werden in kontrollierte Chunks geteilt; jeder Chunk wird abgeschlossen, bevor der nächste beginnt.
@@ -545,6 +583,21 @@ public sealed class PseudoConsoleSession : ITerminalSession
         {
             _inputWriteLock.Release();
         }
+    }
+
+    /// <summary>Schreibt <paramref name="bytes"/> gechunkt, flusht und markiert Eingabeaktivität —
+    /// erwartet die bereits gehaltene <see cref="_inputWriteLock"/> (interner Baustein für den
+    /// verzögerten Zwei-Batch-Submit von <see cref="WritePromptAsync"/>).</summary>
+    private async Task WriteInputChunksCoreAsync(ReadOnlyMemory<byte> bytes, CancellationToken ct)
+    {
+        for (var offset = 0; offset < bytes.Length; offset += InputWriteChunkSize)
+        {
+            var length = Math.Min(InputWriteChunkSize, bytes.Length - offset);
+            await InputStream.WriteAsync(bytes.Slice(offset, length), ct).ConfigureAwait(false);
+        }
+
+        await InputStream.FlushAsync(ct).ConfigureAwait(false);
+        MarkInputActivity();
     }
 
     /// <summary>Wandelt alle Zeilenenden (<c>\r\n</c> und alleinstehendes <c>\n</c>) in ein einzelnes <c>\r</c>

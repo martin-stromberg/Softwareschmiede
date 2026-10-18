@@ -46,8 +46,90 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
         written.Should().Be("Zeile1\rZeile2\rZeile3\rZeile4\r");
     }
 
+    /// <summary>Mit gesetzter <see cref="PseudoConsoleSessionContext.PromptSubmitDelay"/> (Devin CLI)
+    /// werden Prompttext und Submit-<c>\r</c> als zwei getrennte Schreib-Batches gesendet: Ein <c>\r</c>
+    /// im selben Eingabe-Read wie der Text wertet die Devin CLI als Zeilenumbruch statt als Submit.</summary>
+    [Fact]
+    public async Task WritePromptAsync_MitSubmitDelay_SendetTextUndCrInGetrenntenBatches()
+    {
+        var inputStream = new WriteRecordingStream();
+        using var session = TestPseudoConsoleSessionFactory.Create(
+            inputStream, new MemoryStream(), promptSubmitDelay: TimeSpan.FromMilliseconds(50));
+
+        await session.WritePromptAsync("Mach weiter", CancellationToken.None);
+
+        inputStream.Batches.Should().HaveCount(2, "Text und Submit müssen als separate Eingabe-Batches gesendet werden");
+        Encoding.UTF8.GetString(inputStream.Batches[0]).Should().Be("Mach weiter");
+        inputStream.Batches[1].Should().Equal([(byte)'\r'], "der Submit bleibt ein alleinstehendes CR, nur zeitlich getrennt");
+    }
+
+    /// <summary>Auch im verzögerten Modus werden eingebettete Zeilenumbrüche weiterhin als <c>\r</c>
+    /// im Text-Batch übertragen (in Devin = Zeilenumbruch im Entwurf); nur der Submit wandert in den zweiten Batch.</summary>
+    [Fact]
+    public async Task WritePromptAsync_MitSubmitDelay_EingebetteteZeilenumbruecheBleibenImTextBatch()
+    {
+        var inputStream = new WriteRecordingStream();
+        using var session = TestPseudoConsoleSessionFactory.Create(
+            inputStream, new MemoryStream(), promptSubmitDelay: TimeSpan.FromMilliseconds(50));
+
+        await session.WritePromptAsync("Zeile1\r\nZeile2\nZeile3", CancellationToken.None);
+
+        inputStream.Batches.Should().HaveCount(2);
+        Encoding.UTF8.GetString(inputStream.Batches[0]).Should().Be("Zeile1\rZeile2\rZeile3");
+        inputStream.Batches[1].Should().Equal([(byte)'\r']);
+    }
+
+    /// <summary>Die Eingabesperre wird über Text, Verzögerung und Submit gehalten: Ein parallel
+    /// eintreffender Tastatur-Input darf nicht zwischen Prompttext und Submit rutschen.</summary>
+    [Fact]
+    public async Task WritePromptAsync_MitSubmitDelay_FremdinputWartetHinterDemSubmit()
+    {
+        var inputStream = new WriteRecordingStream();
+        using var session = TestPseudoConsoleSessionFactory.Create(
+            inputStream, new MemoryStream(), promptSubmitDelay: TimeSpan.FromMilliseconds(150));
+
+        var promptTask = session.WritePromptAsync("Mach weiter", CancellationToken.None);
+        var keyboardTask = Task.Run(async () =>
+        {
+            await Task.Delay(30);
+            await session.WriteInputAsync(new byte[] { (byte)'x' }, CancellationToken.None);
+        });
+
+        await Task.WhenAll(promptTask, keyboardTask);
+
+        inputStream.Batches.Should().HaveCount(3);
+        inputStream.Batches[1].Should().Equal([(byte)'\r'], "der Submit-Batch muss vor dem Fremdinput gesendet werden");
+        inputStream.Batches[2].Should().Equal([(byte)'x']);
+    }
+
     private static PseudoConsoleSession CreateSession(Stream inputStream)
     {
         return TestPseudoConsoleSessionFactory.Create(inputStream, new MemoryStream());
+    }
+
+    /// <summary>Stream, der jeden Schreibaufruf als eigenen Batch aufzeichnet (zum Nachweis
+    /// getrennter Eingabe-Batches im verzögerten Submit-Modus).</summary>
+    private sealed class WriteRecordingStream : MemoryStream
+    {
+        /// <summary>Aufgezeichnete Byte-Batches in Schreibreihenfolge.</summary>
+        public List<byte[]> Batches { get; } = [];
+
+        /// <inheritdoc/>
+        public override void Write(byte[] buffer, int offset, int count)
+            => Batches.Add(buffer.AsSpan(offset, count).ToArray());
+
+        /// <inheritdoc/>
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            Batches.Add(buffer.AsSpan(offset, count).ToArray());
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            Batches.Add(buffer.ToArray());
+            return ValueTask.CompletedTask;
+        }
     }
 }
