@@ -19,6 +19,7 @@
   - Falls keine Plugins verfügbar sind → wird kein Standard-Plugin gesetzt (null)
 - Beim Speichern: Der Name des gewählten Plugins wird persistiert
 - Bei der Verwendung in Workflows: Das Standard-Plugin wird automatisch für neue Aufgaben verwendet, sofern der Anwender keine explizite Auswahl trifft
+- Bei der CLI-Auflösung (`PluginSelectionService.ResolveDevelopmentAutomationPluginWithProjectScopeAsync`) bildet die unter `ki.plugin.default` gespeicherte Standard-KI-CLI die letzte Fallback-Stufe hinter Aufgaben-Plugin, Projekt-Standard und gespeichertem Global-Default; der gespeicherte `PluginName` wird dabei auf ein vorhandenes KI-Plugin abgebildet (robust auch per `PluginPrefix`), ohne Treffer wird nichts vermutet
 
 **Umsetzung:**
 - `SettingsViewModel.LadenAsync()` — Abgleich von String-Namen mit Plugin-Objekten (Zeile 181-183 für SCM, analog für KI)

@@ -16,8 +16,8 @@ Bekannte Schlüssel:
 | Schlüssel | Typ | Beschreibung |
 |-----------|-----|--------------|
 | `WorkDir` | string | Lokales Arbeitsverzeichnis für Repository-Klons |
-| `DefaultScmPlugin` | string | Prefix des Standard-SCM-Plugins |
-| `DefaultKiPlugin` | string | Prefix des Standard-KI-Plugins |
+| `DefaultScmPlugin` (`scm.plugin.default`) | string | `PluginName` des Standard-SCM-Plugins |
+| `DefaultKiPlugin` (`ki.plugin.default`) | string | `PluginName` des Standard-KI-Plugins; letzte Fallback-Stufe der CLI-Auflösung für Aufgaben-Starts und SCM-Ereigniszustellung |
 | `DarkModeEnabled` | bool | Dark Mode aktiviert (`"true"` / `"false"`) |
 | `WindowPosition.X` | int | Fenster-X-Position (Pixel) |
 | `WindowPosition.Y` | int | Fenster-Y-Position (Pixel) |
