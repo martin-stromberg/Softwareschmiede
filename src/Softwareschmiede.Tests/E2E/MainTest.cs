@@ -33,6 +33,7 @@ public partial class End2EndTest : WpfTestBase
             Todo_ErstellenAbhakenLoeschenUndAbschlussValidierung_E2E(mainWindow);
             TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(mainWindow);
             await AufgabePausieren_DialogCountdownAbblendungUndAufheben_E2E(mainWindow);
+            await AufgabenListe_KompakteKachelSymboleUndModuswechsel_E2E(mainWindow);
             await SessionLimit_MarkerPauseProtokollUndUpdateSicherheit_E2E(mainWindow);
             await TerminalFallbackDiagnose_PipeFallbackUndRequiresPtyFehler_E2E(mainWindow);
             CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(mainWindow);

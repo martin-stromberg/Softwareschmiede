@@ -54,9 +54,9 @@ public partial class End2EndTest
         }
 
         // Die Seitenleiste aktualisiert sich über den 5-s-Timer; auf die Kachel warten.
-        // Anker ist der "→"-Button 'AufgabeNavigieren:{titel}' — er existiert nur im
-        // Seitenleisten-Template (ShowNavigationButton=True) und beweist damit gezielt die
-        // Seitenleisten-Kachel (die Kachel-Border selbst erzeugt keinen AutomationPeer).
+        // Anker ist 'AufgabeNavigieren:{titel}' — seit der Kachel-Umstellung (Issue 288) ist das
+        // die gesamte klickbare Kachel (vollflächiger Button). Er existiert in beiden
+        // ActiveTasksListControl-Instanzen; die Suche läuft gescoped unter 'AktiveAufgabenListeMenue'.
         WaitForElement(
             mainWindow,
             cf => cf.ByName($"AufgabeNavigieren:{titel}"),

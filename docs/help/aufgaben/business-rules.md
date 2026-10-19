@@ -238,7 +238,7 @@
 - Während einer aktiven Pause sind blockiert: Prozessstart, CLI-Neustart (inkl. Plugin-Wechsel-Pfad), automatische und manuelle Recovery, Senden und Planen von Prompts über die Detailansicht.
 - Ein bereits geplanter Prompt wird auf das Pausenende verschoben statt verworfen.
 - Ein laufender CLI-Prozess wird niemals durch die Pause unterbrochen.
-- UI: Buttons werden deaktiviert (`KannPausieren`, `!IstPausiert` in den CanExecute-Prüfungen); die Seitenleisten-Kachel zeigt `⏸ Pausiert (noch …)` mit `Opacity = 0.55`; im Ribbon steht `⏸ Pausiert bis …`.
+- UI: Buttons werden deaktiviert (`KannPausieren`, `!IstPausiert` in den CanExecute-Prüfungen); die Seitenleisten-Kachel zeigt das `⏸`-Glyph mit `Opacity = 0.55` (Countdown-Volltext im Tooltip/`HelpText`); im Ribbon steht `⏸ Pausiert bis …`.
 - Jede Setzen-/Aufheben-Operation schreibt einen `ProtokollTyp.SystemMeldung`-Eintrag.
 
 **Umsetzung:** `AufgabeService.SetPauseAsync`, `EntwicklungsprozessService.WirfWennPausiert`, `AufgabeRecoveryService`, `PromptZeitVersandService`, `TaskDetailViewModel.PauseEinstellenAsync`, `AufgabePausierenDialogViewModel`, `KiAusfuehrungsStatusConverter`.
@@ -400,3 +400,20 @@
 - Die Planung ist rein sitzungsgebunden und wird nicht persistiert — ein App-Neustart löscht alle geplanten Prompts.
 
 **Umsetzung:** `PromptZeitVersandService` — verwaltet geplante Prompts pro Aufgabe in `Dictionary<Guid, ScheduledPromptEntry>` mit pro-Eintrag-Timer via `TimeProvider.CreateTimer`. `TaskDetailViewModel.SchedulePromptAsync` mit UI-Validierung und Status-Rendering.
+
+## Anzeigemodus und Gruppierung der aktiven Aufgabenliste
+
+**Beschreibung:** Die aktive Aufgabenliste (Seitenleiste und Dashboard) lässt sich zwischen drei Anzeigemodi umschalten; Seitenleiste und Dashboard führen je einen eigenen, getrennt persistierten Modus-Zustand.
+
+**Bedingungen:**
+- Modusauswahl über die `RadioButton`s `AufgabenModus:{Datum|Repository|KI}` (Seitenleiste) bzw. `DashboardAufgabenModus:{…}` (Dashboard).
+- Die Modus-Buttons in der Seitenleiste sind nur bei ausgeklappter Navigation sichtbar (`IsNavigationExpanded`).
+
+**Verhalten:**
+- Modus `Datum`: flache Liste, sortiert absteigend nach `SortierZeitpunkt` (`LetzterCliStartUtc ?? ErstellungsDatum`), Tie-Breaker `Titel`, `Id` — identisch zur Sortierung der Datenquelle `AufgabeService.GetAktiveAufgabenAsync`.
+- Modus `Repository`: Gruppierung nach `GitRepository.RepositoryName`; Gruppen alphabetisch, Fallback-Gruppe `Ohne Repository` (Aufgaben ohne `GitRepository`-Verknüpfung) immer am Ende; innerhalb der Gruppe wie im Modus `Datum`.
+- Modus `Ki`: Gruppierung nach dem aufgelösten KI-Plugin-Namen aus `Aufgabe.KiPluginPrefix`; Gruppen alphabetisch, Fallback-Gruppe `Nicht ausgeführt` (leeres Prefix) immer am Ende; ein gesetzter, aber nicht auflösbarer Prefix (Plugin nicht installiert) bildet eine eigene Gruppe unter dem Prefix-Namen — er fällt **nicht** unter `Nicht ausgeführt`.
+- Der Untertitel der Kachel zeigt den Repository-Namen; bei Aufgaben ohne Repository-Verknüpfung der Projektname — analog bleibt `RepositoryGruppenName` aber die Fallback-Gruppe (der Projektname wird nicht als Gruppenname verwendet).
+- Modus-Persistenz: Jede Ansicht speichert ihren Modus unter einem eigenen `AppEinstellung`-Schlüssel (`aktiveaufgaben.listenmodus` bzw. `aktiveaufgaben.listenmodus.dashboard`, Wert = Enum-Name) und stellt ihn beim nächsten Start wieder her. Fehlender oder ungültiger Wert → Default `Datum`. Eine inzwischen erfolgte Benutzerumschaltung wird von einer verspäteten Wiederherstellung nicht überschrieben; der wiederhergestellte Wert wird nicht zurückgeschrieben.
+
+**Umsetzung:** `AufgabenListenAnsicht` (Deskriptoren je Modus auf instanz-eigener `ListCollectionView` pro `ActiveTasksListControl` — die geteilte `AktiveAufgabenListe` darf keine gemeinsame Default-View gruppieren); `AufgabenListenModusBindung` (gemeinsame Zustands-/Race-Guard-Logik) + `AufgabenListenModusService` (Persistenz in eigenem DI-Scope, Muster `DarkModeService`); Mapping der Gruppenschlüssel in `MainWindowViewModel.MapAktiveAufgabePanelItem`.

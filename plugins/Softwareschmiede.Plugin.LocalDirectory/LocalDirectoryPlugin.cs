@@ -43,6 +43,9 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     public override PluginType PluginType => PluginType.SourceCodeManagement;
 
     /// <inheritdoc/>
+    public override string PluginSymbol => "📁";
+
+    /// <inheritdoc/>
     public override IReadOnlyList<PluginSettingGroup> GetSettingGroups()
     {
         var fields = new List<PluginSettingField>

@@ -26,6 +26,9 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase, IIssueTemplateTextGenerat
     public override PluginType PluginType => PluginType.DevelopmentAutomation;
 
     /// <inheritdoc/>
+    public override string PluginSymbol => "✳";
+
+    /// <inheritdoc/>
     public override TerminalProviderCapabilities TerminalCapabilities =>
         TerminalProviderCapabilities.RequiresPty | TerminalProviderCapabilities.SupportsPty;
 

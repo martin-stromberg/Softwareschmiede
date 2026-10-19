@@ -10,6 +10,12 @@ namespace Softwareschmiede.Domain.Interfaces;
 /// </summary>
 public interface IPlugin
 {
+    /// <summary>
+    /// Fallback-Glyph für Plugins ohne eigenes <see cref="PluginSymbol"/> und für
+    /// nicht auflösbare Plugin-Referenzen (z. B. in der Aufgabenliste).
+    /// </summary>
+    const string FallbackSymbol = "◻";
+
     /// <summary>Eindeutiger Anzeigename des Plugins (z.B. "GitHub", "GitHub Copilot").</summary>
     string PluginName { get; }
 
@@ -27,4 +33,11 @@ public interface IPlugin
 
     /// <summary>Plugin-Typ zur automatischen Zuordnung im PluginManager.</summary>
     PluginType PluginType { get; }
+
+    /// <summary>
+    /// Unicode-Glyph zur Anzeige des Plugins in der Aufgabenliste (z. B. "🐙").
+    /// Als Default-Interface-Member binärkompatibel — bereits kompilierte Plugin-DLLs
+    /// ohne eigenes Symbol laden weiter und erhalten den Fallback-Glyph <see cref="FallbackSymbol"/>.
+    /// </summary>
+    string PluginSymbol => FallbackSymbol;
 }

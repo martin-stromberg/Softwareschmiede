@@ -101,6 +101,12 @@ public static class WindowExtensions
                 {
                     return false;
                 }
+                catch (System.Runtime.InteropServices.COMException)
+                {
+                    // Element-Provider zwischen Enumeration und Property-Zugriff gestorben
+                    // (z. B. gerade geschlossenes Popup-/Tooltip-Fenster) - Fenster überspringen.
+                    return false;
+                }
             })
             .Select(w => w.Name)
             .Where(name => !string.IsNullOrWhiteSpace(name))

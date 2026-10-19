@@ -81,7 +81,8 @@ public sealed class MainWindowViewModelTests : IDisposable
         IAktiveAufgabenService? aufgabeService = null,
         IDialogService? dialogService = null,
         IApplicationVersionProvider? versionProvider = null,
-        AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null)
+        AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null,
+        AufgabenListenModusService? aufgabenListenModusService = null)
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var darkModeService = new DarkModeService(scopeFactoryMock.Object, NullLogger<DarkModeService>.Instance);
@@ -99,7 +100,8 @@ public sealed class MainWindowViewModelTests : IDisposable
                 DispatcherInvoke: action => action(),
                 DialogService: dialogService,
                 VersionProvider: versionProvider,
-                LaufdatenChangedNotifier: laufdatenChangedNotifier));
+                LaufdatenChangedNotifier: laufdatenChangedNotifier,
+                AufgabenListenModusService: aufgabenListenModusService));
     }
 
     private ProjectListViewModel CreateProjectListViewModel(ProjektService projektService)
@@ -773,6 +775,261 @@ public sealed class MainWindowViewModelTests : IDisposable
             await Task.Delay(50);
 
         sut.CurrentVersion.Should().Be("Version unbekannt");
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync mappt den Repository-Namen als Untertitel und fällt ohne Repository auf den Projektnamen zurück.</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldMapRepositoryName_WithRepoAndProjectFallback()
+    {
+        // Arrange
+        var repositoryId = Guid.NewGuid();
+        _db.GitRepositories.Add(new Softwareschmiede.Domain.Entities.GitRepository
+        {
+            Id = repositoryId,
+            ProjektId = _projektId,
+            RepositoryName = "mein-repo",
+            RepositoryUrl = "https://example.invalid/mein-repo.git",
+            PluginTyp = "LocalDirectoryPlugin",
+            Aktiv = true
+        });
+        await _db.SaveChangesAsync();
+        var mitRepo = await _aufgabeService.CreateAsync(_projektId, "Repo-Aufgabe", null, repositoryId);
+        var ohneRepo = await _aufgabeService.CreateAsync(_projektId, "Freie Aufgabe", null);
+        await _aufgabeService.StartenAsync(mitRepo.Id, "feature/repo", "/tmp/repo");
+        await _aufgabeService.StartenAsync(ohneRepo.Id, "feature/frei", "/tmp/frei");
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        sut.AktiveAufgabenListe.Single(a => a.Id == mitRepo.Id).RepositoryName.Should().Be("mein-repo");
+        sut.AktiveAufgabenListe.Single(a => a.Id == ohneRepo.Id).RepositoryName.Should().Be("Testprojekt",
+            "ohne Repository-Verknüpfung fällt der Untertitel auf den Projektnamen zurück");
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync mappt Plugin-Symbole; nicht aufgelöste Symbole (Mock ohne Setup liefert null) fallen auf den Fallback-Glyph zurück.</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldMapPluginSymbols_WithFallbackGlyphTolerance()
+    {
+        // Arrange
+        var scmPlugin = new Mock<IGitPlugin>();
+        scmPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
+        scmPlugin.SetupGet(p => p.PluginName).Returns("GitHub");
+        scmPlugin.SetupGet(p => p.PluginSymbol).Returns("🐙");
+        var kiPlugin = new Mock<IKiPlugin>();
+        kiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
+        kiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
+        // PluginSymbol absichtlich nicht aufgesetzt: Moq liefert null statt des Interface-Defaults.
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin.Object]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin.Object]);
+
+        var repositoryId = Guid.NewGuid();
+        _db.GitRepositories.Add(new Softwareschmiede.Domain.Entities.GitRepository
+        {
+            Id = repositoryId,
+            ProjektId = _projektId,
+            RepositoryName = "repo",
+            RepositoryUrl = "https://example.invalid/repo.git",
+            PluginTyp = "Softwareschmiede.GitHub",
+            Aktiv = true
+        });
+        await _db.SaveChangesAsync();
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Symbol-Aufgabe", null, repositoryId);
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.Codex");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/symbol", "/tmp/symbol");
+        var unbekannt = await _aufgabeService.CreateAsync(_projektId, "Unbekannte KI", null);
+        await _aufgabeService.UpdateAsync(unbekannt.Id, unbekannt.Titel, unbekannt.AnforderungsBeschreibung, "Unbekannt.KI");
+        await _aufgabeService.StartenAsync(unbekannt.Id, "feature/unbekannt", "/tmp/unbekannt");
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        var item = sut.AktiveAufgabenListe.Single(a => a.Id == aufgabe.Id);
+        item.ScmPluginSymbol.Should().Be("🐙");
+        item.KiPluginSymbol.Should().Be(IPlugin.FallbackSymbol,
+            "PluginSymbol=null (Mock ohne Setup) muss auf den Fallback-Glyph gemappt werden");
+        var unbekanntesItem = sut.AktiveAufgabenListe.Single(a => a.Id == unbekannt.Id);
+        unbekanntesItem.KiPluginSymbol.Should().Be(IPlugin.FallbackSymbol,
+            "ein nicht auflösbarer Prefix liefert ebenfalls den Fallback-Glyph");
+        unbekanntesItem.ScmPluginSymbol.Should().BeNull("ohne Repository kein SCM-Symbol");
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync mappt KiGruppenName auf PluginName, rohen Prefix bzw. "Nicht ausgeführt".</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldMapKiGruppenName()
+    {
+        // Arrange
+        var kiPlugin = new Mock<IKiPlugin>();
+        kiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
+        kiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin.Object]);
+
+        var mitKi = await _aufgabeService.CreateAsync(_projektId, "KI-Aufgabe", null);
+        await _aufgabeService.UpdateAsync(mitKi.Id, mitKi.Titel, mitKi.AnforderungsBeschreibung, "Softwareschmiede.Codex");
+        await _aufgabeService.StartenAsync(mitKi.Id, "feature/ki", "/tmp/ki");
+        var unbekannt = await _aufgabeService.CreateAsync(_projektId, "Unbekannte KI", null);
+        await _aufgabeService.UpdateAsync(unbekannt.Id, unbekannt.Titel, unbekannt.AnforderungsBeschreibung, "Unbekannt.KI");
+        await _aufgabeService.StartenAsync(unbekannt.Id, "feature/unbekannt", "/tmp/unbekannt");
+        var ohneKi = await _aufgabeService.CreateAsync(_projektId, "Ohne KI", null);
+        await _aufgabeService.StartenAsync(ohneKi.Id, "feature/ohne", "/tmp/ohne");
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        var aufgeloest = sut.AktiveAufgabenListe.Single(a => a.Id == mitKi.Id);
+        aufgeloest.KiGruppenName.Should().Be("Codex");
+        aufgeloest.KiGruppeIstFallback.Should().BeFalse();
+        var roherPrefix = sut.AktiveAufgabenListe.Single(a => a.Id == unbekannt.Id);
+        roherPrefix.KiGruppenName.Should().Be("Unbekannt.KI",
+            "nicht auflösbare Prefixe bilden eine eigene Gruppe mit dem Prefix als Namen");
+        roherPrefix.KiGruppeIstFallback.Should().BeFalse();
+        var fallback = sut.AktiveAufgabenListe.Single(a => a.Id == ohneKi.Id);
+        fallback.KiGruppenName.Should().Be(AufgabenListenAnsicht.NichtAusgefuehrt);
+        fallback.KiGruppeIstFallback.Should().BeTrue();
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync mappt RepositoryGruppenName auf den Repository-Namen bzw. "Ohne Repository".</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldMapRepositoryGruppenName()
+    {
+        // Arrange
+        var repositoryId = Guid.NewGuid();
+        _db.GitRepositories.Add(new Softwareschmiede.Domain.Entities.GitRepository
+        {
+            Id = repositoryId,
+            ProjektId = _projektId,
+            RepositoryName = "gruppen-repo",
+            RepositoryUrl = "https://example.invalid/gruppen-repo.git",
+            PluginTyp = "LocalDirectoryPlugin",
+            Aktiv = true
+        });
+        await _db.SaveChangesAsync();
+        var mitRepo = await _aufgabeService.CreateAsync(_projektId, "Repo-Aufgabe", null, repositoryId);
+        var ohneRepo = await _aufgabeService.CreateAsync(_projektId, "Freie Aufgabe", null);
+        await _aufgabeService.StartenAsync(mitRepo.Id, "feature/repo", "/tmp/repo");
+        await _aufgabeService.StartenAsync(ohneRepo.Id, "feature/frei", "/tmp/frei");
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        var mitGruppe = sut.AktiveAufgabenListe.Single(a => a.Id == mitRepo.Id);
+        mitGruppe.RepositoryGruppenName.Should().Be("gruppen-repo");
+        mitGruppe.RepositoryGruppeIstFallback.Should().BeFalse();
+        var fallback = sut.AktiveAufgabenListe.Single(a => a.Id == ohneRepo.Id);
+        fallback.RepositoryGruppenName.Should().Be(AufgabenListenAnsicht.OhneRepository);
+        fallback.RepositoryGruppeIstFallback.Should().BeTrue();
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync mappt SortierZeitpunkt auf LetzterCliStartUtc ?? ErstellungsDatum.</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldMapSortierZeitpunkt()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Sortier-Aufgabe", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/sort", "/tmp/sort");
+        // StartenAsync setzt LetzterCliStartUtc bewusst auf null — der Zeitstempel entsteht erst
+        // beim echten CLI-Prozessstart (CliProcessManager → AktivenLaufSetzenAsync).
+        await _aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, Guid.NewGuid().ToString());
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        var gelesen = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var item = sut.AktiveAufgabenListe.Single(a => a.Id == aufgabe.Id);
+        gelesen!.LetzterCliStartUtc.Should().NotBeNull(
+            "die gestartete Aufgabe muss einen CLI-Startzeitpunkt haben, damit der Test den ??-Zweig belegt");
+        item.SortierZeitpunkt.Should().BeCloseTo(gelesen.LetzterCliStartUtc!.Value, TimeSpan.FromMilliseconds(50),
+            "SortierZeitpunkt muss auf LetzterCliStartUtc ?? ErstellungsDatum mappen");
+        item.SortierZeitpunkt.Should().NotBe(gelesen.ErstellungsDatum);
+    }
+
+    /// <summary>AufgabenListenModus startet mit dem Default Datum.</summary>
+    [Fact]
+    public void AufgabenListenModus_ShouldDefaultToDatum()
+    {
+        var sut = CreateSut();
+
+        sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Datum);
+    }
+
+    /// <summary>AufgabenListenModus ist setzbar und löst PropertyChanged aus.</summary>
+    [Fact]
+    public void AufgabenListenModus_ShouldBeSettableAndRaisePropertyChanged()
+    {
+        var sut = CreateSut();
+        var geaendert = new List<string?>();
+        sut.PropertyChanged += (_, e) => geaendert.Add(e.PropertyName);
+
+        sut.AufgabenListenModus = AufgabenListenModus.Repository;
+
+        sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Repository);
+        geaendert.Should().Contain(nameof(MainWindowViewModel.AufgabenListenModus));
+    }
+
+    /// <summary>Ein persistierter Modus wird über GespeichertenAufgabenListenModusLadenAsync wiederhergestellt.</summary>
+    [Fact]
+    public async Task AufgabenListenModus_ShouldRestorePersistedModus()
+    {
+        // Arrange
+        var (modusService, provider) = AufgabenListenModusServiceTestFactory.ErstelleModusService();
+        using (provider)
+        {
+            using (var scope = provider.CreateScope())
+            {
+                var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+                await einstellungen.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey, "Repository");
+            }
+
+            var sut = CreateSut(aufgabenListenModusService: modusService);
+
+            // Act
+            await sut.GespeichertenAufgabenListenModusLadenAsync();
+
+            // Assert
+            sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Repository);
+        }
+    }
+
+    /// <summary>Eine Modusänderung wird über den Service persistiert; die Wiederherstellung schreibt nicht zurück.</summary>
+    [Fact]
+    public async Task AufgabenListenModus_ShouldPersistModusOnChange_WithoutWriteBackOnRestore()
+    {
+        // Arrange
+        var (modusService, provider) = AufgabenListenModusServiceTestFactory.ErstelleModusService();
+        using (provider)
+        {
+            var sut = CreateSut(aufgabenListenModusService: modusService);
+
+            // Act: Benutzerumschaltung persistiert den neuen Modus.
+            sut.AufgabenListenModus = AufgabenListenModus.Ki;
+
+            // Assert (Polling, da das Speichern fire-and-forget läuft)
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            string? wert = null;
+            while (DateTime.UtcNow < deadline && wert != "Ki")
+            {
+                using var scope = provider.CreateScope();
+                wert = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
+                    .GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey);
+                if (wert != "Ki")
+                    await Task.Delay(50);
+            }
+            wert.Should().Be("Ki");
+
+            // Act & Assert: die Wiederherstellung würde den gesetzten Benutzer-Modus nicht
+            // überschreiben (Race-Guard) und keinen zweiten Schreibzugriff auslösen.
+            await sut.GespeichertenAufgabenListenModusLadenAsync();
+            sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Ki);
+        }
     }
 
     /// <summary>Test-Datenquelle, die aktive Aufgaben kontrolliert blockierend zurueckgibt.</summary>

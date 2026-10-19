@@ -74,7 +74,7 @@ Die Pause einer regulären Aufgabe ist als zeitbasiertes Overlay (`Aufgabe.Pausi
 | `KiPluginLimitService` | Application Service (scoped) | Persistiert Session-Limits als `AppEinstellung` (`plugins.sessionlimit.<Prefix>`) und wendet die Pause prefix-weit an |
 | `CliOutputProtokollWriter` / `ProtokollService` | Infrastruktur / Application Service | Erkennen den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` im CLI-Output-Stream |
 | `CliUpdateSafetyService` | Application Service | Behandelt Aufgaben mit zukünftigem Session-Limit als nicht riskant |
-| `AktiveAufgabePanelItem` / `KiAusfuehrungsStatusConverter` | ViewModel / Converter | Countdown-Anzeige `⏸ Pausiert (noch …)` und Kachel-Abblendung (`Opacity = 0.55`) |
+| `AktiveAufgabePanelItem` / `KiAusfuehrungsStatusConverter` + `KiAusfuehrungsStatusSymbolConverter` | ViewModel / Converter | `⏸`-Glyph in der Kachel (Countdown-Volltext `⏸ Pausiert (noch …)` im Tooltip) und Kachel-Abblendung (`Opacity = 0.55`) |
 | `AufgabeLaufdatenChangedNotifier` | Infrastruktur | Löst nach persistierten Pausen-Änderungen den sofortigen Seitenleisten-Refresh aus |
 
 ### Datenfluss (automatische Pause bei Session-Limit)

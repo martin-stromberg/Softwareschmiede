@@ -20,6 +20,7 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 ## Kernfunktionen
 
 - **Projekt- und Aufgabenverwaltung** mit lokalem Aufgabenstatus, Protokollierung und To-Do-Listen
+- **Kompakte Aufgabenliste** in Seitenleiste und Dashboard mit dreizeiligen Symbol-Kacheln, vollflächig klickbar, umschaltbar zwischen den Anzeigemodi Datum, Repository und KI (pro Ansicht persistiert)
 - **Plugin-basierte SCM-Integration** für GitHub, BitBucket und lokale Arbeitsverzeichnisse
 - **Plugin-basierte KI-Ausführung** über eingebettete interaktive CLI-Terminal-Sitzungen (ConPTY mit diagnostiziertem Pipe-Fallback)
 - **IDE-Integration** mit Visual Studio für `.sln`/`.slnx` und Visual Studio Code als Fallback
@@ -127,6 +128,18 @@ Die Anwendung pollt regelmäßig Issue- und Pull-Request-Texte repository-weit f
 
 Die CLI-Unterstützung ist eingeschränkt: Codex CLI, Claude CLI und Devin CLI werden nur verwendet, wenn Version, Berechtigungen und der konkrete Zugriff auf den geprüften Antwortkanal erfolgreich nachgewiesen sind. Der KI-Simulator funktioniert nur im eigens gestarteten SCM-Modus. GitHub Copilot CLI und andere Plugins werden für diese Ereigniszustellung derzeit nicht unterstützt. Details und Grenzen stehen in der [Dokumentation zur GitHub-Ereignisüberwachung](docs/help/plugins/github-ereignisse/index.md). Vertrauensabfragen der CLIs für neue Aufgabenverzeichnisse werden vor dem Start pfadgenau in der benutzerbezogenen CLI-Konfiguration vorbereitet; bleibt dennoch ein Dialog offen, wird er als eigener Wartegrund angezeigt und die Zustellung nach der Beantwortung im Terminal automatisch fortgesetzt.
 
+## Aktive Aufgabenliste
+
+Die Seitenleisten-Sektion **„Aktive Aufgaben"** und die gleichnamige Liste im Dashboard zeigen bis zu 20 aktive Aufgaben (Status `Gestartet`/`Wartend`) als kompakte, dreizeilige Kacheln an:
+
+- **Kachel-Aufbau:** Aufgabentitel, Repository-Name als Untertitel (Fallback: Projektname) und eine Symbolzeile mit SCM-Symbol, KI-Symbol und Statussymbol (`⏸`/`⏳`/`▶`/`✓`) sowie der Anzahl offener To-Dos. Plugin-Namen und Status-Volltext (inkl. Pausiert-Countdown) stehen per ToolTip zur Verfügung.
+- **Klickbare Kachel:** Die gesamte Kachel navigiert per Klick zur Aufgabendetailansicht — ein separater Navigations-Button entfällt. Der To-do-Button in der Symbolzeile bleibt eigenständig klickbar und öffnet den Dialog der offenen To-Dos, ohne die Navigation auszulösen.
+- **Umschaltbare Anzeigemodi:** Drei Modus-Buttons in der Titelleiste der Liste schalten zwischen **„Datum"** (flache Liste, absteigend nach letzter Ausführung), **„Repository"** und **„KI"** um. Die beiden Gruppenmodi sortieren die Gruppen alphabetisch und die Einträge innerhalb einer Gruppe nach letzter Ausführung; Fallback-Gruppen („Ohne Repository" bzw. „Nicht ausgeführt") stehen am Ende. Die Buttons sind in Seitenleiste und Dashboard verfügbar und werden in der eingeklappten Seitenleiste ausgeblendet.
+- **Persistenz:** Der gewählte Modus wird pro Ansicht in der `AppEinstellung`-Tabelle gespeichert (`aktiveaufgaben.listenmodus` für die Seitenleiste, `aktiveaufgaben.listenmodus.dashboard` für das Dashboard) und beim App-Start wiederhergestellt.
+- **Plugin-Symbole:** Die Symbole liefert der Plugin-Vertrag — `IPlugin.PluginSymbol` ist als binärkompatibles Default-Interface-Member deklariert (Fallback `◻`); alle mitgelieferten Plugins definieren eigene Glyphen (z. B. 🐙 GitHub, 🪣 BitBucket, 📁 Local Directory, ✳ Claude CLI, ✈ GitHub Copilot, ◈ Codex, 🤖 Devin, 🧪 KI-Simulator).
+
+Die Implementierung liegt in `ActiveTasksListControl`, `MainWindowViewModel`, `DashboardViewModel`, `AufgabenListenModus`, `AufgabenListenAnsicht`, `AufgabenListenModusService`, `AktiveAufgabePanelItem` und `KiAusfuehrungsStatusSymbolConverter`. Abgedeckt wird das Feature u. a. durch `AufgabenListenAnsichtTests`, `KiAusfuehrungsStatusSymbolConverterTests` und den E2E-Test `E2E_AufgabenListeModi`.
+
 ## Aufgaben pausieren und Session-Limits erkennen
 
 Reguläre Aufgaben lassen sich zeitgebunden pausieren. Zusätzlich erkennt die Anwendung Session-Limits in der CLI-Ausgabe und pausiert betroffene Aufgaben automatisch.
@@ -140,7 +153,7 @@ Reguläre Aufgaben lassen sich zeitgebunden pausieren. Zusätzlich erkennt die A
 
 ### Anzeige
 
-- Die Kachel in der Seitenleisten-Sektion **„Aktive Aufgaben"** zeigt `⏸ Pausiert (noch hh:mm:ss)` — ab 24 Stunden Restzeit `d.hh:mm:ss` — und wird per `Opacity`-Trigger auf `0,55` abgeschwächt (`KiAusfuehrungsStatusConverter`, `ActiveTasksListControl`).
+- Die Kachel in der Seitenleisten-Sektion **„Aktive Aufgaben"** zeigt das Statussymbol `⏸`; der Volltext `Pausiert (noch hh:mm:ss)` — ab 24 Stunden Restzeit `d.hh:mm:ss` — steht als ToolTip auf dem Symbol. Die Kachel wird per `Opacity`-Trigger auf `0,55` abgeschwächt (`KiAusfuehrungsStatusConverter`/`KiAusfuehrungsStatusSymbolConverter`, `ActiveTasksListControl`).
 - Die Detailansicht blendet im Ribbon zusätzlich `⏸ Pausiert bis dd.MM.yyyy HH:mm` ein.
 
 ### Wirkung einer aktiven Pause

@@ -50,6 +50,12 @@ public sealed class AppEinstellungService
     /// <summary>Fester EF-Abfragetag der gemeinsamen Update-Einstellungs-Leseabfrage für gezielte Testinterception.</summary>
     public const string UpdateSettingsReadTag = "UpdateSettings.Read";
 
+    /// <summary>Schlüssel für den Anzeigemodus der Aufgabenliste in der Seitenleiste (<c>AufgabenListenModus</c>-Name).</summary>
+    public const string AktiveAufgabenListenModusKey = "aktiveaufgaben.listenmodus";
+
+    /// <summary>Schlüssel für den Anzeigemodus der Aufgabenliste im Dashboard (<c>AufgabenListenModus</c>-Name).</summary>
+    public const string AktiveAufgabenListenModusDashboardKey = "aktiveaufgaben.listenmodus.dashboard";
+
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AppEinstellungService> _logger;
 
