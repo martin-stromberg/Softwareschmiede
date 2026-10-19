@@ -94,7 +94,9 @@ public sealed class PluginSelectionService
     }
 
     /// <summary>
-    /// Löst das KI-Plugin-Prefix mit Projekt-Kontext auf: Aufgaben-Plugin → Projekt-Default → Global-Default.
+    /// Löst das KI-Plugin-Prefix mit Projekt-Kontext auf: Aufgaben-Plugin → Projekt-Default → Global-Default
+    /// (<c>plugins.default.*</c>) → in den Einstellungen konfigurierte Standard-CLI
+    /// (<see cref="AppEinstellungService.DefaultKiPluginKey"/>).
     /// Wird nichts gefunden, gibt die Methode <c>null</c> zurück; der Aufrufer muss in diesem Fall
     /// den Plugin-Auswahl-Dialog anzeigen.
     /// </summary>
@@ -120,7 +122,38 @@ public sealed class PluginSelectionService
             return globalDefault;
         }
 
-        return null;
+        return await ResolveConfiguredDefaultKiPluginPrefixAsync(ct);
+    }
+
+    /// <summary>
+    /// Löst die in den Einstellungen konfigurierte Standard-CLI (<see cref="AppEinstellungService.DefaultKiPluginKey"/>)
+    /// auf einen Plugin-Prefix auf. Die Einstellungen speichern den <see cref="IPlugin.PluginName"/>;
+    /// zur Robustheit wird zusätzlich der <see cref="IPlugin.PluginPrefix"/> akzeptiert. Passt der gespeicherte
+    /// Wert auf kein vorhandenes KI-Plugin, wird <c>null</c> zurückgegeben — es wird kein anderes Plugin vermutet.
+    /// </summary>
+    private async Task<string?> ResolveConfiguredDefaultKiPluginPrefixAsync(CancellationToken ct)
+    {
+        if (_appEinstellungService is null)
+        {
+            return null;
+        }
+
+        var configured = await _appEinstellungService.GetSettingAsync(AppEinstellungService.DefaultKiPluginKey, ct);
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return null;
+        }
+
+        var trimmed = configured.Trim();
+        var match = _pluginManager.GetDevelopmentAutomationPlugins().FirstOrDefault(plugin =>
+            string.Equals(plugin.PluginName, trimmed, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(plugin.PluginPrefix, trimmed, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+        {
+            _logger.LogWarning("Konfigurierte Standard-CLI '{DefaultKiPlugin}' ist nicht installiert.", trimmed);
+        }
+
+        return match?.PluginPrefix;
     }
 
     /// <summary>

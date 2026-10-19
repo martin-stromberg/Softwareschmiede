@@ -15,7 +15,8 @@ public sealed class ScmEventOrchestrator(
     SoftwareschmiededDbContext db, ScmEventStore store, ScmEventOutbox outbox,
     IPluginManager plugins, PluginSelectionService selection, EntwicklungsprozessService development,
     AufgabeService tasks, KiAusfuehrungsService cli, ScmEventExchangeProtocol exchange,
-    ScmEventChangeNotifier notifier, IServiceScopeFactory scopes, TimeProvider time, IOptions<ScmEventOptions> options)
+    ScmEventChangeNotifier notifier, IServiceScopeFactory scopes, TimeProvider time, IOptions<ScmEventOptions> options,
+    AppEinstellungService einstellungen)
 {
     /// <summary>Versucht Zustellung oder rekonstruiert ausschließlich den schon begonnenen Versuch.</summary>
     public async Task DispatchAsync(Guid eventId, string? explicitPluginPrefix = null, CancellationToken ct = default)
@@ -129,7 +130,12 @@ public sealed class ScmEventOrchestrator(
                     plugin.PluginPrefix, $"https://{observation.Reference.Repository.Host}/{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}"), ct);
                 if (currentRepository.RepositoryId != observation.Reference.Repository.RepositoryId || !currentRepository.CanWrite)
                 { await WaitWithCommentAsync(item, observation, responder, "Schreibberechtigung für den Ereignisursprung fehlt. Prüfen Sie unter Einstellungen → Plugins → GitHub → Authentifizierung den Personal Access Token: Er benötigt Zugriff auf " + observation.Reference.Repository.Owner + "/" + observation.Reference.Repository.Name + " sowie Lese- und Schreibrechte für Issues und Pull Requests. Speichern Sie Änderungen und klicken Sie anschließend beim Ereignis auf Erneut prüfen.", ct); return; }
-                if (ScmEventValidationService.GetRejection(observation with { Reference = observation.Reference with { Repository = currentRepository } }) is not null)
+                // Der Trigger wurde bereits bei der Aufnahme geprüft; ein seither geändertes
+                // Keyword entwertet ein angenommenes Ereignis nicht nachträglich.
+                var revalidation = ScmEventValidationService.GetRejection(
+                    observation with { Reference = observation.Reference with { Repository = currentRepository } },
+                    await einstellungen.GetScmTriggerKeywordAsync(ct));
+                if (revalidation is not null && revalidation != "Kein Trigger")
                 { await WaitAsync(item, "Angemeldeter Benutzer ist nicht mehr der bestätigte Repository-Owner.", ct); return; }
                 if (task.Status == AufgabeStatus.Neu) await tasks.SetStatusAsync(task.Id, AufgabeStatus.Gestartet, ct);
                 var adapter = cli.GetScmPromptSession(task.Id);
@@ -177,8 +183,12 @@ public sealed class ScmEventOrchestrator(
                 if (access.Status != ScmExchangeAccessStatus.Supported)
                 { await WaitWithCommentAsync(item, observation, responder, "Antwortkanal für diese CLI nicht verfügbar: " + access.Reason, ct); return; }
                 var attemptId = Guid.NewGuid();
+                // Konfigurierte Prompt-Anhänge werden erst hier — bei der tatsächlichen Zustellung —
+                // aufgelöst und nur in den Prompt eingefügt: Der gespeicherte Ereignistext, die
+                // Trigger-Gegenprüfung, Dedup/BodyHash und request.json bleiben unverändert.
+                var promptSuffix = ScmPromptAppendix.Resolve(observation, await einstellungen.GetScmPromptAppendicesAsync(ct));
                 var attempt = await exchange.PrepareAsync(new(item.Id, attemptId, adapter.CliRunId, task.Id, observation.Body,
-                    observation.ContentKind.ToString(), $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url), adapter.WorkingDirectory, ct, access.RestrictedWriteSids);
+                    observation.ContentKind.ToString(), $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url), adapter.WorkingDirectory, ct, access.RestrictedWriteSids, promptSuffix);
                 if (!ReferenceEquals(adapter, cli.GetScmPromptSession(task.Id)) || !adapter.IsAlive)
                 { await WaitAsync(item, "CLI-Sitzung hat sich geändert. Erneut prüfen.", ct); return; }
                 // A cancellation between preparation and write wins over the tracked delivery state.

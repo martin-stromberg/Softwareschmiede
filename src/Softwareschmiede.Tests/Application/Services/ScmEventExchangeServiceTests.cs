@@ -35,6 +35,44 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         Git("status", "--porcelain").Should().BeEmpty();
     }
 
+    /// <summary>Ein konfigurierter Anhang erscheint als eigenes promptSuffix-Feld nur im Prompt —
+    /// request.json und der unveränderliche Auftrag bleiben frei davon; Zeilenumbrüche bleiben JSON-Daten.</summary>
+    [Fact]
+    public async Task Prepare_PromptSuffixAppearsOnlyInPrompt_NotInStoredRequest()
+    {
+        var suffix = "Bearbeitungsregeln:\nImmer Tests ausführen.";
+        var request = Request();
+        var attempt = await _protocol.PrepareAsync(request, _root, promptSuffix: suffix);
+        attempt.PromptSuffix.Should().Be(suffix);
+        attempt.Prompt.Any(char.IsControl).Should().BeFalse("der Anhang muss einzeilig im JSON-Prompt kodiert bleiben");
+        using var document = JsonDocument.Parse(attempt.Prompt);
+        document.RootElement.GetProperty("promptSuffix").GetString().Should().Be(suffix);
+        document.RootElement.GetProperty("request").GetProperty("body").GetString().Should().Be(request.Body);
+        JsonSerializer.Deserialize<ScmExchangeRequest>(await File.ReadAllTextAsync(attempt.RequestPath), Json).Should().Be(request);
+    }
+
+    /// <summary>Ohne Anhang bleibt der Prompt unverändert: Es gibt kein leeres promptSuffix-Feld.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Prepare_EmptyPromptSuffix_OmitsField(string? suffix)
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root, promptSuffix: suffix);
+        using var document = JsonDocument.Parse(attempt.Prompt);
+        document.RootElement.TryGetProperty("promptSuffix", out _).Should().BeFalse();
+    }
+
+    /// <summary>Die lokale Kanalprobe ist kein SCM-Ereignis und erhält grundsätzlich keinen Anhang.</summary>
+    [Fact]
+    public void AccessProbePrompt_NeverCarriesAPromptSuffix()
+    {
+        var probe = new ScmExchangeAccessProbe(Guid.NewGuid(), "nonce", "fingerprint",
+            Path.Combine(_root, "probe"), []);
+        using var document = JsonDocument.Parse(ScmEventExchangeProtocol.BuildAccessProbePrompt(probe));
+        document.RootElement.TryGetProperty("promptSuffix", out _).Should().BeFalse();
+    }
+
     /// <summary>An occupied or tracked channel is never overwritten.</summary>
     [Theory]
     [InlineData(false)]
@@ -132,6 +170,70 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         await _protocol.ReadAsync(attempt);
         var result = await _protocol.ReadAsync(attempt);
         (result.Complete is not null).Should().Be(valid);
+    }
+
+    /// <summary>Selbst über die SCM-Anbindung ausgeführte Remoteaktionen schließen ohne Kanalaktion
+    /// ab — aber nur mit einem nicht leeren Ergebnisbericht; ein völlig belegloser Abschluss bleibt
+    /// ein Protokollfehler.</summary>
+    [Theory]
+    [InlineData("Konflikt behoben und PR #7 per Admin-Merge gemergt.", true)]
+    [InlineData("   ", false)]
+    [InlineData(null, false)]
+    public async Task Complete_SelfExecutedRemoteActions_RequireReport(string? report, bool valid)
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var request = attempt.Request;
+        await Write(Path.Combine(attempt.DirectoryPath, "complete.json"),
+            new ScmExchangeComplete(1, request.EventId, request.AttemptId, request.CliRunId, [], false, Report: report));
+        await _protocol.ReadAsync(attempt);
+        var result = await _protocol.ReadAsync(attempt);
+        (result.Complete is not null).Should().Be(valid);
+        if (valid)
+        {
+            result.Complete!.Report.Should().Be(report);
+        }
+        else
+        {
+            result.Diagnostic.Should().Contain("Remoteaktionen");
+        }
+    }
+
+    /// <summary>Kanalaktionen bleiben ohne report gültig; ein report kann sie zusätzlich dokumentieren.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Zusätzlich Label gesetzt.")]
+    public async Task Complete_ChannelActions_StayValidWithOrWithoutReport(string? report)
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var request = attempt.Request;
+        var actionId = Guid.NewGuid();
+        await Write(Path.Combine(attempt.DirectoryPath, "complete.json"),
+            new ScmExchangeComplete(1, request.EventId, request.AttemptId, request.CliRunId, [actionId], false, Report: report));
+        await _protocol.ReadAsync(attempt);
+        var result = await _protocol.ReadAsync(attempt);
+        result.Complete.Should().NotBeNull();
+        result.Complete!.ActionIds.Should().BeEquivalentTo([actionId]);
+    }
+
+    /// <summary>Der Prompt weist den Agenten an, erlaubte Issue-/PR-Aktionen selbst über die
+    /// SCM-Anbindung auszuführen, und dokumentiert das report-Feld; Repo- und Ursprungskontext
+    /// bleiben Daten im request.</summary>
+    [Fact]
+    public async Task Prompt_InstructsSelfExecutedActionsWithRepositoryContext()
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        using var document = JsonDocument.Parse(attempt.Prompt);
+        var instruction = document.RootElement.GetProperty("instruction").GetString()!;
+        instruction.Should().Contain("request.repository");
+        instruction.Should().Contain("request.originUrl");
+        instruction.Should().Contain("GH_TOKEN");
+        instruction.Should().Contain("selbst");
+        instruction.Should().Contain("Admin-Merge");
+        instruction.Should().Contain("noRemoteAction");
+        document.RootElement.GetProperty("completeSchema").GetString().Should().Contain("report");
+        document.RootElement.GetProperty("request").GetProperty("repository").GetString().Should().Be("owner/repo");
+        document.RootElement.GetProperty("request").GetProperty("originUrl").GetString()
+            .Should().Be("https://github.com/owner/repo/issues/1#issuecomment-1");
     }
 
     private static ScmExchangeRequest Request(string body = "$Softwareschmiede: requirement") =>

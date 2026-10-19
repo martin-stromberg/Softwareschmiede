@@ -6,14 +6,17 @@
 
 - Das GitHub-Repository ist mit einer Aufgabe verknüpft; die Aufgabe enthält eine Issue- oder Pull-Request-Referenz.
 - In **Einstellungen → Plugins → GitHub → Authentifizierung** ist ein gültiger **Personal Access Token** gespeichert, der auf das Repository zugreifen darf.
-- Der Text enthält `$Softwareschmiede` und stammt vom Repository-Owner. Bei einer bearbeiteten Textfassung muss der Owner auch als Bearbeiter erkennbar sein.
+- Der Text enthält das Trigger-Keyword (Standard `$Softwareschmiede`, einstellbar unter **Einstellungen → Allgemein → SCM-Ereignisse**) und stammt vom Repository-Owner. Bei einer bearbeiteten Textfassung muss der Owner auch als Bearbeiter erkennbar sein.
+- Die SCM-Ereignisüberwachung ist aktiviert (Checkbox unter **Einstellungen → Allgemein → SCM-Ereignisse**, standardmäßig an). Ist sie deaktiviert, werden weder neue Ereignisse eingelesen noch bestehende automatisch zugestellt; die manuellen Aktionen in der Übersicht bleiben nutzbar.
 - Für die automatische CLI-Verarbeitung werden derzeit Codex CLI, Claude CLI oder Devin CLI nur mit einem unterstützten, tatsächlich geprüften Schreibzugriff verwendet. Andere ausgewählte KI-Plugins können in der Ereignisverarbeitung wartend bleiben.
+- Die CLI darf erlaubte Issue-/PR-Aktionen (Kommentar, Review, Merge inkl. Admin-Merge, Commit/Push, Schließen u. a.) selbst über `gh`/git ausführen: Die Sitzung erhält beim Start dieselbe GitHub-Anmeldung wie die Anwendung (Token aus **Einstellungen → Plugins → GitHub → Authentifizierung** als Prozessumgebung). Der Aktionsumfang bleibt durch die Token-/Repository-Berechtigungen begrenzt; `gh` muss auf dem Rechner erreichbar sein.
+- Optional kannst du unter **Einstellungen → Allgemein → SCM-Ereignisse** Prompt-Anhänge pflegen: Texte, die der Anwendung bei der Zustellung je Ereignisart angehängt werden (Allgemein gilt immer, dazu kommt der Anhang für Issue, Issue-Kommentar, Pull Request oder Pull-Request-Kommentar inklusive Reviews). So erhält die CLI z. B. Hinweise auf verfügbare Skills oder Bearbeitungsregeln, ohne dass sie in jedem GitHub-Kommentar stehen müssen. Leere Felder hängen nichts an; Trigger-Keyword und gespeicherter Ereignistext bleiben unverändert.
 
 ## Schritt-für-Schritt-Anleitung
 
 ### 1. Anfrage in GitHub schreiben
 
-Schreibe den Trigger `$Softwareschmiede` in die Beschreibung, einen Kommentar oder Review-Text des verknüpften Issues oder Pull Requests. Ergänze die konkrete Bitte im selben Text.
+Schreibe das Trigger-Keyword (Standard `$Softwareschmiede`) in die Beschreibung, einen Kommentar oder Review-Text des verknüpften Issues oder Pull Requests. Ergänze die konkrete Bitte im selben Text.
 
 ### 2. Eingang prüfen
 

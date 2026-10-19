@@ -50,6 +50,47 @@ public sealed class ScmEventOrchestratorTests
         Assert.Equal(2, fixture.Responses.Count);
     }
 
+    /// <summary>A task without a plugin uses the settings-configured default CLI (ki.plugin.default)
+    /// and the start persists the resolved prefix on the task.</summary>
+    [Fact]
+    public async Task SettingsDefaultCli_StartsTaskAndDelivers()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync();
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
+                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator");
+        await fixture.DispatchAsync(eventId);
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("Zugestellt", item.Status);
+        Assert.NotNull(item.DeliveryAttemptId);
+        Assert.Single(fixture.Sessions);
+        Assert.Single(fixture.Prompts);
+        using var verification = fixture.Services.CreateScope();
+        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(taskId);
+        Assert.Equal(ScmDispatchFixture.KiPrefix, task!.KiPluginPrefix);
+    }
+
+    /// <summary>A settings default that names no installed plugin is not guessed around:
+    /// the event keeps the actionable waiting state.</summary>
+    [Fact]
+    public async Task UnresolvableSettingsDefaultCli_KeepsWaitingState()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (_, eventId) = await fixture.AddAsync();
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
+                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Nicht installiert");
+        await fixture.DispatchAsync(eventId);
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("Wartend", item.Status);
+        Assert.Contains("Keine Standard-CLI", item.Reason);
+        Assert.Empty(fixture.Sessions);
+        Assert.Empty(fixture.Prompts);
+    }
+
     /// <summary>Terminal absence does not override completion, archive or pause guards.</summary>
     [Theory]
     [InlineData(AufgabeStatus.Beendet, false)]

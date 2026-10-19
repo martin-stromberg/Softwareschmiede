@@ -41,6 +41,27 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für das Feature-Flag "Autonome Aufgaben aktiviert".</summary>
     public const string AutonomAufgabenEnabledKey = "autonomeaufgaben.enabled";
 
+    /// <summary>Schlüssel für den Laufzeit-Schalter "SCM-Ereignisüberwachung aktiviert".</summary>
+    public const string ScmMonitoringEnabledKey = "scm.monitoring.enabled";
+
+    /// <summary>Schlüssel für das konfigurierbare SCM-Trigger-Keyword.</summary>
+    public const string ScmTriggerKeywordKey = "scm.trigger.keyword";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang, der bei jeder Ereignisart angehängt wird.</summary>
+    public const string ScmPromptAppendGeneralKey = "scm.prompt.append.general";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Issue-Beschreibungen (neues/geändertes Issue).</summary>
+    public const string ScmPromptAppendIssueKey = "scm.prompt.append.issue";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Kommentaren auf Issues.</summary>
+    public const string ScmPromptAppendIssueCommentKey = "scm.prompt.append.issuecomment";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Pull-Request-Beschreibungen (neuer/geänderter PR).</summary>
+    public const string ScmPromptAppendPullRequestKey = "scm.prompt.append.pr";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Kommentaren und Reviews auf Pull Requests.</summary>
+    public const string ScmPromptAppendPullRequestCommentKey = "scm.prompt.append.prcomment";
+
     /// <summary>Schlüssel für den Update-Modus (<see cref="UpdateMode"/>-Wert als Zahl gespeichert).</summary>
     public const string UpdateModeKey = "updates.mode";
 
@@ -144,6 +165,40 @@ public sealed class AppEinstellungService
         var dbWert = await GetBoolSettingAsync(AutonomAufgabenEnabledKey, ct);
         return dbWert ?? deploymentDefault;
     }
+
+    /// <summary>
+    /// Ermittelt, ob die SCM-Ereignisüberwachung aktuell aktiv ist. Der über
+    /// <see cref="SetBoolSettingAsync"/> unter <see cref="ScmMonitoringEnabledKey"/> persistierte
+    /// Laufzeit-Schalter (GUI-Einstellung) gilt ohne Neustart; ohne gespeicherten Eintrag ist die
+    /// Überwachung aktiviert (<see langword="true"/>).
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn die SCM-Ereignisüberwachung aktiv ist.</returns>
+    public async Task<bool> GetScmMonitoringEnabledAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(ScmMonitoringEnabledKey, ct) ?? true;
+
+    /// <summary>
+    /// Liest das konfigurierte SCM-Trigger-Keyword unter <see cref="ScmTriggerKeywordKey"/>.
+    /// Fehlende oder ungültige (leere bzw. nur aus Leerraum bestehende) Werte fallen auf
+    /// <see cref="ScmEventValidationService.DefaultTriggerKeyword"/> zurück; gespeicherte Werte
+    /// werden getrimmt zurückgegeben.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Das effektive Trigger-Keyword.</returns>
+    public async Task<string> GetScmTriggerKeywordAsync(CancellationToken ct = default)
+        => ScmEventValidationService.NormalizeTriggerKeyword(await GetSettingAsync(ScmTriggerKeywordKey, ct));
+
+    /// <summary>
+    /// Liest alle fünf SCM-Prompt-Anhänge (<see cref="ScmPromptAppendGeneralKey"/>,
+    /// <see cref="ScmPromptAppendIssueKey"/>, <see cref="ScmPromptAppendIssueCommentKey"/>,
+    /// <see cref="ScmPromptAppendPullRequestKey"/> und <see cref="ScmPromptAppendPullRequestCommentKey"/>)
+    /// in einer einzigen Datenbankabfrage. Schlüssel ohne gespeicherten Eintrag fehlen im Ergebnis;
+    /// die fachliche Auswertung (Ereignisart-Mapping, Kombination) übernimmt <see cref="ScmPromptAppendix"/>.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Eine Zuordnung von Schlüssel zu gespeichertem Wert.</returns>
+    public async Task<IReadOnlyDictionary<string, string?>> GetScmPromptAppendicesAsync(CancellationToken ct = default)
+        => await GetSettingsAsync(ScmPromptAppendix.SettingKeys, ct);
 
     /// <summary>Liest die Werte mehrerer Einstellungen anhand ihrer Schlüssel in einer einzigen Datenbankabfrage.</summary>
     /// <param name="schluessel">Die zu lesenden Schlüssel.</param>

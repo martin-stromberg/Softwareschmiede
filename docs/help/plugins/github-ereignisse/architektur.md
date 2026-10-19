@@ -7,7 +7,7 @@
 | Komponente | Typ | Rolle |
 |------------|-----|-------|
 | `ScmEventMonitoringService` | Hintergrunddienst | Pollt lokal verknüpfte Referenzen und dispatcht gespeicherte Einträge. |
-| `GitHubPlugin` | SCM-Provider | Implementiert `IScmEventSource` und `IScmEventResponder`; liest GitHub-Inhalte und führt unterstützte Antworten aus. |
+| `GitHubPlugin` | SCM-Provider | Implementiert `IScmEventSource`, `IScmEventResponder` und `IScmAgentAccess`; liest GitHub-Inhalte, führt unterstützte Antworten aus und stellt Agenten die SCM-Anbindung als Prozessumgebung bereit. |
 | `ScmEventStore` / `SoftwareschmiededDbContext` | Persistenz | Speichert Ereignisse, Snapshots, Checkpoints, Aktionen und Aufgaben-Leases. |
 | `ScmEventOrchestrator` | Application Service | Prüft Aufgabenstatus und CLI, koordiniert Zustellung sowie Wiederaufnahme. |
 | `IScmPromptSessionAdapter` / `ScmEventExchangeService` | CLI-Austausch | Prüft den Antwortkanal und korreliert Annahme, Aktionen und Abschluss mit Lauf und Versuch. |

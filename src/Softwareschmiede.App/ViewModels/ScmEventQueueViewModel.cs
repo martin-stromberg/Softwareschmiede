@@ -47,6 +47,11 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
         RetrySourcesCommand = Command(async ct =>
         {
             using var scope = _scopes.CreateScope();
+            if (!await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct))
+            {
+                Message = "Die SCM-Ereignisüberwachung ist deaktiviert. Aktivierung unter Einstellungen → Allgemein → SCM-Ereignisse.";
+                return;
+            }
             await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmObservationCheckpoints
                 .ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)null), ct);
             await scope.ServiceProvider.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(ct);
@@ -165,6 +170,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             var sourceErrors = await db.ScmObservationCheckpoints.AsNoTracking()
                 .Where(x => x.Diagnostic != null && x.Diagnostic != ScmEventStore.UnassignedDiagnostic).ToListAsync(ct);
             var actionErrors = await db.ScmOutgoingActions.AsNoTracking().Where(x => x.Error != null).ToListAsync(ct);
+            var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct);
             var diagnostic = string.Join(Environment.NewLine,
                 sourceErrors.Select(x => $"Quelle {x.SourceKey}: {x.Diagnostic} ({NextCheck(x.NextAttemptUtc)})")
                     .Concat(actionErrors.Select(x => $"{ActionLabel(x.Purpose)}: {x.Error} ({NextCheck(x.NextAttemptUtc)})")));
@@ -183,7 +189,9 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
                 _hasLoaded = true;
                 LoadError = null;
                 Diagnostics = diagnostic;
-                MonitoringNotice = sourceErrors.Count == 0 ? null
+                MonitoringNotice = !monitoringEnabled
+                    ? "Die SCM-Ereignisüberwachung ist deaktiviert; neue Anfragen werden nicht eingelesen oder automatisch zugestellt (Einstellungen → Allgemein → SCM-Ereignisse)."
+                    : sourceErrors.Count == 0 ? null
                     : "Die GitHub-Überwachung ist für betroffene Quellen unterbrochen; neue Anfragen können fehlen. "
                       + sourceErrors[0].Diagnostic
                       + (sourceErrors.Count > 1 ? $" ({sourceErrors.Count} betroffene Quellen; Details unter Integrationshinweise.)" : string.Empty)
