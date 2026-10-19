@@ -17,7 +17,10 @@ namespace Softwareschmiede.Tests.E2E;
 public partial class End2EndTest
 {
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected async Task AufgabenListe_KompakteKachelSymboleUndModuswechsel_E2E(Window mainWindow)
+    /// <returns>Das Hauptfenster nach dem appinternen Neustart - der Uebergebene
+    /// <paramref name="mainWindow"/> ist danach stale und darf von Folge-Szenarien
+    /// nicht mehr verwendet werden.</returns>
+    protected async Task<Window> AufgabenListe_KompakteKachelSymboleUndModuswechsel_E2E(Window mainWindow)
     {
         var projektName = $"Modi-Projekt {Guid.NewGuid():N}"[..30];
         var titelMitRepo = $"Modi-Repo-Aufgabe {Guid.NewGuid():N}"[..30];
@@ -174,5 +177,7 @@ public partial class End2EndTest
         var projectDetailForDelete = projectList.OpenProject(projektName);
         projectDetailForDelete.DeleteProject();
         projectDetailForDelete.Menu.NavigateToDashboard();
+
+        return restartedWindow;
     }
 }
