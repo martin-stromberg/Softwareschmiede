@@ -102,6 +102,95 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
         inputStream.Batches[2].Should().Equal([(byte)'x']);
     }
 
+    /// <summary>Mit gesetzter Submit-Wiederholung (<see cref="PseudoConsoleSessionContext.PromptSubmitRepeatCount"/>)
+    /// wird der Submit-<c>\r</c> mehrfach als jeweils eigener geflushter Batch gesendet: Ein zu früher
+    /// Versuch kann bei großen Prompts noch im Paste-/Burst-Fenster der CLI verschluckt werden, spätere
+    /// Versuche senden den Entwurf zuverlässig ab (empirisch an der Devin CLI vermessen).</summary>
+    [Fact]
+    public async Task WritePromptAsync_MitSubmitWiederholung_SendetSubmitMehrfachAlsEigeneBatches()
+    {
+        var inputStream = new WriteRecordingStream();
+        using var session = TestPseudoConsoleSessionFactory.Create(
+            inputStream, new MemoryStream(),
+            promptSubmitDelay: TimeSpan.FromMilliseconds(40),
+            promptSubmitRepeatCount: 2,
+            promptSubmitRepeatInterval: TimeSpan.FromMilliseconds(20));
+
+        await session.WritePromptAsync("Mach weiter", CancellationToken.None);
+
+        inputStream.Batches.Should().HaveCount(4, "Text plus erster Submit plus zwei Wiederholungen ergeben vier getrennte Batches");
+        Encoding.UTF8.GetString(inputStream.Batches[0]).Should().Be("Mach weiter");
+        inputStream.Batches[1].Should().Equal([(byte)'\r']);
+        inputStream.Batches[2].Should().Equal([(byte)'\r']);
+        inputStream.Batches[3].Should().Equal([(byte)'\r']);
+    }
+
+    /// <summary>Bei einem Prompt oberhalb der Chunk-Größe bleibt der wiederholte Submit jeweils ein
+    /// eigener Ein-Byte-Batch hinter allen Text-Chunks — genau der Fall, der produktiv an mehreren
+    /// KB langen SCM-Prompts scheiterte, wenn nur ein einziger Submit-Versuch gesendet wurde.</summary>
+    [Fact]
+    public async Task WritePromptAsync_MitSubmitWiederholung_GrosserPrompt_SendetSubmitsHinterAllenTextChunks()
+    {
+        var prompt = new string('x', 10_000);
+        var expectedTextChunks = (int)Math.Ceiling(Encoding.UTF8.GetByteCount(prompt) / 4096.0);
+        const int repeatCount = 3;
+
+        var inputStream = new WriteRecordingStream();
+        using var session = TestPseudoConsoleSessionFactory.Create(
+            inputStream, new MemoryStream(),
+            promptSubmitDelay: TimeSpan.FromMilliseconds(40),
+            promptSubmitRepeatCount: repeatCount,
+            promptSubmitRepeatInterval: TimeSpan.FromMilliseconds(20));
+
+        await session.WritePromptAsync(prompt, CancellationToken.None);
+
+        inputStream.Batches.Should().HaveCount(expectedTextChunks + 1 + repeatCount);
+        string.Concat(inputStream.Batches.Take(expectedTextChunks).Select(Encoding.UTF8.GetString))
+            .Should().Be(prompt, "die Text-Chunks liefern gemeinsam den vollständigen Prompttext");
+        inputStream.Batches.Skip(expectedTextChunks).Should().AllSatisfy(
+            batch => batch.Should().Equal([(byte)'\r'], "jeder Submit-Versuch bleibt ein eigener Ein-Byte-Batch"));
+    }
+
+    /// <summary>Ohne Wiederholungskonfiguration bleibt es beim einmaligen Submit (Bestandsverhalten).</summary>
+    [Fact]
+    public async Task WritePromptAsync_MitSubmitDelay_OhneWiederholung_SendetGenauEinenSubmit()
+    {
+        var inputStream = new WriteRecordingStream();
+        using var session = TestPseudoConsoleSessionFactory.Create(
+            inputStream, new MemoryStream(), promptSubmitDelay: TimeSpan.FromMilliseconds(40));
+
+        await session.WritePromptAsync("Mach weiter", CancellationToken.None);
+
+        inputStream.Batches.Should().HaveCount(2);
+        inputStream.Batches[1].Should().Equal([(byte)'\r']);
+    }
+
+    /// <summary>Die Eingabesperre wird über Text, Verzögerung und <em>alle</em> Submit-Versuche gehalten:
+    /// Fremdinput darf auch nicht zwischen zwei Wiederholungs-Submits rutschen.</summary>
+    [Fact]
+    public async Task WritePromptAsync_MitSubmitWiederholung_FremdinputWartetHinterAllenSubmits()
+    {
+        var inputStream = new WriteRecordingStream();
+        using var session = TestPseudoConsoleSessionFactory.Create(
+            inputStream, new MemoryStream(),
+            promptSubmitDelay: TimeSpan.FromMilliseconds(40),
+            promptSubmitRepeatCount: 2,
+            promptSubmitRepeatInterval: TimeSpan.FromMilliseconds(40));
+
+        var promptTask = session.WritePromptAsync("Mach weiter", CancellationToken.None);
+        var keyboardTask = Task.Run(async () =>
+        {
+            await Task.Delay(70);
+            await session.WriteInputAsync(new byte[] { (byte)'x' }, CancellationToken.None);
+        });
+
+        await Task.WhenAll(promptTask, keyboardTask);
+
+        inputStream.Batches.Should().HaveCount(5);
+        inputStream.Batches[^1].Should().Equal([(byte)'x'], "der Fremdinput darf erst hinter dem letzten Submit-Versuch ankommen");
+        inputStream.Batches.Skip(1).Take(3).Should().AllSatisfy(batch => batch.Should().Equal([(byte)'\r']));
+    }
+
     private static PseudoConsoleSession CreateSession(Stream inputStream)
     {
         return TestPseudoConsoleSessionFactory.Create(inputStream, new MemoryStream());

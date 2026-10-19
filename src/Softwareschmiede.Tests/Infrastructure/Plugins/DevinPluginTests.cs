@@ -51,22 +51,32 @@ public sealed class DevinPluginTests
         _sut.SupportsSessionContinuation().Should().BeTrue();
     }
 
-    /// <summary>Devin benötigt den verzögerten Zwei-Batch-Submit: Ein \r im selben Eingabe-Read wie der
-    /// Prompttext wird von der Devin CLI als Zeilenumbruch gewertet, nicht als Enter-Submit (empirisch
-    /// gegen devin.exe v3000.11.92 unter ConPTY verifiziert).</summary>
+    /// <summary>Devin benötigt den verzögerten, wiederholten Submit: Ein \r im selben Eingabe-Read wie der
+    /// Prompttext wird von der Devin CLI als Zeilenumbruch gewertet, nicht als Enter-Submit — und das für
+    /// einen Submit nötige Abstands-Fenster wächst mit der Prompt-Größe, sodass ein einzelner verzögerter
+    /// Submit bei großen SCM-Prompts verloren gehen kann (empirisch gegen devin.exe v3000.11.92 unter
+    /// ConPTY verifiziert: ~10 KB → ~0,4 s, ~20–30 KB → ~0,7–1,1 s nötiger Abstand).</summary>
     [Fact]
     public void PromptSubmitDelay_ShouldRequireSeparateDelayedSubmit()
     {
         _sut.PromptSubmitDelay.Should().BeGreaterThan(TimeSpan.Zero);
+        _sut.PromptSubmitRepeatCount.Should().BeGreaterThan(0,
+            "der Submit muss wiederholt werden, weil das nötige Abstands-Fenster größenabhängig streut");
+        _sut.PromptSubmitRepeatInterval.Should().BeGreaterThan(TimeSpan.Zero);
+        (_sut.PromptSubmitDelay + _sut.PromptSubmitRepeatCount * _sut.PromptSubmitRepeatInterval)
+            .Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(2.5),
+                "die Wiederholungen müssen große Prompts (~30 KB ≈ 1,1 s) mit deutlichem Sicherheitspuffer abdecken");
     }
 
-    /// <summary>Die Startbeschreibung trägt die Submit-Verzögerung in die Terminal-Session.</summary>
+    /// <summary>Die Startbeschreibung trägt die Submit-Verzögerung und -Wiederholung in die Terminal-Session.</summary>
     [Fact]
     public async Task GetTerminalStartSpecAsync_MapsPromptSubmitDelayIntoSpec()
     {
         var spec = await _sut.GetTerminalStartSpecAsync("/repo");
 
         spec.PromptSubmitDelay.Should().Be(_sut.PromptSubmitDelay);
+        spec.PromptSubmitRepeatCount.Should().Be(_sut.PromptSubmitRepeatCount);
+        spec.PromptSubmitRepeatInterval.Should().Be(_sut.PromptSubmitRepeatInterval);
         spec.Capabilities.Should().HaveFlag(TerminalProviderCapabilities.RequiresPty);
     }
 

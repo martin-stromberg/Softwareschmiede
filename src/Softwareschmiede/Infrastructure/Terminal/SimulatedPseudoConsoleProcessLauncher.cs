@@ -73,6 +73,8 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
                     OutputSink = outputSink,
                     Options = _options.Value,
                     PromptSubmitDelay = spec.PromptSubmitDelay,
+                    PromptSubmitRepeatCount = spec.PromptSubmitRepeatCount,
+                    PromptSubmitRepeatInterval = spec.PromptSubmitRepeatInterval,
                 });
         }
         catch

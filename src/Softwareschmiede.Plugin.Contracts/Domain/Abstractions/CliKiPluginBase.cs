@@ -43,6 +43,15 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// <c>TimeSpan.Zero</c> (Standard) sendet Text und Submit in einem Schreibvorgang.</summary>
     public virtual TimeSpan PromptSubmitDelay => TimeSpan.Zero;
 
+    /// <summary>Anzahl zusätzlicher Submit-Versuche nach dem ersten verzögerten Submit
+    /// (<see cref="TerminalSessionStartSpec.PromptSubmitRepeatCount"/>).
+    /// <c>0</c> (Standard) sendet den Submit genau einmal.</summary>
+    public virtual int PromptSubmitRepeatCount => 0;
+
+    /// <summary>Abstand zwischen zwei Submit-Versuchen
+    /// (<see cref="TerminalSessionStartSpec.PromptSubmitRepeatInterval"/>).</summary>
+    public virtual TimeSpan PromptSubmitRepeatInterval => TimeSpan.Zero;
+
     /// <inheritdoc/>
     public Task<TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
         => Task.FromResult(BuildTerminalStartSpec(localRepoPath, parameters));
@@ -66,6 +75,8 @@ public abstract class CliKiPluginBase : IKiPlugin
             EnvironmentVariables = GetEnvironmentVariables(psi),
             Capabilities = TerminalCapabilities,
             PromptSubmitDelay = PromptSubmitDelay,
+            PromptSubmitRepeatCount = PromptSubmitRepeatCount,
+            PromptSubmitRepeatInterval = PromptSubmitRepeatInterval,
             PluginName = PluginName,
             OptionalParameters = parameters,
         };
