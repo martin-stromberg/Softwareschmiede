@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media.Animation;
+using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Domain.Entities;
 
 namespace Softwareschmiede.App.Behaviors;
@@ -41,13 +42,21 @@ public static class StatusUebergangsAnimation
         if (d is not FrameworkElement element)
             return;
 
-        if (element.DataContext is not Aufgabe aufgabe)
+        // Änderungsschlüssel ist die Aufgaben-Id - neben Aufgabe wird auch das
+        // Panel-Item der aktiven Aufgabenliste akzeptiert (Kachel-Template).
+        var aufgabeId = element.DataContext switch
+        {
+            Aufgabe aufgabe => aufgabe.Id,
+            AktiveAufgabePanelItem item => item.Id,
+            _ => (Guid?)null
+        };
+        if (aufgabeId is null)
             return;
 
-        RegistriereUnloadedBereinigung(element, aufgabe.Id);
+        RegistriereUnloadedBereinigung(element, aufgabeId.Value);
 
         var neuerStatus = (string?)e.NewValue;
-        if (!AenderungsErkennung.HatSichGeaendert(aufgabe.Id, neuerStatus))
+        if (!AenderungsErkennung.HatSichGeaendert(aufgabeId.Value, neuerStatus))
             return;
 
         var animation = new DoubleAnimation

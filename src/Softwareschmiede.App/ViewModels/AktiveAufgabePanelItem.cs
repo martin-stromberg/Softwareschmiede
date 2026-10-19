@@ -14,14 +14,35 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
     /// <summary>Titel der Aufgabe.</summary>
     public string Titel { get; init; } = string.Empty;
 
-    /// <summary>Name des zugehörigen Projekts.</summary>
-    public string ProjektName { get; init; } = string.Empty;
+    /// <summary>Name des zugehörigen Repositorys (<see cref="Domain.Entities.GitRepository.RepositoryName"/>), Fallback Projektname.</summary>
+    public string RepositoryName { get; init; } = string.Empty;
 
     /// <summary>Anzeigename des SCM-/SCI-Plugins oder gespeicherter Prefix als Fallback.</summary>
     public string? ScmPluginName { get; init; }
 
+    /// <summary>Unicode-Glyph des SCM-Plugins (ToolTip: <see cref="ScmPluginName"/>).</summary>
+    public string? ScmPluginSymbol { get; init; }
+
     /// <summary>Anzeigename des KI-Plugins oder gespeicherter Prefix als Fallback.</summary>
     public string? KiPluginName { get; init; }
+
+    /// <summary>Unicode-Glyph des KI-Plugins (ToolTip: <see cref="KiPluginName"/>).</summary>
+    public string? KiPluginSymbol { get; init; }
+
+    /// <summary>Gruppenname im Repository-Modus (Repository-Name oder <see cref="AufgabenListenAnsicht.OhneRepository"/>).</summary>
+    public string RepositoryGruppenName { get; init; } = string.Empty;
+
+    /// <summary><see langword="true"/>, wenn <see cref="RepositoryGruppenName"/> die Fallback-Gruppe ist (sortiert ans Ende).</summary>
+    public bool RepositoryGruppeIstFallback { get; init; }
+
+    /// <summary>Gruppenname im KI-Modus (Plugin-Name, roher Prefix oder <see cref="AufgabenListenAnsicht.NichtAusgefuehrt"/>).</summary>
+    public string KiGruppenName { get; init; } = string.Empty;
+
+    /// <summary><see langword="true"/>, wenn <see cref="KiGruppenName"/> die Fallback-Gruppe ist (sortiert ans Ende).</summary>
+    public bool KiGruppeIstFallback { get; init; }
+
+    /// <summary>Sortierzeitpunkt der Liste (letzte Ausführung bzw. Erstellung).</summary>
+    public DateTimeOffset SortierZeitpunkt { get; init; }
 
     /// <summary>Optionaler Laufzeit-Substatus der aktiven CLI-Ausführung.</summary>
     public AufgabeLaufStatus? LaufStatus { get; init; }

@@ -10,6 +10,12 @@ public sealed class MenuView : BaseWindowView
     private static readonly string[] ProjekteButtonNamen = [" Projekte", "Projekte"];
     private static readonly string[] EinstellungenButtonNamen = [" Einstellungen", "Einstellungen"];
 
+    /// <summary>AutomationId der Aufgabenliste in der Seitenleiste.</summary>
+    private const string AufgabenListeAutomationId = "AktiveAufgabenListeMenue";
+
+    /// <summary>Namenspräfix der Modus-Umschalter der Seitenleisten-Aufgabenliste.</summary>
+    private const string AufgabenModusPraefix = "AufgabenModus:";
+
     /// <param name="window">Das Hauptfenster der Anwendung.</param>
     public MenuView(Window window) : base(window)
     {
@@ -256,26 +262,156 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Die Aufgabendetailansicht der Zielaufgabe.</returns>
     public TaskDetailView NavigateToTask(string taskTitle)
     {
-        WaitForElement(Window, cf => cf.ByName($"AufgabeNavigieren:{taskTitle}"), Medium).AsButton().ClickInForeground();
+        WaitForElement(AktiveAufgabenListeMenueElement(), cf => cf.ByName($"AufgabeNavigieren:{taskTitle}"), Medium).AsButton().ClickInForeground();
         return new TaskDetailView(Window);
     }
 
     /// <summary>
+    /// Klappt die Navigation aus, falls sie eingeklappt ist (in der 48-px-Leiste sind die
+    /// Modus-Umschalter der Aufgabenliste verborgen). Erkennt den Zustand an der Sichtbarkeit
+    /// des 'AufgabenModus:Datum'-Umschalters.
+    /// </summary>
+    /// <returns>Diese Instanz.</returns>
+    public MenuView EnsureNavigationExpanded()
+    {
+        var deadline = DateTime.UtcNow + Medium;
+        var toggleGeklickt = false;
+        while (DateTime.UtcNow < deadline)
+        {
+            var modusButton = Window.FindFirstDescendant(cf => cf.ByName($"{AufgabenModusPraefix}Datum"));
+            if (modusButton is not null && !modusButton.IsOffscreen)
+                return this;
+
+            if (!toggleGeklickt)
+            {
+                var toggle = Window.FindFirstDescendant(
+                    cf => cf.ByName("☰").And(cf.ByControlType(ControlType.Button)));
+                if (toggle is not null)
+                {
+                    toggle.ClickInForeground();
+                    toggleGeklickt = true;
+                }
+            }
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException("Die Navigation konnte nicht ausgeklappt werden (AufgabenModus:Datum nicht sichtbar).");
+    }
+
+    /// <summary>
+    /// Schaltet den Anzeigemodus der Seitenleisten-Aufgabenliste um (Klick auf den
+    /// 'AufgabenModus:{modus}'-Umschalter). Fensterweit eindeutig, da die Dashboard-Umschalter
+    /// 'DashboardAufgabenModus:*' heißen.
+    /// </summary>
+    /// <param name="modus">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
+    /// <returns>Diese Instanz.</returns>
+    public MenuView SetzeAufgabenListenModus(string modus)
+    {
+        KlickeAufgabenModusUmschalter(AufgabenModusPraefix, modus);
+        return this;
+    }
+
+    /// <summary>
+    /// Liest die Gruppennamen der Seitenleisten-Aufgabenliste im gruppierten Modus
+    /// (UIA-Namen 'AufgabenGruppe:{Name}' der Gruppenheader, gescoped unter 'AktiveAufgabenListeMenue').
+    /// </summary>
+    /// <returns>Die Gruppennamen ohne das 'AufgabenGruppe:'-Präfix; leer im flachen Modus.</returns>
+    public string[] GetAufgabenGruppenNamen() => GetAufgabenGruppenNamen(AufgabenListeAutomationId);
+
+    /// <summary>
+    /// Wartet, bis der Gruppenheader 'AufgabenGruppe:{name}' in der Seitenleisten-Aufgabenliste
+    /// erscheint (gescoped unter 'AktiveAufgabenListeMenue').
+    /// </summary>
+    /// <param name="name">Der erwartete Gruppenname (z. B. ein Repository-Name).</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Der Gruppenheader erschien nicht rechtzeitig.</exception>
+    public MenuView WaitForAufgabenGruppe(string name, TimeSpan timeout)
+    {
+        WaitForAufgabenGruppe(AufgabenListeAutomationId, name, timeout);
+        return this;
+    }
+
+    /// <summary>
     /// Liest den in der Seitenleiste für die angegebene aktive Aufgabe angezeigten KI-Plugin-Namen
-    /// (Text "KI: {Name}").
+    /// (HelpText "KI: {Name}" - der UIA-Name des Elements ist seit der Symbolzeile der Glyph).
     /// </summary>
     /// <param name="taskTitle">Der Titel der Aufgabe.</param>
     /// <returns>Der reine Plugin-Name ohne das "KI: "-Präfix.</returns>
     public string GetActiveTaskKiPluginName(string taskTitle)
     {
-        var kiPluginText = WaitForElement(Window, cf => cf.ByAutomationId($"AktiveAufgabeKiPlugin_{taskTitle}"), Short);
-        var name = kiPluginText.Name;
-        if (name is not null && name.StartsWith("KI: ", StringComparison.Ordinal))
+        var kiPluginText = WaitForElement(
+            AktiveAufgabenListeMenueElement(),
+            cf => cf.ByAutomationId($"AktiveAufgabeKiPlugin_{taskTitle}"),
+            Short);
+        var helpText = kiPluginText.HelpText;
+        if (helpText is not null && helpText.StartsWith("KI: ", StringComparison.Ordinal))
         {
-            return name.Substring(4);
+            return helpText.Substring(4);
         }
 
-        throw new InvalidOperationException($"Für Aufgabe '{taskTitle}' wurde kein 'KI: '-Eintrag in der Seitenleiste gefunden. Gesehen: '{name}'.");
+        throw new InvalidOperationException($"Für Aufgabe '{taskTitle}' wurde kein 'KI: '-Eintrag in der Seitenleiste gefunden. Gesehen: '{helpText}'.");
+    }
+
+    /// <summary>Liest den KI-Plugin-Glyph (UIA-Name des 'AktiveAufgabeKiPlugin_{titel}'-Elements) der Kachel.</summary>
+    /// <param name="taskTitle">Der Titel der Aufgabe.</param>
+    /// <returns>Der angezeigte Glyph.</returns>
+    public string GetActiveTaskKiPluginSymbol(string taskTitle)
+        => WaitForElement(
+            AktiveAufgabenListeMenueElement(),
+            cf => cf.ByAutomationId($"AktiveAufgabeKiPlugin_{taskTitle}"),
+            Short).Name;
+
+    /// <summary>Liest den SCM-Plugin-Glyph (UIA-Name des 'AktiveAufgabeScmPlugin_{titel}'-Elements) der Kachel.</summary>
+    /// <param name="taskTitle">Der Titel der Aufgabe.</param>
+    /// <returns>Der angezeigte Glyph.</returns>
+    public string GetActiveTaskScmPluginSymbol(string taskTitle)
+        => WaitForElement(
+            AktiveAufgabenListeMenueElement(),
+            cf => cf.ByAutomationId($"AktiveAufgabeScmPlugin_{taskTitle}"),
+            Short).Name;
+
+    /// <summary>
+    /// Liest den Status-Glyph der Kachel. Der UIA-Name des Elements 'AufgabeStatus:{titel}' ist der
+    /// E2E-Anker selbst - der sichtbare Text (Glyph) wird daher über das TextPattern gelesen.
+    /// </summary>
+    /// <param name="taskTitle">Der Titel der Aufgabe.</param>
+    /// <returns>Der angezeigte Status-Glyph (z. B. "▶", "⏸", "✓").</returns>
+    public string GetActiveTaskStatusGlyph(string taskTitle)
+    {
+        var element = WaitForElement(
+            AktiveAufgabenListeMenueElement(),
+            cf => cf.ByName($"AufgabeStatus:{taskTitle}"),
+            Short);
+        if (element.Patterns.Text.IsSupported)
+        {
+            return element.Patterns.Text.Pattern.DocumentRange.GetText(-1);
+        }
+
+        // Fallback: AutomationId-Element ohne Name-Überschreibung lesen.
+        var glyphElement = AktiveAufgabenListeMenueElement()
+            .FindFirstDescendant(cf => cf.ByAutomationId($"AktiveAufgabeStatusGlyph_{taskTitle}"));
+        return glyphElement?.Name ?? string.Empty;
+    }
+
+    /// <summary>Klickt den 'OffeneTodos:{titel}'-Button innerhalb der Kachel (verschachtelter Button, löst keine Kachel-Navigation aus).</summary>
+    /// <param name="taskTitle">Der Titel der Aufgabe.</param>
+    /// <returns>Diese Instanz.</returns>
+    public MenuView KlickeOffeneTodosButton(string taskTitle)
+    {
+        WaitForElement(
+            AktiveAufgabenListeMenueElement(),
+            cf => cf.ByName($"OffeneTodos:{taskTitle}"),
+            Medium).ClickInForeground();
+        return this;
+    }
+
+    private AutomationElement AktiveAufgabenListeMenueElement()
+    {
+        var menue = Window.FindFirstDescendant(cf => cf.ByAutomationId(AufgabenListeAutomationId));
+        return menue ?? throw new InvalidOperationException(
+            $"Das Element '{AufgabenListeAutomationId}' wurde im Hauptfenster nicht gefunden.");
     }
 
     /// <summary>
@@ -293,7 +429,7 @@ public sealed class MenuView : BaseWindowView
         string? lastStatus = null;
         while (DateTime.UtcNow < deadline)
         {
-            var statusElement = Window.FindFirstDescendant(cf => cf.ByName($"AufgabeStatus:{taskTitle}"));
+            var statusElement = AktiveAufgabenListeMenueElement().FindFirstDescendant(cf => cf.ByName($"AufgabeStatus:{taskTitle}"));
             lastStatus = statusElement?.HelpText;
             if (lastStatus == expectedStatus)
                 return this;
@@ -399,7 +535,17 @@ public sealed class MenuView : BaseWindowView
     {
         foreach (var name in names)
         {
-            var button = Window.FindFirstDescendant(cf => cf.ByName(name).And(cf.ByControlType(ControlType.Button)));
+            AutomationElement? button;
+            try
+            {
+                button = Window.FindFirstDescendant(cf => cf.ByName(name).And(cf.ByControlType(ControlType.Button)));
+            }
+            catch (System.Runtime.InteropServices.COMException)
+            {
+                // UIA-Provider des Fensters transient nicht erreichbar - die
+                // Warteschleife versucht es erneut statt hart zu scheitern.
+                return null;
+            }
             if (button is not null)
                 return button;
         }

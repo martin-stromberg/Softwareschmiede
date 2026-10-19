@@ -59,15 +59,37 @@
 
         <!-- Aktive Aufgaben -->
         <StackPanel Grid.Row="2" Margin="0,0,0,24">
-            <TextBlock Text="Aktive Aufgaben"
-                       FontSize="16"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource PrimaryTextBrush}"
-                       Margin="0,0,0,8" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="Aktive Aufgaben"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center">
+                    <RadioButton GroupName="DashboardAufgabenModus"
+                                 Content="Datum"
+                                 IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Datum}"
+                                 AutomationProperties.Name="DashboardAufgabenModus:Datum"
+                                 ToolTip="Flache Liste, sortiert nach letzter Ausführung"
+                                 Margin="0,0,8,0" />
+                    <RadioButton GroupName="DashboardAufgabenModus"
+                                 Content="Repository"
+                                 IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Repository}"
+                                 AutomationProperties.Name="DashboardAufgabenModus:Repository"
+                                 ToolTip="Gruppiert nach Repository-Name"
+                                 Margin="0,0,8,0" />
+                    <RadioButton GroupName="DashboardAufgabenModus"
+                                 Content="KI"
+                                 IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Ki}"
+                                 AutomationProperties.Name="DashboardAufgabenModus:KI"
+                                 ToolTip="Gruppiert nach aktiver bzw. zuletzt verwendeter KI" />
+                </StackPanel>
+            </StackPanel>
 
             <controls:ActiveTasksListControl ItemsSource="{Binding AktiveAufgabenListe}"
                                               NavigateCommand="{Binding NavigateZuAufgabeCommand}"
-                                              ShowNavigationButton="False" />
+                                              ListenModus="{Binding AufgabenListenModus}"
+                                              AutomationProperties.AutomationId="AktiveAufgabenListeDashboard" />
         </StackPanel>
 
         <!-- Recovery-Banner -->

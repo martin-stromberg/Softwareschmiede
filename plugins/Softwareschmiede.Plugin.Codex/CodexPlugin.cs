@@ -29,6 +29,9 @@ public sealed class CodexPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
     public override PluginType PluginType => PluginType.DevelopmentAutomation;
 
     /// <inheritdoc/>
+    public override string PluginSymbol => "◈";
+
+    /// <inheritdoc/>
     public override TerminalProviderCapabilities TerminalCapabilities =>
         TerminalProviderCapabilities.RequiresPty | TerminalProviderCapabilities.SupportsPty;
 

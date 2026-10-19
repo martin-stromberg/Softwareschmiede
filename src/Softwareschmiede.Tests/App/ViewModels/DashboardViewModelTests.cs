@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -42,8 +44,9 @@ public sealed class DashboardViewModelTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    private DashboardViewModel CreateSut() =>
-        new(_projektService, _aufgabeService, _recoveryService, NullLogger<DashboardViewModel>.Instance);
+    private DashboardViewModel CreateSut(AufgabenListenModusService? aufgabenListenModusService = null) =>
+        new(_projektService, _aufgabeService, _recoveryService, NullLogger<DashboardViewModel>.Instance,
+            aufgabenListenModusService);
 
     /// <summary>Initialize setzt AktiveAufgabenListe auf die übergebene Instanz, um die gemeinsame Datenquelle des MainWindowViewModel zu übernehmen.</summary>
     [Fact]
@@ -108,5 +111,83 @@ public sealed class DashboardViewModelTests : IDisposable
 
         // Assert
         act.Should().NotThrow();
+    }
+
+    /// <summary>AufgabenListenModus startet mit dem Default Datum.</summary>
+    [Fact]
+    public void AufgabenListenModus_ShouldDefaultToDatum()
+    {
+        var sut = CreateSut();
+
+        sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Datum);
+    }
+
+    /// <summary>AufgabenListenModus ist setzbar und löst PropertyChanged aus.</summary>
+    [Fact]
+    public void AufgabenListenModus_ShouldBeSettableAndRaisePropertyChanged()
+    {
+        var sut = CreateSut();
+        var geaendert = new List<string?>();
+        sut.PropertyChanged += (_, e) => geaendert.Add(e.PropertyName);
+
+        sut.AufgabenListenModus = AufgabenListenModus.Repository;
+
+        sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Repository);
+        geaendert.Should().Contain(nameof(DashboardViewModel.AufgabenListenModus));
+    }
+
+    /// <summary>Ein persistierter Dashboard-Modus wird über GespeichertenAufgabenListenModusLadenAsync wiederhergestellt.</summary>
+    [Fact]
+    public async Task AufgabenListenModus_ShouldRestorePersistedDashboardModus()
+    {
+        // Arrange
+        var (modusService, provider) = AufgabenListenModusServiceTestFactory.ErstelleModusService();
+        using (provider)
+        {
+            using (var scope = provider.CreateScope())
+            {
+                var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+                await einstellungen.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey, "Ki");
+            }
+
+            var sut = CreateSut(modusService);
+
+            // Act
+            await sut.GespeichertenAufgabenListenModusLadenAsync();
+
+            // Assert
+            sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Ki);
+        }
+    }
+
+    /// <summary>Eine Modusänderung wird unter dem Dashboard-Schlüssel persistiert und lässt den Menü-Schlüssel unberührt.</summary>
+    [Fact]
+    public async Task AufgabenListenModus_ShouldPersistDashboardModusOnChange_WithoutTouchingMenueKey()
+    {
+        // Arrange
+        var (modusService, provider) = AufgabenListenModusServiceTestFactory.ErstelleModusService();
+        using (provider)
+        {
+            var sut = CreateSut(modusService);
+
+            // Act
+            sut.AufgabenListenModus = AufgabenListenModus.Repository;
+
+            // Assert (Polling, da das Speichern fire-and-forget läuft)
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            string? wert = null;
+            string? menueWert = null;
+            while (DateTime.UtcNow < deadline && wert != "Repository")
+            {
+                using var scope = provider.CreateScope();
+                var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+                wert = await einstellungen.GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey);
+                menueWert = await einstellungen.GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey);
+                if (wert != "Repository")
+                    await Task.Delay(50);
+            }
+            wert.Should().Be("Repository");
+            menueWert.Should().BeNull("der Dashboard-Moduswechsel darf den Menü-Schlüssel nicht schreiben");
+        }
     }
 }

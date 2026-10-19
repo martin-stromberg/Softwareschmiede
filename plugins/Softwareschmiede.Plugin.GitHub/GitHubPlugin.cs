@@ -32,6 +32,9 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     public override PluginType PluginType => PluginType.SourceCodeManagement;
 
     /// <inheritdoc/>
+    public override string PluginSymbol => "🐙";
+
+    /// <inheritdoc/>
     public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
     [
         new PluginSettingGroup("Authentifizierung",

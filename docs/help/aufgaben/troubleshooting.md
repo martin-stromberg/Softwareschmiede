@@ -53,7 +53,7 @@
 
 ## Aufgabe lässt sich nicht starten („pausiert")
 
-**Symptom:** **Starten**, **CLI neu starten** oder **Wiederherstellen** sind deaktiviert bzw. schlagen mit „Die Aufgabe ist bis … pausiert." fehl; die Kachel in der Seitenleiste zeigt „⏸ Pausiert (noch …)".
+**Symptom:** **Starten**, **CLI neu starten** oder **Wiederherstellen** sind deaktiviert bzw. schlagen mit „Die Aufgabe ist bis … pausiert." fehl; die Kachel in der Seitenleiste zeigt das `⏸`-Symbol (abgeblendet; Countdown „⏸ Pausiert (noch …)" im Tooltip).
 
 **Ursache:** Für die Aufgabe ist eine Pause aktiv — entweder manuell über **Pause einstellen** gesetzt oder automatisch durch ein Session-Limit des verwendeten KI-Plugins.
 
