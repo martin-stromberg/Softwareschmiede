@@ -15,13 +15,17 @@ public static class TestPseudoConsoleSessionFactory
     /// <param name="options">Optionale <see cref="TerminalSessionOptions"/>-Einstellungen (Default: <c>new()</c>) —
     /// Test-Doubles ohne <c>IOptions</c>-Injektion.</param>
     /// <param name="promptSubmitDelay">Optionale Submit-Verzögerung (<see cref="PseudoConsoleSessionContext.PromptSubmitDelay"/>).</param>
+    /// <param name="promptSubmitRepeatCount">Optionale Submit-Wiederholungen (<see cref="PseudoConsoleSessionContext.PromptSubmitRepeatCount"/>).</param>
+    /// <param name="promptSubmitRepeatInterval">Abstand der Submit-Wiederholungen (<see cref="PseudoConsoleSessionContext.PromptSubmitRepeatInterval"/>).</param>
     public static PseudoConsoleSession Create(
         Stream inputStream,
         Stream outputStream,
         ILogger? logger = null,
         ITerminalOutputSink? outputSink = null,
         TerminalSessionOptions? options = null,
-        TimeSpan promptSubmitDelay = default)
+        TimeSpan promptSubmitDelay = default,
+        int promptSubmitRepeatCount = 0,
+        TimeSpan promptSubmitRepeatInterval = default)
         => new(
             NullPseudoConsoleHandle.Instance,
             Process.GetCurrentProcess(),
@@ -33,6 +37,8 @@ public static class TestPseudoConsoleSessionFactory
                 OutputSink = outputSink,
                 Options = options ?? new TerminalSessionOptions(),
                 PromptSubmitDelay = promptSubmitDelay,
+                PromptSubmitRepeatCount = promptSubmitRepeatCount,
+                PromptSubmitRepeatInterval = promptSubmitRepeatInterval,
             });
 
     /// <summary>Erstellt eine Session mit kontrollierbarer Zeitquelle und No-Op-PseudoConsole.</summary>

@@ -32,4 +32,11 @@ internal sealed record PseudoConsoleSessionContext
     /// abschließenden Submit als separaten Eingabe-Batch sendet; <c>TimeSpan.Zero</c>
     /// (Standard) schreibt Text und Submit in einem Vorgang.</summary>
     public TimeSpan PromptSubmitDelay { get; init; } = TimeSpan.Zero;
+
+    /// <summary>Anzahl zusätzlicher Submit-Versuche nach dem ersten verzögerten Submit;
+    /// wirkt nur bei gesetztem <see cref="PromptSubmitDelay"/> (<c>0</c> = genau ein Submit).</summary>
+    public int PromptSubmitRepeatCount { get; init; }
+
+    /// <summary>Abstand zwischen zwei Submit-Versuchen bei <see cref="PromptSubmitRepeatCount"/> &gt; 0.</summary>
+    public TimeSpan PromptSubmitRepeatInterval { get; init; } = TimeSpan.Zero;
 }

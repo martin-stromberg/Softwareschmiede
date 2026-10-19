@@ -42,6 +42,8 @@ public sealed class PseudoConsoleSession : ITerminalSession
     private DateTimeOffset? _lastOutputUtc;
     private DateTimeOffset? _lastInputUtc;
     private readonly TimeSpan _promptSubmitDelay;
+    private readonly int _promptSubmitRepeatCount;
+    private readonly TimeSpan _promptSubmitRepeatInterval;
 
     /// <summary>Schreibbarer Stream für Tastatureingaben an den Prozess.</summary>
     public Stream InputStream { get; }
@@ -125,6 +127,8 @@ public sealed class PseudoConsoleSession : ITerminalSession
         _logger = context?.Logger ?? NullLogger.Instance;
         _outputSink = context?.OutputSink;
         _promptSubmitDelay = context?.PromptSubmitDelay ?? TimeSpan.Zero;
+        _promptSubmitRepeatCount = Math.Max(0, context?.PromptSubmitRepeatCount ?? 0);
+        _promptSubmitRepeatInterval = context?.PromptSubmitRepeatInterval ?? TimeSpan.Zero;
         IsPseudoTerminal = context?.IsPseudoTerminal ?? false;
         Buffer = new TerminalBuffer(effectiveOptions.DefaultCols, effectiveOptions.DefaultRows);
         _replayBuffer = new TerminalReplayBuffer(effectiveOptions.ReplayBufferByteBudget);
@@ -498,8 +502,15 @@ public sealed class PseudoConsoleSession : ITerminalSession
     /// erst nach dieser Verzögerung als eigener, separat geflusher Eingabe-Batch gesendet: CLIs wie die
     /// Devin CLI werten ein <c>\r</c>, das im selben Eingabe-Read wie der Prompttext ankommt, nicht als
     /// Enter-Submit, sondern als Zeilenumbruch (Paste-Semantik); erst ein zeitlich getrenntes CR wird als
-    /// Tastatur-Enter erkannt. Die Eingabesperre wird über beide Schreibvorgänge und die Verzögerung
-    /// gehalten, damit kein Fremdinput zwischen Text und Submit rutschen kann.</remarks>
+    /// Tastatur-Enter erkannt. Ist zusätzlich <see cref="PseudoConsoleSessionContext.PromptSubmitRepeatCount"/>
+    /// gesetzt, wird der Submit-<c>\r</c> im Abstand von
+    /// <see cref="PseudoConsoleSessionContext.PromptSubmitRepeatInterval"/> wiederholt: Das für einen
+    /// Submit nötige Abstands-Fenster wächst bei diesen CLIs mit der Eingabegröße (ein zu frühes CR wird
+    /// im Burst als Zeilenumbruch verwirkt) und ist kein fester Wert — ein verschluckter Versuch ist dabei
+    /// harmlos (zusätzlicher Zeilenumbruch im Entwurf), während jeder spätere Versuch den Entwurf
+    /// zuverlässig absendet; trifft eine Wiederholung auf einen bereits erfolgten Submit, wirkt sie wie
+    /// Enter auf leerem bzw. bearbeitendem Prompt und wird ignoriert. Die Eingabesperre wird über Text,
+    /// Verzögerung und alle Submit-Versuche gehalten, damit kein Fremdinput dazwischen rutschen kann.</remarks>
     /// <param name="prompt">Der zu sendende Prompttext.</param>
     /// <param name="ct">Abbruch-Token.</param>
     public async Task WritePromptAsync(string prompt, CancellationToken ct)
@@ -521,7 +532,12 @@ public sealed class PseudoConsoleSession : ITerminalSession
 
             await WriteInputChunksCoreAsync(textBytes, ct).ConfigureAwait(false);
             await Task.Delay(_promptSubmitDelay, ct).ConfigureAwait(false);
-            await WriteInputChunksCoreAsync(SubmitBytes, ct).ConfigureAwait(false);
+            for (var attempt = 0; attempt <= _promptSubmitRepeatCount; attempt++)
+            {
+                if (attempt > 0)
+                    await Task.Delay(_promptSubmitRepeatInterval, ct).ConfigureAwait(false);
+                await WriteInputChunksCoreAsync(SubmitBytes, ct).ConfigureAwait(false);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
