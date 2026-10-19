@@ -336,6 +336,7 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<IRunningAutomationStatusSource>(sp =>
             sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<DarkModeService>();
+        services.AddSingleton<AufgabenListenModusService>();
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<ICliRawExportService, CliRawExportService>();
         services.AddSingleton<CliReplayAufzeichnungStore>();
@@ -358,7 +359,8 @@ public sealed partial class App : System.Windows.Application
             DialogService: sp.GetService<IDialogService>(),
             VersionProvider: sp.GetService<IApplicationVersionProvider>(),
             LaufdatenChangedNotifier: sp.GetService<AufgabeLaufdatenChangedNotifier>(),
-            UpdateDienste: sp.GetService<MainWindowUpdateDienste>()));
+            UpdateDienste: sp.GetService<MainWindowUpdateDienste>(),
+            AufgabenListenModusService: sp.GetService<AufgabenListenModusService>()));
 
         // Plugin Infrastructure
         services.AddSingleton<PluginManager>();

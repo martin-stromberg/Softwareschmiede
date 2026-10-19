@@ -90,21 +90,26 @@ public static class WindowExtensions
         var desktop = window.Automation.GetDesktop();
         return desktop
             .FindAllDescendants(cf => cf.ByControlType(ControlType.Window))
-            .Where(w =>
+            .Select(w =>
             {
                 try
                 {
-                    _ = w.Name;
-                    return true;
+                    return w.Name;
                 }
                 catch (FlaUI.Core.Exceptions.PropertyNotSupportedException)
                 {
-                    return false;
+                    return null;
+                }
+                catch (System.Runtime.InteropServices.COMException)
+                {
+                    // Element-Provider zwischen Enumeration und Property-Zugriff gestorben oder
+                    // Timeout (z. B. gerade geschlossenes Popup-/Tooltip-Fenster) - Fenster
+                    // überspringen.
+                    return null;
                 }
             })
-            .Select(w => w.Name)
             .Where(name => !string.IsNullOrWhiteSpace(name))
-            .ToHashSet(StringComparer.Ordinal);
+            .ToHashSet(StringComparer.Ordinal)!;
     }
 
     private static InvalidOperationException BuildUnrecognizedViewException(Window window)

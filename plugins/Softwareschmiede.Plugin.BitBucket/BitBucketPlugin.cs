@@ -36,6 +36,9 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override PluginType PluginType => PluginType.SourceCodeManagement;
 
+    /// <inheritdoc/>
+    public override string PluginSymbol => "🪣";
+
     /// <inheritdoc cref="BitbucketPlugin"/>
     public BitbucketPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<BitbucketPlugin> logger)
         : base(cliRunner)

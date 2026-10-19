@@ -26,6 +26,9 @@ public sealed class KiSimulatorPlugin : CliKiPluginBase, IIssueTemplateTextGener
     /// <inheritdoc/>
     public override PluginType PluginType => PluginType.DevelopmentAutomation;
 
+    /// <inheritdoc/>
+    public override string PluginSymbol => "🧪";
+
     /// <summary>Erstellt eine neue Instanz von <see cref="KiSimulatorPlugin"/>.</summary>
     public KiSimulatorPlugin(ILogger<KiSimulatorPlugin> logger)
     {

@@ -123,12 +123,38 @@
                             Background="{DynamicResource BorderBrush}"
                             Margin="8,8" />
 
-                    <!-- Sektion: Aktive Aufgaben -->
-                    <TextBlock Text="Aktive Aufgaben"
-                               FontSize="11"
-                               Foreground="{DynamicResource SecondaryTextBrush}"
-                               Margin="8,8,8,4"
-                               Visibility="{Binding IsDashboardVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                    <!-- Sektion: Aktive Aufgaben (Titel und Modus-Umschalter in getrennten Zeilen,
+                         damit sich beide bei 240 px Seitenleistenbreite nicht überlappen) -->
+                    <StackPanel Visibility="{Binding IsDashboardVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                        <TextBlock Text="Aktive Aufgaben"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   Margin="8,8,8,2" />
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="8,0,8,4"
+                                    Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <RadioButton GroupName="AufgabenModus"
+                                         Content="Datum"
+                                         IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Datum}"
+                                         AutomationProperties.Name="AufgabenModus:Datum"
+                                         ToolTip="Flache Liste, sortiert nach letzter Ausführung"
+                                         FontSize="11"
+                                         Margin="0,0,8,0" />
+                            <RadioButton GroupName="AufgabenModus"
+                                         Content="Repository"
+                                         IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Repository}"
+                                         AutomationProperties.Name="AufgabenModus:Repository"
+                                         ToolTip="Gruppiert nach Repository-Name"
+                                         FontSize="11"
+                                         Margin="0,0,8,0" />
+                            <RadioButton GroupName="AufgabenModus"
+                                         Content="KI"
+                                         IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Ki}"
+                                         AutomationProperties.Name="AufgabenModus:KI"
+                                         ToolTip="Gruppiert nach aktiver bzw. zuletzt verwendeter KI"
+                                         FontSize="11" />
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
 
                 <ScrollViewer Grid.Row="1"
@@ -136,7 +162,9 @@
                               HorizontalScrollBarVisibility="Disabled"
                               Visibility="{Binding IsDashboardVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                     <controls:ActiveTasksListControl ItemsSource="{Binding AktiveAufgabenListe}"
-                                                      NavigateCommand="{Binding NavigateZuAufgabeCommand}" />
+                                                      NavigateCommand="{Binding NavigateZuAufgabeCommand}"
+                                                      ListenModus="{Binding AufgabenListenModus}"
+                                                      AutomationProperties.AutomationId="AktiveAufgabenListeMenue" />
                 </ScrollViewer>
 
                 <StackPanel Grid.Row="2"

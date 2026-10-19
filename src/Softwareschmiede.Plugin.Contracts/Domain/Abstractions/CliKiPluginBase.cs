@@ -20,6 +20,9 @@ public abstract class CliKiPluginBase : IKiPlugin
     public abstract PluginType PluginType { get; }
     public abstract IReadOnlyList<PluginSettingGroup> GetSettingGroups();
 
+    /// <inheritdoc/>
+    public virtual string PluginSymbol => IPlugin.FallbackSymbol;
+
     /// <summary>Konstruiert ProcessStartInfo für den CLI-Aufruf.</summary>
     /// <param name="localRepoPath">Lokales Arbeitsverzeichnis.</param>
     /// <param name="parameters">Optionale Parameter (z.B. Session-ID).</param>

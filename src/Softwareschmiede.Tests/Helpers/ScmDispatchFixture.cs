@@ -40,6 +40,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal readonly Mock<IGitPlugin> Git = new();
     internal readonly Mock<IKiPlugin> Ki = new();
     internal readonly Dictionary<Guid, Mock<ITerminalSession>> Sessions = new();
+    internal readonly List<TerminalSessionStartSpec> StartSpecs = [];
     internal readonly List<string> Prompts = [];
     internal readonly List<ScmResponseRequest> Responses = [];
     internal readonly ScmEventRepository Repository = new("test-scm", "github.com", "R_1", "owner", "repo", "U_1", "U_1", "owner", true);
@@ -69,6 +70,10 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
             .ReturnsAsync((PullRequest?)null);
         Git.As<IScmEventResponder>().Setup(x => x.ExecuteResponseAsync(It.IsAny<ScmResponseRequest>(), It.IsAny<CancellationToken>()))
             .Returns((ScmResponseRequest request, CancellationToken _) => { Responses.Add(request); return Task.FromResult(new ScmResponseResult("remote", null, false)); });
+        // As<> muss vor dem ersten Git.Object-Zugriff erfolgen; Tests können die leere
+        // Standard-Anbindung mit eigenem Setup überschreiben.
+        Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, string?>());
         Git.Setup(x => x.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(async (string _, string directory, CancellationToken _) =>
             {
@@ -95,8 +100,9 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         directories.Setup(x => x.ResolveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Root, false, "test", Root));
         var factory = new Mock<ITerminalSessionFactory>();
         factory.Setup(x => x.StartAsync(It.IsAny<Guid>(), It.IsAny<TerminalSessionStartSpec>(), It.IsAny<ITerminalOutputSink?>(), It.IsAny<Func<CancellationToken, Task<bool>>?>(), It.IsAny<CancellationToken>()))
-            .Returns((Guid taskId, TerminalSessionStartSpec _, ITerminalOutputSink? _, Func<CancellationToken, Task<bool>>? _, CancellationToken _) =>
+            .Returns((Guid taskId, TerminalSessionStartSpec spec, ITerminalOutputSink? _, Func<CancellationToken, Task<bool>>? _, CancellationToken _) =>
             {
+                StartSpecs.Add(spec);
                 var process = Process.Start(new ProcessStartInfo("cmd.exe", "/c ping -n 300 127.0.0.1 > nul") { UseShellExecute = false, CreateNoWindow = true })!;
                 _processes.Add(process);
                 var session = new Mock<ITerminalSession>();

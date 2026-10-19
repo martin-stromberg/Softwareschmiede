@@ -31,6 +31,9 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase, IIssueTemplateTextGen
     public override PluginType PluginType => PluginType.DevelopmentAutomation;
 
     /// <inheritdoc/>
+    public override string PluginSymbol => "✈";
+
+    /// <inheritdoc/>
     public override TerminalProviderCapabilities TerminalCapabilities =>
         TerminalProviderCapabilities.RequiresPty | TerminalProviderCapabilities.SupportsPty;
 

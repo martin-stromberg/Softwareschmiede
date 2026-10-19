@@ -1,7 +1,9 @@
 using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
+using Softwareschmiede.App.ViewModels;
 
 namespace Softwareschmiede.App.Controls;
 
@@ -14,7 +16,7 @@ public sealed partial class ActiveTasksListControl : UserControl
             nameof(ItemsSource),
             typeof(IEnumerable),
             typeof(ActiveTasksListControl),
-            new PropertyMetadata(null));
+            new PropertyMetadata(null, OnItemsSourceChanged));
 
     /// <summary>Dependency Property für den Navigations-Command.</summary>
     public static readonly DependencyProperty NavigateCommandProperty =
@@ -24,13 +26,18 @@ public sealed partial class ActiveTasksListControl : UserControl
             typeof(ActiveTasksListControl),
             new PropertyMetadata(null));
 
-    /// <summary>Dependency Property für die Anzeige des Navigations-Buttons.</summary>
-    public static readonly DependencyProperty ShowNavigationButtonProperty =
+    /// <summary>Dependency Property für den Anzeigemodus der Liste (flach oder gruppiert).</summary>
+    public static readonly DependencyProperty ListenModusProperty =
         DependencyProperty.Register(
-            nameof(ShowNavigationButton),
-            typeof(bool),
+            nameof(ListenModus),
+            typeof(AufgabenListenModus),
             typeof(ActiveTasksListControl),
-            new PropertyMetadata(true));
+            new PropertyMetadata(AufgabenListenModus.Datum, OnListenModusChanged));
+
+    // Instanz-eigene Collection-View: Die ItemsSource wird zwischen Seitenleiste und Dashboard
+    // geteilt - CollectionViewSource.GetDefaultView wäre eine gemeinsame Default-View und würde
+    // die Gruppierung einer Ansicht in die andere leaken.
+    private ListCollectionView? _view;
 
     /// <summary>Die anzuzeigenden aktiven Aufgaben.</summary>
     public IEnumerable? ItemsSource
@@ -46,17 +53,50 @@ public sealed partial class ActiveTasksListControl : UserControl
         set => SetValue(NavigateCommandProperty, value);
     }
 
-    /// <summary>Gibt an, ob der separate Navigations-Button angezeigt wird. Wenn <c>false</c>, ist stattdessen die gesamte Kachel klickbar.</summary>
-    public bool ShowNavigationButton
+    /// <summary>Der Anzeigemodus der Liste (flach nach Datum oder gruppiert nach Repository/KI).</summary>
+    public AufgabenListenModus ListenModus
     {
-        get => (bool)GetValue(ShowNavigationButtonProperty);
-        set => SetValue(ShowNavigationButtonProperty, value);
+        get => (AufgabenListenModus)GetValue(ListenModusProperty);
+        set => SetValue(ListenModusProperty, value);
     }
 
     /// <inheritdoc cref="ActiveTasksListControl"/>
     public ActiveTasksListControl()
     {
         InitializeComponent();
+    }
+
+    private static void OnItemsSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var control = (ActiveTasksListControl)d;
+        control.ErstelleAnsicht(e.NewValue);
+    }
+
+    private static void OnListenModusChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var control = (ActiveTasksListControl)d;
+        if (control._view is not null)
+        {
+            AufgabenListenAnsicht.Konfiguriere(control._view, (AufgabenListenModus)e.NewValue);
+        }
+    }
+
+    private void ErstelleAnsicht(object? itemsSource)
+    {
+        if (itemsSource is IList liste)
+        {
+            _view = new ListCollectionView(liste);
+            AufgabenListenAnsicht.Konfiguriere(_view, ListenModus);
+        }
+        else
+        {
+            _view = null;
+        }
+
+        // Die View wird direkt zugewiesen (nicht über ein ItemsSource-Binding am ItemsControl):
+        // Ein Binding auf die gemeinsame Auflistung würde die Default-View verwenden, auf der
+        // die Sort-/Gruppendeskriptoren dieser Instanz nicht liegen.
+        AufgabenItemsControl.ItemsSource = _view ?? (IEnumerable?)itemsSource;
     }
 
     private void OffeneTodosButton_Click(object sender, RoutedEventArgs e)

@@ -32,7 +32,11 @@ Die automatische Aufgabenanlage erfolgt **auch dann, wenn keine Standard-CLI auf
 
 ## Zustellung und Abschluss
 
-Kommentare erhalten eine Empfangsreaktion, Beschreibungen nicht. Eine erfolgreiche Prompt-Eingabe markiert ausschließlich die Zustellung. „Verarbeitet“ setzt korrelierte KI-Annahme, Abschluss und Erfolg aller angeforderten Remote-Aktionen voraus. Nach einem ungewissen Schreibversuch erfolgt kein automatischer Neuversand; die UI verlangt dafür eine bestätigte Warnung.
+Kommentare erhalten eine Empfangsreaktion, Beschreibungen nicht. Eine erfolgreiche Prompt-Eingabe markiert ausschließlich die Zustellung. „Verarbeitet“ setzt korrelierte KI-Annahme und einen korrelierten Abschluss voraus — entweder mit den Kennungen erfolgreich ausgeführter Kanalaktionen, mit einem nicht leeren `report`-Ergebnisbericht über vom Agenten selbst ausgeführte Remoteaktionen (z. B. Admin-Merge, Review, Push), oder begründet ohne Remoteaktion (`noRemoteAction`). Ein belegloser Abschluss ohne Aktionen, Bericht oder Begründung ist ein Protokollfehler und lässt den Eintrag ungeklärt. Nach einem ungewissen Schreibversuch erfolgt kein automatischer Neuversand; die UI verlangt dafür eine bestätigte Warnung.
+
+## Agenten-SCM-Anbindung und Berechtigungen
+
+Beim Start einer CLI-Sitzung ergänzt der Host die vom Repository-SCM-Plugin bereitgestellte Agenten-Anbindung (`IScmAgentAccess`) in der Prozessumgebung des CLI-Kindprozesses. Das GitHub-Plugin liefert dafür `GH_TOKEN` (derselbe Personal Access Token wie für die eigenen `gh`-Aufrufe der Anwendung), einen auf `github.com` beschränkten `http.extraheader`-Eintrag für HTTPS-git-Operationen sowie `GIT_TERMINAL_PROMPT=0`. Diese Werte werden ausschließlich als Prozessumgebung übergeben — niemals in Prompts, Protokollen, Ausgabesenken oder Persistenz. Eine fehlende oder fehlschlagende Anbindung blockiert den regulären CLI-Start nicht; ohne Token erhält die Sitzung nur das deaktivierte Credential-Prompt. Der Aktionsumfang des Agenten bleibt damit exakt durch die Berechtigungen des konfigurierten Tokens und die Repository-Rechte begrenzt — derselbe `CanWrite`-/Owner-Check, der die Zustellung erlaubt, deckt auch die vom Agenten ausgeführten Aktionen. Die gh-CLI selbst muss für die Agenten-Sitzung erreichbar sein (PATH); die Anwendung ändert daran nichts.
 
 ## Abbruch durch den Anwender
 

@@ -10,31 +10,52 @@
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource PrimaryTextBrush}"
                            TextTrimming="CharacterEllipsis" />
-                <TextBlock Text="{Binding ProjektName}"
+                <TextBlock Text="{Binding RepositoryName}"
                            FontSize="11"
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            TextTrimming="CharacterEllipsis"
                            Margin="0,2,0,0" />
-                <TextBlock Text="{Binding ScmPluginName, StringFormat=SCM: {0}}"
-                           FontSize="10"
-                           Foreground="{DynamicResource SecondaryTextBrush}"
-                           TextTrimming="CharacterEllipsis"
-                           Visibility="{Binding ScmPluginName, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
-                           Margin="0,4,0,0" />
-                <TextBlock Text="{Binding KiPluginName, StringFormat=KI: {0}}"
-                           FontSize="10"
-                           Foreground="{DynamicResource SecondaryTextBrush}"
-                           TextTrimming="CharacterEllipsis"
-                           Visibility="{Binding KiPluginName, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
-                           AutomationProperties.AutomationId="{Binding Titel, StringFormat=AktiveAufgabeKiPlugin_{0}}"
-                           Margin="0,1,0,0" />
-                <TextBlock Text="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
-                           FontSize="11"
-                           Foreground="{DynamicResource SecondaryTextBrush}"
-                           Margin="0,4,0,0"
-                           AutomationProperties.Name="{Binding Titel, StringFormat=AufgabeStatus:{0}}"
-                           AutomationProperties.HelpText="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
-                           behaviors:StatusUebergangsAnimation.Status="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}" />
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <TextBlock Text="{Binding ScmPluginSymbol}"
+                               FontSize="13"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               Margin="0,0,8,0"
+                               ToolTip="{Binding ScmPluginName, StringFormat=SCM: {0}}"
+                               AutomationProperties.AutomationId="{Binding Titel, StringFormat=AktiveAufgabeScmPlugin_{0}}"
+                               AutomationProperties.HelpText="{Binding ScmPluginName, StringFormat=SCM: {0}}"
+                               Visibility="{Binding ScmPluginSymbol, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                    <TextBlock Text="{Binding KiPluginSymbol}"
+                               FontSize="13"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               Margin="0,0,8,0"
+                               ToolTip="{Binding KiPluginName, StringFormat=KI: {0}}"
+                               AutomationProperties.AutomationId="{Binding Titel, StringFormat=AktiveAufgabeKiPlugin_{0}}"
+                               AutomationProperties.HelpText="{Binding KiPluginName, StringFormat=KI: {0}}"
+                               Visibility="{Binding KiPluginSymbol, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                    <TextBlock Text="{Binding ., Converter={StaticResource KiAusfuehrungsStatusSymbolConverter}}"
+                               FontSize="13"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               Margin="0,0,8,0"
+                               ToolTip="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
+                               AutomationProperties.AutomationId="{Binding Titel, StringFormat=AktiveAufgabeStatusGlyph_{0}}"
+                               AutomationProperties.Name="{Binding Titel, StringFormat=AufgabeStatus:{0}}"
+                               AutomationProperties.HelpText="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
+                               behaviors:StatusUebergangsAnimation.Status="{Binding ., Converter={StaticResource KiAusfuehrungsStatusSymbolConverter}}" />
+                    <Button Content="{Binding OffeneTodoLabelText}"
+                            Command="{Binding OffeneTodosAnzeigenCommand}"
+                            Click="OffeneTodosButton_Click"
+                            AutomationProperties.Name="{Binding Titel, StringFormat=OffeneTodos:{0}}"
+                            AutomationProperties.HelpText="{Binding OffeneTodoLabelText}"
+                            MinWidth="64"
+                            HorizontalAlignment="Left"
+                            Padding="8,2"
+                            Cursor="Hand"
+                            Background="{DynamicResource BackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            Foreground="{DynamicResource PrimaryTextBrush}"
+                            FontSize="11" />
+                </StackPanel>
                 <!-- UIA-Anker für die Kachel-Abblendung pausierter Aufgaben: Der umgebende Border
                      erzeugt keinen AutomationPeer und ist damit für UI-Automation unsichtbar.
                      Dieses leere TextBlock trägt daher den Pausiert-Marker im HelpText. -->
@@ -46,114 +67,87 @@
                         </MultiBinding>
                     </AutomationProperties.HelpText>
                 </TextBlock>
-                <Button Content="{Binding OffeneTodoLabelText}"
-                        Command="{Binding OffeneTodosAnzeigenCommand}"
-                        Click="OffeneTodosButton_Click"
-                        AutomationProperties.Name="{Binding Titel, StringFormat=OffeneTodos:{0}}"
-                        AutomationProperties.HelpText="{Binding OffeneTodoLabelText}"
-                        MinWidth="64"
-                        HorizontalAlignment="Left"
-                        Margin="0,8,0,0"
-                        Padding="8,3"
-                        Cursor="Hand"
-                        Background="{DynamicResource BackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
-                        Foreground="{DynamicResource PrimaryTextBrush}"
-                        FontSize="11" />
             </StackPanel>
         </DataTemplate>
 
-        <DataTemplate x:Key="AufgabenKachelMitNavigationButtonTemplate">
-            <Border BorderThickness="1"
-                    CornerRadius="8"
-                    Margin="4,4,4,4"
-                    Padding="10"
-                    AutomationProperties.Name="{Binding Titel, StringFormat=Aufgabe:{0}}">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsAktiv}" Value="True">
-                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                            </DataTrigger>
-                            <!-- Abblendung pausierter Kacheln; der Pausiert:-Marker für E2E steckt im
-                                 HelpText des 'AufgabeKachel:'-TextBlocks im Inhaltstemplate (der Border
-                                 selbst erzeugt keinen AutomationPeer und ist per UIA unsichtbar). -->
-                            <DataTrigger Binding="{Binding IstPausiert}" Value="True">
-                                <Setter Property="Opacity" Value="0.55" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <ContentPresenter Grid.Column="0"
-                                       Content="{Binding}"
-                                       ContentTemplate="{StaticResource AufgabenKachelInhaltTemplate}" />
-
-                    <Button Grid.Column="1"
-                            Content="→"
-                            AutomationProperties.Name="{Binding Titel, StringFormat=AufgabeNavigieren:{0}}"
-                            Command="{Binding NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            CommandParameter="{Binding Id}"
-                            Padding="6,3"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            FontSize="13"
-                            VerticalAlignment="Center" />
-                </Grid>
-            </Border>
-        </DataTemplate>
-
-        <DataTemplate x:Key="AufgabenKachelVollflaechigKlickbarTemplate">
-            <Border BorderThickness="1"
-                    CornerRadius="8"
-                    Margin="0,0,0,12"
-                    Padding="16"
+        <DataTemplate x:Key="AufgabenKachelTemplate">
+            <Button AutomationProperties.Name="{Binding Titel, StringFormat=AufgabeNavigieren:{0}}"
+                    Command="{Binding NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    CommandParameter="{Binding Id}"
                     Cursor="Hand"
-                    AutomationProperties.Name="{Binding Titel, StringFormat=Aufgabe:{0}}">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsAktiv}" Value="True">
-                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                            </DataTrigger>
-                            <!-- Abblendung pausierter Kacheln; der Pausiert:-Marker im HelpText ist der E2E-Anker. -->
-                            <DataTrigger Binding="{Binding IstPausiert}" Value="True">
-                                <Setter Property="Opacity" Value="0.55" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <Border.InputBindings>
-                    <MouseBinding MouseAction="LeftClick"
-                                  Command="{Binding NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                  CommandParameter="{Binding Id}" />
-                </Border.InputBindings>
-                <ContentPresenter Content="{Binding}"
-                                   ContentTemplate="{StaticResource AufgabenKachelInhaltTemplate}" />
-            </Border>
+                    Margin="4,4,4,4"
+                    Padding="0"
+                    HorizontalContentAlignment="Stretch"
+                    Background="Transparent"
+                    BorderThickness="0">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="KachelBorder"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="10"
+                                AutomationProperties.Name="{Binding Titel, StringFormat=Aufgabe:{0}}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsAktiv}" Value="True">
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                        </DataTrigger>
+                                        <!-- Abblendung pausierter Kacheln; der Pausiert:-Marker für E2E steckt im
+                                             HelpText des 'AufgabeKachel:'-TextBlocks im Inhaltstemplate (der Border
+                                             selbst erzeugt keinen AutomationPeer und ist per UIA unsichtbar). -->
+                                        <DataTrigger Binding="{Binding IstPausiert}" Value="True">
+                                            <Setter Property="Opacity" Value="0.55" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <ContentPresenter Content="{Binding}"
+                                              ContentTemplate="{StaticResource AufgabenKachelInhaltTemplate}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- Hover-/Klick-Feedback der vollflächig klickbaren Kachel: dezente
+                                 Hervorhebung über den Rahmen, passend zum Theme (IsAktiv setzt
+                                 denselben Brush - der Accent-Rahmen ist damit konsistent). -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="KachelBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="KachelBorder" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
         </DataTemplate>
     </UserControl.Resources>
 
-    <ItemsControl ItemsSource="{Binding ItemsSource, RelativeSource={RelativeSource AncestorType=UserControl}}">
-        <ItemsControl.Style>
-            <Style TargetType="ItemsControl">
-                <Setter Property="ItemTemplate" Value="{StaticResource AufgabenKachelMitNavigationButtonTemplate}" />
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding ShowNavigationButton, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
-                        <Setter Property="ItemTemplate" Value="{StaticResource AufgabenKachelVollflaechigKlickbarTemplate}" />
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
-        </ItemsControl.Style>
+    <ItemsControl x:Name="AufgabenItemsControl"
+                  ItemTemplate="{StaticResource AufgabenKachelTemplate}">
+        <ItemsControl.GroupStyle>
+            <GroupStyle>
+                <!-- E2E-Anker 'AufgabenGruppe:{Name}' liegt auf dem GroupItem selbst: Der
+                     GroupItemAutomationPeer exponiert nur seine Item-Children - ein
+                     AutomationProperties.Name im HeaderTemplate taucht NICHT im UIA-Baum auf
+                     (verifiziert per Visual-/UIA-Tree-Dump). -->
+                <GroupStyle.ContainerStyle>
+                    <Style TargetType="GroupItem">
+                        <Setter Property="AutomationProperties.Name"
+                                Value="{Binding Name, StringFormat=AufgabenGruppe:{0}}" />
+                    </Style>
+                </GroupStyle.ContainerStyle>
+                <GroupStyle.HeaderTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   Margin="8,10,8,2" />
+                    </DataTemplate>
+                </GroupStyle.HeaderTemplate>
+            </GroupStyle>
+        </ItemsControl.GroupStyle>
     </ItemsControl>
 </UserControl>
