@@ -1,3 +1,6 @@
+## 2026-10-19 — Fix: Restricted-Exchange-Test-Race (messages.Accepted)
+
+- ScmEventCliExchangeAccessTests.RestrictedWindowsProcess schlug auf GitHub-Staging wiederkehrend mit "Expected messages.Accepted not to be <null>" fehl. Ursache 1: Die Poll-Schleife brach ab, sobald die Aktionsdatei zweimal unverändert gesehen wurde — accepted.json war zu diesem Zeitpunkt noch nicht stabil bestätigt (ReadAsync meldet Dateien erst nach zweifacher unveränderter Sichtung); jetzt wird auf accepted+action gemeinsam gewartet. Ursache 2: Das Kindskript teilte eine 60-s-Frist für alle Wartephasen; unter CI-Last verbrauchte eine frühe Phase das Budget — jetzt 90 s pro Phase.
 ## 2026-10-20 — SCM-Prompt-Anhänge je Ereignisart einstellbar
 
 - Neue Einstellungen unter **Einstellungen → Allgemein → SCM-Ereignisse** (Abschnitt „Prompt-Anhänge"): fünf mehrzeilige Textfelder — Allgemein (`scm.prompt.append.general`), Issue (`scm.prompt.append.issue`), Issue-Kommentar (`scm.prompt.append.issuecomment`), Pull Request (`scm.prompt.append.pr`) und Pull-Request-Kommentar (`scm.prompt.append.prcomment`) — deren Text bei der Zustellung automatisch an den SCM-Ereignisprompt angehängt wird (z. B. Hinweise auf verfügbare Skills oder Bearbeitungsregeln, ohne sie in jedem Kommentar zu nennen). Leer = nichts anhängen; wirkt ohne Neustart.
