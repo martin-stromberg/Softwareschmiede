@@ -50,7 +50,11 @@ public sealed partial class ScmEventCliExchangeAccessTests
               TracePhase 'Loading framework JSON serializer'
               $null = [Reflection.Assembly]::Load('System.Web.Extensions, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35')
               $serializer = [System.Web.Script.Serialization.JavaScriptSerializer]::new()
-              $deadline = [DateTime]::UtcNow.AddSeconds(60)
+              # Jede Wartephase bekommt eine eigene Frist: Die sequentiellen Host-Pollfenster
+              # wuerden eine gemeinsame Gesamtfrist unter CI-Last in einer spaeteren Phase
+              # ablaufen lassen, obwohl der Host noch innerhalb seines Zeitbudgets arbeitet.
+              $phaseTimeout = 90
+              $deadline = [DateTime]::UtcNow.AddSeconds($phaseTimeout)
               $probePromptPath = [IO.Path]::Combine($workspace, 'probe-prompt.json')
               TracePhase 'Waiting for host probe prompt'
               while (-not [IO.File]::Exists($probePromptPath)) {
@@ -65,6 +69,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
               [IO.File]::Move($probe.temporaryProofPath, $probe.proofPath)
               [IO.File]::Move($probe.challengePath, $probe.readChallengePath)
               TracePhase 'Waiting for host channel'
+              $deadline = [DateTime]::UtcNow.AddSeconds($phaseTimeout)
               while (-not [IO.File]::Exists([IO.Path]::Combine($workspace, 'go'))) {
                 if ([DateTime]::UtcNow -gt $deadline) { throw 'Host did not prepare channel' }
                 [Threading.Thread]::Sleep(25)
@@ -92,6 +97,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
               Publish ([IO.Path]::Combine($channel, 'actions', '{{actionId}}.json')) $action
               $resultPath = [IO.Path]::Combine($channel, 'results', '{{actionId}}.json')
               TracePhase 'Waiting for host action result'
+              $deadline = [DateTime]::UtcNow.AddSeconds($phaseTimeout)
               while (-not [IO.File]::Exists($resultPath)) {
                 if ([DateTime]::UtcNow -gt $deadline) { throw 'Host did not acknowledge remote action' }
                 [Threading.Thread]::Sleep(25)
@@ -150,7 +156,12 @@ public sealed partial class ScmEventCliExchangeAccessTests
             do
             {
                 messages = await protocol.ReadAsync(attempt);
-                if (messages.Actions.Count == 1) break;
+                // The child publishes accepted.json and the action in immediate succession, but
+                // ReadAsync reports a file only after observing it unchanged twice. A snapshot in
+                // which the action is already stable while accepted.json was not yet seen in the
+                // previous pass is a legal transient state — wait for the complete expected state
+                // instead of breaking on the first action sighting.
+                if (messages.Accepted is not null && messages.Actions.Count == 1) break;
                 if (process.HasExited) break;
                 await Task.Delay(25);
             } while (DateTime.UtcNow < deadline);
