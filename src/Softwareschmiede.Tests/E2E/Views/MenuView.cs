@@ -535,7 +535,17 @@ public sealed class MenuView : BaseWindowView
     {
         foreach (var name in names)
         {
-            var button = Window.FindFirstDescendant(cf => cf.ByName(name).And(cf.ByControlType(ControlType.Button)));
+            AutomationElement? button;
+            try
+            {
+                button = Window.FindFirstDescendant(cf => cf.ByName(name).And(cf.ByControlType(ControlType.Button)));
+            }
+            catch (System.Runtime.InteropServices.COMException)
+            {
+                // UIA-Provider des Fensters transient nicht erreichbar - die
+                // Warteschleife versucht es erneut statt hart zu scheitern.
+                return null;
+            }
             if (button is not null)
                 return button;
         }

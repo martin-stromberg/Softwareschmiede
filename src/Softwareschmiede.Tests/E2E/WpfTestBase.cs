@@ -322,6 +322,11 @@ public abstract class WpfTestBase : IDisposable
             {
                 // Fenster können zwischen Enumeration und Element-Erzeugung verschwinden.
             }
+            catch (System.Runtime.InteropServices.COMException)
+            {
+                // UIA-Provider eines enumerierten Fensters transient nicht erreichbar
+                // (z. B. hängender Fremdprozess) - nächster Schleifendurchlauf versucht erneut.
+            }
 
             Thread.Sleep(200);
         }
