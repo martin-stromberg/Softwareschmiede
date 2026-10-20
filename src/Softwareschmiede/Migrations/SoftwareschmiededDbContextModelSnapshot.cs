@@ -169,6 +169,12 @@ namespace Softwareschmiede.Migrations
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(0);
 
+                    b.Property<DateTimeOffset?>("ScmAbschlussErkanntUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ScmAbschlussReferenz")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("TEXT");

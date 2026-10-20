@@ -84,6 +84,70 @@ public sealed class PullRequestReferenzService
         return entity;
     }
 
+    /// <summary>Speichert oder aktualisiert einen Pull Request, den der KI-Agent selbst angelegt und im
+    /// Abschluss gemeldet hat (<c>pullRequestNumber</c> in <c>complete.json</c>). Idempotent: Eine bereits
+    /// derselben Aufgabe zugeordnete Referenz wird ergänzt; eine fremd zugeordnete Referenz wird nicht
+    /// übernommen und mit <see langword="null"/> quittiert.</summary>
+    /// <returns>Die verknüpfte Referenz oder <see langword="null"/>, wenn der Pull Request bereits einer
+    /// anderen Aufgabe zugeordnet ist.</returns>
+    public async Task<PullRequestReferenz?> SaveReportedAsync(
+        Guid aufgabeId,
+        string? pluginPrefix,
+        string repositoryId,
+        int pullRequestNumber,
+        string? url,
+        CancellationToken ct = default)
+    {
+        if (pullRequestNumber <= 0)
+            throw new ArgumentOutOfRangeException(nameof(pullRequestNumber), "Die Pull-Request-Nummer muss positiv sein.");
+
+        var now = _timeProvider.GetUtcNow();
+        // Ereignisquellen liefert derzeit nur das GitHub-Plugin; unbekannte Prefixe werden
+        // bewusst als GitHub-Referenz gespeichert, damit die Abschlussüberwachung sie prüfen kann.
+        var provider = PullRequestProviderDescriptor.TryGetProviderForPluginPrefix(pluginPrefix)
+            ?? PullRequestProvider.GitHub;
+        var normalizedRepositoryId = PullRequestRepositoryId.Normalize(provider, repositoryId);
+
+        var entity = await _db.PullRequestReferenzen
+            .FirstOrDefaultAsync(
+                p => p.Provider == provider
+                     && p.RepositoryId == normalizedRepositoryId
+                     && p.PullRequestNumber == pullRequestNumber,
+                ct);
+
+        if (entity is null)
+        {
+            entity = new PullRequestReferenz
+            {
+                Id = Guid.NewGuid(),
+                AufgabeId = aufgabeId,
+                Provider = provider,
+                Rolle = PullRequestReferenzRolle.CreatedByTask,
+                RepositoryId = normalizedRepositoryId,
+                PullRequestNumber = pullRequestNumber,
+                CreatedUtc = now,
+                MonitoringPhase = PullRequestMonitoringPolicy.GetInitialPhase(provider),
+                NextCheckUtc = PullRequestMonitoringPolicy.GetInitialPhase(provider) == PullRequestMonitoringPhase.NotMonitored ? null : now
+            };
+            _db.PullRequestReferenzen.Add(entity);
+        }
+        else if (entity.AufgabeId != aufgabeId)
+        {
+            _logger.LogWarning(
+                "Pull Request {RepositoryId}#{Number} wurde gemeldet, ist aber bereits Aufgabe {AufgabeId} zugeordnet; Meldung an Aufgabe {MeldendeAufgabeId} wird ignoriert.",
+                normalizedRepositoryId, pullRequestNumber, entity.AufgabeId, aufgabeId);
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(url))
+            entity.Url = url;
+        if (entity.Status == PullRequestStatus.Unknown)
+            entity.Status = PullRequestStatus.Open;
+
+        await _db.SaveChangesAsync(ct);
+        return entity;
+    }
+
     /// <summary>Liefert Pull Requests einer Aufgabe inklusive Workflow-Runs.</summary>
     public async Task<IReadOnlyList<PullRequestReferenz>> GetByAufgabeAsync(Guid aufgabeId, CancellationToken ct = default)
         => await _db.PullRequestReferenzen

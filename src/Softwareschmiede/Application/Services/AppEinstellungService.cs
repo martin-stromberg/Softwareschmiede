@@ -62,6 +62,15 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Kommentaren und Reviews auf Pull Requests.</summary>
     public const string ScmPromptAppendPullRequestCommentKey = "scm.prompt.append.prcomment";
 
+    /// <summary>Schlüssel für den Laufzeit-Schalter "SCM-Abschlussüberwachung aktiviert".</summary>
+    public const string ScmTaskCompletionEnabledKey = "scm.taskcompletion.enabled";
+
+    /// <summary>Schlüssel für die Wartezeit (Minuten) zwischen erkanntem Referenz-Schluss und dem Beenden der Aufgabe.</summary>
+    public const string ScmTaskCompletionWaitMinutesKey = "scm.taskcompletion.wait.minutes";
+
+    /// <summary>Standardwert der Abschluss-Wartezeit in Minuten.</summary>
+    public const int ScmTaskCompletionDefaultWaitMinutes = 60;
+
     /// <summary>Schlüssel für den Update-Modus (<see cref="UpdateMode"/>-Wert als Zahl gespeichert).</summary>
     public const string UpdateModeKey = "updates.mode";
 
@@ -176,6 +185,31 @@ public sealed class AppEinstellungService
     /// <returns><see langword="true"/>, wenn die SCM-Ereignisüberwachung aktiv ist.</returns>
     public async Task<bool> GetScmMonitoringEnabledAsync(CancellationToken ct = default)
         => await GetBoolSettingAsync(ScmMonitoringEnabledKey, ct) ?? true;
+
+    /// <summary>
+    /// Ermittelt, ob die SCM-Abschlussüberwachung ereignisgesteuerter Aufgaben aktiv ist. Der über
+    /// <see cref="SetBoolSettingAsync"/> unter <see cref="ScmTaskCompletionEnabledKey"/> persistierte
+    /// Laufzeit-Schalter (GUI-Einstellung) gilt ohne Neustart; ohne gespeicherten Eintrag ist die
+    /// Überwachung aktiviert (<see langword="true"/>).
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn die Abschlussüberwachung aktiv ist.</returns>
+    public async Task<bool> GetScmTaskCompletionEnabledAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(ScmTaskCompletionEnabledKey, ct) ?? true;
+
+    /// <summary>
+    /// Liest die Wartezeit in Minuten zwischen dem erkannten Schließen/Mergen der verknüpften
+    /// SCM-Referenz und dem automatischen Beenden der Aufgabe (<see cref="ScmTaskCompletionWaitMinutesKey"/>).
+    /// Fehlende oder ungültige Werte fallen auf <see cref="ScmTaskCompletionDefaultWaitMinutes"/> zurück;
+    /// gespeicherte Werte werden auf 0 bis 43200 (30 Tage) begrenzt.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Die wirksame Wartezeit in Minuten.</returns>
+    public async Task<int> GetScmTaskCompletionWaitMinutesAsync(CancellationToken ct = default)
+    {
+        var wert = await GetIntSettingAsync(ScmTaskCompletionWaitMinutesKey, ct);
+        return wert is null ? ScmTaskCompletionDefaultWaitMinutes : Math.Clamp(wert.Value, 0, 43200);
+    }
 
     /// <summary>
     /// Liest das konfigurierte SCM-Trigger-Keyword unter <see cref="ScmTriggerKeywordKey"/>.
