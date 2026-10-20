@@ -59,6 +59,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private string _scmPromptAppendixPullRequestComment = string.Empty;
     private UpdateModusOption? _selectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.NurPruefen);
     private bool _includePrereleases;
+    private ScmBackmergeModusOption? _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Deaktiviert);
 
     /// <summary>Wird direkt nach erfolgreichem Speichern der Update-Einstellungen mit dem gespeicherten Snapshot ausgelöst.</summary>
     public event EventHandler<UpdateSettings>? UpdateSettingsSaved;
@@ -78,6 +79,16 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     {
         get => _includePrereleases;
         set => SetProperty(ref _includePrereleases, value);
+    }
+
+    /// <summary>Feste Auswahlliste der Backmerge-Modi (Steuerwert + Anzeige-Label).</summary>
+    public IReadOnlyList<ScmBackmergeModusOption> BackmergeModusOptionen => ScmBackmergeModusOption.Alle;
+
+    /// <summary>Aktuell ausgewählte Backmerge-Modus-Option aus <see cref="BackmergeModusOptionen"/>.</summary>
+    public ScmBackmergeModusOption? SelectedBackmergeModus
+    {
+        get => _selectedBackmergeModus;
+        set => SetProperty(ref _selectedBackmergeModus, value);
     }
 
     /// <summary>Arbeitsverzeichnis für Repository-Klone.</summary>
@@ -439,6 +450,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             ScmPromptAppendixPullRequest = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendPullRequestKey) ?? string.Empty;
             ScmPromptAppendixPullRequestComment = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendPullRequestCommentKey) ?? string.Empty;
 
+            _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(await _einstellungService.GetScmBackmergeModusAsync(ct));
+            OnPropertyChanged(nameof(SelectedBackmergeModus));
+
             var updateSettings = await _einstellungService.GetUpdateSettingsAsync(ct);
             _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Modus);
             OnPropertyChanged(nameof(SelectedUpdateMode));
@@ -472,6 +486,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             if (SelectedUpdateMode is not { Modus: var updateModus })
             {
                 FehlerMeldung = "Der ausgewählte Update-Modus ist ungültig.";
+                return;
+            }
+
+            if (SelectedBackmergeModus is not { Modus: var backmergeModus })
+            {
+                FehlerMeldung = "Der ausgewählte Backmerge-Modus ist ungültig.";
                 return;
             }
 
@@ -510,6 +530,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 AppEinstellungService.ScmTriggerKeywordKey,
                 ScmTriggerKeyword.Trim(),
                 ct);
+            await _einstellungService.SetScmBackmergeModusAsync(backmergeModus, ct);
             await _einstellungService.SetSettingAsync(
                 AppEinstellungService.ScmPromptAppendGeneralKey,
                 NullWennLeer(ScmPromptAppendixGeneral),

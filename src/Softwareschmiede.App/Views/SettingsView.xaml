@@ -335,6 +335,25 @@
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    TextWrapping="Wrap"
                                    Margin="0,4,0,0" />
+                        <TextBlock Text="Backmerge-Pull-Requests"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,12,0,4" />
+                        <ComboBox SelectedItem="{Binding SelectedBackmergeModus, UpdateSourceTrigger=PropertyChanged}"
+                                  AutomationProperties.Name="Backmerge-Modus"
+                                  ItemsSource="{Binding BackmergeModusOptionen}"
+                                  HorizontalAlignment="Stretch"
+                                  Padding="8,6">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Text="Ein Backmerge-Pull-Request (head = Hauptbranch des Repositories, base = konfigurierter Basis-Branch eines Projekts) aktualisiert nur den Arbeitsbranch. Bei „Global aktiviert“ wird er in allen Projekten automatisch gemergt, sobald der Provider ihn als mergebar meldet; bei „Projektbezogen aktivierbar“ zusätzlich nur in Projekten, in denen die Option in der Projektdetailansicht eingeschaltet ist. Voraussetzung ist ein eingerichteter, vom Hauptbranch abweichender Basis-Branch sowie ein Token mit Schreibrecht."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,0" />
                         <TextBlock Text="Prompt-Anhänge"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource PrimaryTextBrush}"

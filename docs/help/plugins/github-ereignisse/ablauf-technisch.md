@@ -17,6 +17,7 @@ Der Monitor lädt aktive lokale Aufgaben samt Repository, Issue-Referenz und Pul
 Beteiligte Komponenten:
 - `ScmEventMonitoringService.RunOnceAsync` — ermittelt verknüpfte und repository-weite Referenzen, fragt Quellen ab und startet Dispatches.
 - `ScmEventMonitoringService.EnumerateRepositoryAsync` — Repository-Enumeration mit eigenem `enumeration/`-Checkpoint und Backoff; Fehler blockieren aufgabenverknüpfte Referenzen nicht.
+- `ScmBackmergeService.EvaluateDiscoveredReferencesAsync` — bewertet jede enumerierte Pull-Request-Referenz einmalig auf das Backmerge-Muster (`backmerge/`-Checkpoint je PR): head = Hauptbranch → base = `DefaultSourceBranchName`. Bei Treffer, `CanWrite`, aktiviertem Modus (`scm.backmerge.mode`, ggf. `plugins.backmerge.project.{projektId}`) und `PullRequestMergeStatus.Mergeable` erfolgt der Admin-Merge über `IGitPlugin.CompletePullRequestAsync` (`Merge` + `AllowProtectedBranchBypass`); nicht mergebare Treffer werden im Poll-Intervall erneut bewertet, Nicht-Treffer endgültig entschieden.
 - `GitHubPlugin.GetEventRepositoryAsync` — löst Repository, angemeldeten Benutzer und Schreibberechtigung auf.
 - `GitHubPlugin.EnumerateReferencesAsync` — listet offene und im Aktivitätsfenster bewegte geschlossene Referenzen.
 - `GitHubPlugin.ReadEventsAsync` — liest Textstände und Versionsmetadaten.

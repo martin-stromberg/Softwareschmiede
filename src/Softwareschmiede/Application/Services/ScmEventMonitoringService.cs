@@ -104,9 +104,11 @@ public sealed class ScmEventMonitoringService(
             foreach (var repository in repositoriesForEnumeration)
             {
                 using var enumerationScope = scopes.CreateScope();
-                await EnumerateRepositoryAsync(source, repository,
+                await EnumerateRepositoryAsync(source, plugin, repository,
                     enumerationScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>(), enumerated,
-                    enumerationScope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>(), resolved, ct);
+                    enumerationScope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>(), resolved,
+                    localRepositories.TryGetValue(repository, out var lokale) ? lokale : [],
+                    enumerationScope.ServiceProvider.GetRequiredService<ScmBackmergeService>(), ct);
             }
             foreach (var group in resolved.GroupBy(x => (Provider: x.Reference.Repository.ProviderPrefix.ToLowerInvariant(),
                 Host: x.Reference.Repository.Host.ToLowerInvariant(), x.Reference.Repository.RepositoryId, x.Reference.Kind, x.Reference.Number)))
@@ -183,9 +185,10 @@ public sealed class ScmEventMonitoringService(
 
     /// <summary>Enumeriert ein kanonisch aufgelöstes Repository einmal pro Lauf und verwaltet dessen
     /// eigenen Watermark-/Backoff-Checkpoint. Enumerationsfehler blockieren die Provider-Runde nicht.</summary>
-    private async Task EnumerateRepositoryAsync(IScmEventSource source, ScmEventRepository repository,
+    private async Task EnumerateRepositoryAsync(IScmEventSource source, IGitPlugin plugin, ScmEventRepository repository,
         SoftwareschmiededDbContext db, HashSet<string> enumerated, ScmEventChangeNotifier notifier,
-        List<(Guid? TaskId, ScmEventReference Reference)> resolved, CancellationToken ct)
+        List<(Guid? TaskId, ScmEventReference Reference)> resolved, IReadOnlyList<GitRepository> lokaleRepositories,
+        ScmBackmergeService backmerge, CancellationToken ct)
     {
         var enumerationKey = string.Join('/', new[] { "enumeration", repository.ProviderPrefix.ToLowerInvariant(),
             repository.Host.ToLowerInvariant(), repository.RepositoryId }.Select(Uri.EscapeDataString));
@@ -200,6 +203,17 @@ public sealed class ScmEventMonitoringService(
                 : (DateTimeOffset?)null;
             var discovered = await source.EnumerateReferencesAsync(repository, sinceUtc, ct);
             resolved.AddRange(discovered.Select(x => ((Guid?)null, x)));
+            // Backmerge-Bewertung ist unabhängig von der Ereignis-Aufnahme: Ein Fehler darf den
+            // erfolgreichen Enumerations-Checkpoint nicht zurücksetzen.
+            try
+            {
+                await backmerge.EvaluateDiscoveredReferencesAsync(plugin, repository, discovered, lokaleRepositories, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Backmerge-Bewertung für Repository {RepositoryId} fehlgeschlagen.", repository.RepositoryId);
+            }
             if (checkpoint is null)
             {
                 checkpoint = new ScmObservationCheckpoint { SourceKey = enumerationKey };

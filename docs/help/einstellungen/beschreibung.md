@@ -71,6 +71,18 @@ Ist die Funktion für autonome Aufgaben deaktiviert, öffnet ein Klick auf „Au
 
 Die Checkbox wird erst nach einem Klick auf „Speichern" übernommen.
 
+### SCM-Ereignisse
+
+Im Abschnitt **SCM-Ereignisse** der Registerkarte „Allgemein" steuern die Checkbox **„SCM-Ereignisüberwachung aktivieren"**, das **Trigger-Keyword** und die **Prompt-Anhänge** die Ereignisüberwachung (Details: [GitHub-Ereignisüberwachung](../plugins/github-ereignisse/index.md)).
+
+Zusätzlich legt die Auswahlbox **„Backmerge-Pull-Requests"** fest, ob die Anwendung Backmerge-PRs (head = Hauptbranch des Repositories → base = konfigurierter Basis-Branch eines Projekts) automatisch per Admin-Merge bestätigt:
+
+- **Deaktiviert** — (Standard) keine automatischen Merges
+- **Global aktiviert** — Backmerge-PRs werden in allen Projekten automatisch gemergt
+- **Projektbezogen aktivierbar** — zusätzlich muss die Option **„Backmerge-Pull-Requests automatisch mergen"** in der Projektdetailansicht (Basis-Branch-Kachel) eingeschaltet sein; sie wird dort nur angeboten, wenn dieser Modus gesetzt und ein Basis-Branch konfiguriert ist
+
+Voraussetzungen für einen Auto-Merge: ein vom Repository-Hauptbranch abweichender Basis-Branch am Projekt-Repository, ein Token mit Schreibrecht und ein vom Provider als mergebar gemeldeter, offener (nicht als Draft markierter) Pull Request. Die Auswahl wird erst nach einem Klick auf „Speichern" übernommen.
+
 ### Updates
 
 Im Abschnitt **Updates** der Registerkarte „Allgemein" steuert eine Auswahlbox das Update-Verhalten der Anwendung:
