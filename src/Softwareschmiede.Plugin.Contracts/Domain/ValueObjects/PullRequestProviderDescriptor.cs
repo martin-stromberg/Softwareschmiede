@@ -13,6 +13,19 @@ public static class PullRequestProviderDescriptor
         _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "Unbekannter Pull-Request-Provider.")
     };
 
+    /// <summary>Löst einen Plugin-Prefix auf den zugehörigen Pull-Request-Provider auf;
+    /// <see langword="null"/> bei unbekannten Prefixen.</summary>
+    public static PullRequestProvider? TryGetProviderForPluginPrefix(string? pluginPrefix)
+    {
+        if (string.Equals(pluginPrefix, "Softwareschmiede.GitHub", StringComparison.OrdinalIgnoreCase))
+            return PullRequestProvider.GitHub;
+        // Bitbucket kennt nur ein Plugin; Cloud ist der übliche Hosting-Modus und wird bei
+        // Unklarheit angenommen (ereignisgesteuerte Quellen liefert derzeit ohnehin nur GitHub).
+        if (string.Equals(pluginPrefix, "Softwareschmiede.Bitbucket", StringComparison.OrdinalIgnoreCase))
+            return PullRequestProvider.BitbucketCloud;
+        return null;
+    }
+
     /// <summary>Liefert die stabile sichtbare Providerbezeichnung.</summary>
     public static string GetDisplayName(PullRequestProvider provider) => provider switch
     {

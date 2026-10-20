@@ -328,6 +328,8 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<PromptZeitVersandService>();
         services.AddSingleton<PullRequestMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<PullRequestMonitoringService>());
+        services.AddSingleton<ScmTaskCompletionMonitoringService>();
+        services.AddHostedService(sp => sp.GetRequiredService<ScmTaskCompletionMonitoringService>());
         services.AddSingleton<UnteragentGovernanceMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<UnteragentGovernanceMonitoringService>());
         services.AddSingleton<CliProcessManager>();

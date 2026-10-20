@@ -49,6 +49,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private IReadOnlyList<PluginSettingGroupEntry>? _selectedIdePluginSettings;
     private bool _isAutonomAufgabenEnabled = true;
     private bool _isScmMonitoringEnabled = true;
+    private bool _isScmTaskCompletionEnabled = true;
+    private string _scmTaskCompletionWaitMinutes = AppEinstellungService.ScmTaskCompletionDefaultWaitMinutes.ToString(System.Globalization.CultureInfo.InvariantCulture);
     private string _scmTriggerKeyword = ScmEventValidationService.DefaultTriggerKeyword;
     private string _scmPromptAppendixGeneral = string.Empty;
     private string _scmPromptAppendixIssue = string.Empty;
@@ -220,6 +222,20 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     {
         get => _isScmMonitoringEnabled;
         set => SetProperty(ref _isScmMonitoringEnabled, value);
+    }
+
+    /// <summary>Gibt an, ob die Abschlussüberwachung ereignisgesteuerter Aufgaben aktiviert ist (Laufzeit-Schalter, ohne Neustart wirksam).</summary>
+    public bool IsScmTaskCompletionEnabled
+    {
+        get => _isScmTaskCompletionEnabled;
+        set => SetProperty(ref _isScmTaskCompletionEnabled, value);
+    }
+
+    /// <summary>Wartezeit in Minuten zwischen dem erkannten Referenz-Schluss und dem automatischen Beenden der Aufgabe.</summary>
+    public string ScmTaskCompletionWaitMinutes
+    {
+        get => _scmTaskCompletionWaitMinutes;
+        set => SetProperty(ref _scmTaskCompletionWaitMinutes, value);
     }
 
     /// <summary>Das Trigger-Keyword, mit dem SCM-Ereignisse markiert werden (Standard: <c>$Softwareschmiede</c>).</summary>
@@ -411,6 +427,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             IsAutonomAufgabenEnabled = await _einstellungService.GetAutonomAufgabenEnabledAsync(_autonomAufgabenOptions.Value.Enabled, ct);
 
             IsScmMonitoringEnabled = await _einstellungService.GetScmMonitoringEnabledAsync(ct);
+            IsScmTaskCompletionEnabled = await _einstellungService.GetScmTaskCompletionEnabledAsync(ct);
+            ScmTaskCompletionWaitMinutes = (await _einstellungService.GetScmTaskCompletionWaitMinutesAsync(ct))
+                .ToString(System.Globalization.CultureInfo.InvariantCulture);
             ScmTriggerKeyword = await _einstellungService.GetScmTriggerKeywordAsync(ct);
 
             var promptAnhaenge = await _einstellungService.GetScmPromptAppendicesAsync(ct);
@@ -478,6 +497,14 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await _einstellungService.SetBoolSettingAsync(
                 AppEinstellungService.ScmMonitoringEnabledKey,
                 IsScmMonitoringEnabled,
+                ct);
+            await _einstellungService.SetBoolSettingAsync(
+                AppEinstellungService.ScmTaskCompletionEnabledKey,
+                IsScmTaskCompletionEnabled,
+                ct);
+            await _einstellungService.SetIntSettingAsync(
+                AppEinstellungService.ScmTaskCompletionWaitMinutesKey,
+                int.Parse(ScmTaskCompletionWaitMinutes.Trim(), System.Globalization.CultureInfo.InvariantCulture),
                 ct);
             await _einstellungService.SetSettingAsync(
                 AppEinstellungService.ScmTriggerKeywordKey,
@@ -698,7 +725,21 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         return ValidierePluginAktivierung()
             && ValidierePflichtfelderFuerSettings(_selectedPluginSettings)
             && ValidierePromptVorlagen()
-            && ValidiereScmTriggerKeyword();
+            && ValidiereScmTriggerKeyword()
+            && ValidiereScmTaskCompletionWait();
+    }
+
+    /// <summary>Die Abschluss-Wartezeit muss eine nicht negative Ganzzahl in Minuten sein.</summary>
+    private bool ValidiereScmTaskCompletionWait()
+    {
+        if (!int.TryParse(ScmTaskCompletionWaitMinutes?.Trim(), System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out var minuten) || minuten < 0)
+        {
+            FehlerMeldung = $"Die Wartezeit für die SCM-Abschlussüberwachung muss eine nicht negative Ganzzahl in Minuten sein. Standard: {AppEinstellungService.ScmTaskCompletionDefaultWaitMinutes}";
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>Leere oder nur aus Leerraum bestehende Prompt-Anhänge werden nicht gespeichert (leer = nichts anhängen).</summary>

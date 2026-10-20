@@ -14,4 +14,10 @@ public sealed record Issue(
     IReadOnlyList<string> Labels,
     string? Milestone,
     string? IssueUrl
-);
+)
+{
+    /// <summary>Gibt an, ob das Issue beim Provider geschlossen ist. Wird nur von Quellen gesetzt,
+    /// die den Remote-Status kennen (z. B. <c>IScmEventSource.ReadIssueAsync</c>); Listen- und
+    /// Anlagepfade lassen den Standard <see langword="false"/>.</summary>
+    public bool IstGeschlossen { get; init; }
+}

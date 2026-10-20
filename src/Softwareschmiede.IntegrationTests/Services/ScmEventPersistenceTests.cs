@@ -25,8 +25,11 @@ public sealed class ScmEventPersistenceTests
                 await db.GetService<IMigrator>().MigrateAsync("20260916094502_AddAufgabePausiertBisUtc");
                 var project = new Projekt { Id = Guid.NewGuid(), Name = "Altbestand" };
                 db.Projekte.Add(project);
-                db.Aufgaben.Add(new Aufgabe { Id = taskId, ProjektId = project.Id, Titel = "Bestehende Aufgabe" });
                 await db.SaveChangesAsync();
+                // Der Altbestand wird roh eingefügt: Das aktuelle Modell enthält neuere
+                // Aufgaben-Spalten, die es zu diesem Migrationsstand noch nicht gibt.
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"INSERT INTO Aufgaben (Id, ProjektId, Titel, Status, AusfuehrungsStatus, ErstellungsDatum, RecoveryVersion) VALUES ({taskId}, {project.Id}, 'Bestehende Aufgabe', 0, 0, {DateTimeOffset.UtcNow}, 0)");
                 await db.Database.MigrateAsync();
                 var observation = Observe();
                 var store = new ScmEventStore(db, new(), TimeProvider.System);
