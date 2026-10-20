@@ -64,6 +64,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private bool _isEditingInitialisierungsskript;
     private bool? _initialisierungsskriptLoadingFailed;
     private string? _initialisierungsskriptBeforeEdit;
+    private bool _isBackmergeAutoMergeEnabled;
+    private bool _isBackmergeModusProjektbezogen;
 
     /// <summary>Die Projekt-ID, deren Details angezeigt werden.</summary>
     public Guid ProjektId
@@ -143,6 +145,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 IsEditingSourceBranchManualInput = false;
                 SourceBranchInputError = null;
                 SelectedRepositorySourceBranchName = value?.DefaultSourceBranchName;
+                OnPropertyChanged(nameof(IsBackmergeOptionVisible));
                 IsEditingInitialisierungsskript = false;
                 InitialisierungsskriptSuggestionen.Clear();
                 InitialisierungsskriptLoadingFailed = null;
@@ -205,8 +208,30 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     public string? SelectedRepositorySourceBranchName
     {
         get => _selectedRepositorySourceBranchName;
-        set => SetProperty(ref _selectedRepositorySourceBranchName, value);
+        set
+        {
+            if (SetProperty(ref _selectedRepositorySourceBranchName, value))
+                OnPropertyChanged(nameof(IsBackmergeOptionVisible));
+        }
     }
+
+    /// <summary>Projektbezogene Freigabe: Backmerge-Pull-Requests dieses Projekts automatisch mergen.</summary>
+    public bool IsBackmergeAutoMergeEnabled
+    {
+        get => _isBackmergeAutoMergeEnabled;
+        set
+        {
+            if (SetProperty(ref _isBackmergeAutoMergeEnabled, value))
+                SpeichereBackmergeAktivAsync(value).SafeFireAndForget(_logger, "ProjectDetailViewModel.SpeichereBackmergeAktivAsync");
+        }
+    }
+
+    /// <summary>Gibt an, ob die projektbezogene Backmerge-Option angeboten wird: nur im globalen
+    /// Modus „Projektbezogen aktivierbar“ und nur bei einem konfigurierten Basis-Branch.</summary>
+    public bool IsBackmergeOptionVisible
+        => _isBackmergeModusProjektbezogen
+           && _selectedRepository != null
+           && !string.IsNullOrWhiteSpace(SelectedRepositorySourceBranchName);
 
     /// <summary>Gibt an, ob der Basis-Branch des ausgewählten Repositories gerade bearbeitet wird.</summary>
     public bool IsEditingSourceBranch
@@ -392,6 +417,26 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 ProjektBeschreibung = Projekt.Beschreibung;
                 SelectedRepository = Projekt.Repositories.FirstOrDefault();
             }
+
+            // Die Backmerge-Option ist nicht kritisch: Steht der Einstellungsdienst nicht zur
+            // Verfügung, bleibt sie schlicht verborgen statt das Laden des Projekts zu verhindern.
+            try
+            {
+                using var einstellungenScope = _serviceProvider.CreateScope();
+                var einstellungen = einstellungenScope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+                _isBackmergeModusProjektbezogen = await einstellungen.GetScmBackmergeModusAsync(ct) == ScmBackmergeModus.Projektbezogen;
+                _isBackmergeAutoMergeEnabled = await einstellungen.GetBackmergeProjektAktivAsync(_projektId, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Backmerge-Einstellungen für Projekt {ProjektId} konnten nicht geladen werden.", _projektId);
+            }
+            OnPropertyChanged(nameof(IsBackmergeAutoMergeEnabled));
+            OnPropertyChanged(nameof(IsBackmergeOptionVisible));
 
             await LadenOffeneAnforderungenAsync(ct);
         }
@@ -692,6 +737,17 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             _logger.LogError(ex, "Fehler beim Speichern des Basis-Branches für Repository {RepositoryId}.", repository.Id);
             SourceBranchInputError = ex.Message;
         }
+    }
+
+    /// <summary>Persistiert die projektbezogene Backmerge-Freigabe sofort beim Umschalten der Option.</summary>
+    private async Task SpeichereBackmergeAktivAsync(bool aktiv)
+    {
+        if (_projektId == Guid.Empty)
+            return;
+
+        using var scope = _serviceProvider.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
+            .SetBackmergeProjektAktivAsync(_projektId, aktiv, CancellationToken.None);
     }
 
     private void CancelSourceBranchEdit()

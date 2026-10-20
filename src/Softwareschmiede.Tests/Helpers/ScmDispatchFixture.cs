@@ -143,6 +143,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddScoped<ScmEventOutbox>();
         services.AddScoped<ScmEventOrchestrator>();
         services.AddScoped<ScmEventTaskResolver>();
+        services.AddScoped<ScmBackmergeService>();
         services.AddScoped(sp => new EntwicklungsprozessService(sp.GetRequiredService<AufgabeService>(), sp.GetRequiredService<ProtokollService>(),
             Git.Object, sp.GetRequiredService<PluginSelectionService>(), directories.Object,
             new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: sp.GetRequiredService<KiAusfuehrungsService>()), sp.GetRequiredService<ILogger<EntwicklungsprozessService>>()));

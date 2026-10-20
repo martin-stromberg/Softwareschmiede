@@ -729,6 +729,39 @@ public sealed class SettingsViewModelTests : IDisposable
             .Should().BeNull("ein ungültiges Keyword darf nicht persistiert werden");
     }
 
+    /// <summary>LadenCommand lädt den Backmerge-Modus; ohne gespeicherten Eintrag gilt „Deaktiviert“.</summary>
+    [Fact]
+    public async Task LadenCommand_LoadsBackmergeModusDefaults()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedBackmergeModus.Should().Be(ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Deaktiviert));
+        sut.BackmergeModusOptionen.Should().HaveCount(3);
+    }
+
+    /// <summary>SpeichernCommand persistiert den gewählten Backmerge-Modus und lädt ihn beim Neuladen zurück.</summary>
+    [Fact]
+    public async Task SpeichernCommand_PersistsBackmergeModus()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Projektbezogen);
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        (await _einstellungService.GetScmBackmergeModusAsync()).Should().Be(ScmBackmergeModus.Projektbezogen);
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.SelectedBackmergeModus.Should().Be(ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Projektbezogen));
+    }
+
     /// <summary>LadenCommand füllt die fünf SCM-Prompt-Anhänge mit leeren Feldern, wenn nichts gespeichert ist.</summary>
     [Fact]
     public async Task LadenCommand_LoadsScmPromptAppendixDefaults()

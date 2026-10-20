@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Application.Services;
@@ -76,6 +77,12 @@ public sealed class AppEinstellungService
 
     /// <summary>Schlüssel für den Anzeigemodus der Aufgabenliste im Dashboard (<c>AufgabenListenModus</c>-Name).</summary>
     public const string AktiveAufgabenListenModusDashboardKey = "aktiveaufgaben.listenmodus.dashboard";
+
+    /// <summary>Schlüssel für den Backmerge-Aktivierungsmodus (<see cref="ScmBackmergeModus"/>-Wert als Zahl gespeichert).</summary>
+    public const string ScmBackmergeModeKey = "scm.backmerge.mode";
+
+    /// <summary>Schlüsselpräfix für die projektbezogene Backmerge-Freigabe; der vollständige Schlüssel ist <c>plugins.backmerge.project.{projektId}</c>.</summary>
+    public const string BackmergeProjektKeyPrefix = "plugins.backmerge.project.";
 
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AppEinstellungService> _logger;
@@ -176,6 +183,52 @@ public sealed class AppEinstellungService
     /// <returns><see langword="true"/>, wenn die SCM-Ereignisüberwachung aktiv ist.</returns>
     public async Task<bool> GetScmMonitoringEnabledAsync(CancellationToken ct = default)
         => await GetBoolSettingAsync(ScmMonitoringEnabledKey, ct) ?? true;
+
+    /// <summary>Bildet den Einstellungsschlüssel der projektbezogenen Backmerge-Freigabe.</summary>
+    /// <param name="projektId">Die Projekt-ID.</param>
+    /// <returns>Den vollständigen Einstellungsschlüssel <c>plugins.backmerge.project.{projektId}</c>.</returns>
+    public static string BackmergeProjektKey(Guid projektId) => $"{BackmergeProjektKeyPrefix}{projektId}";
+
+    /// <summary>
+    /// Liest den Backmerge-Aktivierungsmodus unter <see cref="ScmBackmergeModeKey"/>.
+    /// Fehlende oder ungültige gespeicherte Werte fallen auf
+    /// <see cref="ScmBackmergeModus.Deaktiviert"/> zurück.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Der effektive Backmerge-Modus.</returns>
+    public async Task<ScmBackmergeModus> GetScmBackmergeModusAsync(CancellationToken ct = default)
+    {
+        var wert = await GetSettingAsync(ScmBackmergeModeKey, ct);
+        return int.TryParse(wert, out var modus) && Enum.IsDefined((ScmBackmergeModus)modus)
+            ? (ScmBackmergeModus)modus
+            : ScmBackmergeModus.Deaktiviert;
+    }
+
+    /// <summary>Speichert den Backmerge-Aktivierungsmodus unter <see cref="ScmBackmergeModeKey"/>.</summary>
+    /// <param name="modus">Der zu speichernde Modus.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="modus"/> ist kein definierter <see cref="ScmBackmergeModus"/>-Wert.</exception>
+    public Task SetScmBackmergeModusAsync(ScmBackmergeModus modus, CancellationToken ct = default)
+    {
+        if (!Enum.IsDefined(modus))
+            throw new ArgumentOutOfRangeException(nameof(modus), modus, "Unbekannter Backmerge-Modus.");
+
+        return SetIntSettingAsync(ScmBackmergeModeKey, (int)modus, ct);
+    }
+
+    /// <summary>Ermittelt, ob die projektbezogene Backmerge-Freigabe für das Projekt gesetzt ist (Standard: <see langword="false"/>).</summary>
+    /// <param name="projektId">Die Projekt-ID.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn Backmerge-PRs für dieses Projekt automatisch gemergt werden dürfen.</returns>
+    public async Task<bool> GetBackmergeProjektAktivAsync(Guid projektId, CancellationToken ct = default)
+        => await GetBoolSettingAsync(BackmergeProjektKey(projektId), ct) ?? false;
+
+    /// <summary>Setzt die projektbezogene Backmerge-Freigabe für das Projekt.</summary>
+    /// <param name="projektId">Die Projekt-ID.</param>
+    /// <param name="aktiv">Der zu speichernde Schalter.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public Task SetBackmergeProjektAktivAsync(Guid projektId, bool aktiv, CancellationToken ct = default)
+        => SetBoolSettingAsync(BackmergeProjektKey(projektId), aktiv, ct);
 
     /// <summary>
     /// Liest das konfigurierte SCM-Trigger-Keyword unter <see cref="ScmTriggerKeywordKey"/>.
