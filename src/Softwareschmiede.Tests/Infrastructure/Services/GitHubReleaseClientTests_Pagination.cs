@@ -158,7 +158,8 @@ public sealed class GitHubReleaseClientTests_Pagination
     [Theory]
     [InlineData("https://evil.example.com/repos/martin-stromberg/Softwareschmiede/releases?page=2")]
     [InlineData("https://api.github.com/repos/anderer-owner/anderes-repo/releases?page=2")]
-    [InlineData("https://api.github.com/repositories/12345/releases?page=2")]
+    [InlineData("https://api.github.com/repositories/abc/releases?page=2")]
+    [InlineData("https://api.github.com/repositories/12345/issues?page=2")]
     [InlineData("http://api.github.com/repos/martin-stromberg/Softwareschmiede/releases?page=2")]
     public async Task GetLatestReleaseAsync_RejectsDisallowedFollowUpUrls(string nextUrl)
     {
@@ -171,6 +172,33 @@ public sealed class GitHubReleaseClientTests_Pagination
         result.Erfolg.Should().BeFalse();
         result.Release.Should().BeNull();
         handler.RequestedUrls.Should().Equal(Page1Url);
+    }
+
+    /// <summary>GitHub liefert in Link-Headern auch die numerische Repository-Form
+    /// <c>/repositories/{id}/releases</c> — die Folge-URL ist zulässig und wird abgerufen.</summary>
+    [Fact]
+    public async Task GetLatestReleaseAsync_AllowsNumericRepositoryIdFollowUp()
+    {
+        const string numericPage2Url = "https://api.github.com/repositories/1234112645/releases?per_page=100&page=2";
+        var handler = new RoutingHttpHandler();
+        handler.AddPage(Page1Url, ValidPageBody(), numericPage2Url);
+        handler.AddPage(numericPage2Url, """
+[
+  {
+    "tag_name": "v1.5.0-rc.1",
+    "prerelease": true,
+    "draft": false,
+    "assets": [ { "name": "release.zip", "browser_download_url": "https://example.invalid/release-1.5.0-rc.1.zip" } ]
+  }
+]
+""");
+        var sut = CreateSut(new HttpClient(handler));
+
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
+
+        result.Erfolg.Should().BeTrue();
+        result.Release!.Version.Should().Be("1.5.0-rc.1");
+        handler.RequestedUrls.Should().Equal(Page1Url, numericPage2Url);
     }
 
     /// <summary>Caller-Cancellation propagiert als OperationCanceledException statt als null-Ergebnis.</summary>

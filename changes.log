@@ -1,3 +1,6 @@
+## 2026-10-20 — Fix: GitHub-Release-Prüfung folgt numerischer Repositories-Pagination
+
+- Der Update-Check brach mit "unzulässige Folge-URL" ab (Release als nicht prüfbar): GitHubs Link-Header liefert Seite 2+ ggf. als /repositories/{id}/releases statt /repos/{owner}/{name}/releases (u. a. nach Umbenennungen). IsAllowedFollowUpUri akzeptiert nun auch die numerische Form (gleicher Host/HTTPS gepinnt); nicht-numerische oder fremde Pfade bleiben verboten.
 ## 2026-10-20 — Fix: Scrollbar im Einstellungen-Tab Allgemein
 
 - Das Register Allgemein ist mit den SCM-Einstellungen gewachsen — untere Optionen waren nicht mehr erreichbar. Der Tab-Inhalt liegt jetzt in einem ScrollViewer (vertikal Auto, horizontal deaktiviert).
