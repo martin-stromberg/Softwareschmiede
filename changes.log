@@ -1,3 +1,6 @@
+## 2026-10-20 — Fix: Scrollbar im Einstellungen-Tab Allgemein
+
+- Das Register Allgemein ist mit den SCM-Einstellungen gewachsen — untere Optionen waren nicht mehr erreichbar. Der Tab-Inhalt liegt jetzt in einem ScrollViewer (vertikal Auto, horizontal deaktiviert).
 ## 2026-10-20 — Abschlussüberwachung ereignisgesteuerter SCM-Aufgaben
 
 - **PR-Verknüpfung über den Antwortkanal**: `ScmExchangeComplete` erhält das optionale Feld `pullRequestNumber` — ein vom Agenten selbst (per `gh`) angelegter Pull Request wird so an die Anwendung gemeldet. `ScmEventOrchestrator.LinkReportedPullRequestAsync` speichert ihn als `PullRequestReferenz` (Rolle `CreatedByTask`) an der Aufgabe (`PullRequestReferenzService.SaveReportedAsync`, idempotent; fremd zugeordnete Referenzen werden nicht übernommen); Repository und Host kommen ausschließlich aus dem gespeicherten Ursprung. `PullRequestProviderDescriptor.TryGetProviderForPluginPrefix` löst Prefix→Provider auf. Die Prompt-Instruktion und das `completeSchema` dokumentieren das Feld; nicht positive Nummern bleiben Protokollfehler.
