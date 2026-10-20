@@ -215,6 +215,38 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         result.Complete!.ActionIds.Should().BeEquivalentTo([actionId]);
     }
 
+    /// <summary>Eine im Abschluss gemeldete Pull-Request-Nummer wird gelesen und verknüpfbar;
+    /// nicht positive Werte bleiben ein Protokollfehler.</summary>
+    [Theory]
+    [InlineData(7, true)]
+    [InlineData(0, false)]
+    [InlineData(-3, false)]
+    public async Task Complete_ReportedPullRequestNumber_IsValidated(int number, bool valid)
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var request = attempt.Request;
+        await Write(Path.Combine(attempt.DirectoryPath, "complete.json"),
+            new ScmExchangeComplete(1, request.EventId, request.AttemptId, request.CliRunId,
+                [], false, Report: "PR angelegt.", PullRequestNumber: number));
+        await _protocol.ReadAsync(attempt);
+        var result = await _protocol.ReadAsync(attempt);
+        (result.Complete is not null).Should().Be(valid);
+        if (valid)
+            result.Complete!.PullRequestNumber.Should().Be(number);
+        else
+            result.Diagnostic.Should().NotBeNullOrWhiteSpace();
+    }
+
+    /// <summary>Der Prompt dokumentiert das pullRequestNumber-Feld für vom Agenten angelegte Pull Requests.</summary>
+    [Fact]
+    public async Task Prompt_DocumentsPullRequestNumberReporting()
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        using var document = JsonDocument.Parse(attempt.Prompt);
+        document.RootElement.GetProperty("instruction").GetString()!.Should().Contain("pullRequestNumber");
+        document.RootElement.GetProperty("completeSchema").GetString()!.Should().Contain("pullRequestNumber");
+    }
+
     /// <summary>Der Prompt weist den Agenten an, erlaubte Issue-/PR-Aktionen selbst über die
     /// SCM-Anbindung auszuführen, und dokumentiert das report-Feld; Repo- und Ursprungskontext
     /// bleiben Daten im request.</summary>

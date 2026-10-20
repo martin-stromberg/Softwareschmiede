@@ -27,3 +27,5 @@ Koordiniert die exklusive Verarbeitung von Ereignissen einer Aufgabe über Worke
 ## Beziehungen
 
 Ein Ereignis gehört fachlich zu einer Aufgabe und kann mehrere ausgehende Aktionen enthalten. Checkpoints und Snapshots sind unabhängig nach Quelle beziehungsweise Textversion indiziert. Eine Aufgaben-Lease serialisiert Ereignisse desselben Aufgabenbereichs. Die konkreten Zuordnungen und Fremdschlüssel werden in `SoftwareschmiededDbContext` konfiguriert.
+
+Für die Abschlussüberwachung trägt die Aufgabe zwei Felder: `ScmAbschlussErkanntUtc` (UTC-Zeitpunkt, ab dem die verknüpfte SCM-Referenz erstmals geschlossen/gemergt beobachtet wurde — persistierter Beginn der Wartezeit) und `ScmAbschlussReferenz` (Anzeigebezeichnung der Referenz). Vom Agenten im Abschluss gemeldete Pull Requests (`complete.json`-Feld `pullRequestNumber`) werden als `PullRequestReferenz` mit Rolle `CreatedByTask` an der Aufgabe gespeichert.

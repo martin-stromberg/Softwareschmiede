@@ -16,7 +16,8 @@ public sealed class ScmEventOrchestrator(
     IPluginManager plugins, PluginSelectionService selection, EntwicklungsprozessService development,
     AufgabeService tasks, KiAusfuehrungsService cli, ScmEventExchangeProtocol exchange,
     ScmEventChangeNotifier notifier, IServiceScopeFactory scopes, TimeProvider time, IOptions<ScmEventOptions> options,
-    AppEinstellungService einstellungen)
+    AppEinstellungService einstellungen, PullRequestReferenzService pullRequestReferenzen,
+    ProtokollService protokoll)
 {
     /// <summary>Versucht Zustellung oder rekonstruiert ausschließlich den schon begonnenen Versuch.</summary>
     public async Task DispatchAsync(Guid eventId, string? explicitPluginPrefix = null, CancellationToken ct = default)
@@ -401,6 +402,11 @@ public sealed class ScmEventOrchestrator(
                     item.Reason = null;
                 }
             }
+            // Ein im Abschluss gemeldeter, vom Agenten selbst angelegter Pull Request wird unabhängig
+            // vom einzelnen Abschlussversuch mit der Aufgabe verknüpft: Die Abschlussüberwachung kann
+            // die Aufgabe nach seinem Merge/Schluss beenden.
+            if (messages.Complete is { PullRequestNumber: > 0 } withPullRequest)
+                await LinkReportedPullRequestAsync(item, observation, withPullRequest.PullRequestNumber.Value, ct);
         }
         var now = time.GetUtcNow().ToUnixTimeMilliseconds();
         if (item.Status == "ZustellungVorbereitet")
@@ -421,6 +427,26 @@ public sealed class ScmEventOrchestrator(
         }
         if (await IsCancelledAsync(item.Id, ct)) return;
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Verknüpft einen vom Agenten im Abschluss gemeldeten Pull Request mit der Aufgabe.
+    /// Repository und Provider kommen ausschließlich aus dem gespeicherten, host-validierten Ursprung;
+    /// die gemeldete Nummer ist Datenwert. Eine fremd zugeordnete Referenz wird nicht übernommen.</summary>
+    private async Task LinkReportedPullRequestAsync(ScmIncomingEvent item, ScmEventObservation observation,
+        int pullRequestNumber, CancellationToken ct)
+    {
+        var repository = observation.Reference.Repository;
+        var provider = PullRequestProviderDescriptor.TryGetProviderForPluginPrefix(repository.ProviderPrefix)
+            ?? PullRequestProvider.GitHub;
+        var repositoryId = PullRequestRepositoryId.Normalize(provider, $"{repository.Owner}/{repository.Name}");
+        var url = $"https://{repository.Host}/{repository.Owner}/{repository.Name}/pull/{pullRequestNumber}";
+        var linked = await pullRequestReferenzen.SaveReportedAsync(
+            item.AufgabeId, repository.ProviderPrefix, repositoryId, pullRequestNumber, url, ct);
+        await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.GitAktion,
+            linked is not null
+                ? $"Pull Request #{pullRequestNumber} wurde vom Agenten gemeldet und mit der Aufgabe verknüpft ({url})."
+                : $"Der vom Agenten gemeldete Pull Request #{pullRequestNumber} ist bereits einer anderen Aufgabe zugeordnet und wurde nicht verknüpft ({url}).",
+            ct: ct);
     }
 
     /// <summary>Liest den persistierten Status unabhängig vom verfolgten Datensatz, damit ein während eines

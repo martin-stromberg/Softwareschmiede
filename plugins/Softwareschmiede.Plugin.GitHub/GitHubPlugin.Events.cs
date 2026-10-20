@@ -129,7 +129,10 @@ public sealed partial class GitHubPlugin
             : Array.Empty<string>();
         return new Issue(int.Parse(Required(element, "number"), CultureInfo.InvariantCulture),
             String(element, "title") ?? string.Empty, String(element, "body"), labels,
-            String(Object(element, "milestone"), "title"), String(element, "html_url") ?? String(element, "url"));
+            String(Object(element, "milestone"), "title"), String(element, "html_url") ?? String(element, "url"))
+        {
+            IstGeschlossen = string.Equals(String(element, "state"), "closed", StringComparison.OrdinalIgnoreCase)
+        };
     }
 
     /// <inheritdoc />

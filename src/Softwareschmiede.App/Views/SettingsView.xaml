@@ -300,6 +300,29 @@
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    TextWrapping="Wrap"
                                    Margin="22,4,0,0" />
+                        <CheckBox IsChecked="{Binding IsScmTaskCompletionEnabled, Mode=TwoWay}"
+                                  AutomationProperties.Name="IsScmTaskCompletionEnabled"
+                                  Content="Abschlussüberwachung ereignisgesteuerter Aufgaben aktivieren"
+                                  Foreground="{DynamicResource PrimaryTextBrush}"
+                                  Margin="0,12,0,0" />
+                        <TextBlock Text="Beobachtet zyklisch die verknüpften Pull Requests bzw. Issues von Aufgaben, die über die SCM-Ereignisüberwachung bearbeitet wurden. Ist die Referenz geschlossen oder gemergt, wird die Aufgabe nach der eingestellten Wartezeit automatisch beendet — inklusive einer noch laufenden KI-Ausführung. Die Änderung wirkt ohne Neustart."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="22,4,0,0" />
+                        <TextBlock Text="Wartezeit bis zum Beenden (Minuten)"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="22,8,0,4" />
+                        <TextBox Text="{Binding ScmTaskCompletionWaitMinutes, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="ScmTaskCompletionWaitMinutes"
+                                 Width="120"
+                                 HorizontalAlignment="Left"
+                                 Margin="22,0,0,0"
+                                 Padding="8,6"
+                                 BorderBrush="{DynamicResource BorderBrush}" />
+                        <TextBlock Text="Zeit zwischen dem erkannten Schließen bzw. Mergen der verknüpften Referenz und dem automatischen Beenden der Aufgabe. Ganzzahl in Minuten; Standard: 60."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="22,4,0,0" />
                         <TextBlock Text="Trigger-Keyword"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource PrimaryTextBrush}"
