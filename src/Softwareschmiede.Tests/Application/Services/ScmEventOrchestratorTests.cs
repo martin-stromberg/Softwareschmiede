@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -197,5 +198,71 @@ public sealed class ScmEventOrchestratorTests
         Assert.Equal("Zugestellt", item.Status);
         Assert.NotNull(item.DeliveryAttemptId);
         Assert.Single(fixture.Prompts);
+    }
+
+    /// <summary>A CLI without a prompt-format profile waits honestly without offering a confirmation.</summary>
+    [Fact]
+    public async Task UnknownCliFormat_WaitsWithoutConfirmOption()
+    {
+        await using var fixture = new ScmDispatchFixture(ki: new ScmKiProfile("Softwareschmiede.GitHubCopilot", string.Empty,
+            "GitHub Copilot CLI", ">", new Dictionary<string, string?>()));
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(eventId);
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("Wartend", item.Status);
+        Assert.Contains("Promptformat", item.Reason);
+        Assert.Contains("unbekannt", item.Reason);
+        Assert.False(ScmCliWaitReason.IsConfirmable(item.Reason));
+        var adapter = fixture.Services.GetRequiredService<KiAusfuehrungsService>().GetScmPromptSession(taskId)!;
+        Assert.Equal(ScmCliRecognitionState.Unknown, adapter.CliRecognition.State);
+        using var scope = fixture.Services.CreateScope();
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D")));
+        Assert.Contains("unbekannt", error.Message);
+        Assert.Empty(fixture.Prompts);
+    }
+
+    /// <summary>An explicit confirmation of an out-of-range version lets the file-tool channel probe prove access.</summary>
+    [Fact]
+    public async Task ConfirmReady_UnsupportedVersion_DeliversAfterChannelProbe()
+    {
+        var prompts = new List<string>();
+        var fixture = default(ScmDispatchFixture);
+        fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3000.12.7",
+            onWritePrompt: async prompt =>
+            {
+                if (prompt.Contains("challengePath", StringComparison.Ordinal)) await ScmDispatchFixture.CompleteProbeAsync(prompt);
+                else prompts.Add(prompt);
+                fixture!.Sessions.Values.Single().Raise(x => x.BufferChanged += null, EventArgs.Empty);
+            }));
+        try
+        {
+            await fixture.InitializeAsync();
+            var (taskId, eventId) = await fixture.AddAsync(configured: true);
+            await fixture.DispatchAsync(eventId);
+            var waiting = await fixture.EventAsync(eventId);
+            Assert.Equal("Wartend", waiting.Status);
+            Assert.Contains("Devin CLI", waiting.Reason);
+            Assert.Contains("v3000.12.7", waiting.Reason);
+            Assert.Contains("nicht unterstützt", waiting.Reason);
+            var adapter = fixture.Services.GetRequiredService<KiAusfuehrungsService>().GetScmPromptSession(taskId)!;
+            Assert.Equal(ScmCliRecognitionState.Unsupported, adapter.CliRecognition.State);
+            using (var scope = fixture.Services.CreateScope())
+                await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"));
+            ScmIncomingEvent item;
+            var attempts = 0;
+            do
+            {
+                await fixture.DispatchAsync(eventId);
+                item = await fixture.EventAsync(eventId);
+            } while (item.Status == "Wartend" && ++attempts < 5);
+            Assert.Equal("Zugestellt", item.Status);
+            Assert.Single(prompts);
+        }
+        finally
+        {
+            if (fixture is not null) await fixture.DisposeAsync();
+        }
     }
 }

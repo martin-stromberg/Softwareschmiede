@@ -173,9 +173,15 @@ public sealed class ScmEventOrchestrator(
                 var ready = await adapter.WaitForInputReadyAsync(ct);
                 if (ready != ScmPromptReadyStatus.Ready)
                 {
+                    // Einmaliger Schnappschuss: geprüfte Bedingung und gemeldeter Grund stammen
+                    // aus demselben Erkennungsstand.
+                    var recognition = adapter.CliRecognition;
                     var reason = ready == ScmPromptReadyStatus.TrustPrompt
                         ? "Die CLI wartet auf die Bestätigung der Vertrauenswürdigkeit dieses Ordners. Bitte die Abfrage im Terminal der laufenden CLI-Sitzung beantworten; die Zustellung wird danach automatisch fortgesetzt."
-                        : adapter.IsBusy ? "CLI beschäftigt; wartet auf Eingabebereitschaft." : "Eingabebereitschaft unbekannt. Für die angezeigte CLI-Sitzung bestätigen.";
+                        : adapter.IsBusy ? "CLI beschäftigt; wartet auf Eingabebereitschaft."
+                        : recognition.State != ScmCliRecognitionState.Supported
+                        ? ScmCliWaitReason.Describe(recognition)
+                        : ScmCliWaitReason.UnknownReady;
                     await WaitWithCommentAsync(item, observation, responder, reason, ct);
                     return;
                 }
@@ -276,7 +282,12 @@ public sealed class ScmEventOrchestrator(
         // The live adapter owns this one-input confirmation and invalidates it at every input.
         // Persisting only a run id would authorize later, unrelated input phases in that same run.
         if (!session.ConfirmReady(session.CliRunId))
-            throw new InvalidOperationException("CLI ist beschäftigt oder kann noch nicht bestätigt werden. Bitte erneut prüfen.");
+        {
+            var recognition = session.CliRecognition;
+            throw new InvalidOperationException(recognition.State == ScmCliRecognitionState.Unknown
+                ? ScmCliWaitReason.Describe(recognition)
+                : "CLI ist beschäftigt oder kann noch nicht bestätigt werden. Bitte erneut prüfen.");
+        }
         // A deliberate confirmation is an explicit retry, so an earlier hard stop must not
         // swallow it like the other queue actions already prevent.
         item.NextAttemptUtc = null;

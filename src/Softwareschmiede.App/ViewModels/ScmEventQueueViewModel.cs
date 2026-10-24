@@ -329,8 +329,8 @@ public sealed record ScmEventQueueItem(Guid Id, Guid TaskId, string TaskTitle, s
     public bool CanCancel => !IsFinal;
     /// <summary>Unsicherheit benötigt eine ausdrückliche Warnungsbestätigung.</summary>
     public bool CanResend => AttemptId is not null && Status is "ZustellungUngewiss" or "VerarbeitungUngeklärt";
-    /// <summary>Nur eine unbekannte, noch nicht zugestellte Bereitschaft kann bestätigt werden.</summary>
-    public bool CanConfirmReady => !IsBlocked && AttemptId is null && CliRunId is not null && Reason?.Contains("Eingabebereitschaft unbekannt", StringComparison.Ordinal) == true;
+    /// <summary>Nur ein als bestätigbar markierter, noch nicht zugestellter Wartegrund bietet die Bestätigung an.</summary>
+    public bool CanConfirmReady => !IsBlocked && AttemptId is null && CliRunId is not null && ScmCliWaitReason.IsConfirmable(Reason);
     /// <summary>Erstellt die menschenlesbare Projektion aus dauerhaften Daten.</summary>
     public static ScmEventQueueItem From(ScmIncomingEvent item, Aufgabe? task)
     {

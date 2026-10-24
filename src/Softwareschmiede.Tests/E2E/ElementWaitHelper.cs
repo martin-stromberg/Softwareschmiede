@@ -129,6 +129,134 @@ internal static class ElementWaitHelper
         return element;
     }
 
+    /// <summary>
+    /// Sucht ein Element in den Top-Level-Fenstern desselben Prozesses wie <paramref name="scopeElement"/>.
+    /// Ersetzt Suchen mit <c>Automation.GetDesktop()</c> als Wurzel: Der Teilbaum aller Fenster des eigenen
+    /// Prozesses ist klein und die Enumeration erfolgt per Win32 ohne UIA-Provider-Traversierung des
+    /// Desktops (siehe <see cref="ProcessWindowEnumeration"/>).
+    /// </summary>
+    /// <param name="scopeElement">Element, dessen Prozess die Fenstermenge bestimmt (z. B. das Hauptfenster der Test-App).</param>
+    /// <param name="conditionFunc">Die Suchbedingung, pro Fenster inkl. des Fensterelements selbst ausgewertet.</param>
+    /// <returns>Das gefundene Element oder <c>null</c>.</returns>
+    internal static AutomationElement? FindInProcessWindows(
+        AutomationElement scopeElement,
+        Func<ConditionFactory, ConditionBase> conditionFunc)
+    {
+        var pid = scopeElement.Properties.ProcessId.ValueOrDefault;
+        foreach (var hwnd in ProcessWindowEnumeration.TopLevelWindowsOfProcess(pid))
+        {
+            AutomationElement? window;
+            try { window = scopeElement.Automation.FromHandle(hwnd); }
+            catch (Exception) { continue; }
+            if (window is null) continue;
+
+            var hit = window.FindFirst(FlaUI.Core.Definitions.TreeScope.Subtree, conditionFunc(window.Automation.ConditionFactory));
+            if (hit is not null)
+                return hit;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Wartet, bis <paramref name="conditionFunc"/> in einem Top-Level-Fenster des Prozesses von
+    /// <paramref name="scopeElement"/> erfüllt ist. Verhält sich wie <see cref="WaitForElement"/>,
+    /// inklusive Fail-Fast auf ein Fehlerbanner (geprüft in <paramref name="scopeElement"/> selbst).
+    /// </summary>
+    internal static AutomationElement WaitForProcessWindow(
+        AutomationElement scopeElement,
+        Func<ConditionFactory, ConditionBase> conditionFunc,
+        TimeSpan timeout,
+        Func<AutomationElement, bool>? isVisible = null)
+    {
+        isVisible ??= static _ => true;
+
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = FindInProcessWindows(scopeElement, conditionFunc);
+            if (element is not null && isVisible(element))
+                return element;
+
+            var fehlerMeldung = scopeElement.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+            if (fehlerMeldung is not null && isVisible(fehlerMeldung))
+                throw new InvalidOperationException(
+                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(fehlerMeldung)}");
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException($"Element wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden.");
+    }
+
+    /// <summary>
+    /// Wartet, bis kein Top-Level-Fenster des Prozesses von <paramref name="scopeElement"/> mehr
+    /// <paramref name="conditionFunc"/> erfüllt. Verhält sich wie <see cref="PollUntilGone"/>.
+    /// </summary>
+    /// <returns><c>null</c>, wenn das Element rechtzeitig verschwunden ist, sonst das zuletzt gefundene Element.</returns>
+    internal static AutomationElement? PollProcessWindowGone(
+        AutomationElement scopeElement,
+        Func<ConditionFactory, ConditionBase> conditionFunc,
+        TimeSpan timeout,
+        Func<AutomationElement, bool>? isVisible = null)
+    {
+        isVisible ??= static _ => true;
+
+        var deadline = DateTime.UtcNow + timeout;
+        AutomationElement? element = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            element = FindInProcessWindows(scopeElement, conditionFunc);
+            if (element is null || !isVisible(element))
+                return null;
+
+            Thread.Sleep(200);
+        }
+
+        return element;
+    }
+
+    /// <summary>Wie <see cref="PollProcessWindowGone"/>, wirft aber bei Timeout eine <see cref="TimeoutException"/>.</summary>
+    internal static void WaitUntilProcessWindowGone(
+        AutomationElement scopeElement,
+        Func<ConditionFactory, ConditionBase> conditionFunc,
+        TimeSpan timeout,
+        Func<AutomationElement, bool>? isVisible = null)
+    {
+        if (PollProcessWindowGone(scopeElement, conditionFunc, timeout, isVisible) is not null)
+            throw new TimeoutException($"Element verschwand nicht innerhalb von {timeout.TotalSeconds}s.");
+    }
+
+    /// <summary>
+    /// Wartet, bis ein Top-Level-Fenster (beliebiger Prozess) mit exakt <paramref name="title"/> als
+    /// Titel existiert, und gibt es als AutomationElement zurück. Ersetzt die Namens-Teilbaumsuche
+    /// auf <c>Automation.GetDesktop()</c>; der Titelvergleich erfolgt per Win32-GetWindowText.
+    /// </summary>
+    internal static AutomationElement WaitForTitledWindow(
+        AutomationElement scopeElement,
+        string title,
+        TimeSpan timeout,
+        Func<AutomationElement, bool>? isVisible = null)
+    {
+        isVisible ??= static _ => true;
+
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var hwnd = ProcessWindowEnumeration.FindTopLevelWindowByTitle(title);
+            if (ProcessWindowEnumeration.IsAliveWindow(hwnd))
+            {
+                var element = scopeElement.Automation.FromHandle(hwnd);
+                if (element is not null && isVisible(element))
+                    return element;
+            }
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException($"Fenster '{title}' wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden.");
+    }
+
     /// <summary>Ersetzt den ausgewählten Text durch Unicode-Eingabe, verlässt das Feld mit Tab und prüft den Feldwert.</summary>
     internal static void ReplaceTextBoxText(AutomationElement element, string text)
     {
@@ -205,7 +333,7 @@ internal static class ElementWaitHelper
 
         AutomationElement? item = comboBoxElement.FindFirstDescendant(cf => cf.ByName(itemText));
         if (item is null || !isVisible(item))
-            item = WaitForElement(comboBoxElement.Automation.GetDesktop(), cf => cf.ByName(itemText), timeout, isVisible);
+            item = WaitForProcessWindow(comboBoxElement, cf => cf.ByName(itemText), timeout, isVisible);
 
         item.ClickInForeground();
         Thread.Sleep(200);

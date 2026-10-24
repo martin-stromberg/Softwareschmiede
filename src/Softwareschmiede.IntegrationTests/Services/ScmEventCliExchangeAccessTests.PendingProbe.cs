@@ -5,6 +5,7 @@ using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.Terminal;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Terminal;
+using Softwareschmiede.TestSupport;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
@@ -22,6 +23,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.114.0)", "›")]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.1.0", "❯")]
     [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3000.11.92", "❭")]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3000.11.205", "❭")]
     public async Task PendingProbe_ResendsAfterDelay_UpToCap(string provider, string arguments, string banner, string prompt)
     {
         var (prefix, spec) = await Spec(provider, arguments);
@@ -84,7 +86,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
         // The file tool completes the re-delivered challenge on the second attempt.
         var sent = (string)session.Invocations.Last(call => call.Method.Name == nameof(ITerminalSession.WritePromptAsync)).Arguments[0]!;
-        await CompleteProbeAsync(sent);
+        await ScmDispatchFixture.CompleteProbeAsync(sent);
         session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
         (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Supported);
     }
