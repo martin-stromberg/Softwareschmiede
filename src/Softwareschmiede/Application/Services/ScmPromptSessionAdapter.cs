@@ -37,6 +37,8 @@ public interface IScmPromptSessionAdapter
     bool IsBusy { get; }
     /// <summary>Aktueller Nachweis einer KI-Eingabe.</summary>
     ScmPromptReadyStatus ReadyStatus { get; }
+    /// <summary>Erkannter CLI-Typ und Versionszustand des gebundenen Laufs.</summary>
+    ScmCliRecognition CliRecognition { get; }
     /// <summary>Wartet auf ein echtes Promptsignal, nie allein auf I/O-Ruhe.</summary>
     Task<ScmPromptReadyStatus> WaitForInputReadyAsync(CancellationToken ct = default);
     /// <summary>Prüft den Startvertrag und fordert bei Bedarf eine separate tatsächliche Dateitool-Probe an.</summary>
@@ -49,7 +51,8 @@ public interface IScmPromptSessionAdapter
 
 /// <summary>
 /// Adapter für die getesteten Codex-/Claude-/Devin-Promptformate und den deterministischen JSON-Simulator.
-/// Shells, Alt-Sessions und unbekannte CLI-Versionen bleiben sichtbar ungeklärt.
+/// Shells, Alt-Sessions und unbekannte Promptformate bleiben sichtbar ungeklärt; erkannte CLIs mit einer
+/// Version außerhalb der unterstützten Bereiche werden mit Name und Version benannt.
 /// </summary>
 public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposable
 {
@@ -78,7 +81,8 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
     private int _accessProbeSends;
     private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private ScmPromptReadyStatus _ready;
-    private bool _recognizedCli;
+    private ScmCliRecognition _cliRecognition;
+    private bool _formatUserConfirmed;
     private bool _manuallyConfirmed;
     private long _inputRevision = -1;
     private long _outputRevision;
@@ -97,6 +101,9 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
         _isCurrent = isCurrent;
         _time = timeProvider ?? TimeProvider.System;
         _access = ScmCliAccessEvaluator.Evaluate(pluginPrefix, spec, runId, files);
+        _cliRecognition = ScmCliPromptProfile.TryGet(pluginPrefix, out var profile)
+            ? new ScmCliRecognition(ScmCliRecognitionState.Unknown, profile.DisplayName, null, profile.SupportedVersionsText)
+            : new ScmCliRecognition(ScmCliRecognitionState.Unknown, null, null, null);
         session.OutputChunk += OnOutput;
         session.BufferChanged += OnBufferChanged;
         session.Exited += OnExited;
@@ -125,6 +132,8 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
     public bool IsBusy => ReadyStatus == ScmPromptReadyStatus.Busy;
     /// <inheritdoc/>
     public ScmPromptReadyStatus ReadyStatus { get { if (!IsAlive) return ScmPromptReadyStatus.Exited; lock (_sync) return _ready; } }
+    /// <inheritdoc/>
+    public ScmCliRecognition CliRecognition { get { lock (_sync) return _cliRecognition; } }
 
     /// <inheritdoc/>
     public async Task<ScmPromptReadyStatus> WaitForInputReadyAsync(CancellationToken ct = default)
@@ -147,6 +156,11 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
     {
         ct.ThrowIfCancellationRequested();
         var access = _access;
+        // Einmaliger Schnappschuss unter dem Sperrobjekt: Bedingung und gemeldeter Grund müssen
+        // aus demselben Erkennungsstand stammen, auch wenn parallel Session-Ereignisse eintreffen.
+        ScmCliRecognition recognition;
+        bool formatUserConfirmed;
+        lock (_sync) { recognition = _cliRecognition; formatUserConfirmed = _formatUserConfirmed; }
         if (!IsAlive) access = access with { Status = ScmExchangeAccessStatus.Unknown, Reason = "CLI-Sitzung hat sich geändert oder wurde beendet." };
         else if (!ScmCliAccessEvaluator.IsUnchanged(_files))
             access = access with { Status = ScmExchangeAccessStatus.Unknown, Reason = "CLI-Konfiguration wurde seit dem Start geändert; regulärer Neustart erforderlich." };
@@ -159,8 +173,9 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
                 var relative = Path.GetRelativePath(root, Path.GetFullPath(exchangePath));
                 if (relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || Path.IsPathRooted(relative))
                     access = access with { Status = ScmExchangeAccessStatus.Denied, Reason = "Antwortkanal liegt außerhalb der erfassten CLI-Schreibwurzel." };
-                else if (!_recognizedCli && access.Status == ScmExchangeAccessStatus.Supported)
-                    access = access with { Status = ScmExchangeAccessStatus.Unknown, Reason = "CLI-Version oder Initialisierung ist nicht durch ein unterstütztes Promptformat bestätigt." };
+                else if (recognition.State != ScmCliRecognitionState.Supported && !formatUserConfirmed &&
+                    access.Status == ScmExchangeAccessStatus.Supported)
+                    access = access with { Status = ScmExchangeAccessStatus.Unknown, Reason = ScmCliWaitReason.Describe(recognition) };
                 else if (access.Status == ScmExchangeAccessStatus.Supported)
                 {
                     // A normal CLI parent says nothing about the token/sandbox of its file tools.
@@ -228,9 +243,12 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
         {
             RefreshScreen();
             // Confirmation cannot turn a shell, unknown adapter, blocking dialog or known busy
-            // turn into an AI prompt.
-            if (!_recognizedCli || _ready is ScmPromptReadyStatus.Busy or ScmPromptReadyStatus.TrustPrompt) return false;
+            // turn into an AI prompt. A recognized but out-of-range version may be confirmed
+            // explicitly: the file-tool channel probe remains the actual safety boundary.
+            if (_cliRecognition.State == ScmCliRecognitionState.Unknown ||
+                _ready is ScmPromptReadyStatus.Busy or ScmPromptReadyStatus.TrustPrompt) return false;
             _manuallyConfirmed = true;
+            if (_cliRecognition.State == ScmCliRecognitionState.Unsupported) _formatUserConfirmed = true;
             SetReady(ScmPromptReadyStatus.Ready);
             return true;
         }
@@ -271,13 +289,37 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
 
     private void RecognizeStartup(string text)
     {
-        // Supported transcript versions are deliberately explicit. New/changed formats require a fixture.
-        if (PluginPrefix == "Softwareschmiede.Codex" && text.Contains("OpenAI Codex (v0.114.0)", StringComparison.Ordinal)) _recognizedCli = true;
-        if (PluginPrefix == "Softwareschmiede.ClaudeCli" && text.Contains("Claude Code v2.1.0", StringComparison.Ordinal)) _recognizedCli = true;
-        if (PluginPrefix == "Softwareschmiede.Devin" && text.Contains("Devin CLI", StringComparison.Ordinal) &&
-            text.Contains("v3000.11.92", StringComparison.Ordinal)) _recognizedCli = true;
-        if (PluginPrefix == "Softwareschmiede.KiSimulator" && text.Contains("SCM_SIMULATOR_PROTOCOL_V1", StringComparison.Ordinal) &&
-            _access.Status is ScmExchangeAccessStatus.Supported or ScmExchangeAccessStatus.Denied) _recognizedCli = true;
+        // Supported transcript formats are deliberately explicit. New/changed formats require a fixture.
+        var match = ScmCliPromptProfile.TryMatch(PluginPrefix, text);
+        // Die Erkennung ist monoton: Ein einmal unterstützt klassifizierter Lauf wird durch
+        // Folgeanker nicht mehr herabgestuft. Der flüchtige Bildschirmpuffer kann den Anker ohne
+        // Versionszeile zeigen (Scrollback-Grenze, erneuter Namensabdruck), während das
+        // kumulative Startup-Transkript die Version längst enthält.
+        if (match is null || _cliRecognition.State == ScmCliRecognitionState.Supported) return;
+        if (match.Profile.VersionPattern is null)
+        {
+            // The simulator contract is unversioned; only a run the start contract already granted
+            // or denied counts as an identified channel, never a plain shell.
+            if (_access.Status is ScmExchangeAccessStatus.Supported or ScmExchangeAccessStatus.Denied)
+                _cliRecognition = new(ScmCliRecognitionState.Supported, match.Profile.DisplayName, null, match.Profile.SupportedVersionsText);
+            else if (_cliRecognition.ChannelReason is null)
+                // Anker ohne Kanalvertrag (z. B. Simulator-Shell ohne SCM-Modus): Der Zugriffsgrund
+                // des Evaluators wird gemeldet statt fälschlich ein fehlendes Banner zu behaupten.
+                _cliRecognition = new(ScmCliRecognitionState.Unknown, match.Profile.DisplayName, null,
+                    match.Profile.SupportedVersionsText)
+                { ChannelReason = _access.Reason };
+            return;
+        }
+        // Nur ein geparstes Versionstoken darf einen einmal klassifizierten Zustand verändern;
+        // ein tokenloser Anker verfeinert höchstens den noch unbekannten Zustand.
+        if (match.Version is null)
+        {
+            if (_cliRecognition.State == ScmCliRecognitionState.Unknown)
+                _cliRecognition = new(ScmCliRecognitionState.Unsupported, match.Profile.DisplayName, null, match.Profile.SupportedVersionsText);
+            return;
+        }
+        _cliRecognition = new(match.IsSupported ? ScmCliRecognitionState.Supported : ScmCliRecognitionState.Unsupported,
+            match.Profile.DisplayName, match.Version, match.Profile.SupportedVersionsText);
     }
 
     private void RefreshScreen()
@@ -288,7 +330,9 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
             var lines = Enumerable.Range(0, Session.Buffer.Rows).Select(row => new string(Session.Buffer.GetRow(row).Select(cell => cell.Character).ToArray()).TrimEnd()).ToArray();
             var screen = string.Join('\n', lines);
             RecognizeStartup(screen);
-            if (!_recognizedCli) return;
+            // A confirmed out-of-range format keeps the regular prompt/busy evaluation so the
+            // channel probe lifecycle (send, resend, re-readiness) works like a supported version.
+            if (_cliRecognition.State != ScmCliRecognitionState.Supported && !_formatUserConfirmed) return;
             if (_manuallyConfirmed) return;
             if (_inputRevision == _outputRevision) return;
             var prompt = lines[Math.Clamp(Session.Buffer.CursorRow, 0, lines.Length - 1)].Trim();

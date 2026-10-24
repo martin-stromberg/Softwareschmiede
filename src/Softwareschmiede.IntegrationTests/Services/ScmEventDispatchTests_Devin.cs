@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FluentAssertions;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -18,7 +17,7 @@ public sealed class ScmEventDispatchTests_Devin
         var fixture = default(ScmDispatchFixture);
         fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(onWritePrompt: async prompt =>
         {
-            if (prompt.Contains("challengePath", StringComparison.Ordinal)) await CompleteProbeAsync(prompt);
+            if (prompt.Contains("challengePath", StringComparison.Ordinal)) await ScmDispatchFixture.CompleteProbeAsync(prompt);
             else prompts.Add(prompt);
             // A real CLI redraws and returns to its prompt after a turn; only new output
             // revisions let the adapter leave the busy state again.
@@ -48,8 +47,59 @@ public sealed class ScmEventDispatchTests_Devin
         }
         finally
         {
-            await fixture.DisposeAsync();
+            if (fixture is not null) await fixture.DisposeAsync();
         }
+    }
+
+    /// <summary>A Devin patch release inside the supported range delivers like the pinned version.</summary>
+    [Fact]
+    public async Task DevinTask_WithSupportedPatchVersion_DeliversEvent()
+    {
+        var prompts = new List<string>();
+        var fixture = default(ScmDispatchFixture);
+        fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3000.11.205", onWritePrompt: async prompt =>
+        {
+            if (prompt.Contains("challengePath", StringComparison.Ordinal)) await ScmDispatchFixture.CompleteProbeAsync(prompt);
+            else prompts.Add(prompt);
+            fixture!.Sessions.Values.Single().Raise(x => x.BufferChanged += null, EventArgs.Empty);
+        }));
+        try
+        {
+            await fixture.InitializeAsync();
+            var (taskId, eventId) = await fixture.AddAsync(configured: true);
+
+            ScmIncomingEvent item;
+            var attempts = 0;
+            do
+            {
+                await fixture.DispatchAsync(eventId);
+                item = await fixture.EventAsync(eventId);
+            } while (item.Status == "Wartend" && ++attempts < 5);
+
+            item.Status.Should().Be("Zugestellt");
+            fixture.Sessions.Should().ContainKey(taskId);
+            prompts.Should().ContainSingle();
+        }
+        finally
+        {
+            if (fixture is not null) await fixture.DisposeAsync();
+        }
+    }
+
+    /// <summary>An out-of-range Devin version waits with an honest reason naming CLI and version.</summary>
+    [Fact]
+    public async Task DevinTask_WithUnsupportedVersion_WaitsWithHonestReason()
+    {
+        await using var fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3000.12.7"));
+        await fixture.InitializeAsync();
+        var (_, eventId) = await fixture.AddAsync(configured: true);
+
+        await fixture.DispatchAsync(eventId);
+
+        var item = await fixture.EventAsync(eventId);
+        item.Status.Should().Be("Wartend");
+        item.Reason.Should().Contain("Devin CLI").And.Contain("v3000.12.7").And.Contain("nicht unterstützt");
+        fixture.Prompts.Should().BeEmpty();
     }
 
     /// <summary>A non-granting Devin mode leaves the event waiting; no prompt and no probe is sent.</summary>
@@ -97,15 +147,5 @@ public sealed class ScmEventDispatchTests_Devin
         };
 
         ScmCliAccessEvaluator.Evaluate("Softwareschmiede.Devin", spec, Guid.NewGuid(), []).Status.Should().Be(ScmExchangeAccessStatus.Supported);
-    }
-
-    private static async Task CompleteProbeAsync(string prompt, CancellationToken ct = default)
-    {
-        using var document = JsonDocument.Parse(prompt);
-        string PathValue(string name) => document.RootElement.GetProperty(name).GetString()!;
-        var content = await File.ReadAllBytesAsync(PathValue("challengePath"), ct);
-        await File.WriteAllBytesAsync(PathValue("temporaryProofPath"), content, ct);
-        File.Move(PathValue("temporaryProofPath"), PathValue("proofPath"));
-        File.Move(PathValue("challengePath"), PathValue("readChallengePath"));
     }
 }

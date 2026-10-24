@@ -25,10 +25,10 @@ internal sealed record ScmKiProfile(string Prefix, string Arguments, string Bann
         "SCM_SIMULATOR_PROTOCOL_V1", "SCM_READY_V1",
         new Dictionary<string, string?> { ["SOFTWARESCHMIEDE_SCM_SIMULATOR"] = "1" });
 
-    /// <summary>Devin-Startvertrag und Promptformat der gepinnten Version v3000.11.92.</summary>
+    /// <summary>Devin-Startvertrag und Promptformat; das Banner ist auf den unterstützten Bereich v3000.11.x voreingestellt.</summary>
     internal static ScmKiProfile Devin(string arguments = "--permission-mode accept-edits --respect-workspace-trust false",
-        Func<string, Task>? onWritePrompt = null) => new("Softwareschmiede.Devin", arguments,
-        "Devin CLI\nv3000.11.92", "❭", new Dictionary<string, string?>(), onWritePrompt);
+        Func<string, Task>? onWritePrompt = null, string banner = "Devin CLI\nv3000.11.92") => new("Softwareschmiede.Devin", arguments,
+        banner, "❭", new Dictionary<string, string?>(), onWritePrompt);
 }
 
 /// <summary>Real SQLite and services with isolated SCM transport and deterministic terminal boundary.</summary>
@@ -190,6 +190,18 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     {
         using var scope = Services.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents.AsNoTracking().SingleAsync(x => x.Id == id);
+    }
+
+    /// <summary>Vollzieht die Dateitool-Kanalprobe wie ein echtes CLI-Dateitool: Challenge lesen,
+    /// temporären Nachweis schreiben und beide Seiten in die Endnamen verschieben.</summary>
+    internal static async Task CompleteProbeAsync(string prompt, CancellationToken ct = default)
+    {
+        using var document = JsonDocument.Parse(prompt);
+        string PathValue(string name) => document.RootElement.GetProperty(name).GetString()!;
+        var content = await File.ReadAllBytesAsync(PathValue("challengePath"), ct);
+        await File.WriteAllBytesAsync(PathValue("temporaryProofPath"), content, ct);
+        File.Move(PathValue("temporaryProofPath"), PathValue("proofPath"));
+        File.Move(PathValue("challengePath"), PathValue("readChallengePath"));
     }
 
     internal void SetPrompt(Guid task, string prompt)

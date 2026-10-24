@@ -126,7 +126,9 @@ public sealed class KiSimulatorPlugin : CliKiPluginBase, IIssueTemplateTextGener
             [IO.File]::WriteAllText((Get-ScmNativePath $temporary), ($value | ConvertTo-Json -Depth 16 -Compress), (New-Object System.Text.UTF8Encoding($false)))
             [IO.File]::Move((Get-ScmNativePath $temporary), (Get-ScmNativePath $path))
         }
-        [Console]::WriteLine('SCM_SIMULATOR_PROTOCOL_V1')
+        if ([string]::IsNullOrWhiteSpace($scmFixture) -or -not [IO.File]::Exists((Join-Path $scmFixture 'unknown-banner'))) {
+            [Console]::WriteLine('SCM_SIMULATOR_PROTOCOL_V1')
+        }
         while ($true) {
             if ([string]::IsNullOrWhiteSpace($scmFixture) -or -not [IO.File]::Exists((Join-Path $scmFixture 'unknown-ready'))) {
                 [Console]::Write('SCM_READY_V1')

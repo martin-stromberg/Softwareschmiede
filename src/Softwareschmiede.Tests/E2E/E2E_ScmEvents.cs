@@ -470,6 +470,44 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Equal(count + 5, fixture.Prompts().Count);
         Assert.DoesNotContain(fixture.Prompts(), p => p.GetProperty("request").GetProperty("cliRunId").GetString() == readOnly.CliRunId);
         output.WriteLine("E6-Read-only: regular task stop/restart replaces denied run; only new supported run receives one event.");
+
+        // A simulator started without its protocol banner stays honestly unrecognized: the wait
+        // reason names the missing banner instead of unknown readiness, no confirm button is
+        // offered, and a regular restart with the banner delivers the same event.
+        fixture.Control("unknown-banner", true);
+        SelectEvent(window, 2);
+        StartSelected(window);
+        await WaitReasonAsync(fixture, 2, "kein unterstütztes Versionsbanner erkannt");
+        SelectEvent(window, 2);
+        WaitContains(window, "ScmEventReason", "Versionsbanner");
+        var confirmButton = window.FindFirstDescendant(cf => cf.ByAutomationId("ScmEventConfirmReady"));
+        Assert.True(confirmButton is null || confirmButton.IsOffscreen,
+            "Der Bestätigen-Button darf bei nicht erkanntem Promptformat nicht angeboten werden.");
+        var unrecognized = await fixture.WaitEventAsync(2, "Wartend");
+        Assert.NotNull(unrecognized.CliRunId);
+        Assert.Equal(count + 5, fixture.Prompts().Count);
+        // Keep dispatch blocked at the remote boundary while proving the manual stop/restart.
+        fixture.Scenario.CanWrite = false;
+        fixture.SaveScenario();
+        SelectEvent(window, 2);
+        Click(window, "ScmEventRetry");
+        await WaitReasonAsync(fixture, 2, "Schreibberechtigung");
+        SelectEvent(window, 2);
+        Click(window, "ScmEventTask");
+        new TaskDetailView(window).StopCli();
+        fixture.Control("unknown-banner", false);
+        WaitForElement(window, cf => cf.ByName("CliNeustarten"), Long).AsButton().Invoke();
+        new TaskDetailView(window).WaitForCliRunning();
+        NavigateQueue(window);
+        SelectEvent(window, 2);
+        Click(window, "ScmEventRetry");
+        await WaitReasonAsync(fixture, 2, "Schreibberechtigung");
+        fixture.Scenario.CanWrite = true;
+        fixture.SaveScenario();
+        var recognized = await fixture.WaitEventAsync(2, "Verarbeitet");
+        Assert.NotEqual(unrecognized.CliRunId, recognized.CliRunId);
+        Assert.Equal(count + 6, fixture.Prompts().Count);
+        output.WriteLine("E3-Erkennung: fehlendes Simulator-Banner meldet ehrlich ohne Bestätigen-Button; regulärer Neustart erkennt und liefert einmal.");
     }
 
     private static async Task WaitPromptCountAsync(ScmE2EFixture fixture, int minimum, Guid? attempt)
