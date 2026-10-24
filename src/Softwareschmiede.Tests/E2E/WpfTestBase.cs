@@ -311,12 +311,19 @@ public abstract class WpfTestBase : IDisposable
                 // liegen bleibt) sind unowned Top-Level-Fenster und können die Heuristik
                 // gewinnen. Stattdessen alle Top-Level-Fenster des Prozesses enumerieren
                 // und anhand des Titels wählen.
-                var fenster = app.GetAllTopLevelWindows(Automation);
+                // Kein GetAllTopLevelWindows/desktopweite UIA-Enumeration: Jede Desktop-Traversierung
+                // fragt alle Top-Level-Fenster aller Prozesse ab und kann an einem nicht antwortenden
+                // Fremd-Provider die volle UIA-Timeout-Zeit hängen (gemessen: ~80s pro Aufruf).
+                var fenster = ProcessWindowEnumeration.TopLevelWindowsAndTitles(app.ProcessId);
                 gesehen = string.Join(" | ", fenster.Select(f => $"'{f.Title}'"));
-                var mainWindow = fenster.FirstOrDefault(
-                    f => f.Title.StartsWith("Softwareschmiede", StringComparison.Ordinal));
-                if (mainWindow is not null)
-                    return mainWindow;
+                var mainHandle = fenster.FirstOrDefault(
+                    f => f.Title.StartsWith("Softwareschmiede", StringComparison.Ordinal)).Hwnd;
+                if (mainHandle != IntPtr.Zero)
+                {
+                    var mainWindow = Automation.FromHandle(mainHandle)?.AsWindow();
+                    if (mainWindow is not null)
+                        return mainWindow;
+                }
             }
             catch (FlaUI.Core.Exceptions.FlaUIException)
             {
@@ -463,7 +470,7 @@ public abstract class WpfTestBase : IDisposable
     /// das etablierte Muster in mehreren anderen E2E-Tests (z. B. E2E_PluginAktivierung.cs).
     /// </remarks>
     protected AutomationElement WaitForWindow(string title, TimeSpan timeout)
-        => WaitForElement(Automation.GetDesktop(), cf => cf.ByName(title).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Window)), timeout);
+        => ElementWaitHelper.WaitForTitledWindow(Automation.GetDesktop(), title, timeout);
 
     /// <summary>Navigiert zur Projektliste.</summary>
     protected void NavigateToProjects(AutomationElement mainWindow)

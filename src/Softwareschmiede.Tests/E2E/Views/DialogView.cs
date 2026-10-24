@@ -21,7 +21,7 @@ public abstract class DialogView : BaseWindowView
     protected abstract string DialogTitle { get; }
 
     /// <inheritdoc/>
-    public override bool IsVisible => ElementExists(Window.Automation.GetDesktop(), DialogWindowCondition);
+    public override bool IsVisible => ElementWaitHelper.FindInProcessWindows(Window, DialogWindowCondition) is not null;
 
     /// <summary>Wartet bis zu <see cref="BaseWindowView.Short"/>, bis das Dialogfenster erscheint, und gibt es zurück.</summary>
     /// <returns>Das gefundene Dialogfenster.</returns>
@@ -30,7 +30,7 @@ public abstract class DialogView : BaseWindowView
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Das gefundene Dialogfenster.</returns>
     protected AutomationElement GetDialogWindow(TimeSpan timeout)
-        => WaitForElement(Window.Automation.GetDesktop(), DialogWindowCondition, timeout);
+        => ElementWaitHelper.WaitForProcessWindow(Window, DialogWindowCondition, timeout);
 
     /// <summary>
     /// Bedingung für die Dialogsuche auf dem Desktop: Name UND Control-Type <c>Window</c>. Nur nach
@@ -83,7 +83,7 @@ public abstract class DialogView : BaseWindowView
         var dialog = GetDialogWindow();
         dialog.Focus();
         Keyboard.TypeSimultaneously(VirtualKeyShort.ALT, VirtualKeyShort.F4);
-        WaitUntilGone(Window.Automation.GetDesktop(), DialogWindowCondition, Short);
+        ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
 
         if (recurseToDashboard)
             RecurseToDashboard();

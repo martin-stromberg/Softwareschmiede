@@ -101,7 +101,7 @@ public abstract class BaseWindowView
     /// <c>UIA3Automation</c> zu erzeugen (vermeidet ein zusätzliches, unverwaltetes COM-Objekt pro Aufruf).
     /// </summary>
     protected AutomationElement WaitForWindow(string title, TimeSpan timeout)
-        => ElementWaitHelper.WaitForElement(Window.Automation.GetDesktop(), cf => cf.ByName(title), timeout, IsOnScreen);
+        => ElementWaitHelper.WaitForTitledWindow(Window, title, timeout, IsOnScreen);
 
     /// <summary>
     /// Wählt einen Eintrag in einer ComboBox per Klick auf das ComboBoxItem aus (robuster als FlaUI's
