@@ -18,7 +18,7 @@ public sealed class SolutionSelectionDialogView : DialogView
     {
         var dialog = GetDialogWindow();
         WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short).AsButton().ClickInForeground();
-        WaitUntilGone(Window.Automation.GetDesktop(), DialogWindowCondition, Short);
+        ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
     }
 
     /// <summary>Wählt einen Eintrag in der "SolutionAuswahl"-Liste anhand seines (plugin-qualifizierten) Anzeigetexts aus.</summary>

@@ -12,7 +12,7 @@ namespace Softwareschmiede.Tests.E2E;
 public partial class End2EndTest : WpfTestBase
 {
     /// <summary>Prüft Start, autonome Aufgaben und Einstellungen in einem isolierten App-Lifecycle.</summary>
-    [Fact]
+    [SkippableFact]
     public Task General_BasisUndAutonomeAufgaben_E2E()
         => MitFrischerAppAsync(async mainWindow =>
         {
@@ -25,7 +25,7 @@ public partial class End2EndTest : WpfTestBase
         });
 
     /// <summary>Prüft Repository-, Aufgaben- und Terminal-Fallback-Szenarien isoliert.</summary>
-    [Fact]
+    [SkippableFact]
     public Task General_RepositoryUndAufgaben_E2E()
         => MitFrischerAppAsync(async mainWindow =>
         {
@@ -33,18 +33,19 @@ public partial class End2EndTest : WpfTestBase
             Todo_ErstellenAbhakenLoeschenUndAbschlussValidierung_E2E(mainWindow);
             TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(mainWindow);
             await AufgabePausieren_DialogCountdownAbblendungUndAufheben_E2E(mainWindow);
+            mainWindow = await AufgabenListe_KompakteKachelSymboleUndModuswechsel_E2E(mainWindow);
             await SessionLimit_MarkerPauseProtokollUndUpdateSicherheit_E2E(mainWindow);
             await TerminalFallbackDiagnose_PipeFallbackUndRequiresPtyFehler_E2E(mainWindow);
             CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(mainWindow);
         });
 
     /// <summary>Prüft die Wiedergabeaufzeichnung isoliert, damit Hänger direkt zuordenbar bleiben.</summary>
-    [Fact]
+    [SkippableFact]
     public Task General_Konsolenwiedergabe_E2E()
         => MitFrischerAppAsync(KonsolenTestfenster_OeffnetLaedtAufzeichnungUndSpieltAb_E2E);
 
     /// <summary>Prüft View- und Dialognavigation in einem eigenen App-Lifecycle.</summary>
-    [Fact]
+    [SkippableFact]
     public Task General_ViewNavigation_E2E()
         => MitFrischerAppAsync(async mainWindow =>
         {
@@ -60,7 +61,7 @@ public partial class End2EndTest : WpfTestBase
         });
 
     /// <summary>Prüft die isolierten Update-Fixture-Smokes separat.</summary>
-    [Fact]
+    [SkippableFact]
     public async Task General_UpdateFixtureSmoke_E2E()
     {
         await Fixture_UsesIsolatedRealUpdatePipeline();
@@ -68,7 +69,7 @@ public partial class End2EndTest : WpfTestBase
     }
 
     /// <summary>Prüft die sieben isolierten Update-Startvarianten separat.</summary>
-    [Fact]
+    [SkippableFact]
     public async Task General_UpdateStartvarianten_E2E()
     {
         await Settings_AllModesAndPrereleasesPersist();
@@ -95,7 +96,7 @@ public partial class End2EndTest : WpfTestBase
 
     /// <summary>Gezielt ausführbarer Pflichtnachweis E-02 für den Mauspfad. Er startet nur die
     /// dafür nötige Test-App statt des gesamten General-E2E-Bündels.</summary>
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "E2E")]
     [Trait("Scenario", "TextCopyReplayMouse")]
     public async Task ReplayText_MarkAndCopyViaMouse_E2E()
@@ -114,7 +115,7 @@ public partial class End2EndTest : WpfTestBase
     /// <summary>Gezielt ausführbarer E-02-Nachweis für Fokus und Kopier-Shortcut auf einer
     /// bestehenden Auswahl. Die Umschalt-Pfeil-Auswahl ist als WPF-Integrationstest getrennt,
     /// weil die Windows-Injektion im E2E-Testdesktop Modifier nicht zuverlässig transportiert.</summary>
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "E2E")]
     [Trait("Scenario", "TextCopyReplayKeyboard")]
     public async Task ReplayText_CopyShortcutWithFocusedSelection_E2E()

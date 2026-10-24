@@ -30,8 +30,37 @@ public sealed class DevinPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
     public override PluginType PluginType => PluginType.DevelopmentAutomation;
 
     /// <inheritdoc/>
+    public override string PluginSymbol => "🤖";
+
+    /// <inheritdoc/>
     public override TerminalProviderCapabilities TerminalCapabilities =>
         TerminalProviderCapabilities.RequiresPty | TerminalProviderCapabilities.SupportsPty;
+
+    /// <summary>Empirisch ermittelte Verzögerung für den Devin-Submit: Die Devin CLI (v3000.11.x,
+    /// crossterm/chisel-TUI) wertet ein <c>\r</c>, das im selben Eingabe-Read wie der Prompttext
+    /// ankommt, als Zeilenumbruch (Paste-Semantik) — nicht als Enter-Submit. Erst ein zeitlich
+    /// getrennt gesendetes CR wird als Tastatur-Enter erkannt (gemessen an kurzen Prompts: 50 ms
+    /// noch im selben Batch, ab ~75 ms separat; 200 ms als Sicherheitsmarge unter Last).
+    /// Achtung: Das nötige Abstands-Fenster wächst mit der Eingabegröße — bei ~10 KB Prompt liegt
+    /// die Schwelle bei ~300–400 ms, bei ~20–30 KB bei ~0,7–1,1 s (ConPTY-vermessen); ein fester
+    /// Delay allein reicht für große SCM-Prompts daher nicht — siehe
+    /// <see cref="PromptSubmitRepeatCount"/>.</summary>
+    /// <inheritdoc/>
+    public override TimeSpan PromptSubmitDelay => TimeSpan.FromMilliseconds(200);
+
+    /// <summary>Wiederholte Submit-Versuche: Weil das für den Devin-Submit nötige Abstands-Fenster
+    /// von der Prompt-Größe abhängt und streut, wird der Submit-<c>\r</c> mehrfach wiederholt
+    /// (erster Versuch nach <see cref="PromptSubmitDelay"/>, dann alle
+    /// <see cref="PromptSubmitRepeatInterval"/>). Empirisch (ConPTY, devin.exe v3000.11.92):
+    /// kurzer Prompt → Versuch 1, ~10 KB → Versuch 2, ~20–30 KB → Versuch 3 bei 400-ms-Abstand;
+    /// 7 Wiederholungen decken bis ~3 s nach dem letzten Text-Batch ab. Verschluckte Versuche
+    /// erzeugen nur einen Zeilenumbruch im Entwurf; Versuche nach einem bereits erfolgten Submit
+    /// wirken als Enter auf leerem/bearbeitendem Prompt und werden ignoriert (vermessen).</summary>
+    /// <inheritdoc/>
+    public override int PromptSubmitRepeatCount => 7;
+
+    /// <inheritdoc/>
+    public override TimeSpan PromptSubmitRepeatInterval => TimeSpan.FromMilliseconds(400);
 
     /// <inheritdoc/>
     public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>

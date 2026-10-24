@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.Application.Services;
@@ -108,7 +109,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// tatsächlichen Repository-Pfads, z. B. bei <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus).
     /// </param>
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
-    public async Task<CliProcessHandle> StartCliAsync(
+    public Task<CliProcessHandle> StartCliAsync(
         Guid aufgabeId,
         IKiPlugin kiPlugin,
         string localRepoPath,
@@ -116,6 +117,11 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         CancellationToken ct = default,
         RepositoryStartKonfiguration? startConfig = null,
         IGitPlugin? gitPlugin = null)
+        => ScmTaskCoordinator.Shared.RunAsync(aufgabeId,
+            () => StartCliCoreAsync(aufgabeId, kiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin), ct);
+
+    private async Task<CliProcessHandle> StartCliCoreAsync(Guid aufgabeId, IKiPlugin kiPlugin, string localRepoPath,
+        string? optionalParameters, CancellationToken ct, RepositoryStartKonfiguration? startConfig, IGitPlugin? gitPlugin)
     {
         await _startLock.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -198,7 +204,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// tatsächlichen Repository-Pfads, z. B. bei <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus).
     /// </param>
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
-    public async Task<CliProcessHandle> StartTerminalSessionAsync(
+    public Task<CliProcessHandle> StartTerminalSessionAsync(
         Guid aufgabeId,
         IKiPlugin kiPlugin,
         string localRepoPath,
@@ -206,6 +212,11 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         CancellationToken ct = default,
         RepositoryStartKonfiguration? startConfig = null,
         IGitPlugin? gitPlugin = null)
+        => ScmTaskCoordinator.Shared.RunAsync(aufgabeId,
+            () => StartTerminalSessionCoreAsync(aufgabeId, kiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin), ct);
+
+    private async Task<CliProcessHandle> StartTerminalSessionCoreAsync(Guid aufgabeId, IKiPlugin kiPlugin, string localRepoPath,
+        string? optionalParameters, CancellationToken ct, RepositoryStartKonfiguration? startConfig, IGitPlugin? gitPlugin)
     {
         await _startLock.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -226,6 +237,21 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             var effectiveWorkdir = await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(localRepoPath, startConfig, gitPlugin, ct).ConfigureAwait(false);
 
             var spec = await kiPlugin.GetTerminalStartSpecAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
+            spec = await WithScmAgentEnvironmentAsync(spec, gitPlugin, ct).ConfigureAwait(false);
+            try { ScmCliWorkspaceTrust.EnsureTrusted(kiPlugin.PluginPrefix, spec); }
+            catch (Exception ex)
+            {
+                // Eine nicht vorbereitete Vertrauensentscheidung darf den CLI-Start nie blockieren;
+                // der Adapter erkennt den Dialog anschließend als eigenen Wartezustand.
+                _logger.LogWarning(ex, "Vertrauensstatus des CLI-Arbeitsverzeichnisses konnte nicht vorbereitet werden.");
+            }
+            IReadOnlyList<ScmCliConfigurationFile> scmConfiguration;
+            try { scmConfiguration = ScmCliAccessEvaluator.Capture(kiPlugin.PluginPrefix, spec); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                // An unavailable SCM channel must never break a regular manual CLI start.
+                scmConfiguration = [new ScmCliConfigurationFile("unavailable-managed-configuration", "unknown")];
+            }
 
             var outputWriter = new CliOutputProtokollWriter(
                 aufgabeId,
@@ -262,7 +288,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             }
 
             var process = startResult.Process;
-            var session = startResult.Session;
+            var session = new ScmCoordinatedTerminalSession(aufgabeId, startResult.Session);
             var handle = new CliProcessHandle(aufgabeId, process)
             {
                 Session = session,
@@ -279,6 +305,10 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             // vor der Event-Verdrahtung eingetragen, damit ein bereits ausgelöstes Exited/Failed das
             // Handle vorfindet (sonst würde HandleExitedCoreAsync es stillschweigend verwerfen).
             _handles[aufgabeId] = handle;
+
+            handle.ScmPromptSession = new ScmPromptSessionAdapter(aufgabeId, handle.CliRunId, kiPlugin.PluginPrefix,
+                spec, session, scmConfiguration, () => _handles.TryGetValue(aufgabeId, out var active) && ReferenceEquals(active, handle), _timeProvider);
+            session.InputStarted = handle.ScmPromptSession.MarkInputStarted;
 
             session.Exited += (_, e) => HandleSessionEndedAsync(aufgabeId, handle, e.ExitCode, "Terminal").SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionEndedAsync");
             session.Failed += (_, e) => HandleSessionFailedAsync(aufgabeId, handle, e).SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionFailedAsync");
@@ -326,6 +356,46 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         }
     }
 
+    /// <summary>Ergänzt die vom Repository-SCM-Plugin bereitgestellte Agenten-Anbindung (z. B.
+    /// <c>GH_TOKEN</c> der <c>gh</c>-CLI) in der Prozessumgebung des CLI-Starts: Erlaubte
+    /// Issue-/PR-Aktionen führt der Agent im Arbeitsverzeichnis selbst aus und arbeitet dafür
+    /// mit denselben Berechtigungen wie der Host. Die Werte können Geheimnisse enthalten;
+    /// sie werden ausschließlich in <see cref="TerminalSessionStartSpec.EnvironmentVariables"/>
+    /// übergeben und niemals protokolliert — sie sind bewusst auch kein Bestandteil des
+    /// <see cref="ScmCliAccessEvaluator"/>-Fingerprints. Eine fehlende oder fehlschlagende
+    /// Anbindung blockiert den regulären CLI-Start nicht.</summary>
+    private async Task<TerminalSessionStartSpec> WithScmAgentEnvironmentAsync(
+        TerminalSessionStartSpec spec, IGitPlugin? gitPlugin, CancellationToken ct)
+    {
+        if (gitPlugin is not IScmAgentAccess agentAccess)
+        {
+            return spec;
+        }
+
+        IReadOnlyDictionary<string, string?> agentEnvironment;
+        try
+        {
+            agentEnvironment = await agentAccess.GetAgentEnvironmentAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "SCM-Anbindung für die Agenten-Sitzung konnte nicht aufgelöst werden; der CLI-Start erfolgt ohne sie.");
+            return spec;
+        }
+
+        if (agentEnvironment.Count == 0)
+        {
+            return spec;
+        }
+
+        var environment = new Dictionary<string, string?>(spec.EnvironmentVariables, StringComparer.Ordinal);
+        foreach (var entry in agentEnvironment)
+        {
+            environment[entry.Key] = entry.Value;
+        }
+        return spec with { EnvironmentVariables = environment };
+    }
+
     /// <summary>Gibt die <see cref="ITerminalSession"/> für eine Aufgabe zurück, oder null wenn keine vorhanden.</summary>
     /// <param name="aufgabeId">ID der Aufgabe.</param>
     /// <returns>Die <see cref="ITerminalSession"/>, oder null.</returns>
@@ -335,6 +405,10 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             return null;
         return handle.Session;
     }
+
+    /// <summary>Gibt den an den tatsächlichen Start gebundenen SCM-Adapter zurück; Alt-/Shellstarts haben keinen sicheren Vertrag.</summary>
+    public IScmPromptSessionAdapter? GetScmPromptSession(Guid aufgabeId)
+        => _handles.TryGetValue(aufgabeId, out var handle) ? handle.ScmPromptSession : null;
 
     /// <summary>Gibt die Rohbyte-Aufzeichnung der letzten Terminal-Session einer Aufgabe zurück —
     /// auch nach dem Session-Ende abrufbar (der Eintrag überlebt das Handle).</summary>
@@ -693,6 +767,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// <param name="handle">Das Handle, dessen Session-Ressourcen bereinigt werden sollen.</param>
     private async Task DisposeSessionResourcesAsync(CliProcessHandle handle)
     {
+        handle.ScmPromptSession?.Dispose();
         if (handle.Session is not null)
             await handle.Session.DrainOutputAsync(ConPtyOutputDrainTimeout).ConfigureAwait(false);
 
@@ -707,6 +782,11 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 /// <summary>Handle auf einen laufenden CLI-Prozess.</summary>
 public sealed class CliProcessHandle
 {
+    /// <summary>Neue Identität für jeden tatsächlich erzeugten Prozess; unabhängig vom Aufgabenstatus.</summary>
+    public Guid CliRunId { get; } = Guid.NewGuid();
+
+    /// <summary>SCM-Vertrag des tatsächlichen interaktiven Starts.</summary>
+    public ScmPromptSessionAdapter? ScmPromptSession { get; set; }
     /// <summary>Aufgaben-ID zu der dieser Prozess gehört.</summary>
     public Guid AufgabeId { get; }
 

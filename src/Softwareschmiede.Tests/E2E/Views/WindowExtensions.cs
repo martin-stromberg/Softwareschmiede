@@ -87,22 +87,13 @@ public static class WindowExtensions
     /// <returns>Die Titel aller offenen Top-Level-Fenster.</returns>
     private static HashSet<string> GetOpenTopLevelWindowTitles(Window window)
     {
-        var desktop = window.Automation.GetDesktop();
-        return desktop
-            .FindAllDescendants(cf => cf.ByControlType(ControlType.Window))
-            .Where(w =>
-            {
-                try
-                {
-                    _ = w.Name;
-                    return true;
-                }
-                catch (FlaUI.Core.Exceptions.PropertyNotSupportedException)
-                {
-                    return false;
-                }
-            })
-            .Select(w => w.Name)
+        // Win32-Enumeration der eigenen Prozessfenster statt UIA-FindAllDescendants auf dem
+        // Desktop: Eine Desktop-Traversierung fragt alle Fenster aller Prozesse ab und kann an
+        // einem nicht antwortenden Fremd-Provider die volle UIA-Timeout-Zeit hängen (~80s/Aufruf).
+        var pid = window.Properties.ProcessId.ValueOrDefault;
+        return ProcessWindowEnumeration
+            .TopLevelWindowsAndTitles(pid)
+            .Select(t => t.Title)
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .ToHashSet(StringComparer.Ordinal);
     }

@@ -202,6 +202,117 @@ public sealed class PluginSelectionServiceTests
         resolved.Should().Be("Softwareschmiede.ProjectKi");
     }
 
+    /// <summary>ResolveDevelopmentAutomationPluginWithProjectScopeAsync löst die in den Einstellungen
+    /// konfigurierte Standard-CLI (ki.plugin.default, gespeicherter PluginName) als letzte Stufe auf.</summary>
+    [Fact]
+    public async Task TestResolvePluginWithProjectScope_UsesConfiguredSettingsDefault()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        await einstellungen.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator CLI");
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
+        var pluginManager = CreatePluginManager([simulator]);
+        var activationService = new PluginActivationService(einstellungen, pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, einstellungen);
+
+        // Act
+        var resolved = await sut.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(null, Guid.NewGuid());
+
+        // Assert
+        resolved.Should().Be("Softwareschmiede.KiSimulator");
+    }
+
+    /// <summary>Die Aufgaben-Auswahl hat Vorrang vor der in den Einstellungen konfigurierten Standard-CLI.</summary>
+    [Fact]
+    public async Task TestResolvePluginWithProjectScope_TaskPluginBeatsSettingsDefault()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        await einstellungen.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator CLI");
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
+        var pluginManager = CreatePluginManager([simulator]);
+        var activationService = new PluginActivationService(einstellungen, pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, einstellungen);
+
+        // Act
+        var resolved = await sut.ResolveDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.TaskCli", Guid.NewGuid());
+
+        // Assert
+        resolved.Should().Be("Softwareschmiede.TaskCli");
+    }
+
+    /// <summary>Der Projekt-Default hat Vorrang vor der in den Einstellungen konfigurierten Standard-CLI.</summary>
+    [Fact]
+    public async Task TestResolvePluginWithProjectScope_ProjectDefaultBeatsSettingsDefault()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        await einstellungen.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator CLI");
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var projektId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi");
+        var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
+        var pluginManager = CreatePluginManager([simulator]);
+        var activationService = new PluginActivationService(einstellungen, pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, einstellungen);
+
+        // Act
+        var resolved = await sut.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(null, projektId);
+
+        // Assert
+        resolved.Should().Be("Softwareschmiede.ProjectKi");
+    }
+
+    /// <summary>Der gespeicherte Global-Default (plugins.default.*) hat Vorrang vor der
+    /// Einstellungen-Standard-CLI (ki.plugin.default).</summary>
+    [Fact]
+    public async Task TestResolvePluginWithProjectScope_StoredGlobalDefaultBeatsSettingsDefault()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        await einstellungen.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator CLI");
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.Stored");
+        var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
+        var pluginManager = CreatePluginManager([simulator]);
+        var activationService = new PluginActivationService(einstellungen, pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, einstellungen);
+
+        // Act
+        var resolved = await sut.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(null, Guid.NewGuid());
+
+        // Assert
+        resolved.Should().Be("Softwareschmiede.Stored");
+    }
+
+    /// <summary>Ein auf kein vorhandenes KI-Plugin passender Einstellungen-Default wird nicht geraten:
+    /// Die Auflösung gibt null zurück und der Aufrufer zeigt weiterhin die Auswahl/Warteanzeige.</summary>
+    [Fact]
+    public async Task TestResolvePluginWithProjectScope_UnknownSettingsDefaultReturnsNull()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        await einstellungen.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Nicht installiert");
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
+        var pluginManager = CreatePluginManager([simulator]);
+        var activationService = new PluginActivationService(einstellungen, pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, einstellungen);
+
+        // Act
+        var resolved = await sut.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(null, Guid.NewGuid());
+
+        // Assert
+        resolved.Should().BeNull();
+    }
+
     /// <summary>ResolveDevelopmentAutomationPluginWithProjectScopeAsync gibt null zurück (Dialog erforderlich), falls kein Projekt- oder Aufgaben-Plugin vorhanden.</summary>
     [Fact]
     public async Task TestResolvePluginWithProjectScope_ReturnsNullIfNoDefault()

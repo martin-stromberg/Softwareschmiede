@@ -112,13 +112,41 @@ public sealed class GreaterThanZeroToVisibilityConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>Konvertiert eine Aufgabe oder ein Aufgabenpanel-Item in einen KI-Ausführungsstatus-String.</summary>
-[ValueConversion(typeof(object), typeof(string))]
-public sealed class KiAusfuehrungsStatusConverter : IValueConverter
+/// <summary>Fachliche Zustandsklassifikation der KI-Ausführung (gemeinsame Basis der Status-Converter).</summary>
+internal enum KiAusfuehrungsZustand
 {
-    /// <inheritdoc/>
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    /// <summary>Aufgabe ist pausiert (PausiertBisUtc in der Zukunft).</summary>
+    Pausiert,
+
+    /// <summary>Ein zeitgesteuerter Prompt steht in der Warteschlange.</summary>
+    PromptInWartestellung,
+
+    /// <summary>CLI-Ausführung läuft (aktiver Run ohne WartetAufEingabe-Substatus).</summary>
+    Laeuft,
+
+    /// <summary>Ausführung wartet (Substatus WartetAufEingabe oder Aufgabenstatus Wartend).</summary>
+    Wartet,
+
+    /// <summary>Keine aktive Ausführung erkennbar.</summary>
+    Bereit
+}
+
+/// <summary>
+/// Gemeinsame Statusklassifikation für <see cref="KiAusfuehrungsStatusConverter"/> (Volltext) und
+/// <see cref="KiAusfuehrungsStatusSymbolConverter"/> (nur Glyph), damit beide Darstellungen nicht divergieren.
+/// </summary>
+internal static class KiAusfuehrungsStatusKlassifikation
+{
+    /// <summary>
+    /// Klassifiziert <paramref name="value"/> (<see cref="Aufgabe"/> oder <see cref="AktiveAufgabePanelItem"/>)
+    /// in einen <see cref="KiAusfuehrungsZustand"/>; liefert <c>null</c> für nicht unterstützte Eingaben.
+    /// Im Zustand <see cref="KiAusfuehrungsZustand.Pausiert"/> enthält <paramref name="pausiertRestzeit"/>
+    /// die verbleibende Pausenzeit.
+    /// </summary>
+    public static KiAusfuehrungsZustand? Klassifiziere(object value, out TimeSpan pausiertRestzeit)
     {
+        pausiertRestzeit = default;
+
         var status = value switch
         {
             Aufgabe aufgabe => new StatusDaten(aufgabe.Status, aufgabe.AusfuehrungsStatus, aufgabe.AktiveRunId, aufgabe.LastHeartbeatUtc, aufgabe.LaufStatus, false, aufgabe.PausiertBisUtc),
@@ -128,51 +156,44 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
 
         if (status is null)
         {
-            return string.Empty;
+            return null;
         }
 
         // Der Pausiert-Zweig steht bewusst vor allen übrigen Anzeigen: Eine aktive Pause überlagert
         // den Laufzeitstatus (die Kachel zeigt den Countdown statt "Läuft"/"Prompt in Wartestellung").
         if (status.PausiertBisUtc is { } pausiertBis && pausiertBis > DateTimeOffset.UtcNow)
         {
-            var restzeit = pausiertBis - DateTimeOffset.UtcNow;
-            var restzeitText = restzeit >= TimeSpan.FromDays(1)
-                ? restzeit.ToString(@"d\.hh\:mm\:ss", CultureInfo.InvariantCulture)
-                : restzeit.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
-            return $"⏸ Pausiert (noch {restzeitText})";
+            pausiertRestzeit = pausiertBis - DateTimeOffset.UtcNow;
+            return KiAusfuehrungsZustand.Pausiert;
         }
 
         if (status.HasScheduledPrompt)
         {
-            return "⏳ Prompt in Wartestellung";
+            return KiAusfuehrungsZustand.PromptInWartestellung;
         }
 
         if (status.AusfuehrungsStatus != AufgabeAusfuehrungsStatus.Aktiv)
         {
-            return "✓ Bereit";
+            return KiAusfuehrungsZustand.Bereit;
         }
 
         if (AufgabeLaufAktivitaet.IstAktiv(status.AktiveRunId, status.LastHeartbeatUtc, DateTimeOffset.UtcNow))
         {
             // LaufStatus bildet den Laufzeit-Substatus der CLI ab (siehe PseudoConsoleSession.RuntimeStatus,
             // persistiert über CliProcessManager/AufgabeService.AktualisiereLaufStatusAsync). Ohne diesen
-            // Substatus (null, z. B. beim klassischen Start ohne ConPTY) bleibt es beim bisherigen "▶ Läuft".
+            // Substatus (null, z. B. beim klassischen Start ohne ConPTY) bleibt es beim Zustand "Läuft".
             return status.LaufStatus == AufgabeLaufStatus.WartetAufEingabe
-                ? "⏸ Wartet"
-                : "▶ Läuft";
+                ? KiAusfuehrungsZustand.Wartet
+                : KiAusfuehrungsZustand.Laeuft;
         }
 
         if (status.Status == AufgabeStatus.Wartend)
         {
-            return "⏸ Wartet";
+            return KiAusfuehrungsZustand.Wartet;
         }
 
-        return "✓ Bereit";
+        return KiAusfuehrungsZustand.Bereit;
     }
-
-    /// <inheritdoc/>
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        => throw new NotSupportedException();
 
     private sealed record StatusDaten(
         AufgabeStatus Status,
@@ -182,4 +203,60 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
         AufgabeLaufStatus? LaufStatus,
         bool HasScheduledPrompt,
         DateTimeOffset? PausiertBisUtc);
+}
+
+/// <summary>Konvertiert eine Aufgabe oder ein Aufgabenpanel-Item in einen KI-Ausführungsstatus-String.</summary>
+[ValueConversion(typeof(object), typeof(string))]
+public sealed class KiAusfuehrungsStatusConverter : IValueConverter
+{
+    /// <inheritdoc/>
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var zustand = KiAusfuehrungsStatusKlassifikation.Klassifiziere(value, out var pausiertRestzeit);
+        return zustand switch
+        {
+            null => string.Empty,
+            KiAusfuehrungsZustand.Pausiert => $"⏸ Pausiert (noch {FormatiereRestzeit(pausiertRestzeit)})",
+            KiAusfuehrungsZustand.PromptInWartestellung => "⏳ Prompt in Wartestellung",
+            KiAusfuehrungsZustand.Laeuft => "▶ Läuft",
+            KiAusfuehrungsZustand.Wartet => "⏸ Wartet",
+            _ => "✓ Bereit"
+        };
+    }
+
+    /// <inheritdoc/>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    private static string FormatiereRestzeit(TimeSpan restzeit)
+        => restzeit >= TimeSpan.FromDays(1)
+            ? restzeit.ToString(@"d\.hh\:mm\:ss", CultureInfo.InvariantCulture)
+            : restzeit.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
+}
+
+/// <summary>
+/// Konvertiert eine Aufgabe oder ein Aufgabenpanel-Item in den reinen Status-Glyph
+/// (<c>⏸</c>/<c>⏳</c>/<c>▶</c>/<c>✓</c>) ohne Text oder Countdown — Symbolzeile der Aufgabenkachel.
+/// </summary>
+[ValueConversion(typeof(object), typeof(string))]
+public sealed class KiAusfuehrungsStatusSymbolConverter : IValueConverter
+{
+    /// <inheritdoc/>
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var zustand = KiAusfuehrungsStatusKlassifikation.Klassifiziere(value, out _);
+        return zustand switch
+        {
+            null => string.Empty,
+            KiAusfuehrungsZustand.Pausiert => "⏸",
+            KiAusfuehrungsZustand.PromptInWartestellung => "⏳",
+            KiAusfuehrungsZustand.Laeuft => "▶",
+            KiAusfuehrungsZustand.Wartet => "⏸",
+            _ => "✓"
+        };
+    }
+
+    /// <inheritdoc/>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
 }

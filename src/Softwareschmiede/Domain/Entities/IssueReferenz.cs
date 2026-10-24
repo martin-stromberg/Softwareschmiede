@@ -27,6 +27,10 @@ public sealed class IssueReferenz
     /// <summary>URL des Issues im Git-Provider.</summary>
     public string? IssueUrl { get; set; }
 
+    /// <summary>Kanonischer Deduplizierungsschlüssel der Referenz ({provider}/{host}/{repositoryId}/Issue/{number});
+    /// wird nur von der ereignisgesteuerten Anlage gesetzt.</summary>
+    public string? SourceKey { get; set; }
+
     /// <summary>Navigationseigenschaft zur zugehörigen Aufgabe.</summary>
     public Aufgabe Aufgabe { get; set; } = null!;
 }

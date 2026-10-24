@@ -15,9 +15,11 @@ namespace Softwareschmiede.App.ViewModels;
 /// <param name="VersionProvider">Optionaler Anbieter der installierten Programmversion.</param>
 /// <param name="LaufdatenChangedNotifier">Optionaler Benachrichtiger für geänderte Aufgaben-Laufdaten.</param>
 /// <param name="UpdateDienste">Optionales Dienstbündel für den Update-Ablauf.</param>
+/// <param name="AufgabenListenModusService">Optionaler Persistenzdienst für den Anzeigemodus der Aufgabenliste.</param>
 public sealed record MainWindowOptionaleDienste(
     Action<Action>? DispatcherInvoke = null,
     IDialogService? DialogService = null,
     IApplicationVersionProvider? VersionProvider = null,
     AufgabeLaufdatenChangedNotifier? LaufdatenChangedNotifier = null,
-    MainWindowUpdateDienste? UpdateDienste = null);
+    MainWindowUpdateDienste? UpdateDienste = null,
+    AufgabenListenModusService? AufgabenListenModusService = null);

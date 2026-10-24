@@ -26,7 +26,7 @@ public sealed class E2E_AutonomAufgabenFeatureFlagDisabled : WpfTestBase
     /// verfügbar, der Einstieg "Autonome Aufgabe starten" ist jedoch nicht sichtbar/ausführbar. Es erscheint
     /// kein Initialisierungsdialog und in der Datenbank wird keine <c>AutonomAufgabeKonfiguration</c> angelegt.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task AutonomAufgabeInitialisieren_ZeigtFehlermeldungStattDialog_WennFeatureFlagDeaktiviert()
     {
         Environment.SetEnvironmentVariable("AutonomAufgaben__Enabled", "false");
@@ -46,7 +46,7 @@ public sealed class E2E_AutonomAufgabenFeatureFlagDisabled : WpfTestBase
             Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutonomAufgabeInitialisieren")));
 
             // Der Initialisierungsdialog darf bei deaktiviertem Feature-Flag nicht erscheinen.
-            Assert.Null(Automation.GetDesktop().FindFirstDescendant(
+            Assert.Null(ElementWaitHelper.FindInProcessWindows(mainWindow,
                 cf => cf.ByName("Autonome Aufgabe initialisieren").And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Window))));
 
             await using (var db = OpenTestDbContext())

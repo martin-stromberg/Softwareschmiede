@@ -9,6 +9,8 @@ Gemeinsame Basis aller Plugins.
 | `PluginName` | `string` | Anzeigename (z.B. `"GitHub"`) |
 | `PluginPrefix` | `string` | Eindeutiger Präfix für Credential-Store-Schlüssel |
 | `PluginType` | `PluginType` | `SourceCodeManagement` oder `DevelopmentAutomation` |
+| `PluginSymbol` | `string` | Unicode-Glyph für die Symbolzeile der Aufgabenkachel (z. B. `"🐙"`). Default-Interface-Member (`=> FallbackSymbol`) — binärkompatibel, bereits kompilierte Plugin-DLLs ohne eigenes Symbol laden weiter und erhalten den Fallback-Glyph. `GitPluginBase`/`CliKiPluginBase` deklarieren es als `virtual`-Eigenschaft. |
+| `FallbackSymbol` | `const string = "◻"` | Fallback-Glyph für Plugins ohne eigenes `PluginSymbol` und für nicht auflösbare Plugin-Referenzen |
 | `GetSettingGroups()` | `IReadOnlyList<PluginSettingGroup>` | Einstellungsfelder für die UI |
 
 ---

@@ -101,6 +101,8 @@ public sealed partial class App : System.Windows.Application
             await promptVorlagenService.EnsureInitialPromptVorlagenAsync();
         }
 
+        _host.Services.GetRequiredService<ScmEventStartupGate>().Ready();
+
         _host.Services.GetService<UpdateE2ETestKontext>()
             ?.Protokoll.Schreibe(UpdateE2EEreignisse.DatabaseInitializationCompleted);
 
@@ -249,6 +251,20 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<RepositoryInitialisierungService>();
         services.AddScoped<GitOrchestrationService>();
         services.AddScoped<PullRequestReferenzService>();
+        services.Configure<ScmEventOptions>(context.Configuration.GetSection("ScmEvents"));
+        services.AddSingleton(ScmTaskCoordinator.Shared);
+        services.AddSingleton<ScmEventStartupGate>();
+        services.AddSingleton<ScmEventChangeNotifier>();
+        services.AddSingleton<ScmEventExchangeProtocol>();
+        services.AddScoped<ScmEventStore>();
+        services.AddScoped<ScmEventOutbox>();
+        services.AddScoped<ScmEventOrchestrator>();
+        services.AddScoped<ScmEventTaskResolver>();
+        services.AddScoped<ScmBackmergeService>();
+        services.AddSingleton<ScmEventMonitoringService>();
+        services.AddHostedService(sp => sp.GetRequiredService<ScmEventMonitoringService>());
+        services.AddSingleton<ScmEventExchangeService>();
+        services.AddHostedService(sp => sp.GetRequiredService<ScmEventExchangeService>());
         services.AddScoped<EntwicklungsprozessService>(sp => new EntwicklungsprozessService(
             sp.GetRequiredService<AufgabeService>(),
             sp.GetRequiredService<ProtokollService>(),
@@ -301,17 +317,20 @@ public sealed partial class App : System.Windows.Application
         // Factory injiziert.
         services.AddSingleton<Win32PseudoConsoleProcessLauncher>();
         services.AddSingleton<SimulatedPseudoConsoleProcessLauncher>();
-        services.AddSingleton<ITerminalSessionFactory>(sp => new TerminalSessionService(
+        services.AddSingleton<TerminalSessionService>(sp => new TerminalSessionService(
             sp.GetRequiredService<IOptions<TerminalSessionOptions>>(),
             sp.GetRequiredService<IServiceScopeFactory>(),
             sp.GetRequiredService<Win32PseudoConsoleProcessLauncher>(),
             sp.GetRequiredService<SimulatedPseudoConsoleProcessLauncher>(),
             sp.GetRequiredService<ILogger<TerminalSessionService>>()));
+        services.AddSingleton<ITerminalSessionFactory>(sp => sp.GetRequiredService<TerminalSessionService>());
         services.AddSingleton<KiAusfuehrungsService>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<PromptZeitVersandService>();
         services.AddSingleton<PullRequestMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<PullRequestMonitoringService>());
+        services.AddSingleton<ScmTaskCompletionMonitoringService>();
+        services.AddHostedService(sp => sp.GetRequiredService<ScmTaskCompletionMonitoringService>());
         services.AddSingleton<UnteragentGovernanceMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<UnteragentGovernanceMonitoringService>());
         services.AddSingleton<CliProcessManager>();
@@ -320,6 +339,7 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<IRunningAutomationStatusSource>(sp =>
             sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<DarkModeService>();
+        services.AddSingleton<AufgabenListenModusService>();
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<ICliRawExportService, CliRawExportService>();
         services.AddSingleton<CliReplayAufzeichnungStore>();
@@ -342,7 +362,8 @@ public sealed partial class App : System.Windows.Application
             DialogService: sp.GetService<IDialogService>(),
             VersionProvider: sp.GetService<IApplicationVersionProvider>(),
             LaufdatenChangedNotifier: sp.GetService<AufgabeLaufdatenChangedNotifier>(),
-            UpdateDienste: sp.GetService<MainWindowUpdateDienste>()));
+            UpdateDienste: sp.GetService<MainWindowUpdateDienste>(),
+            AufgabenListenModusService: sp.GetService<AufgabenListenModusService>()));
 
         // Plugin Infrastructure
         services.AddSingleton<PluginManager>();
@@ -360,6 +381,7 @@ public sealed partial class App : System.Windows.Application
 
         // ViewModels
         services.AddTransient<MainWindowViewModel>();
+        services.AddTransient<ScmEventQueueViewModel>();
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<ProjectListViewModel>();
         services.AddTransient<ProjectDetailViewModel>();
@@ -375,6 +397,16 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<AutonomAufgabeInitialisierungsDialogViewModel>();
         services.AddTransient<AufgabePausierenDialogViewModel>();
         services.AddTransient<KonsolenTestViewModel>();
+
+        var scmTestConfiguration = ScmE2ETestConfiguration.LoadFromEnvironment(testDatenbankPfad);
+        if (scmTestConfiguration is not null)
+        {
+            services.AddSingleton(scmTestConfiguration);
+            services.AddSingleton<IPluginManager, ScmE2EPluginManager>();
+            services.AddSingleton<ITerminalSessionFactory, ScmE2ETerminalSessionFactory>();
+            services.AddHostedService<ScmE2ERuntimeControl>();
+            services.Configure<ScmEventOptions>(o => o.PollInterval = TimeSpan.FromMilliseconds(300));
+        }
 
         // Windows
         services.AddTransient<MainWindow>();

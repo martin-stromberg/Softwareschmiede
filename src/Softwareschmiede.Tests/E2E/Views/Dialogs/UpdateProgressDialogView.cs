@@ -103,7 +103,7 @@ public sealed class UpdateProgressDialogView : DialogView
     {
         var dialog = GetDialogWindow();
         dialog.AsWindow().Close();
-        WaitUntilGone(Window.Automation.GetDesktop(), DialogWindowCondition, Short);
+        ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
         return this;
     }
 }

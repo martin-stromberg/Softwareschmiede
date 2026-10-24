@@ -76,7 +76,7 @@ public sealed class AufgabePausierenDialogView : DialogView
     public TaskDetailView Bestaetigen()
     {
         WaitForElement(GetDialogWindow(), cf => cf.ByName("PausierenBestaetigen"), Short).AsButton().Click();
-        WaitUntilGone(Window.Automation.GetDesktop(), DialogWindowCondition, Short);
+        ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
         return new TaskDetailView(Window);
     }
 
@@ -85,7 +85,7 @@ public sealed class AufgabePausierenDialogView : DialogView
     public TaskDetailView Aufheben()
     {
         WaitForElement(GetDialogWindow(), cf => cf.ByName("PausierenAufheben"), Short).AsButton().Click();
-        WaitUntilGone(Window.Automation.GetDesktop(), DialogWindowCondition, Short);
+        ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
         return new TaskDetailView(Window);
     }
 
@@ -94,7 +94,7 @@ public sealed class AufgabePausierenDialogView : DialogView
     public TaskDetailView Abbrechen()
     {
         WaitForElement(GetDialogWindow(), cf => cf.ByName("PausierenAbbrechen"), Short).AsButton().Click();
-        WaitUntilGone(Window.Automation.GetDesktop(), DialogWindowCondition, Short);
+        ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
         return new TaskDetailView(Window);
     }
 
