@@ -23,8 +23,8 @@ public partial class End2EndTest
     protected void ViewPatternHappyPath_NavigiertUndErstelltKorrekt_E2E(Window mainWindow)
     {
         // Die vorherige Phase (CommandLineParameters) endet auf der Einstellungsseite, nicht dem
-        // Dashboard (siehe Kommentar in AutonomAufgabeInitialisierung_..._E2E) - ForceShow() stellt
-        // den erwarteten Ausgangszustand her, statt ihn stillschweigend vorauszusetzen.
+        // Dashboard - ForceShow() stellt den erwarteten Ausgangszustand her, statt ihn stillschweigend
+        // vorauszusetzen.
         var dashboardView = new DashboardView(mainWindow).ForceShow();
         Assert.True(dashboardView.IsVisible);
         Assert.IsType<DashboardView>(mainWindow.CurrentView());

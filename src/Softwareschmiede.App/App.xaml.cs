@@ -13,8 +13,6 @@ using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.App.Views;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Application.Services.Updates;
-using Softwareschmiede.Domain.Entities;
-using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Infrastructure.Plugins;
@@ -106,37 +104,6 @@ public sealed partial class App : System.Windows.Application
         _host.Services.GetService<UpdateE2ETestKontext>()
             ?.Protokoll.Schreibe(UpdateE2EEreignisse.DatabaseInitializationCompleted);
 
-        using (var recoveryScope = _host.Services.CreateScope())
-        {
-            try
-            {
-                var db = recoveryScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-                var projektleiterAgentService = recoveryScope.ServiceProvider.GetRequiredService<ProjektleiterAgentService>();
-
-                var wiederherzustellendeAufgaben = await db.AutonomAufgabeKonfigurationen
-                    .Include(k => k.Aufgabe)
-                    .Where(k => !k.ExplizitGestoppt && k.Aufgabe.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv)
-                    .ToListAsync();
-
-                foreach (var konfiguration in wiederherzustellendeAufgaben)
-                {
-                    try
-                    {
-                        var resumePrompt = ErstelleResumePromptNachAppNeustart(konfiguration);
-                        await projektleiterAgentService.StarteAgenNachAppNeustartAsync(konfiguration.AufgabeId, resumePrompt);
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Logger.Error(ex, "Autonome Aufgabe {AufgabeId} konnte beim App-Start nicht automatisch fortgesetzt werden.", konfiguration.AufgabeId);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Logger.Error(ex, "App-Startup-Recovery für Autonome Aufgaben ist fehlgeschlagen.");
-            }
-        }
-
         try
         {
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();
@@ -150,15 +117,6 @@ public sealed partial class App : System.Windows.Application
             Log.Logger.Error(ex, "MainWindow konnte nicht angezeigt werden.");
         }
     }
-
-    /// <summary>Erzeugt den Weitermachen-Prompt für die automatische Wiederaufnahme einer Autonomen Aufgabe nach einem
-    /// App-Neustart (analog zu <see cref="SessionManagementService"/>s Weitermachen-Prompt-Generierung).</summary>
-    /// <param name="konfiguration">Die Konfiguration der Autonomen Aufgabe.</param>
-    /// <returns>Der zu sendende Weitermachen-Prompt.</returns>
-    private static string ErstelleResumePromptNachAppNeustart(AutonomAufgabeKonfiguration konfiguration)
-        => "Weitermachen nach App-Neustart: Setze die Arbeit an der Autonomen Aufgabe im Arbeitsverzeichnis " +
-           $"'{konfiguration.ArbeitsverzeichnisPfad}' fort. Prüfe state.json, plan.md und progress.md " +
-           "für den aktuellen Stand, bevor du weitermachst.";
 
     private static void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
     {
@@ -231,18 +189,12 @@ public sealed partial class App : System.Windows.Application
 
         services.AddMemoryCache();
         services.Configure<DirectoryStructureOptions>(context.Configuration.GetSection(DirectoryStructureOptions.SectionName));
-        services.Configure<AutonomAufgabenOptions>(context.Configuration.GetSection(AutonomAufgabenOptions.SectionName));
         services.Configure<TerminalSessionOptions>(context.Configuration.GetSection(TerminalSessionOptions.SectionName));
         services.AddSingleton<IOptions<UpdateOptions>>(Options.Create(new UpdateOptions()));
         services.AddSingleton<DirectoryStructureBrowserService>();
 
         // Domain Services
         services.AddScoped<TodoService>();
-        services.AddScoped<AutonomAufgabenInitialisierungsService>();
-        services.AddScoped<UnteragentGovernanceService>();
-        services.AddScoped<UnteragentGitProvisioningService>();
-        services.AddScoped<SessionManagementService>();
-        services.AddScoped<ProjektleiterAgentService>();
         services.AddScoped<AufgabeService>();
         services.AddScoped<IAktiveAufgabenService>(sp => sp.GetRequiredService<AufgabeService>());
         services.AddScoped<ProjektService>();
@@ -296,7 +248,6 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ArbeitsverzeichnisOeffnenService>();
         services.AddSingleton<IVisualStudioCodeLocator, VisualStudioCodeLocator>();
         services.AddScoped<ICliUpdateSafetyService, CliUpdateSafetyService>();
-        services.AddScoped<AutonomAufgabeStartService>();
         services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
         services.AddSingleton<IUpdateService, UpdateService>();
 
@@ -331,8 +282,6 @@ public sealed partial class App : System.Windows.Application
         services.AddHostedService(sp => sp.GetRequiredService<PullRequestMonitoringService>());
         services.AddSingleton<ScmTaskCompletionMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmTaskCompletionMonitoringService>());
-        services.AddSingleton<UnteragentGovernanceMonitoringService>();
-        services.AddHostedService(sp => sp.GetRequiredService<UnteragentGovernanceMonitoringService>());
         services.AddSingleton<CliProcessManager>();
         services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
         services.AddSingleton<IBenachrichtigungsBannerService, WpfBannerService>();
@@ -394,7 +343,6 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<FileExplorerViewModel>();
         services.AddTransient<TodoListViewModel>();
         services.AddTransient<OpenTodosDialogViewModel>();
-        services.AddTransient<AutonomAufgabeInitialisierungsDialogViewModel>();
         services.AddTransient<AufgabePausierenDialogViewModel>();
         services.AddTransient<KonsolenTestViewModel>();
 

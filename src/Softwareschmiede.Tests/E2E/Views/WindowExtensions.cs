@@ -13,7 +13,6 @@ public static class WindowExtensions
         w => new PluginSelectionDialogView(w),
         w => new IssueSelectionDialogView(w),
         w => new IssueCreateDialogView(w),
-        w => new AutonomAufgabeInitialisierungsDialogView(w),
         w => new ArbeitsverzeichnisBearbeitenDialogView(w),
         w => new OpenTodosDialogView(w),
         w => new HelpTextDialogView(w),
@@ -27,8 +26,8 @@ public static class WindowExtensions
     /// Erkennt anhand charakteristischer UI-Marker die aktuell aktive Ansicht des Hauptfensters und gibt
     /// die passende <see cref="BaseWindowView"/>-Subklasse-Instanz zurück. Prüfreihenfolge: modale Dialoge
     /// (eigenes Fenster, höchste Priorität), Fehlerbanner, verschachtelte Aufgaben-Unteransichten
-    /// (Datei-Explorer, To-Dos), Aufgabendetail, Projektdetail, Projektliste, Einstellungen, autonome
-    /// Aufgabendetailansicht, zuletzt Fallback auf das Dashboard.
+    /// (Datei-Explorer, To-Dos), Aufgabendetail, Projektdetail, Projektliste, Einstellungen,
+    /// zuletzt Fallback auf das Dashboard.
     /// </summary>
     /// <param name="window">Das Hauptfenster der Anwendung.</param>
     /// <returns>Die erkannte View-Instanz.</returns>
@@ -58,7 +57,6 @@ public static class WindowExtensions
         [
             new FileExplorerView(window),
             new TodoListView(window),
-            new AutonomAufgabeDetailView(window),
             new TaskDetailView(window),
             new ProjectDetailView(window),
             new ProjectListView(window),
@@ -103,7 +101,7 @@ public static class WindowExtensions
         var expectedMarkers = string.Join(", ",
         [
             "ProjektName", "AufgabeNeu", "EditTitel", "Neu", "Plugins",
-            "FileExplorerBaum", "TodosList", "AutonomAufgabeDetailTabs", "FehlerMeldung",
+            "FileExplorerBaum", "TodosList", "FehlerMeldung",
             "Dashboard-Titeltext", "Dialogtitel (z. B. 'Repository zuweisen')"
         ]);
 

@@ -68,6 +68,12 @@ public partial class End2EndTest
         var detail = taskDetail.Menu.NavigateToTask(titel);
         WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
 
+        // Das Ribbon enthält nur die regulären Aufgabensteuerungen (Starten, Pause einstellen).
+        WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("PauseEinstellen"), Short);
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutonomAufgabeInitialisieren")));
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("Autonome Aufgabe")));
+
         // Phase 1: Dialog öffnen — Vorbelegung muss ≈ dem aktuellen Zeitpunkt entsprechen.
         var pauseDialog = new AufgabePausierenDialogView(mainWindow).ForceShow();
         var (stunde, minute) = pauseDialog.GetVorbelegteZeit();

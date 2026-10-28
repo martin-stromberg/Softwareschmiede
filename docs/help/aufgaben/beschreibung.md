@@ -128,7 +128,7 @@ Unter jedem Pull Request zeigt die Ansicht die zugeordneten GitHub-Actions-/Work
 #### Ribbon-Menü
 Aktionsgruppen:
 - **Navigation:** „Zurück"-Button zur Rückkehr zur Projektdetailansicht
-- **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet mit kombiniertem Klone+CLI-Start), Beenden (Status=Gestartet/Wartend→Beendet), Pause einstellen (Status ∈ {Neu, Gestartet, Wartend}, nicht bei Autonomen Aufgaben), Plugin ändern (nur bei laufender CLI). Bei aktiver Pause wird neben den Buttons der Hinweis „⏸ Pausiert bis {Datum Uhrzeit}" angezeigt.
+- **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet mit kombiniertem Klone+CLI-Start), Beenden (Status=Gestartet/Wartend→Beendet), Pause einstellen (Status ∈ {Neu, Gestartet, Wartend}), Plugin ändern (nur bei laufender CLI). Bei aktiver Pause wird neben den Buttons der Hinweis „⏸ Pausiert bis {Datum Uhrzeit}" angezeigt.
 - **CLI:** „CLI stoppen" Button (nur sichtbar wenn aktiv)
 - **Issue:** „Issue anlegen" wird angeboten, wenn das Repository die Anlage unterstützt und der Aufgabe noch kein Issue zugeordnet ist. „Issue zuweisen" bleibt für die Auswahl eines vorhandenen Issues verfügbar; nach erfolgreicher Anlage zeigt „Issue öffnen" die gespeicherte Referenz.
 - **Pull Request:** „PR erstellen" Button, sobald Branch, verknüpftes Git-Repository und Pull-Request-Unterstützung des Git-Plugins vorhanden sind
@@ -267,7 +267,7 @@ Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-
 
 ## Einschränkungen
 
-- Eine Pause kann nur für reguläre Aufgaben im Status `Neu`, `Gestartet` oder `Wartend` gesetzt werden; Autonome Aufgaben nutzen ihren eigenen Pausen-Mechanismus. Beendete oder archivierte Aufgaben können nicht pausiert werden.
+- Eine Pause kann nur für Aufgaben im Status `Neu`, `Gestartet` oder `Wartend` gesetzt werden. Beendete oder archivierte Aufgaben können nicht pausiert werden.
 - Die Pause blockiert nur neu ausgelöste Aktionen (Start, CLI-Neustart, Wiederherstellung, Prompt-Versand). Ein laufender CLI-Prozess läuft auch während einer Pause weiter.
 - Nach Ablauf einer Pause erfolgt keine automatische Wiederaufnahme — der Anwender startet bei Bedarf manuell neu.
 - Die automatische Pause bei Session-Limit betrifft nur Aufgaben, deren Ausführung zum Erkennungszeitpunkt läuft. Eine später manuell gestartete Aufgabe mit demselben KI-Plugin wird nicht automatisch blockiert.

@@ -66,7 +66,7 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 
 **Verhalten:**
 
-- Erlaubte Stati: `Neu`, `Gestartet`, `Wartend` — andere Stati sowie Autonome Aufgaben werden mit `InvalidOperationException` abgelehnt.
+- Erlaubte Stati: `Neu`, `Gestartet`, `Wartend` — andere Stati werden mit `InvalidOperationException` abgelehnt.
 - Beim Setzen muss `pausiertBisUtc` in der Zukunft liegen; andernfalls `InvalidOperationException`.
 - Schreibt pro Aufruf einen `ProtokollTyp.SystemMeldung`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben").
 - Wirft `InvalidOperationException`, wenn die Aufgabe nicht gefunden wird.
@@ -94,7 +94,7 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 - Aufgabe nicht gefunden oder `KiPluginPrefix` leer: `LogWarning`, keine Persistenz, keine Pause.
 - Persistiert `resetUtc` (normalisiert auf UTC) als ISO-8601-Roundtrip-String (`"O"`) in `AppEinstellung`.
 - Liegt `resetUtc` in der Vergangenheit: Persistenz erfolgt, aber es wird keine Pause gesetzt.
-- Kandidaten: Aufgaben mit `Status.IstAktivOderWartend()`, `AusfuehrungsStatus == Aktiv`, ohne `AutonomKonfiguration`, Prefix-Vergleich `OrdinalIgnoreCase`.
+- Kandidaten: Aufgaben mit `Status.IstAktivOderWartend()`, `AusfuehrungsStatus == Aktiv`, Prefix-Vergleich `OrdinalIgnoreCase`.
 - Max-Semantik: `PausiertBisUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — längere manuelle Pausen werden nicht verkürzt.
 - Pro pausierter Aufgabe wird ein `ProtokollTyp.SystemMeldung`-Eintrag geschrieben; nach dem Speichern wird `AufgabeLaufdatenChangedNotifier.NotifyLaufdatenChanged` je Aufgabe ausgelöst.
 - Laufende CLI-Prozesse werden nicht angefasst.

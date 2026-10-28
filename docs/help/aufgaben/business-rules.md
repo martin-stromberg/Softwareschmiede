@@ -229,7 +229,6 @@
 **Beschreibung:** Eine reguläre Aufgabe kann bis zu einem frei wählbaren Zeitpunkt pausiert werden. Die Pause ist ein zeitbasiertes Overlay über `Aufgabe.PausiertBisUtc` — es gibt keinen eigenen Status `Pausiert`.
 
 **Bedingungen:**
-- Aufgabe ist keine Autonome Aufgabe (`IstAutonom()` false — deren Pausierung läuft über `AutonomKonfiguration.SessionPauseUtc`).
 - `Status` ist `Neu`, `Gestartet` oder `Wartend`.
 - Beim Setzen muss der gewählte Zeitpunkt in der Zukunft liegen; `null` hebt die Pause auf.
 
@@ -252,7 +251,7 @@
 **Bedingungen:**
 - Eine CLI-Ausgabezeile enthält den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel.
 - Die auslösende Aufgabe besitzt ein `KiPluginPrefix`.
-- Kandidaten für die automatische Pause: `Status` aktiv oder wartend, `AusfuehrungsStatus == Aktiv`, keine `AutonomKonfiguration`, identisches `KiPluginPrefix` (`OrdinalIgnoreCase`).
+- Kandidaten für die automatische Pause: `Status` aktiv oder wartend, `AusfuehrungsStatus == Aktiv`, identisches `KiPluginPrefix` (`OrdinalIgnoreCase`).
 
 **Verhalten:**
 - Der Marker erzeugt an der auslösenden Aufgabe einen `ProtokollTyp.RateLimit`-Eintrag — auch ohne gültigen Zeitstempel.
@@ -334,7 +333,6 @@
 - `Status` ist `Gestartet` oder `Wartend` und `AusfuehrungsStatus == Aktiv`.
 - Kein aktiver KI-Lauf im `KiAusfuehrungsService` (Laufzeitprüfung).
 - `LastHeartbeatUtc` ist älter als `AufgabeRecoveryService.HeartbeatTimeoutMinutes` (5 Minuten).
-- Keine Autonome Aufgabe (deren Wiederaufnahme steuert der Projektleiter-Agent).
 - Keine aktive Pause: `PausiertBisUtc` ist `null` oder liegt nicht in der Zukunft — pausierte Aufgaben wurden bewusst angehalten und gelten nicht als „festhängend".
 
 **Verhalten:**

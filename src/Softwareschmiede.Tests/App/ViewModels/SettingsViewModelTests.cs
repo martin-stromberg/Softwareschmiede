@@ -2,7 +2,6 @@ using System.Diagnostics;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -57,7 +56,7 @@ public sealed class SettingsViewModelTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    private SettingsViewModel CreateSut(AutonomAufgabenOptions? autonomAufgabenOptions = null) =>
+    private SettingsViewModel CreateSut() =>
         new(
             _einstellungService,
             _arbeitsverzeichnisService,
@@ -67,7 +66,6 @@ public sealed class SettingsViewModelTests : IDisposable
             _pluginSettingsService,
             _promptVorlagenService,
             NullLogger<SettingsViewModel>.Instance,
-            Options.Create(autonomAufgabenOptions ?? new AutonomAufgabenOptions()),
             new Mock<IDialogService>().Object,
             new Mock<IServiceProvider>().Object);
 
@@ -490,62 +488,6 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.FehlerMeldung.Should().Contain("Mindestens ein");
         var gespeichertesStatus = await _pluginActivationService.IsPluginEnabledAsync("github");
         gespeichertesStatus.Should().BeTrue();
-    }
-
-    /// <summary>LadenCommand lädt das Feature-Flag "Autonome Aufgaben aktivieren" aus AppEinstellungService und setzt es als IsAutonomAufgabenEnabled (Issue 205).</summary>
-    [Fact]
-    public async Task LoadCommand_ShouldLoadAutonomAufgabenEnabledFlag()
-    {
-        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey, false);
-        var sut = CreateSut();
-
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        sut.IsAutonomAufgabenEnabled.Should().BeFalse();
-    }
-
-    /// <summary>LadenCommand fällt auf true zurück, wenn für das Feature-Flag "Autonome Aufgaben aktivieren" noch kein Wert in der Datenbank gespeichert ist.</summary>
-    [Fact]
-    public async Task LoadCommand_ShouldDefaultAutonomAufgabenEnabledToTrue_WhenNotYetPersisted()
-    {
-        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        var sut = CreateSut();
-
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        sut.IsAutonomAufgabenEnabled.Should().BeTrue();
-    }
-
-    /// <summary>LadenCommand verwendet den aus IOptions&lt;AutonomAufgabenOptions&gt; gebundenen Deployment-Default (statt eines hartkodierten "true"), wenn für das Feature-Flag "Autonome Aufgaben aktivieren" noch kein Wert in der Datenbank gespeichert ist (Issue 205, Regressionstest für Review-Fix 1).</summary>
-    [Fact]
-    public async Task LoadCommand_ShouldHonorDeploymentDefault_WhenDisabledAndNotYetPersisted()
-    {
-        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        var sut = CreateSut(new AutonomAufgabenOptions { Enabled = false });
-
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        sut.IsAutonomAufgabenEnabled.Should().BeFalse();
-    }
-
-    /// <summary>SpeichernCommand persistiert das Feature-Flag "Autonome Aufgaben aktivieren" über AppEinstellungService (Issue 205).</summary>
-    [Fact]
-    public async Task SaveCommand_ShouldPersistAutonomAufgabenEnabledFlag()
-    {
-        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        sut.IsAutonomAufgabenEnabled = false;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
-
-        var gespeicherterWert = await _einstellungService.GetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey);
-        gespeicherterWert.Should().BeFalse();
     }
 
     /// <summary>LadenCommand fällt bei fehlenden oder unbekannten gespeicherten Update-Werten auf die Defaults zurück.</summary>

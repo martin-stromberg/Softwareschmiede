@@ -26,7 +26,6 @@ Bekannte Schlüssel:
 | `NotificationMode` | Enum | Benachrichtigungsmodus (`Deaktiviert` / `Banner` / `Ton`) |
 | `NotificationAudioPath` | string | Pfad zur Benachrichtigungs-Audiodatei (MP3/WAV) |
 | `LogLevel` | Enum | Logging-Granularität (`Debug` / `Information`) |
-| `autonomeaufgaben.enabled` | bool | Feature-Flag "Autonome Aufgaben aktivieren" (`AppEinstellungService.AutonomAufgabenEnabledKey`); Standardwert bei fehlendem Eintrag: `true` |
 | `scm.monitoring.enabled` | bool | Laufzeit-Schalter "SCM-Ereignisüberwachung aktivieren" (`AppEinstellungService.ScmMonitoringEnabledKey`); Standardwert bei fehlendem Eintrag: `true`. Bei `false` beobachten/enumerieren die Hintergrunddienste keine SCM-Quellen und stellen keine Ereignisse automatisch zu; manuelle Queue-Aktionen bleiben funktionsfähig |
 | `scm.trigger.keyword` | string | Trigger-Keyword für SCM-Ereignisse (`AppEinstellungService.ScmTriggerKeywordKey`); Standard bei fehlendem oder leerem Eintrag: `$Softwareschmiede` (`ScmEventValidationService.DefaultTriggerKeyword`). Leere/Leerraum-Werte sind ungültig und fallen auf den Standard zurück |
 | `scm.backmerge.mode` | int | Backmerge-Aktivierungsmodus als `ScmBackmergeModus`-Wert (`AppEinstellungService.ScmBackmergeModeKey`): `0` = Deaktiviert, `1` = Global aktiviert, `2` = Projektbezogen aktivierbar; Standard bei fehlendem/ungültigem Eintrag: `0` |

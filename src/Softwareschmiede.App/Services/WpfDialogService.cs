@@ -2,7 +2,6 @@ using System.Windows;
 using Microsoft.Win32;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.App.Views;
-using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.Services;
@@ -135,17 +134,6 @@ public sealed class WpfDialogService : IDialogService
         return ShowDialogAsync(
             () => new AufgabePausierenDialog(viewModel),
             () => viewModel.Ergebnis);
-    }
-
-    /// <inheritdoc/>
-    public Task<AutonomAufgabeKonfiguration?> ShowAutonomAufgabeInitialisierungsDialogAsync(
-        AutonomAufgabeInitialisierungsDialogViewModel viewModel,
-        CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        return ShowDialogAsync(
-            () => new AutonomAufgabeInitialisierungsDialog(viewModel),
-            () => viewModel.ErstellteKonfiguration);
     }
 
     /// <inheritdoc/>

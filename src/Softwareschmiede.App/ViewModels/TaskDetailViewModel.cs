@@ -6,7 +6,6 @@ using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
@@ -38,8 +37,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         Diff,
         Dateibrowser,
         PullRequests,
-        Todos,
-        Automatisierung
+        Todos
     }
 
     private readonly AufgabeService _aufgabeService;
@@ -56,9 +54,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly FileExplorerViewModel _fileExplorerViewModel;
     private readonly TodoListViewModel _todoListViewModel;
     private readonly ArbeitsverzeichnisOeffnenService _arbeitsverzeichnisOeffnenService;
-    private readonly AutonomAufgabeStartService _autonomAufgabeStartService;
-    private readonly AppEinstellungService _appEinstellungService;
-    private readonly IOptions<AutonomAufgabenOptions> _autonomAufgabenOptions;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly ICliRawExportService _cliRawExportService;
@@ -93,8 +88,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private bool _canCreateIssue;
     private bool _isRefreshingPullRequests;
     private bool _kannIdeAuswaehlen;
-    private AutonomAufgabeDetailViewModel? _autonomAufgabeDetailViewModel;
-    private bool _isAutonomAufgabenEnabled;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -116,11 +109,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 _ladenCts?.Cancel();
                 _ladenCts?.Dispose();
                 _ladenCts = new CancellationTokenSource();
-                _autonomAufgabeDetailViewModel?.Dispose();
-                _autonomAufgabeDetailViewModel = null;
-                OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
-                OnPropertyChanged(nameof(ShowAutomatisierungPanel));
-                OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
                 OnPropertyChanged(nameof(KannCliRawExportieren));
                 LadenAsync(_ladenCts.Token).SafeFireAndForget(_logger, "TaskDetailViewModel.LadenAsync");
             }
@@ -163,9 +151,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(KannPausieren));
             OnPropertyChanged(nameof(KannPromptVorlageSenden));
             OnPropertyChanged(nameof(KannPromptPlanen));
-            OnPropertyChanged(nameof(IsAutonomAufgabe));
-            OnPropertyChanged(nameof(CanAutonomAufgabeInitialisieren));
-            OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
             WaehleStandardAnsicht();
             DetailTitelAenderungAction?.Invoke(value?.Titel);
 
@@ -244,11 +229,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob der laufende CLI-Prozess gestoppt werden kann.</summary>
-    public bool KannCliStoppen => _isCliRunning && !IsAutonomAufgabe;
+    public bool KannCliStoppen => _isCliRunning;
 
-    /// <summary>Gibt an, ob die CLI fuer eine aktive Ausfuehrung wiederhergestellt werden kann. Fuer Autonome Aufgaben immer false, da diese ueber den Projektleiter-Agenten statt die reguläre CLI-Ansicht gesteuert werden.</summary>
+    /// <summary>Gibt an, ob die CLI fuer eine aktive Ausfuehrung wiederhergestellt werden kann.</summary>
     public bool KannCliNeuStarten => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true
-        && !_aufgabe.IstAutonom()
         && !_isCliRunning
         && !IstPausiert;
 
@@ -395,47 +379,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob die Todo-Ansicht ausgewählt ist.</summary>
     public bool IsTodoViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Todos;
 
-    /// <summary>Gibt an, ob die Automatisierung-Ansicht ausgewählt ist.</summary>
-    public bool IsAutomatisierungViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Automatisierung;
-
-    /// <summary>Gibt an, ob die Automatisierung-Registerkarte und die zugehörigen Ribbon-Buttons angezeigt werden können, weil eine Autonome Aufgabe initialisiert wurde und das Feature-Flag für Autonome Aufgaben aktiviert ist.</summary>
-    public bool ShowAutomatisierungPanel => _autonomAufgabeDetailViewModel is not null && IsAutonomAufgabenEnabled;
-
-    /// <summary>
-    /// Gibt an, ob das Feature-Flag für Autonome Aufgaben aktiviert ist: der DB-persistierte Laufzeit-Schalter
-    /// (<see cref="AppEinstellungService.AutonomAufgabenEnabledKey"/>, GUI-Einstellung) hat Vorrang, sofern der
-    /// Anwender ihn bereits explizit gesetzt hat, andernfalls gilt der aus appsettings.json/Umgebungsvariable
-    /// gebundene Deployment-Default <see cref="AutonomAufgabenOptions.Enabled"/> (Issue 205, Dual-Layer-Feature-
-    /// Flag). Da der DB-Zugriff asynchron ist, wird der Wert einmalig beim Laden der Aufgabe in
-    /// <see cref="LadenAsync"/> ermittelt und hier lediglich aus dem zwischengespeicherten Feld gelesen; direkt
-    /// nach der Konstruktion (bevor eine Aufgabe geladen wurde) liefert diese Eigenschaft bereits den
-    /// synchron verfügbaren Options-Default. Steuert die Sichtbarkeit von autonomen Aufgaben-UI-Elementen.
-    /// </summary>
-    public bool IsAutonomAufgabenEnabled => _isAutonomAufgabenEnabled;
-
-    /// <summary>Der aus appsettings.json/Umgebungsvariable gebundene Deployment-Default für das Feature-Flag "Autonome Aufgaben" (<see cref="AutonomAufgabenOptions.Enabled"/>).</summary>
-    private bool AutonomAufgabenDeploymentDefault => _autonomAufgabenOptions.Value.Enabled;
-
-    /// <summary>Das ViewModel der aktuell angezeigten Autonomen Aufgabe, oder null wenn keine initialisiert wurde.</summary>
-    public AutonomAufgabeDetailViewModel? AutonomAufgabeDetailViewModel => _autonomAufgabeDetailViewModel;
-
-    /// <summary>Gibt an, ob die angezeigte Aufgabe eine Autonome Aufgabe ist. Steuert die Sichtbarkeit der regulären
-    /// Aufgaben-Steuerungs-Buttons im Ribbon (bei autonomen Aufgaben erfolgt die Steuerung ausschließlich über die
-    /// Gruppe "Autonome Aufgabe").</summary>
-    public bool IsAutonomAufgabe => _aufgabe?.IstAutonom() == true;
-
-    /// <summary>Gibt an, ob der Ribbon-Button "Autonome Aufgabe starten" angezeigt werden kann: eine Aufgabe ist
-    /// geladen, ist noch nicht selbst autonom konfiguriert und das Feature-Flag für Autonome Aufgaben ist
-    /// aktiviert.</summary>
-    public bool CanAutonomAufgabeInitialisieren => _aufgabe is not null && !IsAutonomAufgabe && IsAutonomAufgabenEnabled;
-
-    /// <summary>Gibt an, ob die Ribbon-Gruppe "Autonome Aufgabe" überhaupt angezeigt werden soll. Alle Buttons
-    /// darin (Initialisieren, Start, Stop, Resume) sind einzeln an <see cref="CanAutonomAufgabeInitialisieren"/>
-    /// bzw. <see cref="ShowAutomatisierungPanel"/> gebunden, die beide bereits <see cref="IsAutonomAufgabenEnabled"/>
-    /// voraussetzen; ohne diese zusätzliche Gruppen-Sichtbarkeit bliebe bei deaktiviertem Feature-Flag eine leere
-    /// Ribbon-Gruppe sichtbar.</summary>
-    public bool ShowAutonomAufgabeRibbonGruppe => CanAutonomAufgabeInitialisieren || ShowAutomatisierungPanel;
-
     /// <summary>Gibt an, ob Pull Requests angezeigt werden koennen.</summary>
     public bool ShowPullRequestPanel => _aufgabe is not null;
 
@@ -483,9 +426,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>True wenn Status == Neu, sonst false.</summary>
     public bool ShowEditPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Neu;
 
-    /// <summary>True wenn die Aufgabe eine aktive KI-Ausfuehrung anzeigen soll. Fuer Autonome Aufgaben immer false, da diese ueber eine eigene Ansicht (Projektleiter-Agent) statt die reguläre CLI-Ansicht gesteuert werden.</summary>
-    public bool ShowCliPanel => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true
-        && !_aufgabe.IstAutonom();
+    /// <summary>True wenn die Aufgabe eine aktive KI-Ausfuehrung anzeigen soll.</summary>
+    public bool ShowCliPanel => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true;
 
     /// <summary>True wenn Status == Beendet, sonst false.</summary>
     public bool ShowDiffPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Beendet;
@@ -571,11 +513,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         ? $"⏸ Pausiert bis {_aufgabe!.PausiertBisUtc!.Value.ToLocalTime():dd.MM.yyyy HH:mm}"
         : null;
 
-    /// <summary>true, wenn für die Aufgabe eine Pause eingestellt werden kann (Status ∈ {Neu, Gestartet, Wartend}, nicht autonom, nicht am Laden).</summary>
+    /// <summary>true, wenn für die Aufgabe eine Pause eingestellt werden kann (Status ∈ {Neu, Gestartet, Wartend}, nicht am Laden).</summary>
     public bool KannPausieren => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Neu
             or Domain.Enums.AufgabeStatus.Gestartet
             or Domain.Enums.AufgabeStatus.Wartend
-        && !_aufgabe.IstAutonom()
         && !_isLoading;
 
     /// <summary>Lädt die Aufgabe.</summary>
@@ -629,9 +570,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Wechselt zur Pull-Request-Ansicht.</summary>
     public ICommand PullRequestViewCommand { get; }
 
-    /// <summary>Wechselt zur Automatisierung-Ansicht.</summary>
-    public ICommand AutomatisierungViewCommand { get; }
-
     /// <summary>Navigiert zurück zur vorherigen Ansicht.</summary>
     public ICommand ZurueckCommand { get; }
 
@@ -643,9 +581,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Öffnet die Issue-URL im Standard-Browser.</summary>
     public ICommand IssueBrowserOeffnenCommand { get; }
-
-    /// <summary>Öffnet den Initialisierungsdialog für eine Autonome Aufgabe und anschließend deren Detail-Ansicht.</summary>
-    public ICommand AutonomAufgabeInitialisierenCommand { get; }
 
     /// <summary>Exportiert die protokollierte CLI-Rohausgabe in eine *.raw-Datei.</summary>
     public ICommand ExportCliRawCommand { get; }
@@ -707,9 +642,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         FileExplorerViewModel fileExplorerViewModel,
         TodoListViewModel todoListViewModel,
         ArbeitsverzeichnisOeffnenService arbeitsverzeichnisOeffnenService,
-        AutonomAufgabeStartService autonomAufgabeStartService,
-        AppEinstellungService appEinstellungService,
-        IOptions<AutonomAufgabenOptions> autonomAufgabenOptions,
         Action<Action>? dispatcherInvoke = null,
         ICliRawExportService? cliRawExportService = null,
         ICliReplayExportService? cliReplayExportService = null,
@@ -730,17 +662,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _fileExplorerViewModel = fileExplorerViewModel;
         _todoListViewModel = todoListViewModel;
         _arbeitsverzeichnisOeffnenService = arbeitsverzeichnisOeffnenService;
-        _autonomAufgabeStartService = autonomAufgabeStartService;
-        _appEinstellungService = appEinstellungService;
-        _autonomAufgabenOptions = autonomAufgabenOptions;
         _timeProvider = timeProvider;
         _cliRawExportService = cliRawExportService ?? new CliRawExportService(protokollService, NullLogger<CliRawExportService>.Instance);
         _cliReplayExportService = cliReplayExportService ?? new CliReplayExportService(kiService, new CliReplayAufzeichnungStore(), NullLogger<CliReplayExportService>.Instance);
         _laufdatenChangedNotifier = laufdatenChangedNotifier;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
-        // Synchroner Default vor dem ersten Laden einer Aufgabe: LadenAsync ermittelt den DB-Wert
-        // asynchron und überschreibt dieses Feld danach ggf. (siehe AktualisiereIsAutonomAufgabenEnabledAsync).
-        _isAutonomAufgabenEnabled = AutonomAufgabenDeploymentDefault;
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
         _promptZeitVersandService.PromptSent += OnPromptSent;
@@ -753,7 +679,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         StartenCommand = new AsyncRelayCommand(
             StartenAsync,
             () => _aufgabe?.AusfuehrungsStatus.DarfAusfuehrungStarten(_aufgabe.Status) == true
-                && !_aufgabe.IstAutonom()
                 && !_isCliRunning
                 && !IstPausiert);
         PluginAendernCommand = new AsyncRelayCommand(PluginWechselAsync, () => AufgabeStatus is Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend && _isCliRunning);
@@ -771,20 +696,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         DiffViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Diff), () => ShowDiffPanel);
         DateiViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Dateibrowser), () => ShowFileExplorerPanel);
         PullRequestViewCommand = new RelayCommand(PullRequestAnsichtWaehlen, () => ShowPullRequestPanel);
-        AutomatisierungViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Automatisierung), () => ShowAutomatisierungPanel);
         ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
         IssueZuweisenCommand = new AsyncRelayCommand(IssueZuweisenAsync, () => CanAssignIssue && !_isLoading);
         IssueAnlegenCommand = new AsyncRelayCommand(IssueAnlegenAsync, () => CanCreateIssue);
         IssueBrowserOeffnenCommand = new RelayCommand(
             IssueBrowserOeffnen,
             () => CurrentIssueReferenz?.IssueUrl != null);
-        // !IsAutonomAufgabe: Verhindert, dass der Initialisierungs-Assistent für eine bereits autonom
-        // konfigurierte Aufgabe versehentlich erneut durchlaufen wird (z. B. weil die eigentlichen
-        // Start/Stop/Resume-Buttons der Gruppe "Autonome Aufgabe" durch einen Lade-Fehler nicht sichtbar
-        // sind) - AutonomAufgabenInitialisierungsService.InitialisiereAsync legt dabei ungeprüft eine
-        // zweite AutonomAufgabeKonfiguration an bzw. bricht beim erneuten Klonen ins bereits vorhandene
-        // Arbeitsverzeichnis ab. IsAutonomAufgabenEnabled: Feature-Flag für Autonome Aufgaben (Issue 205).
-        AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => CanAutonomAufgabeInitialisieren);
         ExportCliRawCommand = new AsyncRelayCommand(ExportCliRawAsync, () => KannCliRawExportieren);
         ExportCliReplayCommand = new AsyncRelayCommand(ExportCliReplayAsync, () => KannCliReplayExportieren);
         PauseEinstellenCommand = new AsyncRelayCommand(PauseEinstellenAsync, () => KannPausieren);
@@ -845,9 +762,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             // LadenAsync bindet nur vorhandene laufende Sitzungen wieder an. Ein neuer CLI-Prozess
             // wird ausschließlich über explizite Start-/Neustartaktionen gestartet.
-
-            await AktualisiereIsAutonomAufgabenEnabledAsync(ct);
-            await StelleAutonomAufgabeDetailViewModelWiederHerAsync(ct);
         }
         catch (OperationCanceledException)
         {
@@ -862,31 +776,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             IsLoading = false;
         }
-    }
-
-    /// <summary>
-    /// Ermittelt den aktuellen Wert von <see cref="IsAutonomAufgabenEnabled"/> asynchron über
-    /// <see cref="AppEinstellungService.GetAutonomAufgabenEnabledAsync"/> (DB-persistierter Laufzeit-Schalter mit
-    /// Fallback auf den Options-Deployment-Default) und speichert ihn im Feld <see cref="_isAutonomAufgabenEnabled"/>
-    /// zwischen, da <see cref="IsAutonomAufgabenEnabled"/> selbst synchron bleiben muss (Property-Binding). Löst
-    /// bei einer Wertänderung <see cref="ViewModelBase.OnPropertyChanged(string)"/> für
-    /// <see cref="IsAutonomAufgabenEnabled"/> und <see cref="ShowAutomatisierungPanel"/> aus, damit die Ribbon-
-    /// Buttons/Registerkarte "Automatisierung" ihre Sichtbarkeit neu auswerten (Issue 205).
-    /// </summary>
-    /// <param name="ct">Abbruch-Token.</param>
-    private async Task AktualisiereIsAutonomAufgabenEnabledAsync(CancellationToken ct)
-    {
-        var neuerWert = await _appEinstellungService.GetAutonomAufgabenEnabledAsync(AutonomAufgabenDeploymentDefault, ct);
-
-        if (neuerWert == _isAutonomAufgabenEnabled)
-            return;
-
-        _isAutonomAufgabenEnabled = neuerWert;
-        OnPropertyChanged(nameof(IsAutonomAufgabenEnabled));
-        OnPropertyChanged(nameof(ShowAutomatisierungPanel));
-        OnPropertyChanged(nameof(CanAutonomAufgabeInitialisieren));
-        OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
-        CommandManager.InvalidateRequerySuggested();
     }
 
     private async Task LadeProtokolleAsync(CancellationToken ct)
@@ -1379,35 +1268,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task AutonomAufgabeInitialisierenAsync(CancellationToken ct)
-    {
-        if (_aufgabe is null)
-        {
-            return;
-        }
-
-        var ergebnis = await _autonomAufgabeStartService.StarteAsync(_aufgabe, ct);
-        if (ergebnis is null)
-        {
-            return;
-        }
-
-        if (ergebnis.AktualisierteAufgabe is not null)
-        {
-            Aufgabe = ergebnis.AktualisierteAufgabe;
-        }
-
-        if (ergebnis.FehlerMeldung is not null)
-        {
-            FehlerMeldung = ergebnis.FehlerMeldung;
-        }
-
-        if (ergebnis.DetailViewModel is not null)
-        {
-            await SetzeAutonomAufgabeDetailViewAsync(ergebnis.DetailViewModel);
-        }
-    }
-
     private async Task IssueAnlegenAsync(CancellationToken ct)
     {
         if (_aufgabe == null)
@@ -1584,8 +1444,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             ansicht = DetailAnsicht.Info;
         if (ansicht == DetailAnsicht.PullRequests && !ShowPullRequestPanel)
             ansicht = DetailAnsicht.Info;
-        if (ansicht == DetailAnsicht.Automatisierung && !ShowAutomatisierungPanel)
-            ansicht = DetailAnsicht.Info;
 
         if (_ausgewaehlteAnsicht == ansicht)
             return;
@@ -1598,65 +1456,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsFileExplorerViewSelected));
         OnPropertyChanged(nameof(IsPullRequestViewSelected));
         OnPropertyChanged(nameof(IsTodoViewSelected));
-        OnPropertyChanged(nameof(IsAutomatisierungViewSelected));
         OnPropertyChanged(nameof(ShowInfoPanel));
-    }
-
-    /// <summary>Speichert <paramref name="vm"/> als ViewModel der Automatisierung-Ansicht, löst die zugehörigen PropertyChanged-Ereignisse aus und wechselt zur Automatisierung-Ansicht. Wird von <see cref="AutonomAufgabeStartService"/> über das Ergebnis von <see cref="AutonomAufgabeStartService.StarteAsync"/> aufgerufen.</summary>
-    /// <param name="vm">Das anzuzeigende ViewModel der Autonomen Aufgabe.</param>
-    public Task SetzeAutonomAufgabeDetailViewAsync(AutonomAufgabeDetailViewModel? vm)
-    {
-        if (!ReferenceEquals(_autonomAufgabeDetailViewModel, vm))
-        {
-            _autonomAufgabeDetailViewModel?.Dispose();
-        }
-
-        _autonomAufgabeDetailViewModel = vm;
-        OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
-        OnPropertyChanged(nameof(ShowAutomatisierungPanel));
-        OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
-        WaehleAnsicht(DetailAnsicht.Automatisierung);
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Stellt <see cref="AutonomAufgabeDetailViewModel"/> wieder her, wenn die geladene Aufgabe bereits als
-    /// Autonome Aufgabe konfiguriert ist (<see cref="Aufgabe.AutonomKonfiguration"/> vorhanden), das ViewModel
-    /// für diese TaskDetailViewModel-Instanz aber noch nicht gesetzt wurde. Ohne dies bliebe
-    /// <see cref="ShowAutomatisierungPanel"/> nach jedem erneuten Öffnen der Aufgabe (Navigation weg und
-    /// zurück, neue Detailansicht nach App-Neustart) dauerhaft false, da <see cref="_autonomAufgabeDetailViewModel"/>
-    /// bislang ausschließlich über den Initialisierungs-Assistenten (<see cref="AutonomAufgabeInitialisierenAsync"/>
-    /// → <see cref="SetzeAutonomAufgabeDetailViewAsync"/>) gesetzt wurde — die Ribbon-Buttons "Start"/"Stop"/"Resume"
-    /// der Gruppe "Autonome Aufgabe" sind an ShowAutomatisierungPanel gebunden und wären dadurch unsichtbar bzw.
-    /// ohne Command. Wechselt bewusst nicht automatisch zur Automatisierung-Ansicht (anders als
-    /// SetzeAutonomAufgabeDetailViewAsync), da LadenAsync auch für andere Ansichten wiederholt aufgerufen wird
-    /// und ein Wechsel dabei den aktuell angezeigten Tab des Anwenders kapern würde.
-    /// </summary>
-    /// <param name="ct">Abbruch-Token für das Laden von plan.md/progress.md/governance.md.</param>
-    private async Task StelleAutonomAufgabeDetailViewModelWiederHerAsync(CancellationToken ct)
-    {
-        if (_autonomAufgabeDetailViewModel is not null || _aufgabe?.AutonomKonfiguration is null)
-        {
-            return;
-        }
-
-        var detailVm = new AutonomAufgabeDetailViewModel(
-            _aufgabe,
-            _aufgabe.AutonomKonfiguration,
-            _serviceProvider.GetRequiredService<ProjektleiterAgentService>(),
-            _serviceProvider.GetRequiredService<SessionManagementService>(),
-            _kiService,
-            _serviceProvider.GetRequiredService<ILogger<AutonomAufgabeDetailViewModel>>());
-
-        _autonomAufgabeDetailViewModel = detailVm;
-        OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
-        OnPropertyChanged(nameof(ShowAutomatisierungPanel));
-        OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
-
-        await Task.WhenAll(
-            detailVm.LaedePlanAsync(ct),
-            detailVm.LaedeProgressAsync(ct),
-            detailVm.LaedeGovernanceAsync(ct)).ConfigureAwait(false);
     }
 
     private void PullRequestAnsichtWaehlen()
@@ -1758,7 +1558,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
         _promptZeitVersandService.PromptSent -= OnPromptSent;
         _promptZeitVersandService.CancelScheduledPrompt(_aufgabeId);
-        _autonomAufgabeDetailViewModel?.Dispose();
         AttachCliStatusSession(null);
         _ladenCts?.Cancel();
         _ladenCts?.Dispose();

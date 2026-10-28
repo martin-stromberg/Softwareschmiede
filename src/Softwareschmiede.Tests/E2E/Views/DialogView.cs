@@ -60,8 +60,7 @@ public abstract class DialogView : BaseWindowView
     /// NICHT aktiv (kein Button-Klick im Hauptfenster), sondern wartet nur passiv, bis der Dialog von
     /// außen bereits geöffnet wurde. Grund: Viele Dialoge dieser Hierarchie werden nicht durch einen
     /// einzelnen, zustandslos erreichbaren Button ausgelöst, sondern erscheinen nur als Folge komplexer
-    /// Fachlogik (z. B. eines laufenden CLI-Prozesses, eines Update-Checks beim App-Start, oder einer
-    /// bereits gestarteten autonomen Aufgabe) - eine generische aktive Navigation ist für diese Fälle
+    /// Fachlogik (z. B. eines laufenden CLI-Prozesses oder eines Update-Checks beim App-Start) - eine generische aktive Navigation ist für diese Fälle
     /// nicht sinnvoll möglich. Subklassen mit einem einfachen, direkt erreichbaren Auslöse-Button
     /// überschreiben <see cref="ForceShow"/> stattdessen mit echter Navigationslogik (siehe
     /// <see cref="Softwareschmiede.Tests.E2E.Views.Dialogs.RepositoryAssignDialogView"/> und

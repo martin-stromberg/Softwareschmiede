@@ -10,10 +10,7 @@ Die Navigationsmenü-Seitenleiste zeigt bis zu 20 derzeit aktive Aufgaben als ko
 
 Reguläre Aufgaben können über **Pause einstellen** bis zu einem frei wählbaren Zeitpunkt pausiert werden; pausierte Kacheln erscheinen abgeblendet mit `⏸`-Symbol (Countdown „⏸ Pausiert (noch …)" im Tooltip). Meldet ein KI-CLI ein Session-Limit, werden alle aktiv laufenden Aufgaben desselben KI-Plugins automatisch bis zum gemeldeten Zeitpunkt pausiert — laufende Ausführungen werden dabei nicht unterbrochen, und ein automatischer Neustart findet nicht statt.
 
-## Arten von Aufgaben
-
-### Reguläre Aufgaben
-Aufgaben werden durch einen KI-Agenten direkt bearbeitet. Der Anwender steuert den Prozess über Buttons (Start, Plugin wechseln, etc.).
+## Weiterführende Seiten
 
 - [Beschreibung](beschreibung.md)
 - [Technischer Ablauf](ablauf-technisch.md)
@@ -23,8 +20,3 @@ Aufgaben werden durch einen KI-Agenten direkt bearbeitet. Der Anwender steuert d
 - [Architektur](architektur.md)
 - [Business Rules](business-rules.md)
 - [Fehlerbehebung](troubleshooting.md)
-
-### Autonome Aufgaben
-Neue Aufgabenart für automatisierte Projektentwicklung unter Kontrolle eines Projektleiter-Agenten. Der Projektleiter zerlegt die Aufgabe selbstständig, erzeugt Unteragenten und orchestriert den Prozess — ideal für komplexe, mehrstufige Projekte.
-
-- [Autonome Aufgaben — Übersicht](autonome-aufgaben/index.md)

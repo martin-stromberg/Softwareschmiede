@@ -196,7 +196,7 @@ Du kannst eine reguläre Aufgabe (Status **Neu**, **Gestartet** oder **Wartend**
 3. Klicke auf **Übernehmen**. Der gewählte Zeitpunkt muss in der Zukunft liegen; sonst zeigt der Dialog einen Hinweis und lässt keine Bestätigung zu.
 4. Die Aufgabe gilt nun als pausiert: Die Kachel in der Seitenleiste zeigt das Symbol `⏸` und ist abgeblendet — der Countdown „⏸ Pausiert (noch …)" steht im Tooltip des Statussymbols; im Ribbon erscheint „⏸ Pausiert bis …". Während der Pause sind **Starten**, **CLI neu starten**, die Wiederherstellung und das Senden oder Planen von Prompts gesperrt.
 
-> **Hinweis:** Ein laufender CLI-Prozess wird durch die Pause nicht gestoppt — die Pause wirkt nur auf neue Aktionen. Autonome Aufgaben können nicht über diesen Dialog pausiert werden.
+> **Hinweis:** Ein laufender CLI-Prozess wird durch die Pause nicht gestoppt — die Pause wirkt nur auf neue Aktionen.
 
 **Pause vorzeitig aufheben:** Öffne **Pause einstellen** erneut — der Dialog zeigt die aktuell gesetzte Pause an — und klicke auf **Pause aufheben**. Ohne Aufheben endet die Pause automatisch zum eingestellten Zeitpunkt; eine automatische Wiederaufnahme findet nicht statt.
 

@@ -1,7 +1,6 @@
 using System.Text;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -91,13 +90,7 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService();
-        var serviceProvider = TaskDetailViewModelTestFactory.CreateDefaultServiceProvider(_db, _kiService);
-        var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
-            serviceProvider,
-            _dialogServiceMock.Object,
-            _aufgabeService,
-            _db,
-            appEinstellungService: _appEinstellungService);
+        var serviceProvider = new Mock<IServiceProvider>().Object;
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -116,9 +109,6 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartService,
-            _appEinstellungService,
-            Options.Create(new AutonomAufgabenOptions()),
             cliReplayExportService: _exportServiceMock.Object);
     }
 

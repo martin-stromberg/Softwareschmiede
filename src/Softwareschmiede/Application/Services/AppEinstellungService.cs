@@ -39,9 +39,6 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für die Prioritäts-Reihenfolge der IDE-Plugins (kommagetrennte Liste von Plugin-Prefixen).</summary>
     public const string IdePluginOrderKey = "plugins.ide.order";
 
-    /// <summary>Schlüssel für das Feature-Flag "Autonome Aufgaben aktiviert".</summary>
-    public const string AutonomAufgabenEnabledKey = "autonomeaufgaben.enabled";
-
     /// <summary>Schlüssel für den Laufzeit-Schalter "SCM-Ereignisüberwachung aktiviert".</summary>
     public const string ScmMonitoringEnabledKey = "scm.monitoring.enabled";
 
@@ -163,24 +160,6 @@ public sealed class AppEinstellungService
     /// <summary>Speichert eine Boolean-Einstellung.</summary>
     public Task SetBoolSettingAsync(string schluessel, bool wert, CancellationToken ct = default)
         => SetSettingAsync(schluessel, wert.ToString(), ct);
-
-    /// <summary>
-    /// Ermittelt, ob das Feature "Autonome Aufgaben" aktuell aktiv ist: Der über <see cref="SetBoolSettingAsync"/>
-    /// unter <see cref="AutonomAufgabenEnabledKey"/> persistierte Laufzeit-Schalter (GUI-Einstellung) hat Vorrang,
-    /// sofern der Anwender ihn bereits explizit gesetzt hat; existiert kein DB-Eintrag (Rückgabe <c>null</c> von
-    /// <see cref="GetBoolSettingAsync"/>), wird <paramref name="deploymentDefault"/> (der aus appsettings.json/
-    /// Umgebungsvariablen gebundene <c>AutonomAufgabenOptions.Enabled</c>-Deployment-Zeit-Default) als Fallback
-    /// verwendet. Bündelt dieses Dual-Layer-Fallback-Muster zentral für alle Guard-Klauseln und UI-Sichtbarkeits-
-    /// Checks rund um Autonome Aufgaben (Issue 205), statt es an jeder Aufrufstelle zu duplizieren.
-    /// </summary>
-    /// <param name="deploymentDefault">Der zu verwendende Fallback-Wert, wenn kein DB-Eintrag existiert (typischerweise <c>IOptions&lt;AutonomAufgabenOptions&gt;.Value.Enabled</c>).</param>
-    /// <param name="ct">Abbruchtoken.</param>
-    /// <returns><see langword="true"/>, wenn Autonome Aufgaben aktiv sind (DB-Wert, sonst <paramref name="deploymentDefault"/>).</returns>
-    public async Task<bool> GetAutonomAufgabenEnabledAsync(bool deploymentDefault, CancellationToken ct = default)
-    {
-        var dbWert = await GetBoolSettingAsync(AutonomAufgabenEnabledKey, ct);
-        return dbWert ?? deploymentDefault;
-    }
 
     /// <summary>
     /// Ermittelt, ob die SCM-Ereignisüberwachung aktuell aktiv ist. Der über

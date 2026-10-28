@@ -444,7 +444,7 @@ Zusätzlich:
 Ausgelöst durch den Button **Pause einstellen** (`AutomationName="PauseEinstellen"`) in der Ribbon-Gruppe „Aufgabe" der `TaskDetailView`.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.PauseEinstellenCommand` — `AsyncRelayCommand` mit CanExecute `KannPausieren` (`Status` ∈ {`Neu`, `Gestartet`, `Wartend`} ∧ `!IsAutonomAufgabe` ∧ `!IsLoading`); der Button ist über `Visibility`-Binding ausgeblendet, wenn `KannPausieren` nicht gilt
+- `TaskDetailViewModel.PauseEinstellenCommand` — `AsyncRelayCommand` mit CanExecute `KannPausieren` (`Status` ∈ {`Neu`, `Gestartet`, `Wartend`} ∧ `!IsLoading`); der Button ist über `Visibility`-Binding ausgeblendet, wenn `KannPausieren` nicht gilt
 - `TaskDetailViewModel.PauseEinstellenAsync` — erzeugt das Dialog-ViewModel, ruft den Dialog und übergibt das Ergebnis an den Service
 - `AufgabePausierenDialogViewModel` — Dialog-Zustand: `PausiertDatum`/`PausiertStunde`/`PausiertMinute` (Vorbelegung: `GetLocalNow().AddMinutes(1)`, da die laufende Minute durch den Sekundenabschnitt bereits in der Vergangenheit läge), `AktuellePauseAnzeige`, `IstAktuellPausiert`, `ValidierungsFehler`/`KannBestaetigen`; `Initialize(aktuellePauseUtc)` übernimmt eine bestehende Pause als Vorbelegung
 - `AufgabePausierenErgebnis` — Record mit `PausiertBisUtc` und `Aufheben`
@@ -457,7 +457,7 @@ Ablauf:
 2. `ShowAufgabePausierenDialogAsync` öffnet den modalen Dialog. Er validiert fortlaufend: Datum gewählt, Stunde 0–23, Minute 0–59, Ergebnis (in lokale Zeit interpretiert, nach UTC normalisiert) muss in der Zukunft liegen — sonst ist `KannBestaetigen == false` und `ValidierungsFehler` wird angezeigt.
 3. Ergebnis-Varianten: **Übernehmen** → `AufgabePausierenErgebnis(pausiertBisUtc, Aufheben: false)`; **Pause aufheben** (nur aktiv bei `IstAktuellPausiert`) → `Ergebnis(null, Aufheben: true)`; **Abbrechen** → `null`, keine Änderung.
 4. Bei `Aufheben` ruft das ViewModel `SetPauseAsync(aufgabeId, null)`, sonst `SetPauseAsync(aufgabeId, ergebnis.PausiertBisUtc)`.
-5. `AufgabeService.SetPauseAsync` lehnt Autonome Aufgaben (`IstAutonom()`), Status außerhalb `Neu`/`Gestartet`/`Wartend` und nicht-zukünftige Zeitpunkte mit `InvalidOperationException` ab; andernfalls wird `PausiertBisUtc` gespeichert und ein `SystemMeldung`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben") geschrieben.
+5. `AufgabeService.SetPauseAsync` lehnt Status außerhalb `Neu`/`Gestartet`/`Wartend` und nicht-zukünftige Zeitpunkte mit `InvalidOperationException` ab; andernfalls wird `PausiertBisUtc` gespeichert und ein `SystemMeldung`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben") geschrieben.
 6. `LadenAsync` lädt die Aufgabe neu; `NotifyLaufdatenChanged` stößt den sofortigen Refresh der Seitenleiste an.
 
 ### 5.5. Automatische Pause bei Session-Limit-Marker
@@ -476,7 +476,7 @@ Ablauf:
 1. Nach `AddCliOutputAsync` prüft `PersistLineAsync` die Zeile erneut mit `TryParseRateLimitMarker`. Nur bei `resetUtc.HasValue` wird `KiPluginLimitService.VerarbeiteRateLimitAsync(aufgabeId, resetUtc)` aufgerufen — ein Marker ohne Zeitstempel erzeugt also nur den `RateLimit`-Protokolleintrag.
 2. `VerarbeiteRateLimitAsync` lädt die auslösende Aufgabe; bei fehlendem `KiPluginPrefix` wird ohne Aktion abgebrochen.
 3. Der Zeitpunkt wird als `AppEinstellung` unter `plugins.sessionlimit.<Prefix>` gespeichert. Liegt er in der Vergangenheit, endet der Ablauf hier (kein Pausieren).
-4. Es werden alle Aufgaben mit `Status.IstAktivOderWartend()`, `AusfuehrungsStatus == Aktiv`, ohne `AutonomKonfiguration` und mit gesetztem `KiPluginPrefix` geladen und clientseitig per `StringComparison.OrdinalIgnoreCase` auf dasselbe Prefix gefiltert.
+4. Es werden alle Aufgaben mit `Status.IstAktivOderWartend()`, `AusfuehrungsStatus == Aktiv` und mit gesetztem `KiPluginPrefix` geladen und clientseitig per `StringComparison.OrdinalIgnoreCase` auf dasselbe Prefix gefiltert.
 5. Pro betroffener Aufgabe gilt **Max-Semantik**: `PausiertBisUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — eine länger laufende manuelle Pause wird nicht verkürzt. Pro Aufgabe entsteht ein `SystemMeldung`-Eintrag („Aufgabe pausiert bis … (Session-Limit des KI-Plugins '…')").
 6. Nach `SaveChangesAsync` wird pro Aufgabe `NotifyLaufdatenChanged` aufgerufen → die Kacheln zeigen sofort „⏸ Pausiert (noch …)".
 7. Es werden **keine** Methoden von `KiAusfuehrungsService`/`CliProcessManager` aufgerufen — laufende CLI-Prozesse bleiben unangetastet.
@@ -1089,7 +1089,7 @@ Ablauf:
 | Heartbeat > 5 Min, kein Prozess | Recovery-Kandidat; Banner auf Dashboard |
 | Start/CLI-Neustart/Recovery bei aktiver Pause | `InvalidOperationException` („Die Aufgabe ist bis … pausiert." / „Wiederherstellung nicht möglich, die Aufgabe ist bis … pausiert."); Recovery-Ablehnung wird mit `TaskRecoveryRejected ReasonCode=Paused` geloggt; in der UI sind die betreffenden Buttons deaktiviert |
 | Pause-Dialog mit Zeitpunkt in Vergangenheit oder ungültiger Eingabe | `KannBestaetigen == false`, `ValidierungsFehler`-Text im Dialog; zusätzlich wirft `AufgabeService.SetPauseAsync` `InvalidOperationException` als Service-Layer-Absicherung |
-| `SetPauseAsync` auf Autonome Aufgabe oder Status `Beendet`/`Archiviert` | `InvalidOperationException`; der Ribbon-Button ist in diesen Fällen ausgeblendet (`KannPausieren`) |
+| `SetPauseAsync` auf Status `Beendet`/`Archiviert` | `InvalidOperationException`; der Ribbon-Button ist in diesen Fällen ausgeblendet (`KannPausieren`) |
 | Rate-Limit-Marker ohne gültigen Zeitstempel oder ohne `KiPluginPrefix` | Nur `RateLimit`-Protokolleintrag; kein persistiertes Plugin-Limit, keine Pause |
 | Session-Limit-Zeitpunkt liegt in der Vergangenheit | Wert wird als `AppEinstellung` persistiert, löst aber keine Pause aus |
 | `KiPluginLimitService` in Scope nicht registriert | `CliOutputProtokollWriter` löst via `GetService` auf — fehlertolerant, nur der `RateLimit`-Eintrag wird geschrieben |

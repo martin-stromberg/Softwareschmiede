@@ -70,7 +70,7 @@
 - Der Marker enthielt keinen gültigen Zeitstempel — dann wird nur der Protokolleintrag geschrieben.
 - Der gemeldete Zeitpunkt lag bereits in der Vergangenheit — er wird gespeichert, löst aber keine Pause aus.
 - Die auslösende Aufgabe hat kein zugeordnetes KI-Plugin — dann kann kein pluginweites Limit gespeichert werden.
-- Andere Aufgaben mit demselben Plugin waren zu dem Zeitpunkt nicht aktiv (Ausführung läuft nicht) oder sind Autonome Aufgaben — beide werden nicht automatisch pausiert.
+- Andere Aufgaben mit demselben Plugin waren zu dem Zeitpunkt nicht aktiv (Ausführung läuft nicht) — sie werden nicht automatisch pausiert.
 
 **Lösung:** Pausiere betroffene Aufgaben bei Bedarf manuell über **Pause einstellen**.
 
