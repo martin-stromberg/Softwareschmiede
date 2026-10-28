@@ -113,8 +113,8 @@ public partial class End2EndTest
         Skip.If(jetzt.Hour == 0 && jetzt.Minute < 10, "Kurz nach Mitternacht: 'jetzt - 10 min' wäre als heutige Uhrzeit eine Zukunftszeit.");
         var vergangen = jetzt.AddMinutes(-10);
 
-        taskB.SelectPromptTemplate(MarkerVorlagenName);
         taskB.SetScheduledPromptTime(vergangen.Hour, vergangen.Minute);
+        taskB.SelectPromptTemplate(MarkerVorlagenName);
         WaitForElement(mainWindow, cf => cf.ByName("ZeitgesteuertSenden"), Short).AsButton().Click();
 
         // Warten, bis der Marker auf dem echten Ausgabepfad verarbeitet wurde:
