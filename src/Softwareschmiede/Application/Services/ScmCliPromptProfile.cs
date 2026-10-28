@@ -49,8 +49,10 @@ public sealed record ScmCliPromptProfile(string PluginPrefix, string BannerAncho
         new("Softwareschmiede.ClaudeCli", "Claude Code",
             new Regex(@"Claude Code v(?<version>\d+\.\d+\.\d+)(?=\s|$)", RegexOptions.CultureInvariant),
             [new ScmCliVersionRange(new Version(2, 1, 0), new Version(2, 2, 0))], "Claude Code", "v2.1.x"),
+        // Das Devin-Banner zeichnet sein Braille-Logo (U+2800–U+28FF) links neben Name und Version;
+        // im Rohtranskript stehen zusätzlich ANSI-Farb-/Löschsequenzen um die Version.
         new("Softwareschmiede.Devin", "Devin CLI",
-            new Regex(@"Devin CLI\s+v(?<version>\d+\.\d+\.\d+)(?=\s|$)", RegexOptions.CultureInvariant),
+            new Regex(@"Devin CLI(?:[\s⠀-⣿]|\x1b\[[0-9;?]*[A-Za-z])+v(?<version>\d+\.\d+\.\d+)(?=[\s⠀-⣿\x1b]|$)", RegexOptions.CultureInvariant),
             [new ScmCliVersionRange(new Version(3000, 11, 0), new Version(3000, 12, 0))], "Devin CLI", "v3000.11.x"),
         new("Softwareschmiede.KiSimulator", "SCM_SIMULATOR_PROTOCOL_V1", null, [], "KI-Simulator", null),
     }.ToDictionary(profile => profile.PluginPrefix, StringComparer.Ordinal);
