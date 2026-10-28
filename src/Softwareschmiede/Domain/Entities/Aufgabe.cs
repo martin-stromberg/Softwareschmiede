@@ -114,9 +114,6 @@ public sealed class Aufgabe
     /// oder „Issue #3") — Diagnose-/Protokollwert zu <see cref="ScmAbschlussErkanntUtc"/>.</summary>
     public string? ScmAbschlussReferenz { get; set; }
 
-    /// <summary>Navigationseigenschaft zur Konfiguration der Autonomen Aufgabe (null für reguläre Aufgaben). Enthält u.a. <see cref="AutonomAufgabeKonfiguration.ProjektleiterAgentId"/>, <see cref="AutonomAufgabeKonfiguration.SessionPauseUtc"/> und <see cref="AutonomAufgabeKonfiguration.AktiveUnteragenten"/>.</summary>
-    public AutonomAufgabeKonfiguration? AutonomKonfiguration { get; set; }
-
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
     public Projekt Projekt { get; set; } = null!;
 

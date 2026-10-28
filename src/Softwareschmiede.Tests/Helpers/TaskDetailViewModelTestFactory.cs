@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -18,9 +17,8 @@ public static class TaskDetailViewModelTestFactory
     /// <summary>Erstellt ein TaskDetailViewModel mit Mock-Abhängigkeiten und dem übergebenen DbContext/AufgabeService.</summary>
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
     /// <param name="aufgabeService">Der zu verwendende AufgabeService.</param>
-    /// <param name="autonomAufgabenOptions">Optionale AutonomAufgabenOptions für das Feature-Flag-Gating, oder null für Standard-Options (Enabled = true, wie im Produktions-Default), konsistent für alle Kollaboratoren des ViewModels.</param>
     /// <returns>Ein vollständig konfiguriertes TaskDetailViewModel.</returns>
-    public static TaskDetailViewModel Create(SoftwareschmiededDbContext db, AufgabeService aufgabeService, AutonomAufgabenOptions? autonomAufgabenOptions = null)
+    public static TaskDetailViewModel Create(SoftwareschmiededDbContext db, AufgabeService aufgabeService)
     {
         var dialogServiceMock = new Mock<IDialogService>();
         dialogServiceMock
@@ -58,14 +56,6 @@ public static class TaskDetailViewModelTestFactory
 
         var arbeitsverzeichnisOeffnenService = CreateArbeitsverzeichnisOeffnenService();
 
-        var autonomAufgabeStartService = CreateAutonomAufgabeStartService(
-            serviceProviderMock.Object,
-            dialogServiceMock.Object,
-            aufgabeService,
-            db,
-            autonomAufgabenOptions,
-            appEinstellungService);
-
         return new TaskDetailViewModel(
             aufgabeService,
             protokollService,
@@ -82,10 +72,7 @@ public static class TaskDetailViewModelTestFactory
             TimeProvider.System,
             fileExplorerViewModel,
             todoListViewModel,
-            arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartService,
-            appEinstellungService,
-            Options.Create(autonomAufgabenOptions ?? new AutonomAufgabenOptions()));
+            arbeitsverzeichnisOeffnenService);
     }
 
     /// <summary>Erstellt ein FileExplorerViewModel mit Mock-Abhängigkeiten für Tests, die kein spezielles Diff-/Browser-Verhalten benötigen.</summary>
@@ -105,51 +92,4 @@ public static class TaskDetailViewModelTestFactory
         prozessStarterMock ??= new Mock<IProzessStarter>();
         return new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object);
     }
-
-    /// <summary>
-    /// Erstellt einen IServiceProvider-Mock, der die von TaskDetailViewModel.LadenAsync via GetRequiredService
-    /// aufgelösten Abhängigkeiten für die Wiederherstellung von AutonomAufgabeDetailViewModel bei bereits
-    /// autonom konfigurierten Aufgaben bereitstellt (ProjektleiterAgentService, SessionManagementService,
-    /// ILogger&lt;AutonomAufgabeDetailViewModel&gt;), ansonsten aber wie ein leerer Mock reagiert (GetService
-    /// liefert für alle anderen Typen weiterhin null). Ohne diese Registrierungen würde jeder CreateSut()-Test
-    /// mit einer bereits autonom konfigurierten Aufgabe an einer InvalidOperationException aus
-    /// GetRequiredService scheitern, sobald LadenAsync (siehe TaskDetailViewModel.cs) versucht, das
-    /// ViewModel wiederherzustellen.
-    /// </summary>
-    /// <param name="db">Der zu verwendende Datenbankkontext.</param>
-    /// <param name="kiAusfuehrungsService">Der zu verwendende KiAusfuehrungsService (dieselbe Instanz wie im übrigen Testaufbau).</param>
-    /// <returns>Ein IServiceProvider mit den für Autonome-Aufgabe-Rehydrierung nötigen Registrierungen.</returns>
-    public static IServiceProvider CreateDefaultServiceProvider(SoftwareschmiededDbContext db, KiAusfuehrungsService kiAusfuehrungsService)
-    {
-        var mock = new Mock<IServiceProvider>();
-        var projektleiterAgentService = AutonomAufgabenInitialisierungsServiceTestFactory.CreateProjektleiterAgentService(db, kiAusfuehrungsService);
-        var sessionManagementService = new SessionManagementService(db, NullLogger<SessionManagementService>.Instance);
-        mock.Setup(sp => sp.GetService(typeof(ProjektleiterAgentService))).Returns(projektleiterAgentService);
-        mock.Setup(sp => sp.GetService(typeof(SessionManagementService))).Returns(sessionManagementService);
-        mock.Setup(sp => sp.GetService(typeof(ILogger<AutonomAufgabeDetailViewModel>))).Returns(NullLogger<AutonomAufgabeDetailViewModel>.Instance);
-        return mock.Object;
-    }
-
-    /// <summary>Erstellt einen AutonomAufgabeStartService mit den übergebenen Abhängigkeiten für Tests.</summary>
-    /// <param name="serviceProvider">Der zu verwendende IServiceProvider.</param>
-    /// <param name="dialogService">Der zu verwendende IDialogService.</param>
-    /// <param name="aufgabeService">Der zu verwendende AufgabeService.</param>
-    /// <param name="db">Der zu verwendende Datenbankkontext, aus dem intern ein AppEinstellungService für die Feature-Flag-Guard-Klausel erzeugt wird (sofern <paramref name="appEinstellungService"/> nicht explizit übergeben wird).</param>
-    /// <param name="autonomAufgabenOptions">Die zu verwendenden AutonomAufgabenOptions, oder null für Standard-Options (Enabled = true).</param>
-    /// <param name="appEinstellungService">Optionaler, bereits vorhandener AppEinstellungService (z. B. um denselben DB-persistierten Feature-Flag-Zustand wie im übrigen Testaufbau zu verwenden); wird sonst aus <paramref name="db"/> neu erstellt.</param>
-    /// <returns>Ein einsatzbereiter AutonomAufgabeStartService.</returns>
-    public static AutonomAufgabeStartService CreateAutonomAufgabeStartService(
-        IServiceProvider serviceProvider,
-        IDialogService dialogService,
-        AufgabeService aufgabeService,
-        SoftwareschmiededDbContext db,
-        AutonomAufgabenOptions? autonomAufgabenOptions = null,
-        AppEinstellungService? appEinstellungService = null)
-        => new(
-            serviceProvider,
-            dialogService,
-            aufgabeService,
-            appEinstellungService ?? new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance),
-            Options.Create(autonomAufgabenOptions ?? new AutonomAufgabenOptions()),
-            NullLogger<AutonomAufgabeStartService>.Instance);
 }

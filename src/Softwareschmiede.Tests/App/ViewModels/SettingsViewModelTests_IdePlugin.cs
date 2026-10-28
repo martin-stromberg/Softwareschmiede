@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -62,7 +61,6 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
             _pluginSettingsService,
             _promptVorlagenService,
             NullLogger<SettingsViewModel>.Instance,
-            Options.Create(new AutonomAufgabenOptions()),
             new Mock<IDialogService>().Object,
             new Mock<IServiceProvider>().Object);
 

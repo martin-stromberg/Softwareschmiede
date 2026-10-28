@@ -4,33 +4,25 @@ using Softwareschmiede.Tests.E2E.Views;
 namespace Softwareschmiede.Tests.E2E;
 
 /// <summary>
-/// E2E-Test für den Feature-Flag-Schalter "Autonome Aufgaben aktivieren" in den Einstellungen (Issue 205).
+/// E2E-Test für den Inhalt der Registerkarte "Allgemein" in den Einstellungen.
 /// </summary>
 public partial class End2EndTest
 {
     /// <summary>
-    /// Öffnet die Einstellungsseite, prüft den Default-Wert der CheckBox "Autonome Aufgaben aktivieren"
-    /// (aktiviert, siehe <see cref="Softwareschmiede.Application.Services.AutonomAufgabenOptions.Enabled"/>-Default),
-    /// deaktiviert sie, speichert und prüft nach erneutem Öffnen der Einstellungen, dass der geänderte Wert
-    /// über <see cref="Softwareschmiede.Application.Services.AppEinstellungService"/> persistiert wurde.
+    /// Öffnet die Registerkarte "Allgemein" der Einstellungen und prüft, dass der Abschnitt
+    /// "SCM-Ereignisse" angezeigt wird und weder ein Abschnitt "Automatisierung" noch eine
+    /// Checkbox zur Aktivierung autonomer Aufgaben vorhanden ist.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected void Einstellungen_AutonomAufgabenFeatureFlagToggle_PersistiertWert_E2E(Window mainWindow)
+    protected void Einstellungen_AllgemeinEnthaeltNurVorhandeneAbschnitte_E2E(Window mainWindow)
     {
         var settings = new SettingsView(mainWindow).ForceShow();
-        Assert.True(settings.IsAutonomAufgabenEnabled(), "Autonome Aufgaben sollten standardmäßig aktiviert sein.");
+        settings.SwitchTab("Allgemein");
 
-        settings.SetAutonomAufgabenEnabled(false);
-        settings.SaveSettings();
+        WaitForElement(mainWindow, cf => cf.ByName("IsScmMonitoringEnabled"), Short);
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("IsAutonomAufgabenEnabled")));
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("Automatisierung")));
+
         settings.Menu.NavigateToDashboard();
-
-        var settingsReopened = new SettingsView(mainWindow).ForceShow();
-        Assert.False(settingsReopened.IsAutonomAufgabenEnabled(), "Der deaktivierte Zustand muss nach erneutem Öffnen der Einstellungen erhalten bleiben.");
-
-        // Wert zurücksetzen, damit nachfolgende Testphasen im selben App-Lifecycle (z. B. weitere autonome
-        // Aufgaben-Szenarien) von der Standardkonfiguration unbeeinflusst bleiben.
-        settingsReopened.SetAutonomAufgabenEnabled(true);
-        settingsReopened.SaveSettings();
-        settingsReopened.Menu.NavigateToDashboard();
     }
 }

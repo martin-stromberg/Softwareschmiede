@@ -125,7 +125,7 @@ Schreibt bereits kodierte Eingabebytes serialisiert in den Input-Stream der Sitz
 
 #### `WritePromptAsync(string prompt, CancellationToken ct)`
 
-Schreibt einen Prompt als Texteingabe inkl. abschließendem Submit (`\r`) in den Input-Stream, flusht und meldet die Eingabe über `MarkInputActivity`. Zeilenumbrüche werden einheitlich als `\r` übertragen (entspricht der Tastaturkodierung von Enter). Wird u. a. von `PromptZeitVersandService` und `ProjektleiterAgentService` (Initial-Prompt) verwendet.
+Schreibt einen Prompt als Texteingabe inkl. abschließendem Submit (`\r`) in den Input-Stream, flusht und meldet die Eingabe über `MarkInputActivity`. Zeilenumbrüche werden einheitlich als `\r` übertragen (entspricht der Tastaturkodierung von Enter). Wird u. a. von `PromptZeitVersandService` verwendet.
 
 **Parameter:**
 - `prompt`: Der zu sendende Prompt-Text

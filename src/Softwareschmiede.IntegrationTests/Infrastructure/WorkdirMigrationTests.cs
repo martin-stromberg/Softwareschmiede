@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Softwareschmiede.IntegrationTests.Infrastructure;
+using static Softwareschmiede.IntegrationTests.Infrastructure.MigrationTestSql;
 
 namespace Softwareschmiede.IntegrationTests.Infrastructure;
 
@@ -106,24 +106,6 @@ public sealed class WorkdirMigrationTests
         (await GetAufgabeAusfuehrungsStatusAsync(db, archiviertId)).Should().Be("Beendet");
     }
 
-    private static async Task<bool> TableExistsAsync(DatabaseFixture db, string tableName)
-    {
-        await using var cmd = db.Context.Database.GetDbConnection().CreateCommand();
-        cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=$name LIMIT 1;";
-        var parameter = cmd.CreateParameter();
-        parameter.ParameterName = "$name";
-        parameter.Value = tableName;
-        cmd.Parameters.Add(parameter);
-
-        if (cmd.Connection!.State != System.Data.ConnectionState.Open)
-        {
-            await cmd.Connection.OpenAsync();
-        }
-
-        var result = await cmd.ExecuteScalarAsync();
-        return result is not null;
-    }
-
     private static async Task<TableColumnInfo?> ColumnInfoAsync(DatabaseFixture db, string tableName, string columnName)
     {
         await using var cmd = db.Context.Database.GetDbConnection().CreateCommand();
@@ -180,45 +162,6 @@ public sealed class WorkdirMigrationTests
             db,
             "SELECT AusfuehrungsStatus FROM Aufgaben WHERE Id = $id;",
             ("$id", aufgabeId));
-
-    private static async Task ExecuteNonQueryAsync(DatabaseFixture db, string commandText, params (string Name, object? Value)[] parameters)
-    {
-        await using var cmd = db.Context.Database.GetDbConnection().CreateCommand();
-        cmd.CommandText = commandText;
-        AddParameters(cmd, parameters);
-
-        if (cmd.Connection!.State != System.Data.ConnectionState.Open)
-        {
-            await cmd.Connection.OpenAsync();
-        }
-
-        await cmd.ExecuteNonQueryAsync();
-    }
-
-    private static async Task<object?> ExecuteScalarAsync(DatabaseFixture db, string commandText, params (string Name, object? Value)[] parameters)
-    {
-        await using var cmd = db.Context.Database.GetDbConnection().CreateCommand();
-        cmd.CommandText = commandText;
-        AddParameters(cmd, parameters);
-
-        if (cmd.Connection!.State != System.Data.ConnectionState.Open)
-        {
-            await cmd.Connection.OpenAsync();
-        }
-
-        return await cmd.ExecuteScalarAsync();
-    }
-
-    private static void AddParameters(System.Data.Common.DbCommand cmd, params (string Name, object? Value)[] parameters)
-    {
-        foreach (var (name, value) in parameters)
-        {
-            var parameter = cmd.CreateParameter();
-            parameter.ParameterName = name;
-            parameter.Value = value ?? DBNull.Value;
-            cmd.Parameters.Add(parameter);
-        }
-    }
 
     private sealed record TableColumnInfo(string Name, bool NotNull);
 }

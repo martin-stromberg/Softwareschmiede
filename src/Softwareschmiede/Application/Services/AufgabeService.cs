@@ -99,8 +99,6 @@ public sealed class AufgabeService : IAktiveAufgabenService
             .Include(a => a.GitRepository)
                 .ThenInclude(r => r!.InitialisierungKonfiguration)
             .Include(a => a.Todos)
-            // Fuer Aufgabe.IstAutonom() (Modus-Indikator regulär/autonom) benötigt, u. a. von TaskDetailViewModel.
-            .Include(a => a.AutonomKonfiguration)
             .FirstOrDefaultAsync(a => a.Id == id, ct);
     }
 
@@ -839,15 +837,8 @@ public sealed class AufgabeService : IAktiveAufgabenService
             pausiertBisUtc?.ToString("O") ?? "-");
 
         var aufgabe = await _db.Aufgaben
-            .Include(a => a.AutonomKonfiguration)
             .FirstOrDefaultAsync(a => a.Id == aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
-
-        if (aufgabe.IstAutonom())
-        {
-            throw new InvalidOperationException(
-                $"Aufgabe {aufgabeId} ist eine Autonome Aufgabe und kann nicht pausiert werden.");
-        }
 
         if (aufgabe.Status is not (AufgabeStatus.Neu or AufgabeStatus.Gestartet or AufgabeStatus.Wartend))
         {

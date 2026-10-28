@@ -106,31 +106,6 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
             .WithMessage("*nicht pausiert*");
     }
 
-    /// <summary>SetPauseAsync lehnt Autonome Aufgaben ab — deren Pausierung läuft über den Projektleiter-Agenten (SessionPauseUtc), nicht über PausiertBisUtc.</summary>
-    [Fact]
-    public async Task SetPauseAsync_ShouldThrow_WhenAufgabeIstAutonom()
-    {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Autonome Aufgabe", null);
-        var tracked = await _db.Aufgaben.FindAsync(aufgabe.Id);
-        tracked!.Status = AufgabeStatus.Gestartet;
-        _db.AutonomAufgabeKonfigurationen.Add(new AutonomAufgabeKonfiguration
-        {
-            Id = Guid.NewGuid(),
-            AufgabeId = aufgabe.Id,
-            ProjektBranchName = "feature/autonom",
-            InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
-            PermissionsJsonPfad = @"C:\arbeitsverzeichnis\permissions.json",
-            ArbeitsverzeichnisPfad = @"C:\arbeitsverzeichnis"
-        });
-        await _db.SaveChangesAsync();
-
-        var act = () => _sut.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1));
-
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Autonom*");
-        (await _db.Aufgaben.FindAsync(aufgabe.Id))!.PausiertBisUtc.Should().BeNull();
-    }
-
     /// <summary>SetPauseAsync lehnt einen Zeitpunkt in der Vergangenheit ab.</summary>
     [Fact]
     public async Task SetPauseAsync_ShouldThrow_WhenTimestampInPast()

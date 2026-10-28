@@ -2,6 +2,7 @@
 
 ## Important Notes Before Update
 
+- The "Autonomous Tasks" feature (project leader agent, sub-agents, skill data, "Automation" setting) has been removed. On update, former autonomous tasks become regular tasks with their run state reset (not started; they can be started again with the normal start button). The project leader, sub-agent and skill data is deleted by the database migration and cannot be restored. The `AutonomAufgaben` section in `appsettings.json` is no longer read and can be removed.
 - AI CLIs that require a pseudo terminal (Claude CLI, Codex CLI, GitHub Copilot CLI, Devin CLI) now fail with an explicit error message if no ConPTY is available, instead of silently running in degraded pipe mode.
 - New `Terminal` section in `appsettings.json` (`ReplayBufferByteBudget`, `DefaultCols`, `DefaultRows`, `AufzeichnungByteBudget`) controls the replay buffer size, the default terminal size and the byte budget of the automatic CLI recording (8 MB by default; values <= 0 disable the recording).
 
@@ -38,6 +39,7 @@
 
 ## Wichtige Hinweise vor dem Update
 
+- Das bisherige Feature „Autonome Aufgaben" (Projektleiter-Agent, Unteragenten, Skill-Daten, Einstellung „Automatisierung") wurde entfernt. Beim Update werden ehemals autonome Aufgaben zu regulären Aufgaben; ihr Laufzustand wird zurückgesetzt (nicht gestartet, erneut über den Starten-Button startbar). Die Projektleiter-, Unteragent- und Skill-Daten werden durch die Datenbankmigration gelöscht und sind danach nicht wiederherstellbar. Der Abschnitt `AutonomAufgaben` in der `appsettings.json` wird nicht mehr ausgewertet und kann entfernt werden.
 - KI-CLIs, die zwingend ein Pseudo-Terminal benötigen (Claude CLI, Codex CLI, GitHub Copilot CLI, Devin CLI), schlagen jetzt mit einer verständlichen Fehlermeldung fehl, wenn kein ConPTY verfügbar ist, statt still im eingeschränkten Pipe-Modus zu laufen.
 - Neue `Terminal`-Sektion in der `appsettings.json` (`ReplayBufferByteBudget`, `DefaultCols`, `DefaultRows`, `AufzeichnungByteBudget`) steuert die Größe des Replay-Puffers, die Standard-Terminalgröße und das Byte-Budget der automatischen CLI-Aufzeichnung (standardmäßig 8 MB; Werte <= 0 deaktivieren den Mitschnitt).
 

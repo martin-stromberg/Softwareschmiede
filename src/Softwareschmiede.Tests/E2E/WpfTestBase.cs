@@ -462,12 +462,10 @@ public abstract class WpfTestBase : IDisposable
     /// <remarks>
     /// Filtert zusätzlich auf <see cref="FlaUI.Core.Definitions.ControlType.Window"/>: Ohne diesen Filter kann
     /// die Teilbaum-Suche von <c>Automation.GetDesktop()</c> nach reinem Namen ein anderes, bereits vorhandenes
-    /// Element mit demselben AutomationProperties.Name im Baum treffen (z. B. eine RibbonGroup namens
-    /// "Autonome Aufgabe" in einer bereits offenen Ansicht, siehe TaskDetailView.xaml), statt auf das
-    /// tatsächliche Fenster zu warten. Das war zuvor eine latente Race Condition, die reproduzierbar wurde,
-    /// sobald sich das Timing bis zur tatsächlichen Fenster-Erstellung leicht verschob (siehe
-    /// AutonomAufgabeInitialisierung_DialogErstelltArbeitsverzeichnisUndZeigtDetailAnsicht_E2E), und ist bereits
-    /// das etablierte Muster in mehreren anderen E2E-Tests (z. B. E2E_PluginAktivierung.cs).
+    /// Element mit demselben AutomationProperties.Name im Baum treffen (z. B. eine gleichnamige RibbonGroup
+    /// in einer bereits offenen Ansicht), statt auf das tatsächliche Fenster zu warten. Das wäre eine latente
+    /// Race Condition, sobald sich das Timing bis zur tatsächlichen Fenster-Erstellung leicht verschiebt, und
+    /// ist bereits das etablierte Muster in mehreren anderen E2E-Tests (z. B. E2E_PluginAktivierung.cs).
     /// </remarks>
     protected AutomationElement WaitForWindow(string title, TimeSpan timeout)
         => ElementWaitHelper.WaitForTitledWindow(Automation.GetDesktop(), title, timeout);

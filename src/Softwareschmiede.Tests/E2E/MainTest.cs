@@ -11,17 +11,16 @@ namespace Softwareschmiede.Tests.E2E;
 [Collection("E2E")]
 public partial class End2EndTest : WpfTestBase
 {
-    /// <summary>Prüft Start, autonome Aufgaben und Einstellungen in einem isolierten App-Lifecycle.</summary>
+    /// <summary>Prüft Start und Einstellungen in einem isolierten App-Lifecycle.</summary>
     [SkippableFact]
-    public Task General_BasisUndAutonomeAufgaben_E2E()
-        => MitFrischerAppAsync(async mainWindow =>
+    public Task General_BasisUndEinstellungen_E2E()
+        => MitFrischerAppAsync(mainWindow =>
         {
             AppStarten_ZeigtVersionsTextInFusszeile_E2E(mainWindow);
-            await AutonomAufgabeInitialisierung_DialogErstelltArbeitsverzeichnisUndZeigtDetailAnsicht_E2E(mainWindow);
-            await AutonomAufgabeAgentExecution_StartUnteragentUndSessionPause_E2E(mainWindow);
             Einstellungen_SpeichernCodexAlsStandardKiPluginUndExecutablePath_PersistiertBeides_E2E(mainWindow);
-            Einstellungen_AutonomAufgabenFeatureFlagToggle_PersistiertWert_E2E(mainWindow);
+            Einstellungen_AllgemeinEnthaeltNurVorhandeneAbschnitte_E2E(mainWindow);
             IdePluginSettings_AktivierungValidierungUndReihenfolge_E2E(mainWindow);
+            return Task.CompletedTask;
         });
 
     /// <summary>Prüft Repository-, Aufgaben- und Terminal-Fallback-Szenarien isoliert.</summary>
@@ -92,6 +91,21 @@ public partial class End2EndTest : WpfTestBase
         {
             app.Close();
         }
+    }
+
+    private static async Task WartenBisAsync(Func<Task<bool>> bedingung, int maxVersuche = 150)
+    {
+        for (var i = 0; i < maxVersuche; i++)
+        {
+            if (await bedingung())
+            {
+                return;
+            }
+
+            await Task.Delay(200);
+        }
+
+        throw new TimeoutException("Bedingung wurde innerhalb des Zeitlimits nicht erfüllt.");
     }
 
     /// <summary>Gezielt ausführbarer Pflichtnachweis E-02 für den Mauspfad. Er startet nur die

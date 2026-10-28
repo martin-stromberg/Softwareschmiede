@@ -27,7 +27,6 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 - **Dateiexplorer und Diff-Ansicht** direkt in der Aufgabendetailansicht
 - **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Ereignisüberwachung
 - **GitHub-Ereignisüberwachung** für Issues und Pull Requests aktivierter Projekt-Repositories — repository-weit — mit persistenter Queue und kontrollierter CLI-Zustellung
-- **Autonome Aufgaben** mit Projektleiter-Agent und Unteragenten-Orchestrierung
 - **Pausierbare Aufgaben** mit manueller Pause und automatischer Pausierung bei erkannten KI-Session-Limits
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases mit konfigurierbarem Update-Modus und optionaler Prerelease-Berücksichtigung
 - **CLI-Aufzeichnung mit Konsolentestfenster** zur Diagnose des Terminal-Renderpfads — byte-exakter Mitschnitt, `.clireplay`-Export, zeitgesteuerte Wiedergabe in der aufgezeichneten Terminal-Geometrie und Einzelschritt-Modus (vor/zurück)
@@ -142,12 +141,12 @@ Die Implementierung liegt in `ActiveTasksListControl`, `MainWindowViewModel`, `D
 
 ## Aufgaben pausieren und Session-Limits erkennen
 
-Reguläre Aufgaben lassen sich zeitgebunden pausieren. Zusätzlich erkennt die Anwendung Session-Limits in der CLI-Ausgabe und pausiert betroffene Aufgaben automatisch.
+Aufgaben lassen sich zeitgebunden pausieren. Zusätzlich erkennt die Anwendung Session-Limits in der CLI-Ausgabe und pausiert betroffene Aufgaben automatisch.
 
 ### Pause einstellen und aufheben
 
 - In der Ribbon-Gruppe **Aufgabe** der Aufgabendetailansicht öffnet **„Pause einstellen"** (`PauseEinstellen`) den `AufgabePausierenDialog` mit Datum- und Uhrzeit-Eingabe (Vorbelegung: nächste volle Minute).
-- Der Button ist nur sichtbar, wenn die Aufgabe den Status `Neu`, `Gestartet` oder `Wartend` hat und keine Autonome Aufgabe ist.
+- Der Button ist nur sichtbar, wenn die Aufgabe den Status `Neu`, `Gestartet` oder `Wartend` hat.
 - `AufgabeService.SetPauseAsync` persistiert den UTC-Zeitpunkt in `Aufgabe.PausiertBisUtc` und schreibt einen `ProtokollTyp.SystemMeldung`-Eintrag. Über **„Pause aufheben"** im selben Dialog lässt sich eine aktive Pause vorzeitig beenden.
 - Der Pause-Endzeitpunkt muss in der Zukunft liegen. Das Ende der Pause ist rein zeitbasiert — es gibt keine automatische Wiederaufnahme der CLI.
 
@@ -165,7 +164,7 @@ Reguläre Aufgaben lassen sich zeitgebunden pausieren. Zusätzlich erkennt die A
 ### Automatische Pause bei Session-Limit
 
 - Enthält eine CLI-Ausgabezeile den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel, ruft der `CliOutputProtokollWriter` den `KiPluginLimitService`.
-- Der Service persistiert den Reset-Zeitpunkt als `AppEinstellung` unter `plugins.sessionlimit.<KiPluginPrefix>` und pausiert alle aktiv laufenden regulären Aufgaben desselben Plugin-Prefix (pro Aufgabe ein `SystemMeldung`-Eintrag).
+- Der Service persistiert den Reset-Zeitpunkt als `AppEinstellung` unter `plugins.sessionlimit.<KiPluginPrefix>` und pausiert alle aktiv laufenden Aufgaben desselben Plugin-Prefix (pro Aufgabe ein `SystemMeldung`-Eintrag).
 - Eine manuell gesetzte, später endende Pause wird dabei nicht verkürzt (Max-Semantik); ein bereits abgelaufener Zeitpunkt wird zwar persistiert, löst aber keine Pause aus.
 - Marker ohne gültigen Zeitstempel erzeugen weiterhin nur den `ProtokollTyp.RateLimit`-Eintrag.
 
@@ -239,14 +238,6 @@ Die Konfigurationsbasis liegt in `src/Softwareschmiede/appsettings*.json`. Im ak
 - `DirectoryStructure:Enabled`
 - `DirectoryStructure:MaxDepth`
 - `DirectoryStructure:CacheDurationSeconds`
-- `AutonomAufgaben:Enabled`
-- `AutonomAufgaben:DefaultTokenBudget`
-- `AutonomAufgaben:DefaultRuntimeLimitMinutes`
-- `AutonomAufgaben:HeartbeatTimeoutSeconds`
-- `AutonomAufgaben:MaxConcurrentUnteragenten`
-- `AutonomAufgaben:SkillAutogenerationEnabled`
-- `AutonomAufgaben:MaxClones`
-- `AutonomAufgaben:MaxFeatureBranches`
 - `Terminal:ReplayBufferByteBudget`
 - `Terminal:DefaultCols`
 - `Terminal:DefaultRows`

@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -80,7 +79,6 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
         services.AddSingleton(_runningStatusSourceMock.Object);
         services.AddSingleton(_pluginManagerMock.Object);
         services.AddSingleton<ICredentialStore>(new InMemoryCredentialStoreForSettings());
-        services.AddSingleton(Options.Create(new AutonomAufgabenOptions()));
         services.AddSingleton(TimeProvider.System);
         _provider = services.BuildServiceProvider();
 

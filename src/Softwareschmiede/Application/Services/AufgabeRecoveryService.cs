@@ -32,9 +32,7 @@ public sealed class AufgabeRecoveryService
     /// <summary>
     /// Scannt alle Aufgaben nach Recovery-Kandidaten.
     /// Kandidaten: aktiver Aufgabenstatus, persistierter Ausfuehrungsstatus Aktiv,
-    /// Heartbeat älter als 5 Minuten, kein laufender CLI-Prozess, keine Autonome Aufgabe
-    /// (Autonome Aufgaben werden durch den Projektleiter-Agenten selbst gesteuert, nicht durch die generische
-    /// Crash-Recovery für reguläre CLI-Ausführungen).
+    /// Heartbeat älter als 5 Minuten, kein laufender CLI-Prozess.
     /// </summary>
     public async Task<IEnumerable<Guid>> ScanForRecoveryCandidatesAsync(CancellationToken ct = default)
     {
@@ -50,8 +48,7 @@ public sealed class AufgabeRecoveryService
                 && a.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv
                 && a.LastHeartbeatUtc != null
                 && a.LastHeartbeatUtc < cutoff
-                && (a.PausiertBisUtc == null || a.PausiertBisUtc <= now)
-                && a.AutonomKonfiguration == null)
+                && (a.PausiertBisUtc == null || a.PausiertBisUtc <= now))
             .Select(a => a.Id)
             .ToListAsync(ct);
 
@@ -72,7 +69,6 @@ public sealed class AufgabeRecoveryService
 
         var aufgabe = await _db.Aufgaben
             .AsNoTracking()
-            .Include(a => a.AutonomKonfiguration)
             .FirstOrDefaultAsync(a => a.Id == aufgabeId, ct);
 
         if (aufgabe is null)
@@ -81,7 +77,7 @@ public sealed class AufgabeRecoveryService
             throw new InvalidOperationException("Aufgabe wurde nicht gefunden.");
         }
 
-        if (!IstRecoveryStatus(aufgabe.Status, aufgabe.AusfuehrungsStatus, aufgabe.IstAutonom()))
+        if (!IstRecoveryStatus(aufgabe.Status, aufgabe.AusfuehrungsStatus))
         {
             LogRejected(correlationId, aufgabeId, "InvalidState");
             throw new InvalidOperationException("Wiederherstellung für aktuellen Status nicht verfügbar.");
@@ -131,10 +127,6 @@ public sealed class AufgabeRecoveryService
 
         try
         {
-            // Kein wiederholter IstAutonom()-Check innerhalb der beiden folgenden Concurrency-Guards: Der Modus
-            // einer Aufgabe (regulär/autonom) ändert sich nach dem Anlegen nie mehr — keine Code-Stelle setzt
-            // AutonomKonfiguration nachträglich auf null zurück. Die maßgebliche Prüfung ist bereits oben vor dem
-            // Öffnen der Transaktion (IstRecoveryStatus) erfolgt.
             int rowCount;
             if (_db.Database.IsRelational())
             {
@@ -224,16 +216,12 @@ public sealed class AufgabeRecoveryService
             reasonCode);
 
     /// <summary>
-    /// Prüft, ob eine Aufgabe für die generische Crash-Recovery in Frage kommt. Autonome Aufgaben sind
-    /// ausdrücklich ausgeschlossen (<paramref name="istAutonom"/>), da sie durch den Projektleiter-Agenten
-    /// selbst gesteuert werden.
+    /// Prüft, ob eine Aufgabe für die generische Crash-Recovery in Frage kommt.
     /// </summary>
     /// <param name="status">Der Aufgabenstatus.</param>
     /// <param name="ausfuehrungsStatus">Der persistierte KI-Ausführungsstatus.</param>
-    /// <param name="istAutonom">Ob die Aufgabe eine Autonome Aufgabe ist (siehe <see cref="AufgabeExtensions.IstAutonom"/>).</param>
     /// <returns><c>true</c>, wenn die Aufgabe ein Recovery-Kandidat ist; andernfalls <c>false</c>.</returns>
-    internal static bool IstRecoveryStatus(AufgabeStatus status, AufgabeAusfuehrungsStatus ausfuehrungsStatus, bool istAutonom)
+    internal static bool IstRecoveryStatus(AufgabeStatus status, AufgabeAusfuehrungsStatus ausfuehrungsStatus)
         => status.IstAktivOderWartend()
-            && ausfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv
-            && !istAutonom;
+            && ausfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv;
 }

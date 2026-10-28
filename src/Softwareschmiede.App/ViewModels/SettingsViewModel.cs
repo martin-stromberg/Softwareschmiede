@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Application.Services.Updates;
@@ -26,7 +25,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private readonly PluginActivationService _pluginActivationService;
     private readonly PluginSettingsService _pluginSettingsService;
     private readonly PromptVorlagenService _promptVorlagenService;
-    private readonly IOptions<AutonomAufgabenOptions> _autonomAufgabenOptions;
     private readonly ILogger<SettingsViewModel> _logger;
     private readonly IDialogService _dialogService;
     private readonly IServiceProvider _serviceProvider;
@@ -47,7 +45,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private List<string> _idePluginOrder = [];
     private PluginActivationEntry? _selectedIdePlugin;
     private IReadOnlyList<PluginSettingGroupEntry>? _selectedIdePluginSettings;
-    private bool _isAutonomAufgabenEnabled = true;
     private bool _isScmMonitoringEnabled = true;
     private bool _isScmTaskCompletionEnabled = true;
     private string _scmTaskCompletionWaitMinutes = AppEinstellungService.ScmTaskCompletionDefaultWaitMinutes.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -221,13 +218,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _selectedIdePluginSettings, value);
     }
 
-    /// <summary>Gibt an, ob das Feature-Flag "Autonome Aufgaben" aktiviert ist.</summary>
-    public bool IsAutonomAufgabenEnabled
-    {
-        get => _isAutonomAufgabenEnabled;
-        set => SetProperty(ref _isAutonomAufgabenEnabled, value);
-    }
-
     /// <summary>Gibt an, ob die SCM-Ereignisüberwachung aktiviert ist (Laufzeit-Schalter, ohne Neustart wirksam).</summary>
     public bool IsScmMonitoringEnabled
     {
@@ -340,7 +330,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         PluginSettingsService pluginSettingsService,
         PromptVorlagenService promptVorlagenService,
         ILogger<SettingsViewModel> logger,
-        IOptions<AutonomAufgabenOptions> autonomAufgabenOptions,
         IDialogService dialogService,
         IServiceProvider serviceProvider)
     {
@@ -352,7 +341,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         _pluginSettingsService = pluginSettingsService;
         _promptVorlagenService = promptVorlagenService;
         _logger = logger;
-        _autonomAufgabenOptions = autonomAufgabenOptions;
         _dialogService = dialogService;
         _serviceProvider = serviceProvider;
 
@@ -435,8 +423,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
             await LadePromptVorlagenAsync(ct);
 
-            IsAutonomAufgabenEnabled = await _einstellungService.GetAutonomAufgabenEnabledAsync(_autonomAufgabenOptions.Value.Enabled, ct);
-
             IsScmMonitoringEnabled = await _einstellungService.GetScmMonitoringEnabledAsync(ct);
             IsScmTaskCompletionEnabled = await _einstellungService.GetScmTaskCompletionEnabledAsync(ct);
             ScmTaskCompletionWaitMinutes = (await _einstellungService.GetScmTaskCompletionWaitMinutesAsync(ct))
@@ -508,11 +494,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, _defaultKiPlugin, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultScmPluginKey, _defaultScmPlugin?.PluginName, ct);
             await SpeicherePromptVorlagenAsync(ct);
-
-            await _einstellungService.SetBoolSettingAsync(
-                AppEinstellungService.AutonomAufgabenEnabledKey,
-                IsAutonomAufgabenEnabled,
-                ct);
 
             await _einstellungService.SetBoolSettingAsync(
                 AppEinstellungService.ScmMonitoringEnabledKey,

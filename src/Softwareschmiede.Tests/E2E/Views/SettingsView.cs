@@ -270,20 +270,6 @@ public sealed class SettingsView : BaseWindowView
         return this;
     }
 
-    /// <summary>Liest den Status der "Autonome Aufgaben aktivieren"-CheckBox im "Allgemein"-Tab (Issue 205).</summary>
-    /// <returns><c>true</c>, wenn das Feature-Flag "Autonome Aufgaben aktivieren" aktuell aktiviert ist.</returns>
-    public bool IsAutonomAufgabenEnabled()
-        => WaitForElement(Window, cf => cf.ByName("IsAutonomAufgabenEnabled"), Short).AsCheckBox().IsChecked ?? false;
-
-    /// <summary>Setzt den Status der "Autonome Aufgaben aktivieren"-CheckBox im "Allgemein"-Tab (Issue 205).</summary>
-    /// <param name="enabled">Der gewünschte Aktivierungsstatus.</param>
-    /// <returns>Diese Instanz.</returns>
-    public SettingsView SetAutonomAufgabenEnabled(bool enabled)
-    {
-        WaitForElement(Window, cf => cf.ByName("IsAutonomAufgabenEnabled"), Short).AsCheckBox().IsChecked = enabled;
-        return this;
-    }
-
     /// <summary>Liest das aktuell ausgewählte Label der "Update-Modus"-ComboBox im "Allgemein"-Tab.</summary>
     /// <returns>Das Anzeige-Label des gewählten Update-Modus (siehe <c>UpdateModusTexte</c>).</returns>
     public string GetUpdateMode()
