@@ -26,6 +26,21 @@ public sealed class ScmCliPromptProfileTests
         Assert.NotNull(match.Version);
     }
 
+    /// <summary>The real Devin banner draws its braille logo between name and version; the raw
+    /// startup transcript additionally carries ANSI color/erase sequences around the version.</summary>
+    /// <param name="text">Rendered screen or raw startup transcript of Devin CLI v3000.11.228.</param>
+    [Theory]
+    [InlineData("⠀⣴⣾⣶⡄⠀⠀⠀⠀\n⠀⠛⠿⠟⠻⣶⣾⣶⡄  Devin CLI\n⠀⣤⣶⣦⣴⠿⢿⠿⠃  v3000.11.228\n⠀⠻⢿⠿⠃⠀⠀⠀⠀")]
+    [InlineData("⠀⠛⠿⠟⠻⣶⣾⣶⡄  Devin CLI⠀⣤⣶⣦⣴⠿⢿⠿⠃  \u001b[38;5;244mv3000.11.228\u001b[m⠀⠻⢿⠿⠃⠀⠀⠀⠀\u001b[9;1H")]
+    [InlineData("\u001b[K⠀⠛⠿⠟⠻⣶⣾⣶⡄  Devin CLI\u001b[K⠀⣤⣶⣦⣴⠿⢿⠿⠃  \u001b[38;5;244mv3000.11.228\u001b[K\u001b[m⠀⠻⢿⠿⠃⠀⠀⠀⠀\u001b[K")]
+    public void TryMatch_DevinBannerWithLogo_DoesNotLoseSupportedVersion(string text)
+    {
+        var match = ScmCliPromptProfile.TryMatch("Softwareschmiede.Devin", text);
+        Assert.NotNull(match);
+        Assert.Equal(new Version(3000, 11, 228), match.Version);
+        Assert.True(match.IsSupported);
+    }
+
     /// <summary>Missing banner anchors and prefixes without a profile never produce a match.</summary>
     [Theory]
     [InlineData("Softwareschmiede.GitHubCopilot", "GitHub Copilot CLI v1.0.0")]
