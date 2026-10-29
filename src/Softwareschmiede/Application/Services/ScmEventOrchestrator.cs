@@ -186,7 +186,7 @@ public sealed class ScmEventOrchestrator(
                     return;
                 }
                 if (adapter.IsBusy) { await WaitWithCommentAsync(item, observation, responder, "CLI beschäftigt; wartet auf Eingabebereitschaft.", ct); return; }
-                var access = await adapter.CheckExchangeAccessAsync(Path.Combine(adapter.WorkingDirectory, ScmEventExchangeProtocol.DirectoryName), ct);
+                var access = await adapter.CheckExchangeAccessAsync(Path.Combine(adapter.WorkingDirectory, ScmEventExchangeProtocol.DirectoryName), ct, task.Titel);
                 if (access.Status != ScmExchangeAccessStatus.Supported)
                 { await WaitWithCommentAsync(item, observation, responder, "Antwortkanal für diese CLI nicht verfügbar: " + access.Reason, ct); return; }
                 var attemptId = Guid.NewGuid();

@@ -73,6 +73,37 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         document.RootElement.TryGetProperty("promptSuffix", out _).Should().BeFalse();
     }
 
+    /// <summary>Der Sitzungsname steht als erstes Feld im Probe-Prompt und wird in der Anweisung als
+    /// Sitzungstitel benannt; Sonderzeichen bleiben JSON-kodiert, die Probe-Pfade unverändert.</summary>
+    [Fact]
+    public void AccessProbePrompt_WithSessionName_NamesTheSession()
+    {
+        var probe = new ScmExchangeAccessProbe(Guid.NewGuid(), "nonce", "fingerprint",
+            Path.Combine(_root, "probe"), []);
+        var prompt = ScmEventExchangeProtocol.BuildAccessProbePrompt(probe, "  Neues Spiel: \"Vokabel-Quiz\"\n(Multiple Choice) ");
+        prompt.Should().NotContain("\n");
+        using var document = JsonDocument.Parse(prompt);
+        var first = document.RootElement.EnumerateObject().First();
+        first.Name.Should().Be("sessionName");
+        first.Value.GetString().Should().Be("Neues Spiel: \"Vokabel-Quiz\"\n(Multiple Choice)");
+        document.RootElement.GetProperty("instruction").GetString().Should().Contain("sessionName").And.Contain("Titel der Sitzung");
+        document.RootElement.GetProperty("challengePath").GetString().Should().Be(probe.ChallengePath);
+    }
+
+    /// <summary>Ohne Namen bleibt der Probe-Prompt ohne Namensfeld.</summary>
+    /// <param name="sessionName">Fehlender oder leerer Sitzungsname.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("   ")]
+    public void AccessProbePrompt_WithoutSessionName_HasNoNameField(string? sessionName)
+    {
+        var probe = new ScmExchangeAccessProbe(Guid.NewGuid(), "nonce", "fingerprint",
+            Path.Combine(_root, "probe"), []);
+        using var document = JsonDocument.Parse(ScmEventExchangeProtocol.BuildAccessProbePrompt(probe, sessionName));
+        document.RootElement.TryGetProperty("sessionName", out _).Should().BeFalse();
+        document.RootElement.GetProperty("instruction").GetString().Should().NotContain("sessionName");
+    }
+
     /// <summary>An occupied or tracked channel is never overwritten.</summary>
     [Theory]
     [InlineData(false)]

@@ -53,6 +53,31 @@ public sealed partial class ScmEventCliExchangeAccessTests
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
     }
 
+    /// <summary>The session name of the first check is kept for the re-sent probe, even when a later
+    /// check passes no name.</summary>
+    [Fact]
+    public async Task PendingProbe_ResendKeepsSessionName()
+    {
+        var (prefix, spec) = await Spec("Devin", "--permission-mode accept-edits --respect-workspace-trust false");
+        await GitInit(_root);
+        var time = new SettableTimeProvider();
+        var session = Session("Devin CLI\nv3000.11.92", "❭");
+        using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), Guid.NewGuid(), prefix, spec, session.Object, [], () => true, time);
+        var channel = Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName);
+        await adapter.CheckExchangeAccessAsync(channel, sessionName: "Neues Spiel: Vokabel-Quiz");
+        time.Now = time.Now.AddSeconds(61);
+        session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
+        await adapter.CheckExchangeAccessAsync(channel);
+        var sent = session.Invocations.Where(call => call.Method.Name == nameof(ITerminalSession.WritePromptAsync))
+            .Select(call => (string)call.Arguments[0]!).ToList();
+        sent.Should().HaveCount(2);
+        foreach (var prompt in sent)
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(prompt);
+            document.RootElement.GetProperty("sessionName").GetString().Should().Be("Neues Spiel: Vokabel-Quiz");
+        }
+    }
+
     /// <summary>A probe swallowed by the trust dialog is re-delivered after the user answers and the prompt is ready.</summary>
     [Theory]
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.114.0)", "›", "Do you trust the contents of this directory?")]

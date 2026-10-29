@@ -14,10 +14,11 @@ public sealed class ScmEventDispatchTests_Devin
     public async Task DevinTask_WithGrantingStartContract_DeliversEvent()
     {
         var prompts = new List<string>();
+        var probes = new List<string>();
         var fixture = default(ScmDispatchFixture);
         fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(onWritePrompt: async prompt =>
         {
-            if (prompt.Contains("challengePath", StringComparison.Ordinal)) await ScmDispatchFixture.CompleteProbeAsync(prompt);
+            if (prompt.Contains("challengePath", StringComparison.Ordinal)) { probes.Add(prompt); await ScmDispatchFixture.CompleteProbeAsync(prompt); }
             else prompts.Add(prompt);
             // A real CLI redraws and returns to its prompt after a turn; only new output
             // revisions let the adapter leave the busy state again.
@@ -44,6 +45,8 @@ public sealed class ScmEventDispatchTests_Devin
             fixture.Sessions.Should().ContainKey(taskId);
             prompts.Should().ContainSingle("only the event prompt itself is recorded; the probe ran through the file tool");
             prompts[0].Should().Contain("\"request\"").And.NotContain("challengePath");
+            // The handshake names the CLI session after the task so sessions stay distinguishable.
+            probes.Should().ContainSingle().Which.Should().Contain("\"sessionName\":\"SCM task\"");
         }
         finally
         {
