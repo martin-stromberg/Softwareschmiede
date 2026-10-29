@@ -12,6 +12,7 @@
 - The task list offers three switchable display modes — Date, Repository and AI — via buttons in its title bar (also on the dashboard): Repository and AI modes group the tiles with fallback groups ("No repository", "Not executed"); the selected mode is persisted.
 - Fixed: SCM sources that are not assigned to any repository are no longer reported as monitoring errors in the SCM Events queue.
 - Pending SCM events can now be cancelled directly in the SCM Events queue.
+- For SCM events, the initial channel check prompt now passes the task title as the session name, so the AI CLI names its session after the task instead of a generic, non-distinguishable title.
 - Fixed: SCM events for Devin CLI stayed waiting with "Devin CLI version could not be determined" although a supported version was running — the version is now also recognized in the real start banner, where the Devin logo sits between the name and the version.
 - Fixed: prompts delivered to Devin CLI were interpreted as a paste (line break) instead of a submit — the prompt text and Enter are now sent as two separate batches with a short delay.
 - Devin CLI is now supported for SCM event responses: version, write permissions and reply-channel access are checked before delivery (recommended: `--permission-mode` `accept-edits`/`dangerous`/`bypass` and `--respect-workspace-trust false`). The `$Softwareschmiede` trigger is now only recognized as a standalone keyword.
@@ -50,6 +51,7 @@
 - Die Aufgabenliste bietet drei umschaltbare Anzeigemodi — Datum, Repository und KI — über Schaltflächen in ihrer Titelleiste (auch im Dashboard): Die Modi Repository und KI gruppieren die Kacheln mit Fallback-Gruppen („Ohne Repository", „Nicht ausgeführt"); der gewählte Modus wird gespeichert.
 - Behoben: SCM-Quellen ohne Repository-Zuordnung werden in der SCM-Ereignisqueue nicht mehr als Überwachungsfehler gemeldet.
 - Wartende SCM-Ereignisse lassen sich jetzt direkt in der SCM-Ereignisqueue abbrechen.
+- Bei SCM-Ereignissen gibt der initiale Prompt der Kanalprüfung jetzt den Aufgabentitel als Sitzungsnamen mit, sodass die KI-CLI ihre Sitzung nach der Aufgabe benennt statt mit einem generischen, nicht unterscheidbaren Titel.
 - Behoben: SCM-Ereignisse für Devin CLI blieben mit „Devin CLI-Version konnte nicht ermittelt werden" wartend, obwohl eine unterstützte Version lief — die Version wird jetzt auch im echten Startbanner erkannt, in dem das Devin-Logo zwischen Name und Version steht.
 - Behoben: An Devin CLI zugestellte Prompts wurden als Einfügung (Zeilenumbruch) statt als Absenden interpretiert — Prompttext und Enter werden jetzt als zwei getrennte Batches mit kurzer Verzögerung gesendet.
 - Devin CLI wird jetzt für SCM-Ereignisantworten unterstützt: Vor der Zustellung werden Version, Schreibberechtigungen und Zugriff auf den Antwortkanal geprüft (empfohlen: `--permission-mode` `accept-edits`/`dangerous`/`bypass` sowie `--respect-workspace-trust false`). Der `$Softwareschmiede`-Trigger wird nur noch als frei stehendes Schlüsselwort erkannt.

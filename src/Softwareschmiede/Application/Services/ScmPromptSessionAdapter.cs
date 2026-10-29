@@ -41,8 +41,13 @@ public interface IScmPromptSessionAdapter
     ScmCliRecognition CliRecognition { get; }
     /// <summary>Wartet auf ein echtes Promptsignal, nie allein auf I/O-Ruhe.</summary>
     Task<ScmPromptReadyStatus> WaitForInputReadyAsync(CancellationToken ct = default);
-    /// <summary>Prüft den Startvertrag und fordert bei Bedarf eine separate tatsächliche Dateitool-Probe an.</summary>
-    Task<ScmExchangeAccess> CheckExchangeAccessAsync(string exchangePath, CancellationToken ct = default);
+    /// <summary>Prüft den Startvertrag und fordert bei Bedarf eine separate tatsächliche Dateitool-Probe an;
+    /// <paramref name="sessionName"/> wird der Probe als Sitzungsname mitgegeben.</summary>
+    /// <param name="exchangePath">Zu prüfender Antwortkanal innerhalb der CLI-Schreibwurzel.</param>
+    /// <param name="ct">Abbruch-Token.</param>
+    /// <param name="sessionName">Optionaler Sitzungsname (Aufgabentitel) für den Probe-Prompt.</param>
+    /// <returns>Der aktuelle Zugriffsstatus des Antwortkanals.</returns>
+    Task<ScmExchangeAccess> CheckExchangeAccessAsync(string exchangePath, CancellationToken ct = default, string? sessionName = null);
     /// <summary>Explizite einmalige Bestätigung des sichtbaren aktuellen Laufs.</summary>
     bool ConfirmReady(Guid runId);
     /// <summary>Prüft Sessionidentität und Ready erneut unmittelbar vor genau einer Texteingabe.</summary>
@@ -79,6 +84,7 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
     private ScmExchangeAccessProbe? _accessProbe;
     private DateTimeOffset _accessProbeSentUtc;
     private int _accessProbeSends;
+    private string? _sessionName;
     private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private ScmPromptReadyStatus _ready;
     private ScmCliRecognition _cliRecognition;
@@ -149,12 +155,14 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
     }
 
     /// <inheritdoc/>
-    public Task<ScmExchangeAccess> CheckExchangeAccessAsync(string exchangePath, CancellationToken ct = default)
-        => ScmTaskCoordinator.Shared.RunAsync(_taskId, () => CheckExchangeAccessCoreAsync(exchangePath, ct), ct);
+    public Task<ScmExchangeAccess> CheckExchangeAccessAsync(string exchangePath, CancellationToken ct = default, string? sessionName = null)
+        => ScmTaskCoordinator.Shared.RunAsync(_taskId, () => CheckExchangeAccessCoreAsync(exchangePath, sessionName, ct), ct);
 
-    private async Task<ScmExchangeAccess> CheckExchangeAccessCoreAsync(string exchangePath, CancellationToken ct)
+    private async Task<ScmExchangeAccess> CheckExchangeAccessCoreAsync(string exchangePath, string? sessionName, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        // Interne Prüfungen ohne Namen (z. B. vor der Prompt-Eingabe) behalten den zuletzt bekannten Namen.
+        if (!string.IsNullOrWhiteSpace(sessionName)) _sessionName = sessionName;
         var access = _access;
         // Einmaliger Schnappschuss unter dem Sperrobjekt: Bedingung und gemeldeter Grund müssen
         // aus demselben Erkennungsstand stammen, auch wenn parallel Session-Ereignisse eintreffen.
@@ -230,7 +238,7 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
     {
         MarkInputStarted();
         // No event text, event acknowledgement or external action is sent before proof.
-        await Session.WritePromptAsync(ScmEventExchangeProtocol.BuildAccessProbePrompt(_accessProbe!), ct).ConfigureAwait(false);
+        await Session.WritePromptAsync(ScmEventExchangeProtocol.BuildAccessProbePrompt(_accessProbe!, _sessionName), ct).ConfigureAwait(false);
         _accessProbeSends++;
         _accessProbeSentUtc = _time.GetUtcNow();
     }
