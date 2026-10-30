@@ -55,7 +55,7 @@ public sealed class KonsolenTestDialogView : DialogView
 
             try
             {
-                WaitUntilGone(Window.Automation.GetDesktop(), OpenDialogCondition, TimeSpan.FromSeconds(8));
+                ElementWaitHelper.WaitUntilProcessWindowGone(Window, OpenDialogCondition, TimeSpan.FromSeconds(8));
                 return this;
             }
             catch (TimeoutException)
@@ -76,7 +76,7 @@ public sealed class KonsolenTestDialogView : DialogView
         var openDialog = WaitForOpenDialog();
         openDialog.Focus();
         Keyboard.Press(VirtualKeyShort.ESCAPE);
-        WaitUntilGone(Window.Automation.GetDesktop(), OpenDialogCondition, Medium);
+        ElementWaitHelper.WaitUntilProcessWindowGone(Window, OpenDialogCondition, Medium);
 
         return this;
     }
@@ -505,7 +505,7 @@ public sealed class KonsolenTestDialogView : DialogView
     public KonsolenTestDialogView Schliessen()
     {
         WaitForElement(GetDialogWindow(), cf => cf.ByName("KonsolenTestSchliessen"), Short).AsButton().Invoke();
-        WaitUntilGone(Window.Automation.GetDesktop(), DialogWindowCondition, Short);
+        ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
         return this;
     }
 
@@ -520,7 +520,7 @@ public sealed class KonsolenTestDialogView : DialogView
         var deadline = DateTime.UtcNow + Long;
         while (DateTime.UtcNow < deadline)
         {
-            var dialog = Window.Automation.GetDesktop().FindFirstDescendant(OpenDialogCondition);
+            var dialog = ElementWaitHelper.FindInProcessWindows(Window, OpenDialogCondition);
             if (dialog is not null)
                 return dialog;
 

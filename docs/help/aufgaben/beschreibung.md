@@ -10,24 +10,28 @@ Eine Aufgabe kapselt eine Entwicklungsanforderung: Titel, Beschreibung und optio
 
 Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `Wartend`) in der linken Navigationsseitenleiste an. Diese Funktion ermöglicht schnellen Zugriff auf laufende Arbeiten:
 
-- **Seitenleisten-Anzeige:** Unterhalb der bestehenden Navigationseinträge (Dashboard, Projekte) wird eine neue Sektion „Aktive Aufgaben" angezeigt. Diese Sektion enthält bis zu 20 aktive Aufgaben als gerahmte Kacheln.
-- **Kachel-Inhalte:** Jede Kachel zeigt den Aufgabentitel, den Projektnamen, das SCM-/SCI-Plugin, das KI-Plugin und den aktuellen KI-Ausführungsstatus:
-  - `⏸ Pausiert (noch hh:mm:ss)` — die Aufgabe ist bis zu einem Zeitpunkt pausiert; der Countdown läuft mit (ab 24 Stunden Restzeit mit Tagesangabe, z. B. `1.02:30:00`). Eine aktive Pause überlagert alle übrigen Stati.
-  - `⏳ Prompt in Wartestellung` — ein zeitgesteuerter Prompt ist geplant
-  - `▶ Läuft` — `AktiveRunId` ist gesetzt, `LastHeartbeatUtc` ist jünger als 5 Minuten und der Laufstatus ist nicht `WartetAufEingabe`
-  - `⏸ Wartet` — die aktive Ausführung wartet auf Eingabe oder die Aufgabe steht im Status `Wartend`
-  - `✓ Bereit` — Keine aktive Ausführung erkannt (Fallback)
+- **Seitenleisten-Anzeige:** Unterhalb der bestehenden Navigationseinträge (Dashboard, Projekte) wird eine Sektion „Aktive Aufgaben" angezeigt. Diese Sektion enthält bis zu 20 aktive Aufgaben als gerahmte Kacheln.
+- **Kompakte Kacheln:** Jede Kachel besteht aus drei Zeilen — dem Aufgabentitel, dem Repository-Namen als Untertitel (bei Aufgaben ohne Repository-Verknüpfung erscheint der Projektname) sowie einer Symbolzeile. In der Symbolzeile stehen hintereinander das Symbol des SCM-Plugins, das Symbol des KI-Plugins, ein Statussymbol und der To-do-Button; die zugehörigen Klartexte (z. B. „SCM: GitHub", „KI: Claude CLI") erscheinen als Tooltip. Das Statussymbol fasst den bisherigen Statustext zu einem Zeichen zusammen; der vollständige Status bleibt ebenfalls als Tooltip lesbar:
+  - `⏸` — die Aufgabe ist bis zu einem Zeitpunkt pausiert; der Tooltip zeigt `⏸ Pausiert (noch hh:mm:ss)` mit laufendem Countdown (ab 24 Stunden Restzeit mit Tagesangabe, z. B. `1.02:30:00`). Eine aktive Pause überlagert alle übrigen Stati.
+  - `⏳` — ein zeitgesteuerter Prompt ist geplant (Tooltip: `⏳ Prompt in Wartestellung`)
+  - `▶` — die KI arbeitet gerade an der Aufgabe (Tooltip: `▶ Läuft`)
+  - `⏸` — die laufende Ausführung wartet auf Eingabe oder die Aufgabe hat ein Rate-Limit erreicht (Tooltip: `⏸ Wartet`)
+  - `✓` — keine aktive Ausführung erkannt (Tooltip: `✓ Bereit`)
 - **Abgeblendete Kacheln:** Pausierte Aufgaben werden in der Kachel abgeschwächt (reduzierte Deckkraft) dargestellt, damit sie auf einen Blick von aktiv laufenden Aufgaben unterscheidbar sind.
 - **Aktive Markierung:** Wenn im Inhaltsbereich eine Aufgabe geöffnet ist, wird genau diese Aufgabe in der Seitenleiste hervorgehoben.
-- **Stabile Sortierung:** Die Aufgaben werden absteigend nach `LetzterCliStartUtc` sortiert. Dieser Zeitstempel wird nur beim echten CLI-Prozessstart aktualisiert, nicht beim Anzeigen einer bereits laufenden Hintergrundaufgabe. Für ältere Aufgaben ohne Wert wird auf `ErstellungsDatum`, danach Titel und ID zurückgefallen.
-- **Navigation:** Ein Navigations-Button (→) auf jeder Kachel ermöglicht den direkten Zugriff auf die Aufgabendetailansicht.
+- **Anzeigemodi:** Die Sektion „Aktive Aufgaben" bietet direkt unter der Überschrift drei Umschalt-Buttons — **Datum**, **Repository** und **KI**:
+  - **Datum** — flache Liste, sortiert nach letzter Ausführung (neueste zuerst); die bisherige Standardansicht.
+  - **Repository** — die Aufgaben werden alphabetisch nach Repository-Name gruppiert; Aufgaben ohne Repository-Verknüpfung bilden die Gruppe „Ohne Repository" am Ende. Innerhalb jeder Gruppe bleibt die Sortierung nach letzter Ausführung erhalten.
+  - **KI** — die Aufgaben werden alphabetisch nach der aktiven bzw. zuletzt verwendeten KI gruppiert; Aufgaben ohne bekannte KI bilden die Gruppe „Nicht ausgeführt" am Ende.
+- **Modus-Merken:** Der gewählte Modus wird gespeichert und beim nächsten Programmstart wiederhergestellt — Seitenleiste und Dashboard merken sich ihre Einstellung jeweils getrennt.
+- **Navigation:** Ein Klick auf die gesamte Kachel öffnet die Aufgabendetailansicht — ein separater Navigations-Button ist nicht mehr nötig. Der To-do-Button innerhalb der Kachel bleibt eigenständig klickbar, ohne die Navigation auszulösen.
 - **Offene Todos:** Jede Kachel zeigt ein anklickbares Todo-Label mit der Anzahl offener Todos, z. B. `0 Todos`, `1 Todo` oder `3 Todos`. Die Anzahl berücksichtigt nur Todos ohne Erledigungsdatum. Ein Klick öffnet einen modalen read-only Dialog mit den offenen Todos der ausgewählten Aufgabe; bei `0` offenen Todos zeigt der Dialog den Leerzustand „Keine offenen Todos.".
-- **Dashboard-Integration:** Die Menü-Sektion wird automatisch verborgen, wenn das Dashboard aktiv ist. Das Dashboard zeigt stattdessen die gleiche Aufgabenliste ohne Höhenlimit an — keine doppelte Anzeige.
+- **Dashboard-Integration:** Die Menü-Sektion wird automatisch verborgen, wenn das Dashboard aktiv ist. Das Dashboard zeigt stattdessen die gleiche Aufgabenliste ohne Höhenlimit an — einschließlich der kompakten Kacheln und der eigenen Modus-Buttons neben der Überschrift.
 - **Automatische Statusaktualisierung:** Der Aufgabenstatus wird ohne manuelles Neuladen aktualisiert:
   - **Sofortreaktion auf Prozess-Änderungen:** Wenn eine Aufgabe gestartet oder beendet wird, wird die Seitenleiste sofort aktualisiert.
   - **Sofortreaktion auf persistierte Laufdaten:** Wenn eine aktive Run-ID, ein Heartbeat oder ein Laufstatus wie `Läuft` oder `WartetAufEingabe` gespeichert wurde, wird die sichtbare Aufgabenliste direkt neu geladen.
   - **Periodische Überprüfung:** Alle 5 Sekunden wird der Status neu abgerufen, um Heartbeat-Ablauf (▶ Läuft → ✓ Bereit nach 5 Minuten ohne Aktivität) und andere verpasste Änderungen zu erkennen.
-  - **Visuelle Übergangsanimation:** Wenn der Status einer Aufgabe sich ändert, wird ein dezenter Opacity-Fade (250 ms) auf dem Status-Text angezeigt, um den Wechsel hervorzuheben.
+  - **Visuelle Übergangsanimation:** Wenn der Status einer Aufgabe sich ändert, wird ein dezenter Opacity-Fade (250 ms) auf dem Statussymbol angezeigt, um den Wechsel hervorzuheben.
 
 ### Navigation zwischen Projekt und Aufgabe
 
@@ -124,7 +128,7 @@ Unter jedem Pull Request zeigt die Ansicht die zugeordneten GitHub-Actions-/Work
 #### Ribbon-Menü
 Aktionsgruppen:
 - **Navigation:** „Zurück"-Button zur Rückkehr zur Projektdetailansicht
-- **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet mit kombiniertem Klone+CLI-Start), Beenden (Status=Gestartet/Wartend→Beendet), Pause einstellen (Status ∈ {Neu, Gestartet, Wartend}, nicht bei Autonomen Aufgaben), Plugin ändern (nur bei laufender CLI). Bei aktiver Pause wird neben den Buttons der Hinweis „⏸ Pausiert bis {Datum Uhrzeit}" angezeigt.
+- **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet mit kombiniertem Klone+CLI-Start), Beenden (Status=Gestartet/Wartend→Beendet), Pause einstellen (Status ∈ {Neu, Gestartet, Wartend}), Plugin ändern (nur bei laufender CLI). Bei aktiver Pause wird neben den Buttons der Hinweis „⏸ Pausiert bis {Datum Uhrzeit}" angezeigt.
 - **CLI:** „CLI stoppen" Button (nur sichtbar wenn aktiv)
 - **Issue:** „Issue anlegen" wird angeboten, wenn das Repository die Anlage unterstützt und der Aufgabe noch kein Issue zugeordnet ist. „Issue zuweisen" bleibt für die Auswahl eines vorhandenen Issues verfügbar; nach erfolgreicher Anlage zeigt „Issue öffnen" die gespeicherte Referenz.
 - **Pull Request:** „PR erstellen" Button, sobald Branch, verknüpftes Git-Repository und Pull-Request-Unterstützung des Git-Plugins vorhanden sind
@@ -153,8 +157,8 @@ Die Promptvorlagen-Auswahlbox im Ribbon wird durch zwei Eingabefelder (Stunde un
 - **Zeitgesteuert senden Button:** Nur aktiv, wenn eine Vorlage ausgewählt, die Zeitfelder valide gefüllt und die CLI läuft. Klick plant den Prompt zur angegebenen Uhrzeit.
 - **Zielzeitberechnung:** Die eingegebene Uhrzeit wird als lokale Zeit des Anwenders (via `DateTime.Now`) interpretiert. Liegt die Zielzeit in der Vergangenheit/Gegenwart, wird der Prompt sofort versendet.
 - **Statusanzeige:** Während der Prompt geplant ist, zeigt ein `TextBlock` „Prompt in Wartestellung" mit der Zielzeit im Format `HH:mm`. Nach erfolgreichem Versand oder beim CLI-Stop wird dieser Status automatisch gelöscht.
-- **Statusanzeige in der Seitenleiste:** Solange ein Prompt für eine Aufgabe geplant ist, zeigt auch die Kachel der Aufgabe in der Seitenleisten-Sektion „Aktive Aufgaben" (siehe oben) „⏳ Prompt in Wartestellung" anstelle des üblichen Laufzeitstatus.
-- **Automatische Stornierung:** Beim Wechsel der Aufgabendetailansicht, beim Dispose des ViewModels oder beim Aufgabenabschluss wird der geplante Prompt storniert; der Timer wird abgebrochen.
+- **Statusanzeige in der Seitenleiste:** Solange ein Prompt für eine Aufgabe geplant ist, zeigt auch die Kachel der Aufgabe in der Seitenleisten-Sektion „Aktive Aufgaben" (siehe oben) das Symbol `⏳` anstelle des üblichen Laufzeitstatus; der Tooltip lautet „⏳ Prompt in Wartestellung".
+- **Automatische Stornierung:** Beim Wechsel der Aufgabendetailansicht, beim Schließen der Ansicht oder beim Aufgabenabschluss wird der geplante Prompt storniert; der Timer wird abgebrochen.
 - **Keine Persistierung:** Die Planung ist rein sitzungsgebunden. Ein App-Neustart löscht alle geplanten Prompts. Ein Prompt wird **nicht** persistiert und bei Wiederstart automatisch versendet.
 
 Der neue `PromptZeitVersandService` (Singleton) verwaltet intern pro Aufgabe einen geplanten Prompt in einer Laufzeit-Warteschlange und einen Timer. Bei Erreichen der Zielzeit ruft der Timer-Callback automatisch `PseudoConsoleSession.WritePromptAsync()` auf und versendet den Prompt. Ist die CLI zwischenzeitlich beendet worden, wird der Prompt still verworfen (nur Log-Warnung, kein UI-Feedback).
@@ -189,7 +193,7 @@ Die Aufzeichnung läuft während jeder CLI-Ausführung automatisch mit und über
 - **Validierung:** Der gewählte Zeitpunkt muss in der Zukunft liegen; bei ungültiger Eingabe zeigt der Dialog einen Hinweis und „Übernehmen" bleibt deaktiviert.
 - **Vorzeitiges Aufheben:** Über **Pause aufheben** im selben Dialog wird eine bestehende Pause sofort beendet. Die Schaltfläche ist nur aktiv, solange eine Pause läuft.
 - **Wirkung der Pause:** Solange die Pause läuft, sind **Starten**, **CLI neu starten**, die Wiederherstellung über das Recovery-Banner und das Senden/Planen von Prompts gesperrt. Ein zu diesem Zeitpunkt bereits laufender CLI-Prozess wird dagegen **nicht** unterbrochen und läuft normal weiter. Ein bereits geplanter zeitgesteuerter Prompt wird nicht verworfen, sondern auf das Pausenende verschoben.
-- **Anzeige:** Die Seitenleisten-Kachel zeigt „⏸ Pausiert (noch …)" mit Countdown und ist abgeblendet; im Ribbon erscheint „⏸ Pausiert bis …".
+- **Anzeige:** Die Seitenleisten-Kachel zeigt das Symbol `⏸` und ist abgeblendet; der Countdown „⏸ Pausiert (noch …)" ist im Tooltip des Symbols lesbar. Im Ribbon erscheint „⏸ Pausiert bis …".
 - **Ende der Pause:** Nach Ablauf des Zeitpunkts endet die Pause von selbst — die Kachel zeigt wieder den normalen Status. Es erfolgt kein automatischer (Neu-)Start; der Anwender startet die Ausführung bei Bedarf manuell.
 
 ### Session-Limit-Erkennung und automatische Pause
@@ -244,7 +248,7 @@ Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Ges
 1. Öffne die Aufgabendetailansicht einer Aufgabe im Status **Neu**, **Gestartet** oder **Wartend**.
 2. Klicke im Ribbon (Gruppe „Aufgabe") auf **Pause einstellen**.
 3. Im Dialog sind Datum und Uhrzeit mit der nächsten vollen Minute vorbelegt; wähle z. B. heute, 18 Uhr, und bestätige mit **Übernehmen**.
-4. Die Kachel in der Seitenleiste zeigt „⏸ Pausiert (noch …)" und ist abgeblendet; **Starten** ist gesperrt.
+4. Die Kachel in der Seitenleiste zeigt das Symbol `⏸` und ist abgeblendet (Countdown „⏸ Pausiert (noch …)" im Tooltip); **Starten** ist gesperrt.
 5. Um die Pause vorzeitig zu beenden, öffne **Pause einstellen** erneut und klicke auf **Pause aufheben**.
 
 ### To-Do-Liste für Aufgabengliederung und Fortschrittsverfolgung
@@ -263,7 +267,7 @@ Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-
 
 ## Einschränkungen
 
-- Eine Pause kann nur für reguläre Aufgaben im Status `Neu`, `Gestartet` oder `Wartend` gesetzt werden; Autonome Aufgaben nutzen ihren eigenen Pausen-Mechanismus. Beendete oder archivierte Aufgaben können nicht pausiert werden.
+- Eine Pause kann nur für Aufgaben im Status `Neu`, `Gestartet` oder `Wartend` gesetzt werden. Beendete oder archivierte Aufgaben können nicht pausiert werden.
 - Die Pause blockiert nur neu ausgelöste Aktionen (Start, CLI-Neustart, Wiederherstellung, Prompt-Versand). Ein laufender CLI-Prozess läuft auch während einer Pause weiter.
 - Nach Ablauf einer Pause erfolgt keine automatische Wiederaufnahme — der Anwender startet bei Bedarf manuell neu.
 - Die automatische Pause bei Session-Limit betrifft nur Aufgaben, deren Ausführung zum Erkennungszeitpunkt läuft. Eine später manuell gestartete Aufgabe mit demselben KI-Plugin wird nicht automatisch blockiert.

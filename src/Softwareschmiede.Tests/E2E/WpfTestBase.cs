@@ -1,6 +1,5 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
-using FlaUI.Core.Input;
 using FlaUI.UIA3;
 using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.App.Views;
@@ -160,6 +159,16 @@ public abstract class WpfTestBase : IDisposable
     /// Startet die Anwendung als Prozess mit einem temporären Datenbankpfad.
     /// Wartet, bis das Hauptfenster sichtbar ist.
     /// </summary>
+    /// <remarks>
+    /// Zentraler Skip-Punkt für ALLE echten Fenster-E2E-Tests: Jeder FlaUI-App-Start - auch
+    /// indirekt über <see cref="LaunchAppAndGetMainWindow"/>, <see cref="RestartAppPreservingDatabase"/>
+    /// oder die Fixture-basierten Pfade - läuft durch diese Methode. Ist
+    /// <c>SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1</c> gesetzt (<see cref="WpfE2EEnvironmentProbe"/>),
+    /// wirft der Aufruf eine <c>Xunit.SkipException</c>, bevor der Prozess überhaupt startet.
+    /// Damit das als "Skipped" statt als Fehler zählt, müssen die aufrufenden Testmethoden mit
+    /// <c>[SkippableFact]</c>/<c>[SkippableTheory]</c> annotiert sein - das gilt für sämtliche
+    /// Testmethoden in <see cref="WpfTestBase"/>-Ableitungen.
+    /// </remarks>
     /// <param name="ensureDatabaseDeleted">Gibt an, ob die Testdatenbank vor dem Start gelöscht werden soll. Sollte normalerweise auf true gesetzt werden, um sicherzustellen, dass jeder Test mit einer frischen Datenbank beginnt.</param>
     /// <param name="umgebungsVariablen">
     /// Zusätzliche prozessbezogene Umgebungsvariablen für den gestarteten App-Prozess
@@ -171,6 +180,8 @@ public abstract class WpfTestBase : IDisposable
         bool ensureDatabaseDeleted = true,
         IReadOnlyDictionary<string, string?>? umgebungsVariablen = null)
     {
+        SkipWennWpfE2ENichtVerfuegbar();
+
         // Ein expliziter Datenbankpfad in den prozessbezogenen Umgebungsvariablen (z. B. der
         // fixture-eigene DB-Pfad der Update-E2E-Umgebung) wird zum effektiven Test-DB-Pfad, damit
         // DeleteTestDatabase/OpenTestDbContext/ResolveProzessStartLogPfad konsistent bleiben.
@@ -300,16 +311,28 @@ public abstract class WpfTestBase : IDisposable
                 // liegen bleibt) sind unowned Top-Level-Fenster und können die Heuristik
                 // gewinnen. Stattdessen alle Top-Level-Fenster des Prozesses enumerieren
                 // und anhand des Titels wählen.
-                var fenster = app.GetAllTopLevelWindows(Automation);
+                // Kein GetAllTopLevelWindows/desktopweite UIA-Enumeration: Jede Desktop-Traversierung
+                // fragt alle Top-Level-Fenster aller Prozesse ab und kann an einem nicht antwortenden
+                // Fremd-Provider die volle UIA-Timeout-Zeit hängen (gemessen: ~80s pro Aufruf).
+                var fenster = ProcessWindowEnumeration.TopLevelWindowsAndTitles(app.ProcessId);
                 gesehen = string.Join(" | ", fenster.Select(f => $"'{f.Title}'"));
-                var mainWindow = fenster.FirstOrDefault(
-                    f => f.Title.StartsWith("Softwareschmiede", StringComparison.Ordinal));
-                if (mainWindow is not null)
-                    return mainWindow;
+                var mainHandle = fenster.FirstOrDefault(
+                    f => f.Title.StartsWith("Softwareschmiede", StringComparison.Ordinal)).Hwnd;
+                if (mainHandle != IntPtr.Zero)
+                {
+                    var mainWindow = Automation.FromHandle(mainHandle)?.AsWindow();
+                    if (mainWindow is not null)
+                        return mainWindow;
+                }
             }
             catch (FlaUI.Core.Exceptions.FlaUIException)
             {
                 // Fenster können zwischen Enumeration und Element-Erzeugung verschwinden.
+            }
+            catch (System.Runtime.InteropServices.COMException)
+            {
+                // UIA-Provider eines enumerierten Fensters transient nicht erreichbar
+                // (z. B. hängender Fremdprozess) - nächster Schleifendurchlauf versucht erneut.
             }
 
             Thread.Sleep(200);
@@ -439,15 +462,13 @@ public abstract class WpfTestBase : IDisposable
     /// <remarks>
     /// Filtert zusätzlich auf <see cref="FlaUI.Core.Definitions.ControlType.Window"/>: Ohne diesen Filter kann
     /// die Teilbaum-Suche von <c>Automation.GetDesktop()</c> nach reinem Namen ein anderes, bereits vorhandenes
-    /// Element mit demselben AutomationProperties.Name im Baum treffen (z. B. eine RibbonGroup namens
-    /// "Autonome Aufgabe" in einer bereits offenen Ansicht, siehe TaskDetailView.xaml), statt auf das
-    /// tatsächliche Fenster zu warten. Das war zuvor eine latente Race Condition, die reproduzierbar wurde,
-    /// sobald sich das Timing bis zur tatsächlichen Fenster-Erstellung leicht verschob (siehe
-    /// AutonomAufgabeInitialisierung_DialogErstelltArbeitsverzeichnisUndZeigtDetailAnsicht_E2E), und ist bereits
-    /// das etablierte Muster in mehreren anderen E2E-Tests (z. B. E2E_PluginAktivierung.cs).
+    /// Element mit demselben AutomationProperties.Name im Baum treffen (z. B. eine gleichnamige RibbonGroup
+    /// in einer bereits offenen Ansicht), statt auf das tatsächliche Fenster zu warten. Das wäre eine latente
+    /// Race Condition, sobald sich das Timing bis zur tatsächlichen Fenster-Erstellung leicht verschiebt, und
+    /// ist bereits das etablierte Muster in mehreren anderen E2E-Tests (z. B. E2E_PluginAktivierung.cs).
     /// </remarks>
     protected AutomationElement WaitForWindow(string title, TimeSpan timeout)
-        => WaitForElement(Automation.GetDesktop(), cf => cf.ByName(title).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Window)), timeout);
+        => ElementWaitHelper.WaitForTitledWindow(Automation.GetDesktop(), title, timeout);
 
     /// <summary>Navigiert zur Projektliste.</summary>
     protected void NavigateToProjects(AutomationElement mainWindow)
@@ -916,6 +937,24 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
+    /// Überspringt den aufrufenden Test (via <c>Skip.If</c>), wenn die Umgebungsvariable
+    /// <c>SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1</c> gesetzt ist (siehe
+    /// <see cref="WpfE2EEnvironmentProbe"/>). Betrifft alle Tests, die ein echtes
+    /// WPF-Hauptfenster via FlaUI fahren - ohne interaktive Desktop-Session scheitern sie
+    /// sonst erst nach dem Fenster-Timeout mit einer nichtssagenden <see cref="TimeoutException"/>.
+    /// Dieselbe Prüfung läuft zusätzlich zentral in <see cref="LaunchApp"/>, sodass jeder
+    /// App-Start abgedeckt ist; ein direkter Aufruf als erste Zeile des Testkörpers lohnt sich
+    /// nur bei teurem Vorab-Setup (z. B. Fixture-Aufbau vor dem ersten App-Start). Erfordert,
+    /// dass die aufrufende Testmethode mit <c>[SkippableFact]</c> (statt <c>[Fact]</c>)
+    /// annotiert ist (Paket <c>Xunit.SkippableFact</c>) - nur damit erzeugt <c>Skip.If</c> ein
+    /// echtes "Skipped"-Ergebnis statt eines fehlschlagenden Tests.
+    /// </summary>
+    protected static void SkipWennWpfE2ENichtVerfuegbar()
+    {
+        Skip.If(!WpfE2EEnvironmentProbe.IsAvailable, WpfE2EEnvironmentProbe.UnavailableReason);
+    }
+
+    /// <summary>
     /// Klickt den "Starten"-Button und bedient den anschließend erscheinenden Plugin-Auswahl-Dialog:
     /// wählt das angegebene KI-Plugin aus, setzt optional die "FuerProjektVerwenden"-Checkbox
     /// (Projekt-Standard speichern) und bestätigt mit "OK". Delegiert an
@@ -1027,7 +1066,7 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Fokussiert das "EditTitel"-Feld, markiert dessen Inhalt (Strg+A) und tippt <paramref name="titel"/>.
+    /// Ersetzt das "EditTitel"-Feld durch <paramref name="titel"/> und prüft dessen vollständigen Wert.
     /// Voraussetzung: <c>TaskDetailView</c> im Edit-Modus sichtbar (z. B. nach <see cref="NeueAufgabeAnlegen"/>).
     /// </summary>
     protected void AufgabeTitelSetzen(AutomationElement mainWindow, string titel)
@@ -1121,7 +1160,7 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Fokussiert das "ProjektName"-Feld, markiert dessen Inhalt (Strg+A), tippt <paramref name="neuerName"/>
+    /// Ersetzt und prüft das "ProjektName"-Feld mit <paramref name="neuerName"/>
     /// und klickt "Speichern" (UpdateAsync-Pfad, bleibt in der Detailansicht). Der "Speichern"-Button
     /// verschwindet in diesem Pfad nicht (im Gegensatz zur Neuanlage) - als echtes Synchronisationssignal
     /// für den Abschluss von Speichern + anschließendem Reload wird stattdessen gewartet, bis das
@@ -1172,13 +1211,8 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Fokussiert <paramref name="box"/> per Klick, markiert dessen Inhalt (Strg+A) und ersetzt ihn
-    /// durch <paramref name="text"/>.
+    /// Ersetzt <paramref name="box"/> durch <paramref name="text"/> und prüft dessen vollständigen Wert.
     /// </summary>
     private static void FeldInhaltErsetzen(AutomationElement box, string text)
-    {
-        box.ClickInForeground();
-        Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_A);
-        Keyboard.Type(text);
-    }
+        => ElementWaitHelper.ReplaceTextBoxText(box, text);
 }

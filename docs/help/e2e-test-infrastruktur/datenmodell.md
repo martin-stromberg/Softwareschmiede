@@ -104,15 +104,6 @@ To-Do-Listen-Panel in Aufgabendetail (Aufgabengliederung).
 | `IsVisible` | bool | True: To-Do-Listenelemente sichtbar |
 | `ForceShow()` | BaseWindowView | Zeigt To-Do-Tab an |
 
-### AutonomAufgabeDetailView : BaseWindowView
-
-Autonome Aufgabe Detail-Ansicht (Projektleiter-Agent-Orchestrierung).
-
-| Eigenschaft / Methode | Typ | Beschreibung |
-|----------------------|-----|-------------|
-| `IsVisible` | bool | True: Autonome-Aufgaben-spezifische Elemente sichtbar |
-| `ForceShow()` | BaseWindowView | Navigiert zu Autonomer Aufgabe |
-
 ### ErrorView : BaseWindowView
 
 Fehlerbanner-View (zeigt Fehler der Anwendung).
@@ -159,22 +150,6 @@ GitHub-Issue/BitBucket-Ticket-Auswahl-Dialog.
 #### IssueCreateDialogView : DialogView
 
 Neuer GitHub-Issue/BitBucket-Ticket-Dialog.
-
-#### AutonomAufgabeInitialisierungsDialogView : DialogView
-
-Dialog zur Initialisierung autonomer Aufgaben.
-
-| Eigenschaften | Beschreibung |
-|--------------|------------|
-| Projektbranch | Auswahl oder Texteingabe |
-| Initialprompt | Texteingabe mit Vorlagensystem |
-| Permissions-Quelle | Auswahl (Generieren/Auswählen/Vorhandene) |
-| Token-Budget | Zahleneingabe |
-| Laufzeitbegrenzung | Zahleneingabe |
-
-#### AutonomAufgabeDetailDialogView : DialogView
-
-Detail-Dialog für laufende autonome Aufgaben.
 
 #### ArbeitsverzeichnisBearbeitenDialogView : DialogView
 
@@ -240,7 +215,6 @@ graph TD
     A -->|erbt| G["SettingsView"]
     A -->|erbt| H["FileExplorerView"]
     A -->|erbt| I["TodoListView"]
-    A -->|erbt| J["AutonomAufgabeDetailView"]
     A -->|erbt| K["ErrorView"]
     A -->|erbt| L["DialogView<br/>(abstrakt)"]
     
@@ -248,8 +222,6 @@ graph TD
     L -->|erbt| N["PluginSelectionDialogView"]
     L -->|erbt| O["IssueSelectionDialogView"]
     L -->|erbt| P["IssueCreateDialogView"]
-    L -->|erbt| Q["AutonomAufgabeInitialisierungsDialogView"]
-    L -->|erbt| R["AutonomAufgabeDetailDialogView"]
     L -->|erbt| S["ArbeitsverzeichnisBearbeitenDialogView"]
     L -->|erbt| T["OpenTodosDialogView"]
     L -->|erbt| U["HelpTextDialogView"]
@@ -281,7 +253,6 @@ src/Softwareschmiede.Tests/E2E/Views/
 ├── SettingsView.cs
 ├── FileExplorerView.cs
 ├── TodoListView.cs
-├── AutonomAufgabeDetailView.cs
 ├── ErrorView.cs
 ├── DialogView.cs                   # Dialog-Basisklasse
 ├── WindowExtensions.cs             # Erweiterungsmethoden
@@ -290,8 +261,6 @@ src/Softwareschmiede.Tests/E2E/Views/
     ├── PluginSelectionDialogView.cs
     ├── IssueSelectionDialogView.cs
     ├── IssueCreateDialogView.cs
-    ├── AutonomAufgabeInitialisierungsDialogView.cs
-    ├── AutonomAufgabeDetailDialogView.cs
     ├── ArbeitsverzeichnisBearbeitenDialogView.cs
     ├── OpenTodosDialogView.cs
     ├── HelpTextDialogView.cs

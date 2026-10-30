@@ -101,7 +101,7 @@ public abstract class BaseWindowView
     /// <c>UIA3Automation</c> zu erzeugen (vermeidet ein zusätzliches, unverwaltetes COM-Objekt pro Aufruf).
     /// </summary>
     protected AutomationElement WaitForWindow(string title, TimeSpan timeout)
-        => ElementWaitHelper.WaitForElement(Window.Automation.GetDesktop(), cf => cf.ByName(title), timeout, IsOnScreen);
+        => ElementWaitHelper.WaitForTitledWindow(Window, title, timeout, IsOnScreen);
 
     /// <summary>
     /// Wählt einen Eintrag in einer ComboBox per Klick auf das ComboBoxItem aus (robuster als FlaUI's
@@ -136,6 +136,61 @@ public abstract class BaseWindowView
         {
             return true;
         }
+    }
+
+    /// <summary>
+    /// Klickt den Modus-Umschalter '<paramref name="umschalterPraefix"/>{modus}' einer
+    /// Aufgabenliste. Gemeinsame Logik für die ansichtsspezifischen Umschalter der
+    /// Seitenleiste ('AufgabenModus:*') und des Dashboards ('DashboardAufgabenModus:*').
+    /// </summary>
+    /// <param name="umschalterPraefix">Das ansichtsspezifische Namenspräfix inkl. Doppelpunkt (z. B. "AufgabenModus:").</param>
+    /// <param name="modus">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
+    protected void KlickeAufgabenModusUmschalter(string umschalterPraefix, string modus)
+        => WaitForElement(Window, cf => cf.ByName($"{umschalterPraefix}{modus}"), Medium).ClickInForeground();
+
+    /// <summary>
+    /// Liest die Gruppennamen einer Aufgabenliste im gruppierten Modus (UIA-Namen
+    /// 'AufgabenGruppe:{Name}' der Gruppenheader, gescoped unter der Listenwurzel).
+    /// </summary>
+    /// <param name="listenAutomationId">Die AutomationId der Listenwurzel (z. B. "AktiveAufgabenListeMenue").</param>
+    /// <returns>Die Gruppennamen ohne das 'AufgabenGruppe:'-Präfix; leer im flachen Modus.</returns>
+    protected string[] GetAufgabenGruppenNamen(string listenAutomationId)
+    {
+        const string praefix = "AufgabenGruppe:";
+        var liste = Window.FindFirstDescendant(cf => cf.ByAutomationId(listenAutomationId));
+        if (liste is null)
+            return [];
+
+        return liste.FindAllDescendants()
+            .Select(e => e.Name)
+            .Where(n => n is not null && n.StartsWith(praefix, StringComparison.Ordinal))
+            .Select(n => n![praefix.Length..])
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Wartet, bis der Gruppenheader 'AufgabenGruppe:{name}' in einer Aufgabenliste
+    /// erscheint (gescoped unter der Listenwurzel).
+    /// </summary>
+    /// <param name="listenAutomationId">Die AutomationId der Listenwurzel.</param>
+    /// <param name="name">Der erwartete Gruppenname (z. B. ein Repository-Name).</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <exception cref="TimeoutException">Der Gruppenheader erschien nicht rechtzeitig.</exception>
+    protected void WaitForAufgabenGruppe(string listenAutomationId, string name, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        string[]? zuletzt = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            zuletzt = GetAufgabenGruppenNamen(listenAutomationId);
+            if (zuletzt.Contains(name))
+                return;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException(
+            $"Gruppenheader 'AufgabenGruppe:{name}' erschien nicht innerhalb von {timeout.TotalSeconds}s. Vorhandene Gruppen: {string.Join(", ", zuletzt ?? [])}");
     }
 
     /// <summary>Liest den <c>HelpText</c> eines Elements aus; fällt auf <c>Name</c> zurück, falls leer oder nicht unterstützt.</summary>

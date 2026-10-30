@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Application.Services;
@@ -38,8 +39,35 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für die Prioritäts-Reihenfolge der IDE-Plugins (kommagetrennte Liste von Plugin-Prefixen).</summary>
     public const string IdePluginOrderKey = "plugins.ide.order";
 
-    /// <summary>Schlüssel für das Feature-Flag "Autonome Aufgaben aktiviert".</summary>
-    public const string AutonomAufgabenEnabledKey = "autonomeaufgaben.enabled";
+    /// <summary>Schlüssel für den Laufzeit-Schalter "SCM-Ereignisüberwachung aktiviert".</summary>
+    public const string ScmMonitoringEnabledKey = "scm.monitoring.enabled";
+
+    /// <summary>Schlüssel für das konfigurierbare SCM-Trigger-Keyword.</summary>
+    public const string ScmTriggerKeywordKey = "scm.trigger.keyword";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang, der bei jeder Ereignisart angehängt wird.</summary>
+    public const string ScmPromptAppendGeneralKey = "scm.prompt.append.general";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Issue-Beschreibungen (neues/geändertes Issue).</summary>
+    public const string ScmPromptAppendIssueKey = "scm.prompt.append.issue";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Kommentaren auf Issues.</summary>
+    public const string ScmPromptAppendIssueCommentKey = "scm.prompt.append.issuecomment";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Pull-Request-Beschreibungen (neuer/geänderter PR).</summary>
+    public const string ScmPromptAppendPullRequestKey = "scm.prompt.append.pr";
+
+    /// <summary>Schlüssel für den SCM-Prompt-Anhang bei Kommentaren und Reviews auf Pull Requests.</summary>
+    public const string ScmPromptAppendPullRequestCommentKey = "scm.prompt.append.prcomment";
+
+    /// <summary>Schlüssel für den Laufzeit-Schalter "SCM-Abschlussüberwachung aktiviert".</summary>
+    public const string ScmTaskCompletionEnabledKey = "scm.taskcompletion.enabled";
+
+    /// <summary>Schlüssel für die Wartezeit (Minuten) zwischen erkanntem Referenz-Schluss und dem Beenden der Aufgabe.</summary>
+    public const string ScmTaskCompletionWaitMinutesKey = "scm.taskcompletion.wait.minutes";
+
+    /// <summary>Standardwert der Abschluss-Wartezeit in Minuten.</summary>
+    public const int ScmTaskCompletionDefaultWaitMinutes = 60;
 
     /// <summary>Schlüssel für den Update-Modus (<see cref="UpdateMode"/>-Wert als Zahl gespeichert).</summary>
     public const string UpdateModeKey = "updates.mode";
@@ -49,6 +77,18 @@ public sealed class AppEinstellungService
 
     /// <summary>Fester EF-Abfragetag der gemeinsamen Update-Einstellungs-Leseabfrage für gezielte Testinterception.</summary>
     public const string UpdateSettingsReadTag = "UpdateSettings.Read";
+
+    /// <summary>Schlüssel für den Anzeigemodus der Aufgabenliste in der Seitenleiste (<c>AufgabenListenModus</c>-Name).</summary>
+    public const string AktiveAufgabenListenModusKey = "aktiveaufgaben.listenmodus";
+
+    /// <summary>Schlüssel für den Anzeigemodus der Aufgabenliste im Dashboard (<c>AufgabenListenModus</c>-Name).</summary>
+    public const string AktiveAufgabenListenModusDashboardKey = "aktiveaufgaben.listenmodus.dashboard";
+
+    /// <summary>Schlüssel für den Backmerge-Aktivierungsmodus (<see cref="ScmBackmergeModus"/>-Wert als Zahl gespeichert).</summary>
+    public const string ScmBackmergeModeKey = "scm.backmerge.mode";
+
+    /// <summary>Schlüsselpräfix für die projektbezogene Backmerge-Freigabe; der vollständige Schlüssel ist <c>plugins.backmerge.project.{projektId}</c>.</summary>
+    public const string BackmergeProjektKeyPrefix = "plugins.backmerge.project.";
 
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AppEinstellungService> _logger;
@@ -122,22 +162,109 @@ public sealed class AppEinstellungService
         => SetSettingAsync(schluessel, wert.ToString(), ct);
 
     /// <summary>
-    /// Ermittelt, ob das Feature "Autonome Aufgaben" aktuell aktiv ist: Der über <see cref="SetBoolSettingAsync"/>
-    /// unter <see cref="AutonomAufgabenEnabledKey"/> persistierte Laufzeit-Schalter (GUI-Einstellung) hat Vorrang,
-    /// sofern der Anwender ihn bereits explizit gesetzt hat; existiert kein DB-Eintrag (Rückgabe <c>null</c> von
-    /// <see cref="GetBoolSettingAsync"/>), wird <paramref name="deploymentDefault"/> (der aus appsettings.json/
-    /// Umgebungsvariablen gebundene <c>AutonomAufgabenOptions.Enabled</c>-Deployment-Zeit-Default) als Fallback
-    /// verwendet. Bündelt dieses Dual-Layer-Fallback-Muster zentral für alle Guard-Klauseln und UI-Sichtbarkeits-
-    /// Checks rund um Autonome Aufgaben (Issue 205), statt es an jeder Aufrufstelle zu duplizieren.
+    /// Ermittelt, ob die SCM-Ereignisüberwachung aktuell aktiv ist. Der über
+    /// <see cref="SetBoolSettingAsync"/> unter <see cref="ScmMonitoringEnabledKey"/> persistierte
+    /// Laufzeit-Schalter (GUI-Einstellung) gilt ohne Neustart; ohne gespeicherten Eintrag ist die
+    /// Überwachung aktiviert (<see langword="true"/>).
     /// </summary>
-    /// <param name="deploymentDefault">Der zu verwendende Fallback-Wert, wenn kein DB-Eintrag existiert (typischerweise <c>IOptions&lt;AutonomAufgabenOptions&gt;.Value.Enabled</c>).</param>
     /// <param name="ct">Abbruchtoken.</param>
-    /// <returns><see langword="true"/>, wenn Autonome Aufgaben aktiv sind (DB-Wert, sonst <paramref name="deploymentDefault"/>).</returns>
-    public async Task<bool> GetAutonomAufgabenEnabledAsync(bool deploymentDefault, CancellationToken ct = default)
+    /// <returns><see langword="true"/>, wenn die SCM-Ereignisüberwachung aktiv ist.</returns>
+    public async Task<bool> GetScmMonitoringEnabledAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(ScmMonitoringEnabledKey, ct) ?? true;
+
+    /// <summary>Bildet den Einstellungsschlüssel der projektbezogenen Backmerge-Freigabe.</summary>
+    /// <param name="projektId">Die Projekt-ID.</param>
+    /// <returns>Den vollständigen Einstellungsschlüssel <c>plugins.backmerge.project.{projektId}</c>.</returns>
+    public static string BackmergeProjektKey(Guid projektId) => $"{BackmergeProjektKeyPrefix}{projektId}";
+
+    /// <summary>
+    /// Liest den Backmerge-Aktivierungsmodus unter <see cref="ScmBackmergeModeKey"/>.
+    /// Fehlende oder ungültige gespeicherte Werte fallen auf
+    /// <see cref="ScmBackmergeModus.Deaktiviert"/> zurück.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Der effektive Backmerge-Modus.</returns>
+    public async Task<ScmBackmergeModus> GetScmBackmergeModusAsync(CancellationToken ct = default)
     {
-        var dbWert = await GetBoolSettingAsync(AutonomAufgabenEnabledKey, ct);
-        return dbWert ?? deploymentDefault;
+        var wert = await GetSettingAsync(ScmBackmergeModeKey, ct);
+        return int.TryParse(wert, out var modus) && Enum.IsDefined((ScmBackmergeModus)modus)
+            ? (ScmBackmergeModus)modus
+            : ScmBackmergeModus.Deaktiviert;
     }
+
+    /// <summary>Speichert den Backmerge-Aktivierungsmodus unter <see cref="ScmBackmergeModeKey"/>.</summary>
+    /// <param name="modus">Der zu speichernde Modus.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="modus"/> ist kein definierter <see cref="ScmBackmergeModus"/>-Wert.</exception>
+    public Task SetScmBackmergeModusAsync(ScmBackmergeModus modus, CancellationToken ct = default)
+    {
+        if (!Enum.IsDefined(modus))
+            throw new ArgumentOutOfRangeException(nameof(modus), modus, "Unbekannter Backmerge-Modus.");
+
+        return SetIntSettingAsync(ScmBackmergeModeKey, (int)modus, ct);
+    }
+
+    /// <summary>Ermittelt, ob die projektbezogene Backmerge-Freigabe für das Projekt gesetzt ist (Standard: <see langword="false"/>).</summary>
+    /// <param name="projektId">Die Projekt-ID.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn Backmerge-PRs für dieses Projekt automatisch gemergt werden dürfen.</returns>
+    public async Task<bool> GetBackmergeProjektAktivAsync(Guid projektId, CancellationToken ct = default)
+        => await GetBoolSettingAsync(BackmergeProjektKey(projektId), ct) ?? false;
+
+    /// <summary>Setzt die projektbezogene Backmerge-Freigabe für das Projekt.</summary>
+    /// <param name="projektId">Die Projekt-ID.</param>
+    /// <param name="aktiv">Der zu speichernde Schalter.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public Task SetBackmergeProjektAktivAsync(Guid projektId, bool aktiv, CancellationToken ct = default)
+        => SetBoolSettingAsync(BackmergeProjektKey(projektId), aktiv, ct);
+
+    /// <summary>
+    /// Ermittelt, ob die SCM-Abschlussüberwachung ereignisgesteuerter Aufgaben aktiv ist. Der über
+    /// <see cref="SetBoolSettingAsync"/> unter <see cref="ScmTaskCompletionEnabledKey"/> persistierte
+    /// Laufzeit-Schalter (GUI-Einstellung) gilt ohne Neustart; ohne gespeicherten Eintrag ist die
+    /// Überwachung aktiviert (<see langword="true"/>).
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn die Abschlussüberwachung aktiv ist.</returns>
+    public async Task<bool> GetScmTaskCompletionEnabledAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(ScmTaskCompletionEnabledKey, ct) ?? true;
+
+    /// <summary>
+    /// Liest die Wartezeit in Minuten zwischen dem erkannten Schließen/Mergen der verknüpften
+    /// SCM-Referenz und dem automatischen Beenden der Aufgabe (<see cref="ScmTaskCompletionWaitMinutesKey"/>).
+    /// Fehlende oder ungültige Werte fallen auf <see cref="ScmTaskCompletionDefaultWaitMinutes"/> zurück;
+    /// gespeicherte Werte werden auf 0 bis 43200 (30 Tage) begrenzt.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Die wirksame Wartezeit in Minuten.</returns>
+    public async Task<int> GetScmTaskCompletionWaitMinutesAsync(CancellationToken ct = default)
+    {
+        var wert = await GetIntSettingAsync(ScmTaskCompletionWaitMinutesKey, ct);
+        return wert is null ? ScmTaskCompletionDefaultWaitMinutes : Math.Clamp(wert.Value, 0, 43200);
+    }
+
+    /// <summary>
+    /// Liest das konfigurierte SCM-Trigger-Keyword unter <see cref="ScmTriggerKeywordKey"/>.
+    /// Fehlende oder ungültige (leere bzw. nur aus Leerraum bestehende) Werte fallen auf
+    /// <see cref="ScmEventValidationService.DefaultTriggerKeyword"/> zurück; gespeicherte Werte
+    /// werden getrimmt zurückgegeben.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Das effektive Trigger-Keyword.</returns>
+    public async Task<string> GetScmTriggerKeywordAsync(CancellationToken ct = default)
+        => ScmEventValidationService.NormalizeTriggerKeyword(await GetSettingAsync(ScmTriggerKeywordKey, ct));
+
+    /// <summary>
+    /// Liest alle fünf SCM-Prompt-Anhänge (<see cref="ScmPromptAppendGeneralKey"/>,
+    /// <see cref="ScmPromptAppendIssueKey"/>, <see cref="ScmPromptAppendIssueCommentKey"/>,
+    /// <see cref="ScmPromptAppendPullRequestKey"/> und <see cref="ScmPromptAppendPullRequestCommentKey"/>)
+    /// in einer einzigen Datenbankabfrage. Schlüssel ohne gespeicherten Eintrag fehlen im Ergebnis;
+    /// die fachliche Auswertung (Ereignisart-Mapping, Kombination) übernimmt <see cref="ScmPromptAppendix"/>.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Eine Zuordnung von Schlüssel zu gespeichertem Wert.</returns>
+    public async Task<IReadOnlyDictionary<string, string?>> GetScmPromptAppendicesAsync(CancellationToken ct = default)
+        => await GetSettingsAsync(ScmPromptAppendix.SettingKeys, ct);
 
     /// <summary>Liest die Werte mehrerer Einstellungen anhand ihrer Schlüssel in einer einzigen Datenbankabfrage.</summary>
     /// <param name="schluessel">Die zu lesenden Schlüssel.</param>

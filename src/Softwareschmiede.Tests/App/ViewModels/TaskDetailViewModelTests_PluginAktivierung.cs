@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -80,12 +79,6 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService();
         var serviceProviderMock = new Mock<IServiceProvider>();
-        var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
-            serviceProviderMock.Object,
-            _dialogServiceMock.Object,
-            _aufgabeService,
-            _db,
-            appEinstellungService: appEinstellungService);
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -103,10 +96,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartService,
-            appEinstellungService,
-            Options.Create(new AutonomAufgabenOptions()));
+            arbeitsverzeichnisOeffnenService);
     }
 
     private async Task<Aufgabe> ErstelleAufgabe()

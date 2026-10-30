@@ -1469,6 +1469,38 @@ public sealed class GitHubPluginTests
             .WithMessage("*git checkout (remote branch) fehlgeschlagen*");
     }
 
+    /// <summary>GetAgentEnvironmentAsync stellt dem Agenten dieselbe gh-/git-Anmeldung wie dem
+    /// Host bereit: GH_TOKEN, github.com-scoped extraheader und deaktiviertes Credential-Prompt.</summary>
+    [Fact]
+    public async Task GetAgentEnvironmentAsync_WithToken_ProvidesGhAndGitAuth()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
+
+        var environment = await _sut.GetAgentEnvironmentAsync();
+
+        environment["GH_TOKEN"].Should().Be("agent-token");
+        environment["GIT_TERMINAL_PROMPT"].Should().Be("0");
+        environment["GIT_CONFIG_COUNT"].Should().Be("1");
+        environment["GIT_CONFIG_KEY_0"].Should().Be("http.https://github.com/.extraheader");
+        var expected = "AUTHORIZATION: basic " + Convert.ToBase64String(
+            System.Text.Encoding.UTF8.GetBytes("x-access-token:agent-token"));
+        environment["GIT_CONFIG_VALUE_0"].Should().Be(expected);
+    }
+
+    /// <summary>Ohne gespeicherten Token bleibt nur das deaktivierte Credential-Prompt —
+    /// ein fehlender Token blockiert den CLI-Start nicht.</summary>
+    [Fact]
+    public async Task GetAgentEnvironmentAsync_WithoutToken_OnlyDisablesGitPrompt()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
+
+        var environment = await _sut.GetAgentEnvironmentAsync();
+
+        environment.Should().ContainKey("GIT_TERMINAL_PROMPT").WhoseValue.Should().Be("0");
+        environment.Should().NotContainKey("GH_TOKEN");
+        environment.Should().NotContainKey("GIT_CONFIG_VALUE_0");
+    }
+
     private static bool SequenceEqual(IEnumerable<string> actual, params string[] expected)
         => actual.SequenceEqual(expected);
 }

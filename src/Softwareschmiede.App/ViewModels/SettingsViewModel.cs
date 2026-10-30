@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Application.Services.Updates;
@@ -26,7 +25,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private readonly PluginActivationService _pluginActivationService;
     private readonly PluginSettingsService _pluginSettingsService;
     private readonly PromptVorlagenService _promptVorlagenService;
-    private readonly IOptions<AutonomAufgabenOptions> _autonomAufgabenOptions;
     private readonly ILogger<SettingsViewModel> _logger;
     private readonly IDialogService _dialogService;
     private readonly IServiceProvider _serviceProvider;
@@ -47,9 +45,18 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private List<string> _idePluginOrder = [];
     private PluginActivationEntry? _selectedIdePlugin;
     private IReadOnlyList<PluginSettingGroupEntry>? _selectedIdePluginSettings;
-    private bool _isAutonomAufgabenEnabled = true;
+    private bool _isScmMonitoringEnabled = true;
+    private bool _isScmTaskCompletionEnabled = true;
+    private string _scmTaskCompletionWaitMinutes = AppEinstellungService.ScmTaskCompletionDefaultWaitMinutes.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    private string _scmTriggerKeyword = ScmEventValidationService.DefaultTriggerKeyword;
+    private string _scmPromptAppendixGeneral = string.Empty;
+    private string _scmPromptAppendixIssue = string.Empty;
+    private string _scmPromptAppendixIssueComment = string.Empty;
+    private string _scmPromptAppendixPullRequest = string.Empty;
+    private string _scmPromptAppendixPullRequestComment = string.Empty;
     private UpdateModusOption? _selectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.NurPruefen);
     private bool _includePrereleases;
+    private ScmBackmergeModusOption? _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Deaktiviert);
 
     /// <summary>Wird direkt nach erfolgreichem Speichern der Update-Einstellungen mit dem gespeicherten Snapshot ausgelöst.</summary>
     public event EventHandler<UpdateSettings>? UpdateSettingsSaved;
@@ -69,6 +76,16 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     {
         get => _includePrereleases;
         set => SetProperty(ref _includePrereleases, value);
+    }
+
+    /// <summary>Feste Auswahlliste der Backmerge-Modi (Steuerwert + Anzeige-Label).</summary>
+    public IReadOnlyList<ScmBackmergeModusOption> BackmergeModusOptionen => ScmBackmergeModusOption.Alle;
+
+    /// <summary>Aktuell ausgewählte Backmerge-Modus-Option aus <see cref="BackmergeModusOptionen"/>.</summary>
+    public ScmBackmergeModusOption? SelectedBackmergeModus
+    {
+        get => _selectedBackmergeModus;
+        set => SetProperty(ref _selectedBackmergeModus, value);
     }
 
     /// <summary>Arbeitsverzeichnis für Repository-Klone.</summary>
@@ -201,11 +218,67 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _selectedIdePluginSettings, value);
     }
 
-    /// <summary>Gibt an, ob das Feature-Flag "Autonome Aufgaben" aktiviert ist.</summary>
-    public bool IsAutonomAufgabenEnabled
+    /// <summary>Gibt an, ob die SCM-Ereignisüberwachung aktiviert ist (Laufzeit-Schalter, ohne Neustart wirksam).</summary>
+    public bool IsScmMonitoringEnabled
     {
-        get => _isAutonomAufgabenEnabled;
-        set => SetProperty(ref _isAutonomAufgabenEnabled, value);
+        get => _isScmMonitoringEnabled;
+        set => SetProperty(ref _isScmMonitoringEnabled, value);
+    }
+
+    /// <summary>Gibt an, ob die Abschlussüberwachung ereignisgesteuerter Aufgaben aktiviert ist (Laufzeit-Schalter, ohne Neustart wirksam).</summary>
+    public bool IsScmTaskCompletionEnabled
+    {
+        get => _isScmTaskCompletionEnabled;
+        set => SetProperty(ref _isScmTaskCompletionEnabled, value);
+    }
+
+    /// <summary>Wartezeit in Minuten zwischen dem erkannten Referenz-Schluss und dem automatischen Beenden der Aufgabe.</summary>
+    public string ScmTaskCompletionWaitMinutes
+    {
+        get => _scmTaskCompletionWaitMinutes;
+        set => SetProperty(ref _scmTaskCompletionWaitMinutes, value);
+    }
+
+    /// <summary>Das Trigger-Keyword, mit dem SCM-Ereignisse markiert werden (Standard: <c>$Softwareschmiede</c>).</summary>
+    public string ScmTriggerKeyword
+    {
+        get => _scmTriggerKeyword;
+        set => SetProperty(ref _scmTriggerKeyword, value);
+    }
+
+    /// <summary>Prompt-Anhang, der bei jeder SCM-Ereignisart an den Prompt angehängt wird (leer = keiner).</summary>
+    public string ScmPromptAppendixGeneral
+    {
+        get => _scmPromptAppendixGeneral;
+        set => SetProperty(ref _scmPromptAppendixGeneral, value);
+    }
+
+    /// <summary>Prompt-Anhang für SCM-Ereignisse aus Issue-Beschreibungen (leer = keiner).</summary>
+    public string ScmPromptAppendixIssue
+    {
+        get => _scmPromptAppendixIssue;
+        set => SetProperty(ref _scmPromptAppendixIssue, value);
+    }
+
+    /// <summary>Prompt-Anhang für SCM-Ereignisse aus Kommentaren auf Issues (leer = keiner).</summary>
+    public string ScmPromptAppendixIssueComment
+    {
+        get => _scmPromptAppendixIssueComment;
+        set => SetProperty(ref _scmPromptAppendixIssueComment, value);
+    }
+
+    /// <summary>Prompt-Anhang für SCM-Ereignisse aus Pull-Request-Beschreibungen (leer = keiner).</summary>
+    public string ScmPromptAppendixPullRequest
+    {
+        get => _scmPromptAppendixPullRequest;
+        set => SetProperty(ref _scmPromptAppendixPullRequest, value);
+    }
+
+    /// <summary>Prompt-Anhang für SCM-Ereignisse aus Kommentaren und Reviews auf Pull Requests (leer = keiner).</summary>
+    public string ScmPromptAppendixPullRequestComment
+    {
+        get => _scmPromptAppendixPullRequestComment;
+        set => SetProperty(ref _scmPromptAppendixPullRequestComment, value);
     }
 
     /// <summary>Editierbare Promptvorlagen.</summary>
@@ -257,7 +330,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         PluginSettingsService pluginSettingsService,
         PromptVorlagenService promptVorlagenService,
         ILogger<SettingsViewModel> logger,
-        IOptions<AutonomAufgabenOptions> autonomAufgabenOptions,
         IDialogService dialogService,
         IServiceProvider serviceProvider)
     {
@@ -269,7 +341,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         _pluginSettingsService = pluginSettingsService;
         _promptVorlagenService = promptVorlagenService;
         _logger = logger;
-        _autonomAufgabenOptions = autonomAufgabenOptions;
         _dialogService = dialogService;
         _serviceProvider = serviceProvider;
 
@@ -352,7 +423,21 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
             await LadePromptVorlagenAsync(ct);
 
-            IsAutonomAufgabenEnabled = await _einstellungService.GetAutonomAufgabenEnabledAsync(_autonomAufgabenOptions.Value.Enabled, ct);
+            IsScmMonitoringEnabled = await _einstellungService.GetScmMonitoringEnabledAsync(ct);
+            IsScmTaskCompletionEnabled = await _einstellungService.GetScmTaskCompletionEnabledAsync(ct);
+            ScmTaskCompletionWaitMinutes = (await _einstellungService.GetScmTaskCompletionWaitMinutesAsync(ct))
+                .ToString(System.Globalization.CultureInfo.InvariantCulture);
+            ScmTriggerKeyword = await _einstellungService.GetScmTriggerKeywordAsync(ct);
+
+            var promptAnhaenge = await _einstellungService.GetScmPromptAppendicesAsync(ct);
+            ScmPromptAppendixGeneral = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendGeneralKey) ?? string.Empty;
+            ScmPromptAppendixIssue = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendIssueKey) ?? string.Empty;
+            ScmPromptAppendixIssueComment = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendIssueCommentKey) ?? string.Empty;
+            ScmPromptAppendixPullRequest = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendPullRequestKey) ?? string.Empty;
+            ScmPromptAppendixPullRequestComment = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendPullRequestCommentKey) ?? string.Empty;
+
+            _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(await _einstellungService.GetScmBackmergeModusAsync(ct));
+            OnPropertyChanged(nameof(SelectedBackmergeModus));
 
             var updateSettings = await _einstellungService.GetUpdateSettingsAsync(ct);
             _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Modus);
@@ -390,6 +475,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 return;
             }
 
+            if (SelectedBackmergeModus is not { Modus: var backmergeModus })
+            {
+                FehlerMeldung = "Der ausgewählte Backmerge-Modus ist ungültig.";
+                return;
+            }
+
             var updateSettings = new UpdateSettings(updateModus, IncludePrereleases);
             await _einstellungService.SetUpdateSettingsAsync(updateSettings, ct);
             UpdateSettingsSaved?.Invoke(this, updateSettings);
@@ -405,8 +496,41 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await SpeicherePromptVorlagenAsync(ct);
 
             await _einstellungService.SetBoolSettingAsync(
-                AppEinstellungService.AutonomAufgabenEnabledKey,
-                IsAutonomAufgabenEnabled,
+                AppEinstellungService.ScmMonitoringEnabledKey,
+                IsScmMonitoringEnabled,
+                ct);
+            await _einstellungService.SetBoolSettingAsync(
+                AppEinstellungService.ScmTaskCompletionEnabledKey,
+                IsScmTaskCompletionEnabled,
+                ct);
+            await _einstellungService.SetIntSettingAsync(
+                AppEinstellungService.ScmTaskCompletionWaitMinutesKey,
+                int.Parse(ScmTaskCompletionWaitMinutes.Trim(), System.Globalization.CultureInfo.InvariantCulture),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmTriggerKeywordKey,
+                ScmTriggerKeyword.Trim(),
+                ct);
+            await _einstellungService.SetScmBackmergeModusAsync(backmergeModus, ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmPromptAppendGeneralKey,
+                NullWennLeer(ScmPromptAppendixGeneral),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmPromptAppendIssueKey,
+                NullWennLeer(ScmPromptAppendixIssue),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmPromptAppendIssueCommentKey,
+                NullWennLeer(ScmPromptAppendixIssueComment),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmPromptAppendPullRequestKey,
+                NullWennLeer(ScmPromptAppendixPullRequest),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmPromptAppendPullRequestCommentKey,
+                NullWennLeer(ScmPromptAppendixPullRequestComment),
                 ct);
 
             try
@@ -602,7 +726,37 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     {
         return ValidierePluginAktivierung()
             && ValidierePflichtfelderFuerSettings(_selectedPluginSettings)
-            && ValidierePromptVorlagen();
+            && ValidierePromptVorlagen()
+            && ValidiereScmTriggerKeyword()
+            && ValidiereScmTaskCompletionWait();
+    }
+
+    /// <summary>Die Abschluss-Wartezeit muss eine nicht negative Ganzzahl in Minuten sein.</summary>
+    private bool ValidiereScmTaskCompletionWait()
+    {
+        if (!int.TryParse(ScmTaskCompletionWaitMinutes?.Trim(), System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out var minuten) || minuten < 0)
+        {
+            FehlerMeldung = $"Die Wartezeit für die SCM-Abschlussüberwachung muss eine nicht negative Ganzzahl in Minuten sein. Standard: {AppEinstellungService.ScmTaskCompletionDefaultWaitMinutes}";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Leere oder nur aus Leerraum bestehende Prompt-Anhänge werden nicht gespeichert (leer = nichts anhängen).</summary>
+    private static string? NullWennLeer(string? wert) => string.IsNullOrWhiteSpace(wert) ? null : wert;
+
+    /// <summary>Das Trigger-Keyword darf nicht leer sein; der Dienst fällt sonst auf den Standard zurück.</summary>
+    private bool ValidiereScmTriggerKeyword()
+    {
+        if (string.IsNullOrWhiteSpace(ScmTriggerKeyword))
+        {
+            FehlerMeldung = $"Das Trigger-Keyword für SCM-Ereignisse darf nicht leer sein. Standard: {ScmEventValidationService.DefaultTriggerKeyword}";
+            return false;
+        }
+
+        return true;
     }
 
     private bool ValidierePluginAktivierung()

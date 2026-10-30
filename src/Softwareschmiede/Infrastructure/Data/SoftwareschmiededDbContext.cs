@@ -87,19 +87,39 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>To-Do-Elemente von Aufgaben.</summary>
     public DbSet<Todo> Todos => Set<Todo>();
 
-    /// <summary>Konfigurationen von Autonomen Aufgaben.</summary>
-    public DbSet<AutonomAufgabeKonfiguration> AutonomAufgabeKonfigurationen => Set<AutonomAufgabeKonfiguration>();
-
-    /// <summary>Unteragenten-Spezifikationen von Autonomen Aufgaben.</summary>
-    public DbSet<UnteragentSpezifikation> UnteragentSpezifikationen => Set<UnteragentSpezifikation>();
-
-    /// <summary>Skill-Definitionen von Autonomen Aufgaben.</summary>
-    public DbSet<SkillDefinition> SkillDefinitionen => Set<SkillDefinition>();
+    /// <summary>Dauerhafte SCM-Eingangsqueue.</summary>
+    public DbSet<ScmIncomingEvent> ScmIncomingEvents => Set<ScmIncomingEvent>();
+    /// <summary>Beobachtete SCM-Textstände.</summary>
+    public DbSet<ScmContentSnapshot> ScmContentSnapshots => Set<ScmContentSnapshot>();
+    /// <summary>Quellenspezifische Abfragestände.</summary>
+    public DbSet<ScmObservationCheckpoint> ScmObservationCheckpoints => Set<ScmObservationCheckpoint>();
+    /// <summary>Dauerhafte ausgehende SCM-Aktionen.</summary>
+    public DbSet<ScmOutgoingAction> ScmOutgoingActions => Set<ScmOutgoingAction>();
+    /// <summary>Instanzübergreifende Aufgabenleases.</summary>
+    public DbSet<ScmTaskLease> ScmTaskLeases => Set<ScmTaskLease>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ScmIncomingEvent>(e =>
+        {
+            e.HasKey(x => x.Sequence);
+            e.Property(x => x.Sequence).ValueGeneratedOnAdd();
+            e.HasIndex(x => x.Id).IsUnique();
+            e.HasIndex(x => x.EventKey).IsUnique();
+            e.HasIndex(x => new { x.AufgabeId, x.Sequence });
+            e.HasIndex(x => new { x.Status, x.NextAttemptUtc });
+        });
+        modelBuilder.Entity<ScmContentSnapshot>().HasKey(x => x.ContentKey);
+        modelBuilder.Entity<ScmObservationCheckpoint>().HasKey(x => x.SourceKey);
+        modelBuilder.Entity<ScmTaskLease>().HasKey(x => x.AufgabeId);
+        modelBuilder.Entity<ScmOutgoingAction>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.EventId, x.Status });
+        });
 
         // Projekt
         modelBuilder.Entity<Projekt>(e =>
@@ -207,61 +227,6 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .WithOne(t => t.Aufgabe)
                 .HasForeignKey(t => t.AufgabeId)
                 .OnDelete(DeleteBehavior.Cascade);
-            e.HasOne(a => a.AutonomKonfiguration)
-                .WithOne(k => k.Aufgabe)
-                .HasForeignKey<AutonomAufgabeKonfiguration>(k => k.AufgabeId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // AutonomAufgabeKonfiguration
-        modelBuilder.Entity<AutonomAufgabeKonfiguration>(e =>
-        {
-            e.HasKey(k => k.Id);
-            e.HasIndex(k => k.AufgabeId).IsUnique();
-            e.Property(k => k.ProjektBranchName).IsRequired().HasMaxLength(255);
-            e.Property(k => k.InitialPrompt).IsRequired();
-            e.Property(k => k.PermissionsJsonPfad).IsRequired().HasMaxLength(512);
-            e.Property(k => k.PersistenzModus).IsRequired().HasConversion<string>();
-            e.Property(k => k.ArbeitsverzeichnisPfad).IsRequired().HasMaxLength(512);
-            e.Property(k => k.SessionPauseUtc).HasConversion(NullableUnixMillisConverter);
-            e.HasMany(k => k.Unteragenten)
-                .WithOne(u => u.AutonomAufgabe)
-                .HasForeignKey(u => u.AutonomAufgabeId)
-                .OnDelete(DeleteBehavior.Cascade);
-            e.HasMany(k => k.Skills)
-                .WithOne(s => s.AutonomAufgabe)
-                .HasForeignKey(s => s.AutonomAufgabeId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // UnteragentSpezifikation
-        modelBuilder.Entity<UnteragentSpezifikation>(e =>
-        {
-            e.HasKey(u => u.Id);
-            e.Property(u => u.ExterneAgentId).IsRequired().HasMaxLength(255);
-            e.Property(u => u.TaskId).IsRequired().HasMaxLength(255);
-            e.Property(u => u.Scope).IsRequired().HasMaxLength(255);
-            e.Property(u => u.Prompt).IsRequired();
-            e.Property(u => u.VerzeichnisPfad).IsRequired().HasMaxLength(512);
-            e.Property(u => u.Branch).IsRequired().HasMaxLength(255);
-            e.Property(u => u.ClonePfad).IsRequired().HasMaxLength(512);
-            e.Property(u => u.Status).IsRequired().HasConversion<string>();
-            e.Property(u => u.ErzeugungsDatum).HasConversion(UnixMillisConverter);
-            e.Property(u => u.AbschlussDatum).HasConversion(NullableUnixMillisConverter);
-            e.HasIndex(u => u.AutonomAufgabeId);
-        });
-
-        // SkillDefinition
-        modelBuilder.Entity<SkillDefinition>(e =>
-        {
-            e.HasKey(s => s.Id);
-            e.Property(s => s.Name).IsRequired().HasMaxLength(255);
-            e.Property(s => s.Version).IsRequired().HasMaxLength(64);
-            e.Property(s => s.Content).IsRequired();
-            e.Property(s => s.Status).IsRequired().HasConversion<string>();
-            e.Property(s => s.ErstellungsDatum).HasConversion(UnixMillisConverter);
-            e.Property(s => s.FreigabeDatum).HasConversion(NullableUnixMillisConverter);
-            e.HasIndex(s => s.AutonomAufgabeId);
         });
 
         // Todo
@@ -278,6 +243,8 @@ public sealed class SoftwareschmiededDbContext : DbContext
         modelBuilder.Entity<IssueReferenz>(e =>
         {
             e.HasKey(i => i.Id);
+            e.Property(i => i.SourceKey).HasMaxLength(700);
+            e.HasIndex(i => i.SourceKey).IsUnique();
         });
 
         // AlertReferenz

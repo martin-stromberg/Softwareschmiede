@@ -102,8 +102,17 @@ public sealed class Aufgabe
     /// </summary>
     public DateTimeOffset? PausiertBisUtc { get; set; }
 
-    /// <summary>Navigationseigenschaft zur Konfiguration der Autonomen Aufgabe (null für reguläre Aufgaben). Enthält u.a. <see cref="AutonomAufgabeKonfiguration.ProjektleiterAgentId"/>, <see cref="AutonomAufgabeKonfiguration.SessionPauseUtc"/> und <see cref="AutonomAufgabeKonfiguration.AktiveUnteragenten"/>.</summary>
-    public AutonomAufgabeKonfiguration? AutonomKonfiguration { get; set; }
+    /// <summary>
+    /// UTC-Zeitpunkt, ab dem die Abschlussüberwachung für ereignisgesteuerte Aufgaben die verknüpfte
+    /// SCM-Referenz (Pull Request oder Issue) erstmals als geschlossen/gemergt beobachtet hat.
+    /// Persistierter Startpunkt der einstellbaren Abschluss-Wartezeit — überlebt App-Neustarts;
+    /// <c>null</c>, solange die Referenz offen ist oder noch nicht geprüft wurde.
+    /// </summary>
+    public DateTimeOffset? ScmAbschlussErkanntUtc { get; set; }
+
+    /// <summary>Anzeigetext der für den Abschluss beobachteten SCM-Referenz (z. B. „Pull Request #7"
+    /// oder „Issue #3") — Diagnose-/Protokollwert zu <see cref="ScmAbschlussErkanntUtc"/>.</summary>
+    public string? ScmAbschlussReferenz { get; set; }
 
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
     public Projekt Projekt { get; set; } = null!;

@@ -60,9 +60,7 @@ public sealed class TaskDetailView : BaseWindowView
     public TaskDetailView SetTaskTitle(string title)
     {
         var box = WaitForElement(Window, cf => cf.ByName("EditTitel"), Short);
-        box.ClickInForeground();
-        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
-        Keyboard.Type(title);
+        ElementWaitHelper.ReplaceTextBoxText(box, title);
 
         return this;
     }
@@ -376,7 +374,7 @@ public sealed class TaskDetailView : BaseWindowView
             Keyboard.Press(VirtualKeyShort.RETURN);
         }
 
-        WaitUntilGone(Window.Automation.GetDesktop(), SaveDialogCondition, Medium);
+        ElementWaitHelper.WaitUntilProcessWindowGone(Window, SaveDialogCondition, Medium);
         return this;
     }
 
@@ -633,7 +631,7 @@ public sealed class TaskDetailView : BaseWindowView
         var deadline = DateTime.UtcNow + Long;
         while (DateTime.UtcNow < deadline)
         {
-            var dialog = Window.Automation.GetDesktop().FindFirstDescendant(SaveDialogCondition);
+            var dialog = ElementWaitHelper.FindInProcessWindows(Window, SaveDialogCondition);
             if (dialog is not null)
                 return dialog;
 

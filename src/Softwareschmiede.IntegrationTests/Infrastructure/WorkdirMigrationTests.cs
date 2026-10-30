@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Softwareschmiede.IntegrationTests.Infrastructure;
+using static Softwareschmiede.IntegrationTests.Infrastructure.MigrationTestSql;
 
 namespace Softwareschmiede.IntegrationTests.Infrastructure;
 
@@ -13,6 +13,25 @@ public sealed class WorkdirMigrationTests
     private const string PreviousBeforeKiPluginPrefixMigration = "20260523113807_AddKiTaskNotifications";
     private const string AddAufgabeAusfuehrungsStatusMigration = "20260816193940_AddAufgabeAusfuehrungsStatus";
     private const string PreviousBeforeAusfuehrungsStatusMigration = "20260805163701_AddTodoEntity";
+    private const string AddIssueReferenzSourceKeyMigration = "20261017195348_AddIssueReferenzSourceKey";
+    private const string PreviousBeforeIssueReferenzSourceKeyMigration = "20261011045239_AddScmEventInbox";
+
+    /// <summary>Prüft, dass die SourceKey-Spalte nullable hinzugefügt und wieder entfernt werden kann.</summary>
+    [Fact]
+    public async Task MigrateAsync_ShouldApplyAndRollbackIssueReferenzSourceKeyMigration()
+    {
+        await using var db = await DatabaseFixture.CreateAsync();
+
+        (await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey")).Should().NotBeNull();
+
+        await db.Context.Database.MigrateAsync(PreviousBeforeIssueReferenzSourceKeyMigration);
+        (await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey")).Should().BeNull();
+
+        await db.Context.Database.MigrateAsync(AddIssueReferenzSourceKeyMigration);
+        var column = await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey");
+        column.Should().NotBeNull();
+        column!.NotNull.Should().BeFalse("Migration muss rückwärtskompatibel als nullable sein.");
+    }
 
     /// <summary>Prüft, dass die Workdir-Migration angewendet und zurückgerollt werden kann.</summary>
     [Fact]
@@ -87,24 +106,6 @@ public sealed class WorkdirMigrationTests
         (await GetAufgabeAusfuehrungsStatusAsync(db, archiviertId)).Should().Be("Beendet");
     }
 
-    private static async Task<bool> TableExistsAsync(DatabaseFixture db, string tableName)
-    {
-        await using var cmd = db.Context.Database.GetDbConnection().CreateCommand();
-        cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=$name LIMIT 1;";
-        var parameter = cmd.CreateParameter();
-        parameter.ParameterName = "$name";
-        parameter.Value = tableName;
-        cmd.Parameters.Add(parameter);
-
-        if (cmd.Connection!.State != System.Data.ConnectionState.Open)
-        {
-            await cmd.Connection.OpenAsync();
-        }
-
-        var result = await cmd.ExecuteScalarAsync();
-        return result is not null;
-    }
-
     private static async Task<TableColumnInfo?> ColumnInfoAsync(DatabaseFixture db, string tableName, string columnName)
     {
         await using var cmd = db.Context.Database.GetDbConnection().CreateCommand();
@@ -161,45 +162,6 @@ public sealed class WorkdirMigrationTests
             db,
             "SELECT AusfuehrungsStatus FROM Aufgaben WHERE Id = $id;",
             ("$id", aufgabeId));
-
-    private static async Task ExecuteNonQueryAsync(DatabaseFixture db, string commandText, params (string Name, object? Value)[] parameters)
-    {
-        await using var cmd = db.Context.Database.GetDbConnection().CreateCommand();
-        cmd.CommandText = commandText;
-        AddParameters(cmd, parameters);
-
-        if (cmd.Connection!.State != System.Data.ConnectionState.Open)
-        {
-            await cmd.Connection.OpenAsync();
-        }
-
-        await cmd.ExecuteNonQueryAsync();
-    }
-
-    private static async Task<object?> ExecuteScalarAsync(DatabaseFixture db, string commandText, params (string Name, object? Value)[] parameters)
-    {
-        await using var cmd = db.Context.Database.GetDbConnection().CreateCommand();
-        cmd.CommandText = commandText;
-        AddParameters(cmd, parameters);
-
-        if (cmd.Connection!.State != System.Data.ConnectionState.Open)
-        {
-            await cmd.Connection.OpenAsync();
-        }
-
-        return await cmd.ExecuteScalarAsync();
-    }
-
-    private static void AddParameters(System.Data.Common.DbCommand cmd, params (string Name, object? Value)[] parameters)
-    {
-        foreach (var (name, value) in parameters)
-        {
-            var parameter = cmd.CreateParameter();
-            parameter.ParameterName = name;
-            parameter.Value = value ?? DBNull.Value;
-            cmd.Parameters.Add(parameter);
-        }
-    }
 
     private sealed record TableColumnInfo(string Name, bool NotNull);
 }

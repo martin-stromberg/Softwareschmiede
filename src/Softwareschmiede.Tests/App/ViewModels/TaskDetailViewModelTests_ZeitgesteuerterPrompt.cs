@@ -2,7 +2,6 @@ using System.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
 using Softwareschmiede.App.Services;
@@ -94,12 +93,6 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
 
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService();
         var serviceProviderMock = new Mock<IServiceProvider>();
-        var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
-            serviceProviderMock.Object,
-            _dialogServiceMock.Object,
-            _aufgabeService,
-            _db,
-            appEinstellungService: _appEinstellungService);
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -117,10 +110,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
             _timeProvider,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartService,
-            _appEinstellungService,
-            Options.Create(new AutonomAufgabenOptions()));
+            arbeitsverzeichnisOeffnenService);
     }
 
     private async Task<Aufgabe> ErstelleAufgabe(AufgabeStatus status = AufgabeStatus.Neu)

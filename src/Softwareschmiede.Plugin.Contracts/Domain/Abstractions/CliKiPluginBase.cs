@@ -20,6 +20,9 @@ public abstract class CliKiPluginBase : IKiPlugin
     public abstract PluginType PluginType { get; }
     public abstract IReadOnlyList<PluginSettingGroup> GetSettingGroups();
 
+    /// <inheritdoc/>
+    public virtual string PluginSymbol => IPlugin.FallbackSymbol;
+
     /// <summary>Konstruiert ProcessStartInfo für den CLI-Aufruf.</summary>
     /// <param name="localRepoPath">Lokales Arbeitsverzeichnis.</param>
     /// <param name="parameters">Optionale Parameter (z.B. Session-ID).</param>
@@ -34,6 +37,20 @@ public abstract class CliKiPluginBase : IKiPlugin
 
     /// <inheritdoc/>
     public virtual TerminalProviderCapabilities TerminalCapabilities => TerminalProviderCapabilities.SupportsPty;
+
+    /// <summary>Verzögerung, mit der der abschließende Submit eines Terminal-Prompts als separater
+    /// Eingabe-Batch hinter dem Prompttext gesendet wird (<see cref="TerminalSessionStartSpec.PromptSubmitDelay"/>).
+    /// <c>TimeSpan.Zero</c> (Standard) sendet Text und Submit in einem Schreibvorgang.</summary>
+    public virtual TimeSpan PromptSubmitDelay => TimeSpan.Zero;
+
+    /// <summary>Anzahl zusätzlicher Submit-Versuche nach dem ersten verzögerten Submit
+    /// (<see cref="TerminalSessionStartSpec.PromptSubmitRepeatCount"/>).
+    /// <c>0</c> (Standard) sendet den Submit genau einmal.</summary>
+    public virtual int PromptSubmitRepeatCount => 0;
+
+    /// <summary>Abstand zwischen zwei Submit-Versuchen
+    /// (<see cref="TerminalSessionStartSpec.PromptSubmitRepeatInterval"/>).</summary>
+    public virtual TimeSpan PromptSubmitRepeatInterval => TimeSpan.Zero;
 
     /// <inheritdoc/>
     public Task<TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
@@ -57,6 +74,9 @@ public abstract class CliKiPluginBase : IKiPlugin
             WorkingDirectory = psi.WorkingDirectory,
             EnvironmentVariables = GetEnvironmentVariables(psi),
             Capabilities = TerminalCapabilities,
+            PromptSubmitDelay = PromptSubmitDelay,
+            PromptSubmitRepeatCount = PromptSubmitRepeatCount,
+            PromptSubmitRepeatInterval = PromptSubmitRepeatInterval,
             PluginName = PluginName,
             OptionalParameters = parameters,
         };

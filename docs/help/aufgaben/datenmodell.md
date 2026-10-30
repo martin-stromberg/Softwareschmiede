@@ -233,3 +233,14 @@ Enthält der Rate-Limit-Marker einen gültigen Reset-Zeitpunkt, speichert `KiPlu
 | `plugins.sessionlimit.<KiPluginPrefix>` | ISO-8601-Roundtrip-Zeitstempel (UTC) | Letztes bekanntes Session-Limit des KI-Plugins; Grundlage für die automatische Pause aktiver Aufgaben mit demselben Prefix und für die Update-Sicherheitsprüfung |
 
 Dieser Eintrag ist **Laufzeitstatus**, keine Anwender-Konfiguration — er wird ausschließlich vom System geschrieben. Abgelaufene oder ungültige Werte werden beim Lesen (`GetAktiveSessionLimitsAsync`) ignoriert und beim nächsten Marker-Ereignis überschrieben. Details zum `AppEinstellung`-Modell: [Einstellungen — Datenmodell](../einstellungen/datenmodell.md).
+
+## Persistierter Anzeigemodus der Aufgabenliste
+
+Der Anzeigemodus der aktiven Aufgabenliste wird je Ansicht als eigener Key-Value-Eintrag in der `AppEinstellung`-Tabelle gespeichert (kein eigenes Schema, keine Migration):
+
+| Schlüssel | Wert | Zweck |
+|-----------|------|-------|
+| `aktiveaufgaben.listenmodus` (`AppEinstellungService.AktiveAufgabenListenModusKey`) | Enum-Name des `AufgabenListenModus` (`Datum`, `Repository`, `Ki`) | Anzeigemodus der Seitenleisten-Aufgabenliste; beim App-Start wiederhergestellt |
+| `aktiveaufgaben.listenmodus.dashboard` (`AppEinstellungService.AktiveAufgabenListenModusDashboardKey`) | Enum-Name des `AufgabenListenModus` | Anzeigemodus der Dashboard-Aufgabenliste — unabhängig vom Menü-Modus |
+
+Lesen und Schreiben laufen über den `AufgabenListenModusService` (Singleton) mit eigenem DI-Scope pro Operation — kein gemeinsamer `DbContext` mit dem 5-Sekunden-Aufgaben-Refresh. Fehlende oder ungültige Werte fallen beim Lesen auf `Datum` zurück (`Enum.TryParse` + `Enum.IsDefined`). Die Einträge entstehen als Datenzeilen zur Laufzeit über `AppEinstellungService.SetSettingAsync` beim ersten expliziten Moduswechsel — die Wiederherstellung schreibt nicht zurück.

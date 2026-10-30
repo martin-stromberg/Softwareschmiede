@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -95,15 +94,13 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     /// <param name="prozessStarterMock">Optionaler Mock für IProzessStarter zur Prüfung gestarteter Prozesse.</param>
     /// <param name="visualStudioCodeLocator">Optionaler IVisualStudioCodeLocator zur Steuerung der VS-Code-Verfügbarkeit.</param>
     /// <param name="idePlugins">Optionale Überschreibung der aktiven IDE-Plugins (Standard: Visual Studio + Visual Studio Code).</param>
-    /// <param name="serviceProvider">Optionaler IServiceProvider für AutonomAufgabeStartService (Standard: leerer Mock ohne Registrierungen).</param>
-    /// <param name="autonomAufgabenOptions">Optionale AutonomAufgabenOptions für das Feature-Flag-Gating (Standard: Enabled = true, wie der Produktions-Default).</param>
+    /// <param name="serviceProvider">Optionaler IServiceProvider (Standard: leerer Mock ohne Registrierungen).</param>
     /// <returns>Das erzeugte TaskDetailViewModel.</returns>
     protected TaskDetailViewModel CreateSut(
         Mock<IProzessStarter>? prozessStarterMock = null,
         IVisualStudioCodeLocator? visualStudioCodeLocator = null,
         IReadOnlyList<IIdePlugin>? idePlugins = null,
-        IServiceProvider? serviceProvider = null,
-        IOptions<AutonomAufgabenOptions>? autonomAufgabenOptions = null)
+        IServiceProvider? serviceProvider = null)
     {
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
@@ -135,13 +132,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
-        var serviceProviderObj = serviceProvider ?? TaskDetailViewModelTestFactory.CreateDefaultServiceProvider(_db, _kiService);
-        var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
-            serviceProviderObj,
-            _dialogServiceMock.Object,
-            _aufgabeService,
-            _db,
-            appEinstellungService: appEinstellungService);
+        var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -159,10 +150,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartService,
-            appEinstellungService,
-            autonomAufgabenOptions ?? Options.Create(new AutonomAufgabenOptions()));
+            arbeitsverzeichnisOeffnenService);
     }
 
     /// <summary>Legt ein GitRepository (optional mit RepositoryStartKonfiguration) sowie eine damit verknüpfte Aufgabe an.</summary>

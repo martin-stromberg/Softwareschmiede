@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 
@@ -12,6 +13,7 @@ public sealed class DashboardViewModel : ViewModelBase
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
     private readonly AufgabeRecoveryService _recoveryService;
+    private readonly AufgabenListenModusBindung _modusBindung;
     private readonly ILogger<DashboardViewModel> _logger;
 
     private int _projektAnzahl;
@@ -81,16 +83,30 @@ public sealed class DashboardViewModel : ViewModelBase
     /// <summary>Lädt die Dashboard-Daten neu.</summary>
     public ICommand LadenCommand { get; }
 
+    /// <summary>
+    /// Anzeigemodus der Dashboard-Aufgabenliste (flach nach Datum oder gruppiert nach Repository/KI).
+    /// Änderungen werden über den <see cref="AufgabenListenModusService"/> unter dem
+    /// Dashboard-eigenen Einstellungsschlüssel persistiert — unabhängig vom Seitenleisten-Modus.
+    /// </summary>
+    public AufgabenListenModus AufgabenListenModus
+    {
+        get => _modusBindung.Wert;
+        set => _modusBindung.Wert = value;
+    }
+
     /// <inheritdoc cref="DashboardViewModel"/>
     public DashboardViewModel(
         ProjektService projektService,
         AufgabeService aufgabeService,
         AufgabeRecoveryService recoveryService,
-        ILogger<DashboardViewModel> logger)
+        ILogger<DashboardViewModel> logger,
+        AufgabenListenModusService? aufgabenListenModusService = null)
     {
         _projektService = projektService;
         _aufgabeService = aufgabeService;
         _recoveryService = recoveryService;
+        _modusBindung = AufgabenListenModusBindung.FuerDashboard(aufgabenListenModusService, logger);
+        _modusBindung.WertGeaendert += () => OnPropertyChanged(nameof(AufgabenListenModus));
         _logger = logger;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
@@ -143,5 +159,17 @@ public sealed class DashboardViewModel : ViewModelBase
     {
         AktiveAufgabenListe = aktiveAufgabenListe;
         NavigateZuAufgabeAction = navigateZuAufgabeAction;
+        GespeichertenAufgabenListenModusLadenAsync()
+            .SafeFireAndForget(_logger, "Dashboard-Aufgabenlisten-Modus laden");
     }
+
+    /// <summary>
+    /// Lädt den persistierten Anzeigemodus der Dashboard-Aufgabenliste und wendet ihn an, ohne den
+    /// Wert zurückzuschreiben. Wird aus <see cref="Initialize"/> per <c>SafeFireAndForget</c>
+    /// angestoßen und ist für Tests direkt awaitbar. Ein zwischenzeitlich vom Anwender gewählter
+    /// Modus wird nicht überschrieben (Race-Guard in <see cref="AufgabenListenModusBindung"/>).
+    /// </summary>
+    /// <param name="ct">Token zum Abbrechen der Operation.</param>
+    public Task GespeichertenAufgabenListenModusLadenAsync(CancellationToken ct = default)
+        => _modusBindung.GespeichertenWertLadenAsync(ct);
 }

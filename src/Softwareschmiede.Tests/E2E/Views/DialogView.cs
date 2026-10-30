@@ -21,7 +21,7 @@ public abstract class DialogView : BaseWindowView
     protected abstract string DialogTitle { get; }
 
     /// <inheritdoc/>
-    public override bool IsVisible => ElementExists(Window.Automation.GetDesktop(), DialogWindowCondition);
+    public override bool IsVisible => ElementWaitHelper.FindInProcessWindows(Window, DialogWindowCondition) is not null;
 
     /// <summary>Wartet bis zu <see cref="BaseWindowView.Short"/>, bis das Dialogfenster erscheint, und gibt es zurück.</summary>
     /// <returns>Das gefundene Dialogfenster.</returns>
@@ -30,7 +30,7 @@ public abstract class DialogView : BaseWindowView
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Das gefundene Dialogfenster.</returns>
     protected AutomationElement GetDialogWindow(TimeSpan timeout)
-        => WaitForElement(Window.Automation.GetDesktop(), DialogWindowCondition, timeout);
+        => ElementWaitHelper.WaitForProcessWindow(Window, DialogWindowCondition, timeout);
 
     /// <summary>
     /// Bedingung für die Dialogsuche auf dem Desktop: Name UND Control-Type <c>Window</c>. Nur nach
@@ -60,8 +60,7 @@ public abstract class DialogView : BaseWindowView
     /// NICHT aktiv (kein Button-Klick im Hauptfenster), sondern wartet nur passiv, bis der Dialog von
     /// außen bereits geöffnet wurde. Grund: Viele Dialoge dieser Hierarchie werden nicht durch einen
     /// einzelnen, zustandslos erreichbaren Button ausgelöst, sondern erscheinen nur als Folge komplexer
-    /// Fachlogik (z. B. eines laufenden CLI-Prozesses, eines Update-Checks beim App-Start, oder einer
-    /// bereits gestarteten autonomen Aufgabe) - eine generische aktive Navigation ist für diese Fälle
+    /// Fachlogik (z. B. eines laufenden CLI-Prozesses oder eines Update-Checks beim App-Start) - eine generische aktive Navigation ist für diese Fälle
     /// nicht sinnvoll möglich. Subklassen mit einem einfachen, direkt erreichbaren Auslöse-Button
     /// überschreiben <see cref="ForceShow"/> stattdessen mit echter Navigationslogik (siehe
     /// <see cref="Softwareschmiede.Tests.E2E.Views.Dialogs.RepositoryAssignDialogView"/> und
@@ -83,7 +82,7 @@ public abstract class DialogView : BaseWindowView
         var dialog = GetDialogWindow();
         dialog.Focus();
         Keyboard.TypeSimultaneously(VirtualKeyShort.ALT, VirtualKeyShort.F4);
-        WaitUntilGone(Window.Automation.GetDesktop(), DialogWindowCondition, Short);
+        ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
 
         if (recurseToDashboard)
             RecurseToDashboard();

@@ -12,6 +12,7 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 - `ProtokollService` — Persistente Protokolleinträge, einschließlich automatischer CLI-Ausgaben und Rate-Limit-Marker
 - `ICliRawExportService` — Exportiert die gespeicherte CLI-Rohausgabe einer Aufgabe als `.raw`
 - `IDialogService` — UI-Abstraktion für Dialoge (Speichern-Dialog, Pause-Dialog)
+- `AufgabenListenModusService` / `AufgabenListenModusBindung` — Persistenz und Zustand des Anzeigemodus der aktiven Aufgabenliste je Ansicht
 
 ## ProtokollService — CLI-Ausgabeprotokoll
 
@@ -65,7 +66,7 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 
 **Verhalten:**
 
-- Erlaubte Stati: `Neu`, `Gestartet`, `Wartend` — andere Stati sowie Autonome Aufgaben werden mit `InvalidOperationException` abgelehnt.
+- Erlaubte Stati: `Neu`, `Gestartet`, `Wartend` — andere Stati werden mit `InvalidOperationException` abgelehnt.
 - Beim Setzen muss `pausiertBisUtc` in der Zukunft liegen; andernfalls `InvalidOperationException`.
 - Schreibt pro Aufruf einen `ProtokollTyp.SystemMeldung`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben").
 - Wirft `InvalidOperationException`, wenn die Aufgabe nicht gefunden wird.
@@ -93,7 +94,7 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 - Aufgabe nicht gefunden oder `KiPluginPrefix` leer: `LogWarning`, keine Persistenz, keine Pause.
 - Persistiert `resetUtc` (normalisiert auf UTC) als ISO-8601-Roundtrip-String (`"O"`) in `AppEinstellung`.
 - Liegt `resetUtc` in der Vergangenheit: Persistenz erfolgt, aber es wird keine Pause gesetzt.
-- Kandidaten: Aufgaben mit `Status.IstAktivOderWartend()`, `AusfuehrungsStatus == Aktiv`, ohne `AutonomKonfiguration`, Prefix-Vergleich `OrdinalIgnoreCase`.
+- Kandidaten: Aufgaben mit `Status.IstAktivOderWartend()`, `AusfuehrungsStatus == Aktiv`, Prefix-Vergleich `OrdinalIgnoreCase`.
 - Max-Semantik: `PausiertBisUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — längere manuelle Pausen werden nicht verkürzt.
 - Pro pausierter Aufgabe wird ein `ProtokollTyp.SystemMeldung`-Eintrag geschrieben; nach dem Speichern wird `AufgabeLaufdatenChangedNotifier.NotifyLaufdatenChanged` je Aufgabe ausgelöst.
 - Laufende CLI-Prozesse werden nicht angefasst.
@@ -387,6 +388,47 @@ Exportiert den im `KiAusfuehrungsService` gehaltenen Rohbyte-Mitschnitt einer Au
 ### `HatAufzeichnung(Guid aufgabeId) : bool`
 
 **Beschreibung:** Prüft, ob für die Aufgabe ein Mitschnitt vorliegt — Vorab-Prüfung im `TaskDetailViewModel`, bevor der Speicherdialog geöffnet wird.
+
+## AufgabenListenModusService — Anzeigemodus-Persistenz
+
+Singleton-Service (`src/Softwareschmiede.App/Services/`), der den Anzeigemodus der aktiven Aufgabenliste je Ansicht (Seitenleiste, Dashboard) über `AppEinstellungService` in eigenen DI-Scopes (`IServiceScopeFactory`) liest und schreibt — Muster `DarkModeService`.
+
+### `LadeMenueModusAsync(CancellationToken ct = default) : Task<AufgabenListenModus>`
+
+**Beschreibung:** Lädt den gespeicherten Anzeigemodus der Seitenleisten-Aufgabenliste (`AppEinstellungService.AktiveAufgabenListenModusKey`).
+
+**Rückgabe:** Der gespeicherte `AufgabenListenModus` oder `Datum`, wenn kein gültiger Wert gespeichert ist (`Enum.TryParse`, Groß-/Kleinschreibung tolerant, plus `Enum.IsDefined`).
+
+### `LadeDashboardModusAsync(CancellationToken ct = default) : Task<AufgabenListenModus>`
+
+**Beschreibung:** Wie `LadeMenueModusAsync`, aber für den Dashboard-Schlüssel (`AktiveAufgabenListenModusDashboardKey`).
+
+### `SpeichereMenueModusAsync(AufgabenListenModus modus, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Speichert den Anzeigemodus der Seitenleisten-Aufgabenliste als Enum-Namen (`modus.ToString()`) per `SetSettingAsync`.
+
+### `SpeichereDashboardModusAsync(AufgabenListenModus modus, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Wie `SpeichereMenueModusAsync`, aber für den Dashboard-Schlüssel.
+
+## AufgabenListenModusBindung — Modus-Zustand je Ansicht
+
+Kapselt die gemeinsame Bindungslogik von `MainWindowViewModel` und `DashboardViewModel` für den persistierten Anzeigemodus.
+
+| Member | Typ | Beschreibung |
+|--------|-----|--------------|
+| `FuerMenue(modusService, logger, dispatch)` | statische Factory | Bindung für die Seitenleiste (Menü-Schlüssel); `dispatch` = UI-Thread-Marshalling der Wiederherstellung |
+| `FuerDashboard(modusService, logger)` | statische Factory | Bindung für das Dashboard (Dashboard-Schlüssel) |
+| `Wert` | `AufgabenListenModus` | Aktueller Modus; Setzen löst `WertGeaendert` aus, setzt den Race-Guard und persistiert fire-and-forget |
+| `WertGeaendert` | `event Action` | Benachrichtigung nach Wertänderung und Wiederherstellung (für `OnPropertyChanged` im ViewModel) |
+| `GespeichertenWertLadenAsync(ct)` | `Task` | Lädt den persistierten Modus und wendet ihn ohne Write-Back an; ein zwischenzeitlich gesetzter Wert (Race-Guard, geprüft vor und nach dem `await`) wird nicht überschrieben |
+
+## AufgabenListenModus / AufgabenListenAnsicht
+
+- `AufgabenListenModus` (Enum): `Datum` (flache Liste nach letzter Ausführung), `Repository` (gruppiert nach Repository-Name), `Ki` (gruppiert nach KI).
+- `AufgabenListenAnsicht` (statisch): `Konfiguriere(ListCollectionView, AufgabenListenModus)` setzt die zum Modus gehörigen `SortDescriptions` und optional eine `PropertyGroupDescription`; `ErstelleSortierDeskriptoren`/`ErstelleGruppenDeskriptor` liefern dieselben Deskriptoren als Daten (unit-testbar). Konstanten `NichtAusgefuehrt` (`"Nicht ausgeführt"`) und `OhneRepository` (`"Ohne Repository"`) als Fallback-Gruppennamen.
+- `ActiveTasksListControl.ListenModus` (Dependency Property): gebunden an `AufgabenListenModus` des jeweiligen ViewModels; Änderungen werden über `OnListenModusChanged` → `AufgabenListenAnsicht.Konfiguriere` auf die instanz-eigene `ListCollectionView` angewendet.
+- `IPlugin.PluginSymbol` (`string`, Default-Interface-Member → `IPlugin.FallbackSymbol = "◻"`): Unicode-Glyph des Plugins für die Symbolzeile der Aufgabenkachel; `virtual` an `GitPluginBase<TPlugin>`/`CliKiPluginBase`, von allen Repo-Plugins überschrieben. Binärkompatibel — ältere Plugin-DLLs erhalten den Fallback-Glyph. Details: [Plugin-System — API](../plugins/api.md).
 
 ## IDialogService — Dialoge
 

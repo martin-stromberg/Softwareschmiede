@@ -82,7 +82,6 @@ public sealed class KiPluginLimitService
         var kandidaten = await _db.Aufgaben
             .Where(a => AufgabeStatusExtensions.AktivOderWartendStatus.Contains(a.Status)
                 && a.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv
-                && a.AutonomKonfiguration == null
                 && a.KiPluginPrefix != null)
             .ToListAsync(ct);
 

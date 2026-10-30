@@ -64,8 +64,7 @@ Beispiele:
 5. Projektdetail
 6. Projektliste
 7. Einstellungen
-8. Autonome Aufgabendetail
-9. Fallback: Dashboard
+8. Fallback: Dashboard
 
 ## Beispiele
 

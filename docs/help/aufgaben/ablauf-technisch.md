@@ -444,7 +444,7 @@ Zusätzlich:
 Ausgelöst durch den Button **Pause einstellen** (`AutomationName="PauseEinstellen"`) in der Ribbon-Gruppe „Aufgabe" der `TaskDetailView`.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.PauseEinstellenCommand` — `AsyncRelayCommand` mit CanExecute `KannPausieren` (`Status` ∈ {`Neu`, `Gestartet`, `Wartend`} ∧ `!IsAutonomAufgabe` ∧ `!IsLoading`); der Button ist über `Visibility`-Binding ausgeblendet, wenn `KannPausieren` nicht gilt
+- `TaskDetailViewModel.PauseEinstellenCommand` — `AsyncRelayCommand` mit CanExecute `KannPausieren` (`Status` ∈ {`Neu`, `Gestartet`, `Wartend`} ∧ `!IsLoading`); der Button ist über `Visibility`-Binding ausgeblendet, wenn `KannPausieren` nicht gilt
 - `TaskDetailViewModel.PauseEinstellenAsync` — erzeugt das Dialog-ViewModel, ruft den Dialog und übergibt das Ergebnis an den Service
 - `AufgabePausierenDialogViewModel` — Dialog-Zustand: `PausiertDatum`/`PausiertStunde`/`PausiertMinute` (Vorbelegung: `GetLocalNow().AddMinutes(1)`, da die laufende Minute durch den Sekundenabschnitt bereits in der Vergangenheit läge), `AktuellePauseAnzeige`, `IstAktuellPausiert`, `ValidierungsFehler`/`KannBestaetigen`; `Initialize(aktuellePauseUtc)` übernimmt eine bestehende Pause als Vorbelegung
 - `AufgabePausierenErgebnis` — Record mit `PausiertBisUtc` und `Aufheben`
@@ -457,7 +457,7 @@ Ablauf:
 2. `ShowAufgabePausierenDialogAsync` öffnet den modalen Dialog. Er validiert fortlaufend: Datum gewählt, Stunde 0–23, Minute 0–59, Ergebnis (in lokale Zeit interpretiert, nach UTC normalisiert) muss in der Zukunft liegen — sonst ist `KannBestaetigen == false` und `ValidierungsFehler` wird angezeigt.
 3. Ergebnis-Varianten: **Übernehmen** → `AufgabePausierenErgebnis(pausiertBisUtc, Aufheben: false)`; **Pause aufheben** (nur aktiv bei `IstAktuellPausiert`) → `Ergebnis(null, Aufheben: true)`; **Abbrechen** → `null`, keine Änderung.
 4. Bei `Aufheben` ruft das ViewModel `SetPauseAsync(aufgabeId, null)`, sonst `SetPauseAsync(aufgabeId, ergebnis.PausiertBisUtc)`.
-5. `AufgabeService.SetPauseAsync` lehnt Autonome Aufgaben (`IstAutonom()`), Status außerhalb `Neu`/`Gestartet`/`Wartend` und nicht-zukünftige Zeitpunkte mit `InvalidOperationException` ab; andernfalls wird `PausiertBisUtc` gespeichert und ein `SystemMeldung`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben") geschrieben.
+5. `AufgabeService.SetPauseAsync` lehnt Status außerhalb `Neu`/`Gestartet`/`Wartend` und nicht-zukünftige Zeitpunkte mit `InvalidOperationException` ab; andernfalls wird `PausiertBisUtc` gespeichert und ein `SystemMeldung`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben") geschrieben.
 6. `LadenAsync` lädt die Aufgabe neu; `NotifyLaufdatenChanged` stößt den sofortigen Refresh der Seitenleiste an.
 
 ### 5.5. Automatische Pause bei Session-Limit-Marker
@@ -476,7 +476,7 @@ Ablauf:
 1. Nach `AddCliOutputAsync` prüft `PersistLineAsync` die Zeile erneut mit `TryParseRateLimitMarker`. Nur bei `resetUtc.HasValue` wird `KiPluginLimitService.VerarbeiteRateLimitAsync(aufgabeId, resetUtc)` aufgerufen — ein Marker ohne Zeitstempel erzeugt also nur den `RateLimit`-Protokolleintrag.
 2. `VerarbeiteRateLimitAsync` lädt die auslösende Aufgabe; bei fehlendem `KiPluginPrefix` wird ohne Aktion abgebrochen.
 3. Der Zeitpunkt wird als `AppEinstellung` unter `plugins.sessionlimit.<Prefix>` gespeichert. Liegt er in der Vergangenheit, endet der Ablauf hier (kein Pausieren).
-4. Es werden alle Aufgaben mit `Status.IstAktivOderWartend()`, `AusfuehrungsStatus == Aktiv`, ohne `AutonomKonfiguration` und mit gesetztem `KiPluginPrefix` geladen und clientseitig per `StringComparison.OrdinalIgnoreCase` auf dasselbe Prefix gefiltert.
+4. Es werden alle Aufgaben mit `Status.IstAktivOderWartend()`, `AusfuehrungsStatus == Aktiv` und mit gesetztem `KiPluginPrefix` geladen und clientseitig per `StringComparison.OrdinalIgnoreCase` auf dasselbe Prefix gefiltert.
 5. Pro betroffener Aufgabe gilt **Max-Semantik**: `PausiertBisUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — eine länger laufende manuelle Pause wird nicht verkürzt. Pro Aufgabe entsteht ein `SystemMeldung`-Eintrag („Aufgabe pausiert bis … (Session-Limit des KI-Plugins '…')").
 6. Nach `SaveChangesAsync` wird pro Aufgabe `NotifyLaufdatenChanged` aufgerufen → die Kacheln zeigen sofort „⏸ Pausiert (noch …)".
 7. Es werden **keine** Methoden von `KiAusfuehrungsService`/`CliProcessManager` aufgerufen — laufende CLI-Prozesse bleiben unangetastet.
@@ -702,32 +702,94 @@ Beteiligte Komponenten:
 
 Ablauf in `AufgabeService.GetAktiveAufgabenAsync()`:
 1. Filtert Aufgaben mit `Status == AufgabeStatus.Gestartet || Status == AufgabeStatus.Wartend`
-2. Sortiert absteigend nach `LastHeartbeatUtc ?? ErstellungsDatum` (neueste zuerst)
+2. Sortiert absteigend nach `LetzterCliStartUtc ?? ErstellungsDatum` (neueste zuerst), Tie-Breaker `Titel`, dann `Id`
 3. Begrenzt auf maximal 20 Ergebnisse
 4. Verwendet `AsNoTracking()` für Performance
 5. Gibt `List<Aufgabe>` zurück
 
-### Seitenleisten-Rendering (MainWindow.xaml)
+`MainWindowViewModel.AktiveAufgabenAktualisierenAsync()` mapped jede `Aufgabe` über `MapAktiveAufgabePanelItem` auf ein `AktiveAufgabePanelItem` und füllt damit die `AktiveAufgabenListe` (siehe „Plugin-Symbol-Auflösung und Mapping").
+
+### Seitenleisten-Rendering (MainWindow.xaml / ActiveTasksListControl)
 
 Beteiligte Komponenten:
-- `MainWindow.xaml` — Seitenleiste mit `ItemsControl` für aktive Aufgaben
-- `MainWindowViewModel.AktiveAufgabenListe` — Binding-Quelle
-- `MainWindowViewModel.IsDashboardVisible` — computed Property, steuert Sichtbarkeit
-- `KiAusfuehrungsStatusConverter` — Konvertiert `Aufgabe` zu Status-String
-- `App.xaml` — DataTemplate `AktiveAufgabeCardTemplate` definiert Kachel-Layout
+- `MainWindow.xaml` — Seitenleiste mit Sektions-Titel „Aktive Aufgaben", drei Modus-`RadioButton`s und `ActiveTasksListControl`
+- `ActiveTasksListControl.xaml` — geteiltes Control mit `ItemsControl`, Kachel-Templates (`AufgabenKachelTemplate`, `AufgabenKachelInhaltTemplate`) und `GroupStyle`
+- `MainWindowViewModel.AktiveAufgabenListe` — Binding-Quelle (`ObservableCollection<AktiveAufgabePanelItem>`)
+- `MainWindowViewModel.AufgabenListenModus` — gebunden an die Dependency Property `ListenModus` des Controls
+- `MainWindowViewModel.IsDashboardVisible` — computed Property, steuert Sichtbarkeit der Sektion
+- `KiAusfuehrungsStatusSymbolConverter` — liefert den Status-Glyph (`⏸`/`⏳`/`▶`/`✓`)
+- `KiAusfuehrungsStatusConverter` — liefert den Volltext für Tooltip/`AutomationProperties.HelpText`
 
 Ablauf:
 1. `MainWindowViewModel` Constructor ruft `AktiveAufgabenAktualisierenAsync()` auf
-2. Service wird aufgerufen, aktive Aufgaben werden abgerufen
-3. `AktiveAufgabenListe.ReplaceAll(aufgaben)` füllt die Collection
-4. Seitenleiste bindet auf `AktiveAufgabenListe` mit `ItemsControl`
-5. Für jede Aufgabe wird `AktiveAufgabeCardTemplate` DataTemplate angewendet:
+2. Service wird aufgerufen, aktive Aufgaben werden abgerufen und gemappt
+3. `AktiveAufgabenListe.ReplaceAll(items)` füllt die Collection
+4. Das `ActiveTasksListControl` erzeugt beim Setzen seiner `ItemsSource` eine instanz-eigene `ListCollectionView` über der Collection (bewusst kein `CollectionViewSource.GetDefaultView` — die ItemsSource wird mit dem Dashboard geteilt; eine gemeinsame Default-View würde die Gruppierung einer Ansicht in die andere leaken) und weist sie dem internen `ItemsControl` zu
+5. `AufgabenListenAnsicht.Konfiguriere(view, ListenModus)` setzt die zum Modus gehörigen Sort- und Gruppierungsdeskriptoren (siehe „Anzeigemodus und Gruppierung")
+6. Für jedes `AktiveAufgabePanelItem` wird `AufgabenKachelTemplate` angewendet — ein vollflächiger `Button` (`AutomationProperties.Name="AufgabeNavigieren:{Titel}"`, `Cursor="Hand"`, `Command={Binding NavigateCommand}` mit `CommandParameter={Binding Id}`) mit eigenem `ControlTemplate` (bisheriger `Border` inkl. `IsAktiv`/`IstPausiert`-Triggern, Hover-/Pressed-Feedback). Das `AufgabenKachelInhaltTemplate` rendert drei Zeilen:
    - `TextBlock` zeigt `Titel` (mit Ellipsis bei Überlauf)
-   - `TextBlock` zeigt Status via `KiAusfuehrungsStatusConverter`
-   - `Button` führt `NavigateZuAufgabeCommand` aus mit `CommandParameter={Binding Id}`
-6. Sichtbarkeit gesteuert durch `IsDashboardVisible`:
+   - `TextBlock` zeigt `RepositoryName` (Repository-Name, Fallback Projektname)
+   - horizontale Symbolzeile: SCM-Glyph (`ScmPluginSymbol`, Tooltip/`HelpText` „SCM: {ScmPluginName}", `AutomationId="AktiveAufgabeScmPlugin_{Titel}"`, ausgeblendet wenn leer), KI-Glyph (`KiPluginSymbol`, Tooltip „KI: {KiPluginName}", `AutomationId="AktiveAufgabeKiPlugin_{Titel}"`), Status-Glyph via `KiAusfuehrungsStatusSymbolConverter` (`AutomationProperties.Name="AufgabeStatus:{Titel}"`, Volltext via `KiAusfuehrungsStatusConverter` in Tooltip/`HelpText`, `StatusUebergangsAnimation.Status` am Symbol-Converter) und der `OffeneTodos:{Titel}`-Button (`Command` + `Click`-Handler mit `e.Handled = true`, damit der Klick nicht die Kachel-Navigation auslöst)
+7. Sichtbarkeit gesteuert durch `IsDashboardVisible`:
    - Wenn `CurrentView is DashboardViewModel`: `Visibility=Collapsed`
    - Sonst: `Visibility=Visible`
+
+### Anzeigemodus und Gruppierung
+
+Beteiligte Komponenten:
+- `AufgabenListenModus` — Enum `Datum` (flach), `Repository`, `Ki` (`src/Softwareschmiede.App/ViewModels/`)
+- `ActiveTasksListControl.ListenModus` — Dependency Property, an `AufgabenListenModus` des jeweiligen ViewModels gebunden
+- `AufgabenListenAnsicht` — statische Hilfsklasse, liefert die Deskriptoren je Modus
+- `MainWindow.xaml` / `DashboardView.xaml` — je drei `RadioButton`s (`AufgabenModus:{m}` bzw. `DashboardAufgabenModus:{m}`), `IsChecked` via `EnumToBoolConverter` mit `ConverterParameter` an `AufgabenListenModus` gebunden
+- `ItemsControl.GroupStyle` — `HeaderTemplate` mit Gruppenname; `AutomationProperties.Name="AufgabenGruppe:{Name}"` am `GroupItem`
+
+Ablauf bei Moduswechsel:
+1. `RadioButton`-Auswahl setzt `AufgabenListenModus` im ViewModel (Zwei-Wege über `EnumToBoolConverter.ConvertBack`)
+2. Die gebundene Dependency Property `ListenModus` ändert sich; `OnListenModusChanged` ruft `AufgabenListenAnsicht.Konfiguriere(view, modus)` auf
+3. `Konfiguriere` löscht `GroupDescriptions`/`SortDescriptions` der View und setzt je Modus:
+   - `Datum`: keine Gruppierung, Sort `[SortierZeitpunkt desc, Titel asc, Id asc]`
+   - `Repository`: `PropertyGroupDescription(RepositoryGruppenName)` + Sort `[RepositoryGruppeIstFallback asc, RepositoryGruppenName asc, SortierZeitpunkt desc, Titel asc, Id asc]`
+   - `Ki`: `PropertyGroupDescription(KiGruppenName)` + Sort `[KiGruppeIstFallback asc, KiGruppenName asc, SortierZeitpunkt desc, Titel asc, Id asc]`
+4. Durch die Item-Sortierung erscheinen die Gruppen alphabetisch mit der Fallback-Gruppe (`AufgabenListenAnsicht.OhneRepository` / `NichtAusgefuehrt`) am Ende; gruppenintern gilt die Sortierung nach letzter Ausführung — identisch zur Datenquelle
+5. Die Gruppenheader werden über das `HeaderTemplate` gerendert (`CollectionViewGroup.Name`)
+
+Die Modus-Buttons in der Seitenleiste werden an `IsNavigationExpanded` gebunden — in der eingeklappten 48-px-Leiste sind sie verborgen. Da die Template-Anker (`AufgabenGruppe:*`, `AufgabeNavigieren:*` u. a.) in beiden Ansichten existieren, sobald das Dashboard sichtbar ist, tragen die Controls die ansichtsspezifischen `AutomationId`s `AktiveAufgabenListeMenue` bzw. `AktiveAufgabenListeDashboard` als E2E-Scoping-Wurzeln; die Modus-Buttons heißen `AufgabenModus:*` (Seitenleiste) vs. `DashboardAufgabenModus:*` (Dashboard).
+
+### Persistenz des Anzeigemodus
+
+Beteiligte Komponenten:
+- `AufgabenListenModusService` — Singleton (`src/Softwareschmiede.App/Services/`), liest/schreibt den Modus je Ansicht über `AppEinstellungService` in eigenen DI-Scopes (`IServiceScopeFactory`, Muster `DarkModeService` — verhindert `DbContext`-Konflikte mit dem 5-s-Refresh)
+- `AufgabenListenModusBindung` — kapselt den gemeinsamen Zustand beider ViewModels: hält den Wert, persistiert Anwender-Änderungen per `SafeFireAndForget`, stellt den gespeicherten Modus ohne Write-Back wieder her; Race-Guard `_geaendert` (vor und nach dem `await` geprüft) verhindert, dass ein verspäteter Ladevorgang eine Benutzerumschaltung überschreibt
+- `AppEinstellungService.AktiveAufgabenListenModusKey` (`"aktiveaufgaben.listenmodus"`) / `AktiveAufgabenListenModusDashboardKey` (`"aktiveaufgaben.listenmodus.dashboard"`) — je Ansicht ein eigener Schlüssel
+- `MainWindowViewModel` / `DashboardViewModel` — eigene `AufgabenListenModus`-Property, die an `AufgabenListenModusBindung.Wert` delegiert
+
+Ablauf beim Speichern:
+1. Setter von `AufgabenListenModus` → `AufgabenListenModusBindung.Wert` setzt `_geaendert`, löst `WertGeaendert` aus (`OnPropertyChanged`) und ruft `SpeichereMenueModusAsync` bzw. `SpeichereDashboardModusAsync` fire-and-forget auf
+2. Der Service schreibt den Enum-Namen (`modus.ToString()`, z. B. `"Repository"`) per `AppEinstellungService.SetSettingAsync` unter dem Ansichts-Schlüssel
+
+Ablauf beim Wiederherstellen:
+1. `MainWindowViewModel`-Konstruktor stößt `GespeichertenAufgabenListenModusLadenAsync()` per `SafeFireAndForget` an; beim `DashboardViewModel` geschieht dies aus `Initialize`
+2. `AufgabenListenModusBindung.GespeichertenWertLadenAsync` liest den Wert über `LadeMenueModusAsync`/`LadeDashboardModusAsync`; `Enum.TryParse` (Groß-/Kleinschreibung tolerant) + `Enum.IsDefined` — fehlender oder ungültiger Wert fällt auf `Datum` zurück
+3. Der geladene Wert wird über den optionalen Dispatcher (UI-Thread) auf das Backing-Feld gesetzt und `WertGeaendert` ausgelöst — ohne zurückzuschreiben; bei gruppiertem Start zeigt die Liste sofort Gruppenheader
+
+### Plugin-Symbol-Auflösung und Mapping
+
+Beteiligte Komponenten:
+- `IPlugin.PluginSymbol` — Unicode-Glyph als Default-Interface-Member (`=> IPlugin.FallbackSymbol`, binärkompatibel für bereits kompilierte Plugin-DLLs); `GitPluginBase<TPlugin>`/`CliKiPluginBase` deklarieren es als `virtual`, alle acht Repo-Plugins überschreiben es mit eigenen Glyphen
+- `IPlugin.FallbackSymbol` — Konstante `"◻"` für Plugins ohne eigenes Symbol und nicht auflösbare Prefixe
+- `MainWindowViewModel.ResolvePlugin(pluginType, prefix)` — Nachfolger von `ResolvePluginName`, liefert `(Name, Symbol)`
+- `MainWindowViewModel.MapAktiveAufgabePanelItem` — befüllt die Kachel-Properties
+
+Ablauf in `ResolvePlugin`:
+1. Leerer Prefix → `(null, null)` (kein Symbol-Element sichtbar)
+2. Plugin-Suche über `IPluginManager` (`GetSourceCodeManagementPlugins`/`GetDevelopmentAutomationPlugins`, Prefix-Vergleich `OrdinalIgnoreCase`)
+3. Name = `PluginName` bzw. roher Prefix als Fallback; Symbol = `PluginSymbol` bzw. `FallbackSymbol`, wenn das Plugin nicht auflösbar ist oder `PluginSymbol` leer/`null` liefert (Moq-Mocks ohne Setup liefern `null`)
+
+Ablauf in `MapAktiveAufgabePanelItem` — zusätzlich zu den bisherigen Feldern:
+- `RepositoryName` = `GitRepository?.RepositoryName`, Fallback `Projekt?.Name` bei Aufgaben ohne Repository-Verknüpfung
+- `RepositoryGruppenName` = Repository-Name bzw. `AufgabenListenAnsicht.OhneRepository` (`RepositoryGruppeIstFallback = true`)
+- `KiGruppenName` = aufgelöster `PluginName`, sonst roher Prefix (eigene Gruppe), sonst `NichtAusgefuehrt` (`KiGruppeIstFallback = true`, nur bei leerem Prefix)
+- `SortierZeitpunkt` = `LetzterCliStartUtc ?? ErstellungsDatum`
 
 Trigger zur Aktualisierung:
 - `MainWindowViewModel.NavigateToDashboard()` ruft `AktiveAufgabenAktualisierenAsync()` auf
@@ -758,10 +820,10 @@ Ablauf:
 7. `AktiveAufgabenAktualisierenAsync()` betritt den `SemaphoreSlim`-Re-Entrancy-Schutz:
    - Falls bereits eine Aktualisierung läuft (WaitAsync mit Timeout=0 scheitert), wird die neue Anfrage übersprungen (Skip-if-busy)
    - Sonst: `AufgabeService.GetAktiveAufgabenAsync()` wird aufgerufen, aktive Aufgaben werden abgerufen
-8. `AktiveAufgabenListe.ReplaceAll(aufgaben)` ersetzt die Collection vollständig
-9. WPF bewertet die neuen `Aufgabe`-Instanzen neu:
-   - `KiAusfuehrungsStatusConverter` wird erneut aufgerufen für jede Aufgabe
-   - Status-String wird neu berechnet (▶ Läuft, ⏸ Wartet, oder ✓ Bereit)
+8. `AktiveAufgabenListe.ReplaceAll(items)` ersetzt die Collection vollständig
+9. WPF bewertet die neuen `AktiveAufgabePanelItem`-Instanzen neu:
+   - `KiAusfuehrungsStatusSymbolConverter` und `KiAusfuehrungsStatusConverter` werden erneut aufgerufen für jede Aufgabe
+   - Status-Glyph und -Volltext werden neu berechnet (▶ Läuft, ⏸ Wartet, oder ✓ Bereit)
    - Seitenleiste und Dashboard zeigen den aktualisierten Status an (gemeinsame Collection)
 
 ### Automatische Statusaktualisierung bei persistierten Laufdaten
@@ -803,38 +865,38 @@ Ablauf:
 
 ### Übergangsanimation bei Statuswechsel
 
-Ausgelöst, wenn `AktiveAufgabenListe.ReplaceAll()` neue `Aufgabe`-Instanzen in die Collection einfügt und WPF die UI-Elemente neu rendert.
+Ausgelöst, wenn `AktiveAufgabenListe.ReplaceAll()` neue `AktiveAufgabePanelItem`-Instanzen in die Collection einfügt und WPF die UI-Elemente neu rendert.
 
 Beteiligte Komponenten:
 - `ActiveTasksListControl.xaml` — `ItemsControl` mit Status-`TextBlock`, Attached Behavior `StatusUebergangsAnimation.Status`
 - `StatusUebergangsAnimation` — Static class mit Attached Property und `PropertyChangedCallback`
 - `StatusAenderungsErkennung` — Merkt je `Aufgabe.Id` den zuletzt beobachteten Status
-- `KiAusfuehrungsStatusConverter` — Bindet an das Attached Property
+- `KiAusfuehrungsStatusSymbolConverter` — Bindet an das Attached Property (der **Glyph** ist je Zustand konstant; der Volltext enthielte beim Pausiert-Status einen pro Refresh tickenden Countdown und würde die Animation dauerhaft re-triggern)
 - `DoubleAnimation` — Opacity-Fade-Animation auf `UIElement.OpacityProperty`
 
 Ablauf:
-1. Nach einem Refresh (Event-Pfad oder Timer-Pfad) wird `AktiveAufgabenListe.ReplaceAll(aufgaben)` aufgerufen
-2. WPF ItemsControl regeneriert die Item-Container; für jede `Aufgabe` wird ein neuer Status-`TextBlock` erzeugt
-3. Binding `{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}` wird ausgewertet
+1. Nach einem Refresh (Event-Pfad oder Timer-Pfad) wird `AktiveAufgabenListe.ReplaceAll(items)` aufgerufen
+2. WPF ItemsControl regeneriert die Item-Container; für jedes `AktiveAufgabePanelItem` wird ein neuer Status-`TextBlock` erzeugt
+3. Binding `{Binding ., Converter={StaticResource KiAusfuehrungsStatusSymbolConverter}}` wird ausgewertet
 4. Der neue Wert wird in das Attached Property `StatusUebergangsAnimation.Status` geschrieben
 5. `StatusUebergangsAnimation.OnStatusChanged()` Callback wird aufgerufen mit:
    - `d`: Ziel-Element (`TextBlock`)
-   - `e.NewValue`: Neuer Status-String (z. B. `"▶ Läuft"`)
-6. Callback prüft: Ist `d` ein `FrameworkElement` und ist `DataContext` eine `Aufgabe`? Sonst abbrechen.
+   - `e.NewValue`: Neuer Status-Glyph (z. B. `"▶"`)
+6. Callback prüft: Ist `d` ein `FrameworkElement` und ist `DataContext` eine `Aufgabe` oder ein `AktiveAufgabePanelItem`? Sonst abbrechen. (Die Erweiterung auf `AktiveAufgabePanelItem` war nötig, weil der `DataContext` im Kachel-Template nie eine `Aufgabe` ist — ohne sie feuerte die Animation dort faktisch nie.)
 7. Callback registriert eine Unloaded-Bereinigung (nur beim ersten Mal), um die Erkennung aus dem Speicher zu entfernen, wenn das Element entladen wird
-8. Callback fragt `StatusAenderungsErkennung.HatSichGeaendert(aufgabe.Id, neuerStatus)` ab:
+8. Callback fragt `StatusAenderungsErkennung.HatSichGeaendert(id, neuerStatus)` ab (`id` = `Aufgabe.Id` bzw. `AktiveAufgabePanelItem.Id`):
    - **Erste Beobachtung** (Status noch nicht für diese `Id` gemerkt): `false` → keine Animation
    - **Gleicher Status wie zuletzt** (Routine-Refresh alle 5 s ohne echten Wechsel): `false` → keine Animation
-   - **Neuer Status** (echter Wechsel, z. B. von `"✓ Bereit"` zu `"▶ Läuft"`): `true` → Animation wird ausgelöst
+   - **Neuer Status** (echter Wechsel, z. B. von `"✓"` zu `"▶"`): `true` → Animation wird ausgelöst
 9. Bei `true` wird eine neue `DoubleAnimation` konstruiert:
    - `From = 0.3`, `To = 1.0` (Opacity-Fade)
    - `Duration = 250 ms` (kurz und unauffällig)
    - `EasingFunction = QuadraticEase` mit `EasingMode = EaseOut` (sanfte Beschleunigung)
 10. Animation wird auf dem `TextBlock` mit `BeginAnimation(UIElement.OpacityProperty, animation)` gestartet
-11. Visuelles Ergebnis: Status-Text fades von gedimmt (0.3) auf vollständige Opazität (1.0) — hebt den Wechsel dezent hervor
+11. Visuelles Ergebnis: Status-Symbol fades von gedimmt (0.3) auf vollständige Opazität (1.0) — hebt den Wechsel dezent hervor
 12. `AutomationProperties.Name` und `AutomationProperties.HelpText` bleiben während der Animation auslesbar und beeinflussen sie nicht
 
-**Wichtig:** Die Erkennung ist `aufgabe.Id`-gekeyted, nicht element-gekeyted. Dadurch wird sichergestellt, dass:
+**Wichtig:** Die Erkennung ist `id`-gekeyted, nicht element-gekeyted. Dadurch wird sichergestellt, dass:
 - Animation feuert nur bei echtem Statuswechsel der Aufgabe
 - Routine-Refreshs alle 5 Sekunden (ohne Wechsel) triggern keine Animation
 - Eine Aufgabe, die von der Liste entfernt und später wieder hinzugefügt wird, als neuer Eintrag erkannt wird (neue Baseline)
@@ -845,18 +907,20 @@ Ablauf:
 1. `DashboardViewModel.LadenAsync()` wird ausgelöst (z.B. via `LadenCommand`)
 2. Bestehende Logik für Projekte, Recovery, Statistik-Zähler bleibt unverändert
 3. Neue Zeile: `AufgabeService.GetAktiveAufgabenAsync()` wird aufgerufen
-4. `AktiveAufgabenListe.ReplaceAll(aufgaben)` füllt die Collection
-5. Dashboard bindet auf `AktiveAufgabenListe` mit `ItemsControl`
-6. Gleiches `AktiveAufgabeCardTemplate` wird verwendet wie in Seitenleiste
+4. `AktiveAufgabenListe.ReplaceAll(items)` füllt die Collection
+5. Dashboard bindet auf `AktiveAufgabenListe` mit demselben `ActiveTasksListControl` wie die Seitenleiste — mit eigener instanz-eigener `ListCollectionView`, eigener `ListenModus`-Bindung (`DashboardViewModel.AufgabenListenModus`) und den ansichtsspezifischen Modus-Buttons `DashboardAufgabenModus:*`
+6. Gleiche Kachel-Templates (`AufgabenKachelTemplate`/`AufgabenKachelInhaltTemplate`) wie in der Seitenleiste
 7. Abschnitt ist immer sichtbar wenn auf Dashboard
 
 ### KI-Ausführungsstatus-Konvertierung
 
 Beteiligte Komponenten:
-- `KiAusfuehrungsStatusConverter : IValueConverter` — Konvertiert `Aufgabe` zu Status-String
+- `KiAusfuehrungsStatusConverter : IValueConverter` — Konvertiert `Aufgabe`/`AktiveAufgabePanelItem` zum Status-Volltext (Tooltip/`HelpText` der Kachel)
+- `KiAusfuehrungsStatusSymbolConverter : IValueConverter` — Konvertiert dieselbe Eingabe zum reinen Status-Glyph (sichtbarer Text der Kachel); in `App.xaml` registriert
+- `KiAusfuehrungsStatusKlassifikation` / `KiAusfuehrungsZustand` — gemeinsame, aus dem Volltext-Converter extrahierte Statusklassifikation (`Pausiert`, `PromptInWartestellung`, `Laeuft`, `Wartet`, `Bereit`), damit Volltext und Glyph nicht divergieren
 - Referenz: `AufgabeRecoveryService.HeartbeatTimeoutMinutes` (standardmäßig 5 Minuten)
 
-Konvertierungs-Logik in `Convert()`:
+Konvertierungs-Logik in `Convert()` (Volltext):
 1. Input-Check: Ist Wert vom Typ `Aufgabe` oder `AktiveAufgabePanelItem`? Sonst `string.Empty` zurückgeben
 2. Wenn `PausiertBisUtc` gesetzt ist und in der Zukunft liegt (über alle übrigen Stati hinweg):
    - Output: `"⏸ Pausiert (noch {hh\:mm\:ss})"`; ab einer Restzeit von ≥ 24 Stunden im Format `{d\.hh\:mm\:ss}`
@@ -873,19 +937,21 @@ Konvertierungs-Logik in `Convert()`:
    - Output: `"✓ Bereit"`
 8. `ConvertBack()` ist nicht implementiert (Converter ist One-Way)
 
-Der Pausiert-Zweig steht bewusst vor allen übrigen Anzeigen: Eine aktive Pause überlagert den Laufzeitstatus — die Kachel zeigt den Countdown statt `Läuft` oder `Prompt in Wartestellung`. `PausiertBisUtc` wird aus `Aufgabe` übernommen bzw. über `AktiveAufgabePanelItem.PausiertBisUtc` (gemappt in `MainWindowViewModel.MapAktiveAufgabePanelItem`) bereitgestellt; das abgeleitete `AktiveAufgabePanelItem.IstPausiert` steuert zusätzlich die Kachel-Abblendung (`Opacity = 0.55` per `DataTrigger` in `ActiveTasksListControl.xaml`). Der Countdown tickt ohne eigenen Timer, weil der 5-Sekunden-Refresh die Panel-Items neu erzeugt.
+Der Pausiert-Zweig steht bewusst vor allen übrigen Anzeigen: Eine aktive Pause überlagert den Laufzeitstatus — die Kachel zeigt das `⏸`-Glyph statt `Läuft` oder `Prompt in Wartestellung`; der Countdown-Volltext bleibt im Tooltip/`HelpText`. `PausiertBisUtc` wird aus `Aufgabe` übernommen bzw. über `AktiveAufgabePanelItem.PausiertBisUtc` (gemappt in `MainWindowViewModel.MapAktiveAufgabePanelItem`) bereitgestellt; das abgeleitete `AktiveAufgabePanelItem.IstPausiert` steuert zusätzlich die Kachel-Abblendung (`Opacity = 0.55` per `DataTrigger` in `ActiveTasksListControl.xaml`). Der Countdown tickt ohne eigenen Timer, weil der 5-Sekunden-Refresh die Panel-Items neu erzeugt.
+
+Der `KiAusfuehrungsStatusSymbolConverter` mappt denselben `KiAusfuehrungsZustand` auf die Glyphen `⏸` (Pausiert), `⏳` (PromptInWartestellung), `▶` (Laeuft), `⏸` (Wartet) und `✓` (Bereit); der sichtbare `Text` des Status-`TextBlock` enthält damit nur das Symbol, während `ToolTip` und `AutomationProperties.HelpText` weiterhin den Volltext des `KiAusfuehrungsStatusConverter` liefern.
 
 ### Navigation zu Aufgabendetail aus aktiver Aufgabe
 
-Ausgelöst durch Klick auf den Navigation-Button (→) einer aktiven Aufgabenkachel.
+Ausgelöst durch Klick auf die Aufgabenkachel (die gesamte Kachel ist ein `Button`).
 
 Beteiligte Komponenten:
-- Aufgabenkachel-Template mit Button: `Command="{Binding DataContext.NavigateZuAufgabeCommand, RelativeSource={RelativeSource AncestorType=Window}}"`
-- `MainWindowViewModel.NavigateZuAufgabeCommand` — `RelayCommand<Guid>`
+- `AufgabenKachelTemplate` in `ActiveTasksListControl.xaml` — vollflächiger `Button` mit `Command="{Binding NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"` und `CommandParameter="{Binding Id}"`; der To-do-Button innerhalb der Kachel bleibt eigenständig klickbar (sein Click-Handling leitet den Klick nicht an den äußeren Button weiter; `OffeneTodosButton_Click` setzt zusätzlich `e.Handled = true`)
+- `NavigateZuAufgabeCommand` des jeweiligen ViewModels — `RelayCommand<Guid>` (`MainWindowViewModel` bzw. `DashboardViewModel`)
 - `MainWindowViewModel.NavigateZuAufgabe(Guid aufgabeId)` — Erstellt `TaskDetailViewModel`
 
 Ablauf:
-1. Benutzer klickt Navigation-Button auf Aufgabenkachel
+1. Benutzer klickt auf die Aufgabenkachel
 2. `NavigateZuAufgabeCommand.Execute(aufgabeId)` wird aufgerufen
 3. `NavigateZuAufgabe(aufgabeId)` wird ausgeführt:
    - Neue `TaskDetailViewModel`-Instanz wird aus DI-Container erstellt: `_serviceProvider.GetRequiredService<TaskDetailViewModel>()`
@@ -1023,7 +1089,7 @@ Ablauf:
 | Heartbeat > 5 Min, kein Prozess | Recovery-Kandidat; Banner auf Dashboard |
 | Start/CLI-Neustart/Recovery bei aktiver Pause | `InvalidOperationException` („Die Aufgabe ist bis … pausiert." / „Wiederherstellung nicht möglich, die Aufgabe ist bis … pausiert."); Recovery-Ablehnung wird mit `TaskRecoveryRejected ReasonCode=Paused` geloggt; in der UI sind die betreffenden Buttons deaktiviert |
 | Pause-Dialog mit Zeitpunkt in Vergangenheit oder ungültiger Eingabe | `KannBestaetigen == false`, `ValidierungsFehler`-Text im Dialog; zusätzlich wirft `AufgabeService.SetPauseAsync` `InvalidOperationException` als Service-Layer-Absicherung |
-| `SetPauseAsync` auf Autonome Aufgabe oder Status `Beendet`/`Archiviert` | `InvalidOperationException`; der Ribbon-Button ist in diesen Fällen ausgeblendet (`KannPausieren`) |
+| `SetPauseAsync` auf Status `Beendet`/`Archiviert` | `InvalidOperationException`; der Ribbon-Button ist in diesen Fällen ausgeblendet (`KannPausieren`) |
 | Rate-Limit-Marker ohne gültigen Zeitstempel oder ohne `KiPluginPrefix` | Nur `RateLimit`-Protokolleintrag; kein persistiertes Plugin-Limit, keine Pause |
 | Session-Limit-Zeitpunkt liegt in der Vergangenheit | Wert wird als `AppEinstellung` persistiert, löst aber keine Pause aus |
 | `KiPluginLimitService` in Scope nicht registriert | `CliOutputProtokollWriter` löst via `GetService` auf — fehlertolerant, nur der `RateLimit`-Eintrag wird geschrieben |
@@ -1034,3 +1100,7 @@ Ablauf:
 | Überlappende Event- und Timer-Aktualisierungen | `SemaphoreSlim(1,1)` in `AktiveAufgabenAktualisierenAsync()` mit `WaitAsync(0)` (non-blocking) überspringt neue Anfragen während eine Aktualisierung läuft — keine DbContext-Konflikte, aber auch keine "schwebenden" Anfragen-Queue |
 | DispatcherTimer läuft weiter, obwohl Fenster geschlossen | `MainWindowViewModel.Dispose()` wird in `MainWindow.OnClosed` aufgerufen; Timer wird gestoppt und Event-Handler abgemeldet — wichtig für App-Lifecycle |
 | Statuserkennung speichert Einträge ohne Limit | Pro aktiver Aufgabe wird ein Eintrag in `StatusAenderungsErkennung._letzterStatus` erstellt; maximal ~20 gleichzeitig aktive Aufgaben; Speicher-Overhead ist vernachlässigbar; Einträge werden nicht bereinigt, aber Speicher wird bei App-Shutdown freigegeben |
+| Fehlender/ungültiger gespeicherter Aufgabenlisten-Modus | `AufgabenListenModusService` fällt auf `Datum` zurück (`Enum.TryParse` + `Enum.IsDefined`) — kein Fehler, kein Crash |
+| Persistenz-Fehler beim Modus-Wechsel | `SafeFireAndForget` loggt den Fehler; der Live-Modus bleibt wirksam — die Umschaltung selbst ist nicht vom Schreibzugriff abhängig |
+| Wiederherstellungs-Ladevorgang vs. Benutzerumschaltung | Race-Guard `_geaendert` in `AufgabenListenModusBindung` (vor und nach dem `await` geprüft) verwirft den geladenen Wert, wenn der Anwender inzwischen selbst umgeschaltet hat |
+| Modus-Laden/-Speichern parallel zum 5-s-Aufgaben-Refresh | `AufgabenListenModusService` arbeitet in eigenem DI-Scope pro Operation — kein gemeinsamer `DbContext`, keine EF-Core-Nebenläufigkeitsfehler |

@@ -10,9 +10,8 @@ Die Einstellungsseite ermöglicht die zentrale Konfiguration der Anwendung ohne 
 4. **Benachrichtigungen** — Ob und wie der Anwender bei abgeschlossenen KI-Läufen benachrichtigt wird
 5. **Erscheinungsbild** — Dark Mode ein-/ausschalten
 6. **Promptvorlagen** — Wiederkehrende CLI-Prompts zentral verwalten
-7. **Automatisierung** — Autonome Aufgaben aktivieren oder deaktivieren
-8. **Updates** — Update-Modus (Aus / Nur prüfen / Bei Programmstart prüfen und ausführen) und optionale Prerelease-Berücksichtigung
-9. **Diagnose** — Öffnet das Konsolentestfenster zur Wiedergabe exportierter CLI-Aufzeichnungen
+7. **Updates** — Update-Modus (Aus / Nur prüfen / Bei Programmstart prüfen und ausführen) und optionale Prerelease-Berücksichtigung
+8. **Diagnose** — Öffnet das Konsolentestfenster zur Wiedergabe exportierter CLI-Aufzeichnungen
 
 ## Funktionsweise
 
@@ -63,13 +62,17 @@ Für das Codex-Plugin gilt eine zusätzliche Schutzregel: Der Wert `Softwareschm
 
 Das Arbeitsverzeichnis bestimmt, wo die Softwareschmiede lokale Repository-Klons anlegt. Der Pfad wird als `AppEinstellung` in der SQLite-Datenbank gespeichert. Ist kein Verzeichnis konfiguriert oder ist der Pfad ungültig, greift ein Fallback auf das Temp-Verzeichnis. Der Fallback wird im Aufgabenprotokoll protokolliert.
 
-### Automatisierung
+### SCM-Ereignisse
 
-Im Abschnitt **Automatisierung** der Registerkarte „Allgemein" befindet sich die Checkbox **„Autonome Aufgaben aktivieren"** (Standard: aktiviert). Sie hält fest, ob autonome Aufgaben grundsätzlich verwendet werden sollen, und wird beim erneuten Öffnen der Einstellungen wieder mit dem zuletzt gespeicherten Wert angezeigt.
+Im Abschnitt **SCM-Ereignisse** der Registerkarte „Allgemein" steuern die Checkbox **„SCM-Ereignisüberwachung aktivieren"**, das **Trigger-Keyword** und die **Prompt-Anhänge** die Ereignisüberwachung (Details: [GitHub-Ereignisüberwachung](../plugins/github-ereignisse/index.md)).
 
-Ist die Funktion für autonome Aufgaben deaktiviert, öffnet ein Klick auf „Autonome Aufgabe starten" in der Aufgabendetailansicht keinen Dialog mehr, sondern zeigt die Meldung „Autonome Aufgaben sind in den Einstellungen deaktiviert." an. Das einfache Starten einer Aufgabe mit direkter CLI-Ausführung (Button „Starten") bleibt davon unberührt und weiterhin uneingeschränkt nutzbar.
+Zusätzlich legt die Auswahlbox **„Backmerge-Pull-Requests"** fest, ob die Anwendung Backmerge-PRs (head = Hauptbranch des Repositories → base = konfigurierter Basis-Branch eines Projekts) automatisch per Admin-Merge bestätigt:
 
-Die Checkbox wird erst nach einem Klick auf „Speichern" übernommen.
+- **Deaktiviert** — (Standard) keine automatischen Merges
+- **Global aktiviert** — Backmerge-PRs werden in allen Projekten automatisch gemergt
+- **Projektbezogen aktivierbar** — zusätzlich muss die Option **„Backmerge-Pull-Requests automatisch mergen"** in der Projektdetailansicht (Basis-Branch-Kachel) eingeschaltet sein; sie wird dort nur angeboten, wenn dieser Modus gesetzt und ein Basis-Branch konfiguriert ist
+
+Voraussetzungen für einen Auto-Merge: ein vom Repository-Hauptbranch abweichender Basis-Branch am Projekt-Repository, ein Token mit Schreibrecht und ein vom Provider als mergebar gemeldeter, offener (nicht als Draft markierter) Pull Request. Die Auswahl wird erst nach einem Klick auf „Speichern" übernommen.
 
 ### Updates
 

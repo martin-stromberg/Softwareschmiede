@@ -18,7 +18,7 @@ Das View-Pattern implementiert eine Abstraktionsschicht über FlaUI. Der Program
    - Wenn `true`: gibt diese View-Instanz zurück (Dialog gefunden)
 4. Falls kein Dialog: Prüft `ErrorView.IsVisible`
    - Wenn Fehlerbanner sichtbar: gibt `ErrorView`-Instanz zurück
-5. Falls weder Dialog noch Fehler: Durchsucht Main-View-Kandidaten (Datei-Explorer, To-Dos, Aufgabendetail, Projektdetail, Projektliste, Einstellungen, Autonome Aufgabe)
+5. Falls weder Dialog noch Fehler: Durchsucht Main-View-Kandidaten (Datei-Explorer, To-Dos, Aufgabendetail, Projektdetail, Projektliste, Einstellungen)
    - Für jede View-Klasse: Instanz erzeugen, `IsVisible` prüfen
    - Erste übereinstimmende View-Instanz zurückgeben
 6. Falls keine Ansicht erkannt: wirft `InvalidOperationException` mit Diagnose

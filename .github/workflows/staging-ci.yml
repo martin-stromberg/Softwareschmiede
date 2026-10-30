@@ -124,16 +124,6 @@ jobs:
         run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category!=OsInterface" --collect:"XPlat Code Coverage" --logger "trx;LogFileName=test-results-regular-integration.trx" --logger "console;verbosity=normal"
         shell: pwsh
 
-      - name: Test OS interface (Softwareschmiede.Tests)
-        continue-on-error: true
-        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-tests.trx" --logger "console;verbosity=normal"
-        shell: pwsh
-
-      - name: Test OS interface (IntegrationTests)
-        continue-on-error: true
-        run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-integration.trx" --logger "console;verbosity=normal"
-        shell: pwsh
-
       - name: Install ReportGenerator
         run: dotnet tool install -g dotnet-reportgenerator-globaltool --version 5.5.11
         shell: pwsh
@@ -174,6 +164,67 @@ jobs:
           path: |
             src/Softwareschmiede.Tests/TestResults/*.trx
             src/Softwareschmiede.IntegrationTests/TestResults/*.trx
+          retention-days: 14
+
+  os-interface-tests:
+    name: os-interface tests
+    needs: detect-backmerge
+    if: needs.detect-backmerge.outputs.is_backmerge != 'true'
+    # Separated from build & test into its own non-blocking job: the OS-interface lane
+    # (FlaUI E2E, ConPTY, clipboard, real process starts) is the slowest part of the suite
+    # and used to run inside build & test, where its runtime counted against that job's
+    # 20-minute timeout. On 2026-10-18 a run was cancelled mid-OS-interface-step, which
+    # skipped version/prerelease and silently suppressed the pre-release for the push.
+    # version/prerelease deliberately do not `needs:` this job, so even a hard failure
+    # here can never block the release chain again. Job-level continue-on-error keeps the
+    # overall run green like the previous per-step flags did.
+    continue-on-error: true
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      # GitHub-hosted runners have no interactive Windows desktop session: the real
+      # FlaUI window E2E tests (WpfTestBase.LaunchApp) and the ConPTY E2E tests would
+      # deterministically time out waiting for windows/terminal output that never
+      # appears. These flags report them as "Skipped" instead; the remaining
+      # OsInterface tests (clipboard, real process starts, ...) keep running here.
+      # Leave both unset locally - there the lane covers the full breadth.
+      SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS: '1'
+      SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore Softwareschmiede.slnx
+        shell: pwsh
+
+      - name: Build (Debug)
+        run: |
+          dotnet build src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-restore -c Debug
+          dotnet build src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-restore -c Debug
+        shell: pwsh
+
+      - name: Test OS interface (Softwareschmiede.Tests)
+        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-tests.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Test OS interface (IntegrationTests)
+        run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-integration.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-os-interface-staging
+          path: |
+            src/Softwareschmiede.Tests/TestResults/test-results-os-interface-tests.trx
+            src/Softwareschmiede.IntegrationTests/TestResults/test-results-os-interface-integration.trx
           retention-days: 14
 
   version:

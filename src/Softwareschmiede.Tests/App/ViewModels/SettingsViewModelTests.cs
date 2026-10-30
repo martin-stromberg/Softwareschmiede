@@ -2,7 +2,6 @@ using System.Diagnostics;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -57,7 +56,7 @@ public sealed class SettingsViewModelTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    private SettingsViewModel CreateSut(AutonomAufgabenOptions? autonomAufgabenOptions = null) =>
+    private SettingsViewModel CreateSut() =>
         new(
             _einstellungService,
             _arbeitsverzeichnisService,
@@ -67,7 +66,6 @@ public sealed class SettingsViewModelTests : IDisposable
             _pluginSettingsService,
             _promptVorlagenService,
             NullLogger<SettingsViewModel>.Instance,
-            Options.Create(autonomAufgabenOptions ?? new AutonomAufgabenOptions()),
             new Mock<IDialogService>().Object,
             new Mock<IServiceProvider>().Object);
 
@@ -492,62 +490,6 @@ public sealed class SettingsViewModelTests : IDisposable
         gespeichertesStatus.Should().BeTrue();
     }
 
-    /// <summary>LadenCommand lädt das Feature-Flag "Autonome Aufgaben aktivieren" aus AppEinstellungService und setzt es als IsAutonomAufgabenEnabled (Issue 205).</summary>
-    [Fact]
-    public async Task LoadCommand_ShouldLoadAutonomAufgabenEnabledFlag()
-    {
-        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey, false);
-        var sut = CreateSut();
-
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        sut.IsAutonomAufgabenEnabled.Should().BeFalse();
-    }
-
-    /// <summary>LadenCommand fällt auf true zurück, wenn für das Feature-Flag "Autonome Aufgaben aktivieren" noch kein Wert in der Datenbank gespeichert ist.</summary>
-    [Fact]
-    public async Task LoadCommand_ShouldDefaultAutonomAufgabenEnabledToTrue_WhenNotYetPersisted()
-    {
-        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        var sut = CreateSut();
-
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        sut.IsAutonomAufgabenEnabled.Should().BeTrue();
-    }
-
-    /// <summary>LadenCommand verwendet den aus IOptions&lt;AutonomAufgabenOptions&gt; gebundenen Deployment-Default (statt eines hartkodierten "true"), wenn für das Feature-Flag "Autonome Aufgaben aktivieren" noch kein Wert in der Datenbank gespeichert ist (Issue 205, Regressionstest für Review-Fix 1).</summary>
-    [Fact]
-    public async Task LoadCommand_ShouldHonorDeploymentDefault_WhenDisabledAndNotYetPersisted()
-    {
-        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        var sut = CreateSut(new AutonomAufgabenOptions { Enabled = false });
-
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        sut.IsAutonomAufgabenEnabled.Should().BeFalse();
-    }
-
-    /// <summary>SpeichernCommand persistiert das Feature-Flag "Autonome Aufgaben aktivieren" über AppEinstellungService (Issue 205).</summary>
-    [Fact]
-    public async Task SaveCommand_ShouldPersistAutonomAufgabenEnabledFlag()
-    {
-        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        sut.IsAutonomAufgabenEnabled = false;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
-
-        var gespeicherterWert = await _einstellungService.GetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey);
-        gespeicherterWert.Should().BeFalse();
-    }
-
     /// <summary>LadenCommand fällt bei fehlenden oder unbekannten gespeicherten Update-Werten auf die Defaults zurück.</summary>
     [Fact]
     public async Task UpdateSettings_DefaultsAndInvalidValues()
@@ -669,6 +611,174 @@ public sealed class SettingsViewModelTests : IDisposable
         (await _einstellungService.GetUpdateSettingsAsync())
             .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, false),
                 "Verwerfen darf keine Update-Werte schreiben");
+    }
+
+    /// <summary>LadenCommand füllt die SCM-Einstellungen mit den Defaults: Überwachung aktiv, Standard-Trigger.</summary>
+    [Fact]
+    public async Task LadenCommand_LoadsScmMonitoringDefaults()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsScmMonitoringEnabled.Should().BeTrue();
+        sut.ScmTriggerKeyword.Should().Be(ScmEventValidationService.DefaultTriggerKeyword);
+    }
+
+    /// <summary>SpeichernCommand persistiert den Überwachungs-Schalter und das getrimmte Trigger-Keyword.</summary>
+    [Fact]
+    public async Task SpeichernCommand_PersistsScmMonitoringSettings()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsScmMonitoringEnabled = false;
+        sut.ScmTriggerKeyword = "  !Bearbeite  ";
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        (await _einstellungService.GetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey))
+            .Should().BeFalse();
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey))
+            .Should().Be("!Bearbeite");
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.IsScmMonitoringEnabled.Should().BeFalse();
+        sut.ScmTriggerKeyword.Should().Be("!Bearbeite");
+    }
+
+    /// <summary>Ein leeres Trigger-Keyword wird abgelehnt und nicht gespeichert.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task SpeichernCommand_RejectsEmptyScmTriggerKeyword(string keyword)
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.ScmTriggerKeyword = keyword;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().Contain("Trigger-Keyword");
+        sut.ErfolgsMeldung.Should().BeNull();
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey))
+            .Should().BeNull("ein ungültiges Keyword darf nicht persistiert werden");
+    }
+
+    /// <summary>LadenCommand lädt den Backmerge-Modus; ohne gespeicherten Eintrag gilt „Deaktiviert“.</summary>
+    [Fact]
+    public async Task LadenCommand_LoadsBackmergeModusDefaults()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedBackmergeModus.Should().Be(ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Deaktiviert));
+        sut.BackmergeModusOptionen.Should().HaveCount(3);
+    }
+
+    /// <summary>SpeichernCommand persistiert den gewählten Backmerge-Modus und lädt ihn beim Neuladen zurück.</summary>
+    [Fact]
+    public async Task SpeichernCommand_PersistsBackmergeModus()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Projektbezogen);
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        (await _einstellungService.GetScmBackmergeModusAsync()).Should().Be(ScmBackmergeModus.Projektbezogen);
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.SelectedBackmergeModus.Should().Be(ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Projektbezogen));
+    }
+
+    /// <summary>LadenCommand füllt die fünf SCM-Prompt-Anhänge mit leeren Feldern, wenn nichts gespeichert ist.</summary>
+    [Fact]
+    public async Task LadenCommand_LoadsScmPromptAppendixDefaults()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.ScmPromptAppendixGeneral.Should().BeEmpty();
+        sut.ScmPromptAppendixIssue.Should().BeEmpty();
+        sut.ScmPromptAppendixIssueComment.Should().BeEmpty();
+        sut.ScmPromptAppendixPullRequest.Should().BeEmpty();
+        sut.ScmPromptAppendixPullRequestComment.Should().BeEmpty();
+    }
+
+    /// <summary>SpeichernCommand persistiert alle fünf SCM-Prompt-Anhänge (mehrzeilig möglich) und
+    /// lädt sie nach einem Neuladen unverändert zurück.</summary>
+    [Fact]
+    public async Task SpeichernCommand_PersistsAndReloadsScmPromptAppendices()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.ScmPromptAppendixGeneral = "Immer auf Deutsch antworten.";
+        sut.ScmPromptAppendixIssue = "Issue:\nReproduktion prüfen.";
+        sut.ScmPromptAppendixIssueComment = "Issue-Kommentar-Anhang";
+        sut.ScmPromptAppendixPullRequest = "PR-Anhang";
+        sut.ScmPromptAppendixPullRequestComment = "PR-Kommentar-Anhang";
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey))
+            .Should().Be("Immer auf Deutsch antworten.");
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmPromptAppendIssueKey))
+            .Should().Be("Issue:\nReproduktion prüfen.");
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmPromptAppendIssueCommentKey))
+            .Should().Be("Issue-Kommentar-Anhang");
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestKey))
+            .Should().Be("PR-Anhang");
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestCommentKey))
+            .Should().Be("PR-Kommentar-Anhang");
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.ScmPromptAppendixGeneral.Should().Be("Immer auf Deutsch antworten.");
+        sut.ScmPromptAppendixIssue.Should().Be("Issue:\nReproduktion prüfen.");
+        sut.ScmPromptAppendixIssueComment.Should().Be("Issue-Kommentar-Anhang");
+        sut.ScmPromptAppendixPullRequest.Should().Be("PR-Anhang");
+        sut.ScmPromptAppendixPullRequestComment.Should().Be("PR-Kommentar-Anhang");
+    }
+
+    /// <summary>Leere oder nur aus Leerraum bestehende Anhänge werden nicht gespeichert (leer = nichts anhängen);
+    /// ein geleertes Feld entfernt den wirksamen Wert wieder.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task SpeichernCommand_BlankScmPromptAppendix_StoresNoValue(string blank)
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        await _einstellungService.SetSettingAsync(AppEinstellungService.ScmPromptAppendIssueKey, "vorhanden");
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.ScmPromptAppendixIssue.Should().Be("vorhanden");
+
+        sut.ScmPromptAppendixIssue = blank;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        sut.ErfolgsMeldung.Should().NotBeNull();
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmPromptAppendIssueKey))
+            .Should().BeNull("ein leerer Anhang hängt nichts an und wird als leerer Wert persistiert");
     }
 }
 

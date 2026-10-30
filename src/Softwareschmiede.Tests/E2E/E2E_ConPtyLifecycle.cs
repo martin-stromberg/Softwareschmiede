@@ -86,6 +86,23 @@ public partial class End2EndTest
 
             taskDetail.ExportCliReplay(pfad);
 
+            // Der Export läuft nach dem Schließen des Save-Dialogs asynchron weiter -
+            // erst auf Existenz und vollständige Schreibweise des Dateiheaders warten.
+            var deadline = DateTime.UtcNow + Medium;
+            while (DateTime.UtcNow < deadline)
+            {
+                try
+                {
+                    if (File.Exists(pfad) && new FileInfo(pfad).Length >= 8)
+                        break;
+                }
+                catch (IOException)
+                {
+                    // Datei wird gerade noch geschrieben.
+                }
+
+                await Task.Delay(100);
+            }
             Assert.True(File.Exists(pfad), "Die .clireplay-Exportdatei wurde nicht erzeugt.");
 
             var magic = new byte[8];

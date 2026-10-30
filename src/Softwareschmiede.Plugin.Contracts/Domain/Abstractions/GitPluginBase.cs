@@ -21,6 +21,9 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
     public abstract PluginType PluginType { get; }
     public abstract IReadOnlyList<PluginSettingGroup> GetSettingGroups();
     public virtual IReadOnlyList<PluginSettingField> GetRepositoryLinkFields() => [];
+
+    /// <inheritdoc/>
+    public virtual string PluginSymbol => IPlugin.FallbackSymbol;
     public abstract Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default);
     public virtual Task<IEnumerable<PullRequest>> GetOpenPullRequestsAsync(string repositoryId, CancellationToken ct = default)
         => Task.FromResult(Enumerable.Empty<PullRequest>());

@@ -57,6 +57,15 @@ Die Basis-Branch-Konfiguration kann jederzeit in der Projektdetailansicht geänd
 
 Die neue Konfiguration wird sofort aktiv für alle zukünftigen Aufgabenstarts.
 
+### Backmerge-Pull-Requests automatisch mergen
+
+In derselben Basis-Branch-Kachel kann pro Projekt die Option **„Backmerge-Pull-Requests automatisch mergen"** eingeschaltet werden. Sie ist nur sichtbar, wenn zwei Bedingungen erfüllt sind:
+
+- der globale Backmerge-Modus steht unter **Einstellungen → Allgemein → SCM-Ereignisse** auf **„Projektbezogen aktivierbar"**, und
+- für das ausgewählte Repository ist ein Basis-Branch konfiguriert.
+
+Ist die Option aktiv, bestätigt die Anwendung Pull Requests vom Repository-Hauptbranch (z. B. `main`) auf den konfigurierten Basis-Branch automatisch per Admin-Merge, sobald der Provider sie als mergebar meldet — ein Backmerge aktualisiert nur den Arbeitsbranch und erfordert keine inhaltliche Prüfung. Die Freigabe wirkt sofort beim Umschalten (kein „Speichern" nötig) und wird als `AppEinstellung` unter `plugins.backmerge.project.{projektId}` persistiert. Details: [GitHub-Ereignisüberwachung](../plugins/github-ereignisse/index.md).
+
 ## Beispiele
 
 ### Staging-Branch-Workflow

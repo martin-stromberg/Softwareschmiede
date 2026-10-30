@@ -3,6 +3,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.App.Extensions;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
@@ -32,6 +33,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IApplicationVersionProvider? _versionProvider;
     private readonly IPluginManager? _pluginManager;
     private readonly AufgabeLaufdatenChangedNotifier? _laufdatenChangedNotifier;
+    private readonly AufgabenListenModusBindung _modusBindung;
     private readonly Action<Action> _dispatcherInvoke;
     private readonly DispatcherTimer _aktualisierungsTimer;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
@@ -41,6 +43,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private string _title = "Softwareschmiede";
     private string? _currentVersion;
     private bool _disposed;
+    private readonly ScmEventChangeNotifier? _scmNotifier;
+    private int _scmWaitingCount;
+    private ScmEventQueueViewModel? _scmQueue;
 
     /// <summary>Gibt den Fenstertitel zurück.</summary>
     public string Title
@@ -95,6 +100,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Aktuell aktive Aufgaben (Status Gestartet oder Wartend) für die Seitenleisten-Anzeige.</summary>
     public ObservableCollection<AktiveAufgabePanelItem> AktiveAufgabenListe { get; } = new();
 
+    /// <summary>
+    /// Anzeigemodus der Seitenleisten-Aufgabenliste (flach nach Datum oder gruppiert nach Repository/KI).
+    /// Änderungen werden über den <see cref="AufgabenListenModusService"/> persistiert.
+    /// </summary>
+    public AufgabenListenModus AufgabenListenModus
+    {
+        get => _modusBindung.Wert;
+        set => _modusBindung.Wert = value;
+    }
+
     /// <summary>Gibt an, ob aktuell das Dashboard angezeigt wird.</summary>
     public bool IsDashboardVisible => CurrentView is DashboardViewModel;
 
@@ -106,6 +121,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>Navigiert zu den Einstellungen.</summary>
     public ICommand NavigateToSettingsCommand { get; }
+
+    /// <summary>Navigiert zur dauerhaften SCM-Ereignisübersicht.</summary>
+    public ICommand NavigateToScmEventQueueCommand { get; }
+
+    /// <summary>Navigationstext einschließlich noch nicht abgeschlossener Ereignisse.</summary>
+    public string ScmEventQueueLabel => $"SCM-Ereignisse ({_scmWaitingCount})";
 
     /// <summary>Schaltet den Dark-Mode um.</summary>
     public ICommand ToggleDarkModeCommand { get; }
@@ -144,7 +165,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _versionProvider = optionaleDienste?.VersionProvider;
         _laufdatenChangedNotifier = optionaleDienste?.LaufdatenChangedNotifier;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
+        _scmNotifier = serviceProvider.GetService<ScmEventChangeNotifier>();
         _dispatcherInvoke = DispatcherInvokeFactory.Create(optionaleDienste?.DispatcherInvoke);
+        _modusBindung = AufgabenListenModusBindung.FuerMenue(
+            optionaleDienste?.AufgabenListenModusService, logger, _dispatcherInvoke);
+        _modusBindung.WertGeaendert += () => OnPropertyChanged(nameof(AufgabenListenModus));
         _updateFlow = new MainWindowUpdateFlow(
             serviceProvider, logger, optionaleDienste?.UpdateDienste, optionaleDienste?.DialogService);
         _updateFlow.PropertyChanged += (_, e) => OnPropertyChanged(e.PropertyName);
@@ -152,6 +177,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         NavigateToDashboardCommand = new RelayCommand(NavigateToDashboard);
         NavigateToProjectListCommand = new RelayCommand(NavigateToProjectList);
         NavigateToSettingsCommand = new RelayCommand(NavigateToSettings);
+        NavigateToScmEventQueueCommand = new RelayCommand(NavigateToScmEventQueue);
         ToggleDarkModeCommand = new AsyncRelayCommand(async ct =>
             await _darkModeService.SetModeAsync(_darkModeService.Current == "Dark" ? "Light" : "Dark", ct));
         ToggleNavigationCommand = new RelayCommand(() => IsNavigationExpanded = !IsNavigationExpanded);
@@ -160,6 +186,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         UpdateStartenCommand = new AsyncRelayCommand(_updateFlow.StartenAsync, _updateFlow.KannStarten);
 
         _runningStatusSource.RunningCountChanged += OnRunningCountChanged;
+        if (_scmNotifier is not null) _scmNotifier.Changed += OnScmChanged;
         if (_laufdatenChangedNotifier is not null)
         {
             _laufdatenChangedNotifier.LaufdatenChanged += OnLaufdatenChanged;
@@ -174,7 +201,20 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         NavigateToDashboard();
         VersionLadenImHintergrund();
+        GespeichertenAufgabenListenModusLadenAsync()
+            .SafeFireAndForget(_logger, "Aufgabenlisten-Modus laden");
+        OnScmChanged();
     }
+
+    /// <summary>
+    /// Lädt den persistierten Anzeigemodus der Seitenleisten-Aufgabenliste und wendet ihn an,
+    /// ohne den Wert zurückzuschreiben. Wird im Konstruktor per <c>SafeFireAndForget</c> gestartet
+    /// und ist für Tests direkt awaitbar. Ein zwischenzeitlich vom Anwender gewählter Modus wird
+    /// nicht überschrieben (Race-Guard in <see cref="AufgabenListenModusBindung"/>).
+    /// </summary>
+    /// <param name="ct">Token zum Abbrechen der Operation.</param>
+    public Task GespeichertenAufgabenListenModusLadenAsync(CancellationToken ct = default)
+        => _modusBindung.GespeichertenWertLadenAsync(ct);
 
     private DashboardViewModel? _dashboardViewModel;
 
@@ -226,6 +266,43 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     private SettingsViewModel? _settingsViewModel;
+
+    private void NavigateToScmEventQueue()
+    {
+        if (_scmQueue is null)
+        {
+            _scmQueue = _serviceProvider.GetRequiredService<ScmEventQueueViewModel>();
+            _scmQueue.BackAction = NavigateToDashboard;
+            _scmQueue.NavigateToSettingsAction = NavigateToSettings;
+            _scmQueue.NavigateToTaskAction = id =>
+            {
+                NavigateZuAufgabe(id);
+                if (CurrentView is TaskDetailViewModel task) task.ZurueckAction = NavigateToScmEventQueue;
+            };
+        }
+        CurrentView = _scmQueue;
+        Title = "Softwareschmiede – SCM-Ereignisse";
+        _scmQueue.RefreshAsync().SafeFireAndForget(_logger, "SCM-Ereignisse laden");
+    }
+
+    private void OnScmChanged()
+    {
+        if (_disposed || _scmNotifier is null) return;
+        RefreshScmCountAsync().SafeFireAndForget(_logger, "SCM-Ereignisanzahl laden");
+    }
+
+    private async Task RefreshScmCountAsync()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var count = await scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>()
+            .ScmIncomingEvents.CountAsync(x => x.Status != "Verarbeitet" && x.Status != "Abgebrochen");
+        _dispatcherInvoke(() =>
+        {
+            if (_disposed) return;
+            _scmWaitingCount = count;
+            OnPropertyChanged(nameof(ScmEventQueueLabel));
+        });
+    }
 
     private void NavigateToSettings()
     {
@@ -296,13 +373,28 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         offeneTodosCommand.OnError = ex =>
             _logger.LogWarning(ex, "Fehler beim Öffnen des offene To-Dos-Dialogs für Aufgabe {AufgabeId}.", aufgabe.Id);
 
+        var (scmPluginName, scmPluginSymbol) = ResolvePlugin(PluginType.SourceCodeManagement, aufgabe.GitRepository?.PluginTyp);
+        var (kiPluginName, kiPluginSymbol) = ResolvePlugin(PluginType.DevelopmentAutomation, aufgabe.KiPluginPrefix);
+        var repositoryName = aufgabe.GitRepository?.RepositoryName;
+
         return new AktiveAufgabePanelItem
         {
             Id = aufgabe.Id,
             Titel = aufgabe.Titel,
-            ProjektName = aufgabe.Projekt?.Name ?? string.Empty,
-            ScmPluginName = ResolvePluginName(PluginType.SourceCodeManagement, aufgabe.GitRepository?.PluginTyp),
-            KiPluginName = ResolvePluginName(PluginType.DevelopmentAutomation, aufgabe.KiPluginPrefix),
+            RepositoryName = string.IsNullOrWhiteSpace(repositoryName)
+                ? aufgabe.Projekt?.Name ?? string.Empty
+                : repositoryName!,
+            ScmPluginName = scmPluginName,
+            ScmPluginSymbol = scmPluginSymbol,
+            KiPluginName = kiPluginName,
+            KiPluginSymbol = kiPluginSymbol,
+            RepositoryGruppenName = string.IsNullOrWhiteSpace(repositoryName)
+                ? AufgabenListenAnsicht.OhneRepository
+                : repositoryName!,
+            RepositoryGruppeIstFallback = string.IsNullOrWhiteSpace(repositoryName),
+            KiGruppenName = kiPluginName ?? AufgabenListenAnsicht.NichtAusgefuehrt,
+            KiGruppeIstFallback = kiPluginName is null,
+            SortierZeitpunkt = aufgabe.LetzterCliStartUtc ?? aufgabe.ErstellungsDatum,
             Status = aufgabe.Status,
             AusfuehrungsStatus = aufgabe.AusfuehrungsStatus,
             AktiveRunId = aufgabe.AktiveRunId,
@@ -327,19 +419,26 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         await _dialogService.ShowOpenTodosDialogAsync(viewModel, ct);
     }
 
-    private string? ResolvePluginName(PluginType pluginType, string? pluginPrefix)
+    /// <summary>
+    /// Löst einen gespeicherten Plugin-Prefix über den <see cref="IPluginManager"/> auf und liefert
+    /// Anzeigename und Symbol-Glyph. Bei leerem Prefix <c>(null, null)</c>; bei nicht auflösbarem
+    /// Prefix der rohe Prefix als Name und der Fallback-Glyph <see cref="IPlugin.FallbackSymbol"/> als Symbol (Moq-Mocks ohne
+    /// Setup liefern für <c>PluginSymbol</c> <c>null</c> — wird ebenfalls auf den Fallback gemappt).
+    /// </summary>
+    private (string? Name, string? Symbol) ResolvePlugin(PluginType pluginType, string? pluginPrefix)
     {
         if (string.IsNullOrWhiteSpace(pluginPrefix))
         {
-            return null;
+            return (null, null);
         }
 
         var plugins = pluginType == PluginType.SourceCodeManagement
             ? _pluginManager?.GetSourceCodeManagementPlugins().Cast<IPlugin>()
             : _pluginManager?.GetDevelopmentAutomationPlugins().Cast<IPlugin>();
 
-        return plugins?.FirstOrDefault(p => string.Equals(p.PluginPrefix, pluginPrefix, StringComparison.OrdinalIgnoreCase))?.PluginName
-            ?? pluginPrefix;
+        var plugin = plugins?.FirstOrDefault(p => string.Equals(p.PluginPrefix, pluginPrefix, StringComparison.OrdinalIgnoreCase));
+        var symbol = plugin?.PluginSymbol;
+        return (plugin?.PluginName ?? pluginPrefix, string.IsNullOrWhiteSpace(symbol) ? IPlugin.FallbackSymbol : symbol);
     }
 
     private Guid? GetAktiveAufgabeId()
@@ -388,6 +487,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _aktualisierungsTimer.Stop();
         _aktualisierungsTimer.Tick -= OnAktualisierungsTimerTick;
         _runningStatusSource.RunningCountChanged -= OnRunningCountChanged;
+        if (_scmNotifier is not null) _scmNotifier.Changed -= OnScmChanged;
+        _scmQueue?.Dispose();
         if (_laufdatenChangedNotifier is not null)
         {
             _laufdatenChangedNotifier.LaufdatenChanged -= OnLaufdatenChanged;

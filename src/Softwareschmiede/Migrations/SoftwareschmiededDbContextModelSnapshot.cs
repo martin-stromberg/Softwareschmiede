@@ -169,6 +169,12 @@ namespace Softwareschmiede.Migrations
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(0);
 
+                    b.Property<DateTimeOffset?>("ScmAbschlussErkanntUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ScmAbschlussReferenz")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -190,70 +196,6 @@ namespace Softwareschmiede.Migrations
                     b.HasIndex("ProjektId");
 
                     b.ToTable("Aufgaben");
-                });
-
-            modelBuilder.Entity("Softwareschmiede.Domain.Entities.AutonomAufgabeKonfiguration", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("AktiveUnteragenten")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("ArbeitsverzeichnisPfad")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("AufgabeId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("ExplizitGestoppt")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("InitialPrompt")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("LaufzeitLimitMinuten")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("PermissionsJsonPfad")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("PersistenzModus")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ProjektBranchName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ProjektleiterAgentId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<long?>("SessionPauseUtc")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("SkillAutogeneration")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("TokenBudget")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("TokenBudgetErweitert")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AufgabeId")
-                        .IsUnique();
-
-                    b.ToTable("AutonomAufgabeKonfigurationen");
                 });
 
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.BenachrichtigungsAudioDatei", b =>
@@ -635,6 +577,10 @@ namespace Softwareschmiede.Migrations
                     b.Property<string>("Milestone")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("SourceKey")
+                        .HasMaxLength(700)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Titel")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -642,6 +588,9 @@ namespace Softwareschmiede.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AufgabeId")
+                        .IsUnique();
+
+                    b.HasIndex("SourceKey")
                         .IsUnique();
 
                     b.ToTable("IssueReferenzen");
@@ -821,8 +770,9 @@ namespace Softwareschmiede.Migrations
 
                     b.Property<string>("Rolle")
                         .IsRequired()
-                        .HasDefaultValue("CreatedByTask")
-                        .HasColumnType("TEXT");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("CreatedByTask");
 
                     b.Property<string>("SourceBranch")
                         .IsRequired()
@@ -993,44 +943,198 @@ namespace Softwareschmiede.Migrations
                     b.ToTable("RepositoryStartKonfigurationen");
                 });
 
-            modelBuilder.Entity("Softwareschmiede.Domain.Entities.SkillDefinition", b =>
+            modelBuilder.Entity("Softwareschmiede.Domain.Entities.ScmContentSnapshot", b =>
+                {
+                    b.Property<string>("ContentKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BodyHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Diagnostic")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IdentityResolved")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Revision")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ContentKey");
+
+                    b.ToTable("ScmContentSnapshots");
+                });
+
+            modelBuilder.Entity("Softwareschmiede.Domain.Entities.ScmIncomingEvent", b =>
+                {
+                    b.Property<long>("Sequence")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("AcceptedUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("AufgabeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CliRunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("DeliveredUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("DeliveryAttemptId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorCode")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExchangePath")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExchangeRestrictedWriteSidsJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("LeaseUntilUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("NextAttemptUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ObservationJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReadyConfirmedRunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ReceivedUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Sequence");
+
+                    b.HasIndex("EventKey")
+                        .IsUnique();
+
+                    b.HasIndex("Id")
+                        .IsUnique();
+
+                    b.HasIndex("AufgabeId", "Sequence");
+
+                    b.HasIndex("Status", "NextAttemptUtc");
+
+                    b.ToTable("ScmIncomingEvents");
+                });
+
+            modelBuilder.Entity("Softwareschmiede.Domain.Entities.ScmObservationCheckpoint", b =>
+                {
+                    b.Property<string>("SourceKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Diagnostic")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorCode")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Failures")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("NextAttemptUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("WatermarkUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("SourceKey");
+
+                    b.ToTable("ScmObservationCheckpoints");
+                });
+
+            modelBuilder.Entity("Softwareschmiede.Domain.Entities.ScmOutgoingAction", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("AutonomAufgabeId")
+                    b.Property<Guid?>("AttemptId")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Content")
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorCode")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("NextAttemptUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Purpose")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<long>("ErstellungsDatum")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("RemoteId")
+                        .HasColumnType("TEXT");
 
-                    b.Property<long?>("FreigabeDatum")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
+                    b.Property<string>("RequestJson")
                         .IsRequired()
-                        .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Version")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("AutonomAufgabeId");
+                    b.HasIndex("EventId", "Status");
 
-                    b.ToTable("SkillDefinitionen");
+                    b.ToTable("ScmOutgoingActions");
+                });
+
+            modelBuilder.Entity("Softwareschmiede.Domain.Entities.ScmTaskLease", b =>
+                {
+                    b.Property<Guid>("AufgabeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ExpiresUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Owner")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AufgabeId");
+
+                    b.ToTable("ScmTaskLeases");
                 });
 
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.TestErgebnis", b =>
@@ -1089,66 +1193,6 @@ namespace Softwareschmiede.Migrations
                     b.ToTable("Todos");
                 });
 
-            modelBuilder.Entity("Softwareschmiede.Domain.Entities.UnteragentSpezifikation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<long?>("AbschlussDatum")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid>("AutonomAufgabeId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Branch")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ClonePfad")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("TEXT");
-
-                    b.Property<long>("ErzeugungsDatum")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("ExterneAgentId")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Prompt")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TaskId")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("VerzeichnisPfad")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AutonomAufgabeId");
-
-                    b.ToTable("UnteragentSpezifikationen");
-                });
-
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.AlertReferenz", b =>
                 {
                     b.HasOne("Softwareschmiede.Domain.Entities.Aufgabe", "Aufgabe")
@@ -1176,17 +1220,6 @@ namespace Softwareschmiede.Migrations
                     b.Navigation("GitRepository");
 
                     b.Navigation("Projekt");
-                });
-
-            modelBuilder.Entity("Softwareschmiede.Domain.Entities.AutonomAufgabeKonfiguration", b =>
-                {
-                    b.HasOne("Softwareschmiede.Domain.Entities.Aufgabe", "Aufgabe")
-                        .WithOne("AutonomKonfiguration")
-                        .HasForeignKey("Softwareschmiede.Domain.Entities.AutonomAufgabeKonfiguration", "AufgabeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Aufgabe");
                 });
 
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.DiffBlock", b =>
@@ -1324,17 +1357,6 @@ namespace Softwareschmiede.Migrations
                     b.Navigation("GitRepository");
                 });
 
-            modelBuilder.Entity("Softwareschmiede.Domain.Entities.SkillDefinition", b =>
-                {
-                    b.HasOne("Softwareschmiede.Domain.Entities.AutonomAufgabeKonfiguration", "AutonomAufgabe")
-                        .WithMany("Skills")
-                        .HasForeignKey("AutonomAufgabeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AutonomAufgabe");
-                });
-
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.TestErgebnis", b =>
                 {
                     b.HasOne("Softwareschmiede.Domain.Entities.Protokolleintrag", "Protokolleintrag")
@@ -1357,22 +1379,9 @@ namespace Softwareschmiede.Migrations
                     b.Navigation("Aufgabe");
                 });
 
-            modelBuilder.Entity("Softwareschmiede.Domain.Entities.UnteragentSpezifikation", b =>
-                {
-                    b.HasOne("Softwareschmiede.Domain.Entities.AutonomAufgabeKonfiguration", "AutonomAufgabe")
-                        .WithMany("Unteragenten")
-                        .HasForeignKey("AutonomAufgabeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AutonomAufgabe");
-                });
-
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.Aufgabe", b =>
                 {
                     b.Navigation("AlertReferenz");
-
-                    b.Navigation("AutonomKonfiguration");
 
                     b.Navigation("DiffResults");
 
@@ -1383,13 +1392,6 @@ namespace Softwareschmiede.Migrations
                     b.Navigation("PullRequests");
 
                     b.Navigation("Todos");
-                });
-
-            modelBuilder.Entity("Softwareschmiede.Domain.Entities.AutonomAufgabeKonfiguration", b =>
-                {
-                    b.Navigation("Skills");
-
-                    b.Navigation("Unteragenten");
                 });
 
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.DiffBlock", b =>

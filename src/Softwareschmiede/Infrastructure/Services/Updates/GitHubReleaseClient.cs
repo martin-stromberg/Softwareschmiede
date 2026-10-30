@@ -144,9 +144,22 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
     private bool IsAllowedFollowUpUri(Uri uri)
     {
         var expectedPath = $"/repos/{_options.RepositoryOwner}/{_options.RepositoryName}/releases";
+        var path = uri.AbsolutePath.TrimEnd('/');
         return uri.Scheme == Uri.UriSchemeHttps
             && string.Equals(uri.Host, "api.github.com", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(uri.AbsolutePath.TrimEnd('/'), expectedPath, StringComparison.OrdinalIgnoreCase);
+            && (string.Equals(path, expectedPath, StringComparison.OrdinalIgnoreCase) || IsRepositoryIdReleasesPath(path));
+    }
+
+    /// <summary>GitHub liefert in Link-Headern auch die numerische Repository-Form
+    /// <c>/repositories/{id}/releases</c> (u. a. nach Umbenennungen). Der Pfad kommt aus der
+    /// API-Antwort selbst; Host und Schema bleiben in <see cref="IsAllowedFollowUpUri"/> gepinnt.</summary>
+    private static bool IsRepositoryIdReleasesPath(string path)
+    {
+        var segments = path.Trim('/').Split('/');
+        return segments.Length == 3
+            && string.Equals(segments[0], "repositories", StringComparison.OrdinalIgnoreCase)
+            && long.TryParse(segments[1], out _)
+            && string.Equals(segments[2], "releases", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryGetNextPageUri(HttpResponseMessage response, out Uri? nextUri)

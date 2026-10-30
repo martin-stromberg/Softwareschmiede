@@ -54,16 +54,21 @@ Das Design wird in den Einstellungen geändert:
 
 Die Änderung wird sofort wirksam und beim nächsten Start automatisch beibehalten.
 
-## Feature-Flag "Autonome Aufgaben" konfigurieren
+## SCM-Ereignisüberwachung konfigurieren
 
-Das Feature "Autonome Aufgaben" (Projektleiter-Agent) wird über zwei Ebenen gesteuert:
+Die SCM-Ereignisüberwachung wird auf der Registerkarte „Allgemein" im Abschnitt „SCM-Ereignisse" gesteuert:
 
-| Ebene | Ort | Standardwert | Wirkung |
-|-------|-----|--------------|---------|
-| Deployment-Zeit | `appsettings.json`, Sektion `AutonomAufgaben:Enabled` (`AutonomAufgabenOptions.Enabled`) | `true` | Wird über `IOptions<AutonomAufgabenOptions>` injiziert und beim App-Start gebunden; Änderungen erfordern einen Neustart |
-| Laufzeit / GUI | `AppEinstellung`-Datensatz mit Schlüssel `autonomeaufgaben.enabled` (`AppEinstellungService.AutonomAufgabenEnabledKey`) | `true` (Fallback, falls kein Eintrag vorhanden) | Wird über die Checkbox „Autonome Aufgaben aktivieren" auf der Registerkarte „Allgemein" gesetzt (`SettingsViewModel.IsAutonomAufgabenEnabled`) |
+| Einstellung | Schlüssel (`AppEinstellung`) | Standardwert | Wirkung |
+|-------------|------------------------------|--------------|---------|
+| Checkbox „SCM-Ereignisüberwachung aktivieren" (`SettingsViewModel.IsScmMonitoringEnabled`) | `scm.monitoring.enabled` (`AppEinstellungService.ScmMonitoringEnabledKey`) | `true` (Fallback, falls kein Eintrag vorhanden) | Wirkt ohne Neustart; bei `false` beobachten `ScmEventMonitoringService` und `ScmEventExchangeService` keine Quellen und stellen keine Ereignisse automatisch zu |
+| Textfeld „Trigger-Keyword" (`SettingsViewModel.ScmTriggerKeyword`) | `scm.trigger.keyword` (`AppEinstellungService.ScmTriggerKeywordKey`) | `$Softwareschmiede` (`ScmEventValidationService.DefaultTriggerKeyword`) | Wirkt ohne Neustart; leere/Leerraum-Eingaben werden in der GUI abgelehnt, ein ungültiger gespeicherter Wert fällt auf den Standard zurück |
+| Textfeld „Prompt-Anhänge → Allgemein" (`SettingsViewModel.ScmPromptAppendixGeneral`) | `scm.prompt.append.general` (`AppEinstellungService.ScmPromptAppendGeneralKey`) | leer | Wirkt ohne Neustart; wird bei jeder SCM-Ereigniszustellung dem Prompt angehängt; leer = nichts anhängen |
+| Textfeld „Prompt-Anhänge → Issue" (`SettingsViewModel.ScmPromptAppendixIssue`) | `scm.prompt.append.issue` (`AppEinstellungService.ScmPromptAppendIssueKey`) | leer | Wirkt ohne Neustart; Anhang für Ereignisse aus Issue-Beschreibungen (neuer/geänderter Issue-Text) |
+| Textfeld „Prompt-Anhänge → Issue-Kommentar" (`SettingsViewModel.ScmPromptAppendixIssueComment`) | `scm.prompt.append.issuecomment` (`AppEinstellungService.ScmPromptAppendIssueCommentKey`) | leer | Wirkt ohne Neustart; Anhang für Ereignisse aus Kommentaren auf Issues |
+| Textfeld „Prompt-Anhänge → Pull Request" (`SettingsViewModel.ScmPromptAppendixPullRequest`) | `scm.prompt.append.pr` (`AppEinstellungService.ScmPromptAppendPullRequestKey`) | leer | Wirkt ohne Neustart; Anhang für Ereignisse aus Pull-Request-Beschreibungen (neuer/geänderter PR-Text) |
+| Textfeld „Prompt-Anhänge → Pull-Request-Kommentar" (`SettingsViewModel.ScmPromptAppendixPullRequestComment`) | `scm.prompt.append.prcomment` (`AppEinstellungService.ScmPromptAppendPullRequestCommentKey`) | leer | Wirkt ohne Neustart; Anhang für Ereignisse aus Kommentaren, Zeilenkommentaren und veröffentlichten Reviews auf Pull Requests |
 
-Ist `AutonomAufgaben:Enabled` in `appsettings.json` auf `false` gesetzt, greifen die Guard-Klauseln in `AutonomAufgabeStartService.StarteAsync()`, `AutonomAufgabenInitialisierungsService.InitialisiereAsync()` und `ProjektleiterAgentService.StarteAgentAsync()`: Der Initialisierungsdialog öffnet sich nicht mehr, stattdessen wird die Fehlermeldung `AutonomAufgabenOptions.DisabledErrorMessage` ("Autonome Aufgaben sind nicht aktiviert.") bzw. für den UI-Einstiegspunkt "Autonome Aufgaben sind in den Einstellungen deaktiviert." zurückgegeben. Der nicht-autonome Weg (`EntwicklungsprozessService`, Button "Starten") bleibt davon unberührt, da er nicht gegen dieses Flag prüft.
+Bei der Zustellung wird zuerst der allgemeine, dann der zur Ereignisart passende Anhang mit einer Leerzeile getrennt angehängt (als eigenes `promptSuffix`-Feld im JSON-Prompt). Die Anhänge verändern weder den gespeicherten Ereignistext noch die Trigger-Prüfung; ein leerer spezifischer Anhang ersetzt den allgemeinen nicht.
 
 ## Überprüfung
 

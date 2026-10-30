@@ -1,7 +1,6 @@
 using System.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -94,13 +93,6 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetIdePlugins()).Returns([]);
 
-        var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
-            _serviceProviderMock.Object,
-            _dialogServiceMock.Object,
-            _aufgabeService,
-            _db,
-            appEinstellungService: _appEinstellungService);
-
         return new TaskDetailViewModel(
             _aufgabeService,
             _protokollService,
@@ -118,9 +110,6 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
             TaskDetailViewModelTestFactory.CreateStub(),
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(),
-            autonomAufgabeStartService,
-            _appEinstellungService,
-            Options.Create(new AutonomAufgabenOptions()),
             laufdatenChangedNotifier: _laufdatenChangedNotifier);
     }
 

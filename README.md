@@ -20,12 +20,13 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 ## Kernfunktionen
 
 - **Projekt- und Aufgabenverwaltung** mit lokalem Aufgabenstatus, Protokollierung und To-Do-Listen
+- **Kompakte Aufgabenliste** in Seitenleiste und Dashboard mit dreizeiligen Symbol-Kacheln, vollflächig klickbar, umschaltbar zwischen den Anzeigemodi Datum, Repository und KI (pro Ansicht persistiert)
 - **Plugin-basierte SCM-Integration** für GitHub, BitBucket und lokale Arbeitsverzeichnisse
 - **Plugin-basierte KI-Ausführung** über eingebettete interaktive CLI-Terminal-Sitzungen (ConPTY mit diagnostiziertem Pipe-Fallback)
 - **IDE-Integration** mit Visual Studio für `.sln`/`.slnx` und Visual Studio Code als Fallback
 - **Dateiexplorer und Diff-Ansicht** direkt in der Aufgabendetailansicht
-- **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Monitoring
-- **Autonome Aufgaben** mit Projektleiter-Agent und Unteragenten-Orchestrierung
+- **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Ereignisüberwachung
+- **GitHub-Ereignisüberwachung** für Issues und Pull Requests aktivierter Projekt-Repositories — repository-weit — mit persistenter Queue und kontrollierter CLI-Zustellung
 - **Pausierbare Aufgaben** mit manueller Pause und automatischer Pausierung bei erkannten KI-Session-Limits
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases mit konfigurierbarem Update-Modus und optionaler Prerelease-Berücksichtigung
 - **CLI-Aufzeichnung mit Konsolentestfenster** zur Diagnose des Terminal-Renderpfads — byte-exakter Mitschnitt, `.clireplay`-Export, zeitgesteuerte Wiedergabe in der aufgezeichneten Terminal-Geometrie und Einzelschritt-Modus (vor/zurück)
@@ -120,20 +121,38 @@ Beide Werte werden in der SQLite-Einstellungstabelle unter den Schlüsseln `upda
 
 Die Implementierung liegt in `UpdateService`, `GitHubReleaseClient`, `UpdateVersionComparer`/`SemanticUpdateVersion`, `AppEinstellungService`, `SettingsViewModel` und `MainWindowViewModel` (einmalige Startprüfung über `MainWindow.ContentRendered` → `InitializeUpdatesAfterWindowReadyAsync`). Abgedeckt wird das Feature u. a. durch `AppEinstellungServiceTests_UpdateSettings`, `UpdateServiceTests_Options`, `UpdateServiceTests_PrereleaseChain`, `UpdateVersionComparerTests_SemVer`, `GitHubReleaseClientTests_Filters`, `GitHubReleaseClientTests_Pagination`, `MainWindowViewModelTests_UpdateStartup`, `MainWindowViewModelTests_UpdateSettingsReadFailure` und `E2E_UpdateSettings`.
 
+## GitHub-Ereignisüberwachung
+
+Die Anwendung pollt regelmäßig Issue- und Pull-Request-Texte repository-weit für aktivierte Projekt-Repositories: alle offenen Referenzen sowie geschlossene mit Aktivität im laufenden Prüffenster; aufgabenverknüpfte Referenzen bleiben unverändert eingeschlossen. Texte mit dem Trigger-Keyword (Standard `$Softwareschmiede`, konfigurierbar unter **Einstellungen → Allgemein → SCM-Ereignisse**) werden nur angenommen, wenn der Autor beziehungsweise bei einer Bearbeitung der Bearbeiter dem angemeldeten Repository-Owner entspricht. Die gesamte Überwachung lässt sich dort auch deaktivieren (keine GitHub-Abfragen, keine automatische Zustellung; eingegangene Ereignisse bleiben erhalten und manuell bedienbar). Zu Referenzen ohne lokale Aufgabe wird bei qualifizierten Ereignissen die passende Aufgabe automatisch angelegt oder eine eindeutig passende wiederverwendet — dedupliziert über die kanonischen Referenzschlüssel, auch ohne auflösbare Standard-CLI. Angenommene Ereignisse werden dauerhaft gespeichert und unter **SCM-Ereignisse** nachverfolgbar; Kommentare und veröffentlichte PR-Reviews erhalten eine 👀-Reaktion, und nicht sofort zustellbare Ereignisse bleiben in der Queue. Nicht blockierte Aufgaben werden dabei automatisch gestartet (`Neu` → `Gestartet`; Klon, Branch und CLI-Start). Die CLI-Sitzung erhält beim Start dieselbe SCM-Anbindung wie die Anwendung (bei GitHub als Prozessumgebung, nie im Prompt): Der Agent führt erlaubte Issue-/PR-Aktionen — Kommentar, Review, Label, Merge inklusive Admin-Merge, Commit/Push, Schließen — selbst über `gh`/git aus und meldet Status und Ergebnis über den Antwortkanal zurück. Die Zustellung an eine CLI erfolgt kontrolliert und ein ungewisser Zustellstatus wird nicht automatisch erneut gesendet. Bei der Zustellung können dem Prompt je Ereignisart konfigurierbare Anhänge mitgegeben werden (Einstellungen → Allgemein → SCM-Ereignisse: Allgemein, Issue, Issue-Kommentar, Pull Request, Pull-Request-Kommentar inklusive Reviews) — etwa Hinweise auf Skills oder Bearbeitungsregeln; sie verändern weder den gespeicherten Ereignistext noch die Trigger-Prüfung. Nicht mehr relevante Ereignisse lassen sich in der Übersicht endgültig **abbrechen** (Endstatus, keine weiteren Zustell-/Prüfversuche oder GitHub-Antworten; eine laufende CLI-Verarbeitung wird nicht beendet).
+
+Die CLI-Unterstützung ist eingeschränkt: Codex CLI, Claude CLI und Devin CLI werden nur verwendet, wenn Version, Berechtigungen und der konkrete Zugriff auf den geprüften Antwortkanal erfolgreich nachgewiesen sind. Der KI-Simulator funktioniert nur im eigens gestarteten SCM-Modus. GitHub Copilot CLI und andere Plugins werden für diese Ereigniszustellung derzeit nicht unterstützt. Details und Grenzen stehen in der [Dokumentation zur GitHub-Ereignisüberwachung](docs/help/plugins/github-ereignisse/index.md). Vertrauensabfragen der CLIs für neue Aufgabenverzeichnisse werden vor dem Start pfadgenau in der benutzerbezogenen CLI-Konfiguration vorbereitet; bleibt dennoch ein Dialog offen, wird er als eigener Wartegrund angezeigt und die Zustellung nach der Beantwortung im Terminal automatisch fortgesetzt.
+
+## Aktive Aufgabenliste
+
+Die Seitenleisten-Sektion **„Aktive Aufgaben"** und die gleichnamige Liste im Dashboard zeigen bis zu 20 aktive Aufgaben (Status `Gestartet`/`Wartend`) als kompakte, dreizeilige Kacheln an:
+
+- **Kachel-Aufbau:** Aufgabentitel, Repository-Name als Untertitel (Fallback: Projektname) und eine Symbolzeile mit SCM-Symbol, KI-Symbol und Statussymbol (`⏸`/`⏳`/`▶`/`✓`) sowie der Anzahl offener To-Dos. Plugin-Namen und Status-Volltext (inkl. Pausiert-Countdown) stehen per ToolTip zur Verfügung.
+- **Klickbare Kachel:** Die gesamte Kachel navigiert per Klick zur Aufgabendetailansicht — ein separater Navigations-Button entfällt. Der To-do-Button in der Symbolzeile bleibt eigenständig klickbar und öffnet den Dialog der offenen To-Dos, ohne die Navigation auszulösen.
+- **Umschaltbare Anzeigemodi:** Drei Modus-Buttons in der Titelleiste der Liste schalten zwischen **„Datum"** (flache Liste, absteigend nach letzter Ausführung), **„Repository"** und **„KI"** um. Die beiden Gruppenmodi sortieren die Gruppen alphabetisch und die Einträge innerhalb einer Gruppe nach letzter Ausführung; Fallback-Gruppen („Ohne Repository" bzw. „Nicht ausgeführt") stehen am Ende. Die Buttons sind in Seitenleiste und Dashboard verfügbar und werden in der eingeklappten Seitenleiste ausgeblendet.
+- **Persistenz:** Der gewählte Modus wird pro Ansicht in der `AppEinstellung`-Tabelle gespeichert (`aktiveaufgaben.listenmodus` für die Seitenleiste, `aktiveaufgaben.listenmodus.dashboard` für das Dashboard) und beim App-Start wiederhergestellt.
+- **Plugin-Symbole:** Die Symbole liefert der Plugin-Vertrag — `IPlugin.PluginSymbol` ist als binärkompatibles Default-Interface-Member deklariert (Fallback `◻`); alle mitgelieferten Plugins definieren eigene Glyphen (z. B. 🐙 GitHub, 🪣 BitBucket, 📁 Local Directory, ✳ Claude CLI, ✈ GitHub Copilot, ◈ Codex, 🤖 Devin, 🧪 KI-Simulator).
+
+Die Implementierung liegt in `ActiveTasksListControl`, `MainWindowViewModel`, `DashboardViewModel`, `AufgabenListenModus`, `AufgabenListenAnsicht`, `AufgabenListenModusService`, `AktiveAufgabePanelItem` und `KiAusfuehrungsStatusSymbolConverter`. Abgedeckt wird das Feature u. a. durch `AufgabenListenAnsichtTests`, `KiAusfuehrungsStatusSymbolConverterTests` und den E2E-Test `E2E_AufgabenListeModi`.
+
 ## Aufgaben pausieren und Session-Limits erkennen
 
-Reguläre Aufgaben lassen sich zeitgebunden pausieren. Zusätzlich erkennt die Anwendung Session-Limits in der CLI-Ausgabe und pausiert betroffene Aufgaben automatisch.
+Aufgaben lassen sich zeitgebunden pausieren. Zusätzlich erkennt die Anwendung Session-Limits in der CLI-Ausgabe und pausiert betroffene Aufgaben automatisch.
 
 ### Pause einstellen und aufheben
 
 - In der Ribbon-Gruppe **Aufgabe** der Aufgabendetailansicht öffnet **„Pause einstellen"** (`PauseEinstellen`) den `AufgabePausierenDialog` mit Datum- und Uhrzeit-Eingabe (Vorbelegung: nächste volle Minute).
-- Der Button ist nur sichtbar, wenn die Aufgabe den Status `Neu`, `Gestartet` oder `Wartend` hat und keine Autonome Aufgabe ist.
+- Der Button ist nur sichtbar, wenn die Aufgabe den Status `Neu`, `Gestartet` oder `Wartend` hat.
 - `AufgabeService.SetPauseAsync` persistiert den UTC-Zeitpunkt in `Aufgabe.PausiertBisUtc` und schreibt einen `ProtokollTyp.SystemMeldung`-Eintrag. Über **„Pause aufheben"** im selben Dialog lässt sich eine aktive Pause vorzeitig beenden.
 - Der Pause-Endzeitpunkt muss in der Zukunft liegen. Das Ende der Pause ist rein zeitbasiert — es gibt keine automatische Wiederaufnahme der CLI.
 
 ### Anzeige
 
-- Die Kachel in der Seitenleisten-Sektion **„Aktive Aufgaben"** zeigt `⏸ Pausiert (noch hh:mm:ss)` — ab 24 Stunden Restzeit `d.hh:mm:ss` — und wird per `Opacity`-Trigger auf `0,55` abgeschwächt (`KiAusfuehrungsStatusConverter`, `ActiveTasksListControl`).
+- Die Kachel in der Seitenleisten-Sektion **„Aktive Aufgaben"** zeigt das Statussymbol `⏸`; der Volltext `Pausiert (noch hh:mm:ss)` — ab 24 Stunden Restzeit `d.hh:mm:ss` — steht als ToolTip auf dem Symbol. Die Kachel wird per `Opacity`-Trigger auf `0,55` abgeschwächt (`KiAusfuehrungsStatusConverter`/`KiAusfuehrungsStatusSymbolConverter`, `ActiveTasksListControl`).
 - Die Detailansicht blendet im Ribbon zusätzlich `⏸ Pausiert bis dd.MM.yyyy HH:mm` ein.
 
 ### Wirkung einer aktiven Pause
@@ -145,7 +164,7 @@ Reguläre Aufgaben lassen sich zeitgebunden pausieren. Zusätzlich erkennt die A
 ### Automatische Pause bei Session-Limit
 
 - Enthält eine CLI-Ausgabezeile den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel, ruft der `CliOutputProtokollWriter` den `KiPluginLimitService`.
-- Der Service persistiert den Reset-Zeitpunkt als `AppEinstellung` unter `plugins.sessionlimit.<KiPluginPrefix>` und pausiert alle aktiv laufenden regulären Aufgaben desselben Plugin-Prefix (pro Aufgabe ein `SystemMeldung`-Eintrag).
+- Der Service persistiert den Reset-Zeitpunkt als `AppEinstellung` unter `plugins.sessionlimit.<KiPluginPrefix>` und pausiert alle aktiv laufenden Aufgaben desselben Plugin-Prefix (pro Aufgabe ein `SystemMeldung`-Eintrag).
 - Eine manuell gesetzte, später endende Pause wird dabei nicht verkürzt (Max-Semantik); ein bereits abgelaufener Zeitpunkt wird zwar persistiert, löst aber keine Pause aus.
 - Marker ohne gültigen Zeitstempel erzeugen weiterhin nur den `ProtokollTyp.RateLimit`-Eintrag.
 
@@ -219,14 +238,6 @@ Die Konfigurationsbasis liegt in `src/Softwareschmiede/appsettings*.json`. Im ak
 - `DirectoryStructure:Enabled`
 - `DirectoryStructure:MaxDepth`
 - `DirectoryStructure:CacheDurationSeconds`
-- `AutonomAufgaben:Enabled`
-- `AutonomAufgaben:DefaultTokenBudget`
-- `AutonomAufgaben:DefaultRuntimeLimitMinutes`
-- `AutonomAufgaben:HeartbeatTimeoutSeconds`
-- `AutonomAufgaben:MaxConcurrentUnteragenten`
-- `AutonomAufgaben:SkillAutogenerationEnabled`
-- `AutonomAufgaben:MaxClones`
-- `AutonomAufgaben:MaxFeatureBranches`
 - `Terminal:ReplayBufferByteBudget`
 - `Terminal:DefaultCols`
 - `Terminal:DefaultRows`

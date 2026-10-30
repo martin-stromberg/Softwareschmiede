@@ -99,8 +99,6 @@ public sealed class AufgabeService : IAktiveAufgabenService
             .Include(a => a.GitRepository)
                 .ThenInclude(r => r!.InitialisierungKonfiguration)
             .Include(a => a.Todos)
-            // Fuer Aufgabe.IstAutonom() (Modus-Indikator regulär/autonom) benötigt, u. a. von TaskDetailViewModel.
-            .Include(a => a.AutonomKonfiguration)
             .FirstOrDefaultAsync(a => a.Id == id, ct);
     }
 
@@ -245,6 +243,75 @@ public sealed class AufgabeService : IAktiveAufgabenService
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Aufgabe aus Issue #{IssueNummer} mit ID {AufgabeId} erstellt.", issue.Nummer, aufgabe.Id);
+        return aufgabe;
+    }
+
+    /// <summary>Erstellt eine neue Aufgabe aus einer Issue-Ereignisreferenz. Der kanonische
+    /// <paramref name="sourceKey"/> verhindert Anlageduplikate; bei paralleler Anlage wird die
+    /// bestehende Aufgabe zurückgegeben.</summary>
+    public async Task<Aufgabe> CreateFromIssueEventAsync(
+        Guid projektId,
+        Issue issue,
+        Guid gitRepositoryId,
+        string sourceKey,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(issue);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceKey);
+
+        _logger.LogInformation("Aufgabe aus Issue-Ereignis {SourceKey} für Projekt {ProjektId} erstellen.", sourceKey, projektId);
+
+        var existing = await _db.IssueReferenzen
+            .AsNoTracking()
+            .Where(i => i.SourceKey == sourceKey)
+            .Select(i => (Guid?)i.AufgabeId)
+            .FirstOrDefaultAsync(ct);
+        if (existing is { } existingId)
+        {
+            _logger.LogInformation("Issue-Ereignis {SourceKey} ist bereits als Aufgabe {AufgabeId} angelegt.", sourceKey, existingId);
+            return await _db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == existingId, ct);
+        }
+
+        var aufgabe = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = projektId,
+            GitRepositoryId = gitRepositoryId,
+            Titel = issue.Titel,
+            AnforderungsBeschreibung = issue.Body,
+            Status = AufgabeStatus.Neu,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        };
+
+        var issueReferenz = CreateIssueReferenz(aufgabe.Id, issue);
+        issueReferenz.SourceKey = sourceKey;
+        aufgabe.IssueReferenz = issueReferenz;
+
+        _db.Aufgaben.Add(aufgabe);
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            _db.ChangeTracker.Clear();
+            var concurrentlyCreated = await _db.IssueReferenzen
+                .AsNoTracking()
+                .Where(i => i.SourceKey == sourceKey)
+                .Select(i => (Guid?)i.AufgabeId)
+                .FirstOrDefaultAsync(ct);
+            if (concurrentlyCreated is { } aufgabeId)
+            {
+                _logger.LogWarning(ex, "Issue-Ereignis {SourceKey} wurde parallel angelegt.", sourceKey);
+                return await _db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == aufgabeId, ct);
+            }
+
+            throw;
+        }
+
+        _logger.LogInformation("Aufgabe aus Issue-Ereignis {SourceKey} mit ID {AufgabeId} erstellt.", sourceKey, aufgabe.Id);
         return aufgabe;
     }
 
@@ -770,15 +837,8 @@ public sealed class AufgabeService : IAktiveAufgabenService
             pausiertBisUtc?.ToString("O") ?? "-");
 
         var aufgabe = await _db.Aufgaben
-            .Include(a => a.AutonomKonfiguration)
             .FirstOrDefaultAsync(a => a.Id == aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
-
-        if (aufgabe.IstAutonom())
-        {
-            throw new InvalidOperationException(
-                $"Aufgabe {aufgabeId} ist eine Autonome Aufgabe und kann nicht pausiert werden.");
-        }
 
         if (aufgabe.Status is not (AufgabeStatus.Neu or AufgabeStatus.Gestartet or AufgabeStatus.Wartend))
         {

@@ -33,7 +33,7 @@ public sealed class E2E_RepositoryManagementTests : WpfTestBase
     /// Repositories mit manuell eingegebenem Basis-Branch, danach die nachträgliche Bearbeitung dieses
     /// Basis-Branches in der Projektdetailansicht.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task BasisBranchVerwaltung()
     {
         var mainWindow = LaunchAppAndGetMainWindow();

@@ -1,0 +1,145 @@
+<UserControl x:Class="Softwareschmiede.App.Views.ScmEventQueueView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.AutomationId="ScmEventQueueView"
+             Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource PrimaryTextBrush}">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="2*" MinHeight="100"/>
+            <RowDefinition Height="5"/>
+            <RowDefinition Height="3*" MinHeight="170"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <DockPanel Margin="0,0,0,14">
+            <Button DockPanel.Dock="Right" Content="Dashboard" Command="{Binding BackCommand}" Padding="12,6" AutomationProperties.AutomationId="ScmEventBack"/>
+            <TextBlock Text="SCM-Ereignisse" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        </DockPanel>
+        <DockPanel Grid.Row="1" Margin="0,0,0,10">
+            <Button DockPanel.Dock="Right" Content="Aktualisieren" Command="{Binding RefreshCommand}" Padding="12,6" AutomationProperties.AutomationId="ScmEventRefresh"/>
+            <TextBlock Text="Anzeigen:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" Width="150" HorizontalAlignment="Left"
+                      AutomationProperties.AutomationId="ScmEventFilter" AutomationProperties.Name="Ereignisfilter"/>
+        </DockPanel>
+        <Grid Grid.Row="2">
+            <DataGrid ItemsSource="{Binding Events}" SelectedItem="{Binding SelectedEvent}" IsReadOnly="True" AutoGenerateColumns="False"
+                      SelectionMode="Single" SelectionUnit="FullRow" CanUserAddRows="False" MouseDoubleClick="OnDoubleClick"
+                      AutomationProperties.AutomationId="ScmEventList" AutomationProperties.Name="SCM-Ereignisse"
+                      Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource PrimaryTextBrush}">
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Setter Property="Background" Value="{DynamicResource BackgroundBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+                        <Setter Property="BorderBrush" Value="Transparent"/>
+                        <Setter Property="BorderThickness" Value="0,0,3,0"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True"/>
+                                    <Condition Property="Selector.IsSelectionActive" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter Property="Background" Value="{DynamicResource SidebarBackgroundBrush}"/>
+                            </MultiTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.CellStyle>
+                    <Style TargetType="DataGridCell">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+                        <Setter Property="BorderBrush" Value="Transparent"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True"/>
+                                    <Condition Property="Selector.IsSelectionActive" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter Property="Background" Value="{DynamicResource SidebarBackgroundBrush}"/>
+                            </MultiTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.CellStyle>
+                <DataGrid.ColumnHeaderStyle>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                        <Setter Property="Padding" Value="8,6"/>
+                    </Style>
+                </DataGrid.ColumnHeaderStyle>
+                <DataGrid.InputBindings><KeyBinding Key="Enter" Command="{Binding OpenEventCommand}"/></DataGrid.InputBindings>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Aufgabe" Binding="{Binding TaskTitle}" Width="*" MinWidth="120"/>
+                    <DataGridTextColumn Header="Repository" Binding="{Binding Repository}" Width="*" MinWidth="110"/>
+                    <DataGridTextColumn Header="Ursprung" Binding="{Binding Reference}" Width="100"/>
+                    <DataGridTextColumn Header="Art" Binding="{Binding Kind}" Width="95"/>
+                    <DataGridTextColumn Header="Eingang" Binding="{Binding Received}" Width="120"/>
+                    <DataGridTextColumn Header="Status" Binding="{Binding StatusText}" Width="145"/>
+                </DataGrid.Columns>
+            </DataGrid>
+            <TextBlock Text="{Binding EmptyText}" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" Padding="12"
+                       Background="{DynamicResource BackgroundBrush}" AutomationProperties.AutomationId="ScmEventEmpty"/>
+        </Grid>
+        <GridSplitter Grid.Row="3" Height="5" HorizontalAlignment="Stretch"/>
+        <Grid Grid.Row="4" Margin="0,12,0,0" Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Zur Aufgabe" Command="{Binding NavigateToTaskCommand}" Padding="10,4" AutomationProperties.AutomationId="ScmEventTask"/>
+                <TextBlock Text="{Binding SelectedEvent.TaskTitle}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+            </DockPanel>
+            <StackPanel Grid.Row="1" Margin="0,4,0,4">
+                <TextBlock Text="{Binding SelectedEvent.StatusText}" FontWeight="SemiBold" AutomationProperties.AutomationId="ScmEventStatus"/>
+                <TextBox Text="{Binding SelectedEvent.Origin, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                         AutomationProperties.AutomationId="ScmEventOrigin" ToolTip="Ursprung – Adresse kann kopiert werden"/>
+                <TextBlock Text="{Binding SelectedEvent.CliRunId, StringFormat=CLI-Sitzung: {0}}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}"
+                           AutomationProperties.AutomationId="ScmEventRun"/>
+            </StackPanel>
+            <TextBlock Grid.Row="2" Text="{Binding SelectedEvent.Reason}" TextWrapping="Wrap" Margin="0,4,0,8"
+                       AutomationProperties.AutomationId="ScmEventReason"/>
+            <TextBox Grid.Row="3" Text="{Binding SelectedEvent.Body, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto" AutomationProperties.AutomationId="ScmEventBody"/>
+            <WrapPanel Grid.Row="4" Margin="0,10,0,0">
+                <Button Content="Öffnen / CLI auswählen" Command="{Binding OpenEventCommand}" Padding="10,6" Margin="0,0,6,6" AutomationProperties.AutomationId="ScmEventOpen"/>
+                <Button Content="Erneut prüfen" Command="{Binding RetryCommand}" Padding="10,6" Margin="0,0,6,6" AutomationProperties.AutomationId="ScmEventRetry"/>
+                <Button Content="Eingabebereitschaft bestätigen" Command="{Binding ConfirmReadyCommand}" Padding="10,6" Margin="0,0,6,6"
+                        Visibility="{Binding SelectedEvent.CanConfirmReady, Converter={StaticResource BoolToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventConfirmReady"/>
+                <Button Content="Status erneut prüfen" Command="{Binding CheckStatusCommand}" Padding="10,6" Margin="0,0,6,6"
+                        Visibility="{Binding SelectedEvent.CanResend, Converter={StaticResource BoolToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventCheckStatus"/>
+                <Button Content="Neu senden…" Command="{Binding ResendCommand}" Padding="10,6" Margin="0,0,6,6"
+                        Visibility="{Binding SelectedEvent.CanResend, Converter={StaticResource BoolToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventResend"/>
+                <Button Content="Abbrechen…" Command="{Binding CancelCommand}" Padding="10,6" Margin="0,0,6,6"
+                        Visibility="{Binding SelectedEvent.CanCancel, Converter={StaticResource BoolToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventCancel"/>
+            </WrapPanel>
+        </Grid>
+        <StackPanel Grid.Row="5" Margin="0,8,0,0">
+            <TextBlock Text="SCM-Ereignisse werden geladen…" Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventLoading"/>
+            <StackPanel Visibility="{Binding LoadError, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+                <TextBlock Text="{Binding LoadError}" TextWrapping="Wrap" AutomationProperties.AutomationId="ScmEventLoadError"/>
+                <Button Content="Erneut laden" Command="{Binding RefreshCommand}" HorizontalAlignment="Left" Padding="10,4" AutomationProperties.AutomationId="ScmEventReload"/>
+            </StackPanel>
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" AutomationProperties.AutomationId="ScmEventMessage"/>
+            <TextBlock Text="{Binding MonitoringNotice}" Visibility="{Binding MonitoringNotice, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" TextWrapping="Wrap" AutomationProperties.AutomationId="ScmEventMonitoringNotice"/>
+            <Button Content="Quellen erneut prüfen" Command="{Binding RetrySourcesCommand}" HorizontalAlignment="Left" Padding="10,4"
+                    Visibility="{Binding Diagnostics, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventRetrySources"/>
+            <Expander Header="Integrationshinweise" Visibility="{Binding Diagnostics, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" Margin="0,4,0,0">
+                <StackPanel>
+                    <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto"><TextBlock Text="{Binding Diagnostics}" TextWrapping="Wrap" AutomationProperties.AutomationId="ScmEventDiagnostics"/></ScrollViewer>
+                </StackPanel>
+            </Expander>
+            <Button Content="CLI-Einstellungen" Command="{Binding NavigateToSettingsCommand}" HorizontalAlignment="Left" Padding="10,4" Margin="0,6,0,0" AutomationProperties.AutomationId="ScmEventSettings"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

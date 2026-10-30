@@ -47,11 +47,6 @@ public interface IDialogService
         AufgabePausierenDialogViewModel viewModel,
         CancellationToken ct = default);
 
-    /// <summary>Zeigt den Initialisierungsdialog für eine Autonome Aufgabe und gibt die erstellte Konfiguration zurück, oder null wenn abgebrochen.</summary>
-    Task<AutonomAufgabeKonfiguration?> ShowAutonomAufgabeInitialisierungsDialogAsync(
-        AutonomAufgabeInitialisierungsDialogViewModel viewModel,
-        CancellationToken ct = default);
-
     /// <summary>Zeigt einen Speichern-Dialog und gibt den gewählten Dateipfad zurück, oder null wenn abgebrochen.</summary>
     Task<string?> ShowSaveFileDialogAsync(
         string title,

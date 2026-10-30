@@ -72,6 +72,9 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
                     Logger = _loggerFactory.CreateLogger<PseudoConsoleSession>(),
                     OutputSink = outputSink,
                     Options = _options.Value,
+                    PromptSubmitDelay = spec.PromptSubmitDelay,
+                    PromptSubmitRepeatCount = spec.PromptSubmitRepeatCount,
+                    PromptSubmitRepeatInterval = spec.PromptSubmitRepeatInterval,
                 });
         }
         catch

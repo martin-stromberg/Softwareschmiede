@@ -250,6 +250,19 @@
                                         Padding="10,4" />
                             </StackPanel>
                         </StackPanel>
+
+                        <!-- Projektbezogene Backmerge-Freigabe (nur bei Modus „Projektbezogen aktivierbar“ und konfiguriertem Basis-Branch sichtbar) -->
+                        <StackPanel Margin="0,12,0,0"
+                                    Visibility="{Binding IsBackmergeOptionVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <CheckBox IsChecked="{Binding IsBackmergeAutoMergeEnabled, Mode=TwoWay}"
+                                      AutomationProperties.Name="BackmergeAutoMergeEnabled"
+                                      Content="Backmerge-Pull-Requests automatisch mergen"
+                                      Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Pull Requests vom Repository-Hauptbranch auf den konfigurierten Basis-Branch werden automatisch gemergt, sobald der Provider sie als mergebar meldet."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="22,4,0,0" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

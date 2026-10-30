@@ -54,9 +54,9 @@ public partial class End2EndTest
         }
 
         // Die Seitenleiste aktualisiert sich über den 5-s-Timer; auf die Kachel warten.
-        // Anker ist der "→"-Button 'AufgabeNavigieren:{titel}' — er existiert nur im
-        // Seitenleisten-Template (ShowNavigationButton=True) und beweist damit gezielt die
-        // Seitenleisten-Kachel (die Kachel-Border selbst erzeugt keinen AutomationPeer).
+        // Anker ist 'AufgabeNavigieren:{titel}' — seit der Kachel-Umstellung (Issue 288) ist das
+        // die gesamte klickbare Kachel (vollflächiger Button). Er existiert in beiden
+        // ActiveTasksListControl-Instanzen; die Suche läuft gescoped unter 'AktiveAufgabenListeMenue'.
         WaitForElement(
             mainWindow,
             cf => cf.ByName($"AufgabeNavigieren:{titel}"),
@@ -67,6 +67,12 @@ public partial class End2EndTest
         // allein wäre bereits über die Seitenleisten-Kachel im Automation-Baum auffindbar.
         var detail = taskDetail.Menu.NavigateToTask(titel);
         WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+
+        // Das Ribbon enthält nur die regulären Aufgabensteuerungen (Starten, Pause einstellen).
+        WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("PauseEinstellen"), Short);
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutonomAufgabeInitialisieren")));
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("Autonome Aufgabe")));
 
         // Phase 1: Dialog öffnen — Vorbelegung muss ≈ dem aktuellen Zeitpunkt entsprechen.
         var pauseDialog = new AufgabePausierenDialogView(mainWindow).ForceShow();
