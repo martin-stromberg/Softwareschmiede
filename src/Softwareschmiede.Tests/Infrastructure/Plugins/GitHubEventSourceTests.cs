@@ -1,9 +1,12 @@
+using System.Net.Http;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Plugins;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Infrastructure.Plugins;
 
@@ -363,31 +366,31 @@ public sealed class GitHubEventSourceTests
         Assert.Equal(ScmProviderFailureKind.Temporary, error.FailureKind);
     }
 
-    /// <summary>gh erhält JSON ausschließlich in einer kurzlebigen Inputdatei und Tokens nur im Environment.</summary>
+    /// <summary>Der HTTP-Transport sendet JSON als Request-Body und den Token nur im Authorization-Header.</summary>
     [Fact]
-    public async Task GhTransport_UsesArgumentListAndJsonFile_NotBodyOrTokenArguments()
+    public async Task HttpTransport_SendsJsonBodyAndBearerToken_InRequest()
     {
-        var runner = new Mock<ICliRunner>();
         const string json = "{\"body\":\"quotes \\\" \\n \\u001B \\u0000\"}";
-        string? inputPath = null;
-        runner.Setup(x => x.RunAsync("gh", It.IsAny<IEnumerable<string>>(), null,
-                It.IsAny<IDictionary<string, string>>(), It.IsAny<CancellationToken>()))
-            .Returns((string _, IEnumerable<string> args, string? _, IDictionary<string, string>? environment, CancellationToken _) =>
-            {
-                var array = args.ToArray();
-                Assert.DoesNotContain("token-secret", string.Join(" ", array));
-                Assert.DoesNotContain(json, array);
-                Assert.Equal("token-secret", environment!["GH_TOKEN"]);
-                inputPath = array[Array.IndexOf(array, "--input") + 1];
-                Assert.Equal(json, File.ReadAllText(inputPath));
-                return Task.FromResult(new CliResult(0, "HTTP/2.0 201 Created\r\nContent-Type: application/json\r\n\r\n{\"id\":42}", ""));
-            });
-        var client = new GhEventApiClient(runner.Object, () => new Dictionary<string, string> { ["GH_TOKEN"] = "token-secret" });
+        HttpRequestMessage? captured = null;
+        string? capturedBody = null;
+        var handler = new DelegateHandler(async (request, _) =>
+        {
+            captured = request;
+            capturedBody = await request.Content!.ReadAsStringAsync();
+            return new HttpResponseMessage(System.Net.HttpStatusCode.Created)
+            { Content = new StringContent("{\"id\":42}", System.Text.Encoding.UTF8, "application/json") };
+        });
+        var client = new GitHubHttpApiClient(() => "token-secret", handler);
         var result = await client.SendAsync(new("github.com", "POST", "repos/owner/repo/issues/7/comments", json));
         Assert.Equal(201, result.StatusCode);
         Assert.Equal("{\"id\":42}", result.Body);
-        Assert.NotNull(inputPath);
-        Assert.False(File.Exists(inputPath));
+        Assert.NotNull(captured);
+        Assert.Equal("Bearer", captured!.Headers.Authorization?.Scheme);
+        Assert.Equal("token-secret", captured.Headers.Authorization?.Parameter);
+        Assert.Equal("application/vnd.github+json", captured.Headers.Accept.ToString());
+        Assert.Equal("2022-11-28", captured.Headers.GetValues("X-GitHub-Api-Version").Single());
+        Assert.Equal(json, capturedBody);
+        Assert.DoesNotContain("token-secret", captured.RequestUri!.ToString());
     }
 
     /// <summary>Issue-Anlagedaten liefern Titel, Text, Labels, Milestone und kanonische URL.</summary>
@@ -463,7 +466,80 @@ public sealed class GitHubEventSourceTests
         Assert.Equal(ScmProviderFailureKind.Permanent, error.FailureKind);
     }
 
+    /// <summary>Die Repository-Auflösung läuft im SeparatesKonto ausschließlich über den
+    /// Agent-Client; der Benutzer-Client wird nicht berührt und das Ergebnis trägt das Konto.</summary>
+    [Fact]
+    public async Task GetEventRepositoryAsync_SeparatesKonto_UsesAgentToken()
+    {
+        var user = new FakeApi();
+        var agent = new FakeApi();
+        Identity(agent);
+        var plugin = Plugin(user, StoreWithAgentToken(), agent);
+
+        var result = await plugin.GetEventRepositoryAsync(
+            new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo", ScmKontoModus.SeparatesKonto));
+
+        Assert.Equal(Repository with { Konto = ScmKontoModus.SeparatesKonto }, result);
+        Assert.Empty(user.Requests);
+        Assert.Equal(2, agent.Requests.Count);
+    }
+
+    /// <summary>Reads folgen dem Konto der Referenz: SeparatesKonto → Agent-Client,
+    /// Benutzerkonto → Benutzer-Client.</summary>
+    [Theory]
+    [InlineData(ScmKontoModus.Benutzerkonto)]
+    [InlineData(ScmKontoModus.SeparatesKonto)]
+    public async Task ReadEventsAsync_RoutesByReferenceKonto(ScmKontoModus konto)
+    {
+        var user = new FakeApi();
+        var agent = new FakeApi();
+        var routed = konto == ScmKontoModus.SeparatesKonto ? agent : user;
+        var idle = konto == ScmKontoModus.SeparatesKonto ? user : agent;
+        routed.AddGraph(new { repository = new { issue = Node("I_7", "text") } });
+        var plugin = Plugin(user, StoreWithAgentToken(), agent);
+        var reference = Issue with { Repository = Repository with { Konto = konto } };
+
+        var batch = await plugin.ReadEventsAsync(Read(reference, ScmContentKind.Description));
+
+        Assert.Single(batch.Observations);
+        Assert.Single(routed.Requests);
+        Assert.Empty(idle.Requests);
+    }
+
+    /// <summary>Antworten folgen dem Konto der gespeicherten Referenz — inklusive
+    /// Identitätsprüfung, Abgleichs-Reads und dem eigentlichen POST.</summary>
+    [Theory]
+    [InlineData(ScmKontoModus.Benutzerkonto)]
+    [InlineData(ScmKontoModus.SeparatesKonto)]
+    public async Task Response_RoutesByReferenceKonto(ScmKontoModus konto)
+    {
+        var user = new FakeApi();
+        var agent = new FakeApi();
+        var routed = konto == ScmKontoModus.SeparatesKonto ? agent : user;
+        var idle = konto == ScmKontoModus.SeparatesKonto ? user : agent;
+        Identity(routed);
+        routed.Add("comments?", Array.Empty<object>());
+        routed.Add("issues/7/comments", new { id = 99, html_url = "https://github.com/owner/repo/issues/7#issuecomment-99" });
+        var plugin = Plugin(user, StoreWithAgentToken(), agent);
+        var reference = Issue with { Repository = Repository with { Konto = konto } };
+
+        var result = await plugin.ExecuteResponseAsync(new(reference, "action-1", ScmResponseKind.Comment, "Antwort"));
+
+        Assert.Equal("99", result.RemoteId);
+        Assert.Empty(idle.Requests);
+        Assert.Contains(routed.Requests, x => x.Method == "POST");
+        routed.AssertComplete();
+    }
+
     private static GitHubPlugin Plugin(FakeApi api) => new(Mock.Of<ICliRunner>(), Mock.Of<ICredentialStore>(), NullLogger<GitHubPlugin>.Instance, api);
+    private static GitHubPlugin Plugin(FakeApi api, ICredentialStore store, FakeApi agent)
+        => new(Mock.Of<ICliRunner>(), store, NullLogger<GitHubPlugin>.Instance, api, agent);
+    private static ICredentialStore StoreWithAgentToken()
+    {
+        var store = new Mock<ICredentialStore>();
+        store.Setup(x => x.GetCredential("Softwareschmiede.GitHub.AgentToken")).Returns("bot-token");
+        return store.Object;
+    }
     private static ScmEventReadRequest Read(ScmEventReference reference, ScmContentKind kind) => new(reference, kind, null, Created.AddHours(1));
     private static void Identity(FakeApi api, string viewer = "U_1")
     {
@@ -500,24 +576,5 @@ public sealed class GitHubEventSourceTests
     private static object Page(object nodes, bool hasNextPage, string? endCursor) =>
         new { nodes, pageInfo = new { hasNextPage, endCursor } };
 
-    private sealed class FakeApi : IGitHubEventApiClient
-    {
-        private readonly Queue<(string Endpoint, GitHubEventApiResponse? Response, Exception? Error)> _steps = new();
-        internal List<GitHubEventApiRequest> Requests { get; } = [];
-        internal void Add(string endpoint, object body, Dictionary<string, string>? headers = null) =>
-            _steps.Enqueue((endpoint, new(200, JsonSerializer.Serialize(body), headers), null));
-        internal void AddGraph(object data) => Add("graphql", new { data });
-        internal void AddStatus(string endpoint, int status, Dictionary<string, string>? headers = null) =>
-            _steps.Enqueue((endpoint, new(status, "{\"message\":\"secret\"}", headers), null));
-        internal void AddFailure(string endpoint, Exception error) => _steps.Enqueue((endpoint, null, error));
-        internal void AssertComplete() => Assert.Empty(_steps);
-        public Task<GitHubEventApiResponse> SendAsync(GitHubEventApiRequest request, CancellationToken ct = default)
-        {
-            Requests.Add(request);
-            Assert.NotEmpty(_steps);
-            var step = _steps.Dequeue();
-            Assert.Contains(step.Endpoint, request.Endpoint);
-            return step.Error is null ? Task.FromResult(step.Response!) : Task.FromException<GitHubEventApiResponse>(step.Error);
-        }
-    }
+    private sealed class FakeApi : FakeGitHubEventApi;
 }

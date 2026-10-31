@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Domain.Entities;
@@ -17,6 +18,14 @@ public sealed class ScmEventMonitoringService(
     : PeriodicBackgroundService(options.Value.PollInterval, time, logger, "SCM-Ereignisüberwachung fehlgeschlagen.")
 {
     private readonly TimeProvider _time = time;
+
+    /// <summary>Zykluslokaler Zustand einer Provider-Runde; wird explizit an die Quellenhelfer
+    /// weitergereicht statt als Seiteneffekt über ein Instanzfeld gesetzt.</summary>
+    private sealed class CycleState
+    {
+        internal bool HadFailure;
+    }
+
     /// <inheritdoc/>
     public override async Task RunOnceAsync(CancellationToken ct = default)
     {
@@ -32,11 +41,13 @@ public sealed class ScmEventMonitoringService(
             return;
         }
         var triggerKeyword = await einstellungen.GetScmTriggerKeywordAsync(ct);
+        var kontoModus = await einstellungen.GetScmKontoModusAsync(ct);
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         var tasks = await db.Aufgaben.AsNoTracking().Include(x => x.GitRepository).Include(x => x.IssueReferenz)
             .Include(x => x.PullRequests).Where(x => x.GitRepository != null && x.GitRepository.Aktiv).ToListAsync(ct);
         var repositories = await db.GitRepositories.AsNoTracking().Where(x => x.Aktiv).ToListAsync(ct);
         var plugins = scope.ServiceProvider.GetRequiredService<IPluginManager>().GetSourceCodeManagementPlugins();
+        var pendingInboxCommits = new List<(string Key, DateTimeOffset Now, string Diagnostic)>();
         var linked = new List<(Guid TaskId, GitRepository Repository, ScmReferenceKind Kind, int Number, string RepositoryId)>();
         foreach (var task in tasks)
         {
@@ -54,6 +65,7 @@ public sealed class ScmEventMonitoringService(
             var repositoriesForEnumeration = new List<ScmEventRepository>();
             var localRepositories = new Dictionary<ScmEventRepository, List<GitRepository>>();
             var complete = true;
+            var cycle = new CycleState();
             // Resolve the entire local reference set before assigning any incoming event.
             // Raw HTTPS/SSH addresses and plugin display names are not repository identities.
             var aliasGroups = linked.Where(x => MatchesPlugin(plugin, x.Repository))
@@ -76,7 +88,7 @@ public sealed class ScmEventMonitoringService(
                 }
                 try
                 {
-                    var repository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(aliasGroup.Repository.Id, plugin.PluginPrefix, alias), ct);
+                    var repository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(aliasGroup.Repository.Id, plugin.PluginPrefix, alias, kontoModus), ct);
                     resolved.AddRange(aliasGroup.Linked.Select(x => ((Guid?)x.TaskId, new ScmEventReference(repository, x.Kind, x.Number))));
                     if (!localRepositories.TryGetValue(repository, out var candidates))
                         localRepositories[repository] = candidates = [];
@@ -94,21 +106,37 @@ public sealed class ScmEventMonitoringService(
                 catch (Exception ex)
                 {
                     complete = false;
-                    await RecordFailureAsync(resolutionKey, ex, ct,
+                    await RecordFailureAsync(resolutionKey, ex, cycle, ct,
                         " Bis zur vollständigen Repositoryzuordnung werden keine neuen Anfragen dieses Providers eingelesen.");
                 }
             }
             // An unresolved alias could name any of the resolved repositories. Do not guess an assignment.
             if (!complete) continue;
-            var enumerated = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var repository in repositoriesForEnumeration)
+            if (kontoModus == ScmKontoModus.SeparatesKonto && plugin is IScmNotificationSource notificationSource)
             {
-                using var enumerationScope = scopes.CreateScope();
-                await EnumerateRepositoryAsync(source, plugin, repository,
-                    enumerationScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>(), enumerated,
-                    enumerationScope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>(), resolved,
-                    localRepositories.TryGetValue(repository, out var lokale) ? lokale : [],
-                    enumerationScope.ServiceProvider.GetRequiredService<ScmBackmergeService>(), ct);
+                // Im SeparatesKonto ersetzt die Inbox des separaten Kontos die repository-weite
+                // Enumeration; verknüpfte Referenzen aus Aufgaben werden nicht als Quellen übernommen.
+                resolved.Clear();
+                foreach (var host in repositoriesForEnumeration.Select(x => x.Host).Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    using var inboxScope = scopes.CreateScope();
+                    await EnumerateNotificationsAsync(notificationSource, plugin, host,
+                        inboxScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>(),
+                        resolved, repositoriesForEnumeration, pendingInboxCommits, cycle, ct);
+                }
+            }
+            else
+            {
+                var enumerated = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var repository in repositoriesForEnumeration)
+                {
+                    using var enumerationScope = scopes.CreateScope();
+                    await EnumerateRepositoryAsync(source, plugin, repository,
+                        enumerationScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>(), enumerated,
+                        enumerationScope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>(), resolved,
+                        localRepositories.TryGetValue(repository, out var lokale) ? lokale : [],
+                        enumerationScope.ServiceProvider.GetRequiredService<ScmBackmergeService>(), cycle, ct);
+                }
             }
             foreach (var group in resolved.GroupBy(x => (Provider: x.Reference.Repository.ProviderPrefix.ToLowerInvariant(),
                 Host: x.Reference.Repository.Host.ToLowerInvariant(), x.Reference.Repository.RepositoryId, x.Reference.Kind, x.Reference.Number)))
@@ -152,10 +180,32 @@ public sealed class ScmEventMonitoringService(
                     catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                     catch (Exception ex)
                     {
-                        await RecordFailureAsync(sourceKey, ex, ct);
+                        await RecordFailureAsync(sourceKey, ex, cycle, ct);
                     }
                 }
             }
+            // Der Inbox-Watermark wird erst committet, wenn Inbox und alle abgeleiteten Quellen
+            // des Zyklus fehlerfrei verarbeitet wurden; sonst bleibt er stehen (idempotent).
+            if (!cycle.HadFailure)
+                foreach (var (commitKey, commitNow, diagnostic) in pendingInboxCommits)
+                {
+                    using var commitScope = scopes.CreateScope();
+                    var commitDb = commitScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+                    var commitCheckpoint = await commitDb.ScmObservationCheckpoints.FindAsync([commitKey], ct);
+                    if (commitCheckpoint is null)
+                    {
+                        commitCheckpoint = new ScmObservationCheckpoint { SourceKey = commitKey };
+                        commitDb.Add(commitCheckpoint);
+                    }
+                    commitCheckpoint.WatermarkUtc = commitNow.ToUnixTimeMilliseconds();
+                    commitCheckpoint.Failures = 0;
+                    commitCheckpoint.NextAttemptUtc = null;
+                    commitCheckpoint.ErrorCode = null;
+                    commitCheckpoint.Diagnostic = diagnostic;
+                    await commitDb.SaveChangesAsync(ct);
+                    scope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>().Notify();
+                }
+            pendingInboxCommits.Clear();
         }
         var nowMilliseconds = _time.GetUtcNow().ToUnixTimeMilliseconds();
         var upperSequence = await db.ScmIncomingEvents.MaxAsync(x => (long?)x.Sequence, ct) ?? 0;
@@ -188,7 +238,7 @@ public sealed class ScmEventMonitoringService(
     private async Task EnumerateRepositoryAsync(IScmEventSource source, IGitPlugin plugin, ScmEventRepository repository,
         SoftwareschmiededDbContext db, HashSet<string> enumerated, ScmEventChangeNotifier notifier,
         List<(Guid? TaskId, ScmEventReference Reference)> resolved, IReadOnlyList<GitRepository> lokaleRepositories,
-        ScmBackmergeService backmerge, CancellationToken ct)
+        ScmBackmergeService backmerge, CycleState cycle, CancellationToken ct)
     {
         var enumerationKey = string.Join('/', new[] { "enumeration", repository.ProviderPrefix.ToLowerInvariant(),
             repository.Host.ToLowerInvariant(), repository.RepositoryId }.Select(Uri.EscapeDataString));
@@ -230,11 +280,61 @@ public sealed class ScmEventMonitoringService(
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
-            await RecordFailureAsync(enumerationKey, ex, ct);
+            await RecordFailureAsync(enumerationKey, ex, cycle, ct);
         }
     }
 
-    private async Task RecordFailureAsync(string sourceKey, Exception error, CancellationToken ct, string diagnosticSuffix = "")
+    /// <summary>Liest die Notifications-Inbox eines Hosts und leitet Referenzen auf registrierte
+    /// Repositories ab. Der Watermark wird erst nach vollständiger Verarbeitung des Zyklus committet;
+    /// verworfene Fremd-Notifications werden als nicht-alarmierende Diagnose sichtbar.</summary>
+    private async Task EnumerateNotificationsAsync(IScmNotificationSource source, IGitPlugin plugin, string host,
+        SoftwareschmiededDbContext db,
+        List<(Guid? TaskId, ScmEventReference Reference)> resolved, IReadOnlyList<ScmEventRepository> repositories,
+        List<(string Key, DateTimeOffset Now, string Diagnostic)> pendingInboxCommits,
+        CycleState cycle, CancellationToken ct)
+    {
+        var inboxKey = string.Join('/', new[] { "notifications", plugin.PluginPrefix.ToLowerInvariant(), host.ToLowerInvariant() }.Select(Uri.EscapeDataString));
+        var checkpoint = await db.ScmObservationCheckpoints.FindAsync([inboxKey], ct);
+        var now = _time.GetUtcNow();
+        if (checkpoint?.NextAttemptUtc > now.ToUnixTimeMilliseconds()) return;
+        try
+        {
+            var sinceUtc = checkpoint?.WatermarkUtc is long watermark
+                ? DateTimeOffset.FromUnixTimeMilliseconds(watermark) - options.Value.PollInterval * 2
+                : (DateTimeOffset?)null;
+            var notifications = await source.EnumerateNotificationsAsync(host, sinceUtc, ct);
+            // Node-IDs sind instanzlokal: eine Notification darf nur Repositories desselben Hosts
+            // matchen — sonst zeigt die abgeleitete Referenz auf ein fremdes Repository.
+            var byRepository = repositories
+                .Where(x => x.Host.Equals(host, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(x => x.RepositoryId, StringComparer.Ordinal)
+                .ToDictionary(x => x.Key, x => x.First(), StringComparer.Ordinal);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var discarded = 0;
+            var mentions = notifications.Where(x => x.Reason == ScmNotification.MentionReason).ToList();
+            foreach (var notification in mentions)
+            {
+                if (!byRepository.TryGetValue(notification.RepositoryNodeId, out var repository))
+                {
+                    discarded++;
+                    continue;
+                }
+                if (seen.Add($"{notification.RepositoryNodeId}/{notification.Kind}/{notification.Number}"))
+                    resolved.Add((null, new ScmEventReference(repository, notification.Kind, notification.Number)));
+            }
+            // Der Watermark darf erst nach dem Verarbeiten aller abgeleiteten Quellen stehen;
+            // das Commit erfolgt daher erst am Ende des Plugin-Durchlaufs (siehe RunOnceAsync).
+            pendingInboxCommits.Add((inboxKey, now,
+                $"{ScmEventStore.InboxDiscardDiagnosticPrefix} {mentions.Count - discarded} verarbeitet, {discarded} verworfen (Repository nicht registriert)."));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            await RecordFailureAsync(inboxKey, ex, cycle, ct);
+        }
+    }
+
+    private async Task RecordFailureAsync(string sourceKey, Exception error, CycleState cycle, CancellationToken ct, string diagnosticSuffix = "")
     {
         using var failureScope = scopes.CreateScope();
         var failureDb = failureScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -250,6 +350,7 @@ public sealed class ScmEventMonitoringService(
         checkpoint.Diagnostic = (failure?.Message ?? "Quelle konnte nicht vollständig gelesen werden.") + diagnosticSuffix;
         checkpoint.NextAttemptUtc = failure?.FailureKind is ScmProviderFailureKind.Authentication or ScmProviderFailureKind.Permission or ScmProviderFailureKind.Permanent
             ? long.MaxValue : ScmEventStore.RetryAt(checkpoint.Failures, _time.GetUtcNow().ToUnixTimeMilliseconds(), failure?.RetryAfterUtc);
+        cycle.HadFailure = true;
         await failureDb.SaveChangesAsync(ct);
         failureScope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>().Notify();
     }

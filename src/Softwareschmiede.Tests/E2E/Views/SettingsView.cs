@@ -1,5 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Input;
+using FlaUI.Core.WindowsAPI;
 using Softwareschmiede.Tests.E2E;
 using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
@@ -267,6 +269,86 @@ public sealed class SettingsView : BaseWindowView
             throw new InvalidOperationException("Kein Textfeld auf der Einstellungsseite gefunden.");
 
         textBoxen[0].AsTextBox().Text = value;
+        return this;
+    }
+
+    /// <summary>Liest das aktuell ausgewählte Label der "Konto-Modus"-ComboBox im "Allgemein"-Tab.</summary>
+    /// <returns>Das Anzeige-Label des gewählten SCM-Konto-Modus (siehe <c>ScmKontoModusTexte</c>).</returns>
+    public string GetKontoModus()
+        => WaitForElement(Window, cf => cf.ByName("Konto-Modus").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+
+    /// <summary>Wählt einen Eintrag der "Konto-Modus"-ComboBox und wartet, bis er übernommen wurde.</summary>
+    /// <param name="label">Das Anzeige-Label (aus <c>ScmKontoModusTexte</c>: "Benutzerkonto" oder "Separates Konto").</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetKontoModus(string label)
+    {
+        // Die ComboBox liegt weit unten im ScrollViewer: ExpandCollapse öffnet sie auch ohne
+        // sichtbaren Klickpunkt (das UIA-Element einer WPF-ComboBox ist selbst nicht
+        // tastaturfokussierbar). Die Einträge liegen im Popup-Teilbaum der ComboBox; die
+        // Auswahl erfolgt patternbasiert, da auch Items keinen eigenen Klickpunkt brauchen.
+        var box = WaitForElement(Window, cf => cf.ByName("Konto-Modus").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox();
+        box.Expand();
+        AutomationElement? item = null;
+        var deadline = DateTime.UtcNow + Short;
+        while (DateTime.UtcNow < deadline)
+        {
+            item = box.FindFirstDescendant(cf => cf.ByName(label))
+                ?? ElementWaitHelper.FindInProcessWindows(Window, cf => cf.ByName(label));
+            if (item is not null)
+                break;
+            Thread.Sleep(200);
+        }
+        Assert.NotNull(item);
+        item.Patterns.SelectionItem.Pattern.Select();
+        WaitForKontoModus(label, Short);
+        return this;
+    }
+
+    /// <summary>
+    /// Wartet, bis die "Konto-Modus"-ComboBox das erwartete Label anzeigt. Dient als echtes
+    /// Synchronisationssignal für das Neuladen der persistierten Einstellungen.
+    /// </summary>
+    /// <param name="label">Das erwartete Anzeige-Label.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Das Label wurde nicht rechtzeitig angezeigt.</exception>
+    public SettingsView WaitForKontoModus(string label, TimeSpan timeout)
+    {
+        ElementWaitHelper.WaitForSelectedComboBoxItem(
+            WaitForElement(Window, cf => cf.ByName("Konto-Modus").And(cf.ByControlType(ControlType.ComboBox)), timeout), label, timeout);
+        return this;
+    }
+
+    /// <summary>
+    /// Setzt ein Secret-Pluginfeld (PasswordBox, <c>AutomationProperties.Name</c> = Feld-Key) per
+    /// Tastatur. WPF-PasswordBoxen unterstützen über UI-Automation weder ValuePattern noch
+    /// TextPattern; Fokus + Unicode-Tastatureingabe ist der einzig verlässliche Weg.
+    /// </summary>
+    /// <param name="fieldKey">Der Feld-Key aus dem Plugin-Settings-Schema (z. B. "AgentToken").</param>
+    /// <param name="value">Der einzugebende Wert.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetPluginSecretField(string fieldKey, string value)
+    {
+        var field = WaitForElement(Window, cf => cf.ByName(fieldKey), Short);
+        // Fokus scrollt das Feld in den sichtbaren Bereich und setzt den Tastaturfokus —
+        // ein vorgängiger Mausklick würde an einem außerhalb liegenden Element fehlschlagen.
+        field.Focus();
+        Assert.True(field.Properties.HasKeyboardFocus.Value,
+            $"Secret-Feld '{fieldKey}' hat vor der Eingabe keinen Tastaturfokus.");
+        foreach (var rune in value.EnumerateRunes())
+        {
+            var runeText = rune.ToString();
+            var input = runeText.SelectMany(character => new[]
+            {
+                INPUT.KeyboardInput(new KEYBDINPUT { wScan = character, dwFlags = KeyEventFlags.KEYEVENTF_UNICODE }),
+                INPUT.KeyboardInput(new KEYBDINPUT { wScan = character, dwFlags = KeyEventFlags.KEYEVENTF_UNICODE | KeyEventFlags.KEYEVENTF_KEYUP })
+            }).ToArray();
+            Assert.Equal((uint)input.Length, User32.SendInput((uint)input.Length, input, INPUT.Size));
+        }
+        Keyboard.Type(VirtualKeyShort.TAB);
+        var deadline = DateTime.UtcNow + Short;
+        while (field.Properties.HasKeyboardFocus.Value && DateTime.UtcNow < deadline)
+            Thread.Sleep(20);
         return this;
     }
 

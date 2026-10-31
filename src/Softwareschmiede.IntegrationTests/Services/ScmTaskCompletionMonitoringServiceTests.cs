@@ -127,6 +127,37 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         Assert.Equal(AufgabeStatus.Beendet, (await TaskAsync(fixture, taskId)).Status);
     }
 
+    /// <summary>Der Issue-Abschlusspfad reicht den aktiven Kontomodus in den Repository-Kontext
+    /// durch: Im SeparatesKonto läuft die Issue-Prüfung unter dem Agent-Konto (der PR-Pfad bleibt
+    /// bewusst Benutzer-Token, siehe Token-Grenze).</summary>
+    [Fact]
+    public async Task CompletionService_PassesActiveKonto_ToRepositoryContext()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: null);
+        await AddIssueReferenceAsync(fixture, taskId, 7);
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
+                .SetScmKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        var contexts = new List<ScmRepositoryContext>();
+        fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
+                It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
+            .Returns((ScmRepositoryContext context, CancellationToken _) =>
+            {
+                contexts.Add(context);
+                return Task.FromResult(fixture.Repository with { Konto = context.Konto });
+            });
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        await monitor.RunOnceAsync();
+
+        var context = Assert.Single(contexts);
+        Assert.Equal(ScmKontoModus.SeparatesKonto, context.Konto);
+        Assert.Equal("https://github.com/owner/repo", context.RepositoryId);
+    }
+
     /// <summary>Deaktivierte Abschlussüberwachung beobachtet nichts; Aufgaben ohne
     /// SCM-Ereigniszuordnung (manuell angelegt) bleiben ebenfalls unberührt.</summary>
     [Fact]

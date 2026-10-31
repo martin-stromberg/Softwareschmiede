@@ -541,7 +541,7 @@ Ablauf:
 10. Schlägt die lokale Zuordnung nach externer Anlage fehl, werden URL oder Nummer des externen Issues in der Fehlermeldung genannt; ein automatischer erneuter Create-Versuch erfolgt nicht.
 
 Providerumfang:
-- GitHub unterstützt Issue-Anlage und das Laden von Repository-Templates über `gh`.
+- GitHub unterstützt Issue-Anlage über `gh` (seltene, ereignisgebundene Mutation) und das Laden von Repository-Templates über die HTTP-REST-API (`GET /repos/{id}/contents/...`).
 - Der Jira-Pfad im Bitbucket-Plugin unterstützt die Issue-Anlage mit konfiguriertem Jira-URL, Projekt-Key und Issue-Typ; die Beschreibung wird als Jira-ADF übertragen.
 - Nicht unterstützte Template-Fähigkeiten bei Jira/Bitbucket verhindern den No-Template-Pfad nicht.
 - Provider ohne `IIssueCreateProvider`, etwa LocalDirectory, bieten die Aktion nicht an.
@@ -551,7 +551,7 @@ Providerumfang:
 Beteiligte Komponenten:
 - `ProjectDetailViewModel.LadenOffeneAnforderungenAsync` — lädt Issues und Alerts für die Projektdetailansicht.
 - `IScmAlertProvider.GetAlertsAsync` — optionale Alert-Quelle des SCM-Plugins.
-- `GitHubPlugin.GetAlertsAsync` — liest GitHub-Code-Scanning-Alerts über `gh api --paginate --slurp`.
+- `GitHubPlugin.GetAlertsAsync` — liest GitHub-Code-Scanning-Alerts paginiert über die HTTP-REST-API (`GET /repos/{id}/code-scanning/alerts`).
 - `ProjectDetailViewModel.AufgabeAusAnforderungErstellenCommand` — unterscheidet `ScmRequirementKind.Issue` und `ScmRequirementKind.Alert`.
 - `IIssueCreateProvider.CreateIssueAsync` — legt aus dem Alert ein neues GitHub-Issue an.
 - `AufgabeService.CreateFromAlertAsync` — speichert Aufgabe, `IssueReferenz` und `AlertReferenz`.
@@ -611,7 +611,7 @@ Ablauf:
 2. `PullRequestReferenzService` legt oder aktualisiert eine `PullRequestReferenz` fuer Aufgabe, Provider, Repository und PR-Nummer.
 3. Die PR-Ansicht laedt die gespeicherten Referenzen inklusive `PullRequestWorkflowRun`-Eintraegen und zeigt PR-, Merge- und Monitoring-Status.
 4. `PullRequestMonitoringService` ermittelt faellige PRs anhand von `MonitoringPhase` und `NextCheckUtc`.
-5. Fuer GitHub werden Statusdaten mit `gh pr view` und Workflow-Runs mit `gh run list` abgefragt. Wenn eine Head-SHA bekannt ist, wird sie zur Zuordnung verwendet.
+5. Fuer GitHub werden Statusdaten per GraphQL-Abfrage und Workflow-Runs per REST (`GET /repos/{id}/actions/runs`, gefiltert ueber `head_sha`) prozesslos ueber HTTP abgefragt. Wenn eine Head-SHA bekannt ist, wird sie zur Zuordnung verwendet.
 6. Workflow-Runs werden ueber `ProviderRunId` upserted. `Success` und `Skipped` gelten als unkritische Abschluesse; fehlgeschlagene Conclusions fuehren in eine Fehler- oder Blockierungsphase.
 7. Bei erfolgreichen Pre-Merge-Runs und aktivierter GitHub-Einstellung `AutoCompletePullRequests` versucht der Monitor die konfigurierte Abschlussstrategie.
 8. `Merge` fuehrt einen direkten `gh pr merge` mit konfigurierter Merge-Methode aus. `AutoMerge` nutzt `gh pr merge --auto`; ein Merge gilt erst nach anschliessender Statusabfrage als tatsaechlich abgeschlossen. `ApprovalOnly` fuehrt `gh pr review --approve` aus und laesst den PR offen.

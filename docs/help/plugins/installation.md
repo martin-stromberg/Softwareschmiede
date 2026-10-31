@@ -4,7 +4,7 @@
 
 | Plugin | Voraussetzung |
 |--------|---------------|
-| `GitHubPlugin` | GitHub CLI (`gh`) installiert und eingeloggt |
+| `GitHubPlugin` | GitHub Personal Access Token; GitHub CLI (`gh`) nur für die optionalen Aktionen Issue-/PR-Anlage und PR-Abschluss sowie für Agenten-Sitzungen — lesende Zugriffe und Überwachung laufen über HTTP ohne `gh` |
 | `BitbucketPlugin` | Git und curl installiert; BitBucket Cloud oder Self-Hosted Account |
 | `LocalDirectoryPlugin` | Git installiert |
 | `ClaudeCliPlugin` | Claude Code CLI (`claude`) installiert; optionaler Anthropic API Key |
@@ -35,6 +35,7 @@ Plugin-Einstellungen werden in der **Einstellungsseite** verwaltet:
 | Feld | Beschreibung |
 |------|--------------|
 | Token | GitHub Personal Access Token (PAT) mit `repo`-Scope. Für private Organisationen kann zusätzlich `read:org` erforderlich sein. Zum Lesen von Code-Scanning-Alerts muss der Token Zugriff auf Code-Scanning-Alerts des Repositories haben. |
+| Personal Access Token des separaten Kontos | Optionaler PAT eines eigenen Bot-Kontos für den Konto-Modus „Separates Konto" (Notifications-Inbox). Empfohlene Scopes: `notifications` + `repo`; das Bot-Konto benötigt Collaborator-Schreibrecht auf den überwachten Repositories. Pflicht, sobald der Konto-Modus „Separates Konto" gewählt ist. |
 | Automatischer PR-Abschluss | Aktiviert den automatischen Abschluss gespeicherter Pull Requests nach erfolgreichen zugeordneten Actions. Standard: deaktiviert. |
 | Abschlussstrategie | Strategie fuer den automatischen Abschluss: `Merge`, `AutoMerge` oder `ApprovalOnly`. Standard: `Merge`. |
 | Merge-Methode | Merge-Methode fuer direkte Merges: `Merge`, `Squash` oder `Rebase`. Standard: `Squash`. |

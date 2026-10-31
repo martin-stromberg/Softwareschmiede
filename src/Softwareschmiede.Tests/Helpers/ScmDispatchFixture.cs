@@ -43,6 +43,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal readonly List<TerminalSessionStartSpec> StartSpecs = [];
     internal readonly List<string> Prompts = [];
     internal readonly List<ScmResponseRequest> Responses = [];
+    internal readonly List<ScmNotification> Notifications = [];
     internal readonly ScmEventRepository Repository = new("test-scm", "github.com", "R_1", "owner", "repo", "U_1", "U_1", "owner", true);
     internal ServiceProvider Services { get; }
     internal Func<Task>? CloneGate { get; set; }
@@ -72,8 +73,10 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
             .Returns((ScmResponseRequest request, CancellationToken _) => { Responses.Add(request); return Task.FromResult(new ScmResponseResult("remote", null, false)); });
         // As<> muss vor dem ersten Git.Object-Zugriff erfolgen; Tests können die leere
         // Standard-Anbindung mit eigenem Setup überschreiben.
-        Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<CancellationToken>()))
+        Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmKontoModus>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, string?>());
+        Git.As<IScmNotificationSource>().Setup(x => x.EnumerateNotificationsAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, DateTimeOffset? _, CancellationToken _) => Task.FromResult<IReadOnlyList<ScmNotification>>(Notifications.ToArray()));
         Git.Setup(x => x.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(async (string _, string directory, CancellationToken _) =>
             {
@@ -160,7 +163,8 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     }
 
     internal async Task<(Guid TaskId, Guid EventId)> AddAsync(AufgabeStatus status = AufgabeStatus.Neu, bool configured = false, bool cloned = true,
-        ScmReferenceKind referenceKind = ScmReferenceKind.Issue, ScmContentKind contentKind = ScmContentKind.IssueComment, string body = "$Softwareschmiede test")
+        ScmReferenceKind referenceKind = ScmReferenceKind.Issue, ScmContentKind contentKind = ScmContentKind.IssueComment, string body = "$Softwareschmiede test",
+        ScmEventRepository? eventRepository = null)
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -174,11 +178,14 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         var url = referenceKind == ScmReferenceKind.PullRequest
             ? "https://github.com/owner/repo/pull/7"
             : "https://github.com/owner/repo/issues/7";
-        var observation = new ScmEventObservation(new(Repository, referenceKind, 7), contentKind, Guid.NewGuid().ToString(), "42",
+        var observation = new ScmEventObservation(new(eventRepository ?? Repository, referenceKind, 7), contentKind, Guid.NewGuid().ToString(), "42",
             time, time, null, "U_1", "owner", null, null, body, url, time);
         await scope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(task.Id, task.Id.ToString(), new(new(observation.Reference, observation.ContentKind, null, time), [observation]));
         return (task.Id, await db.ScmIncomingEvents.Where(x => x.AufgabeId == task.Id).Select(x => x.Id).SingleAsync());
     }
+
+    /// <summary>Registriert eine Inbox-Notification, die die gemockte <see cref="IScmNotificationSource"/> liefert.</summary>
+    internal void AddNotification(ScmNotification notification) => Notifications.Add(notification);
 
     internal async Task DispatchAsync(Guid id)
     {

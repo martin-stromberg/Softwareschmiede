@@ -4,7 +4,7 @@
 
 ## Voraussetzungen
 
-- Das GitHub-SCM-Plugin ist aktiviert und seine GitHub CLI (`gh`) ist verfügbar.
+- Das GitHub-SCM-Plugin ist aktiviert. Die GitHub CLI (`gh`) wird für die Überwachung und alle lesenden Zugriffe **nicht** benötigt — sie läuft über direkte HTTP-Aufrufe. `gh` muss nur vorhanden sein, wenn die seltenen Komfortaktionen Issue-Anlage, PR-Anlage oder PR-Abschluss (Merge/Review) aus der Anwendung heraus genutzt werden oder Agenten in ihrer Sitzung selbst `gh` aufrufen sollen.
 - Ein gültiger **Personal Access Token** ist unter **Einstellungen → Plugins → GitHub → Authentifizierung** gespeichert.
 - Der Token muss auf die betroffenen Repositorys zugreifen können. Für Ereignisantworten benötigt er außerdem Schreibrechte für Issues und Pull Requests.
 - Aufgaben müssen mit einem GitHub-Repository und der passenden Issue- oder Pull-Request-Referenz verknüpft sein.
@@ -17,6 +17,15 @@
 3. Klicke **Speichern**.
 4. Prüfe in einer Aufgabe, dass Repository und Issue- oder Pull-Request-Referenz korrekt verknüpft sind.
 5. Schreibe als Repository-Owner einen Text mit dem Trigger-Keyword (Standard `$Softwareschmiede`) in die Beschreibung oder Diskussion und prüfe **SCM-Ereignisse**.
+
+## Separates Konto (Bot-Konto)
+
+Alternativ kann die Überwachung unter **Einstellungen → Allgemein → SCM-Ereignisse → Konto-Modus** auf **„Separates Konto“** umgeschaltet werden. Dann wird nicht mehr repository-weit enumeriert, sondern ausschließlich die GitHub-Notifications-Inbox eines eigenen Bot-Kontos gelesen; aus `reason = mention`-Einträgen entstehen Ereignisse.
+
+1. Lege ein separates GitHub-Konto an und lade es als **Collaborator mit Schreibrecht** in die zu überwachenden Repositories ein.
+2. Erstelle für dieses Konto einen Personal Access Token mit den Scopes `notifications` und `repo` und trage ihn unter **Einstellungen → Plugins → GitHub → Authentifizierung** im Feld **„Personal Access Token des separaten Kontos“** ein.
+3. Wähle unter **Allgemein → SCM-Ereignisse** den **Konto-Modus „Separates Konto“** und speichere. Ohne eingetragenes Token des separaten Kontos bricht das Speichern mit einer Fehlermeldung ab.
+4. Eine Aufgabe wird ausgelöst, wenn der Repository-Owner das separate Konto frei stehend als `@bot-name` in einer Beschreibung oder einem Kommentar erwähnt.
 
 ## Hinweise
 

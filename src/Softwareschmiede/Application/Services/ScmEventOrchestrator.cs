@@ -128,7 +128,8 @@ public sealed class ScmEventOrchestrator(
             try
             {
                 var currentRepository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(task.GitRepositoryId!.Value,
-                    plugin.PluginPrefix, $"https://{observation.Reference.Repository.Host}/{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}"), ct);
+                    plugin.PluginPrefix, $"https://{observation.Reference.Repository.Host}/{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}",
+                    observation.Reference.Repository.Konto), ct);
                 if (currentRepository.RepositoryId != observation.Reference.Repository.RepositoryId || !currentRepository.CanWrite)
                 { await WaitWithCommentAsync(item, observation, responder, "Schreibberechtigung für den Ereignisursprung fehlt. Prüfen Sie unter Einstellungen → Plugins → GitHub → Authentifizierung den Personal Access Token: Er benötigt Zugriff auf " + observation.Reference.Repository.Owner + "/" + observation.Reference.Repository.Name + " sowie Lese- und Schreibrechte für Issues und Pull Requests. Speichern Sie Änderungen und klicken Sie anschließend beim Ereignis auf Erneut prüfen.", ct); return; }
                 // Der Trigger wurde bereits bei der Aufnahme geprüft; ein seither geändertes
@@ -136,7 +137,7 @@ public sealed class ScmEventOrchestrator(
                 var revalidation = ScmEventValidationService.GetRejection(
                     observation with { Reference = observation.Reference with { Repository = currentRepository } },
                     await einstellungen.GetScmTriggerKeywordAsync(ct));
-                if (revalidation is not null && revalidation != "Kein Trigger")
+                if (revalidation is not null && revalidation != "Kein Trigger" && revalidation != ScmEventValidationService.KeineErwaehnungRejection)
                 { await WaitAsync(item, "Angemeldeter Benutzer ist nicht mehr der bestätigte Repository-Owner.", ct); return; }
                 if (task.Status == AufgabeStatus.Neu) await tasks.SetStatusAsync(task.Id, AufgabeStatus.Gestartet, ct);
                 var adapter = cli.GetScmPromptSession(task.Id);
