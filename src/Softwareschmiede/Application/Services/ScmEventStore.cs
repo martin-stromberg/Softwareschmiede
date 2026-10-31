@@ -15,6 +15,9 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
     public const string AmbiguousAssignmentDiagnostic = "Mehrdeutige Zuordnung zu Aufgaben";
     /// <summary>Diagnose für Referenzen ohne zuordenbare lokale Aufgabe.</summary>
     public const string UnassignedDiagnostic = "Keine Aufgabe zugeordnet";
+    /// <summary>Präfix der Routine-Verwerfungsdiagnose verworfener Fremd-Notifications; löst keinen
+    /// Unterbrechungshinweis in der SCM-Ereignisübersicht aus.</summary>
+    public const string InboxDiscardDiagnosticPrefix = "Inbox:";
     /// <summary>Serialisierungsregeln für die unveränderlichen Providerdaten.</summary>
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     /// <summary>Liest den unveränderlichen Ursprung.</summary>

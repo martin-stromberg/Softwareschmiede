@@ -6,7 +6,7 @@
 
 - Das GitHub-Repository ist mit einer Aufgabe verknüpft; die Aufgabe enthält eine Issue- oder Pull-Request-Referenz.
 - In **Einstellungen → Plugins → GitHub → Authentifizierung** ist ein gültiger **Personal Access Token** gespeichert, der auf das Repository zugreifen darf.
-- Der Text enthält das Trigger-Keyword (Standard `$Softwareschmiede`, einstellbar unter **Einstellungen → Allgemein → SCM-Ereignisse**) und stammt vom Repository-Owner. Bei einer bearbeiteten Textfassung muss der Owner auch als Bearbeiter erkennbar sein.
+- Der Text enthält das Trigger-Keyword (Standard `$Softwareschmiede`, einstellbar unter **Einstellungen → Allgemein → SCM-Ereignisse**) und stammt vom Repository-Owner. Bei einer bearbeiteten Textfassung muss der Owner auch als Bearbeiter erkennbar sein. Im Konto-Modus **„Separates Konto“** gilt stattdessen: Der Repository-Owner erwähnt das separate Konto frei stehend als `@Kontoname`; das Trigger-Keyword ist dann nicht erforderlich. Voraussetzung ist ein unter **Einstellungen → Plugins → GitHub → Authentifizierung** hinterlegter Token des separaten Kontos.
 - Die SCM-Ereignisüberwachung ist aktiviert (Checkbox unter **Einstellungen → Allgemein → SCM-Ereignisse**, standardmäßig an). Ist sie deaktiviert, werden weder neue Ereignisse eingelesen noch bestehende automatisch zugestellt; die manuellen Aktionen in der Übersicht bleiben nutzbar.
 - Für die automatische CLI-Verarbeitung werden derzeit Codex CLI, Claude CLI oder Devin CLI nur in einer unterstützten Version (Codex `v0.114.x`, Claude Code `v2.1.x`, Devin CLI `v3000.11.x`) und mit einem tatsächlich geprüften Schreibzugriff verwendet. Eine erkannte Version außerhalb des Bereichs lässt sich beim wartenden Ereignis ausdrücklich bestätigen; andere ausgewählte KI-Plugins können in der Ereignisverarbeitung wartend bleiben.
 - Die CLI darf erlaubte Issue-/PR-Aktionen (Kommentar, Review, Merge inkl. Admin-Merge, Commit/Push, Schließen u. a.) selbst über `gh`/git ausführen: Die Sitzung erhält beim Start dieselbe GitHub-Anmeldung wie die Anwendung (Token aus **Einstellungen → Plugins → GitHub → Authentifizierung** als Prozessumgebung). Der Aktionsumfang bleibt durch die Token-/Repository-Berechtigungen begrenzt; `gh` muss auf dem Rechner erreichbar sein.
@@ -17,6 +17,8 @@
 ### 1. Anfrage in GitHub schreiben
 
 Schreibe das Trigger-Keyword (Standard `$Softwareschmiede`) in die Beschreibung, einen Kommentar oder Review-Text des verknüpften Issues oder Pull Requests. Ergänze die konkrete Bitte im selben Text.
+
+> **Hinweis:** Im Konto-Modus **„Separates Konto“** wird die Anfrage stattdessen ausgelöst, indem der Repository-Owner das separate Konto frei stehend als `@Kontoname` in der Beschreibung oder einem Kommentar erwähnt. Benachrichtigungen zu Repositories, die nicht an einem Projekt erfasst und aktiviert sind, werden verworfen — ihre Anzahl erscheint in den Integrationshinweisen der Ereignisübersicht.
 
 ### 2. Eingang prüfen
 

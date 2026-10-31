@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.TestSupport;
 
@@ -23,7 +25,7 @@ public sealed class ScmEventDispatchTests_AgentActions
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<CancellationToken>()))
+        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmKontoModus>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, string?>
             {
                 ["GH_TOKEN"] = "agent-secret-token",
@@ -42,6 +44,38 @@ public sealed class ScmEventDispatchTests_AgentActions
         Assert.DoesNotContain("agent-secret-token", Assert.Single(fixture.Prompts));
     }
 
+    /// <summary>Die Revalidierung vor der Zustellung löst den Repository-Kontext unter dem Konto
+    /// der persistierten Observation auf — ein SeparatesKonto-Ereignis wird dem Agent-Konto
+    /// weitergereicht und unter der Bot-Viewer-Identität geprüft.</summary>
+    [Fact]
+    public async Task Dispatch_SeparatesKontoEvent_RevalidatesUnderAgentKonto()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var botRepository = fixture.Repository with
+        {
+            Konto = ScmKontoModus.SeparatesKonto,
+            ViewerId = "BOT",
+            ViewerLogin = "scm-bot"
+        };
+        var contexts = new List<ScmRepositoryContext>();
+        fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
+                It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
+            .Returns((ScmRepositoryContext context, CancellationToken _) =>
+            {
+                contexts.Add(context);
+                return Task.FromResult(botRepository with { Konto = context.Konto });
+            });
+        var (_, eventId) = await fixture.AddAsync(configured: true,
+            body: "@scm-bot bitte übernehmen", eventRepository: botRepository);
+
+        await fixture.DispatchAsync(eventId);
+
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
+        var context = Assert.Single(contexts);
+        Assert.Equal(ScmKontoModus.SeparatesKonto, context.Konto);
+    }
+
     /// <summary>Ein Fehler beim Auflösen der Agenten-Anbindung blockiert den regulären CLI-Start
     /// nicht: Die Spec bleibt unverändert und das Ereignis wird zugestellt.</summary>
     [Fact]
@@ -49,7 +83,7 @@ public sealed class ScmEventDispatchTests_AgentActions
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<CancellationToken>()))
+        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmKontoModus>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Credential-Store nicht erreichbar."));
         var (_, eventId) = await fixture.AddAsync(configured: true);
 

@@ -66,6 +66,11 @@ Das Arbeitsverzeichnis bestimmt, wo die Softwareschmiede lokale Repository-Klons
 
 Im Abschnitt **SCM-Ereignisse** der Registerkarte „Allgemein" steuern die Checkbox **„SCM-Ereignisüberwachung aktivieren"**, das **Trigger-Keyword** und die **Prompt-Anhänge** die Ereignisüberwachung (Details: [GitHub-Ereignisüberwachung](../plugins/github-ereignisse/index.md)).
 
+Die Auswahlbox **„Konto-Modus"** legt den Eingangskanal der Überwachung fest:
+
+- **Benutzerkonto** — (Standard) die registrierten Projekt-Repositories werden repository-weit überwacht; Auslöser ist das Trigger-Keyword
+- **Separates Konto** — es wird ausschließlich die GitHub-Benachrichtigungen eines separaten Kontos überwacht; Auslöser ist eine frei stehende `@`-Erwähnung dieses Kontos. Dafür muss unter **Einstellungen → Plugins → GitHub → Authentifizierung** ein **„Personal Access Token des separaten Kontos"** hinterlegt sein — ohne ihn bricht das Speichern mit einer Fehlermeldung ab. Im separaten Modus entfällt die repository-weite Enumeration; Backmerge-Pull-Requests werden dann nicht automatisch entdeckt
+
 Zusätzlich legt die Auswahlbox **„Backmerge-Pull-Requests"** fest, ob die Anwendung Backmerge-PRs (head = Hauptbranch des Repositories → base = konfigurierter Basis-Branch eines Projekts) automatisch per Admin-Merge bestätigt:
 
 - **Deaktiviert** — (Standard) keine automatischen Merges

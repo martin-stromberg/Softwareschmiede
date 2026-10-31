@@ -780,6 +780,114 @@ public sealed class SettingsViewModelTests : IDisposable
         (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmPromptAppendIssueKey))
             .Should().BeNull("ein leerer Anhang hängt nichts an und wird als leerer Wert persistiert");
     }
+
+    private static Mock<IGitPlugin> CreateGitHubPluginMock()
+    {
+        var mock = new Mock<IGitPlugin>();
+        mock.Setup(p => p.PluginName).Returns("GitHub");
+        mock.Setup(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
+        mock.Setup(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+        mock.Setup(p => p.GetSettingGroups()).Returns(
+        [
+            new PluginSettingGroup("Authentifizierung",
+            [
+                new PluginSettingField("Token", "Personal Access Token", PluginSettingFieldType.Secret, IsRequired: true),
+                new PluginSettingField("AgentToken", "Personal Access Token des separaten Kontos", PluginSettingFieldType.Secret)
+            ])
+        ]);
+        return mock;
+    }
+
+    /// <summary>LadenCommand lädt den Konto-Modus; ohne Eintrag gilt „Benutzerkonto“.</summary>
+    [Fact]
+    public async Task LadenCommand_LoadsKontoModusDefaults()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedKontoModus.Should().Be(ScmKontoModusOption.FuerModus(ScmKontoModus.Benutzerkonto));
+        sut.KontoModusOptionen.Should().HaveCount(2);
+    }
+
+    /// <summary>SpeichernCommand persistiert den gewählten Konto-Modus und lädt ihn beim Neuladen zurück.</summary>
+    [Fact]
+    public async Task SpeichernCommand_PersistsKontoModus()
+    {
+        var plugin = CreateGitHubPluginMock().Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        _credentialStore.SetCredential("Softwareschmiede.GitHub.AgentToken", "bot-token");
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        (await _einstellungService.GetScmKontoModusAsync()).Should().Be(ScmKontoModus.SeparatesKonto);
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.SelectedKontoModus.Should().Be(ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto));
+    }
+
+    /// <summary>Eine fehlende Konto-Modus-Auswahl wird nicht gespeichert.</summary>
+    [Fact]
+    public async Task SpeichernCommand_RejectsMissingKontoModus()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedKontoModus = null;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        (await _einstellungService.GetScmKontoModusAsync()).Should().Be(ScmKontoModus.Benutzerkonto);
+    }
+
+    /// <summary>SeparatesKonto ohne AgentToken wird abgelehnt — der Modus bleibt unpersistiert.</summary>
+    [Fact]
+    public async Task SpeichernCommand_SeparatesKontoWithoutAgentToken_ShowsFehlerMeldung()
+    {
+        var plugin = CreateGitHubPluginMock().Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().Contain("separaten Kontos").And.Contain("Authentifizierung");
+        sut.ErfolgsMeldung.Should().BeNull();
+        (await _einstellungService.GetScmKontoModusAsync()).Should().Be(ScmKontoModus.Benutzerkonto);
+    }
+
+    /// <summary>Ein gerade im Formular eingetragener AgentToken-Wert zählt bereits bei der Pflichtprüfung —
+    /// Token eintragen und Modus wählen gelingt in einem Speicherschritt.</summary>
+    [Fact]
+    public async Task SpeichernCommand_SeparatesKonto_FormValueSatisfiesAgentTokenRequirement()
+    {
+        var plugin = CreateGitHubPluginMock().Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.ScmPluginSelectedCommand.Execute(plugin);
+        sut.SelectedPluginSettings.SelectMany(g => g.Entries).Single(e => e.Field.Key == "Token").Value = "user-token";
+        sut.SelectedPluginSettings.SelectMany(g => g.Entries).Single(e => e.Field.Key == "AgentToken").Value = "bot-token";
+
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        (await _einstellungService.GetScmKontoModusAsync()).Should().Be(ScmKontoModus.SeparatesKonto);
+        _credentialStore.GetCredential("Softwareschmiede.GitHub.AgentToken").Should().Be("bot-token");
+    }
 }
 
 /// <summary>In-Memory Credential Store für SettingsViewModel-Tests.</summary>

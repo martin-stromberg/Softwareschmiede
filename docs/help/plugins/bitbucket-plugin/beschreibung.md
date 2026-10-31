@@ -127,9 +127,9 @@ Ports werden in der BitBucket-URL unterstützt.
 |---------|-----------------|----------------------|--------|
 | **Hosting-Modi** | 1 (Cloud) | 1 (Self-Hosted) | 1 (GitHub.com) |
 | **Jira-Integration** | Ja | Ja | Nein |
-| **Authentifizierung** | App Password | App Password | Token (GitHub CLI) |
+| **Authentifizierung** | App Password | App Password | Personal Access Token |
 | **API-Version** | 2.0 | 1.0 | v3 / GraphQL |
 | **Repository-Namespace** | Workspace | Project Key | User/Org |
 | **Arbeitsverzeichnis-Auswahl** | Remote-Struktur über Source-API | Remote-Struktur über Browse-API | Remote-Struktur über Git-Trees-API |
 
-Das GitHub-Plugin verwendet die GitHub CLI (`gh`), während das BitBucket-Plugin `curl` für API-Aufrufe und `git` für Repository-Operationen nutzt.
+Das GitHub-Plugin ruft die GitHub-API direkt per HTTP auf (`gh` nur noch für die seltenen Aktionen Issue-/PR-Anlage und PR-Abschluss), während das BitBucket-Plugin `curl` für API-Aufrufe und `git` für Repository-Operationen nutzt.
