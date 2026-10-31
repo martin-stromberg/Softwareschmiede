@@ -1,10 +1,13 @@
+using Softwareschmiede.Domain.Enums;
+
 namespace Softwareschmiede.Domain.ValueObjects;
 
 /// <summary>Unveraenderlicher lokaler und externer Repository-Kontext eines SCM-Vorschlags.</summary>
 public sealed record ScmRepositoryContext
 {
     /// <summary>Erstellt einen vollstaendigen Repository-Snapshot.</summary>
-    public ScmRepositoryContext(Guid gitRepositoryId, string pluginPrefix, string repositoryId)
+    public ScmRepositoryContext(Guid gitRepositoryId, string pluginPrefix, string repositoryId,
+        ScmKontoModus konto = ScmKontoModus.Benutzerkonto)
     {
         if (gitRepositoryId == Guid.Empty)
             throw new ArgumentException("Die lokale Repository-ID darf nicht leer sein.", nameof(gitRepositoryId));
@@ -14,6 +17,7 @@ public sealed record ScmRepositoryContext
         GitRepositoryId = gitRepositoryId;
         PluginPrefix = pluginPrefix.Trim();
         RepositoryId = repositoryId.Trim();
+        Konto = konto;
     }
 
     /// <summary>ID des lokal persistierten Projekt-Repositories.</summary>
@@ -24,4 +28,7 @@ public sealed record ScmRepositoryContext
 
     /// <summary>Kanonische API-Repository-ID des Providers.</summary>
     public string RepositoryId { get; }
+
+    /// <summary>Kontomodus, unter dem Provider-Aufrufe dieses Kontexts laufen.</summary>
+    public ScmKontoModus Konto { get; }
 }

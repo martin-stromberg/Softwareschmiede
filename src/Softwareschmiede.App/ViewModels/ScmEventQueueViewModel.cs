@@ -169,6 +169,8 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             // Aufgabe und weder eine Unterbrechung noch ein Fehler — nur echte Beobachtungsfehler alarmieren.
             var sourceErrors = await db.ScmObservationCheckpoints.AsNoTracking()
                 .Where(x => x.Diagnostic != null && x.Diagnostic != ScmEventStore.UnassignedDiagnostic).ToListAsync(ct);
+            // Routine-Verwerfungsdiagnosen der Inbox bleiben sichtbar, gelten aber nicht als Unterbrechung.
+            var alertErrors = sourceErrors.Where(x => !x.Diagnostic!.StartsWith(ScmEventStore.InboxDiscardDiagnosticPrefix, StringComparison.Ordinal)).ToList();
             var actionErrors = await db.ScmOutgoingActions.AsNoTracking().Where(x => x.Error != null).ToListAsync(ct);
             var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct);
             var diagnostic = string.Join(Environment.NewLine,
@@ -191,10 +193,10 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
                 Diagnostics = diagnostic;
                 MonitoringNotice = !monitoringEnabled
                     ? "Die SCM-Ereignisüberwachung ist deaktiviert; neue Anfragen werden nicht eingelesen oder automatisch zugestellt (Einstellungen → Allgemein → SCM-Ereignisse)."
-                    : sourceErrors.Count == 0 ? null
+                    : alertErrors.Count == 0 ? null
                     : "Die GitHub-Überwachung ist für betroffene Quellen unterbrochen; neue Anfragen können fehlen. "
-                      + sourceErrors[0].Diagnostic
-                      + (sourceErrors.Count > 1 ? $" ({sourceErrors.Count} betroffene Quellen; Details unter Integrationshinweise.)" : string.Empty)
+                      + alertErrors[0].Diagnostic
+                      + (alertErrors.Count > 1 ? $" ({alertErrors.Count} betroffene Quellen; Details unter Integrationshinweise.)" : string.Empty)
                       + " Nach der Korrektur: Quellen erneut prüfen.";
                 OnPropertyChanged(nameof(IsEmpty));
                 OnPropertyChanged(nameof(EmptyText));

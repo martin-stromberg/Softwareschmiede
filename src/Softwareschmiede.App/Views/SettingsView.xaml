@@ -17,6 +17,7 @@
             <local:PluginSettingFieldTemplateSelector.SecretTemplate>
                 <DataTemplate>
                     <PasswordBox Tag="{Binding}"
+                                 AutomationProperties.Name="{Binding Field.Key}"
                                  Width="320"
                                  HorizontalAlignment="Left"
                                  Loaded="OnPasswordBoxLoaded"
@@ -340,6 +341,25 @@
                             </ComboBox.ItemTemplate>
                         </ComboBox>
                         <TextBlock Text="Ein Backmerge-Pull-Request (head = Hauptbranch des Repositories, base = konfigurierter Basis-Branch eines Projekts) aktualisiert nur den Arbeitsbranch. Bei „Global aktiviert“ wird er in allen Projekten automatisch gemergt, sobald der Provider ihn als mergebar meldet; bei „Projektbezogen aktivierbar“ zusätzlich nur in Projekten, in denen die Option in der Projektdetailansicht eingeschaltet ist. Voraussetzung ist ein eingerichteter, vom Hauptbranch abweichender Basis-Branch sowie ein Token mit Schreibrecht."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,0" />
+                        <TextBlock Text="Konto-Modus"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,12,0,4" />
+                        <ComboBox SelectedItem="{Binding SelectedKontoModus, UpdateSourceTrigger=PropertyChanged}"
+                                  AutomationProperties.Name="Konto-Modus"
+                                  ItemsSource="{Binding KontoModusOptionen}"
+                                  HorizontalAlignment="Stretch"
+                                  Padding="8,6">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Text="„Benutzerkonto“ überwacht die registrierten Projekt-Repositories direkt und reagiert auf das Trigger-Keyword. „Separates Konto“ überwacht stattdessen die GitHub-Benachrichtigungen eines separaten Kontos und reagiert auf Erwähnungen (@Kontoname); dafür ist unter Plugins → GitHub → Authentifizierung ein eigener Token mit den Scopes notifications und repo erforderlich. Hinweis: Im separaten Modus entfällt die repository-weite Enumeration — Backmerge-Pull-Requests werden dann nicht automatisch entdeckt."
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    TextWrapping="Wrap"
                                    Margin="0,4,0,0" />

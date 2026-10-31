@@ -6,15 +6,17 @@ using Softwareschmiede.Infrastructure.Plugins;
 namespace Softwareschmiede.App.Services.Testing;
 
 /// <summary>Raw GitHub REST/GraphQL fixture transport; production parsing remains in GitHubPlugin.</summary>
-internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration) : IGitHubEventApiClient
+internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
+    string viewerLogin = "scm-owner", string viewerNodeId = "OWNER") : IGitHubEventApiClient
 {
-    private readonly object _sync = new();
+    // Both fixture account clients append to the same calls.jsonl.
+    private static readonly object Sync = new();
     private const string Repository = "repos/scm-owner/scm-e2e";
 
     public Task<GitHubEventApiResponse> SendAsync(GitHubEventApiRequest request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        lock (_sync)
+        lock (Sync)
         {
             File.AppendAllText(configuration.CallsPath, JsonSerializer.Serialize(request) + "\n");
             return Task.FromResult(Respond(request));
@@ -27,7 +29,20 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration) : I
         var scenario = configuration.ReadScenario();
         if (!scenario.Authenticated) return new(401, "{}");
         var path = request.Endpoint.Split('?')[0];
-        if (path == "user" && request.Method == "GET") return Json(new { node_id = "OWNER", login = "scm-owner" });
+        if (path == "user" && request.Method == "GET") return Json(new { node_id = viewerNodeId, login = viewerLogin });
+        if (path == "notifications" && request.Method == "GET")
+            return Json(scenario.Notifications.Select(notification => (object)new
+            {
+                id = notification.ThreadId,
+                repository = new { node_id = notification.RepositoryNodeId, owner = new { node_id = "OWNER", login = "scm-owner" }, name = "scm-e2e" },
+                subject = new
+                {
+                    type = notification.PullRequest ? "PullRequest" : "Issue",
+                    url = $"https://api.github.com/{Repository}/{(notification.PullRequest ? "pulls" : "issues")}/{notification.Number}"
+                },
+                reason = notification.Reason,
+                updated_at = notification.UpdatedAt
+            }).ToArray());
         if (path == Repository && request.Method == "GET")
             return Json(new { node_id = "REPO", name = "scm-e2e", owner = new { node_id = "OWNER", login = "scm-owner" }, permissions = new { push = scenario.CanWrite } });
         var responses = ReadResponses();
@@ -57,6 +72,8 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration) : I
             }
             var number = numberProperty.GetInt32();
             var pr = query.Contains("pullRequest(", StringComparison.Ordinal);
+            if (query.Contains("mergeStateStatus", StringComparison.Ordinal))
+                return Json(new { data = new { repository = new { pullRequest = PullRequestStatus(number) } } });
             if (query.Contains("reviews(", StringComparison.Ordinal))
                 return Json(new { data = new { repository = new { pullRequest = new { reviews = new { nodes = Array.Empty<object>(), pageInfo = new { hasNextPage = false, endCursor = (string?)null } } } } } });
             var description = scenario.Texts.SingleOrDefault(x => x.Number == number && x.PullRequest == pr && x.Kind == "Description")
@@ -65,6 +82,8 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration) : I
         }
         if (!path.StartsWith(Repository + "/", StringComparison.Ordinal))
             throw new InvalidOperationException("Unbekannter SCM-Fixture-Endpunkt: " + path);
+        if (request.Method == "GET" && path == Repository + "/actions/runs")
+            return Json(new { total_count = 0, workflow_runs = Array.Empty<object>() });
         if (request.Method == "POST")
         {
             using var document = JsonDocument.Parse(request.JsonBody!);
@@ -145,7 +164,26 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration) : I
             editor = text.EditedAt is null ? null : new { id = text.Author == "scm-owner" ? "OWNER" : "OTHER", login = text.Author }
         };
 
-    private static object Remote(ScmE2ERemoteResponse response)
+    // Feldliste der PR-Status-Abfrage (ParsePullRequestStatus): offen und mergebar — die
+    // Abschlussüberwachung schließt keine Aufgabe, ohne dass das Szenario es ausdrücklich vorgibt.
+    private static object PullRequestStatus(int number)
+        => new
+        {
+            id = "PR_" + number,
+            number,
+            title = $"SCM Referenz {number}",
+            url = $"https://github.com/scm-owner/scm-e2e/pull/{number}",
+            state = "OPEN",
+            headRefName = $"scm-branch-{number}",
+            baseRefName = "main",
+            headRefOid = "sha" + number,
+            mergeCommit = (object?)null,
+            mergeStateStatus = "CLEAN"
+        };
+
+    // Vom Host gepostete Antworten tragen die Identität des lesenden Kontos — der Marker-Filter
+    // eigener Antworten arbeitet damit in beiden Kontomodi identisch.
+    private object Remote(ScmE2ERemoteResponse response)
         => new
         {
             id = response.Id,
@@ -153,7 +191,7 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration) : I
             body = response.Body,
             content = response.Content,
             html_url = "https://github.com/scm-owner/scm-e2e/issues/1#issuecomment-" + response.Id,
-            user = new { node_id = "OWNER", login = "scm-owner" }
+            user = new { node_id = viewerNodeId, login = viewerLogin }
         };
 
     private static GitHubEventApiResponse Json(object value) => new(200, JsonSerializer.Serialize(value));

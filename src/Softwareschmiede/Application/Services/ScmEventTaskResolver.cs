@@ -89,7 +89,7 @@ public sealed class ScmEventTaskResolver(
         if (taskIds.Count > 1) return ScmTaskResolution.Ambiguous;
         if (taskIds.Count == 1) return ScmTaskResolution.Assigned(taskIds[0]);
         var repository = ChooseRepository(repositories);
-        var context = new ScmRepositoryContext(repository.Id, repository.PluginTyp, repositoryId);
+        var context = new ScmRepositoryContext(repository.Id, repository.PluginTyp, repositoryId, reference.Repository.Konto);
         var composed = pullRequest with { Body = ComposeBody(pullRequest.Body, trigger) };
         try
         {

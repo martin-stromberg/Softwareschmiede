@@ -102,6 +102,19 @@ internal sealed class ScmE2EFixture
         SaveScenario();
     }
 
+    public void AddNotification(int number, string repositoryNodeId = "REPO", string reason = "mention", bool pullRequest = false)
+    {
+        Scenario.Notifications.Add(new ScmE2ENotification(number, pullRequest, repositoryNodeId, reason, DateTimeOffset.UtcNow, "THREAD_" + number));
+        SaveScenario();
+    }
+
+    public async Task SetKontoModus(ScmKontoModus modus)
+    {
+        await using var db = OpenDatabase();
+        var settings = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        await settings.SetScmKontoModusAsync(modus);
+    }
+
     public void SaveScenario()
     {
         var temporary = Configuration.ScenarioPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -146,16 +159,30 @@ internal sealed class ScmE2EFixture
         throw new TimeoutException($"{label}: erwartet {status}, tatsächlich {last?.Status}: {last?.Reason}. Fixture: {Configuration.TestRoot}");
     }
 
-    public async Task WaitForPollAsync()
+    // Das feste Poll-Muster (8 Aufrufe) gilt nur im Benutzerkonto; andere Kontomodi haben ein
+    // abweichendes Aufrufmuster und werden über WaitForCallsAsync abgewartet.
+    public async Task WaitForPollAsync(int minAdditionalCalls = 8)
     {
         var before = ReadLines(Configuration.CallsPath).Count;
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
-            if (ReadLines(Configuration.CallsPath).Count >= before + 8) return;
+            if (ReadLines(Configuration.CallsPath).Count >= before + minAdditionalCalls) return;
             await Task.Delay(100);
         }
         throw new TimeoutException("SCM-Fixture: kein weiterer produktiver Monitorlauf.");
+    }
+
+    public async Task WaitForCallsAsync(string endpointFragment, int minCount = 1)
+    {
+        var before = ReadLines(Configuration.CallsPath).Count(x => x.Contains(endpointFragment, StringComparison.Ordinal));
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (ReadLines(Configuration.CallsPath).Count(x => x.Contains(endpointFragment, StringComparison.Ordinal)) >= before + minCount) return;
+            await Task.Delay(100);
+        }
+        throw new TimeoutException($"SCM-Fixture: kein Aufruf von '{endpointFragment}'. Fixture: {Configuration.TestRoot}");
     }
 
     public IReadOnlyList<ScmE2ERemoteResponse> Responses() => ReadLines(Configuration.ResponsesPath).Select(x => JsonSerializer.Deserialize<ScmE2ERemoteResponse>(x)!).ToArray();

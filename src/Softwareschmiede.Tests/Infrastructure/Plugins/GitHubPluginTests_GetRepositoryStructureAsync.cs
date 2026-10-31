@@ -5,6 +5,7 @@ using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Plugins;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Infrastructure.Plugins;
 
@@ -17,6 +18,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
 {
     private readonly Mock<ICliRunner> _cliRunnerMock;
     private readonly Mock<ICredentialStore> _credentialStoreMock;
+    private readonly FakeGitHubEventApi _api;
     private readonly GitHubPlugin _sut;
 
     /// <summary>GitHubPluginTests_GetRepositoryStructureAsync.</summary>
@@ -24,10 +26,12 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
     {
         _cliRunnerMock = new Mock<ICliRunner>();
         _credentialStoreMock = new Mock<ICredentialStore>();
+        _api = new FakeGitHubEventApi();
         _sut = new GitHubPlugin(
             _cliRunnerMock.Object,
             _credentialStoreMock.Object,
-            new Mock<ILogger<GitHubPlugin>>().Object);
+            new Mock<ILogger<GitHubPlugin>>().Object,
+            _api);
     }
 
     private void SetupDefaultBranch(string branch = "main")
@@ -66,13 +70,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
                 ]
             }
             """;
-        _cliRunnerMock.Setup(c => c.RunAsync(
-                "gh",
-                It.Is<IEnumerable<string>>(args => args.Any(a => a.Contains("git/trees/main"))),
-                null,
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(0, treeJson, string.Empty));
+        _api.AddJson("git/trees/main?recursive=1", treeJson);
 
         var result = (await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2)).ToList();
 
@@ -92,13 +90,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
     {
         SetupDefaultBranch();
         const string treeJson = """{ "tree": [ { "path": "src", "type": "tree" } ] }""";
-        _cliRunnerMock.Setup(c => c.RunAsync(
-                "gh",
-                It.Is<IEnumerable<string>>(args => args.Any(a => a == "repos/owner/repo/git/trees/main?recursive=1")),
-                null,
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(0, treeJson, string.Empty));
+        _api.AddJson("repos/owner/repo/git/trees/main?recursive=1", treeJson);
 
         GitPluginBase<GitHubPlugin> plugin = _sut;
 
@@ -107,18 +99,12 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
         result.Select(e => e.Path).Should().Contain("src");
     }
 
-    /// <summary>Wenn der gh-Aufruf fehlschlägt, wird eine leere Liste zurückgegeben statt einer Exception.</summary>
+    /// <summary>Wenn der API-Aufruf fehlschlägt, wird eine leere Liste zurückgegeben statt einer Exception.</summary>
     [Fact]
     public async Task GetRepositoryStructureAsync_ShouldReturnEmpty_WhenGhApiFails()
     {
         SetupDefaultBranch();
-        _cliRunnerMock.Setup(c => c.RunAsync(
-                "gh",
-                It.Is<IEnumerable<string>>(args => args.Any(a => a.Contains("git/trees/"))),
-                null,
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(1, string.Empty, "HTTP 404: Not Found"));
+        _api.AddStatus("git/trees/", 404);
 
         var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2);
 
@@ -130,13 +116,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
     public async Task GetRepositoryStructureLoadResultAsync_ShouldReturnFailed_WhenGhApiFails()
     {
         SetupDefaultBranch();
-        _cliRunnerMock.Setup(c => c.RunAsync(
-                "gh",
-                It.Is<IEnumerable<string>>(args => args.Any(a => a.Contains("git/trees/"))),
-                null,
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(1, string.Empty, "HTTP 404: Not Found"));
+        _api.AddStatus("git/trees/", 404);
 
         var result = await _sut.GetRepositoryStructureLoadResultAsync("https://github.com/owner/repo", maxDepth: 2);
 
@@ -167,13 +147,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
     {
         SetupDefaultBranch();
         const string treeJson = """{ "tree": [ { "path": "src", "type": "tree" } ] }""";
-        _cliRunnerMock.Setup(c => c.RunAsync(
-                "gh",
-                It.Is<IEnumerable<string>>(args => args.Any(a => a == "repos/owner/repo/git/trees/main?recursive=1")),
-                null,
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(0, treeJson, string.Empty));
+        _api.AddJson("repos/owner/repo/git/trees/main?recursive=1", treeJson);
 
         var result = await _sut.GetRepositoryStructureAsync("git@github.com:owner/repo.git", maxDepth: 2);
 
@@ -191,13 +165,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
     {
         SetupDefaultBranch();
         const string treeJson = """{ "tree": [ { "path": "src", "type": "tree" } ] }""";
-        _cliRunnerMock.Setup(c => c.RunAsync(
-                "gh",
-                It.Is<IEnumerable<string>>(args => args.Any(a => a == "repos/owner/repo/git/trees/main?recursive=1")),
-                null,
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(0, treeJson, string.Empty));
+        _api.AddJson("repos/owner/repo/git/trees/main?recursive=1", treeJson);
 
         var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo/", maxDepth: 2);
 
@@ -215,17 +183,27 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
                 "tree": [ { "path": "backend", "type": "tree" } ]
             }
             """;
-        _cliRunnerMock.Setup(c => c.RunAsync(
-                "gh",
-                It.Is<IEnumerable<string>>(args => args.Any(a => a.Contains("git/trees/"))),
-                null,
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(0, treeJson, string.Empty));
+        _api.AddJson("git/trees/", treeJson);
 
         var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2);
 
         result.Select(e => e.Path).Should().Contain("backend");
+    }
+
+    /// <summary>Branch-Namen mit URI-Sonderzeichen (#, %) werden segmentweise kodiert, damit der
+    /// Endpoint weder am Fragment gekappt noch durch ungültige Escape-Sequenzen beschädigt wird.</summary>
+    [Fact]
+    public async Task GetRepositoryStructureLoadResultAsync_ShouldEscapeBranchName_InEndpoint()
+    {
+        const string treeJson = """{ "tree": [ { "path": "src", "type": "tree" } ] }""";
+        _api.AddJson("git/trees/feature/x%23y%25z?recursive=1", treeJson);
+
+        var result = await _sut.GetRepositoryStructureLoadResultAsync(
+            "https://github.com/owner/repo", maxDepth: 2, branchName: "feature/x#y%z");
+
+        result.Status.Should().Be(RepositoryStructureLoadStatus.Success);
+        _api.Requests.Should().ContainSingle().Which.Endpoint
+            .Should().Contain("git/trees/feature/x%23y%25z?recursive=1");
     }
 
     /// <summary>Ungültiges JSON in der API-Antwort führt zu einer leeren Liste statt einer unbehandelten Exception.</summary>
@@ -233,13 +211,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
     public async Task GetRepositoryStructureAsync_ShouldReturnEmpty_ForMalformedJson()
     {
         SetupDefaultBranch();
-        _cliRunnerMock.Setup(c => c.RunAsync(
-                "gh",
-                It.Is<IEnumerable<string>>(args => args.Any(a => a.Contains("git/trees/"))),
-                null,
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(0, "not-json", string.Empty));
+        _api.AddJson("git/trees/", "not-json");
 
         var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2);
 

@@ -13,6 +13,7 @@ public sealed partial class GitHubPlugin
         if (request.Kind == ScmResponseKind.Reaction && request.ContentKind == ScmContentKind.PullRequestReview)
             return await ReconcileReviewReactionAsync(request, ct);
         var repository = request.Reference.Repository;
+        var client = ClientFor(repository.Konto);
         var endpoint = request.Kind switch
         {
             ScmResponseKind.Comment => $"{RepositoryEndpoint(repository)}/issues/{request.Reference.Number}/comments?per_page=100",
@@ -21,7 +22,7 @@ public sealed partial class GitHubPlugin
             _ => throw Permanent("Unbekannte GitHub-Antwortaktion.")
         };
         // Read all pages before reporting absence; a failed later page must not permit a second POST.
-        var candidates = await RestPagesAsync(repository.Host, endpoint, ct);
+        var candidates = await RestPagesAsync(client, repository.Host, endpoint, ct);
         foreach (var candidate in candidates)
         {
             var user = Object(candidate, "user");
@@ -39,9 +40,10 @@ public sealed partial class GitHubPlugin
     {
         ValidateResponse(request);
         var repository = request.Reference.Repository;
+        var client = ClientFor(repository.Konto);
         // A renamed/replaced repository or changed credential must not redirect a persisted answer.
         var current = await GetEventRepositoryAsync(new(Guid.NewGuid(), PluginPrefix,
-            $"https://{repository.Host}/{repository.Owner}/{repository.Name}"), ct);
+            $"https://{repository.Host}/{repository.Owner}/{repository.Name}", repository.Konto), ct);
         if (current.RepositoryId != repository.RepositoryId || current.ViewerId != repository.ViewerId)
             throw new ScmProviderException(ScmProviderFailureKind.Permission, "Repository- oder Benutzeridentität hat sich geändert.");
         if (!current.CanWrite) throw new ScmProviderException(ScmProviderFailureKind.Permission, "GitHub-Schreibberechtigung fehlt.");
@@ -50,7 +52,7 @@ public sealed partial class GitHubPlugin
         JsonElement result;
         if (request.Kind == ScmResponseKind.Reaction && request.ContentKind == ScmContentKind.PullRequestReview)
         {
-            var data = await GraphAsync(repository.Host,
+            var data = await GraphAsync(client, repository.Host,
                 "mutation($subject:ID!,$content:ReactionContent!){addReaction(input:{subjectId:$subject,content:$content}){reaction{id}}}",
                 new { subject = request.RemoteNodeId, content = GraphReaction(request.Reaction!) }, true, ct);
             result = Object(Object(data, "addReaction"), "reaction");
@@ -66,7 +68,7 @@ public sealed partial class GitHubPlugin
                     (object)new { title = request.Title, body = ResponseBody(request), head = request.HeadBranch, @base = request.BaseBranch }),
                 _ => throw Permanent("Unbekannte GitHub-Antwortaktion.")
             };
-            result = await EventApiAsync(repository.Host, "POST", endpoint, body, true, ct);
+            result = await EventApiAsync(client, repository.Host, "POST", endpoint, body, true, ct);
         }
         var id = String(result, "id");
         if (string.IsNullOrWhiteSpace(id)) throw new ScmProviderException(ScmProviderFailureKind.Temporary,
@@ -77,12 +79,13 @@ public sealed partial class GitHubPlugin
     private async Task<ScmResponseResult?> ReconcileReviewReactionAsync(ScmResponseRequest request, CancellationToken ct)
     {
         var repository = request.Reference.Repository;
+        var client = ClientFor(repository.Konto);
         string? cursor = null;
         var visited = new HashSet<string>(StringComparer.Ordinal);
         ScmResponseResult? found = null;
         do
         {
-            var data = await GraphAsync(repository.Host,
+            var data = await GraphAsync(client, repository.Host,
                 "query($id:ID!,$cursor:String){node(id:$id){... on PullRequestReview{pullRequest{number repository{id}} reactions(first:100,after:$cursor){nodes{id content user{id login}} pageInfo{hasNextPage endCursor}}}}}",
                 new { id = request.RemoteNodeId, cursor }, false, ct);
             var node = Object(data, "node");

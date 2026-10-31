@@ -87,6 +87,9 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für den Backmerge-Aktivierungsmodus (<see cref="ScmBackmergeModus"/>-Wert als Zahl gespeichert).</summary>
     public const string ScmBackmergeModeKey = "scm.backmerge.mode";
 
+    /// <summary>Schlüssel für den Kontomodus der SCM-Ereignisüberwachung (<see cref="ScmKontoModus"/>-Wert als Zahl gespeichert).</summary>
+    public const string ScmKontoModusKey = "scm.monitoring.accountmode";
+
     /// <summary>Schlüsselpräfix für die projektbezogene Backmerge-Freigabe; der vollständige Schlüssel ist <c>plugins.backmerge.project.{projektId}</c>.</summary>
     public const string BackmergeProjektKeyPrefix = "plugins.backmerge.project.";
 
@@ -202,6 +205,33 @@ public sealed class AppEinstellungService
             throw new ArgumentOutOfRangeException(nameof(modus), modus, "Unbekannter Backmerge-Modus.");
 
         return SetIntSettingAsync(ScmBackmergeModeKey, (int)modus, ct);
+    }
+
+    /// <summary>
+    /// Liest den Kontomodus der SCM-Ereignisüberwachung unter <see cref="ScmKontoModusKey"/>.
+    /// Fehlende oder ungültige gespeicherte Werte fallen auf
+    /// <see cref="ScmKontoModus.Benutzerkonto"/> zurück.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Der effektive Kontomodus.</returns>
+    public async Task<ScmKontoModus> GetScmKontoModusAsync(CancellationToken ct = default)
+    {
+        var wert = await GetSettingAsync(ScmKontoModusKey, ct);
+        return int.TryParse(wert, out var modus) && Enum.IsDefined((ScmKontoModus)modus)
+            ? (ScmKontoModus)modus
+            : ScmKontoModus.Benutzerkonto;
+    }
+
+    /// <summary>Speichert den Kontomodus der SCM-Ereignisüberwachung unter <see cref="ScmKontoModusKey"/>.</summary>
+    /// <param name="modus">Der zu speichernde Modus.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="modus"/> ist kein definierter <see cref="ScmKontoModus"/>-Wert.</exception>
+    public Task SetScmKontoModusAsync(ScmKontoModus modus, CancellationToken ct = default)
+    {
+        if (!Enum.IsDefined(modus))
+            throw new ArgumentOutOfRangeException(nameof(modus), modus, "Unbekannter SCM-Kontomodus.");
+
+        return SetIntSettingAsync(ScmKontoModusKey, (int)modus, ct);
     }
 
     /// <summary>Ermittelt, ob die projektbezogene Backmerge-Freigabe für das Projekt gesetzt ist (Standard: <see langword="false"/>).</summary>
