@@ -190,7 +190,8 @@ public sealed class ScmTaskCompletionMonitoringService(
                 return null;
             var repository = await source.GetEventRepositoryAsync(
                 new ScmRepositoryContext(task.GitRepository.Id, plugin.PluginPrefix,
-                    task.GitRepository.RepositoryUrl), ct);
+                    task.GitRepository.RepositoryUrl,
+                    await services.GetRequiredService<AppEinstellungService>().GetScmKontoModusAsync(ct)), ct);
             var issue = await source.ReadIssueAsync(
                 new ScmEventReference(repository, ScmReferenceKind.Issue, task.IssueReferenz.IssueNummer.Value), ct);
             return issue?.IstGeschlossen == true

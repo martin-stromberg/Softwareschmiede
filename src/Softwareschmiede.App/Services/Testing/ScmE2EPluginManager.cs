@@ -12,11 +12,17 @@ internal sealed class ScmE2EPluginManager : IPluginManager
     private readonly IGitPlugin _gitHub;
 
     public ScmE2EPluginManager(PluginManager inner, ScmE2ETestConfiguration configuration,
-        ICliRunner cliRunner, ILogger<GitHubPlugin> logger)
+        ICliRunner cliRunner, ILogger<GitHubPlugin> logger, ICredentialStore credentialStore)
     {
         _inner = inner;
         _configuration = configuration;
-        _gitHub = new GitHubPlugin(new ScmE2EGitRunner(cliRunner, configuration), new EmptyCredentialStore(), logger, new ScmE2EApiClient(configuration));
+        // Der Fixture-Benutzer-Token steht von Anfang an im Store; das AgentToken bleibt
+        // absichtlich leer, damit die UI-Pflichtvalidierung greifen kann.
+        credentialStore.SetCredential("Softwareschmiede.GitHub.Token", "isolated-fixture-token");
+        // Zwei getrennte Fixture-Identitäten: ein falsches Client-Routing (Benutzer- statt
+        // Agent-Client) liefe gegen scm-owner und fiele beim scm-bot-Abgleich sofort auf.
+        _gitHub = new GitHubPlugin(new ScmE2EGitRunner(cliRunner, configuration), credentialStore, logger,
+            new ScmE2EApiClient(configuration), new ScmE2EApiClient(configuration, "scm-bot", "BOT"));
     }
 
     public IReadOnlyList<IGitPlugin> GetSourceCodeManagementPlugins() => [_gitHub];
@@ -27,11 +33,4 @@ internal sealed class ScmE2EPluginManager : IPluginManager
     public IKiPlugin GetDefaultDevelopmentAutomationPlugin() => GetDevelopmentAutomationPlugins().First();
     public IReadOnlyList<IIdePlugin> GetIdePlugins() => _inner.GetIdePlugins();
     public IIdePlugin GetDefaultIdePlugin() => _inner.GetDefaultIdePlugin();
-
-    private sealed class EmptyCredentialStore : ICredentialStore
-    {
-        public string? GetCredential(string key) => key == "Softwareschmiede.GitHub.Token" ? "isolated-fixture-token" : null;
-        public void SetCredential(string key, string value) => throw new InvalidOperationException("SCM-Fixture verwendet keine Benutzercredentials.");
-        public void DeleteCredential(string key) { }
-    }
 }

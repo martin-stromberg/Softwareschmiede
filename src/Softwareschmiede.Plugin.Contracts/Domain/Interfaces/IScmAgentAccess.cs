@@ -1,3 +1,4 @@
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Domain.Interfaces;
@@ -16,6 +17,7 @@ public interface IScmAgentAccess
     /// werden — sie gehören ausschließlich in die Prozessumgebung des Kindprozesses.
     /// Eine leere Liste bedeutet: keine Anbindung verfügbar; der reguläre CLI-Start
     /// darf dadurch nicht blockiert werden.</summary>
+    /// <param name="konto">Der aktive Kontomodus; wählt das bereitzustellende Credential.</param>
     /// <param name="ct">Abbruch-Token.</param>
-    Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(CancellationToken ct = default);
+    Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(ScmKontoModus konto, CancellationToken ct = default);
 }

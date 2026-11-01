@@ -16,6 +16,8 @@ namespace Softwareschmiede.App.ViewModels;
 public sealed class SettingsViewModel : ViewModelBase, IDisposable
 {
     private const string CodexPluginPrefix = "Softwareschmiede.Codex";
+    private const string GitHubPluginPrefix = "Softwareschmiede.GitHub";
+    private const string GitHubAgentTokenFieldKey = "AgentToken";
     private const string CommandLineParametersKey = "CommandLineParameters";
 
     private readonly AppEinstellungService _einstellungService;
@@ -57,6 +59,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private UpdateModusOption? _selectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.NurPruefen);
     private bool _includePrereleases;
     private ScmBackmergeModusOption? _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Deaktiviert);
+    private ScmKontoModusOption? _selectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.Benutzerkonto);
 
     /// <summary>Wird direkt nach erfolgreichem Speichern der Update-Einstellungen mit dem gespeicherten Snapshot ausgelöst.</summary>
     public event EventHandler<UpdateSettings>? UpdateSettingsSaved;
@@ -86,6 +89,16 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     {
         get => _selectedBackmergeModus;
         set => SetProperty(ref _selectedBackmergeModus, value);
+    }
+
+    /// <summary>Feste Auswahlliste der SCM-Konto-Modi (Steuerwert + Anzeige-Label).</summary>
+    public IReadOnlyList<ScmKontoModusOption> KontoModusOptionen => ScmKontoModusOption.Alle;
+
+    /// <summary>Aktuell ausgewählte Konto-Modus-Option aus <see cref="KontoModusOptionen"/>.</summary>
+    public ScmKontoModusOption? SelectedKontoModus
+    {
+        get => _selectedKontoModus;
+        set => SetProperty(ref _selectedKontoModus, value);
     }
 
     /// <summary>Arbeitsverzeichnis für Repository-Klone.</summary>
@@ -438,6 +451,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
             _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(await _einstellungService.GetScmBackmergeModusAsync(ct));
             OnPropertyChanged(nameof(SelectedBackmergeModus));
+            _selectedKontoModus = ScmKontoModusOption.FuerModus(await _einstellungService.GetScmKontoModusAsync(ct));
+            OnPropertyChanged(nameof(SelectedKontoModus));
 
             var updateSettings = await _einstellungService.GetUpdateSettingsAsync(ct);
             _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Modus);
@@ -481,6 +496,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 return;
             }
 
+            if (SelectedKontoModus is not { Modus: var kontoModus })
+            {
+                FehlerMeldung = "Der ausgewählte Konto-Modus ist ungültig.";
+                return;
+            }
+
             var updateSettings = new UpdateSettings(updateModus, IncludePrereleases);
             await _einstellungService.SetUpdateSettingsAsync(updateSettings, ct);
             UpdateSettingsSaved?.Invoke(this, updateSettings);
@@ -512,6 +533,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 ScmTriggerKeyword.Trim(),
                 ct);
             await _einstellungService.SetScmBackmergeModusAsync(backmergeModus, ct);
+            await _einstellungService.SetScmKontoModusAsync(kontoModus, ct);
             await _einstellungService.SetSettingAsync(
                 AppEinstellungService.ScmPromptAppendGeneralKey,
                 NullWennLeer(ScmPromptAppendixGeneral),
@@ -728,7 +750,37 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             && ValidierePflichtfelderFuerSettings(_selectedPluginSettings)
             && ValidierePromptVorlagen()
             && ValidiereScmTriggerKeyword()
-            && ValidiereScmTaskCompletionWait();
+            && ValidiereScmTaskCompletionWait()
+            && ValidiereScmKontoModus();
+    }
+
+    /// <summary>Im Kontomodus „Separates Konto“ ist ein effektives Agent-Token Pflicht — ein gerade
+    /// eingegebener, noch ungespeicherter Wert im geöffneten GitHub-Einstellungspanel zählt bereits.</summary>
+    private bool ValidiereScmKontoModus()
+    {
+        if (SelectedKontoModus?.Modus != ScmKontoModus.SeparatesKonto)
+            return true;
+
+        var github = SourceCodeManagementPlugins.FirstOrDefault(x =>
+            string.Equals(x.Plugin.PluginPrefix, GitHubPluginPrefix, StringComparison.Ordinal));
+        var field = github?.Plugin.GetSettingGroups()
+            .SelectMany(g => g.Fields)
+            .FirstOrDefault(f => string.Equals(f.Key, GitHubAgentTokenFieldKey, StringComparison.Ordinal));
+        var effektiv = github is null || field is null
+            ? null
+            : _selectedPluginSettings.SelectMany(g => g.Entries)
+                .Where(e => e.Field == field)
+                .Select(e => e.Value)
+                .FirstOrDefault()
+              ?? _pluginSettingsService.GetValue(github.Plugin, field);
+
+        if (string.IsNullOrWhiteSpace(effektiv))
+        {
+            FehlerMeldung = "Für den Konto-Modus „Separates Konto“ ist ein Personal Access Token des separaten Kontos erforderlich. Tragen Sie ihn unter Einstellungen → Plugins → GitHub → Authentifizierung im Feld „Personal Access Token des separaten Kontos“ ein.";
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>Die Abschluss-Wartezeit muss eine nicht negative Ganzzahl in Minuten sein.</summary>

@@ -1,6 +1,6 @@
 # GitHub-Ereignisüberwachung
 
-Die Softwareschmiede beobachtet Texte in lokal verknüpften GitHub-Issues und Pull Requests und kann passende Anfragen an eine Aufgabe und deren CLI weiterleiten. Die Verarbeitung und ihr aktueller Stand sind auf der Seite **SCM-Ereignisse** nachvollziehbar.
+Die Softwareschmiede beobachtet Texte in lokal verknüpften GitHub-Issues und Pull Requests — wahlweise repository-weit unter dem Benutzerkonto (Trigger-Keyword) oder über die GitHub-Benachrichtigungen eines separaten Kontos (`@`-Erwähnung) — und kann passende Anfragen an eine Aufgabe und deren CLI weiterleiten. Die Verarbeitung und ihr aktueller Stand sind auf der Seite **SCM-Ereignisse** nachvollziehbar.
 
 ## Inhalt
 

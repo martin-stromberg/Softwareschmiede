@@ -339,6 +339,100 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Equal("$Softwareschmiede Aufgabe anlegen",
             fixture.Prompts().Last().GetProperty("request").GetProperty("body").GetString());
         output.WriteLine("E8: auto-created task waits actionably without default CLI; queue selection starts clone/CLI and delivers exactly once.");
+
+        // Bot-Phase ans Ende gelegt: der prozessgebundene ScmE2ECredentialStore verliert
+        // eingetragene Secrets bei einem Neustart — danach findet keiner mehr statt.
+        await BotModeAsync(window, fixture);
+    }
+
+    /// <summary>Kontomodus „Separates Konto“: UI-Validierung ohne Token, Token per Tastatur,
+    /// Inbox-Polling am Agent-Client (scm-bot), Mention→Aufgabe→Dispatch→Antwort, Fremd-
+    /// Verwerfungsdiagnose ohne Monitoring-Alarm und Rückschaltung auf Benutzerkonto.</summary>
+    private async Task BotModeAsync(Window window, ScmE2EFixture fixture)
+    {
+        // Fehlerfall zuerst: Separates Konto ohne AgentToken wird mit sichtbarer
+        // Fehlermeldung abgelehnt; DiscardChanges setzt Banner und Modus zurück.
+        var settings = new SettingsView(window).ForceShow();
+        settings.SwitchTab("Allgemein");
+        settings.SetKontoModus("Separates Konto");
+        var rejected = Assert.Throws<InvalidOperationException>(() => settings.SaveSettings());
+        Assert.Contains("Personal Access Token", rejected.Message);
+        settings.DiscardChanges();
+        settings.WaitForKontoModus("Benutzerkonto", Medium);
+
+        settings.SwitchTab("Plugins");
+        WaitForElement(window, cf => cf.ByName("Softwareschmiede.GitHub.Eintrag"), Long).ClickInForeground();
+        settings.SetPluginSecretField("AgentToken", "fixture-agent-token");
+        settings.SwitchTab("Allgemein");
+        settings.SetKontoModus("Separates Konto");
+        settings.SaveSettings();
+        output.WriteLine("Bot: Separates Konto ohne Token abgelehnt; AgentToken per Tastatur eingetragen und gemeinsam gespeichert.");
+
+        // Der nächste Poll liest die Inbox des separaten Kontos am Agent-Client (scm-bot).
+        await fixture.WaitForCallsAsync("notifications");
+        NavigateQueue(window);
+
+        // Mention-Benachrichtigung auf Issue 18: Referenz → Aufgabe → Ereignis → Dispatch → Antwort.
+        var eyesBefore = fixture.Responses().Count(x => x.Content == "eyes");
+        fixture.AddText(18, 1801, "@scm-bot Aufgabe aus Benachrichtigung anlegen");
+        fixture.AddNotification(18);
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        Aufgabe? botTask = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            await using var db = fixture.OpenDatabase();
+            botTask = await db.Aufgaben.Include(x => x.IssueReferenz)
+                .SingleOrDefaultAsync(x => x.IssueReferenz != null && x.IssueReferenz.IssueNummer == 18);
+            if (botTask is not null) break;
+            await Task.Delay(200);
+        }
+        Assert.NotNull(botTask);
+        var waiting = await fixture.WaitEventForTaskAsync(botTask!.Id, "Wartend");
+        Assert.Equal(ScmKontoModus.SeparatesKonto, ScmEventStore.Observation(waiting).Reference.Repository.Konto);
+        SelectEventByTitle(window, "SCM Referenz 18", "/issues/18");
+        StartSelected(window);
+        await fixture.WaitEventForTaskAsync(botTask.Id, "Verarbeitet");
+        Assert.Equal(eyesBefore + 1, fixture.Responses().Count(x => x.Content == "eyes"));
+        Assert.Contains(fixture.Responses(), x => x.Endpoint.EndsWith("/issues/18/comments", StringComparison.Ordinal)
+            && x.Body.Contains("KI-Simulator:", StringComparison.Ordinal));
+        output.WriteLine("Bot: mention-Benachrichtigung legte Aufgabe an, Dispatch und Antwort liefen unter scm-bot.");
+
+        // Fremd- und Nicht-mention-Benachrichtigungen: verworfen bzw. ignoriert, Diagnose
+        // sichtbar in den Integrationshinweisen — ohne MonitoringNotice-Alarm.
+        fixture.AddNotification(19, repositoryNodeId: "FREMD_REPO");
+        fixture.AddNotification(21, reason: "assign");
+        const string inboxKey = "notifications/softwareschmiede.github/github.com";
+        string? diagnostic = null;
+        deadline = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < deadline)
+        {
+            await using var db = fixture.OpenDatabase();
+            diagnostic = (await db.ScmObservationCheckpoints.FindAsync(inboxKey))?.Diagnostic;
+            if (diagnostic?.Contains("1 verworfen", StringComparison.Ordinal) == true) break;
+            await Task.Delay(200);
+        }
+        Assert.NotNull(diagnostic);
+        Assert.StartsWith(ScmEventStore.InboxDiscardDiagnosticPrefix, diagnostic);
+        Assert.Contains("1 verworfen", diagnostic);
+        await using (var db = fixture.OpenDatabase())
+        {
+            Assert.False(await db.Aufgaben.Include(x => x.IssueReferenz)
+                .AnyAsync(x => x.IssueReferenz != null && (x.IssueReferenz.IssueNummer == 19 || x.IssueReferenz.IssueNummer == 21)));
+        }
+        WaitForElement(window, cf => cf.ByName("Integrationshinweise"), Long)
+            .Patterns.ExpandCollapse.Pattern.Expand();
+        WaitContains(window, "ScmEventDiagnostics", "1 verworfen");
+        var notice = window.FindFirstDescendant(cf => cf.ByAutomationId("ScmEventMonitoringNotice"));
+        Assert.True(notice is null || notice.IsOffscreen || !notice.Name.Contains("verworfen", StringComparison.Ordinal),
+            "Die Verwerfungsdiagnose darf keinen Monitoring-Alarm auslösen: " + notice?.Name);
+        output.WriteLine("Bot: Fremd-Benachrichtigung verworfen und nur als Integrationshinweis sichtbar, kein Alarm.");
+
+        // Rückschaltung: der nächste Poll enumeriert wieder repository-weit, der Keyword-
+        // Trigger läuft wie bisher.
+        await fixture.SetKontoModus(ScmKontoModus.Benutzerkonto);
+        fixture.AddText(1, 106, "$Softwareschmiede Zurück im Benutzerkonto");
+        await fixture.WaitEventAsync(1, "Verarbeitet", 106);
+        output.WriteLine("Bot: Rückschaltung auf Benutzerkonto — Enumeration und Keyword-Pfad laufen wieder.");
     }
 
     private async Task MissingVariantsAsync(Window window, ScmE2EFixture fixture)

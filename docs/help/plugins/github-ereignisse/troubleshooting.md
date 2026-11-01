@@ -42,7 +42,21 @@
 
 **Ursache:** Der Personal Access Token fehlt, ist ungültig oder hat keinen ausreichenden Zugriff.
 
-**Lösung:** Öffne **Einstellungen → Plugins → GitHub → Authentifizierung**, aktualisiere den **Personal Access Token**, speichere die Änderung und wähle beim Ereignis **Erneut prüfen**. Prüfe auch Repositoryzugriff sowie Lese- und Schreibrechte für Issues und Pull Requests.
+**Lösung:** Öffne **Einstellungen → Plugins → GitHub → Authentifizierung**, aktualisiere den **Personal Access Token**, speichere die Änderung und wähle beim Ereignis **Erneut prüfen**. Prüfe auch Repositoryzugriff sowie Lese- und Schreibrechte für Issues und Pull Requests. Im Konto-Modus „Separates Konto" gilt dieselbe Prüfung für den Token des separaten Kontos — das Bot-Konto benötigt Collaborator-Schreibrecht auf den überwachten Repositories.
+
+## Das Speichern meldet einen fehlenden Token des separaten Kontos
+
+**Ursache:** Unter **Einstellungen → Allgemein → SCM-Ereignisse** wurde der **Konto-Modus „Separates Konto"** gewählt, ohne dass ein Token des separaten Kontos hinterlegt ist.
+
+**Lösung:** Trage unter **Einstellungen → Plugins → GitHub → Authentifizierung** im Feld **„Personal Access Token des separaten Kontos"** einen gültigen Personal Access Token des Bot-Kontos ein (empfohlene Scopes `notifications` und `repo`) und speichere erneut. Alternativ den Konto-Modus zurück auf **„Benutzerkonto"** stellen.
+
+## Im Modus „Separates Konto" erscheint kein Ereignis
+
+**Ursache:** Die Erwähnung ist nicht frei stehend (z. B. innerhalb eines Zitats oder Wortes), der Autor der Erwähnung ist nicht der Repository-Owner, das Bot-Konto hat keinen Zugriff auf das Repository, die Benachrichtigung betrifft ein Repository, das an keinem Projekt erfasst und aktiviert ist, oder der Benachrichtigungsgrund ist keine Erwähnung (`reason = mention`).
+
+**Lösung:** Erwähne das separate Konto als Repository-Owner frei stehend als `@Kontoname` in einer Beschreibung oder einem Kommentar. Prüfe die **Integrationshinweise** in der SCM-Ereignisübersicht: Verworfene Benachrichtigungen zu nicht registrierten Repositories werden dort gezählt. Stelle außerdem sicher, dass das Bot-Konto als Collaborator mit Schreibrecht auf dem Repository eingeladen ist.
+
+> **Hinweis:** Im Modus „Separates Konto" werden ausschließlich Benachrichtigungen ausgewertet — weder die repository-weite Enumeration noch verknüpfte Referenzen vorhandener Aufgaben noch Backmerge-Entdeckungen laufen in diesem Modus.
 
 ## Der Ausgang einer CLI-Zustellung ist ungewiss
 

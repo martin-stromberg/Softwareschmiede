@@ -53,7 +53,18 @@ internal sealed class ScmE2EScenario
     public bool RejectAiResponse { get; set; }
     public bool PluginAvailable { get; set; } = true;
     public List<ScmE2EText> Texts { get; set; } = [];
+    public List<ScmE2ENotification> Notifications { get; set; } = [];
 }
+
+// Inbox-Eintrag der Notifications-API; eine abweichende RepositoryNodeId steht für ein
+// nicht registriertes Fremd-Repository.
+internal sealed record ScmE2ENotification(
+    int Number,
+    bool PullRequest,
+    string RepositoryNodeId,
+    string Reason,
+    DateTimeOffset UpdatedAt,
+    string ThreadId);
 
 internal sealed class ScmE2EText
 {

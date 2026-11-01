@@ -9,6 +9,7 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 public sealed partial class GitHubPlugin
 {
     private readonly IGitHubEventApiClient _eventApiClient;
+    private readonly IGitHubEventApiClient _agentEventApiClient;
     private const string TextFields = "id body createdAt updatedAt lastEditedAt url author { login ... on Node { id } } editor { login ... on Node { id } }";
 
     /// <inheritdoc />
@@ -16,9 +17,10 @@ public sealed partial class GitHubPlugin
     {
         if (!repository.PluginPrefix.Equals(PluginPrefix, StringComparison.OrdinalIgnoreCase))
             throw Permanent("Der Repository-Provider stimmt nicht überein.");
+        var client = ClientFor(repository.Konto);
         var (host, owner, name) = ParseEventRepository(repository.RepositoryId);
-        var viewer = await EventApiAsync(host, "GET", "user", null, false, ct);
-        var metadata = await EventApiAsync(host, "GET", $"repos/{owner}/{name}", null, false, ct);
+        var viewer = await EventApiAsync(client, host, "GET", "user", null, false, ct);
+        var metadata = await EventApiAsync(client, host, "GET", $"repos/{owner}/{name}", null, false, ct);
         var remoteOwner = Object(metadata, "owner");
         var canonicalOwner = Required(remoteOwner, "login");
         var canonicalName = Required(metadata, "name");
@@ -27,7 +29,8 @@ public sealed partial class GitHubPlugin
         var permissions = Object(metadata, "permissions");
         return new(PluginPrefix, host, Required(metadata, "node_id"), canonicalOwner, canonicalName,
             String(remoteOwner, "node_id"), Required(viewer, "node_id"), Required(viewer, "login"),
-            Boolean(permissions, "push") || Boolean(permissions, "admin") || Boolean(permissions, "maintain"));
+            Boolean(permissions, "push") || Boolean(permissions, "admin") || Boolean(permissions, "maintain"),
+            repository.Konto);
     }
 
     /// <inheritdoc />
@@ -35,6 +38,7 @@ public sealed partial class GitHubPlugin
     {
         ValidateReference(request.Reference);
         var repository = request.Reference.Repository;
+        var client = ClientFor(repository.Konto);
         var observations = new List<ScmEventObservation>();
         var field = request.Reference.Kind == ScmReferenceKind.Issue ? "issue" : "pullRequest";
         var variables = new Dictionary<string, object?>
@@ -45,7 +49,7 @@ public sealed partial class GitHubPlugin
         };
         if (request.ContentKind == ScmContentKind.Description)
         {
-            var data = await GraphAsync(repository.Host,
+            var data = await GraphAsync(client, repository.Host,
                 "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){" + field + "(number:$number){" + TextFields + "}}}", variables, false, ct);
             AddObservation(request, Object(Object(data, "repository"), field), null, observations);
         }
@@ -57,7 +61,7 @@ public sealed partial class GitHubPlugin
             do
             {
                 variables["cursor"] = cursor;
-                var data = await GraphAsync(repository.Host,
+                var data = await GraphAsync(client, repository.Host,
                     "query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviews(first:100,after:$cursor){nodes{" +
                     TextFields + " fullDatabaseId state submittedAt} pageInfo{hasNextPage endCursor}}}}}", variables, false, ct);
                 var connection = Object(Object(Object(data, "repository"), "pullRequest"), "reviews");
@@ -76,13 +80,13 @@ public sealed partial class GitHubPlugin
                 throw Permanent("Review-Kommentare benötigen eine Pull-Request-Referenz.");
             var endpoint = $"{RepositoryEndpoint(repository)}/{(request.ContentKind == ScmContentKind.ReviewComment ? "pulls" : "issues")}/{request.Reference.Number}/comments?per_page=100";
             if (request.SinceUtc is { } since) endpoint += "&since=" + Uri.EscapeDataString(since.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
-            var comments = await RestPagesAsync(repository.Host, endpoint, ct);
+            var comments = await RestPagesAsync(client, repository.Host, endpoint, ct);
             foreach (var comment in comments)
             {
                 // Always obtain body and editor in the same GraphQL snapshot, including same-second edits.
                 var nodeId = Required(comment, "node_id");
                 var type = request.ContentKind == ScmContentKind.ReviewComment ? "PullRequestReviewComment" : "IssueComment";
-                var data = await GraphAsync(repository.Host, "query($id:ID!){node(id:$id){... on " + type + "{" + TextFields + "}}}",
+                var data = await GraphAsync(client, repository.Host, "query($id:ID!){node(id:$id){... on " + type + "{" + TextFields + "}}}",
                     new { id = nodeId }, false, ct);
                 var node = Object(data, "node");
                 if (node.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) continue; // Deleted between calls.
@@ -103,12 +107,13 @@ public sealed partial class GitHubPlugin
                 .Equals(repository.Host, StringComparison.OrdinalIgnoreCase))
             throw Permanent("Ungültiger GitHub-Ereignisursprung.");
         var references = new List<ScmEventReference>();
-        await CollectReferencesAsync(repository, ScmReferenceKind.Issue, "issues", "[OPEN]", null, references, ct);
-        await CollectReferencesAsync(repository, ScmReferenceKind.PullRequest, "pullRequests", "[OPEN]", null, references, ct);
+        var client = ClientFor(repository.Konto);
+        await CollectReferencesAsync(client, repository, ScmReferenceKind.Issue, "issues", "[OPEN]", null, references, ct);
+        await CollectReferencesAsync(client, repository, ScmReferenceKind.PullRequest, "pullRequests", "[OPEN]", null, references, ct);
         if (sinceUtc is { } since)
         {
-            await CollectReferencesAsync(repository, ScmReferenceKind.Issue, "issues", "[CLOSED]", since, references, ct);
-            await CollectReferencesAsync(repository, ScmReferenceKind.PullRequest, "pullRequests", "[CLOSED,MERGED]", since, references, ct);
+            await CollectReferencesAsync(client, repository, ScmReferenceKind.Issue, "issues", "[CLOSED]", since, references, ct);
+            await CollectReferencesAsync(client, repository, ScmReferenceKind.PullRequest, "pullRequests", "[CLOSED,MERGED]", since, references, ct);
         }
         return references;
     }
@@ -119,7 +124,7 @@ public sealed partial class GitHubPlugin
         ValidateReference(reference);
         if (reference.Kind != ScmReferenceKind.Issue) throw Permanent("Issue-Anlagedaten benötigen eine Issue-Referenz.");
         var repository = reference.Repository;
-        var element = await EventApiAsync(repository.Host, "GET", $"{RepositoryEndpoint(repository)}/issues/{reference.Number}", null, false, ct);
+        var element = await EventApiAsync(ClientFor(repository.Konto), repository.Host, "GET", $"{RepositoryEndpoint(repository)}/issues/{reference.Number}", null, false, ct);
         if (element.ValueKind != JsonValueKind.Object) throw Permanent("Unvollständige GitHub-Antwort.");
         // Der Issues-Endpunkt liefert auch Pull Requests; eine fremde Referenzart ist nicht anlegbar.
         if (Object(element, "pull_request").ValueKind == JsonValueKind.Object) return null;
@@ -142,14 +147,46 @@ public sealed partial class GitHubPlugin
         if (reference.Kind != ScmReferenceKind.PullRequest) throw Permanent("Pull-Request-Anlagedaten benötigen eine Pull-Request-Referenz.");
         var repository = reference.Repository;
         var repositoryId = PullRequestRepositoryId.Normalize(PullRequestProvider.GitHub, $"{repository.Owner}/{repository.Name}");
-        var element = await EventApiAsync(repository.Host, "GET", $"{RepositoryEndpoint(repository)}/pulls/{reference.Number}", null, false, ct);
+        var element = await EventApiAsync(ClientFor(repository.Konto), repository.Host, "GET", $"{RepositoryEndpoint(repository)}/pulls/{reference.Number}", null, false, ct);
         if (element.ValueKind != JsonValueKind.Object) throw Permanent("Unvollständige GitHub-Antwort.");
         var pullRequest = ParsePullRequest(element, repositoryId);
         return pullRequest is not null && pullRequest.Nummer == reference.Number ? pullRequest : null;
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ScmNotification>> EnumerateNotificationsAsync(string host,
+        DateTimeOffset? sinceUtc, CancellationToken ct = default)
+    {
+        host = GitHubHttpApiClient.ValidateHost(host);
+        var endpoint = "notifications?all=true&participating=true&per_page=100";
+        if (sinceUtc is { } since)
+            endpoint += "&since=" + Uri.EscapeDataString(since.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        var threads = await RestPagesAsync(ClientFor(ScmKontoModus.SeparatesKonto), host, endpoint, ct);
+        var notifications = new List<ScmNotification>();
+        foreach (var thread in threads)
+        {
+            var subject = Object(thread, "subject");
+            var kind = String(subject, "type") switch
+            {
+                "Issue" => ScmReferenceKind.Issue,
+                "PullRequest" => ScmReferenceKind.PullRequest,
+                _ => (ScmReferenceKind?)null
+            };
+            if (kind is null) continue; // Releases, CheckSuites, Discussions u. a. sind keine Referenzen.
+            var subjectUrl = String(subject, "url");
+            var number = subjectUrl is not null && int.TryParse(subjectUrl.TrimEnd('/').Split('/')[^1],
+                NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0;
+            if (number <= 0) continue;
+            var repository = Object(thread, "repository");
+            notifications.Add(new(Required(thread, "id"), Required(repository, "node_id"), host,
+                Required(Object(repository, "owner"), "login"), Required(repository, "name"), kind.Value, number,
+                String(thread, "reason") ?? string.Empty, RequiredDate(thread, "updated_at")));
+        }
+        return notifications;
+    }
+
     /// <summary>Liest eine paginierte Referenzliste; jüngste Aktivität zuerst, Abbruch am <paramref name="cutoff"/>.</summary>
-    private async Task CollectReferencesAsync(ScmEventRepository repository, ScmReferenceKind kind, string field,
+    private async Task CollectReferencesAsync(IGitHubEventApiClient client, ScmEventRepository repository, ScmReferenceKind kind, string field,
         string states, DateTimeOffset? cutoff, List<ScmEventReference> target, CancellationToken ct)
     {
         var variables = new Dictionary<string, object?> { ["owner"] = repository.Owner, ["name"] = repository.Name };
@@ -158,7 +195,7 @@ public sealed partial class GitHubPlugin
         do
         {
             variables["cursor"] = cursor;
-            var data = await GraphAsync(repository.Host,
+            var data = await GraphAsync(client, repository.Host,
                 "query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){" + field
                 + "(first:100,states:" + states + ",orderBy:{field:UPDATED_AT,direction:DESC},after:$cursor){nodes{number updatedAt} pageInfo{hasNextPage endCursor}}}}",
                 variables, false, ct);
@@ -207,7 +244,22 @@ public sealed partial class GitHubPlugin
             $"https://{repo.Host}/{repo.Owner}/{repo.Name}/{referencePath}/{request.Reference.Number}{fragment}", DateTimeOffset.UtcNow));
     }
 
-    private async Task<List<JsonElement>> RestPagesAsync(string host, string endpoint, CancellationToken ct)
+    private Task<List<JsonElement>> RestPagesAsync(IGitHubEventApiClient client, string host, string endpoint, CancellationToken ct)
+        => RestPagesAsync(client, host, endpoint,
+            page => page.ValueKind == JsonValueKind.Array ? page.EnumerateArray() : null, ct);
+
+    /// <summary>Liest paginierte Elemente einer Objekt-Antwort mit verschachtelter Liste
+    /// (<c>{total_count, &lt;arrayProperty&gt;:[]}</c>) mit derselben Link-/Host-Semantik wie <see cref="RestPagesAsync(IGitHubEventApiClient, string, string, CancellationToken)"/>.</summary>
+    private Task<List<JsonElement>> RestObjectPagesAsync(IGitHubEventApiClient client, string host, string endpoint,
+        string arrayProperty, CancellationToken ct)
+        => RestPagesAsync(client, host, endpoint,
+            page => Object(page, arrayProperty).ValueKind == JsonValueKind.Array ? page.GetProperty(arrayProperty).EnumerateArray() : null, ct);
+
+    /// <summary>Liest einen paginierten REST-Endpunkt vollständig: Zyklusprüfung, Link-Header-
+    /// Pagination mit <see cref="ValidateNextPage"/> und einheitliche Fehlersemantik;
+    /// <paramref name="extractElements"/> liefert die Elemente einer Seite oder <see langword="null"/>.</summary>
+    private async Task<List<JsonElement>> RestPagesAsync(IGitHubEventApiClient client, string host, string endpoint,
+        Func<JsonElement, IEnumerable<JsonElement>?> extractElements, CancellationToken ct)
     {
         var items = new List<JsonElement>();
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -216,10 +268,10 @@ public sealed partial class GitHubPlugin
         while (next is not null)
         {
             if (!visited.Add(next)) throw Permanent("GitHub lieferte eine zyklische Seitennavigation.");
-            var response = await SendEventApiAsync(new(host, "GET", next), false, ct);
-            var array = ParseJson(response.Body);
-            if (array.ValueKind != JsonValueKind.Array) throw Permanent("Ungültige GitHub-Seitenantwort.");
-            items.AddRange(array.EnumerateArray());
+            var response = await SendEventApiAsync(client, new(host, "GET", next), false, ct);
+            var page = ParseJson(response.Body);
+            if (extractElements(page) is not { } elements) throw Permanent("Ungültige GitHub-Seitenantwort.");
+            items.AddRange(elements);
             var link = Header(response, "Link");
             var match = Regex.Match(link ?? string.Empty, "<([^>]+)>;\\s*rel=\"next\"", RegexOptions.CultureInvariant);
             next = match.Success ? ValidateNextPage(host, initialPath, match.Groups[1].Value) : null;
@@ -227,17 +279,17 @@ public sealed partial class GitHubPlugin
         return items;
     }
 
-    private async Task<JsonElement> EventApiAsync(string host, string method, string endpoint, object? body, bool mutation, CancellationToken ct)
+    private async Task<JsonElement> EventApiAsync(IGitHubEventApiClient client, string host, string method, string endpoint, object? body, bool mutation, CancellationToken ct)
     {
-        var result = await SendEventApiAsync(new(host, method, endpoint, body is null ? null : JsonSerializer.Serialize(body)), mutation, ct);
+        var result = await SendEventApiAsync(client, new(host, method, endpoint, body is null ? null : JsonSerializer.Serialize(body)), mutation, ct);
         try { return ParseJson(result.Body); }
         catch (ScmProviderException) when (mutation)
         { throw new ScmProviderException(ScmProviderFailureKind.Temporary, "GitHub-Antwort nach Schreibversuch nicht auswertbar.", outcomeUncertain: true); }
     }
 
-    private async Task<JsonElement> GraphAsync(string host, string query, object variables, bool mutation, CancellationToken ct)
+    private async Task<JsonElement> GraphAsync(IGitHubEventApiClient client, string host, string query, object variables, bool mutation, CancellationToken ct)
     {
-        var result = await EventApiAsync(host, "POST", "graphql", new { query, variables }, mutation, ct);
+        var result = await EventApiAsync(client, host, "POST", "graphql", new { query, variables }, mutation, ct);
         if (result.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Array && errors.GetArrayLength() > 0)
         {
             var types = errors.EnumerateArray().Select(e => String(e, "type") ?? String(Object(e, "extensions"), "code")).ToArray();
@@ -252,10 +304,32 @@ public sealed partial class GitHubPlugin
         return data;
     }
 
-    private async Task<GitHubEventApiResponse> SendEventApiAsync(GitHubEventApiRequest request, bool mutation, CancellationToken ct)
+    /// <summary>Wählt den API-Transport zum Konto. Token-Grenze (bewusste Asymmetrie): Das
+    /// Konto-Routing gilt ausschließlich für die Ereignispfade (<see cref="IScmEventSource"/>,
+    /// <see cref="IScmEventResponder"/>, <see cref="IScmNotificationSource"/>,
+    /// <see cref="IScmAgentAccess"/>). Nicht-Ereignis-APIs (Repository-/Issue-/PR-Listen,
+    /// PR-Status, Workflow-Runs, Alerts, Templates, <c>CheckHealthAsync</c>) sowie die verbleibenden
+    /// gh-/git-Schreib- und Arbeitskopien-Pfade (<c>issue create</c>, <c>pr create</c>, <c>pr merge</c>,
+    /// Clone/Push/Pull, <c>git ls-remote</c>) laufen bewusst weiter unter dem Benutzer-Token —
+    /// siehe <c>_eventApiClient</c>/<c>GetGhEnvironment</c>/<c>GetGitEnvironment</c>.</summary>
+    private IGitHubEventApiClient ClientFor(ScmKontoModus konto)
+    {
+        if (konto == ScmKontoModus.SeparatesKonto
+            && string.IsNullOrEmpty(_credentialStore.GetCredential(GitHubAgentTokenCredentialKey)))
+            throw new ScmProviderException(ScmProviderFailureKind.Authentication,
+                "Für den Kontomodus „Separates Konto“ fehlt der Personal Access Token des separaten Kontos. Öffnen Sie Einstellungen → Plugins → GitHub → Authentifizierung und tragen Sie den Token ein. Bis dahin werden keine Benachrichtigungen eingelesen.");
+        return konto == ScmKontoModus.SeparatesKonto ? _agentEventApiClient : _eventApiClient;
+    }
+
+    /// <summary>Wählt den Credential-Key zum Konto; dieselbe Token-Grenze wie bei
+    /// <see cref="ClientFor"/> — Nicht-Ereignis-Pfade nutzen weiterhin <c>GitHubTokenCredentialKey</c>.</summary>
+    private static string CredentialKeyFor(ScmKontoModus konto)
+        => konto == ScmKontoModus.SeparatesKonto ? GitHubAgentTokenCredentialKey : GitHubTokenCredentialKey;
+
+    private async Task<GitHubEventApiResponse> SendEventApiAsync(IGitHubEventApiClient client, GitHubEventApiRequest request, bool mutation, CancellationToken ct)
     {
         GitHubEventApiResponse response;
-        try { response = await _eventApiClient.SendAsync(request, ct); }
+        try { response = await client.SendAsync(request, ct); }
         catch (ScmProviderException ex) when (mutation && ex.FailureKind == ScmProviderFailureKind.Temporary && !ex.OutcomeUncertain)
         { throw new ScmProviderException(ex.FailureKind, ex.Message, ex.RetryAfterUtc, true); }
         catch (Exception ex) when (ex is IOException or HttpRequestException or TimeoutException || (mutation && ex is OperationCanceledException))

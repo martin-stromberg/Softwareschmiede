@@ -350,6 +350,10 @@ public sealed partial class App : System.Windows.Application
         if (scmTestConfiguration is not null)
         {
             services.AddSingleton(scmTestConfiguration);
+            // Prozessgebundener Credential-Store: Plugin-Einstellungen und das Fixture-Plugin
+            // teilen denselben Speicher; der echte WindowsCredentialStore bleibt unberührt.
+            services.AddSingleton<ScmE2ECredentialStore>();
+            services.AddSingleton<ICredentialStore>(sp => sp.GetRequiredService<ScmE2ECredentialStore>());
             services.AddSingleton<IPluginManager, ScmE2EPluginManager>();
             services.AddSingleton<ITerminalSessionFactory, ScmE2ETerminalSessionFactory>();
             services.AddHostedService<ScmE2ERuntimeControl>();

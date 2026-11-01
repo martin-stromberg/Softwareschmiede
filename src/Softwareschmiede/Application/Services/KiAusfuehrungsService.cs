@@ -375,7 +375,9 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         IReadOnlyDictionary<string, string?> agentEnvironment;
         try
         {
-            agentEnvironment = await agentAccess.GetAgentEnvironmentAsync(ct).ConfigureAwait(false);
+            using var scope = _scopeFactory.CreateScope();
+            var konto = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmKontoModusAsync(ct).ConfigureAwait(false);
+            agentEnvironment = await agentAccess.GetAgentEnvironmentAsync(konto, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

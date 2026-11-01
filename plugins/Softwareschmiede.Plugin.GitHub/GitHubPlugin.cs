@@ -9,12 +9,17 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>
-/// GitHub Plugin – nutzt gh CLI und git CLI für alle GitHub-Operationen.
-/// Der GitHub-Token wird als GH_TOKEN Umgebungsvariable übergeben, niemals als CLI-Argument.
+/// GitHub Plugin – REST-/GraphQL-API-Zugriffe (alle Ereignis- und Lesepfade) laufen prozesslos über
+/// <see cref="IGitHubEventApiClient"/>; die gh CLI bleibt für die verbleibenden Mutationen
+/// (<c>issue create</c>, <c>pr create</c>, <c>pr merge</c>) und die git CLI für lokale
+/// Arbeitskopien-Operationen im Einsatz.
+/// Der GitHub-Token wird als GH_TOKEN Umgebungsvariable bzw. Authorization-Header übergeben,
+/// niemals als CLI-Argument oder in URLs.
 /// </summary>
-public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEventSource, IScmEventResponder, IScmAgentAccess
+public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEventSource, IScmEventResponder, IScmAgentAccess, IScmNotificationSource
 {
     private const string GitHubTokenCredentialKey = "Softwareschmiede.GitHub.Token";
+    private const string GitHubAgentTokenCredentialKey = "Softwareschmiede.GitHub.AgentToken";
     private const string RepositoryUrlKey = "RepositoryUrl";
     private const string RepositoryNameKey = "RepositoryName";
     private static readonly Regex EmbeddedTokenPattern = new(@"oauth2:[^@\s]+@", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -45,7 +50,14 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
                 FieldType: PluginSettingFieldType.Secret,
                 Placeholder: "ghp_...",
                 Description: "GitHub Personal Access Token mit den Berechtigungen repo, read:org und Zugriff auf Code-Scanning-Alerts. Token erstellen: https://github.com/settings/tokens/new",
-                IsRequired: true)
+                IsRequired: true),
+            new PluginSettingField(
+                Key: "AgentToken",
+                Label: "Personal Access Token des separaten Kontos",
+                FieldType: PluginSettingFieldType.Secret,
+                Placeholder: "ghp_...",
+                Description: "GitHub Personal Access Token eines separaten Kontos für den Kontomodus „Separates Konto“ (Scopes: notifications und repo). Erforderlich, sobald der Kontomodus „Separates Konto“ gewählt ist.",
+                IsRequired: false)
         ]),
         new PluginSettingGroup("Pull Requests",
         [
@@ -106,12 +118,20 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     /// <summary>Erstellt den Provider mit austauschbarem Ereignis-API-Transport.</summary>
     public GitHubPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<GitHubPlugin> logger,
         IGitHubEventApiClient? eventApiClient)
+        : this(cliRunner, credentialStore, logger, eventApiClient, null)
+    {
+    }
+
+    /// <summary>Erstellt den Provider mit austauschbaren Ereignis-API-Transporten beider Konten.</summary>
+    public GitHubPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<GitHubPlugin> logger,
+        IGitHubEventApiClient? eventApiClient, IGitHubEventApiClient? agentEventApiClient)
         : base(cliRunner)
     {
         _cliRunner = cliRunner;
         _credentialStore = credentialStore;
         _logger = logger;
-        _eventApiClient = eventApiClient ?? new GhEventApiClient(cliRunner, GetGhEnvironment);
+        _eventApiClient = eventApiClient ?? new GitHubHttpApiClient(() => _credentialStore.GetCredential(GitHubTokenCredentialKey));
+        _agentEventApiClient = agentEventApiClient ?? new GitHubHttpApiClient(() => _credentialStore.GetCredential(GitHubAgentTokenCredentialKey));
     }
 
     private IDictionary<string, string> GetGhEnvironment()
@@ -135,7 +155,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     /// statt interaktiv zu blockieren. Die Werte werden ausschließlich als Prozessumgebung
     /// des CLI-Kindprozesses gesetzt — niemals in Prompts, Logs oder Persistenz.
     /// </remarks>
-    public Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(CancellationToken ct = default)
+    public Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(ScmKontoModus konto, CancellationToken ct = default)
     {
         var environment = new Dictionary<string, string?>
         {
@@ -143,7 +163,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             // statt die Agenten-Sitzung zu blockieren.
             ["GIT_TERMINAL_PROMPT"] = "0",
         };
-        var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
+        var token = _credentialStore.GetCredential(CredentialKeyFor(konto));
         if (!string.IsNullOrEmpty(token))
         {
             environment["GH_TOKEN"] = token;
@@ -199,7 +219,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
                || normalizedError.Contains("insufficient", StringComparison.Ordinal);
     }
 
-    private static string SanitizeSensitiveOutput(string? message, string? token)
+    private string SanitizeSensitiveOutput(string? message)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
@@ -208,9 +228,13 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
 
         var sanitizedMessage = message;
 
-        if (!string.IsNullOrWhiteSpace(token))
+        foreach (var credentialKey in new[] { GitHubTokenCredentialKey, GitHubAgentTokenCredentialKey })
         {
-            sanitizedMessage = sanitizedMessage.Replace(token, "***", StringComparison.Ordinal);
+            var token = _credentialStore.GetCredential(credentialKey);
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                sanitizedMessage = sanitizedMessage.Replace(token, "***", StringComparison.Ordinal);
+            }
         }
 
         sanitizedMessage = EmbeddedTokenPattern.Replace(sanitizedMessage, "oauth2:***@");
@@ -376,20 +400,20 @@ password {token}
 
         _logger.LogInformation("Rufe Issues für Repository {RepositoryId} ab.", normalizedRepositoryId);
 
-        var result = await _cliRunner.RunAsync(
-            "gh",
-            ["issue", "list", "--repo", normalizedRepositoryId, "--json", "number,title,body,labels,milestone", "--limit", "100"],
-            null,
-            GetGhEnvironment(),
-            ct);
-
-        if (!result.IsSuccess)
+        try
         {
-            _logger.LogError("gh issue list fehlgeschlagen für {RepositoryId}: {StdErr}", normalizedRepositoryId, result.StdErr);
+            var (host, owner, name) = ParseEventRepository(normalizedRepositoryId);
+            var items = await RestPagesAsync(_eventApiClient, host,
+                $"repos/{owner}/{name}/issues?state=open&per_page=100", ct);
+            return ParseIssues(items);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError("GitHub-Issues konnten für {RepositoryId} nicht geladen werden: {Error}",
+                normalizedRepositoryId, SanitizeSensitiveOutput(ex.Message));
             return [];
         }
-
-        return ParseIssues(result.StdOut);
     }
 
     /// <inheritdoc/>
@@ -403,42 +427,35 @@ password {token}
 
         _logger.LogInformation("Rufe Code-Scanning-Alerts für Repository {RepositoryId} ab.", normalizedRepositoryId);
 
-        var result = await _cliRunner.RunAsync(
-            "gh",
-            ["api", "--paginate", "--slurp", $"repos/{normalizedRepositoryId}/code-scanning/alerts?state=open&per_page=100"],
-            null,
-            GetGhEnvironment(),
-            ct);
-
-        if (!result.IsSuccess)
+        try
         {
-            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
-            if (IsNotFound(result.StdErr))
-            {
-                _logger.LogInformation(
-                    "Code-Scanning-Alerts für Repository {RepositoryId} nicht verfügbar: {StdErr}",
-                    normalizedRepositoryId,
-                    sanitizedError);
-                return [];
-            }
-
-            if (IsAuthenticationFailure(result.StdErr))
-            {
-                _logger.LogWarning(
-                    "Code-Scanning-Alerts für Repository {RepositoryId} konnten wegen fehlender Rechte nicht geladen werden: {StdErr}",
-                    normalizedRepositoryId,
-                    sanitizedError);
-                return [];
-            }
-
-            _logger.LogWarning(
-                "gh api code-scanning/alerts fehlgeschlagen für {RepositoryId}: {StdErr}",
-                normalizedRepositoryId,
-                sanitizedError);
+            var (host, owner, name) = ParseEventRepository(normalizedRepositoryId);
+            var items = await RestPagesAsync(_eventApiClient, host,
+                $"repos/{owner}/{name}/code-scanning/alerts?state=open&per_page=100", ct);
+            return ParseCodeScanningAlerts(items, normalizedRepositoryId);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (ScmProviderException ex) when (ex.FailureKind == ScmProviderFailureKind.Permanent)
+        {
+            _logger.LogInformation(
+                "Code-Scanning-Alerts für Repository {RepositoryId} nicht verfügbar: {Error}",
+                normalizedRepositoryId, ex.Message);
             return [];
         }
-
-        return ParseCodeScanningAlerts(result.StdOut, normalizedRepositoryId);
+        catch (ScmProviderException ex) when (ex.FailureKind is ScmProviderFailureKind.Authentication or ScmProviderFailureKind.Permission)
+        {
+            _logger.LogWarning(
+                "Code-Scanning-Alerts für Repository {RepositoryId} konnten wegen fehlender Rechte nicht geladen werden: {Error}",
+                normalizedRepositoryId, ex.Message);
+            return [];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                "Code-Scanning-Alerts für Repository {RepositoryId} fehlgeschlagen: {Error}",
+                normalizedRepositoryId, SanitizeSensitiveOutput(ex.Message));
+            return [];
+        }
     }
 
     /// <inheritdoc/>
@@ -476,7 +493,7 @@ password {token}
 
         if (!result.IsSuccess)
         {
-            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr);
             _logger.LogError("gh issue create fehlgeschlagen für {RepositoryId}: {StdErr}", normalizedRepositoryId, sanitizedError);
             return IssueCreateResult.Failed($"GitHub-Issue konnte nicht erstellt werden: {sanitizedError}");
         }
@@ -505,23 +522,33 @@ password {token}
             return IssueTemplateLoadResult.Success([]);
         }
 
-        var listResult = await _cliRunner.RunAsync(
-            "gh",
-            ["api", $"repos/{normalizedRepositoryId}/contents/.github/ISSUE_TEMPLATE"],
-            null,
-            GetGhEnvironment(),
-            ct);
-
-        if (!listResult.IsSuccess)
+        GitHubEventApiResponse listResult;
+        (string Host, string Owner, string Name) eventRepository;
+        try
         {
-            return IsNotFound(listResult.StdErr)
-                ? IssueTemplateLoadResult.Success([])
-                : IssueTemplateLoadResult.Failed($"GitHub-Issue-Templates konnten nicht geladen werden: {SanitizeSensitiveOutput(listResult.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey))}");
+            eventRepository = ParseEventRepository(normalizedRepositoryId);
+            listResult = await _eventApiClient.SendAsync(new(eventRepository.Host, "GET",
+                $"repos/{eventRepository.Owner}/{eventRepository.Name}/contents/.github/ISSUE_TEMPLATE"), ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            return IssueTemplateLoadResult.Failed($"GitHub-Issue-Templates konnten nicht geladen werden: {SanitizeSensitiveOutput(ex.Message)}");
+        }
+
+        if (listResult.StatusCode == 404)
+        {
+            return IssueTemplateLoadResult.Success([]);
+        }
+
+        if (listResult.StatusCode is < 200 or >= 300)
+        {
+            return IssueTemplateLoadResult.Failed($"GitHub-Issue-Templates konnten nicht geladen werden (HTTP {listResult.StatusCode}).");
         }
 
         try
         {
-            using var doc = JsonDocument.Parse(listResult.StdOut);
+            using var doc = JsonDocument.Parse(listResult.Body);
             if (doc.RootElement.ValueKind != JsonValueKind.Array)
             {
                 return IssueTemplateLoadResult.Success([]);
@@ -542,7 +569,7 @@ password {token}
                     continue;
                 }
 
-                var content = await LoadTemplateContentAsync(normalizedRepositoryId, path, ct);
+                var content = await LoadTemplateContentAsync(eventRepository, path, ct);
                 if (!string.IsNullOrWhiteSpace(content))
                 {
                     templates.Add(new IssueTemplate(name, content));
@@ -562,22 +589,28 @@ password {token}
         }
     }
 
-    private async Task<string?> LoadTemplateContentAsync(string repositoryId, string path, CancellationToken ct)
+    private async Task<string?> LoadTemplateContentAsync((string Host, string Owner, string Name) repository, string path, CancellationToken ct)
     {
-        var result = await _cliRunner.RunAsync(
-            "gh",
-            ["api", $"repos/{repositoryId}/contents/{path}"],
-            null,
-            GetGhEnvironment(),
-            ct);
-
-        if (!result.IsSuccess)
+        GitHubEventApiResponse result;
+        try
         {
-            _logger.LogWarning("GitHub-Issue-Template {TemplatePath} konnte nicht geladen werden: {StdErr}", path, result.StdErr);
+            var escapedPath = string.Join('/', path.Split('/').Select(Uri.EscapeDataString));
+            result = await _eventApiClient.SendAsync(new(repository.Host, "GET", $"repos/{repository.Owner}/{repository.Name}/contents/{escapedPath}"), ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("GitHub-Issue-Template {TemplatePath} konnte nicht geladen werden: {Error}", path, SanitizeSensitiveOutput(ex.Message));
             return null;
         }
 
-        using var doc = JsonDocument.Parse(result.StdOut);
+        if (result.StatusCode is < 200 or >= 300)
+        {
+            _logger.LogWarning("GitHub-Issue-Template {TemplatePath} konnte nicht geladen werden (HTTP {StatusCode}).", path, result.StatusCode);
+            return null;
+        }
+
+        using var doc = JsonDocument.Parse(result.Body);
         if (!doc.RootElement.TryGetProperty("content", out var contentEl))
         {
             return null;
@@ -615,20 +648,10 @@ password {token}
         return extracted ?? repositoryId.Trim().Trim('/');
     }
 
-    private static bool IsNotFound(string error)
-        => error.Contains("404", StringComparison.OrdinalIgnoreCase)
-           || error.Contains("not found", StringComparison.OrdinalIgnoreCase);
-
-    private static IEnumerable<ScmAlert> ParseCodeScanningAlerts(string json, string repositoryId)
+    private static IEnumerable<ScmAlert> ParseCodeScanningAlerts(IEnumerable<JsonElement> elements, string repositoryId)
     {
-        using var doc = JsonDocument.Parse(json);
         var alerts = new List<ScmAlert>();
-        if (doc.RootElement.ValueKind != JsonValueKind.Array)
-        {
-            return alerts;
-        }
-
-        foreach (var element in EnumerateCodeScanningAlertElements(doc.RootElement))
+        foreach (var element in elements)
         {
             var number = GetInt32OrDefault(element, "number");
             if (number <= 0)
@@ -669,30 +692,6 @@ password {token}
         return alerts;
     }
 
-    private static IEnumerable<JsonElement> EnumerateCodeScanningAlertElements(JsonElement root)
-    {
-        foreach (var element in root.EnumerateArray())
-        {
-            if (element.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var nestedElement in element.EnumerateArray())
-                {
-                    if (nestedElement.ValueKind == JsonValueKind.Object)
-                    {
-                        yield return nestedElement;
-                    }
-                }
-
-                continue;
-            }
-
-            if (element.ValueKind == JsonValueKind.Object)
-            {
-                yield return element;
-            }
-        }
-    }
-
     private static JsonElement? TryGetObject(JsonElement? element, string propertyName)
     {
         if (element is not { ValueKind: JsonValueKind.Object } value
@@ -730,12 +729,16 @@ password {token}
     private static string? FirstNonWhiteSpace(params string?[] values)
         => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
-    private static IEnumerable<Issue> ParseIssues(string json)
+    private static IEnumerable<Issue> ParseIssues(IEnumerable<JsonElement> elements)
     {
-        using var doc = JsonDocument.Parse(json);
         var issues = new List<Issue>();
-        foreach (var element in doc.RootElement.EnumerateArray())
+        foreach (var element in elements)
         {
+            // Der Issues-Endpunkt listet auch Pull Requests; diese sind keine Issues.
+            if (element.TryGetProperty("pull_request", out var prEl) && prEl.ValueKind == JsonValueKind.Object)
+            {
+                continue;
+            }
             var number = element.GetProperty("number").GetInt32();
             var title = element.GetProperty("title").GetString() ?? string.Empty;
             var body = element.TryGetProperty("body", out var bodyEl) ? bodyEl.GetString() : null;
@@ -747,7 +750,7 @@ password {token}
             var milestone = element.TryGetProperty("milestone", out var msEl) && msEl.ValueKind == JsonValueKind.Object
                 ? msEl.TryGetProperty("title", out var msTitle) ? msTitle.GetString() : null
                 : null;
-            var url = element.TryGetProperty("url", out var urlEl) ? urlEl.GetString() : null;
+            var url = element.TryGetProperty("html_url", out var urlEl) ? urlEl.GetString() : null;
             issues.Add(new Issue(number, title, body, labels, milestone, url));
         }
         return issues;
@@ -770,41 +773,27 @@ password {token}
 
         _logger.LogInformation("Rufe offene Pull Requests fuer Repository {RepositoryId} ab.", normalizedRepositoryId);
 
-        var result = await _cliRunner.RunAsync(
-            "gh",
-            ["api", "--paginate", "--slurp", $"repos/{normalizedRepositoryId}/pulls?state=open&per_page=100"],
-            null,
-            GetGhEnvironment(),
-            ct);
-
-        if (!result.IsSuccess)
+        try
         {
-            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
-            _logger.LogWarning("gh api pulls fehlgeschlagen fuer {RepositoryId}: {StdErr}", normalizedRepositoryId, sanitizedError);
+            var (host, owner, name) = ParseEventRepository(normalizedRepositoryId);
+            var items = await RestPagesAsync(_eventApiClient, host,
+                $"repos/{owner}/{name}/pulls?state=open&per_page=100", ct);
+            return ParseOpenPullRequests(items, normalizedRepositoryId);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Offene Pull Requests fuer {RepositoryId} fehlgeschlagen: {Error}", normalizedRepositoryId, SanitizeSensitiveOutput(ex.Message));
             return [];
         }
-
-        return ParseOpenPullRequests(result.StdOut, normalizedRepositoryId);
     }
 
-    private static IEnumerable<PullRequest> ParseOpenPullRequests(string json, string repositoryId)
+    private static IEnumerable<PullRequest> ParseOpenPullRequests(IEnumerable<JsonElement> elements, string repositoryId)
     {
-        using var doc = JsonDocument.Parse(json);
         var list = new List<PullRequest>();
-        if (doc.RootElement.ValueKind != JsonValueKind.Array)
-            return list;
-
-        foreach (var page in doc.RootElement.EnumerateArray())
+        foreach (var element in elements)
         {
-            if (page.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var element in page.EnumerateArray())
-                    AddOpenPullRequest(list, element, repositoryId);
-            }
-            else
-            {
-                AddOpenPullRequest(list, page, repositoryId);
-            }
+            AddOpenPullRequest(list, element, repositoryId);
         }
 
         return list;
@@ -894,7 +883,7 @@ password {token}
 
         if (!result.IsSuccess)
         {
-            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, token);
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr);
             if (IsAuthenticationFailure(result.StdErr))
             {
                 throw new InvalidOperationException(
@@ -927,7 +916,7 @@ password {token}
 
         if (!result.IsSuccess)
         {
-            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, token);
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr);
             throw new InvalidOperationException($"git push fehlgeschlagen: {sanitizedError}");
         }
     }
@@ -951,7 +940,7 @@ password {token}
 
         if (!result.IsSuccess)
         {
-            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, token);
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr);
             throw new InvalidOperationException($"git pull fehlgeschlagen: {sanitizedError}");
         }
     }
@@ -993,7 +982,7 @@ password {token}
 
         if (!result.IsSuccess)
         {
-            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr);
             _logger.LogError("gh pr create fehlgeschlagen: {StdErr}", sanitizedError);
 
             if (IsNoCommitsBetweenFailure(result.StdErr))
@@ -1046,24 +1035,23 @@ password {token}
         var normalizedRepositoryId = NormalizeRepositoryId(repositoryId)
             ?? throw new InvalidOperationException("Repository-ID fehlt.");
 
-        var result = await _cliRunner.RunAsync(
-            "gh",
-            [
-                "pr", "view", pullRequestNumber.ToString(),
-                "--repo", normalizedRepositoryId,
-                "--json", "id,number,title,url,state,headRefName,baseRefName,headRefOid,mergeCommit,mergeStateStatus"
-            ],
-            null,
-            GetGhEnvironment(),
-            ct);
-
-        if (!result.IsSuccess)
+        try
         {
-            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
-            throw new InvalidOperationException($"gh pr view fehlgeschlagen: {sanitizedError}");
+            var (host, owner, name) = ParseEventRepository(normalizedRepositoryId);
+            var data = await GraphAsync(_eventApiClient, host,
+                "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id number title url state headRefName baseRefName headRefOid mergeCommit{oid} mergeStateStatus}}}",
+                new Dictionary<string, object?> { ["owner"] = owner, ["name"] = name, ["number"] = pullRequestNumber }, false, ct);
+            var pullRequest = Object(Object(data, "repository"), "pullRequest");
+            if (pullRequest.ValueKind != JsonValueKind.Object)
+                throw new InvalidOperationException($"Pull Request #{pullRequestNumber} wurde in {normalizedRepositoryId} nicht gefunden.");
+            return ParsePullRequestStatus(pullRequest.GetRawText(), normalizedRepositoryId);
         }
-
-        return ParsePullRequestStatus(result.StdOut, normalizedRepositoryId);
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (InvalidOperationException) { throw; }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Pull-Request-Status konnte nicht geladen werden: {SanitizeSensitiveOutput(ex.Message)}");
+        }
     }
 
     /// <inheritdoc/>
@@ -1080,21 +1068,21 @@ password {token}
         var runs = new List<PullRequestWorkflowRunInfo>();
         if (!string.IsNullOrWhiteSpace(headSha))
         {
-            var result = await RunWorkflowListAsync(normalizedRepositoryId, headSha, ct);
-            runs.AddRange(ParseWorkflowRuns(result.StdOut, headSha, null));
+            var elements = await RunWorkflowListAsync(normalizedRepositoryId, headSha, ct);
+            runs.AddRange(ParseWorkflowRuns(elements, headSha, null));
         }
 
         if (!string.IsNullOrWhiteSpace(mergeCommitSha)
             && !string.Equals(mergeCommitSha, headSha, StringComparison.OrdinalIgnoreCase))
         {
-            var result = await RunWorkflowListAsync(normalizedRepositoryId, mergeCommitSha, ct);
-            runs.AddRange(ParseWorkflowRuns(result.StdOut, null, mergeCommitSha));
+            var elements = await RunWorkflowListAsync(normalizedRepositoryId, mergeCommitSha, ct);
+            runs.AddRange(ParseWorkflowRuns(elements, null, mergeCommitSha));
         }
 
         if (runs.Count == 0 && string.IsNullOrWhiteSpace(headSha) && string.IsNullOrWhiteSpace(mergeCommitSha))
         {
-            var result = await RunWorkflowListAsync(normalizedRepositoryId, null, ct);
-            runs.AddRange(ParseWorkflowRuns(result.StdOut, headSha, mergeCommitSha));
+            var elements = await RunWorkflowListAsync(normalizedRepositoryId, null, ct);
+            runs.AddRange(ParseWorkflowRuns(elements, headSha, mergeCommitSha));
         }
 
         return runs
@@ -1145,7 +1133,7 @@ password {token}
         var result = await _cliRunner.RunAsync("gh", args.ToArray(), null, GetGhEnvironment(), ct);
         if (!result.IsSuccess)
         {
-            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr);
             return IsAuthenticationFailure(result.StdErr) || IsBranchProtectionFailure(result.StdErr)
                 ? PullRequestCompletionResult.BlockedResult(sanitizedError)
                 : PullRequestCompletionResult.Failed(sanitizedError);
@@ -1165,29 +1153,22 @@ password {token}
         return PullRequestCompletionResult.Completed(status.MergeCommitSha, result.StdOut.Trim());
     }
 
-    private async Task<CliResult> RunWorkflowListAsync(string repositoryId, string? commitSha, CancellationToken ct)
+    private async Task<IReadOnlyList<JsonElement>> RunWorkflowListAsync(string repositoryId, string? commitSha, CancellationToken ct)
     {
-        var args = new List<string>
+        var (host, owner, name) = ParseEventRepository(repositoryId);
+        var endpoint = $"repos/{owner}/{name}/actions/runs";
+        endpoint += string.IsNullOrWhiteSpace(commitSha)
+            ? "?per_page=100"
+            : $"?head_sha={Uri.EscapeDataString(commitSha)}&per_page=100";
+        try
         {
-            "run", "list",
-            "--repo", repositoryId,
-            "--json", "databaseId,name,displayTitle,status,conclusion,url,headSha,headBranch,createdAt,updatedAt",
-            "--limit", "100"
-        };
-
-        if (!string.IsNullOrWhiteSpace(commitSha))
-        {
-            args.AddRange(["--commit", commitSha]);
+            return await RestObjectPagesAsync(_eventApiClient, host, endpoint, "workflow_runs", ct);
         }
-
-        var result = await _cliRunner.RunAsync("gh", args.ToArray(), null, GetGhEnvironment(), ct);
-        if (!result.IsSuccess)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
         {
-            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
-            throw new InvalidOperationException($"gh run list fehlgeschlagen: {sanitizedError}");
+            throw new InvalidOperationException($"GitHub-Workflow-Runs konnten nicht geladen werden: {SanitizeSensitiveOutput(ex.Message)}");
         }
-
-        return result;
     }
 
     private static PullRequestStatusInfo ParsePullRequestStatus(string json, string repositoryId)
@@ -1228,20 +1209,14 @@ password {token}
     }
 
     private static IReadOnlyList<PullRequestWorkflowRunInfo> ParseWorkflowRuns(
-        string json,
+        IEnumerable<JsonElement> elements,
         string? headSha,
         string? mergeCommitSha)
     {
-        using var doc = JsonDocument.Parse(json);
-        if (doc.RootElement.ValueKind != JsonValueKind.Array)
-        {
-            return [];
-        }
-
         var runs = new List<PullRequestWorkflowRunInfo>();
-        foreach (var element in doc.RootElement.EnumerateArray())
+        foreach (var element in elements)
         {
-            var runHeadSha = GetStringOrNull(element, "headSha");
+            var runHeadSha = GetStringOrNull(element, "head_sha");
             var isPreMerge = !string.IsNullOrWhiteSpace(headSha)
                              && string.Equals(runHeadSha, headSha, StringComparison.OrdinalIgnoreCase);
             var isPostMerge = !string.IsNullOrWhiteSpace(mergeCommitSha)
@@ -1252,7 +1227,7 @@ password {token}
                 continue;
             }
 
-            var providerRunId = element.TryGetProperty("databaseId", out var databaseId)
+            var providerRunId = element.TryGetProperty("id", out var databaseId)
                 ? databaseId.ValueKind == JsonValueKind.Number
                     ? databaseId.GetInt64().ToString()
                     : databaseId.GetString() ?? string.Empty
@@ -1261,13 +1236,13 @@ password {token}
             runs.Add(new PullRequestWorkflowRunInfo(
                 providerRunId,
                 ResolveWorkflowRunDisplayName(element),
-                GetStringOrNull(element, "url"),
+                GetStringOrNull(element, "html_url"),
                 runHeadSha,
-                GetStringOrNull(element, "headBranch"),
+                GetStringOrNull(element, "head_branch"),
                 MapWorkflowRunStatus(GetStringOrNull(element, "status")),
                 MapWorkflowRunConclusion(GetStringOrNull(element, "conclusion")),
-                TryGetDateTimeOffset(element, "createdAt"),
-                TryGetDateTimeOffset(element, "updatedAt"),
+                TryGetDateTimeOffset(element, "created_at"),
+                TryGetDateTimeOffset(element, "updated_at"),
                 isPostMerge));
         }
 
@@ -1277,7 +1252,7 @@ password {token}
     private static string ResolveWorkflowRunDisplayName(JsonElement element)
     {
         var name = GetStringOrNull(element, "name");
-        var displayTitle = GetStringOrNull(element, "displayTitle");
+        var displayTitle = GetStringOrNull(element, "display_title");
         if (!string.IsNullOrWhiteSpace(displayTitle))
         {
             return !string.IsNullOrWhiteSpace(name)
@@ -1346,8 +1321,16 @@ password {token}
     public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Prüfe GitHub-Plugin-Health.");
-        var result = await _cliRunner.RunAsync("gh", ["auth", "status"], null, GetGhEnvironment(), ct);
-        return result.IsSuccess;
+        try
+        {
+            var response = await _eventApiClient.SendAsync(new("github.com", "GET", "user"), ct);
+            return response.StatusCode is >= 200 and < 300;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     /// <inheritdoc/>
@@ -1386,34 +1369,22 @@ password {token}
     public override async Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Lade verfügbare GitHub-Repositories.");
-        var result = await _cliRunner.RunAsync(
-            "gh",
-            ["repo", "list", "--json", "name,nameWithOwner,url,createdAt,updatedAt,owner", "--limit", "100"],
-            null,
-            GetGhEnvironment(),
-            ct);
-
-        if (!result.IsSuccess)
-        {
-            _logger.LogWarning("gh repo list fehlgeschlagen: {StdErr}", result.StdErr);
-            return [];
-        }
-
         try
         {
-            using var doc = JsonDocument.Parse(result.StdOut);
-            return doc.RootElement.EnumerateArray()
+            var items = await RestPagesAsync(_eventApiClient, "github.com", "user/repos?affiliation=owner&per_page=100", ct);
+            return items
                 .Select(e => new AvailableRepository(
-                    e.GetProperty("name").GetString() ?? string.Empty,
-                    e.TryGetProperty("updatedAt", out var updatedAt) ? updatedAt.GetDateTime() :
-                        e.TryGetProperty("createdAt", out var createdAt) ? createdAt.GetDateTime() : DateTime.MinValue,
-                    e.GetProperty("nameWithOwner").GetString() ?? string.Empty,
-                    e.GetProperty("url").GetString() ?? string.Empty))
+                    GetStringOrNull(e, "name") ?? string.Empty,
+                    TryGetDateTimeOffset(e, "updated_at")?.UtcDateTime
+                        ?? TryGetDateTimeOffset(e, "created_at")?.UtcDateTime ?? DateTime.MinValue,
+                    GetStringOrNull(e, "full_name") ?? string.Empty,
+                    GetStringOrNull(e, "html_url") ?? string.Empty))
                 .ToList();
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Parsen der GitHub-Repository-Liste.");
+            _logger.LogWarning("Verfügbare GitHub-Repositories konnten nicht geladen werden: {Error}", SanitizeSensitiveOutput(ex.Message));
             return [];
         }
     }
@@ -1483,24 +1454,25 @@ password {token}
 
         var branch = string.IsNullOrWhiteSpace(branchName) ? await GetDefaultBranchAsync(repositoryUrl, ct) : branchName;
 
-        var result = await _cliRunner.RunAsync(
-            "gh",
-            ["api", $"repos/{repositoryId}/git/trees/{branch}?recursive=1"],
-            null,
-            GetGhEnvironment(),
-            ct);
-
-        if (!result.IsSuccess)
+        try
+        {
+            var (host, owner, name) = ParseEventRepository(repositoryId);
+            // Git-Refs dürfen '#' und '%' enthalten; '/' bleibt als Segmenttrenner erhalten.
+            var escapedBranch = string.Join('/', branch.Split('/').Select(Uri.EscapeDataString));
+            var tree = await EventApiAsync(_eventApiClient, host, "GET",
+                $"repos/{owner}/{name}/git/trees/{escapedBranch}?recursive=1", null, false, ct);
+            return ParseRepositoryTreeLoadResult(tree.GetRawText(), maxDepth, repositoryId);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
         {
             _logger.LogWarning(
-                "gh api git/trees fehlgeschlagen für {RepositoryId} (Branch {Branch}): {StdErr}",
+                "GitHub git/trees fehlgeschlagen für {RepositoryId} (Branch {Branch}): {Error}",
                 repositoryId,
                 branch,
-                result.StdErr);
-            return RepositoryStructureLoadResult.Failed(result.StdErr);
+                SanitizeSensitiveOutput(ex.Message));
+            return RepositoryStructureLoadResult.Failed(SanitizeSensitiveOutput(ex.Message));
         }
-
-        return ParseRepositoryTreeLoadResult(result.StdOut, maxDepth, repositoryId);
     }
 
     private RepositoryStructureLoadResult ParseRepositoryTreeLoadResult(string json, int maxDepth, string repositoryId)

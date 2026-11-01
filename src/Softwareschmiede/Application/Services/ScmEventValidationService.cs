@@ -1,3 +1,4 @@
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Application.Services;
@@ -8,6 +9,10 @@ public sealed class ScmEventValidationService
     /// <summary>Standard-Trigger-Keyword, wenn kein abweichender Wert konfiguriert ist
     /// (Einstellung <see cref="AppEinstellungService.ScmTriggerKeywordKey"/>).</summary>
     public const string DefaultTriggerKeyword = "$Softwareschmiede";
+
+    /// <summary>Ablehnungsgrund, wenn im Modus <see cref="ScmKontoModus.SeparatesKonto"/> keine frei
+    /// stehende Erwähnung des separaten Kontos vorliegt.</summary>
+    public const string KeineErwaehnungRejection = "Keine Erwähnung des separaten Kontos";
 
     private const string QuoteChars = "'\"`´‚‘’„“”«»";
 
@@ -24,16 +29,21 @@ public sealed class ScmEventValidationService
     public static string? GetRejection(ScmEventObservation observation, string? triggerKeyword = null)
     {
         var repository = observation.Reference.Repository;
-        if (!HasFreeStandingTrigger(observation.Body, NormalizeTriggerKeyword(triggerKeyword)))
-            return "Kein Trigger";
-        if (!SameIdentity(repository.OwnerId, repository.Owner, repository.ViewerId, repository.ViewerLogin))
+        var separat = repository.Konto == ScmKontoModus.SeparatesKonto;
+        // Trigger je Modus: Benutzerkonto = konfiguriertes Keyword, SeparatesKonto = frei stehende
+        // Erwähnung des separaten Kontos (Viewer = Bot-Identität).
+        if (separat
+                ? !HasFreeStandingTrigger(observation.Body, "@" + repository.ViewerLogin)
+                : !HasFreeStandingTrigger(observation.Body, NormalizeTriggerKeyword(triggerKeyword)))
+            return separat ? KeineErwaehnungRejection : "Kein Trigger";
+        if (!separat && !SameIdentity(repository.OwnerId, repository.Owner, repository.ViewerId, repository.ViewerLogin))
             return "Angemeldeter Benutzer ist nicht Repository-Owner";
         var edited = observation.LastEditedAt is not null;
         var actorId = edited ? observation.EditorId : observation.AuthorId;
         var actorLogin = edited ? observation.EditorLogin : observation.AuthorLogin;
         if (string.IsNullOrWhiteSpace(actorId) && string.IsNullOrWhiteSpace(actorLogin))
             return "Bearbeiter nicht bestimmbar";
-        if (!SameIdentity(actorId, actorLogin, repository.ViewerId, repository.ViewerLogin))
+        if (!SameIdentity(actorId, actorLogin, repository.OwnerId, repository.Owner))
             return "Textversion stammt nicht vom Repository-Owner";
         if (observation.Body.Contains("<!-- softwareschmiede:", StringComparison.Ordinal))
             return "Eigene Antwort";

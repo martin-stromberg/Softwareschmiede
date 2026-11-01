@@ -8,6 +8,8 @@
 
 ## What's New
 
+- New account mode for SCM events in the program settings: "Separates Konto" exclusively watches the GitHub notifications inbox of a dedicated bot account and starts processing when the account is @mentioned in a description or comment; "Benutzerkonto" keeps the existing keyword monitoring. Only repositories registered as projects are processed — foreign notifications are discarded and shown as info diagnostics. The separate mode requires a second PAT (`AgentToken` field, scopes `notifications` and `repo`) in the GitHub plugin settings and drops the repository-wide enumeration, so backmerge pull requests are no longer discovered automatically.
+- GitHub API access now runs over HTTP instead of spawning the `gh` CLI — this also fixes the console windows constantly flashing during monitoring; `gh` remains in use only for `issue create`, `pr create`, `merge` and `review`.
 - Compact task list: the menu and dashboard now show three-line tiles with SCM and AI plugin icons plus an execution-status symbol instead of text lines, including the number of open to-dos. Clicking anywhere on a tile selects the task — the separate arrow button was removed.
 - The task list offers three switchable display modes — Date, Repository and AI — via buttons in its title bar (also on the dashboard): Repository and AI modes group the tiles with fallback groups ("No repository", "Not executed"); the selected mode is persisted.
 - Fixed: SCM sources that are not assigned to any repository are no longer reported as monitoring errors in the SCM Events queue.
@@ -47,6 +49,8 @@
 
 ## Neuerungen
 
+- Neuer Konto-Modus für SCM-Ereignisse in den Programmeinstellungen: „Separates Konto" überwacht ausschließlich die GitHub-Benachrichtigungen eines eigenen Bot-Kontos und startet die Bearbeitung bei einer @Erwähnung des Kontos in Beschreibung oder Kommentar; „Benutzerkonto" behält die bisherige Keyword-Überwachung. Es werden weiterhin nur als Projekt erfasste Repositories verarbeitet — fremde Benachrichtigungen werden verworfen und als Hinweis-Diagnose angezeigt. Der separate Modus benötigt ein zweites PAT (`AgentToken`-Feld, Scopes `notifications` und `repo`) in den GitHub-Plugin-Einstellungen und verzichtet auf die repository-weite Enumeration, sodass Backmerge-Pull-Requests nicht mehr automatisch entdeckt werden.
+- GitHub-API-Zugriffe laufen jetzt über HTTP statt über die `gh`-CLI — behebt unter anderem das ständige Aufblitzen von Konsolenfenstern bei der Überwachung; `gh` bleibt nur für `issue create`, `pr create`, `merge` und `review` im Einsatz.
 - Kompakte Aufgabenliste: Menü und Dashboard zeigen jetzt dreizeilige Kacheln mit Symbolen für SCM- und KI-Plugin sowie den Ausführungsstatus statt Textzeilen, inklusive der Anzahl offener Todos. Ein Klick auf die gesamte Kachel wählt die Aufgabe aus — der separate Pfeil-Button entfällt.
 - Die Aufgabenliste bietet drei umschaltbare Anzeigemodi — Datum, Repository und KI — über Schaltflächen in ihrer Titelleiste (auch im Dashboard): Die Modi Repository und KI gruppieren die Kacheln mit Fallback-Gruppen („Ohne Repository", „Nicht ausgeführt"); der gewählte Modus wird gespeichert.
 - Behoben: SCM-Quellen ohne Repository-Zuordnung werden in der SCM-Ereignisqueue nicht mehr als Überwachungsfehler gemeldet.

@@ -199,6 +199,30 @@ public sealed class ScmEventQueueViewModelTests
         Assert.Contains("GitHub-Anmeldung ungültig", view.Diagnostics);
     }
 
+    /// <summary>Die Inbox-Verwerfungsdiagnose bleibt unter Integrationshinweise sichtbar, löst aber
+    /// keinen Unterbrechungshinweis aus; echte Fehler anderer Quellen alarmieren weiterhin.</summary>
+    [Fact]
+    public async Task InboxDiscardDiagnostic_VisibleWithoutMonitoringNotice()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
+            {
+                SourceKey = "notifications/softwareschmiede.github/github.com",
+                Diagnostic = ScmEventStore.InboxDiscardDiagnosticPrefix + " 1 verarbeitet, 2 verworfen (Repository nicht registriert)."
+            });
+            await db.SaveChangesAsync();
+        }
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+        await view.RefreshAsync();
+        Assert.Null(view.MonitoringNotice);
+        Assert.Contains("verworfen", view.Diagnostics);
+        Assert.Contains("notifications/", view.Diagnostics);
+    }
+
     private static ScmEventQueueViewModel View(IServiceScopeFactory scopes, ScmDispatchFixture fixture)
         => new(scopes, fixture.Services.GetRequiredService<ScmEventChangeNotifier>(), Mock.Of<IDialogService>(), NullLogger<ScmEventQueueViewModel>.Instance);
 

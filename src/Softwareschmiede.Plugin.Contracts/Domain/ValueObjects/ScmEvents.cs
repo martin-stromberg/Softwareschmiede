@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.Domain.ValueObjects;
 
@@ -12,7 +13,8 @@ public enum ScmContentKind { Description, IssueComment, ReviewComment, PullReque
 
 /// <summary>Vom Provider geladene Repository- und Authentifizierungsdaten, ohne Credentials.</summary>
 public sealed record ScmEventRepository(string ProviderPrefix, string Host, string RepositoryId,
-    string Owner, string Name, string? OwnerId, string ViewerId, string ViewerLogin, bool CanWrite);
+    string Owner, string Name, string? OwnerId, string ViewerId, string ViewerLogin, bool CanWrite,
+    ScmKontoModus Konto = ScmKontoModus.Benutzerkonto);
 
 /// <summary>Validierter Ursprung einer Beobachtung oder Antwort.</summary>
 public sealed record ScmEventReference(ScmEventRepository Repository, ScmReferenceKind Kind, int Number);
@@ -61,6 +63,15 @@ public sealed record ScmResponseRequest(ScmEventReference Reference, string Acti
 
 /// <summary>Bestätigte oder wiedergefundene Remoteaktion.</summary>
 public sealed record ScmResponseResult(string RemoteId, string? Url = null, bool AlreadyExisted = false);
+
+/// <summary>Ein roher Eintrag der Notifications-Inbox des separaten Kontos.</summary>
+public sealed record ScmNotification(string ThreadId, string RepositoryNodeId, string Host,
+    string Owner, string Name, ScmReferenceKind Kind, int Number, string Reason, DateTimeOffset UpdatedAt)
+{
+    /// <summary><see cref="Reason"/>-Wert, der eine direkte Erwähnung des Kontos kennzeichnet
+    /// (GitHub: <c>"mention"</c>); nur dieser Auslöser führt zur Beobachtung einer Referenz.</summary>
+    public const string MentionReason = "mention";
+}
 
 /// <summary>Fehlerklasse für gezielte Sperren und zeitgesteuerte Wiederholungen.</summary>
 public enum ScmProviderFailureKind { Authentication, Permission, RateLimit, Temporary, Permanent }

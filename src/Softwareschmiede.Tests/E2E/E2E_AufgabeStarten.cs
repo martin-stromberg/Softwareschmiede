@@ -57,8 +57,12 @@ public partial class End2EndTest
 
         var taskDetail = projectDetail.CreateTask();
 
-        // Erster Versuch: ConfirmGitInitInSourceDirectory ist nicht gesetzt → Fehlermeldung erwartet
+        // Erster Versuch: ConfirmGitInitInSourceDirectory ist nicht gesetzt → Fehlermeldung erwartet.
+        // Das Fehlerbanner wird erst eingeblendet, nachdem der Start asynchron fehlgeschlagen ist —
+        // deshalb auf das Element "FehlerMeldung" warten, bevor die aktuelle Ansicht ausgewertet wird
+        // (Muster: new ErrorView(mainWindow).GetErrorMessage() wartet intern ebenso).
         taskDetail.Start(pluginName, fuerProjektVerwenden: false);
+        WaitForElement(mainWindow, cf => cf.ByName("FehlerMeldung"), Short);
         var errorView = Assert.IsType<ErrorView>(mainWindow.CurrentView());
         Assert.False(string.IsNullOrWhiteSpace(errorView.GetErrorMessage()));
 
