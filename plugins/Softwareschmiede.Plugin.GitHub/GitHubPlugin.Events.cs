@@ -12,6 +12,19 @@ public sealed partial class GitHubPlugin
     private readonly IGitHubEventApiClient _agentEventApiClient;
     private const string TextFields = "id body createdAt updatedAt lastEditedAt url author { login ... on Node { id } } editor { login ... on Node { id } }";
 
+    /// <summary>Sicherheitsabstand für den serverseitigen <c>since</c>-Filter. GitHub vergleicht Zeitpunkte
+    /// aus der wiederholten Stunde der US-Zeitumstellung um eine Stunde verschoben (beobachtet am
+    /// 2026-11-01: Notification mit <c>updated_at</c> 09:47:34Z wurde wie 08:47:34Z gefiltert). Ohne
+    /// Abstand fällt ein solcher Eintrag dauerhaft aus dem Fenster. Wiederholt gelieferte Einträge sind
+    /// unschädlich, weil Beobachtungen über Snapshots und Ereignisschlüssel dedupliziert werden.</summary>
+    internal static readonly TimeSpan SinceSafetyMargin = TimeSpan.FromHours(2);
+
+    /// <summary>Formatiert den an GitHub übergebenen <c>since</c>-Parameter inklusive Sicherheitsabstand.</summary>
+    /// <param name="since">Der Beginn des lokalen Abfragefensters.</param>
+    /// <returns>Der URL-kodierte Abfrageparameter samt führendem <c>&amp;</c>.</returns>
+    private static string SinceParameter(DateTimeOffset since)
+        => "&since=" + Uri.EscapeDataString((since - SinceSafetyMargin).ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+
     /// <inheritdoc />
     public async Task<ScmEventRepository> GetEventRepositoryAsync(ScmRepositoryContext repository, CancellationToken ct = default)
     {
@@ -79,7 +92,7 @@ public sealed partial class GitHubPlugin
             if (request.ContentKind == ScmContentKind.ReviewComment && request.Reference.Kind != ScmReferenceKind.PullRequest)
                 throw Permanent("Review-Kommentare benötigen eine Pull-Request-Referenz.");
             var endpoint = $"{RepositoryEndpoint(repository)}/{(request.ContentKind == ScmContentKind.ReviewComment ? "pulls" : "issues")}/{request.Reference.Number}/comments?per_page=100";
-            if (request.SinceUtc is { } since) endpoint += "&since=" + Uri.EscapeDataString(since.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+            if (request.SinceUtc is { } since) endpoint += SinceParameter(since);
             var comments = await RestPagesAsync(client, repository.Host, endpoint, ct);
             foreach (var comment in comments)
             {
@@ -160,7 +173,7 @@ public sealed partial class GitHubPlugin
         host = GitHubHttpApiClient.ValidateHost(host);
         var endpoint = "notifications?all=true&participating=true&per_page=100";
         if (sinceUtc is { } since)
-            endpoint += "&since=" + Uri.EscapeDataString(since.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+            endpoint += SinceParameter(since);
         var threads = await RestPagesAsync(ClientFor(ScmKontoModus.SeparatesKonto), host, endpoint, ct);
         var notifications = new List<ScmNotification>();
         foreach (var thread in threads)
