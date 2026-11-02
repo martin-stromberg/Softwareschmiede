@@ -66,6 +66,10 @@ public sealed class ScmEventMonitoringService(
             var localRepositories = new Dictionary<ScmEventRepository, List<GitRepository>>();
             var complete = true;
             var cycle = new CycleState();
+            // Im SeparatesKonto ordnet die Inbox über Repository-Node-IDs zu, es wird nichts geraten.
+            // Ein für das Konto unsichtbares Repository (404/403) liefert ihm auch keine Notifications
+            // und wird daher nur ausgelassen, statt die Überwachung aller Repositories anzuhalten.
+            var inboxMode = kontoModus == ScmKontoModus.SeparatesKonto && plugin is IScmNotificationSource;
             // Resolve the entire local reference set before assigning any incoming event.
             // Raw HTTPS/SSH addresses and plugin display names are not repository identities.
             var aliasGroups = linked.Where(x => MatchesPlugin(plugin, x.Repository))
@@ -83,7 +87,8 @@ public sealed class ScmEventMonitoringService(
                 var checkpoint = await resolutionDb.ScmObservationCheckpoints.FindAsync([resolutionKey], ct);
                 if (checkpoint?.NextAttemptUtc > _time.GetUtcNow().ToUnixTimeMilliseconds())
                 {
-                    complete = false;
+                    if (!(inboxMode && IsInaccessible(checkpoint.ErrorCode)))
+                        complete = false;
                     continue;
                 }
                 try
@@ -105,9 +110,16 @@ public sealed class ScmEventMonitoringService(
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception ex)
                 {
-                    complete = false;
-                    await RecordFailureAsync(resolutionKey, ex, cycle, ct,
-                        " Bis zur vollständigen Repositoryzuordnung werden keine neuen Anfragen dieses Providers eingelesen.");
+                    var isolated = inboxMode && ex is ScmProviderException failure && IsInaccessible(failure.FailureKind.ToString());
+                    if (!isolated)
+                        complete = false;
+                    // Repository-Auflösungen werden auch bei „Permanent“ (z. B. 404 nach entzogenem oder
+                    // noch fehlendem Zugriff) per Backoff erneut versucht, statt dauerhaft gesperrt zu bleiben.
+                    await RecordFailureAsync(resolutionKey, ex, cycle, ct, isolated
+                            ? " Das Repository ist für das separate Konto nicht erreichbar (z. B. privates Repository ohne Zugriff oder fehlende Token-Berechtigung)."
+                              + " Es wird ausgelassen; die übrigen Repositories werden weiter überwacht."
+                            : " Bis zur vollständigen Repositoryzuordnung werden keine neuen Anfragen dieses Providers eingelesen.",
+                        blocksCycle: !isolated, retryPermanent: true);
                 }
             }
             // An unresolved alias could name any of the resolved repositories. Do not guess an assignment.
@@ -334,7 +346,23 @@ public sealed class ScmEventMonitoringService(
         }
     }
 
-    private async Task RecordFailureAsync(string sourceKey, Exception error, CycleState cycle, CancellationToken ct, string diagnosticSuffix = "")
+    /// <summary>Kennzeichnet Fehlerarten, bei denen das Repository für das Konto schlicht nicht
+    /// sichtbar ist (GitHub meldet fehlenden Zugriff auf private Repositories als 404).</summary>
+    /// <param name="errorCode">Der gespeicherte bzw. aktuelle Fehlercode (Name von <see cref="ScmProviderFailureKind"/>).</param>
+    /// <returns><see langword="true"/>, wenn das Repository für das Konto nicht erreichbar ist.</returns>
+    private static bool IsInaccessible(string? errorCode)
+        => errorCode is nameof(ScmProviderFailureKind.Permanent) or nameof(ScmProviderFailureKind.Permission);
+
+    /// <summary>Speichert einen Quellenfehler samt Diagnose und nächstem Prüfzeitpunkt.</summary>
+    /// <param name="sourceKey">Der Checkpoint-Schlüssel der Quelle.</param>
+    /// <param name="error">Der aufgetretene Fehler.</param>
+    /// <param name="cycle">Der Zustand der laufenden Provider-Runde.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <param name="diagnosticSuffix">Ergänzender Diagnosetext.</param>
+    /// <param name="blocksCycle">Ob der Fehler den Inbox-Watermark des Zyklus zurückhält.</param>
+    /// <param name="retryPermanent">Ob auch „Permanent“-Fehler per Backoff statt dauerhaft gesperrt werden.</param>
+    private async Task RecordFailureAsync(string sourceKey, Exception error, CycleState cycle, CancellationToken ct,
+        string diagnosticSuffix = "", bool blocksCycle = true, bool retryPermanent = false)
     {
         using var failureScope = scopes.CreateScope();
         var failureDb = failureScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -348,9 +376,12 @@ public sealed class ScmEventMonitoringService(
         var failure = error as ScmProviderException;
         checkpoint.ErrorCode = failure?.FailureKind.ToString() ?? "Temporary";
         checkpoint.Diagnostic = (failure?.Message ?? "Quelle konnte nicht vollständig gelesen werden.") + diagnosticSuffix;
-        checkpoint.NextAttemptUtc = failure?.FailureKind is ScmProviderFailureKind.Authentication or ScmProviderFailureKind.Permission or ScmProviderFailureKind.Permanent
+        var blockedForever = failure?.FailureKind is ScmProviderFailureKind.Authentication or ScmProviderFailureKind.Permission
+            || (failure?.FailureKind is ScmProviderFailureKind.Permanent && !retryPermanent);
+        checkpoint.NextAttemptUtc = blockedForever
             ? long.MaxValue : ScmEventStore.RetryAt(checkpoint.Failures, _time.GetUtcNow().ToUnixTimeMilliseconds(), failure?.RetryAfterUtc);
-        cycle.HadFailure = true;
+        if (blocksCycle)
+            cycle.HadFailure = true;
         await failureDb.SaveChangesAsync(ct);
         failureScope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>().Notify();
     }

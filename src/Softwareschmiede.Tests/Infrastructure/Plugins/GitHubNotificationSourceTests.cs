@@ -84,7 +84,8 @@ public sealed class GitHubNotificationSourceTests
         result.Should().ContainSingle().Which.Number.Should().Be(3);
     }
 
-    /// <summary>Ein vorhandenes since-Fenster wird als ISO-Parameter weitergereicht.</summary>
+    /// <summary>Ein vorhandenes since-Fenster wird als ISO-Parameter weitergereicht, abzüglich des
+    /// zweistündigen Sicherheitsabstands gegen GitHubs DST-verschobenen since-Filter.</summary>
     [Fact]
     public async Task EnumerateNotifications_PassesSinceParameter()
     {
@@ -96,7 +97,7 @@ public sealed class GitHubNotificationSourceTests
         await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", since);
 
         agent.Requests.Should().ContainSingle()
-            .Which.Endpoint.Should().Contain("since=" + Uri.EscapeDataString(since.ToUniversalTime().ToString("O")));
+            .Which.Endpoint.Should().Contain("since=" + Uri.EscapeDataString((since - TimeSpan.FromHours(2)).ToUniversalTime().ToString("O")));
     }
 
     /// <summary>Die Inbox wird über den Link-Header paginiert.</summary>
