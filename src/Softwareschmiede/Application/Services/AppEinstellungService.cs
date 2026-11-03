@@ -428,7 +428,7 @@ public sealed class AppEinstellungService
         var updates = new[]
         {
             (UpdateModeKey, ((int)settings.Modus).ToString()),
-            (UpdatePfadKey, settings.UpdatePfad.Trim()),
+            (UpdatePfadKey, UpdatePfadKanalResolver.NormalisierePfad(settings.UpdatePfad)),
         };
 
         var keys = updates.Select(u => u.Item1).ToArray();

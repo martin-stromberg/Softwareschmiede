@@ -86,7 +86,7 @@ public partial class End2EndTest
                 filter: e => DatenText(e, "status") == "NichtPruefbar");
             Assert.Equal(httpVorher, fixture.ZaehleEreignis(UpdateE2EEreignisse.HttpResponse));
 
-            // RC-Auswahl bei aktivierten Prereleases über echten, DB-erhaltenden Neustart.
+            // RC-Auswahl über den Vorabversionen-Update-Pfad nach echtem, DB-erhaltendem Neustart.
             fixture.SetzeStandardAntworten();
             fixture.SpeichereSzenario();
             await fixture.AktualisiereUpdateEinstellungenAsync(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad);

@@ -51,8 +51,9 @@ public static class UpdatePfadKanalResolver
     /// <summary>
     /// Ermittelt den Kanal einer installierten Version anhand ihres Release-Tags: ein
     /// „-rc"-Infix (OrdinalIgnoreCase) kennzeichnet <see cref="UpdateKanal.ReleaseCandidate"/>.
-    /// Fehlende oder leere Tag-Namen werden konservativ dem RC-Kanal zugeordnet
-    /// (gleiche Regel wie <c>DatenbankPfadResolver</c>).
+    /// Fehlende oder leere Tag-Namen werden konservativ dem RC-Kanal zugeordnet.
+    /// Diese Klassifikationsregel ist die einzige Quelle und wird auch von
+    /// <c>DatenbankPfadResolver</c> für die Wahl des Datenbankpfads wiederverwendet.
     /// </summary>
     /// <param name="tagName">Der Release-Tag der installierten <c>version.json</c>.</param>
     /// <returns>Der Kanal der installierten Version.</returns>

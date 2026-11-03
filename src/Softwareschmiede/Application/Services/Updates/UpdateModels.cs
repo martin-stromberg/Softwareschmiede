@@ -52,11 +52,7 @@ public enum UpdateKanal
 /// <summary>Gemeinsam geladenes, unveränderliches Paar der Update-Einstellungen.</summary>
 /// <param name="Modus">Persistierter Update-Modus.</param>
 /// <param name="UpdatePfad">Persistierter Update-Pfad (Kanalselektor; siehe <see cref="UpdatePfadKanalResolver"/>).</param>
-public sealed record UpdateSettings(UpdateMode Modus, string UpdatePfad)
-{
-    /// <summary>Der aus <see cref="UpdatePfad"/> abgeleitete exklusive Update-Kanal.</summary>
-    public UpdateKanal Kanal => UpdatePfadKanalResolver.ErmittleKanal(UpdatePfad);
-}
+public sealed record UpdateSettings(UpdateMode Modus, string UpdatePfad);
 
 /// <summary>Unveränderlicher Optionsvertrag einer Update-Prüfung für <see cref="IUpdateService"/> und <see cref="IUpdateReleaseClient"/>.</summary>
 /// <param name="UpdatePfad">Der konfigurierte Update-Pfad (Kanalselektor; siehe <see cref="UpdatePfadKanalResolver"/>).</param>
