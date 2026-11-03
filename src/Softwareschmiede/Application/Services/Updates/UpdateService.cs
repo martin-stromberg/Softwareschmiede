@@ -48,14 +48,30 @@ public sealed class UpdateService : IUpdateService
             if (latest is null)
                 return UpdateCheckResult.KeinUpdate("Kein Update verfügbar. Die installierte Version ist aktuell.");
 
-            // Defensiver Ausschluss: Ein als Prerelease klassifiziertes Client-Ergebnis trotz
-            // deaktivierter Prereleases ist eine Vertragsverletzung und wird nicht angeboten.
-            if (latest.IsPrerelease && !options.IncludePrereleases)
+            // Defensiver Ausschluss: Ein Client-Ergebnis, das nicht zum gewählten Kanal passt
+            // (Prerelease im Produktiv-Kanal oder Stabiles im RC-Kanal), ist eine
+            // Vertragsverletzung und wird nicht angeboten.
+            if (latest.IsPrerelease != (options.Kanal == UpdateKanal.ReleaseCandidate))
                 return UpdateCheckResult.NichtPruefbar("GitHub-Release ist nicht prüfbar.");
 
-            return UpdateVersionComparer.IsNewer(installed.Version, latest.Version)
-                ? UpdateCheckResult.UpdateVerfuegbar(latest)
-                : UpdateCheckResult.KeinUpdate("Kein Update verfügbar. Die installierte Version ist aktuell.");
+            if (!UpdateVersionComparer.IsNewer(installed.Version, latest.Version))
+                return UpdateCheckResult.KeinUpdate("Kein Update verfügbar. Die installierte Version ist aktuell.");
+
+            // Konsistenzwarnung: Passt der Installationskanal nicht zum gewählten Kanal, wird
+            // das Update trotzdem angeboten — der Konflikt reist als nicht-blockierender
+            // Hinweis auf dem Ergebnis mit.
+            var installationsKanal = UpdatePfadKanalResolver.ErmittleKanalFuerTagName(installed.TagName);
+            if (installationsKanal != options.Kanal)
+            {
+                _logger.LogWarning(
+                    "Update-Kanal {GewaehlterKanal} passt nicht zum Kanal {InstallationsKanal} der installierten Version {TagName}.",
+                    options.Kanal, installationsKanal, installed.TagName);
+                return UpdateCheckResult.UpdateVerfuegbar(
+                    latest,
+                    "Der gewählte Update-Pfad passt nicht zur installierten Version. Das Update wird trotzdem angeboten.");
+            }
+
+            return UpdateCheckResult.UpdateVerfuegbar(latest);
         }
         catch (OperationCanceledException)
         {

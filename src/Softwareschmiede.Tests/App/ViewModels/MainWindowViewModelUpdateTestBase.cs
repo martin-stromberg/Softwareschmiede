@@ -141,13 +141,13 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
     /// sodass das UpdateSettingsSaved-Ereignis im MainWindowViewModel ausgelöst wird.
     /// </summary>
     protected async Task SpeichereUpdateEinstellungenUeberUiAsync(
-        MainWindowViewModel sut, UpdateModusOption modus, bool includePrereleases)
+        MainWindowViewModel sut, UpdateModusOption modus, string updatePfad)
     {
         sut.NavigateToSettingsCommand.Execute(null);
         var settingsViewModel = sut.CurrentView.Should().BeOfType<SettingsViewModel>().Subject;
         await ((AsyncRelayCommand)settingsViewModel.LadenCommand).ExecuteAsync();
         settingsViewModel.SelectedUpdateMode = modus;
-        settingsViewModel.IncludePrereleases = includePrereleases;
+        settingsViewModel.SelectedUpdatePfad = UpdatePfadOption.FuerPfad(updatePfad);
         await ((AsyncRelayCommand)settingsViewModel.SpeichernCommand).ExecuteAsync();
         settingsViewModel.FehlerMeldung.Should().BeNull(
             "das Speichern der Update-Einstellungen muss im Test erfolgreich sein");

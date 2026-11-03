@@ -57,7 +57,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private string _scmPromptAppendixPullRequest = string.Empty;
     private string _scmPromptAppendixPullRequestComment = string.Empty;
     private UpdateModusOption? _selectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.NurPruefen);
-    private bool _includePrereleases;
+    private UpdatePfadOption? _selectedUpdatePfad = UpdatePfadOption.FuerPfad(null);
     private ScmBackmergeModusOption? _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Deaktiviert);
     private ScmKontoModusOption? _selectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.Benutzerkonto);
 
@@ -74,12 +74,25 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _selectedUpdateMode, value);
     }
 
-    /// <summary>Gibt an, ob bei der Update-Prüfung auch Prerelease-Versionen berücksichtigt werden.</summary>
-    public bool IncludePrereleases
+    /// <summary>Feste Auswahlliste der Update-Pfade (Steuerwert + Anzeige-Label).</summary>
+    public IReadOnlyList<UpdatePfadOption> UpdatePfadOptionen => UpdatePfadOption.Alle;
+
+    /// <summary>Aktuell ausgewählte Update-Pfad-Option aus <see cref="UpdatePfadOptionen"/>.</summary>
+    public UpdatePfadOption? SelectedUpdatePfad
     {
-        get => _includePrereleases;
-        set => SetProperty(ref _includePrereleases, value);
+        get => _selectedUpdatePfad;
+        set
+        {
+            if (SetProperty(ref _selectedUpdatePfad, value))
+                OnPropertyChanged(nameof(AbgeleiteterUpdateKanal));
+        }
     }
+
+    /// <summary>Schreibgeschützter Anzeigetext des aus der Pfad-Auswahl resultierenden exklusiven Update-Kanals.</summary>
+    public string AbgeleiteterUpdateKanal
+        => UpdatePfadKanalResolver.ErmittleKanal(SelectedUpdatePfad?.Pfad) == UpdateKanal.ReleaseCandidate
+            ? UpdatePfadTexte.KanalReleaseCandidate
+            : UpdatePfadTexte.KanalProduktiv;
 
     /// <summary>Feste Auswahlliste der Backmerge-Modi (Steuerwert + Anzeige-Label).</summary>
     public IReadOnlyList<ScmBackmergeModusOption> BackmergeModusOptionen => ScmBackmergeModusOption.Alle;
@@ -457,7 +470,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             var updateSettings = await _einstellungService.GetUpdateSettingsAsync(ct);
             _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Modus);
             OnPropertyChanged(nameof(SelectedUpdateMode));
-            IncludePrereleases = updateSettings.IncludePrereleases;
+            SelectedUpdatePfad = UpdatePfadOption.FuerPfad(updateSettings.UpdatePfad);
         }
         catch (OperationCanceledException)
         {
@@ -490,6 +503,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 return;
             }
 
+            if (SelectedUpdatePfad is not { Pfad: var updatePfad })
+            {
+                FehlerMeldung = "Der ausgewählte Update-Pfad ist ungültig.";
+                return;
+            }
+
             if (SelectedBackmergeModus is not { Modus: var backmergeModus })
             {
                 FehlerMeldung = "Der ausgewählte Backmerge-Modus ist ungültig.";
@@ -502,7 +521,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            var updateSettings = new UpdateSettings(updateModus, IncludePrereleases);
+            var updateSettings = new UpdateSettings(updateModus, updatePfad);
             await _einstellungService.SetUpdateSettingsAsync(updateSettings, ct);
             UpdateSettingsSaved?.Invoke(this, updateSettings);
 

@@ -170,7 +170,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         await FuehreUpdateVersuchAsync("startup", vorbereitend: false, async (settings, generation, token) =>
         {
             token.ThrowIfCancellationRequested();
-            var result = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.IncludePrereleases), token);
+            var result = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.UpdatePfad), token);
             if (!IstUpdateVersuchAktuell(generation))
                 return;
 
@@ -195,7 +195,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         return FuehreUpdateVersuchAsync("pruefen", vorbereitend: false, async (settings, generation, token) =>
         {
             token.ThrowIfCancellationRequested();
-            var result = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.IncludePrereleases), token);
+            var result = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.UpdatePfad), token);
             if (!IstUpdateVersuchAktuell(generation))
                 return;
 
@@ -217,7 +217,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         return FuehreUpdateVersuchAsync("starten", vorbereitend: true, async (settings, generation, token) =>
         {
             token.ThrowIfCancellationRequested();
-            var checkResult = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.IncludePrereleases), token);
+            var checkResult = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.UpdatePfad), token);
             if (!IstUpdateVersuchAktuell(generation))
                 return;
 
@@ -416,7 +416,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         {
             VerfuegbaresUpdate = result.Update;
             UpdateVerfuegbar = true;
-            UpdateHinweis = null;
+            UpdateHinweis = result.Message;
             return;
         }
 

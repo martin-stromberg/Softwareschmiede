@@ -450,14 +450,31 @@
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
-                        <CheckBox IsChecked="{Binding IncludePrereleases, Mode=TwoWay}"
-                                  AutomationProperties.Name="Prerelease-Versionen laden"
-                                  Content="Prerelease-Versionen laden"
-                                  Foreground="{DynamicResource PrimaryTextBrush}" />
-                        <TextBlock Text="Berücksichtigt auch Vorabversionen (z. B. Beta-Versionen oder Release-Kandidaten) bei der Update-Prüfung. Diese können noch Fehler enthalten."
+                        <TextBlock Text="Update-Pfad"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,4" />
+                        <ComboBox SelectedItem="{Binding SelectedUpdatePfad, UpdateSourceTrigger=PropertyChanged}"
+                                  AutomationProperties.Name="Update-Pfad"
+                                  ItemsSource="{Binding UpdatePfadOptionen}"
+                                  HorizontalAlignment="Stretch"
+                                  Margin="0,0,0,8"
+                                  Padding="8,6">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="Kanal: "
+                                       Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="{Binding AbgeleiteterUpdateKanal}"
+                                       AutomationProperties.Name="Update-Kanal"
+                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                        </StackPanel>
+                        <TextBlock Text="Der Update-Pfad legt ausschließlich den Update-Kanal fest: „Produktivversionen“ berücksichtigt nur stabile Versionen, „Vorabversionen“ nur Release-Kandidaten — niemals gemischt. Vorabversionen können noch Fehler enthalten."
                                    Foreground="{DynamicResource SecondaryTextBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="22,4,0,0" />
+                                   TextWrapping="Wrap" />
                     </StackPanel>
 
                     <!-- Diagnose -->

@@ -62,8 +62,9 @@ flowchart LR
 | `MainWindowUpdateDienste` | Record-Bündel der Update-Kollaborateure (`IUpdateService`, `ICliUpdateSafetyService`, `IUpdateProgressDialogService`, `IUpdateVersuchProtokoll`). |
 | `MainWindowOptionaleDienste` | Record-Bündel der optionalen `MainWindowViewModel`-Abhängigkeiten (DispatcherInvoke, `IDialogService`, `IApplicationVersionProvider`, `AufgabeLaufdatenChangedNotifier`, `MainWindowUpdateDienste`). |
 | `UpdateModusTexte` / `UpdateModusOption` | Zentrale Anzeige-Labels (`Aus`/`Nur prüfen`/`Bei Programmstart prüfen und ausführen`) und typisierte Auswahloptionen (`Alle`, `FuerModus`). |
-| `SettingsViewModel` | Bietet `UpdateModusOptionen` (`UpdateModusOption.Alle`), typisiertes `SelectedUpdateMode`, `IncludePrereleases` und das Event `UpdateSettingsSaved` mit gespeichertem `UpdateSettings`-Snapshot. |
-| `SettingsView.xaml` | Abschnitt „Updates" im Register „Allgemein": ComboBox (`AutomationProperties.Name="Update-Modus"`, `SelectedItem`-Binding, Erläuterungstexte je Modus) und CheckBox „Prerelease-Versionen laden" mit Hinweistext. |
+| `UpdatePfadTexte` / `UpdatePfadOption` (`UpdatePfadOptionen.cs`) | Zentrale Labels der zwei Update-Pfade (`Produktivversionen`/`Vorabversionen`) und der Kanal-Anzeigetexte (`KanalProduktiv`/`KanalReleaseCandidate`); typisierte Auswahloptionen (`Alle`, `FuerPfad` mit Produktiv-Fallback). |
+| `SettingsViewModel` | Bietet `UpdateModusOptionen` (`UpdateModusOption.Alle`), typisiertes `SelectedUpdateMode`, `UpdatePfadOptionen` (`UpdatePfadOption.Alle`), typisiertes `SelectedUpdatePfad`, die schreibgeschützte Kanal-Anzeige `AbgeleiteterUpdateKanal` und das Event `UpdateSettingsSaved` mit gespeichertem `UpdateSettings`-Snapshot. |
+| `SettingsView.xaml` | Abschnitt „Updates" im Register „Allgemein": ComboBoxen „Update-Modus" (`AutomationProperties.Name="Update-Modus"`) und „Update-Pfad" (`AutomationProperties.Name="Update-Pfad"`, jeweils `SelectedItem`-Binding mit `Label`-ItemTemplate) sowie schreibgeschützter TextBlock für den abgeleiteten Kanal (`AutomationProperties.Name="Update-Kanal"`, Binding `AbgeleiteterUpdateKanal`) mit Hinweistext zur exklusiven Kanalsemantik. |
 | `UpdateProgressViewModel` / `UpdateProgressDialog` | Fortschrittsdialog der Vorbereitung (Phasen, Prozent, Abbrechen, explizites „Schließen" in Fehler-/Abschlusszuständen). |
 | `WpfUpdateProgressDialogService` | `IUpdateProgressDialogService`-Implementierung; öffnet den Dialog modal mit Hauptfenster-Owner. |
 | `WpfApplicationShutdownService` | `IApplicationShutdownService`-Implementierung; geordnetes Beenden nach Updater-Start. |
@@ -77,15 +78,16 @@ flowchart LR
 | `CliUpdateSafetyService` (`ICliUpdateSafetyService`) | Bewertet aktive Aufgaben via `AufgabeLaufAktivitaet.IstAktiv`; liefert `CliUpdateSafetyResult`. |
 | `UpdateVersionComparer` | Statische Fassade: `TryParse`, `Normalize`, `IsNewer` auf Basis von `SemanticUpdateVersion`. |
 | `SemanticUpdateVersion` | SemVer-2.0-Value-Object: `Major`/`Minor`/`Patch`, `PrereleaseIdentifiers`, `BuildMetadata`, `IsPrerelease`, `IComparable`/`IEquatable`. |
-| `UpdateModels.cs` | `UpdateMode`, `UpdateSettings`, `UpdateCheckOptions`, `UpdateInfo`, `UpdateReleaseLookupResult`, `UpdateCheckResult`/`UpdateCheckStatus`, `UpdatePreparationProgress`/`Phase`, `UpdatePreparationResult`, `CliUpdateSafetyResult`, `InstalledVersionInfo`. |
+| `UpdateModels.cs` | `UpdateMode`, `UpdateKanal`, `UpdateSettings`, `UpdateCheckOptions`, `UpdateInfo`, `UpdateReleaseLookupResult`, `UpdateCheckResult`/`UpdateCheckStatus`, `UpdatePreparationProgress`/`Phase`, `UpdatePreparationResult`, `CliUpdateSafetyResult`, `InstalledVersionInfo`. |
+| `UpdatePfadKanalResolver` | Statische Pfad→Kanal-Abbildung: Konstanten `ProduktivversionenPfad`/`VorabversionenPfad`, `ErmittleKanal`, `NormalisierePfad` (Produktiv-Fallback), `IstGueltigerPfad` und `ErmittleKanalFuerTagName` („-rc"-Infix → `ReleaseCandidate`, gleiche Regel wie `DatenbankPfadResolver`). |
 | `UpdateOptions` | Konfiguration: `RepositoryOwner`, `RepositoryName`, `AssetName` (`release.zip`), `UpdateDirectoryName` (`updates`), `CheckTimeout` (15 s), `ExecutableName` (`Softwareschmiede.exe`). |
-| `AppEinstellungService` | `GetUpdateSettingsAsync`/`SetUpdateSettingsAsync` (Schlüssel `updates.mode`, `updates.includePrereleases`; Abfragetag `UpdateSettings.Read`). |
+| `AppEinstellungService` | `GetUpdateSettingsAsync`/`SetUpdateSettingsAsync` (Schlüssel `updates.mode`, `updates.pfad`; Abfragetag `UpdateSettings.Read`). |
 
 ### Infrastruktur (`Softwareschmiede/Infrastructure/Services/Updates`)
 
 | Komponente | Rolle |
 |------------|-------|
-| `GitHubReleaseClient` (`IUpdateReleaseClient`) | Paginierte Release-Suche über die GitHub-REST-API, Kandidatenfilter (Draft/Tag/Asset/Prerelease), SemVer-Maximum, `UpdateReleaseLookupResult`. |
+| `GitHubReleaseClient` (`IUpdateReleaseClient`) | Paginierte Release-Suche über die GitHub-REST-API, exklusiver Kandidatenfilter je `UpdateCheckOptions.Kanal` (Draft/Tag/Asset/Kanalzugehörigkeit), SemVer-Maximum, `UpdateReleaseLookupResult`. |
 | `UpdatePackageService` (`IUpdatePackageService`) | Download (`*.download` → `release.zip`), Entpacken nach `updates/extracted/{Version}`, Paketvalidierung (Executable + `version.json`), Schreibrechte-Probe (`RequiresElevation`), Pfadsicherung gegen Verzeichnisaustritt (`EnsureInsideBase`). |
 | `UpdateScriptService` (`IUpdateScriptService`) | Schreibt `updates/update.ps1` (wartet auf App-Exit, kopiert Dateien, startet App neu, Logdatei) und startet es via `IUpdateProcessLauncher`. |
 | `UpdateProcessLauncher` (`IUpdateProcessLauncher`) | `ProcessStartInfo`-Kapselung; `Verb = "runas"` bei `RequiresElevation`. |
@@ -107,7 +109,9 @@ Beide Einstellungen liegen in der bestehenden Key-Value-Tabelle `AppEinstellunge
 | Schlüssel | Inhalt | Default |
 |-----------|--------|---------|
 | `updates.mode` | `UpdateMode`-Wert als Zahl (0/1/2) | `NurPruefen` |
-| `updates.includePrereleases` | `True`/`False` | `false` |
+| `updates.pfad` | Update-Pfad als Kanalselektor (`Produktivversionen`/`Vorabversionen`) | `Produktivversionen` (bei fehlendem/leerem/unbekanntem Wert) |
+
+Der Altbestand `updates.includePrereleases` verfällt still — er wird nicht mehr gelesen oder geschrieben; eine Migration ist nicht nötig.
 
 ## Testarchitektur (E2E)
 

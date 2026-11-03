@@ -34,7 +34,9 @@
    - **Aus** — keine Update-Prüfung
    - **Nur prüfen** — prüfen und Update anbieten (Standard)
    - **Bei Programmstart prüfen und ausführen** — beim Programmstart prüfen und ein gefundenes Update automatisch installieren
-3. Aktivieren Sie bei Bedarf die Checkbox **„Prerelease-Versionen laden"**, um auch Vorabversionen zu berücksichtigen
+3. Wählen Sie in der Auswahlbox **„Update-Pfad"** den Update-Kanal:
+   - **Produktivversionen** — nur stabile Versionen (Standard)
+   - **Vorabversionen** — nur Release-Kandidaten/Vorabversionen; die Anzeige **„Kanal:"** darunter zeigt den resultierenden Kanal
 4. Klicken Sie **Speichern**
 
 > **Hinweis:** Werden die Update-Einstellungen geändert, während ein Update angeboten wird oder ein Update-Vorgang läuft, wird das Angebot zurückgenommen bzw. der Vorgang abgebrochen. Details zum Update-Ablauf finden Sie in der [Programmupdate-Dokumentation](../programmupdate/index.md).

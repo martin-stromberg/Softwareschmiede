@@ -234,34 +234,37 @@ public sealed class UpdateE2EFixture : IDisposable
     /// darin. Für Vorbedingungen vor dem ersten App-Start.
     /// </summary>
     /// <param name="modus">Der zu speichernde Update-Modus.</param>
-    /// <param name="includePrereleases">Die zu speichernde Prerelease-Auswahl.</param>
-    public async Task SetzeUpdateEinstellungenAsync(UpdateMode modus, bool includePrereleases)
-    {
-        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
-            .UseSqlite($"Data Source={DatenbankPfad}")
-            .Options;
-
-        await using var db = new SoftwareschmiededDbContext(options);
-        await db.Database.MigrateAsync();
-        var service = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        await service.SetUpdateSettingsAsync(new UpdateSettings(modus, includePrereleases));
-    }
+    /// <param name="updatePfad">Der zu speichernde Update-Pfad.</param>
+    public async Task SetzeUpdateEinstellungenAsync(UpdateMode modus, string updatePfad)
+        => await SchreibeUpdateEinstellungenAsync(modus, updatePfad, migriere: true);
 
     /// <summary>
     /// Persistiert Update-Einstellungen in der bereits bestehenden Fixture-Datenbank
     /// (für Änderungen zwischen zwei App-Läufen bei erhaltener Datenbank).
     /// </summary>
     /// <param name="modus">Der zu speichernde Update-Modus.</param>
-    /// <param name="includePrereleases">Die zu speichernde Prerelease-Auswahl.</param>
-    public async Task AktualisiereUpdateEinstellungenAsync(UpdateMode modus, bool includePrereleases)
+    /// <param name="updatePfad">Der zu speichernde Update-Pfad.</param>
+    public async Task AktualisiereUpdateEinstellungenAsync(UpdateMode modus, string updatePfad)
+        => await SchreibeUpdateEinstellungenAsync(modus, updatePfad, migriere: false);
+
+    /// <summary>
+    /// Persistiert die Update-Einstellungen über einen eigenen DbContext auf der
+    /// Fixture-Datenbank; migriert das Schema nur bei <paramref name="migriere"/>.
+    /// </summary>
+    /// <param name="modus">Der zu speichernde Update-Modus.</param>
+    /// <param name="updatePfad">Der zu speichernde Update-Pfad.</param>
+    /// <param name="migriere">Bei <c>true</c> wird die Fixture-Datenbank zuvor per EF-Migration erstellt.</param>
+    private async Task SchreibeUpdateEinstellungenAsync(UpdateMode modus, string updatePfad, bool migriere)
     {
         var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
             .UseSqlite($"Data Source={DatenbankPfad}")
             .Options;
 
         await using var db = new SoftwareschmiededDbContext(options);
+        if (migriere)
+            await db.Database.MigrateAsync();
         var service = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        await service.SetUpdateSettingsAsync(new UpdateSettings(modus, includePrereleases));
+        await service.SetUpdateSettingsAsync(new UpdateSettings(modus, updatePfad));
     }
 
     /// <summary>Liest alle bisher geschriebenen JSONL-Protokolleinträge.</summary>

@@ -10,7 +10,7 @@ Die Einstellungsseite ermöglicht die zentrale Konfiguration der Anwendung ohne 
 4. **Benachrichtigungen** — Ob und wie der Anwender bei abgeschlossenen KI-Läufen benachrichtigt wird
 5. **Erscheinungsbild** — Dark Mode ein-/ausschalten
 6. **Promptvorlagen** — Wiederkehrende CLI-Prompts zentral verwalten
-7. **Updates** — Update-Modus (Aus / Nur prüfen / Bei Programmstart prüfen und ausführen) und optionale Prerelease-Berücksichtigung
+7. **Updates** — Update-Modus (Aus / Nur prüfen / Bei Programmstart prüfen und ausführen) und Update-Pfad (exklusiver Kanal: nur stabile bzw. nur Vorabversionen)
 8. **Diagnose** — Öffnet das Konsolentestfenster zur Wiedergabe exportierter CLI-Aufzeichnungen
 
 ## Funktionsweise
@@ -87,7 +87,12 @@ Im Abschnitt **Updates** der Registerkarte „Allgemein" steuert eine Auswahlbox
 - **Nur prüfen** — (Standard) beim Programmstart und auf manuellen Klick wird geprüft; ein gefundenes Update wird angeboten, aber nie automatisch installiert
 - **Bei Programmstart prüfen und ausführen** — beim Programmstart wird geprüft und ein gefundenes Update automatisch installiert
 
-Die Checkbox **„Prerelease-Versionen laden"** legt fest, ob bei der Prüfung auch Vorabversionen berücksichtigt werden. Beide Werte werden persistent gespeichert und erst mit **Speichern** wirksam. Details zum Update-Ablauf siehe [Programmupdate](../programmupdate/index.md).
+Die Auswahlbox **„Update-Pfad"** legt den exklusiven Update-Kanal fest:
+
+- **Produktivversionen** — (Standard) ausschließlich stabile Versionen werden bei der Prüfung berücksichtigt
+- **Vorabversionen** — ausschließlich Release-Kandidaten (Vorabversionen) werden berücksichtigt
+
+Die Kanaltrennung ist strikt: Stabile und Vorabversionen werden niemals gemeinsam betrachtet. Darunter zeigt die schreibgeschützte Zeile **„Kanal:"** den resultierenden Kanal an. Beide Werte werden persistent gespeichert und erst mit **Speichern** wirksam. Details zum Update-Ablauf siehe [Programmupdate](../programmupdate/index.md).
 
 ### Diagnose
 
