@@ -16,13 +16,15 @@ namespace Softwareschmiede.Application.Services;
 /// <param name="GitOrchestrationService">
 /// Optionaler Dienst zur Validierung des konfigurierten Arbeitsverzeichnisses direkt nach dem Git-Klon.
 /// </param>
+/// <param name="PromptZeitVersandService">Optionaler Dienst zum Zurückziehen geplanter zeitgesteuerter Prompts beim Aufgaben-Abschluss.</param>
 /// <returns>Eine neue Instanz mit den angegebenen optionalen Abhängigkeiten.</returns>
 public sealed record EntwicklungsprozessServiceOptions(
     ProjektService? ProjektService = null,
     RepositoryStartskriptService? RepositoryStartskriptService = null,
     RepositoryInitialisierungService? RepositoryInitialisierungService = null,
     KiAusfuehrungsService? KiAusfuehrungsService = null,
-    GitOrchestrationService? GitOrchestrationService = null);
+    GitOrchestrationService? GitOrchestrationService = null,
+    PromptZeitVersandService? PromptZeitVersandService = null);
 
 /// <summary>
 /// Koordiniert Git-Repository-Setup für Aufgaben und Rate-Limit-Marker-Erkennung.
@@ -86,7 +88,7 @@ public sealed class EntwicklungsprozessService
     /// <param name="basisBranchName">Optionaler Basis-Branch; wird ein neuer Task-Branch angelegt, wenn er dem Default-Branch entspricht.</param>
     /// <param name="selectedScmPluginPrefix">Optionaler Prefix des zu verwendenden SCM-Plugins.</param>
     /// <param name="ct">Abbruch-Token.</param>
-    public Task ProzessStartenAsync(
+    internal Task ProzessStartenAsync(
         Guid aufgabeId,
         string repositoryUrl,
         string? basisBranchName = null,
@@ -413,12 +415,27 @@ public sealed class EntwicklungsprozessService
         return pullRequest;
     }
 
-    /// <summary>Schließt die Aufgabe ab: Klon löschen, Status auf Beendet setzen.</summary>
+    /// <summary>
+    /// Schließt die Aufgabe ab: CLI stoppen, geplanten Prompt zurückziehen, Klon löschen,
+    /// Status auf Beendet setzen. Einziger produktiver Einstieg des Geschäftsvorgangs —
+    /// läuft wie die Start-Einstiege unter der <see cref="ScmTaskCoordinator"/>-Aufgabensperre.
+    /// </summary>
     /// <param name="aufgabeId">ID der Aufgabe.</param>
     /// <param name="ct">Abbruch-Token.</param>
-    public async Task AbschliessenAsync(Guid aufgabeId, CancellationToken ct = default)
+    public Task AbschliessenAsync(Guid aufgabeId, CancellationToken ct = default)
+        => ScmTaskCoordinator.Shared.RunAsync(aufgabeId,
+            () => AbschliessenCoordinatedAsync(aufgabeId, ct), ct);
+
+    private async Task AbschliessenCoordinatedAsync(Guid aufgabeId, CancellationToken ct)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} abschließen.", aufgabeId);
+
+        if (_options.KiAusfuehrungsService is not null)
+        {
+            await _options.KiAusfuehrungsService.StopCliAsync(aufgabeId, ct);
+        }
+
+        _options.PromptZeitVersandService?.CancelScheduledPrompt(aufgabeId);
 
         var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");

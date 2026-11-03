@@ -122,7 +122,6 @@ public sealed class ScmTaskCompletionMonitoringService(
                 return;
             try
             {
-                await services.GetRequiredService<KiAusfuehrungsService>().StopCliAsync(taskId, ct);
                 await services.GetRequiredService<EntwicklungsprozessService>().AbschliessenAsync(taskId, ct);
                 await protokoll.AddEintragAsync(taskId, ProtokollTyp.SystemMeldung,
                     $"Aufgabe automatisch beendet: {current.ScmAbschlussReferenz} ist geschlossen/gemergt und die Abschluss-Wartezeit ist abgelaufen.",

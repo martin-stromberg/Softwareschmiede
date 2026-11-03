@@ -46,7 +46,7 @@ public static class TaskDetailViewModelTestFactory
             gitPluginMock.Object,
             pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: kiService),
+            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: kiService, PromptZeitVersandService: promptZeitVersandService),
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var serviceProviderMock = new Mock<IServiceProvider>();
