@@ -17,14 +17,19 @@ Regeln:
 - `Aus` sperrt die Startprüfung, den manuellen Prüfbefehl und den manuellen Installationsstart — ohne Ausnahmen.
 - Die automatische Installation ist auf den einmaligen Programmstart begrenzt (`_startInitialisierungErfolgt`). Spätere manuelle Prüfungen installieren nie automatisch, auch nicht im Startmodus.
 - Die CLI-Sicherheitsprüfung samt Bestätigungsdialog gilt in allen Modi, in denen eine Installation ansteht — auch bei der Startautomatik.
-- Fehlende oder ungültige gespeicherte Werte fallen auf `NurPruefen` bzw. `IncludePrereleases = false` zurück.
+- Fehlende oder ungültige gespeicherte Werte fallen auf `NurPruefen` bzw. den Update-Pfad `Produktivversionen` zurück.
 - Ein Datenbank-**Lesefehler** ist kein erfolgreich gelesener fehlender Schlüssel: Er erzeugt den sichtbaren Nicht-prüfbar-Zustand und verhindert jeden Updater-Start. Es gibt keine Ersatzfreigabe durch Defaults, Snapshots oder Caches.
 
-## Prerelease-Regeln
+## Update-Pfad und exklusiver Update-Kanal
 
+- Der gespeicherte Update-Pfad (`updates.pfad`, `AppEinstellungService.UpdatePfadKey`) kennt genau zwei gültige Werte (`UpdatePfadKanalResolver.ProduktivversionenPfad`/`VorabversionenPfad`), die auf den exklusiven `UpdateKanal` abgebildet werden: `Produktivversionen` → `UpdateKanal.Produktiv`, `Vorabversionen` → `UpdateKanal.ReleaseCandidate` (`UpdatePfadKanalResolver.ErmittleKanal`, OrdinalIgnoreCase + Trim).
+- Fehlende, leere oder unbekannte gespeicherte Werte werden beim Lesen über `UpdatePfadKanalResolver.NormalisierePfad` auf `Produktivversionen` zurückgeführt; `SetUpdateSettingsAsync` lehnt Werte außerhalb der zwei bekannten Pfade per `IstGueltigerPfad` mit `ArgumentOutOfRangeException` ab — es wird dann nichts geschrieben.
+- Der Kanal filtert die Kandidatenmenge **strikt exklusiv**: Im Produktiv-Kanal überspringt `GitHubReleaseClient.TryCreateCandidate` alle als Prerelease klassifizierten Einträge, im RC-Kanal alle nicht-prerelease Einträge. Stabile und Vorabversionen konkurrieren niemals gemeinsam im SemVer-Vergleich.
+- Hintergrund der Trennung: RC-Installationen nutzen einen eigenen Datenbank-Speicherort (`DatenbankPfadResolver`: `version.json`-`tagName` mit „-rc"-Infix → `{Programmverzeichnis}\softwareschmiede.db`, produktive Tags → `%LocalAppData%\Softwareschmiede\softwareschmiede.db`). Ein kanalübergreifendes Update würde die Installation auf den fremden Datenbestand umschalten.
 - Ein Release gilt als Prerelease, wenn das GitHub-Flag `prerelease` gesetzt **oder** das Tag ein SemVer-Prerelease-Suffix trägt (`SemanticUpdateVersion.IsPrerelease`). `UpdateInfo.IsPrerelease` führt diese Klassifikation verbindlich weiter — auch bei GitHub-markierten Tags ohne Suffix.
-- `IncludePrereleases = false` (Default): Prereleases werden bereits im `GitHubReleaseClient` aus der Kandidatenmenge ausgeschlossen. Erreicht dennoch ein als Prerelease klassifiziertes Ergebnis den `UpdateService` (Vertragsverletzung), wird es nicht angeboten (`NichtPruefbar`).
-- `IncludePrereleases = true`: Stabile und Prerelease-Versionen konkurrieren gemeinsam im SemVer-Vergleich; die höchste Präzedenz gewinnt.
+- **Defensivprüfung:** Ein Ergebnis, das nicht zum gewählten Kanal passt (`UpdateInfo.IsPrerelease` widerspricht `UpdateCheckOptions.Kanal` in beide Richtungen), ist eine interne Vertragsverletzung und wird nicht angeboten (`NichtPruefbar`).
+- **Konsistenzwarnung Installation ↔ Kanal:** `UpdatePfadKanalResolver.ErmittleKanalFuerTagName` ordnet den `tagName` der installierten `version.json` dem Kanalmodell zu („-rc"-Infix → `ReleaseCandidate`; fehlender/leerer Tag konservativ → `ReleaseCandidate`, gleiche Regel wie `DatenbankPfadResolver`). Weicht der Installationskanal vom gewählten Kanal ab, bleibt das Ergebnis `UpdateVerfuegbar`, trägt aber eine Warn-`Message` („Der gewählte Update-Pfad passt nicht zur installierten Version. Das Update wird trotzdem angeboten."), die über `UpdateHinweis` in der Seitenleiste erscheint; zusätzlich wird ein `LogWarning` geschrieben. Die Warnung greift nur im Angebotsfall — `KeinUpdate` und `NichtPruefbar` bleiben warnfrei.
+- Der Altbestand `updates.includePrereleases` wird nicht mehr gelesen oder geschrieben (stiller Verfall, keine Migration).
 
 ## SemVer-Versionsvergleich
 
@@ -35,7 +40,7 @@ Regeln:
   - Eine kürzere identische Identifierfolge ist kleiner als deren Verlängerung (`1.0.0-rc.1` < `1.0.0-rc.1.1`).
   - Eine stabile Version ist höher als ihre eigenen Prereleases (`1.3.0` > `1.3.0-rc.2`).
 - Build-Metadaten (`+…`) haben keinen Einfluss auf Rangfolge und Gleichheit, bleiben aber in Anzeige und Pfaden erhalten.
-- Konsequenz für die Update-Kette: Nach installiertem `1.3.0-rc.1` gelten `1.3.0-rc.2` und das stabile `1.3.0` als neuer.
+- Konsequenz für die Update-Kette im Kanal: Nach installiertem `1.3.0-rc.1` gilt im RC-Kanal (`Vorabversionen`) nur `1.3.0-rc.2` (oder ein neuerer RC) als Update — die semantisch neuere stabile `1.3.0` ist dort kein zulässiger Kandidat; im Produktiv-Kanal gilt umgekehrt ausschließlich die stabile Folgeversion. Der SemVer-Vergleich selbst ist unverändert — die Kanaltrennung wirkt auf die Kandidatenmenge, nicht auf die Präzedenz.
 - `IsNewer` liefert nur bei zwei gültig geparsten Versionen ein Ergebnis; ungültige Kandidaten können nie als „neuer" gelten.
 
 ## Release-Auswahl (Pagination)

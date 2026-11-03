@@ -383,19 +383,38 @@ public sealed class SettingsView : BaseWindowView
         return this;
     }
 
-    /// <summary>Liest den Status der "Prerelease-Versionen laden"-CheckBox im "Allgemein"-Tab.</summary>
-    /// <returns><c>true</c>, wenn Prerelease-Versionen aktuell geladen werden.</returns>
-    public bool GetIncludePrereleases()
-        => WaitForElement(Window, cf => cf.ByName("Prerelease-Versionen laden"), Short).AsCheckBox().IsChecked ?? false;
+    /// <summary>Liest das aktuell ausgewählte Label der "Update-Pfad"-ComboBox im "Allgemein"-Tab.</summary>
+    /// <returns>Das Anzeige-Label des gewählten Update-Pfads (siehe <c>UpdatePfadTexte</c>).</returns>
+    public string GetUpdatePfad()
+        => WaitForElement(Window, cf => cf.ByName("Update-Pfad").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
 
-    /// <summary>Setzt den Status der "Prerelease-Versionen laden"-CheckBox im "Allgemein"-Tab.</summary>
-    /// <param name="enabled">Der gewünschte Status.</param>
+    /// <summary>Wählt einen Eintrag der "Update-Pfad"-ComboBox und wartet, bis er übernommen wurde.</summary>
+    /// <param name="label">Das Anzeige-Label (aus <c>UpdatePfadTexte</c>: "Produktivversionen" oder "Vorabversionen").</param>
     /// <returns>Diese Instanz.</returns>
-    public SettingsView SetIncludePrereleases(bool enabled)
+    public SettingsView SetUpdatePfad(string label)
     {
-        WaitForElement(Window, cf => cf.ByName("Prerelease-Versionen laden"), Short).AsCheckBox().IsChecked = enabled;
+        var box = WaitForElement(Window, cf => cf.ByName("Update-Pfad").And(cf.ByControlType(ControlType.ComboBox)), Short);
+        SelectComboBoxItemByClick(box, label, Short);
+        WaitForUpdatePfad(label, Short);
         return this;
     }
+
+    /// <summary>Wartet, bis die "Update-Pfad"-ComboBox das erwartete Label anzeigt.</summary>
+    /// <param name="label">Das erwartete Anzeige-Label.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Das Label wurde nicht rechtzeitig angezeigt.</exception>
+    public SettingsView WaitForUpdatePfad(string label, TimeSpan timeout)
+    {
+        ElementWaitHelper.WaitForSelectedComboBoxItem(
+            WaitForElement(Window, cf => cf.ByName("Update-Pfad").And(cf.ByControlType(ControlType.ComboBox)), timeout), label, timeout);
+        return this;
+    }
+
+    /// <summary>Liest den schreibgeschützten Anzeigetext des abgeleiteten Update-Kanals im "Allgemein"-Tab.</summary>
+    /// <returns>Der Kanal-Anzeigetext (siehe <c>UpdatePfadTexte</c>).</returns>
+    public string GetAbgeleitetenUpdateKanal()
+        => WaitForElement(Window, cf => cf.ByName("Update-Kanal"), Short).AsLabel().Text;
 
     /// <summary>Wartet auf die Speicher-Bestätigung "Einstellungen gespeichert.".</summary>
     /// <returns>Diese Instanz.</returns>

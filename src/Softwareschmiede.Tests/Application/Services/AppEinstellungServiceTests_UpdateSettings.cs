@@ -32,14 +32,14 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         {
             await db.Database.EnsureCreatedAsync();
             await CreateService(db).SetUpdateSettingsAsync(
-                new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, true));
+                new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad));
         }
 
         await using (var db = CreateContext())
         {
             var settings = await CreateService(db).GetUpdateSettingsAsync();
 
-            settings.Should().Be(new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, true));
+            settings.Should().Be(new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad));
         }
     }
 
@@ -50,7 +50,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         await using (var db = CreateContext())
         {
             await db.Database.EnsureCreatedAsync();
-            await CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Aus, true));
+            await CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Aus, UpdatePfadKanalResolver.VorabversionenPfad));
         }
 
         // Eine zweite Verbindung hält eine offene Schreibtransaktion und damit den SQLite-Write-Lock;
@@ -68,7 +68,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
 
         await using (var db = CreateContext(defaultTimeoutSeconds: 1))
         {
-            var act = () => CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, false));
+            var act = () => CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
 
             await act.Should().ThrowAsync<SqliteException>();
         }
@@ -77,7 +77,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         {
             var settings = await CreateService(db).GetUpdateSettingsAsync();
 
-            settings.Should().Be(new UpdateSettings(UpdateMode.Aus, true));
+            settings.Should().Be(new UpdateSettings(UpdateMode.Aus, UpdatePfadKanalResolver.VorabversionenPfad));
         }
     }
 
@@ -91,7 +91,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         {
             await db.Database.EnsureCreatedAsync();
             await CreateService(db).SetUpdateSettingsAsync(
-                new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, true));
+                new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad));
         }
 
         var reachedCount = 0;
@@ -101,7 +101,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         {
             var settings = await CreateService(db).GetUpdateSettingsAsync();
 
-            settings.Should().Be(new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, true));
+            settings.Should().Be(new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad));
             interceptor.SettingsReadCount.Should().Be(1);
             reachedCount.Should().Be(1);
         }
@@ -122,11 +122,11 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         {
             var settings = await CreateService(db).GetUpdateSettingsAsync();
 
-            settings.Should().Be(new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, true));
+            settings.Should().Be(new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad));
         }
     }
 
-    /// <summary>Fehlende oder ungültige gespeicherte Werte liefern die Defaults NurPruefen/false.</summary>
+    /// <summary>Fehlende oder ungültige gespeicherte Werte liefern die Defaults NurPruefen/Produktivversionen; ein Altbestand unter updates.includePrereleases wird ignoriert.</summary>
     [Fact]
     public async Task GetUpdateSettingsAsync_ReturnsDefaults_WhenStoredValuesAreMissingOrInvalid()
     {
@@ -135,19 +135,27 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         var service = CreateService(db);
 
         (await service.GetUpdateSettingsAsync())
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, false));
+            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
 
         await service.SetSettingAsync(AppEinstellungService.UpdateModeKey, "kein-modus");
-        await service.SetSettingAsync(AppEinstellungService.IncludePrereleasesKey, "vielleicht");
+        await service.SetSettingAsync(AppEinstellungService.UpdatePfadKey, "vielleicht");
 
         (await service.GetUpdateSettingsAsync())
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, false));
+            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
 
         await service.SetSettingAsync(AppEinstellungService.UpdateModeKey, "7");
-        await service.SetSettingAsync(AppEinstellungService.IncludePrereleasesKey, "True");
+        await service.SetSettingAsync(AppEinstellungService.UpdatePfadKey, "Vorabversionen");
 
         (await service.GetUpdateSettingsAsync())
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, true));
+            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.VorabversionenPfad));
+
+        // Altbestand des entfernten Schlüssels updates.includePrereleases verfällt still.
+        await service.SetSettingAsync(AppEinstellungService.UpdateModeKey, "1");
+        await service.SetSettingAsync(AppEinstellungService.UpdatePfadKey, "Produktivversionen");
+        await service.SetSettingAsync("updates.includePrereleases", "True");
+
+        (await service.GetUpdateSettingsAsync())
+            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
     }
 
     /// <summary>SetUpdateSettingsAsync lehnt nicht definierte UpdateMode-Werte ab, ohne etwas zu schreiben.</summary>
@@ -158,11 +166,26 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         await db.Database.EnsureCreatedAsync();
         var service = CreateService(db);
 
-        var act = () => service.SetUpdateSettingsAsync(new UpdateSettings((UpdateMode)7, true));
+        var act = () => service.SetUpdateSettingsAsync(new UpdateSettings((UpdateMode)7, UpdatePfadKanalResolver.ProduktivversionenPfad));
 
         await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
         (await service.GetUpdateSettingsAsync())
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, false));
+            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
+    }
+
+    /// <summary>SetUpdateSettingsAsync lehnt unbekannte Update-Pfade ab, ohne etwas zu schreiben.</summary>
+    [Fact]
+    public async Task SetUpdateSettingsAsync_RejectsUnknownUpdatePfad()
+    {
+        await using var db = CreateContext();
+        await db.Database.EnsureCreatedAsync();
+        var service = CreateService(db);
+
+        var act = () => service.SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, "unbekannter-pfad"));
+
+        await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        (await service.GetUpdateSettingsAsync())
+            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
     }
 
     private SoftwareschmiededDbContext CreateContext(

@@ -39,14 +39,28 @@ public enum UpdateMode
     BeiProgrammstartPruefenUndAusfuehren = 2
 }
 
+/// <summary>Exklusiver Update-Kanal, der sich aus dem konfigurierten Update-Pfad ableitet.</summary>
+public enum UpdateKanal
+{
+    /// <summary>Ausschließlich stabile Produktivversionen werden als Update-Kandidaten berücksichtigt.</summary>
+    Produktiv = 0,
+
+    /// <summary>Ausschließlich Prerelease-Versionen (Release-Kandidaten) werden als Update-Kandidaten berücksichtigt.</summary>
+    ReleaseCandidate = 1
+}
+
 /// <summary>Gemeinsam geladenes, unveränderliches Paar der Update-Einstellungen.</summary>
 /// <param name="Modus">Persistierter Update-Modus.</param>
-/// <param name="IncludePrereleases">Gibt an, ob Prerelease-Versionen bei der Update-Auswahl berücksichtigt werden.</param>
-public sealed record UpdateSettings(UpdateMode Modus, bool IncludePrereleases);
+/// <param name="UpdatePfad">Persistierter Update-Pfad (Kanalselektor; siehe <see cref="UpdatePfadKanalResolver"/>).</param>
+public sealed record UpdateSettings(UpdateMode Modus, string UpdatePfad);
 
 /// <summary>Unveränderlicher Optionsvertrag einer Update-Prüfung für <see cref="IUpdateService"/> und <see cref="IUpdateReleaseClient"/>.</summary>
-/// <param name="IncludePrereleases">Gibt an, ob Prerelease-Versionen bei der Release-Auswahl berücksichtigt werden.</param>
-public sealed record UpdateCheckOptions(bool IncludePrereleases);
+/// <param name="UpdatePfad">Der konfigurierte Update-Pfad (Kanalselektor; siehe <see cref="UpdatePfadKanalResolver"/>).</param>
+public sealed record UpdateCheckOptions(string UpdatePfad)
+{
+    /// <summary>Der aus <see cref="UpdatePfad"/> abgeleitete exklusive Update-Kanal.</summary>
+    public UpdateKanal Kanal => UpdatePfadKanalResolver.ErmittleKanal(UpdatePfad);
+}
 
 /// <summary>
 /// Ergebnis der Release-Abfrage eines <see cref="IUpdateReleaseClient"/>. Unterscheidet eine
@@ -101,7 +115,7 @@ public sealed record UpdateCheckResult(UpdateCheckStatus Status, UpdateInfo? Upd
     public static UpdateCheckResult KeinUpdate(string? message = null) => new(UpdateCheckStatus.KeinUpdate, null, message);
 
     /// <summary>Erzeugt ein Ergebnis mit verfügbarem Update.</summary>
-    public static UpdateCheckResult UpdateVerfuegbar(UpdateInfo update) => new(UpdateCheckStatus.UpdateVerfuegbar, update);
+    public static UpdateCheckResult UpdateVerfuegbar(UpdateInfo update, string? message = null) => new(UpdateCheckStatus.UpdateVerfuegbar, update, message);
 
     /// <summary>Erzeugt ein Ergebnis für eine nicht prüfbare Situation.</summary>
     public static UpdateCheckResult NichtPruefbar(string? message = null) => new(UpdateCheckStatus.NichtPruefbar, null, message);

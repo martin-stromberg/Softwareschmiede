@@ -72,8 +72,8 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für den Update-Modus (<see cref="UpdateMode"/>-Wert als Zahl gespeichert).</summary>
     public const string UpdateModeKey = "updates.mode";
 
-    /// <summary>Schlüssel für die Prerelease-Auswahl bei Updates.</summary>
-    public const string IncludePrereleasesKey = "updates.includePrereleases";
+    /// <summary>Schlüssel für den Update-Pfad (Kanalselektor; siehe <c>UpdatePfadKanalResolver</c>).</summary>
+    public const string UpdatePfadKey = "updates.pfad";
 
     /// <summary>Fester EF-Abfragetag der gemeinsamen Update-Einstellungs-Leseabfrage für gezielte Testinterception.</summary>
     public const string UpdateSettingsReadTag = "UpdateSettings.Read";
@@ -378,16 +378,17 @@ public sealed class AppEinstellungService
     }
 
     /// <summary>
-    /// Liest Update-Modus und Prerelease-Auswahl gemeinsam in einer einzigen Datenbankabfrage
+    /// Liest Update-Modus und Update-Pfad gemeinsam in einer einzigen Datenbankabfrage
     /// (Abfragetag <see cref="UpdateSettingsReadTag"/>). Fehlende oder ungültige gespeicherte Werte
-    /// fallen auf die Defaults <see cref="UpdateMode.NurPruefen"/> bzw. <see langword="false"/> zurück;
+    /// fallen auf die Defaults <see cref="UpdateMode.NurPruefen"/> bzw. den Pfad
+    /// <see cref="UpdatePfadKanalResolver.ProduktivversionenPfad"/> zurück;
     /// Datenbank-Lesefehler werden nicht abgefangen und propagieren an den Aufrufer.
     /// </summary>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Die gelesenen Update-Einstellungen.</returns>
     public async Task<UpdateSettings> GetUpdateSettingsAsync(CancellationToken ct = default)
     {
-        var keys = new[] { UpdateModeKey, IncludePrereleasesKey };
+        var keys = new[] { UpdateModeKey, UpdatePfadKey };
 
         var werte = await _db.AppEinstellungen
             .AsNoTracking()
@@ -403,29 +404,31 @@ public sealed class AppEinstellungService
             modus = (UpdateMode)modusZahl;
         }
 
-        var includePrereleases = werte.TryGetValue(IncludePrereleasesKey, out var prereleaseWert)
-            && bool.TryParse(prereleaseWert, out var prereleaseFlag)
-            && prereleaseFlag;
+        werte.TryGetValue(UpdatePfadKey, out var pfadWert);
+        var updatePfad = UpdatePfadKanalResolver.NormalisierePfad(pfadWert);
 
-        return new UpdateSettings(modus, includePrereleases);
+        return new UpdateSettings(modus, updatePfad);
     }
 
     /// <summary>
-    /// Validiert den Update-Modus und schreibt Modus und Prerelease-Auswahl gemeinsam
+    /// Validiert den Update-Modus und den Update-Pfad und schreibt beide gemeinsam
     /// in einem einzigen Speichervorgang.
     /// </summary>
     /// <param name="settings">Die zu speichernden Update-Einstellungen.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="settings"/> enthält einen nicht definierten <see cref="UpdateMode"/>-Wert.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="settings"/> enthält einen nicht definierten <see cref="UpdateMode"/>-Wert oder einen unbekannten Update-Pfad.</exception>
     public async Task SetUpdateSettingsAsync(UpdateSettings settings, CancellationToken ct = default)
     {
         if (!Enum.IsDefined(settings.Modus))
             throw new ArgumentOutOfRangeException(nameof(settings), settings.Modus, "Unbekannter Update-Modus.");
 
+        if (!UpdatePfadKanalResolver.IstGueltigerPfad(settings.UpdatePfad))
+            throw new ArgumentOutOfRangeException(nameof(settings), settings.UpdatePfad, "Unbekannter Update-Pfad.");
+
         var updates = new[]
         {
-            (UpdateModeKey,         ((int)settings.Modus).ToString()),
-            (IncludePrereleasesKey, settings.IncludePrereleases.ToString()),
+            (UpdateModeKey, ((int)settings.Modus).ToString()),
+            (UpdatePfadKey, UpdatePfadKanalResolver.NormalisierePfad(settings.UpdatePfad)),
         };
 
         var keys = updates.Select(u => u.Item1).ToArray();

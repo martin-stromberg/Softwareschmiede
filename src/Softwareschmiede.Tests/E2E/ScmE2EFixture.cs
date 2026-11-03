@@ -33,7 +33,7 @@ internal sealed class ScmE2EFixture
         await using var db = OpenDatabase();
         await db.Database.MigrateAsync();
         var settings = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        await settings.SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Aus, false));
+        await settings.SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad));
         await settings.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, null);
         await settings.SetSettingAsync(ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey, Configuration.TestRoot);
         var origin = Path.Combine(Configuration.TestRoot, "origin");

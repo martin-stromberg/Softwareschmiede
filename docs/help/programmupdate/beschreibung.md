@@ -16,7 +16,15 @@ Auf der Registerkarte **Allgemein** der Einstellungsseite befindet sich der Absc
   - **Aus** — die Update-Prüfung ist deaktiviert. Es findet weder eine Prüfung beim Programmstart noch eine manuelle Prüfung statt; die Schaltfläche „⟳ Prüfen" ist deaktiviert.
   - **Nur prüfen** — (Standard) die Anwendung prüft beim Programmstart einmalig und auf manuellen Klick, ob ein Update verfügbar ist. Ein gefundenes Update wird angeboten, aber nie automatisch installiert.
   - **Bei Programmstart prüfen und ausführen** — die Anwendung prüft einmalig beim Programmstart und installiert ein gefundenes Update automatisch. Nach dem Start können weiterhin manuell Prüfungen ausgelöst und angebotene Updates per Klick installiert werden.
-- **Checkbox „Prerelease-Versionen laden"** — ist sie aktiviert, werden bei der Update-Prüfung auch Vorabversionen (z. B. Release Candidates) berücksichtigt. Ist sie deaktiviert, werden nur stabile Versionen als Update angeboten.
+- **Auswahlbox „Update-Pfad"** mit zwei festen Optionen:
+  - **Produktivversionen** — (Standard) ausschließlich stabile, produktive Versionen werden als Update-Kandidaten berücksichtigt.
+  - **Vorabversionen** — ausschließlich Vorabversionen (Release-Kandidaten, erkennbar am „-rc"-Versionsuffix bzw. als Vorabversion markierte Releases) werden berücksichtigt.
+
+Die Kanaltrennung ist strikt exklusiv: Es werden niemals stabile und Vorabversionen gemeinsam betrachtet — im Pfad „Vorabversionen" ist selbst die zu einem Release-Kandidaten gehörende Finalversion kein zulässiges Update, im Pfad „Produktivversionen" niemals eine Vorabversion. Unterhalb der Auswahlbox zeigt die Zeile **„Kanal:"** schreibgeschützt den resultierenden Update-Kanal an („Produktiv (nur stabile Versionen)" bzw. „Release Candidate (nur Vorabversionen)").
+
+Hintergrund der strikten Trennung: Produktiv- und Vorab-Installationen verwenden getrennte Datenbank-Speicherorte (Vorabversionen speichern ihre Datenbank im Programmverzeichnis, Produktivversionen unter `%LocalAppData%\Softwareschmiede`). Ein kanalübergreifendes Update würde die Installation auf den jeweils anderen Datenbestand umschalten.
+
+Passt der gewählte Update-Pfad nicht zum Kanal der installierten Version (z. B. eine Vorab-Installation mit dem Pfad „Produktivversionen"), erscheint beim Update-Angebot ein nicht-blockierender Hinweis in der Seitenleiste — das Update wird trotzdem angeboten.
 
 Beide Werte werden erst mit einem Klick auf **Speichern** wirksam; die Erfolgsmeldung „Einstellungen gespeichert." bestätigt die Übernahme. Werden die Update-Einstellungen geändert, während ein Update-Angebot angezeigt wird oder ein Update-Vorgang läuft, wird das Angebot zurückgenommen bzw. der laufende Vorgang abgebrochen.
 
@@ -53,7 +61,7 @@ Bei einem Fehler wird die Fehlermeldung im Dialog angezeigt und der Dialog kann 
 
 Der Update-Vorgang läuft in mehreren Phasen ab:
 
-1. **Prüfung** — die installierte Version wird mit der neuesten passenden Version auf dem Update-Server verglichen. Je nach Einstellung werden nur stabile Versionen oder auch Prerelease-Versionen berücksichtigt.
+1. **Prüfung** — die installierte Version wird mit der neuesten passenden Version auf dem Update-Server verglichen. Je nach gewähltem Update-Pfad werden ausschließlich stabile Versionen („Produktivversionen") oder ausschließlich Vorabversionen („Vorabversionen") als Kandidaten berücksichtigt.
 2. **Sicherheitsprüfung** — vor der Installation wird geprüft, ob laufende CLI-Aufgaben das Update blockieren würden.
 3. **Download** — das Update-Paket wird heruntergeladen (Fortschritt in Prozent).
 4. **Entpacken** — das Paket wird in ein Arbeitsverzeichnis entpackt und auf Vollständigkeit geprüft.
@@ -66,5 +74,6 @@ Der Update-Vorgang läuft in mehreren Phasen ab:
 - Die automatische Installation findet ausschließlich einmalig beim Programmstart statt — nur im Modus „Bei Programmstart prüfen und ausführen". Spätere manuelle Prüfungen bieten ein gefundenes Update lediglich an.
 - Der Update-Vorgang kann nicht pausiert werden, nur abgebrochen.
 - Während der Update-Vorbereitung können keine anderen Operationen in der Anwendung ausgeführt werden (modaler Dialog).
+- Der Update-Pfad akzeptiert nur die zwei festen Auswahlwerte „Produktivversionen" und „Vorabversionen" — eine Mischform („stabile und Vorabversionen gemeinsam") ist nicht wählbar.
 - Kann der Update-Server nicht erreicht werden oder sind die Update-Einstellungen nicht lesbar, wird ein Hinweistext statt eines Update-Angebots angezeigt; es findet dann keine Installation statt.
 - Schlägt das externe Update-Skript fehl, wird die Anwendung möglicherweise in einem inkonsistenten Zustand hinterlassen. Dies liegt außerhalb des Features; das Skript schreibt ein eigenes Protokoll.

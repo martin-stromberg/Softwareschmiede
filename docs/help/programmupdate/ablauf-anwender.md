@@ -10,7 +10,11 @@
    - **Aus** — keine Update-Prüfung (die Schaltfläche „⟳ Prüfen" ist deaktiviert)
    - **Nur prüfen** — prüfen und Update anbieten, aber nie automatisch installieren
    - **Bei Programmstart prüfen und ausführen** — beim Programmstart prüfen und ein gefundenes Update automatisch installieren
-4. Aktivieren Sie bei Bedarf die Checkbox **„Prerelease-Versionen laden"**, wenn auch Vorabversionen als Update angeboten werden sollen.
+4. Wählen Sie in der Auswahlbox **„Update-Pfad"** den Update-Kanal:
+   - **Produktivversionen** — nur stabile Versionen werden als Update angeboten (Standard)
+   - **Vorabversionen** — nur Vorabversionen (Release-Kandidaten) werden als Update angeboten
+
+   Unter der Auswahlbox zeigt die Zeile **„Kanal:"** den resultierenden Kanal an — die Trennung ist exklusiv, stabile und Vorabversionen werden niemals gemischt.
 5. Klicken Sie auf **Speichern**. Die Meldung „Einstellungen gespeichert." bestätigt die Übernahme.
 
 > **Hinweis:** Änderungen wirken erst nach dem Speichern. Wenn Sie die Einstellungen ändern, während ein Update-Angebot angezeigt wird oder ein Update läuft, wird das Angebot zurückgenommen bzw. der laufende Vorgang abgebrochen — es wird dann kein veraltetes Update installiert.
@@ -51,10 +55,12 @@ Ist der Modus **Bei Programmstart prüfen und ausführen** gespeichert, prüft d
 - Ist ein Update verfügbar, beginnt der Update-Vorgang ohne weiteren Klick. Laufen riskante CLI-Aufgaben, wird zuvor die Sicherheitsabfrage „Update starten?" gezeigt — die Automatik umgeht diese Entscheidung nicht.
 - Die automatische Installation findet nur einmalig beim Start statt. Ein später manuell ausgelöster Check installiert nicht automatisch, sondern bietet das Update über „⇧ Update" an.
 
-## Prerelease-Versionen erhalten
+## Vorabversionen erhalten
 
-1. Aktivieren Sie in den Einstellungen unter **Updates** die Checkbox **„Prerelease-Versionen laden"** und klicken Sie **Speichern**.
+1. Wählen Sie in den Einstellungen unter **Updates** in der Auswahlbox **„Update-Pfad"** den Eintrag **„Vorabversionen"** und klicken Sie **Speichern**.
 2. Führen Sie eine Prüfung über **⟳ Prüfen** aus (oder starten Sie die Anwendung neu).
 3. Ist eine Vorabversion die neueste passende Version, wird sie wie ein reguläres Update angeboten bzw. — im Startmodus — installiert.
 
-> **Hinweis:** Ist die Checkbox deaktiviert, werden Vorabversionen bei der Prüfung ignoriert — auch wenn sie neuer als die installierte Version sind.
+> **Hinweis:** Im Pfad „Vorabversionen" werden ausschließlich Release-Kandidaten berücksichtigt — eine stabile Version wird nicht angeboten, auch wenn sie semantisch neuer ist. Umgekehrt erhält der Pfad „Produktivversionen" niemals eine Vorabversion.
+
+> **Hinweis:** Passt der gewählte Update-Pfad nicht zur installierten Version (z. B. eine Vorab-Installation mit dem Pfad „Produktivversionen"), erscheint beim Update-Angebot der Hinweis „Der gewählte Update-Pfad passt nicht zur installierten Version. Das Update wird trotzdem angeboten." — prüfen Sie dann, ob der Update-Pfad zur Installation passt.

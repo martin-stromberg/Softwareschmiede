@@ -53,7 +53,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
     [InlineData(UpdateMode.BeiProgrammstartPruefenUndAusfuehren)]
     public async Task WindowReady_StartsOnceWithImmediateResult(UpdateMode modus)
     {
-        await SetUpdateSettingsAsync(new UpdateSettings(modus, false));
+        await SetUpdateSettingsAsync(new UpdateSettings(modus, UpdatePfadKanalResolver.ProduktivversionenPfad));
         _updateServiceMock
             .Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(NeuesUpdate));
@@ -102,7 +102,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
             .ReturnsAsync(new CliUpdateSafetyResult(0, []));
 
         // Phase 1: Aus ist bereits persistiert -> keine Prüfung, beide Commands gesperrt
-        await SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Aus, false));
+        await SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad));
         var sut = CreateSut();
 
         await sut.InitializeUpdatesAfterWindowReadyAsync();
@@ -125,7 +125,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
             Times.Never);
 
         // Phase 2: Wechsel aus aktivem Modus -> Angebot verschwindet, Commands gesperrt, kein weiterer Check
-        await SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, false));
+        await SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
         var sut2 = CreateSut();
         await sut2.InitializeUpdatesAfterWindowReadyAsync();
 
@@ -133,7 +133,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         sut2.UpdatePruefenCommand.CanExecute(null).Should().BeTrue();
         sut2.UpdateStartenCommand.CanExecute(null).Should().BeTrue();
 
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, UpdateModusOption.FuerModus(UpdateMode.Aus), false);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, UpdateModusOption.FuerModus(UpdateMode.Aus), UpdatePfadKanalResolver.ProduktivversionenPfad);
 
         sut2.UpdateVerfuegbar.Should().BeFalse("ein Moduswechsel auf Aus muss das Angebot verwerfen");
         sut2.VerfuegbaresUpdate.Should().BeNull();
@@ -157,13 +157,13 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
 
     /// <summary>
     /// Eine Einstellungsänderung während einer laufenden Prüfung verwirft das verzögerte Ergebnis
-    /// und übergibt beim Folgeaufruf die aktuelle Checkbox-Einstellung; eine Änderung während
+    /// und übergibt beim Folgeaufruf die aktuelle Update-Pfad-Einstellung; eine Änderung während
     /// der Vorbereitung stoppt die Installation vor dem Updater-Start.
     /// </summary>
     [Fact]
     public async Task SettingsChange_DiscardsDelayedResultAndStopsPreparation()
     {
-        await SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, true));
+        await SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.VorabversionenPfad));
 
         var eingecheckteOptionen = new List<UpdateCheckOptions>();
         var verzoegertesErgebnis = new TaskCompletionSource<UpdateCheckResult>(
@@ -186,24 +186,24 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
 
         // a) Verzögertes Check-Ergebnis wird nach Kanalwechsel verworfen
         var laufendePruefung = ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.NurPruefen), false);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.NurPruefen), UpdatePfadKanalResolver.ProduktivversionenPfad);
 
         verzoegertesErgebnis.SetResult(UpdateCheckResult.UpdateVerfuegbar(ReleaseCandidateUpdate));
         await laufendePruefung.WaitAsync(TimeSpan.FromSeconds(10));
 
         sut.VerfuegbaresUpdate.Should().BeNull("das verzögerte Ergebnis stammt aus der alten Einstellungs-Generation");
         sut.UpdateVerfuegbar.Should().BeFalse();
-        eingecheckteOptionen[0].IncludePrereleases.Should().BeTrue();
+        eingecheckteOptionen[0].UpdatePfad.Should().Be(UpdatePfadKanalResolver.VorabversionenPfad);
 
-        // Folgeprüfung verwendet die aktuelle Einstellung (Checkbox jetzt aus)
+        // Folgeprüfung verwendet die aktuelle Einstellung (Update-Pfad jetzt auf Produktivversionen)
         await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
         eingecheckteOptionen.Should().HaveCount(2);
-        eingecheckteOptionen[1].IncludePrereleases.Should().BeFalse();
+        eingecheckteOptionen[1].UpdatePfad.Should().Be(UpdatePfadKanalResolver.ProduktivversionenPfad);
         sut.UpdateVerfuegbar.Should().BeFalse();
 
         // b) Einstellungsänderung während der Vorbereitung stoppt vor dem Updater-Start
         await SetUpdateSettingsAsync(new UpdateSettings(
-            UpdateMode.BeiProgrammstartPruefenUndAusfuehren, false));
+            UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.ProduktivversionenPfad));
         var vorbereitungGestartet = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var vorbereitungFreigabe = new TaskCompletionSource<UpdatePreparationResult>(
@@ -223,7 +223,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         var startTask = sut2.InitializeUpdatesAfterWindowReadyAsync();
         await vorbereitungGestartet.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, UpdateModusOption.FuerModus(UpdateMode.Aus), false);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, UpdateModusOption.FuerModus(UpdateMode.Aus), UpdatePfadKanalResolver.ProduktivversionenPfad);
         vorbereitungFreigabe.SetResult(FertigeVorbereitung);
         await startTask.WaitAsync(TimeSpan.FromSeconds(10));
 
@@ -244,7 +244,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
     public async Task Startup_NoUpdateOrNotCheckable_DoesNotInstall(bool nichtPruefbar)
     {
         await SetUpdateSettingsAsync(new UpdateSettings(
-            UpdateMode.BeiProgrammstartPruefenUndAusfuehren, false));
+            UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.ProduktivversionenPfad));
         _updateServiceMock
             .Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(nichtPruefbar
@@ -280,7 +280,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
     public async Task Startup_SafetyDeclined_DoesNotContinue(bool automatisch)
     {
         await SetUpdateSettingsAsync(new UpdateSettings(
-            automatisch ? UpdateMode.BeiProgrammstartPruefenUndAusfuehren : UpdateMode.NurPruefen, false));
+            automatisch ? UpdateMode.BeiProgrammstartPruefenUndAusfuehren : UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
         _updateServiceMock
             .Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(NeuesUpdate));
@@ -315,7 +315,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
     public async Task Startup_SafetyCancelled_DoesNotContinue(bool automatisch)
     {
         await SetUpdateSettingsAsync(new UpdateSettings(
-            automatisch ? UpdateMode.BeiProgrammstartPruefenUndAusfuehren : UpdateMode.NurPruefen, false));
+            automatisch ? UpdateMode.BeiProgrammstartPruefenUndAusfuehren : UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
         _updateServiceMock
             .Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(NeuesUpdate));
@@ -371,7 +371,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
     public async Task Startup_PrepareOrStartFailure_DoesNotShutdown(bool fehlerBeimStart)
     {
         await SetUpdateSettingsAsync(new UpdateSettings(
-            UpdateMode.BeiProgrammstartPruefenUndAusfuehren, false));
+            UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.ProduktivversionenPfad));
         _updateServiceMock
             .Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(NeuesUpdate));
@@ -424,7 +424,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
     public async Task Startup_ConcurrentCommandsCannotDuplicateInstall()
     {
         await SetUpdateSettingsAsync(new UpdateSettings(
-            UpdateMode.BeiProgrammstartPruefenUndAusfuehren, false));
+            UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.ProduktivversionenPfad));
         var pruefungGestartet = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var pruefungFreigabe = new TaskCompletionSource<UpdateCheckResult>(

@@ -21,7 +21,7 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(update));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
 
         result.Status.Should().Be(UpdateCheckStatus.UpdateVerfuegbar);
         result.Update.Should().Be(update);
@@ -39,7 +39,7 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(UpdateReleaseLookupResult.KeinTreffer);
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
 
         result.Status.Should().Be(UpdateCheckStatus.KeinUpdate);
         result.Update.Should().BeNull();
@@ -57,7 +57,7 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(UpdateReleaseLookupResult.Fehlgeschlagen);
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
 
         result.Status.Should().Be(UpdateCheckStatus.NichtPruefbar);
         result.Update.Should().BeNull();
@@ -73,10 +73,44 @@ public sealed class UpdateServiceTests
         var releaseClient = new Mock<IUpdateReleaseClient>();
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
 
         result.Status.Should().Be(UpdateCheckStatus.NichtPruefbar);
         releaseClient.Verify(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Bei Konflikt zwischen Installationskanal und gewähltem Kanal bleibt das Update verfügbar
+    /// und trägt eine nicht-blockierende Warnung; bei passendem Kanal ist die Meldung leer.
+    /// </summary>
+    [Theory]
+    [InlineData("v1.2.0-rc.1", UpdatePfadKanalResolver.ProduktivversionenPfad, true)]
+    [InlineData("v1.2.0", UpdatePfadKanalResolver.VorabversionenPfad, true)]
+    [InlineData("v1.2.0", UpdatePfadKanalResolver.ProduktivversionenPfad, false)]
+    [InlineData("v1.2.0-rc.1", UpdatePfadKanalResolver.VorabversionenPfad, false)]
+    public async Task CheckForUpdateAsync_WarnsOnInstallationChannelConflict(
+        string installierterTag, string updatePfad, bool erwarteWarnung)
+    {
+        var istRcKanal = updatePfad == UpdatePfadKanalResolver.VorabversionenPfad;
+        var update = istRcKanal
+            ? new UpdateInfo("1.3.0-rc.1", "v1.3.0-rc.1", "release.zip", new Uri("https://example.invalid/rc.zip"), null, IsPrerelease: true)
+            : new UpdateInfo("1.3.0", "v1.3.0", "release.zip", new Uri("https://example.invalid/stable.zip"), null, IsPrerelease: false);
+        var versionProvider = new Mock<IApplicationVersionProvider>();
+        versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new InstalledVersionInfo("1.2.0", installierterTag, null, null));
+        var releaseClient = new Mock<IUpdateReleaseClient>();
+        releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(update));
+        var sut = CreateSut(versionProvider.Object, releaseClient.Object);
+
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(updatePfad));
+
+        result.Status.Should().Be(UpdateCheckStatus.UpdateVerfuegbar);
+        result.Update.Should().Be(update);
+        if (erwarteWarnung)
+            result.Message.Should().NotBeNullOrEmpty("ein Kanalkonflikt muss als nicht-blockierende Warnung mitreisen");
+        else
+            result.Message.Should().BeNull("bei passendem Kanal darf keine Warnung mitreisen");
     }
 
     /// <summary>Wenn der externe Skriptstart fehlschlägt, wird die App nicht beendet.</summary>

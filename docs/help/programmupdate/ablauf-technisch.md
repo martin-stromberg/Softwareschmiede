@@ -10,17 +10,18 @@ Der Update-Ablauf wird vom `MainWindowUpdateFlow` orchestriert; das `MainWindowV
 
 ### Lesen
 
-`AppEinstellungService.GetUpdateSettingsAsync(ct)` liest die beiden Schlüssel `updates.mode` (`UpdateModeKey`) und `updates.includePrereleases` (`IncludePrereleasesKey`) in **einer** gemeinsamen EF-Core-Abfrage (mit `TagWith(UpdateSettingsReadTag)` für gezielte Testinterception) und liefert ein unveränderliches `UpdateSettings`-Record:
+`AppEinstellungService.GetUpdateSettingsAsync(ct)` liest die beiden Schlüssel `updates.mode` (`UpdateModeKey`) und `updates.pfad` (`UpdatePfadKey`) in **einer** gemeinsamen EF-Core-Abfrage (mit `TagWith(UpdateSettingsReadTag)` für gezielte Testinterception) und liefert ein unveränderliches `UpdateSettings`-Record:
 
 - Fehlender oder ungültiger `updates.mode`-Wert → Default `UpdateMode.NurPruefen`
-- Fehlender oder ungültiger `updates.includePrereleases`-Wert → Default `false`
+- Fehlender, leerer oder unbekannter `updates.pfad`-Wert → normalisiert über `UpdatePfadKanalResolver.NormalisierePfad` auf `Produktivversionen`
+- Der Altbestand `updates.includePrereleases` wird nicht mehr gelesen.
 - Datenbank-Lesefehler werden **nicht** abgefangen und propagieren an den Aufrufer. Der Aufrufer (`MainWindowUpdateFlow.LeseUpdateSettingsAsync`) bildet daraus `null` und zeigt den Nicht-prüfbar-Hinweis — es erfolgt keine Ersatzfreigabe durch Defaults, Snapshots oder Caches.
 
 Im `MainWindowUpdateFlow` werden die Werte immer in einem frischen DI-Scope gelesen (`_serviceProvider.CreateScope()`), da der `AppEinstellungService` einen scoped `DbContext` nutzt, der Update-Service selbst aber ein Singleton ist.
 
 ### Speichern und Wirksamwerden
 
-`SettingsViewModel.SpeichernAsync` verwendet die typisierte Auswahl `SelectedUpdateMode` (`UpdateModusOption` aus `UpdateModusOption.Alle`; die Anzeige-Labels liegen zentral in `UpdateModusTexte`), schreibt beide Werte gemeinsam über `SetUpdateSettingsAsync` in einem `SaveChangesAsync` und löst direkt danach das Event `UpdateSettingsSaved` mit dem gespeicherten Snapshot aus — auch wenn ein späterer Einstellungsschritt fehlschlägt.
+`SettingsViewModel.SpeichernAsync` verwendet die typisierten Auswahlen `SelectedUpdateMode` (`UpdateModusOption` aus `UpdateModusOption.Alle`; die Anzeige-Labels liegen zentral in `UpdateModusTexte`) und `SelectedUpdatePfad` (`UpdatePfadOption` aus `UpdatePfadOption.Alle`; Labels in `UpdatePfadTexte`). Fehlt eine der beiden Auswahlen, bricht der Speichervorgang mit einer `FehlerMeldung` ab (z. B. „Der ausgewählte Update-Pfad ist ungültig."). `SetUpdateSettingsAsync` validiert den Modus per `Enum.IsDefined` und den Pfad per `UpdatePfadKanalResolver.IstGueltigerPfad` (jeweils `ArgumentOutOfRangeException`, kein Write) und schreibt beide Werte gemeinsam in einem `SaveChangesAsync`; direkt danach wird das Event `UpdateSettingsSaved` mit dem gespeicherten Snapshot ausgelöst — auch wenn ein späterer Einstellungsschritt fehlschlägt. Die schreibgeschützte Anzeige `AbgeleiteterUpdateKanal` im ViewModel folgt der Pfadauswahl live (`UpdatePfadTexte.KanalProduktiv`/`KanalReleaseCandidate`).
 
 Der `MainWindowViewModel` hat das Event beim ersten `NavigateToSettings` auf das gecachte `SettingsViewModel` abonniert und leitet es an `MainWindowUpdateFlow.ApplyGespeicherteUpdateSettings` weiter. Der Handler:
 
@@ -51,9 +52,10 @@ Serialisiert über ein eigenes `SemaphoreSlim` (`_checkGate`):
 
 1. `ApplicationVersionProvider.GetInstalledVersionAsync` liest `version.json` aus dem Programmverzeichnis. Fehlende/ungültige lokale Version → `NichtPruefbar` ohne Releaseabruf.
 2. `IUpdateReleaseClient.GetLatestReleaseAsync(options, ct)` liefert ein `UpdateReleaseLookupResult` (`Erfolg` + `Release`). `!Erfolg` → `NichtPruefbar`; `Release == null` → `KeinUpdate`.
-3. Defensiver Ausschluss: Ein als Prerelease klassifiziertes Ergebnis (`UpdateInfo.IsPrerelease`) bei `options.IncludePrereleases == false` ist eine Vertragsverletzung → `NichtPruefbar`.
+3. Defensiver Ausschluss: Ein Ergebnis, das nicht zum gewählten Kanal passt (`latest.IsPrerelease` widerspricht `options.Kanal` — Prerelease im Produktiv-Kanal **oder** Stabiles im RC-Kanal), ist eine Vertragsverletzung → `NichtPruefbar`. Der Kanal ergibt sich aus `UpdateCheckOptions.UpdatePfad` über `UpdatePfadKanalResolver.ErmittleKanal`.
 4. `UpdateVersionComparer.IsNewer(installed.Version, latest.Version)` entscheidet zwischen `UpdateVerfuegbar` und `KeinUpdate`.
-5. `OperationCanceledException` propagiert; andere Exceptions werden geloggt und zu `NichtPruefbar`.
+5. Konsistenzwarnung Installation ↔ Kanal (nur im Angebotsfall): `UpdatePfadKanalResolver.ErmittleKanalFuerTagName(installed.TagName)` ordnet die installierte Version über den „-rc"-Infix (OrdinalIgnoreCase; fehlender/leerer Tag konservativ → `ReleaseCandidate`) dem Kanalmodell zu. Bei Konflikt mit `options.Kanal` bleibt das Ergebnis `UpdateVerfuegbar`, trägt aber den nicht-blockierenden Hinweis „Der gewählte Update-Pfad passt nicht zur installierten Version. Das Update wird trotzdem angeboten." in `Message` — zusätzlich `_logger.LogWarning`.
+6. `OperationCanceledException` propagiert; andere Exceptions werden geloggt und zu `NichtPruefbar`.
 
 ### `GitHubReleaseClient.GetLatestReleaseAsync` (paginierte Suche)
 
@@ -62,7 +64,7 @@ Serialisiert über ein eigenes `SemaphoreSlim` (`_checkGate`):
 - Ein gemeinsames `CheckTimeout` (Standard 15 s) begrenzt alle Seiten zusammen.
 - Pro Release-Eintrag (`TryCreateCandidate`):
   - `draft == true`, fehlender/ungültiger Tag (`UpdateVersionComparer.TryParse`) oder fehlendes `release.zip`-Asset (`UpdateOptions.AssetName`, absolute HTTPS-Download-URL) → Eintrag wird übersprungen; ein einzelner unbrauchbarer Eintrag verhindert andere Kandidaten nicht.
-  - Prerelease-Klassifikation: GitHub-Flag `prerelease` **oder** SemVer-Prerelease-Suffix (`SemanticUpdateVersion.IsPrerelease`). Bei `IncludePrereleases == false` werden beide ausgeschlossen.
+  - Prerelease-Klassifikation: GitHub-Flag `prerelease` **oder** SemVer-Prerelease-Suffix (`SemanticUpdateVersion.IsPrerelease`). Die Filterung ist exklusiv je `options.Kanal`: `Produktiv` überspringt alle Prerelease-Kandidaten, `ReleaseCandidate` überspringt alle Nicht-Prerelease-Kandidaten.
   - Gewinner ist die höchste zulässige `SemanticUpdateVersion` über **alle** Seiten — unabhängig von Reihenfolge oder Veröffentlichungsdatum; bei Gleichstand bleibt die erste Fundstelle.
 - Ergebnis: Kein zulässiger Kandidat → `KeinTreffer`. HTTP-, JSON-, Timeout- oder Pagination-Fehler auf **irgendeiner** Seite → `Fehlgeschlagen` (keine Teiltreffer). Caller-Cancellation propagiert als `OperationCanceledException`.
 - Das gelieferte `UpdateInfo` trägt die normalisierte Version (`UpdateVersionComparer.Normalize`), den Original-Tag, Asset-Name, Download-URL, `PublishedAt` und `IsPrerelease`.
