@@ -131,6 +131,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddSingleton<IOptions<TerminalSessionOptions>>(Options.Create(new TerminalSessionOptions()));
         services.AddSingleton<IOptions<ScmEventOptions>>(Options.Create(new ScmEventOptions()));
         services.AddSingleton<KiAusfuehrungsService>();
+        services.AddSingleton<PromptZeitVersandService>();
         services.AddSingleton<ScmEventStartupGate>();
         services.AddSingleton<ScmEventChangeNotifier>();
         services.AddSingleton<ScmEventExchangeProtocol>();
@@ -151,7 +152,8 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddScoped<ScmBackmergeService>();
         services.AddScoped(sp => new EntwicklungsprozessService(sp.GetRequiredService<AufgabeService>(), sp.GetRequiredService<ProtokollService>(),
             Git.Object, sp.GetRequiredService<PluginSelectionService>(), directories.Object,
-            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: sp.GetRequiredService<KiAusfuehrungsService>()), sp.GetRequiredService<ILogger<EntwicklungsprozessService>>()));
+            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: sp.GetRequiredService<KiAusfuehrungsService>(),
+                PromptZeitVersandService: sp.GetRequiredService<PromptZeitVersandService>()), sp.GetRequiredService<ILogger<EntwicklungsprozessService>>()));
         Services = services.BuildServiceProvider();
     }
 

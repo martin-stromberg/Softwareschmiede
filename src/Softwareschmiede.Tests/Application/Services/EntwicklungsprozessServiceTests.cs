@@ -534,6 +534,63 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         protokoll.Should().Contain(p => p.Typ == ProtokollTyp.StatusUebergang);
     }
 
+    /// <summary>AbschliessenAsync zieht einen geplanten zeitgesteuerten Prompt zurück, wenn
+    /// PromptZeitVersandService in den Options konfiguriert ist.</summary>
+    [Fact]
+    public async Task AbschliessenAsync_ShouldCancelScheduledPrompt_WhenPromptGeplant()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit geplantem Prompt", null);
+        var promptZeitVersandService = new PromptZeitVersandService(
+            _kiAusfuehrungsService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
+        var sut = CreateSut(new EntwicklungsprozessServiceOptions(
+            KiAusfuehrungsService: _kiAusfuehrungsService,
+            PromptZeitVersandService: promptZeitVersandService));
+        await promptZeitVersandService.SchedulePromptAsync(aufgabe.Id, "Test-Prompt", DateTimeOffset.UtcNow.AddHours(1));
+        promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id).Should().NotBeNull();
+
+        // Act
+        await sut.AbschliessenAsync(aufgabe.Id);
+
+        // Assert
+        promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id).Should().BeNull();
+    }
+
+    /// <summary>AbschliessenAsync beendet eine laufende CLI-Session über StopCliAsync
+    /// (nachweisbar am AbsichtlichGestoppt-Flag des Handles).</summary>
+    [Fact]
+    public async Task AbschliessenAsync_ShouldStopRunningCli_WhenSessionActive()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit laufender CLI", null);
+        var directory = Path.Combine(Path.GetTempPath(), $"sw-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        _kiPluginMock.Setup(p => p.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c exit 0",
+            });
+
+        try
+        {
+            var handle = await _kiAusfuehrungsService.StartTerminalSessionAsync(aufgabe.Id, _kiPluginMock.Object, directory);
+            handle.AbsichtlichGestoppt.Should().BeFalse();
+
+            // Act
+            await _sut.AbschliessenAsync(aufgabe.Id);
+
+            // Assert
+            handle.AbsichtlichGestoppt.Should().BeTrue();
+        }
+        finally
+        {
+            await _kiAusfuehrungsService.StopCliAsync(aufgabe.Id);
+            DeleteDirectoryIfExists(directory);
+        }
+    }
+
     /// <summary>CommitDurchfuehrenAsync wirft Exception wenn kein LokalerKlonPfad gesetzt.</summary>
     [Fact]
     public async Task CommitDurchfuehrenAsync_ShouldThrowInvalidOperationException_WhenNoKlonPfad()

@@ -73,6 +73,34 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         Assert.True(fixture.Sessions[taskId].Object.Process.HasExited);
     }
 
+    /// <summary>Der automatische Abschluss zieht einen für die Aufgabe geplanten
+    /// zeitgesteuerten Prompt zurück (Prompt-Abbruch läuft im einheitlichen Pass).</summary>
+    [Fact]
+    public async Task Monitor_MergedPullRequest_CancelsScheduledPromptOnComplete()
+    {
+        var time = new TestTimeProvider();
+        await using var fixture = new ScmDispatchFixture(time: time);
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: 7);
+        await SetWaitAsync(fixture, 5);
+        SetupPullRequestStatus(fixture, PullRequestStatus.Merged);
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+        var promptService = fixture.Services.GetRequiredService<PromptZeitVersandService>();
+
+        await monitor.RunOnceAsync();
+        Assert.NotNull((await TaskAsync(fixture, taskId)).ScmAbschlussErkanntUtc);
+
+        await promptService.SchedulePromptAsync(taskId, "verspäteter Prompt", time.GetUtcNow().AddHours(1));
+        Assert.NotNull(promptService.GetScheduledPromptStatus(taskId));
+
+        time.Advance(TimeSpan.FromMinutes(5));
+        await monitor.RunOnceAsync();
+
+        Assert.Equal(AufgabeStatus.Beendet, (await TaskAsync(fixture, taskId)).Status);
+        Assert.Null(promptService.GetScheduledPromptStatus(taskId));
+    }
+
     /// <summary>Ein wieder geöffneter Pull Request setzt den laufenden Countdown zurück.</summary>
     [Fact]
     public async Task Monitor_ReopenedPullRequest_ResetsCountdown()

@@ -1079,7 +1079,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            _promptZeitVersandService.CancelScheduledPrompt(_aufgabeId);
             await _entwicklungsprozessService.AbschliessenAsync(_aufgabeId, ct);
             await LadenAsync(ct);
         }
