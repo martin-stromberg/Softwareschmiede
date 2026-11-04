@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Softwareschmiede.Application.Services.Updates;
 
 namespace Softwareschmiede.Infrastructure.Data;
 
@@ -13,7 +14,6 @@ public static class DatenbankPfadResolver
 {
     private const string DatenbankDateiname = "softwareschmiede.db";
     private const string VersionsDateiname = "version.json";
-    private const string ReleaseCandidateMarker = "-rc";
 
     /// <summary>
     /// Ermittelt den zu verwendenden Datenbankpfad.
@@ -64,15 +64,10 @@ public static class DatenbankPfadResolver
             var document = JsonSerializer.Deserialize<VersionJson>(json);
             var tagName = document?.TagName;
 
-            if (string.IsNullOrWhiteSpace(tagName))
-            {
-                // version.json ohne verwertbares tagName → konservativ als nicht produktiv behandeln.
-                return false;
-            }
-
             // RC-Tags folgen dem Format "v{version}-rc.{n}" (siehe staging-ci.yml), produktive Tags
-            // dem Format "v{version}" ohne "-rc"-Infix (siehe release.yml).
-            return !tagName.Contains(ReleaseCandidateMarker, StringComparison.OrdinalIgnoreCase);
+            // dem Format "v{version}" ohne "-rc"-Infix (siehe release.yml). Fehlende oder leere
+            // Tags ordnet der Resolver konservativ dem RC-Kanal zu → nicht produktiv.
+            return UpdatePfadKanalResolver.ErmittleKanalFuerTagName(tagName) == UpdateKanal.Produktiv;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or FormatException)
         {

@@ -15,11 +15,11 @@ public sealed class GitHubReleaseClientTests_Pagination
     private const string Page1Url = "https://api.github.com/repos/martin-stromberg/Softwareschmiede/releases?per_page=100";
     private const string Page2Url = "https://api.github.com/repos/martin-stromberg/Softwareschmiede/releases?per_page=100&page=2";
 
-    /// <summary>Die höchste zulässige SemVer über alle Seiten gewinnt; beide Seiten werden abgerufen.</summary>
+    /// <summary>Die höchste zulässige SemVer des gewählten Kanals über alle Seiten gewinnt; beide Seiten werden abgerufen.</summary>
     [Theory]
-    [InlineData(true, "1.4.0-rc.1", true)]
-    [InlineData(false, "1.3.0", false)]
-    public async Task GetLatestReleaseAsync_SelectsHighestAcrossPages(bool includePrereleases, string expectedVersion, bool expectedIsPrerelease)
+    [InlineData(UpdatePfadKanalResolver.VorabversionenPfad, "1.4.0-rc.1", true)]
+    [InlineData(UpdatePfadKanalResolver.ProduktivversionenPfad, "1.3.0", false)]
+    public async Task GetLatestReleaseAsync_SelectsHighestAcrossPages(string updatePfad, string expectedVersion, bool expectedIsPrerelease)
     {
         var handler = new RoutingHttpHandler();
         handler.AddPage(Page1Url, """
@@ -80,7 +80,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 """);
         var sut = CreateSut(new HttpClient(handler));
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(includePrereleases));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(updatePfad));
 
         result.Erfolg.Should().BeTrue();
         result.Release.Should().NotBeNull();
@@ -98,7 +98,7 @@ public sealed class GitHubReleaseClientTests_Pagination
         handler.AddPage(Page2Url, "[]", statusCode: HttpStatusCode.InternalServerError);
         var sut = CreateSut(new HttpClient(handler));
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
 
         result.Erfolg.Should().BeFalse();
         result.Release.Should().BeNull();
@@ -114,7 +114,7 @@ public sealed class GitHubReleaseClientTests_Pagination
         handler.AddPage(Page2Url, "{ \"unexpected\": \"object\" }");
         var sut = CreateSut(new HttpClient(handler));
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
 
         result.Erfolg.Should().BeFalse();
         result.Release.Should().BeNull();
@@ -133,7 +133,7 @@ public sealed class GitHubReleaseClientTests_Pagination
         });
         var sut = CreateSut(new HttpClient(handler), new UpdateOptions { CheckTimeout = TimeSpan.FromMilliseconds(50) });
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
 
         result.Erfolg.Should().BeFalse();
         result.Release.Should().BeNull();
@@ -148,7 +148,7 @@ public sealed class GitHubReleaseClientTests_Pagination
         handler.AddPage(Page2Url, "[]", nextUrl: Page1Url);
         var sut = CreateSut(new HttpClient(handler));
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
 
         result.Erfolg.Should().BeFalse();
         result.Release.Should().BeNull();
@@ -167,7 +167,7 @@ public sealed class GitHubReleaseClientTests_Pagination
         handler.AddPage(Page1Url, ValidPageBody(), nextUrl);
         var sut = CreateSut(new HttpClient(handler));
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
 
         result.Erfolg.Should().BeFalse();
         result.Release.Should().BeNull();
@@ -194,7 +194,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 """);
         var sut = CreateSut(new HttpClient(handler));
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
 
         result.Erfolg.Should().BeTrue();
         result.Release!.Version.Should().Be("1.5.0-rc.1");
@@ -211,7 +211,7 @@ public sealed class GitHubReleaseClientTests_Pagination
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        var act = () => sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true), cts.Token);
+        var act = () => sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad), cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
     }

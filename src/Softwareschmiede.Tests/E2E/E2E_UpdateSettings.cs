@@ -13,8 +13,8 @@ namespace Softwareschmiede.Tests.E2E;
 /// <summary>
 /// Update-E2E-Szenarien E-01 bis E-07 (Plan U-07) gegen die isolierte
 /// <see cref="UpdateE2EFixture"/>-Pipeline: Persistenz aller Update-Modi und der
-/// Prerelease-Auswahl über die echte Settings-UI inklusive echtem Neustart,
-/// modusabhängige Startautomatik, Asset-Auswahl je Checkboxzustand (manuell und
+/// Update-Pfad-Auswahl über die echte Settings-UI inklusive echtem Neustart,
+/// modusabhängige Startautomatik, Asset-Auswahl je Update-Pfad (manuell und
 /// automatisch), Invalidierung zuvor angebotener Updates durch gespeicherte Änderungen,
 /// Nicht-prüfbar-/Fehler-/Abbruch-Robustheit, kontrollierte Settings-Lesefehler an allen
 /// drei Grenzen (T-09, automatisch und manuell) sowie die Einmaligkeit des Startversuchs.
@@ -26,6 +26,9 @@ public partial class End2EndTest
     private const string UpdateModusAusLabel = UpdateModusTexte.Aus;
     private const string UpdateModusNurPruefenLabel = UpdateModusTexte.NurPruefen;
     private const string UpdateModusStartLabel = UpdateModusTexte.BeiProgrammstartPruefenUndAusfuehren;
+    private const string UpdatePfadProduktivLabel = UpdatePfadTexte.Produktivversionen;
+    private const string UpdatePfadVorabLabel = UpdatePfadTexte.Vorabversionen;
+    private const string UpdateHinweisKanalKonfliktTeil = "passt nicht";
     private const string UpdateDownloadGate = "download-block";
     private const string UpdateReleaseGate = "release-block";
     private const string UpdateHinweisNichtPruefbarTeil = "nicht prüfbar";
@@ -35,16 +38,16 @@ public partial class End2EndTest
     private static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
 
     /// <summary>
-    /// E-01: Alle drei exakten Update-Modus-Labels und beide Prerelease-Checkboxzustände
+    /// E-01: Alle drei exakten Update-Modus-Labels und beide Update-Pfade
     /// werden über die echte Settings-UI gesetzt, gespeichert und nach Weg-/Zurücknavigation
     /// sowie nach einem echten, DB-erhaltenden Neustart wieder angezeigt. Eine ungespeicherte
     /// Änderung wird über "Verwerfen" zurückgesetzt. Der lange Auswahltext bleibt bei der
     /// minimalen Fenstergröße lesbar (ComboBox ist breit genug).
     /// </summary>
-    private async Task Settings_AllModesAndPrereleasesPersist()
+    private async Task Settings_AllModesAndUpdatePfadPersist()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, includePrereleases: true);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, UpdatePfadKanalResolver.VorabversionenPfad);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -60,7 +63,8 @@ public partial class End2EndTest
 
             var settings = await OeffneSettingsGeladenAsync(fixture, menu);
             Assert.Equal(UpdateModusAusLabel, settings.GetUpdateMode());
-            Assert.True(settings.GetIncludePrereleases());
+            Assert.Equal(UpdatePfadVorabLabel, settings.GetUpdatePfad());
+            Assert.Equal(UpdatePfadTexte.KanalReleaseCandidate, settings.GetAbgeleitetenUpdateKanal());
 
             // Alle drei exakten Labels nacheinander setzen und speichern.
             settings.SetUpdateMode(UpdateModusNurPruefenLabel).SaveSettings();
@@ -98,13 +102,15 @@ public partial class End2EndTest
             WarteAufSpeichernAktiviert(settings);
             Assert.Equal(UpdateModusAusLabel, settings.GetUpdateMode());
 
-            // Beide Checkboxzustände setzen und speichern.
-            settings.SetIncludePrereleases(false).SaveSettings();
+            // Beide Update-Pfade setzen und speichern; der abgeleitete Kanal folgt der Auswahl.
+            settings.SetUpdatePfad(UpdatePfadProduktivLabel).SaveSettings();
             WarteAufSpeichernAktiviert(settings);
-            Assert.False(settings.GetIncludePrereleases());
-            settings.SetIncludePrereleases(true).SaveSettings();
+            Assert.Equal(UpdatePfadProduktivLabel, settings.GetUpdatePfad());
+            Assert.Equal(UpdatePfadTexte.KanalProduktiv, settings.GetAbgeleitetenUpdateKanal());
+            settings.SetUpdatePfad(UpdatePfadVorabLabel).SaveSettings();
             WarteAufSpeichernAktiviert(settings);
-            Assert.True(settings.GetIncludePrereleases());
+            Assert.Equal(UpdatePfadVorabLabel, settings.GetUpdatePfad());
+            Assert.Equal(UpdatePfadTexte.KanalReleaseCandidate, settings.GetAbgeleitetenUpdateKanal());
 
             // "Nur prüfen" als Restart-Ausgangslage (kein Auto-Install beim Neustart).
             settings.SetUpdateMode(UpdateModusNurPruefenLabel).SaveSettings();
@@ -114,21 +120,24 @@ public partial class End2EndTest
             menu.NavigateToDashboard();
             settings = await OeffneSettingsGeladenAsync(fixture, menu);
             Assert.Equal(UpdateModusNurPruefenLabel, settings.GetUpdateMode());
-            Assert.True(settings.GetIncludePrereleases());
+            Assert.Equal(UpdatePfadVorabLabel, settings.GetUpdatePfad());
 
             // Ungespeicherte Änderung wird über "Verwerfen" zurückgesetzt.
             settings.SetUpdateMode(UpdateModusAusLabel);
             Assert.Equal(UpdateModusAusLabel, settings.GetUpdateMode());
+            settings.SetUpdatePfad(UpdatePfadProduktivLabel);
+            Assert.Equal(UpdatePfadProduktivLabel, settings.GetUpdatePfad());
             var readsVorher = fixture.ZaehleEreignis(UpdateE2EEreignisse.UpdateSettingsReadReached);
             settings.DiscardChanges();
             await fixture.WarteAufEreignisAsync(UpdateE2EEreignisse.UpdateSettingsReadReached, Medium,
                 mindestens: readsVorher + 1);
             settings.WaitForUpdateMode(UpdateModusNurPruefenLabel, Medium);
-            Assert.True(settings.GetIncludePrereleases());
+            settings.WaitForUpdatePfad(UpdatePfadVorabLabel, Medium);
             menu.NavigateToDashboard();
 
             // Echter Neustart mit derselben DB: beide Werte sind persistiert und steuern den
-            // Startlauf sichtbar (Nur prüfen + Prereleases -> RC-Angebot ohne Installation).
+            // Startlauf sichtbar (Nur prüfen + Vorabversionen -> RC-Angebot mit
+            // nicht-blockierender Konfliktwarnung, ohne Installation).
             basis = ProtokollBasis(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
@@ -136,16 +145,19 @@ public partial class End2EndTest
 
             Assert.Equal(UpdateE2EFixture.RcVersion, menu.WaitForOfferedUpdateVersion(Medium));
             Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckStarted
-                && DatenBool(e, "includePrereleases") == true);
+                && DatenText(e, "updatePfad") == UpdatePfadKanalResolver.VorabversionenPfad
+                && DatenText(e, "kanal") == nameof(UpdateKanal.ReleaseCandidate));
             Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckCompleted
                 && DatenText(e, "version") == UpdateE2EFixture.RcVersion
                 && DatenBool(e, "isPrerelease") == true);
+            menu.WaitForUpdateHinweis(UpdateHinweisKanalKonfliktTeil, Medium);
             Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateProcessStartRecorded));
             Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.ShutdownRequested));
 
             settings = await OeffneSettingsGeladenAsync(fixture, menu);
             Assert.Equal(UpdateModusNurPruefenLabel, settings.GetUpdateMode());
-            Assert.True(settings.GetIncludePrereleases());
+            Assert.Equal(UpdatePfadVorabLabel, settings.GetUpdatePfad());
+            Assert.Equal(UpdatePfadTexte.KanalReleaseCandidate, settings.GetAbgeleitetenUpdateKanal());
             menu.NavigateToDashboard();
         }
         finally
@@ -168,7 +180,7 @@ public partial class End2EndTest
     private async Task Startup_ModesDriveUpdatePipeline()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.NurPruefen, includePrereleases: false);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -183,7 +195,7 @@ public partial class End2EndTest
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
 
             // Modus "Aus" über die UI speichern, regulär schließen, gleiche DB neu starten.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusAusLabel, prereleases: false);
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusAusLabel, UpdatePfadProduktivLabel);
             basis = ProtokollBasis(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
@@ -197,7 +209,7 @@ public partial class End2EndTest
             AssertKeinUpdateNebenwirkungSeit(fixture, basis);
 
             // Modus "Nur prüfen" über die UI speichern, regulär schließen, neu starten.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, prereleases: false);
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadProduktivLabel);
             basis = ProtokollBasis(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
@@ -215,7 +227,7 @@ public partial class End2EndTest
             AssertKeinUpdateNebenwirkungSeit(fixture, basis);
 
             // Startmodus über die UI speichern; der ZIP-Stream wird per Gate blockiert.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, prereleases: false);
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadProduktivLabel);
             fixture.AktualisiereSzenario(s =>
             {
                 var paket = s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl);
@@ -266,18 +278,20 @@ public partial class End2EndTest
     }
 
     /// <summary>
-    /// E-03: Die Prerelease-Checkbox wählt exakt das passende Asset. In "Nur prüfen" wird
-    /// die Checkbox aus/ein per UI gespeichert und der Prüfbutton geklickt: es wird exakt
-    /// Stable bzw. RC angeboten. Der Installationsbutton führt die echte Vorbereitung bis
-    /// zur aufgezeichneten Übergabe aus; Download-URL, entpackte <c>version.json</c> und
-    /// Skriptziel gehören exakt zur gewählten Version. Beide Checkboxzustände werden
-    /// zusätzlich mit UI-gespeichertem Startmodus und je echtem Neustart ohne Updateklick
-    /// geprüft.
+    /// E-03: Der Update-Pfad wählt exklusiv den Kanal. In "Nur prüfen" werden beide Pfade
+    /// per UI gespeichert und der Prüfbutton geklickt: der Produktiv-Pfad bietet exakt
+    /// Stable an, der Vorab-Pfad exakt RC - eine semantisch höhere stabile Version wird im
+    /// RC-Kanal nicht gewählt. Der Installationsbutton führt die echte Vorbereitung bis zur
+    /// aufgezeichneten Übergabe aus; Download-URL, entpackte <c>version.json</c> und
+    /// Skriptziel gehören exakt zur gewählten Version. Der Kanalkonflikt (produktive
+    /// Installation + Vorab-Pfad) zeigt die nicht-blockierende Warnung im UpdateHinweis
+    /// und im Versuchsprotokoll. Beide Pfade werden zusätzlich mit UI-gespeichertem
+    /// Startmodus und je echtem Neustart ohne Updateklick geprüft.
     /// </summary>
-    private async Task PrereleaseCheckbox_SelectsMatchingAsset()
+    private async Task UpdatePfad_SelectsExclusiveChannelAsset()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, includePrereleases: false);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -291,10 +305,10 @@ public partial class End2EndTest
             var menu = new MenuView(mainWindow);
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
 
-            // Manueller Modus, Checkbox aus: exakt Stable wird angeboten und installiert.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, prereleases: false);
+            // Produktiv-Pfad: exakt Stable wird angeboten und installiert.
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadProduktivLabel);
             await PruefeUpdateUeberUiAsync(fixture, menu, basis = ProtokollBasis(fixture),
-                UpdateE2EFixture.StableVersion, isPrerelease: false);
+                UpdateE2EFixture.StableVersion, isPrerelease: false, UpdatePfadProduktivLabel);
 
             basis = ProtokollBasis(fixture);
             menu.ClickUpdateStarten();
@@ -306,10 +320,19 @@ public partial class End2EndTest
                 e => DatenText(e, "url") == fixture.RcDownloadUrl));
             new UpdateProgressDialogView(mainWindow).Close();
 
-            // Checkbox ein: exakt RC wird angeboten und installiert.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, prereleases: true);
+            // Vorab-Pfad mit semantisch höherer stabiler Konkurrenz: exakt RC - die höhere
+            // stabile Version ist kanalfremd. Produktive Installation + Vorab-Pfad ergibt
+            // den Kanalkonflikt: Angebot bleibt, die Warnung ist nicht blockierend.
+            fixture.AktualisiereSzenario(s =>
+                s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Inhalt =
+                    ErzeugeRcUndHoeheresStableReleaseJson(fixture));
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadVorabLabel);
             await PruefeUpdateUeberUiAsync(fixture, menu, basis = ProtokollBasis(fixture),
-                UpdateE2EFixture.RcVersion, isPrerelease: true);
+                UpdateE2EFixture.RcVersion, isPrerelease: true, UpdatePfadVorabLabel);
+            menu.WaitForUpdateHinweis(UpdateHinweisKanalKonfliktTeil, Medium);
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateAttemptCompleted
+                && DatenText(e, "versuch") == "pruefen"
+                && (DatenText(e, "hinweis") ?? string.Empty).Contains(UpdateHinweisKanalKonfliktTeil));
 
             basis = ProtokollBasis(fixture);
             menu.ClickUpdateStarten();
@@ -321,9 +344,11 @@ public partial class End2EndTest
                 e => DatenText(e, "url") == fixture.StableDownloadUrl));
             new UpdateProgressDialogView(mainWindow).Close();
 
-            // Startmodus + Checkbox aus über die UI speichern: echter Neustart installiert
+            // Startmodus + Produktiv-Pfad über die UI speichern: echter Neustart installiert
             // Stable ohne Updateklick.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, prereleases: false);
+            fixture.SetzeStandardAntworten();
+            fixture.SpeichereSzenario();
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadProduktivLabel);
             basis = ProtokollBasis(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
@@ -332,14 +357,18 @@ public partial class End2EndTest
                 UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, "stable-marker");
             new UpdateProgressDialogView(mainWindow).Close();
 
-            // Startmodus + Checkbox ein: echter Neustart installiert RC ohne Updateklick.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, prereleases: true);
+            // Startmodus + Vorab-Pfad: echter Neustart installiert RC ohne Updateklick;
+            // die Konfliktwarnung erscheint erneut, blockiert die Installation aber nicht.
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadVorabLabel);
             basis = ProtokollBasis(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
             AssertiereInstallationsNachweis(fixture, basis,
                 UpdateE2EFixture.RcVersion, fixture.RcDownloadUrl, "rc-marker");
+            menu.WaitForUpdateHinweis(UpdateHinweisKanalKonfliktTeil, Medium);
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.StartupUpdateCompleted
+                && (DatenText(e, "hinweis") ?? string.Empty).Contains(UpdateHinweisKanalKonfliktTeil));
             new UpdateProgressDialogView(mainWindow).Close();
         }
         finally
@@ -351,7 +380,7 @@ public partial class End2EndTest
 
     /// <summary>
     /// E-04: Gespeicherte Änderungen invalidieren das zuvor angebotene Update sofort.
-    /// RC-Angebot -&gt; Checkbox aus + speichern: Angebot weg, Installieren nicht
+    /// RC-Angebot -&gt; Update-Pfad auf Produktivversionen + speichern: Angebot weg, Installieren nicht
     /// aktivierbar, kein neuer Request. Erneute Prüfung bietet Stable an; die Installation
     /// fordert nur das Stable-Asset an. Erneutes RC-Angebot -&gt; "Aus" speichern: Prüfen
     /// deaktiviert, Angebot verborgen, keine neuen Requests/Starts; gleiche DB neu gestartet
@@ -363,7 +392,7 @@ public partial class End2EndTest
     private async Task SavedChangesInvalidatePreviousOffer()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.NurPruefen, includePrereleases: true);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.NurPruefen, UpdatePfadKanalResolver.VorabversionenPfad);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -378,10 +407,10 @@ public partial class End2EndTest
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
             Assert.Equal(UpdateE2EFixture.RcVersion, menu.WaitForOfferedUpdateVersion(Medium));
 
-            // Checkbox aus + speichern: das alte RC-Angebot verschwindet sofort, ohne dass
+            // Update-Pfad auf Produktivversionen + speichern: das alte RC-Angebot verschwindet sofort, ohne dass
             // das Speichern selbst einen Update-Request auslöst.
             basis = ProtokollBasis(fixture);
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, prereleases: false);
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadProduktivLabel);
             WarteAufUiZustand(() => !menu.IsUpdateStartButtonVisible(),
                 "Updateangebot nach Speichern entfernt", Medium);
             Assert.Null(menu.GetOfferedUpdateVersion());
@@ -402,8 +431,8 @@ public partial class End2EndTest
                 UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, "stable-marker");
             new UpdateProgressDialogView(mainWindow).Close();
 
-            // Erneut RC anbieten (Checkbox wieder an).
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, prereleases: true);
+            // Erneut RC anbieten (Update-Pfad wieder auf Vorabversionen).
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadVorabLabel);
             basis = ProtokollBasis(fixture);
             menu.ClickUpdatePruefen();
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.UpdateAttemptCompleted, Long,
@@ -419,7 +448,7 @@ public partial class End2EndTest
                 filter: e => DatenText(e, "url") == UpdateE2EFixture.ReleaseApiUrl
                     && DatenText(e, "gate") == UpdateReleaseGate);
 
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusAusLabel, prereleases: true);
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusAusLabel, UpdatePfadVorabLabel);
             WarteAufUiZustand(() => !menu.IsUpdateStartButtonVisible(),
                 "Updateangebot nach Aus-Speichern entfernt", Medium);
             WarteAufUiZustand(() => !menu.IsUpdatePruefenButtonEnabled(),
@@ -477,7 +506,7 @@ public partial class End2EndTest
     private async Task Startup_NoUpdateOrUncheckableRemainsUsable()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, includePrereleases: false);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -490,7 +519,7 @@ public partial class End2EndTest
             mainWindow = WarteAufEchtesHauptfenster(app);
             var menu = new MenuView(mainWindow);
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, prereleases: false);
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadProduktivLabel);
 
             var versionsDatei = Path.Combine(fixture.InstalliertesVerzeichnis, "version.json");
 
@@ -606,7 +635,7 @@ public partial class End2EndTest
     private async Task Startup_SafetyCancelAndErrorsRemainUsable()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, includePrereleases: false);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -619,7 +648,7 @@ public partial class End2EndTest
             mainWindow = WarteAufEchtesHauptfenster(app);
             var menu = new MenuView(mainWindow);
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, prereleases: false);
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadProduktivLabel);
 
             // (a) Riskante CLI-Fixture: der echte Sicherheitsdialog wird mit Nein beantwortet.
             (mainWindow, menu) = await SafetyDialogAbgelehntPhaseAsync(fixture);
@@ -981,7 +1010,7 @@ public partial class End2EndTest
     private async Task Startup_IsOnceAndCommandsStayBlocked()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, includePrereleases: false);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -994,7 +1023,7 @@ public partial class End2EndTest
             mainWindow = WarteAufEchtesHauptfenster(app);
             var menu = new MenuView(mainWindow);
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, prereleases: false);
+            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadProduktivLabel);
 
             fixture.AktualisiereSzenario(s =>
             {
@@ -1132,19 +1161,19 @@ public partial class End2EndTest
     }
 
     /// <summary>
-    /// Setzt Update-Modus und Prerelease-Checkbox über die echte Settings-UI, speichert und
+    /// Setzt Update-Modus und Update-Pfad über die echte Settings-UI, speichert und
     /// navigiert zurück zum Dashboard.
     /// </summary>
     /// <param name="fixture">Die Update-Fixture.</param>
     /// <param name="menu">Das Navigationsmenü.</param>
     /// <param name="modusLabel">Das exakte Update-Modus-Label.</param>
-    /// <param name="prereleases">Der zu setzende Prerelease-Zustand.</param>
+    /// <param name="pfadLabel">Das zu setzende Update-Pfad-Label.</param>
     private async Task SpeichereUpdateEinstellungenUeberUiAsync(
-        UpdateE2EFixture fixture, MenuView menu, string modusLabel, bool prereleases)
+        UpdateE2EFixture fixture, MenuView menu, string modusLabel, string pfadLabel)
     {
         var settings = await OeffneSettingsGeladenAsync(fixture, menu);
         settings.SetUpdateMode(modusLabel);
-        settings.SetIncludePrereleases(prereleases);
+        settings.SetUpdatePfad(pfadLabel);
         settings.SaveSettings();
         WarteAufSpeichernAktiviert(settings);
         menu.NavigateToDashboard();
@@ -1155,15 +1184,20 @@ public partial class End2EndTest
     /// anschließend Angebot und CheckCompleted-Protokolleintrag für die erwartete Version.
     /// </summary>
     private async Task PruefeUpdateUeberUiAsync(
-        UpdateE2EFixture fixture, MenuView menu, int basis, string erwarteteVersion, bool isPrerelease)
+        UpdateE2EFixture fixture, MenuView menu, int basis, string erwarteteVersion,
+        bool isPrerelease, string erwarteterPfad)
     {
         WarteAufUiZustand(() => menu.IsUpdatePruefenButtonEnabled(), "Prüfen-Button aktiviert", Medium);
         menu.ClickUpdatePruefen();
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.UpdateAttemptCompleted, Long,
             filter: e => DatenText(e, "versuch") == "pruefen");
         Assert.Equal(erwarteteVersion, menu.WaitForOfferedUpdateVersion(Medium));
+        var erwarteterKanal = erwarteterPfad == UpdatePfadVorabLabel
+            ? nameof(UpdateKanal.ReleaseCandidate)
+            : nameof(UpdateKanal.Produktiv);
         Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckStarted
-            && DatenBool(e, "includePrereleases") == isPrerelease);
+            && DatenText(e, "updatePfad") == erwarteterPfad
+            && DatenText(e, "kanal") == erwarteterKanal);
         Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckCompleted
             && DatenText(e, "status") == "UpdateVerfuegbar"
             && DatenText(e, "version") == erwarteteVersion
@@ -1373,6 +1407,31 @@ public partial class End2EndTest
         BestEffort(() => fixture.SetzeGateZurueck(UpdateDownloadGate));
         BestEffort(() => fixture.SetzeGateZurueck(UpdateReleaseGate));
         BestEffort(() => fixture.SetzeGateZurueck(UpdateE2ETestKontext.LesefehlerGateName));
+    }
+
+    /// <summary>Erzeugt eine Release-Liste mit dem RC-Paket und einer semantisch höheren stabilen Version.</summary>
+    private static string ErzeugeRcUndHoeheresStableReleaseJson(UpdateE2EFixture fixture)
+    {
+        var releases = new object[]
+        {
+            new
+            {
+                tag_name = $"v{UpdateE2EFixture.RcVersion}",
+                prerelease = true,
+                draft = false,
+                published_at = DateTimeOffset.UtcNow,
+                assets = new[] { new { name = new UpdateOptions().AssetName, browser_download_url = fixture.RcDownloadUrl } }
+            },
+            new
+            {
+                tag_name = "v9.9.9",
+                prerelease = false,
+                draft = false,
+                published_at = DateTimeOffset.UtcNow,
+                assets = new[] { new { name = new UpdateOptions().AssetName, browser_download_url = "https://e2e.invalid/unused-stable.zip" } }
+            }
+        };
+        return JsonSerializer.Serialize(releases);
     }
 
     /// <summary>Erzeugt eine Release-Listen-JSON mit den angegebenen Stable-Versionen.</summary>

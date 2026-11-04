@@ -119,7 +119,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
         }
 
         var isPrerelease = release.Prerelease || parsed.IsPrerelease;
-        if (isPrerelease && !options.IncludePrereleases)
+        if (isPrerelease != (options.Kanal == UpdateKanal.ReleaseCandidate))
             return null;
 
         var asset = release.Assets.FirstOrDefault(a =>

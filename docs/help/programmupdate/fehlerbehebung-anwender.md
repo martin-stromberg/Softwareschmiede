@@ -17,12 +17,23 @@ Hinweise und Fehlermeldungen zum Programmupdate erscheinen als Hinweistext unter
 **Mögliche Ursachen:**
 
 1. Es wurde noch keine Prüfung durchgeführt oder kein Update gefunden — klicken Sie auf **⟳ Prüfen**.
-2. Das angebotene Update ist nur als Prerelease verfügbar — aktivieren Sie in den Einstellungen die Checkbox **„Prerelease-Versionen laden"**, speichern Sie und prüfen Sie erneut.
+2. Das verfügbare Update liegt in einem anderen Kanal — ist das neueste Release eine Vorabversion, wählen Sie in den Einstellungen den Update-Pfad **„Vorabversionen"**, speichern Sie und prüfen Sie erneut. Befindet sich die Installation auf „Vorabversionen", werden stabile Versionen nicht angeboten — auch nicht die Finalversion zu einem Release-Kandidaten.
 3. Die Update-Einstellungen wurden geändert — ein zuvor angezeigtes Angebot wird dabei zurückgenommen; prüfen Sie danach erneut.
 
 ## Hinweis „Kein Update verfügbar. Die installierte Version ist aktuell."
 
-Die Prüfung war erfolgreich — es gibt keine neuere passende Version. Wenn Sie eine Vorabversion erwarten, prüfen Sie, ob **„Prerelease-Versionen laden"** aktiviert und gespeichert ist.
+Die Prüfung war erfolgreich — es gibt keine neuere passende Version im gewählten Update-Kanal. Wenn Sie eine Vorabversion erwarten, prüfen Sie, ob der Update-Pfad auf **„Vorabversionen"** steht und gespeichert wurde; für stabile Folgeversionen aus einer Vorab-Installation gilt umgekehrt der Pfad **„Produktivversionen"**.
+
+## Hinweis „Der gewählte Update-Pfad passt nicht zur installierten Version. Das Update wird trotzdem angeboten."
+
+Der Kanal der installierten Version und der gewählte Update-Pfad passen nicht zusammen — z. B. eine Vorab-Installation (Version mit „-rc" im Tag) bei gewähltem Pfad „Produktivversionen" oder umgekehrt.
+
+**Ursache:** Produktiv- und Vorab-Installationen verwenden getrennte Datenbank-Speicherorte; der Update-Pfad sollte daher immer zum Kanal der Installation passen.
+
+**Lösung:** Der Hinweis blockiert das Update nicht — das Angebot bleibt bestehen. Prüfen Sie dennoch, ob der Update-Pfad absichtlich so gewählt wurde:
+
+1. Soll die Installation auf dem bisherigen Kanal bleiben, stellen Sie in den Einstellungen den zur Installation passenden Update-Pfad ein (Vorab-Installation → „Vorabversionen", Produktiv-Installation → „Produktivversionen") und speichern Sie.
+2. Soll bewusst der Kanal gewechselt werden, kann das Update trotz des Hinweises installiert werden — beachten Sie, dass die neue Version ihren Datenbank-Speicherort verwendet.
 
 ## Hinweis „GitHub-Release ist nicht prüfbar." oder „Update-Prüfung ist fehlgeschlagen."
 

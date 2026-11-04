@@ -21,7 +21,7 @@ public partial class End2EndTest
     private async Task Fixture_UsesIsolatedRealUpdatePipeline()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, includePrereleases: false);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.ProduktivversionenPfad);
 
         var app = LaunchApp(ensureDatabaseDeleted: false, fixture.ErzeugeStartUmgebung());
         try
@@ -86,10 +86,10 @@ public partial class End2EndTest
                 filter: e => DatenText(e, "status") == "NichtPruefbar");
             Assert.Equal(httpVorher, fixture.ZaehleEreignis(UpdateE2EEreignisse.HttpResponse));
 
-            // RC-Auswahl bei aktivierten Prereleases über echten, DB-erhaltenden Neustart.
+            // RC-Auswahl über den Vorabversionen-Update-Pfad nach echtem, DB-erhaltendem Neustart.
             fixture.SetzeStandardAntworten();
             fixture.SpeichereSzenario();
-            await fixture.AktualisiereUpdateEinstellungenAsync(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, includePrereleases: true);
+            await fixture.AktualisiereUpdateEinstellungenAsync(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad);
             mainWindow = RestartAppPreservingDatabase();
             await fixture.WarteAufEreignisAsync(UpdateE2EEreignisse.StartupUpdateCompleted, Long,
                 mindestens: 2);
@@ -121,7 +121,7 @@ public partial class End2EndTest
     private async Task Fixture_SettingsReadFailureTargetsPhaseAfterDatabaseInitialization()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.NurPruefen, includePrereleases: false);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad);
 
         // Der Lesefehler wird vor dem Start aktiviert; markierte Reads kommen frühestens nach
         // DatabaseInitializationCompleted im ersten Updateversuch vor (der erste getaggte Read

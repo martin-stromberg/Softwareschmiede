@@ -71,9 +71,9 @@ public partial class End2EndTest : WpfTestBase
     [SkippableFact]
     public async Task General_UpdateStartvarianten_E2E()
     {
-        await Settings_AllModesAndPrereleasesPersist();
+        await Settings_AllModesAndUpdatePfadPersist();
         await Startup_ModesDriveUpdatePipeline();
-        await PrereleaseCheckbox_SelectsMatchingAsset();
+        await UpdatePfad_SelectsExclusiveChannelAsset();
         await SavedChangesInvalidatePreviousOffer();
         await Startup_NoUpdateOrUncheckableRemainsUsable();
         await Startup_SafetyCancelAndErrorsRemainUsable();

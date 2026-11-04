@@ -498,19 +498,20 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
 
-        // Fehlende Werte -> Defaults (Nur prüfen / Prereleases aus)
+        // Fehlende Werte -> Defaults (Nur prüfen / Produktivversionen)
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(UpdateMode.NurPruefen));
-        sut.IncludePrereleases.Should().BeFalse();
+        sut.SelectedUpdatePfad.Should().Be(UpdatePfadOption.FuerPfad(UpdatePfadKanalResolver.ProduktivversionenPfad));
+        sut.AbgeleiteterUpdateKanal.Should().Be(UpdatePfadTexte.KanalProduktiv);
 
         // Unbekannte gespeicherte Werte -> Defaults
         await _einstellungService.SetSettingAsync(AppEinstellungService.UpdateModeKey, "unbekannt");
-        await _einstellungService.SetSettingAsync(AppEinstellungService.IncludePrereleasesKey, "kein-bool");
+        await _einstellungService.SetSettingAsync(AppEinstellungService.UpdatePfadKey, "kein-pfad");
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(UpdateMode.NurPruefen));
-        sut.IncludePrereleases.Should().BeFalse();
+        sut.SelectedUpdatePfad.Should().Be(UpdatePfadOption.FuerPfad(UpdatePfadKanalResolver.ProduktivversionenPfad));
 
         // Eine fehlende Auswahl (kein Eintrag aus UpdateModusOptionen) wird nicht gespeichert.
         UpdateSettings? published = null;
@@ -520,19 +521,27 @@ public sealed class SettingsViewModelTests : IDisposable
 
         published.Should().BeNull("eine fehlende Modus-Auswahl darf nicht gespeichert werden");
         sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+
+        // Auch eine fehlende Pfad-Auswahl wird nicht gespeichert.
+        sut.SelectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.NurPruefen);
+        sut.SelectedUpdatePfad = null;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        published.Should().BeNull("eine fehlende Pfad-Auswahl darf nicht gespeichert werden");
+        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
         (await _einstellungService.GetUpdateSettingsAsync())
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, false));
+            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
     }
 
-    /// <summary>Alle drei Update-Modi in Kombination mit beiden Checkbox-Zuständen werden gespeichert und nach erneutem Laden wiederhergestellt.</summary>
+    /// <summary>Alle drei Update-Modi in Kombination mit beiden Update-Pfaden werden gespeichert und nach erneutem Laden wiederhergestellt.</summary>
     [Theory]
-    [InlineData(UpdateMode.Aus, false)]
-    [InlineData(UpdateMode.Aus, true)]
-    [InlineData(UpdateMode.NurPruefen, false)]
-    [InlineData(UpdateMode.NurPruefen, true)]
-    [InlineData(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, false)]
-    [InlineData(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, true)]
-    public async Task UpdateSettings_SaveLoadAllValues(UpdateMode modus, bool includePrereleases)
+    [InlineData(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad)]
+    [InlineData(UpdateMode.Aus, UpdatePfadKanalResolver.VorabversionenPfad)]
+    [InlineData(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad)]
+    [InlineData(UpdateMode.NurPruefen, UpdatePfadKanalResolver.VorabversionenPfad)]
+    [InlineData(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.ProduktivversionenPfad)]
+    [InlineData(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad)]
+    public async Task UpdateSettings_SaveLoadAllValues(UpdateMode modus, string updatePfad)
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -543,18 +552,22 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.UpdateSettingsSaved += (_, s) => published = s;
 
         sut.SelectedUpdateMode = UpdateModusOption.FuerModus(modus);
-        sut.IncludePrereleases = includePrereleases;
+        sut.SelectedUpdatePfad = UpdatePfadOption.FuerPfad(updatePfad);
+        var erwarteterKanal = updatePfad == UpdatePfadKanalResolver.VorabversionenPfad
+            ? UpdatePfadTexte.KanalReleaseCandidate
+            : UpdatePfadTexte.KanalProduktiv;
+        sut.AbgeleiteterUpdateKanal.Should().Be(erwarteterKanal);
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        published.Should().Be(new UpdateSettings(modus, includePrereleases),
+        published.Should().Be(new UpdateSettings(modus, updatePfad),
             "das Event muss den tatsächlich gespeicherten Snapshot liefern");
 
         var gespeichert = await _einstellungService.GetUpdateSettingsAsync();
-        gespeichert.Should().Be(new UpdateSettings(modus, includePrereleases));
+        gespeichert.Should().Be(new UpdateSettings(modus, updatePfad));
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.IncludePrereleases.Should().Be(includePrereleases);
+        sut.SelectedUpdatePfad.Should().Be(UpdatePfadOption.FuerPfad(updatePfad));
         sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(modus));
     }
 
@@ -581,10 +594,10 @@ public sealed class SettingsViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         eventCount.Should().Be(1, "das Event muss trotz des späteren Fehlers ausgelöst worden sein");
-        published.Should().Be(new UpdateSettings(UpdateMode.Aus, false));
+        published.Should().Be(new UpdateSettings(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad));
         sut.FehlerMeldung.Should().NotBeNullOrEmpty();
         (await _einstellungService.GetUpdateSettingsAsync())
-            .Should().Be(new UpdateSettings(UpdateMode.Aus, false),
+            .Should().Be(new UpdateSettings(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad),
                 "die Update-Einstellungen müssen trotz späterem Fehler persistiert sein");
     }
 
@@ -602,14 +615,14 @@ public sealed class SettingsViewModelTests : IDisposable
 
         // Ungespeicherte Änderungen -> Verwerfen lädt neu, ohne zu publizieren
         sut.SelectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.Aus);
-        sut.IncludePrereleases = true;
+        sut.SelectedUpdatePfad = UpdatePfadOption.FuerPfad(UpdatePfadKanalResolver.VorabversionenPfad);
         await ((AsyncRelayCommand)sut.VerwerfenCommand).ExecuteAsync();
 
         eventCount.Should().Be(0, "Verwerfen darf kein UpdateSettingsSaved-Ereignis auslösen");
         sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(UpdateMode.NurPruefen));
-        sut.IncludePrereleases.Should().BeFalse();
+        sut.SelectedUpdatePfad.Should().Be(UpdatePfadOption.FuerPfad(UpdatePfadKanalResolver.ProduktivversionenPfad));
         (await _einstellungService.GetUpdateSettingsAsync())
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, false),
+            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad),
                 "Verwerfen darf keine Update-Werte schreiben");
     }
 

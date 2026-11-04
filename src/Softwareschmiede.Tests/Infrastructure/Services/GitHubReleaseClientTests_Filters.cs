@@ -12,11 +12,11 @@ namespace Softwareschmiede.Tests.Infrastructure.Services;
 /// <summary>Filter- und Klassifikationstests für <see cref="GitHubReleaseClient"/>.</summary>
 public sealed class GitHubReleaseClientTests_Filters
 {
-    /// <summary>Bei deaktivierten Prereleases gewinnt die höchste stabile Version, bei aktivierten der Prerelease-Kandidat.</summary>
+    /// <summary>Der Kanal filtert exklusiv: Der Produktiv-Kanal überspringt Prereleases (auch höhere), der RC-Kanal überspringt Stabile (auch höhere).</summary>
     [Theory]
-    [InlineData(false, "1.2.1", false)]
-    [InlineData(true, "1.3.0-rc.1", true)]
-    public async Task GetLatestReleaseAsync_FiltersByOptions(bool includePrereleases, string expectedVersion, bool expectedIsPrerelease)
+    [InlineData(UpdatePfadKanalResolver.ProduktivversionenPfad, "1.4.0", false)]
+    [InlineData(UpdatePfadKanalResolver.VorabversionenPfad, "1.3.0-rc.1", true)]
+    public async Task GetLatestReleaseAsync_FiltersExclusivelyByChannel(string updatePfad, string expectedVersion, bool expectedIsPrerelease)
     {
         var httpClient = new HttpClient(new StaticHttpHandler(HttpStatusCode.OK, """
 [
@@ -35,12 +35,20 @@ public sealed class GitHubReleaseClientTests_Filters
     "assets": [
       { "name": "release.zip", "browser_download_url": "https://example.invalid/release-1.3.0-rc.1.zip" }
     ]
+  },
+  {
+    "tag_name": "v1.4.0",
+    "prerelease": false,
+    "draft": false,
+    "assets": [
+      { "name": "release.zip", "browser_download_url": "https://example.invalid/release-1.4.0.zip" }
+    ]
   }
 ]
 """));
         var sut = CreateSut(httpClient);
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(includePrereleases));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(updatePfad));
 
         result.Erfolg.Should().BeTrue();
         result.Release.Should().NotBeNull();
@@ -50,9 +58,9 @@ public sealed class GitHubReleaseClientTests_Filters
 
     /// <summary>Das GitHub-Flag prerelease klassifiziert auch einen stabilen Tag als Prerelease.</summary>
     [Theory]
-    [InlineData(false, "1.2.1", false)]
-    [InlineData(true, "1.3.0", true)]
-    public async Task GetLatestReleaseAsync_FiltersGitHubPrereleaseFlag(bool includePrereleases, string expectedVersion, bool expectedIsPrerelease)
+    [InlineData(UpdatePfadKanalResolver.ProduktivversionenPfad, "1.2.1", false)]
+    [InlineData(UpdatePfadKanalResolver.VorabversionenPfad, "1.3.0", true)]
+    public async Task GetLatestReleaseAsync_FiltersGitHubPrereleaseFlag(string updatePfad, string expectedVersion, bool expectedIsPrerelease)
     {
         var httpClient = new HttpClient(new StaticHttpHandler(HttpStatusCode.OK, """
 [
@@ -76,7 +84,7 @@ public sealed class GitHubReleaseClientTests_Filters
 """));
         var sut = CreateSut(httpClient);
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(includePrereleases));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(updatePfad));
 
         result.Erfolg.Should().BeTrue();
         result.Release.Should().NotBeNull();
@@ -86,9 +94,9 @@ public sealed class GitHubReleaseClientTests_Filters
 
     /// <summary>Das SemVer-Prerelease-Suffix klassifiziert auch ein Release ohne GitHub-Flag als Prerelease.</summary>
     [Theory]
-    [InlineData(false, "1.2.1", false)]
-    [InlineData(true, "1.3.0-rc.1", true)]
-    public async Task GetLatestReleaseAsync_FiltersSemVerPrereleaseSuffix(bool includePrereleases, string expectedVersion, bool expectedIsPrerelease)
+    [InlineData(UpdatePfadKanalResolver.ProduktivversionenPfad, "1.2.1", false)]
+    [InlineData(UpdatePfadKanalResolver.VorabversionenPfad, "1.3.0-rc.1", true)]
+    public async Task GetLatestReleaseAsync_FiltersSemVerPrereleaseSuffix(string updatePfad, string expectedVersion, bool expectedIsPrerelease)
     {
         var httpClient = new HttpClient(new StaticHttpHandler(HttpStatusCode.OK, """
 [
@@ -112,7 +120,7 @@ public sealed class GitHubReleaseClientTests_Filters
 """));
         var sut = CreateSut(httpClient);
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(includePrereleases));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(updatePfad));
 
         result.Erfolg.Should().BeTrue();
         result.Release.Should().NotBeNull();
@@ -184,7 +192,7 @@ public sealed class GitHubReleaseClientTests_Filters
 """));
         var sut = CreateSut(httpClient);
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
 
         result.Erfolg.Should().BeTrue();
         result.Release.Should().NotBeNull();
@@ -211,7 +219,7 @@ public sealed class GitHubReleaseClientTests_Filters
 """));
         var sut = CreateSut(httpClient);
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
 
         result.Erfolg.Should().BeTrue();
         result.Release.Should().NotBeNull();

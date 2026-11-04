@@ -52,7 +52,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
     [InlineData(UpdateEinstieg.ManuellInstallieren)]
     public async Task UpdateSettingsReadFailure_InitialStopsBeforeReleaseRequest(UpdateEinstieg einstieg)
     {
-        await SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, false));
+        await SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
         _updateServiceMock
             .Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(NeuesUpdate));
@@ -112,7 +112,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         // Wiederherstellung: Fehler deaktivieren, Einstellungen über die UI neu laden und speichern
         _interceptor.DeactivateFailure();
         await SpeichereUpdateEinstellungenUeberUiAsync(
-            sut, UpdateModusOption.FuerModus(UpdateMode.BeiProgrammstartPruefenUndAusfuehren), true);
+            sut, UpdateModusOption.FuerModus(UpdateMode.BeiProgrammstartPruefenUndAusfuehren), UpdatePfadKanalResolver.VorabversionenPfad);
 
         sut.UpdatePruefenCommand.CanExecute(null).Should().BeTrue(
             "nach erfolgreichem Speichern muss die Prüfung wieder verfügbar sein");
@@ -120,8 +120,8 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
 
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(
-                It.Is<UpdateCheckOptions>(o => o.IncludePrereleases), It.IsAny<CancellationToken>()),
-            Times.Once, "die Folgeprüfung muss die aktuelle Checkbox-Einstellung übergeben");
+                It.Is<UpdateCheckOptions>(o => o.UpdatePfad == UpdatePfadKanalResolver.VorabversionenPfad), It.IsAny<CancellationToken>()),
+            Times.Once, "die Folgeprüfung muss die aktuelle Update-Pfad-Einstellung übergeben");
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),
             Times.Exactly(erwartetePruefungen + 1));
@@ -143,7 +143,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
     public async Task UpdateSettingsReadFailure_BeforePreparationStopsInstall(bool automatisch)
     {
         await SetUpdateSettingsAsync(new UpdateSettings(
-            automatisch ? UpdateMode.BeiProgrammstartPruefenUndAusfuehren : UpdateMode.NurPruefen, false));
+            automatisch ? UpdateMode.BeiProgrammstartPruefenUndAusfuehren : UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
         var aktivierenBeiAufruf = automatisch ? 1 : 2;
         var checkCalls = 0;
         _updateServiceMock
@@ -188,7 +188,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         // Wiederherstellung über die Settings-UI: Neue Prüfung findet das Update erneut.
         var checksVorWiederherstellung = checkCalls;
         _interceptor.DeactivateFailure();
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.NurPruefen), false);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.NurPruefen), UpdatePfadKanalResolver.ProduktivversionenPfad);
         await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
 
         _updateServiceMock.Verify(
@@ -210,7 +210,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
     public async Task UpdateSettingsReadFailure_BeforeUpdaterStartStopsInstall(bool automatisch)
     {
         await SetUpdateSettingsAsync(new UpdateSettings(
-            automatisch ? UpdateMode.BeiProgrammstartPruefenUndAusfuehren : UpdateMode.NurPruefen, false));
+            automatisch ? UpdateMode.BeiProgrammstartPruefenUndAusfuehren : UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
         _updateServiceMock
             .Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(NeuesUpdate));
@@ -253,7 +253,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
 
         // Wiederherstellung über die Settings-UI: Neue Prüfung findet das Update erneut.
         _interceptor.DeactivateFailure();
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.NurPruefen), false);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.NurPruefen), UpdatePfadKanalResolver.ProduktivversionenPfad);
         await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
 
         sut.UpdateVerfuegbar.Should().BeTrue();

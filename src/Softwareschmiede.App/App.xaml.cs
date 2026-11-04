@@ -228,7 +228,8 @@ public sealed partial class App : System.Windows.Application
                 RepositoryStartskriptService: sp.GetRequiredService<RepositoryStartskriptService>(),
                 RepositoryInitialisierungService: sp.GetRequiredService<RepositoryInitialisierungService>(),
                 KiAusfuehrungsService: sp.GetRequiredService<KiAusfuehrungsService>(),
-                GitOrchestrationService: sp.GetRequiredService<GitOrchestrationService>()),
+                GitOrchestrationService: sp.GetRequiredService<GitOrchestrationService>(),
+                PromptZeitVersandService: sp.GetRequiredService<PromptZeitVersandService>()),
             sp.GetRequiredService<ILogger<EntwicklungsprozessService>>()));
         services.AddScoped<BenachrichtigungsService>();
         services.AddScoped<BenachrichtigungsEinstellungenService>();

@@ -4,7 +4,7 @@
 
 Der Entwicklungsprozess wird durch `EntwicklungsprozessService.ProzessStartenAsync` eingeleitet. Das CLI des KI-Tools wird als nativer Prozess gestartet und via Win32 `SetParent` in die WPF-Aufgabendetailansicht eingebettet. `KiAusfuehrungsService` verwaltet den Prozess-Lifecycle als Singleton.
 
-Der fachliche Aufgabenstatus (`Aufgabe.Status`) und der persistente Lebenszyklus der KI-Ausführung (`Aufgabe.AusfuehrungsStatus`) sind getrennt. Ein gestoppter oder natürlich beendeter CLI-Prozess setzt die KI-Ausführung auf `Beendet`, lässt die Aufgabe aber im Gesamtstatus `Gestartet` oder `Wartend`. Erst `EntwicklungsprozessService.AbschliessenAsync` beendet die Aufgabe fachlich und bereinigt den lokalen Klon.
+Der fachliche Aufgabenstatus (`Aufgabe.Status`) und der persistente Lebenszyklus der KI-Ausführung (`Aufgabe.AusfuehrungsStatus`) sind getrennt. Ein gestoppter oder natürlich beendeter CLI-Prozess setzt die KI-Ausführung auf `Beendet`, lässt die Aufgabe aber im Gesamtstatus `Gestartet` oder `Wartend`. Erst `EntwicklungsprozessService.AbschliessenAsync` beendet die Aufgabe fachlich und bereinigt den lokalen Klon — als einziger produktiver Einstieg des Geschäftsvorgangs unter der `ScmTaskCoordinator`-Aufgabensperre (CLI-Stopp → Prompt-Abbruch → To-do-Prüfung → Klon-Löschung → Status `Beendet` → Protokoll).
 
 Die Seitenleisten-Anzeige aktiver Aufgaben wird durch `MainWindowViewModel.AktiveAufgabenAktualisierenAsync()` verwaltet, die `AufgabeService.GetAktiveAufgabenAsync()` aufruft und die `AktiveAufgabenListe` ObservableCollection befüllt. Das Dashboard zeigt dieselbe Liste über `DashboardViewModel.AktiveAufgabenListe` an.
 
@@ -425,7 +425,7 @@ Ausgelöst durch mehrere Ereignisse: Wechsel der Aufgabendetailansicht, Dispose 
 Beteiligte Komponenten:
 - `PromptZeitVersandService.CancelScheduledPrompt` — Storniert einen geplanten Prompt
 - `TaskDetailViewModel.Dispose` — ruft `CancelScheduledPrompt` auf
-- `TaskDetailViewModel.AufgabeAbschliessenAsync` — ruft `CancelScheduledPrompt` vor Abschluss auf
+- `EntwicklungsprozessService.AbschliessenAsync` — ruft `CancelScheduledPrompt` als Schritt des einheitlichen Abschluss-Passes auf (gilt für UI- und Monitoring-Abschluss gleichermaßen)
 - `TaskDetailViewModel.LadenAsync` — ruft `CancelScheduledPrompt` beim Wechsel der AufgabeId auf
 
 Ablauf beim Stornieren:
@@ -515,7 +515,7 @@ Ablauf:
 
 ### 7. Aufgabe abschließen (`AbschliessenAsync`)
 
-- `EntwicklungsprozessService.AbschliessenAsync` — Setzt Status auf `Beendet`, löscht optional Klonverzeichnis
+- `EntwicklungsprozessService.AbschliessenAsync` — einziger produktiver Einstieg des Geschäftsvorgangs; fährt unter der `ScmTaskCoordinator`-Aufgabensperre die vollständige Sequenz: `KiAusfuehrungsService.StopCliAsync` → `PromptZeitVersandService.CancelScheduledPrompt` → Offene-To-do-Prüfung → Klonverzeichnis löschen → Status auf `Beendet` setzen → Statusübergang protokollieren. Alle Aufrufer (UI über `AufgabeAbschliessenCommand`, `ScmTaskCompletionMonitoringService`) nutzen denselben Pass.
 
 ### 7.1. Issue anlegen und der Aufgabe zuordnen
 
@@ -1054,7 +1054,7 @@ Beteiligte Komponenten:
 - `TaskDetailViewModel.AufgabeAbschliessenCommand` — RelayCommand
 - `TaskDetailViewModel.AufgabeAbschliessenAsync()` — Orchestriert Validierung und Service-Aufruf
 - `AufgabeService.CanCompleteTaskAsync()` — Prüft, ob offene To-Dos vorhanden sind
-- `EntwicklungsprozessService.AbschliessenAsync()` — Setzt Status auf `Beendet`
+- `EntwicklungsprozessService.AbschliessenAsync()` — Einheitlicher Abschluss-Pass unter der `ScmTaskCoordinator`-Aufgabensperre (CLI-Stopp → Prompt-Abbruch → To-do-Prüfung → Klon-Löschung → Status `Beendet` → Protokoll)
 
 Ablauf:
 1. Benutzer klickt „Beenden" Button im Ribbon
