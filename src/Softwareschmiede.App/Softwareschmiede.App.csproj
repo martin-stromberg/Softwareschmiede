@@ -21,6 +21,13 @@
     <WarningsAsErrors>CS1591</WarningsAsErrors>
     <ApplicationIcon Condition="'$(ReleaseTag)' == '' or !$(ReleaseTag.ToLower().Contains('-rc'))">images\Softwareschmiede.ico</ApplicationIcon>
     <ApplicationIcon Condition="'$(ReleaseTag)' != '' and $(ReleaseTag.ToLower().Contains('-rc'))">images\Softwareschmiede-RC.ico</ApplicationIcon>
+    <!-- Release-Identität: Die Release-Action benennt den Apphost in Softwareschmiede.exe um;
+         diese Versionsmetadaten lassen den angezeigten Prozess-/Anwendungsnamen (FileDescription
+         u. a.) mit dem Auslieferungsnamen übereinstimmen. Ohne ReleaseTag bleibt der Dev-Build
+         bei den AssemblyName-Defaults (Softwareschmiede.App). -->
+    <AssemblyTitle Condition="'$(ReleaseTag)' != ''">Softwareschmiede</AssemblyTitle>
+    <Product Condition="'$(ReleaseTag)' != ''">Softwareschmiede</Product>
+    <Company Condition="'$(ReleaseTag)' != ''">Softwareschmiede</Company>
   </PropertyGroup>
 
   <ItemGroup>

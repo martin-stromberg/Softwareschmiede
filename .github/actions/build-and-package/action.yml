@@ -48,6 +48,9 @@ runs:
       # logic) could accidentally hit the release/host instance instead of an orphaned test
       # instance. The rename deliberately happens here in the publish step, not via
       # <AssemblyName> in the csproj, so the local dev build stays unaffected.
+      # The process/display name (FileDescription etc.) is aligned by the csproj's
+      # ReleaseTag-conditional AssemblyTitle/Product/Company properties, so the renamed
+      # exe consistently shows up as "Softwareschmiede" instead of "Softwareschmiede.App".
       run: Rename-Item -Path 'publish/Softwareschmiede.App.exe' -NewName 'Softwareschmiede.exe'
       shell: pwsh
 
