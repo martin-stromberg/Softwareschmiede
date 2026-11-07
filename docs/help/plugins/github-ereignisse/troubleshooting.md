@@ -22,7 +22,7 @@
 
 ## Der Wartegrund nennt eine nicht unterstützte CLI-Version
 
-**Ursache:** Die gestartete CLI wurde erkannt, aber ihre Version liegt außerhalb des unterstützten Bereichs — etwa nach einem automatischen Update der CLI. Unterstützt sind derzeit Codex `v0.114.x`, Claude Code `v2.1.x` und Devin CLI `v3000.11.x` (jeweils gleiches Major.Minor, beliebiger Patch). Der Wartegrund benennt die CLI und die tatsächlich erkannte Version.
+**Ursache:** Die gestartete CLI wurde erkannt, aber ihre Version liegt außerhalb des unterstützten Bereichs — etwa nach einem automatischen Update der CLI. Unterstützt sind derzeit Codex `v0.114.x` und Claude Code `v2.1.x` (jeweils gleiches Major.Minor, beliebiger Patch) sowie Devin CLI `v3000.x` (gleiches Major, beliebige Minor- und Patch-Version). Der Wartegrund benennt die CLI und die tatsächlich erkannte Version.
 
 **Lösung:** Du kannst die angezeigte CLI-Sitzung ausdrücklich bestätigen (**Eingabebereitschaft bestätigen**) — die tatsächliche Dateitool-Probe des Antwortkanals bleibt dabei die Sicherheitsgrenze und muss weiterhin gelingen. Alternativ die CLI der Aufgabe regulär neu starten, sobald wieder eine unterstützte Version installiert ist; die Prüfung läuft dann automatisch erneut.
 

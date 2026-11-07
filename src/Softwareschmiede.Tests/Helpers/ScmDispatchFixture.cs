@@ -25,7 +25,7 @@ internal sealed record ScmKiProfile(string Prefix, string Arguments, string Bann
         "SCM_SIMULATOR_PROTOCOL_V1", "SCM_READY_V1",
         new Dictionary<string, string?> { ["SOFTWARESCHMIEDE_SCM_SIMULATOR"] = "1" });
 
-    /// <summary>Devin-Startvertrag und Promptformat; das Banner ist auf den unterstützten Bereich v3000.11.x voreingestellt.</summary>
+    /// <summary>Devin-Startvertrag und Promptformat; das Banner ist auf den unterstützten Bereich v3000.x voreingestellt.</summary>
     internal static ScmKiProfile Devin(string arguments = "--permission-mode accept-edits --respect-workspace-trust false",
         Func<string, Task>? onWritePrompt = null, string banner = "Devin CLI\nv3000.11.92") => new("Softwareschmiede.Devin", arguments,
         banner, "❭", new Dictionary<string, string?>(), onWritePrompt);

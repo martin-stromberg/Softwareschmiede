@@ -5,7 +5,8 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Range boundaries, token strictness and catalog honesty of the prompt-format profiles.</summary>
 public sealed class ScmCliPromptProfileTests
 {
-    /// <summary>Same Major.Minor with any patch is supported; other Minor/Major releases are not.</summary>
+    /// <summary>Codex and Claude support the same Major.Minor with any patch; Devin tolerates
+    /// any Minor and Patch within Major 3000. Other Major releases are not supported.</summary>
     [Theory]
     [InlineData("Softwareschmiede.Codex", "OpenAI Codex (v0.114.0)", true)]
     [InlineData("Softwareschmiede.Codex", "OpenAI Codex (v0.114.7)", true)]
@@ -16,7 +17,9 @@ public sealed class ScmCliPromptProfileTests
     [InlineData("Softwareschmiede.ClaudeCli", "Claude Code v2.2.0", false)]
     [InlineData("Softwareschmiede.Devin", "Devin CLI\nv3000.11.0", true)]
     [InlineData("Softwareschmiede.Devin", "Devin CLI\nv3000.11.205", true)]
-    [InlineData("Softwareschmiede.Devin", "Devin CLI\nv3000.12.0", false)]
+    [InlineData("Softwareschmiede.Devin", "Devin CLI\nv3000.12.0", true)]
+    [InlineData("Softwareschmiede.Devin", "Devin CLI\nv3000.12.7", true)]
+    [InlineData("Softwareschmiede.Devin", "Devin CLI\nv3001.0.0", false)]
     [InlineData("Softwareschmiede.Devin", "Devin CLI\nv2999.9.9", false)]
     public void TryMatch_ClassifiesRangeBoundaries(string prefix, string text, bool supported)
     {
@@ -77,7 +80,7 @@ public sealed class ScmCliPromptProfileTests
     /// <summary>Only reasons carrying the shared confirmation suffix offer the confirm action.</summary>
     [Theory]
     [InlineData("Eingabebereitschaft unbekannt. Für die angezeigte CLI-Sitzung bestätigen.", true)]
-    [InlineData("Devin CLI v3000.12.0 wird nicht unterstützt; unterstützt ist v3000.11.x. Für die angezeigte CLI-Sitzung bestätigen.", true)]
+    [InlineData("Devin CLI v3001.0.0 wird nicht unterstützt; unterstützt ist v3000.x. Für die angezeigte CLI-Sitzung bestätigen.", true)]
     [InlineData("Das Promptformat der gestarteten CLI ist unbekannt; Eingabebereitschaft und Antwortkanal können nicht geprüft werden.", false)]
     [InlineData("Eingabebereitschaft unbekannt.", false)]
     [InlineData(null, false)]
@@ -88,10 +91,10 @@ public sealed class ScmCliPromptProfileTests
     [Fact]
     public void Describe_UnsupportedVersion_NamesCliVersionAndRange()
     {
-        var reason = ScmCliWaitReason.Describe(new(ScmCliRecognitionState.Unsupported, "Devin CLI", new Version(3000, 12, 0), "v3000.11.x"));
+        var reason = ScmCliWaitReason.Describe(new(ScmCliRecognitionState.Unsupported, "Devin CLI", new Version(3001, 0, 0), "v3000.x"));
         Assert.Contains("Devin CLI", reason);
-        Assert.Contains("v3000.12.0", reason);
-        Assert.Contains("v3000.11.x", reason);
+        Assert.Contains("v3001.0.0", reason);
+        Assert.Contains("v3000.x", reason);
         Assert.True(ScmCliWaitReason.IsConfirmable(reason));
     }
 
