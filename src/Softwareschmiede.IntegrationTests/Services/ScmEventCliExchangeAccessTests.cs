@@ -54,6 +54,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.1.15", "❯")]
     [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3000.11.92", "❭")]
     [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3000.11.205", "❭")]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3000.12.7", "❭")]
     public async Task ActualStartSpec_AllowsWorkspaceChannelWithoutAddingBypass(string provider, string arguments, string banner, string prompt)
     {
         var (prefix, spec) = await Spec(provider, arguments);
@@ -84,7 +85,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
     [Theory]
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.115.0)", "›", "v0.115.0")]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.2.0", "❯", "v2.2.0")]
-    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3000.12.0", "❭", "v3000.12.0")]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3001.0.0", "❭", "v3001.0.0")]
     [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv2999.9.9", "❭", "v2999.9.9")]
     public async Task UnsupportedVersion_ReportsHonestReason(string provider, string arguments, string banner, string prompt, string version)
     {
@@ -124,7 +125,8 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.114.0)", "OpenAI Codex", "›", ScmCliRecognitionState.Supported)]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.1.0", "Claude Code", "❯", ScmCliRecognitionState.Supported)]
     [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3000.11.92", "Devin CLI", "❭", ScmCliRecognitionState.Supported)]
-    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3000.12.7", "Devin CLI", "❭", ScmCliRecognitionState.Unsupported)]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3000.12.7", "Devin CLI", "❭", ScmCliRecognitionState.Supported)]
+    [InlineData("Devin", "--permission-mode accept-edits --respect-workspace-trust false", "Devin CLI\nv3001.0.0", "Devin CLI", "❭", ScmCliRecognitionState.Unsupported)]
     public async Task TokenlessAnchorReprint_KeepsClassifiedRecognition(string provider, string arguments,
         string banner, string reprintedAnchor, string prompt, ScmCliRecognitionState expected)
     {

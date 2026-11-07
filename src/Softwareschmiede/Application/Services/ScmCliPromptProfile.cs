@@ -53,7 +53,7 @@ public sealed record ScmCliPromptProfile(string PluginPrefix, string BannerAncho
         // im Rohtranskript stehen zusätzlich ANSI-Farb-/Löschsequenzen um die Version.
         new("Softwareschmiede.Devin", "Devin CLI",
             new Regex(@"Devin CLI(?:[\s⠀-⣿]|\x1b\[[0-9;?]*[A-Za-z])+v(?<version>\d+\.\d+\.\d+)(?=[\s⠀-⣿\x1b]|$)", RegexOptions.CultureInvariant),
-            [new ScmCliVersionRange(new Version(3000, 11, 0), new Version(3000, 12, 0))], "Devin CLI", "v3000.11.x"),
+            [new ScmCliVersionRange(new Version(3000, 0, 0), new Version(3001, 0, 0))], "Devin CLI", "v3000.x"),
         new("Softwareschmiede.KiSimulator", "SCM_SIMULATOR_PROTOCOL_V1", null, [], "KI-Simulator", null),
     }.ToDictionary(profile => profile.PluginPrefix, StringComparer.Ordinal);
 

@@ -229,7 +229,7 @@ public sealed class ScmEventOrchestratorTests
     {
         var prompts = new List<string>();
         var fixture = default(ScmDispatchFixture);
-        fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3000.12.7",
+        fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3001.0.0",
             onWritePrompt: async prompt =>
             {
                 if (prompt.Contains("challengePath", StringComparison.Ordinal)) await ScmDispatchFixture.CompleteProbeAsync(prompt);
@@ -244,7 +244,7 @@ public sealed class ScmEventOrchestratorTests
             var waiting = await fixture.EventAsync(eventId);
             Assert.Equal("Wartend", waiting.Status);
             Assert.Contains("Devin CLI", waiting.Reason);
-            Assert.Contains("v3000.12.7", waiting.Reason);
+            Assert.Contains("v3001.0.0", waiting.Reason);
             Assert.Contains("nicht unterstützt", waiting.Reason);
             var adapter = fixture.Services.GetRequiredService<KiAusfuehrungsService>().GetScmPromptSession(taskId)!;
             Assert.Equal(ScmCliRecognitionState.Unsupported, adapter.CliRecognition.State);
