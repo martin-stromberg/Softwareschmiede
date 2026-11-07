@@ -54,13 +54,13 @@ public sealed class ScmEventDispatchTests_Devin
         }
     }
 
-    /// <summary>A Devin patch release inside the supported range delivers like the pinned version.</summary>
+    /// <summary>A newer Devin minor inside the supported major delivers like the pinned version.</summary>
     [Fact]
-    public async Task DevinTask_WithSupportedPatchVersion_DeliversEvent()
+    public async Task DevinTask_WithNewerMinorVersion_DeliversEvent()
     {
         var prompts = new List<string>();
         var fixture = default(ScmDispatchFixture);
-        fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3000.11.205", onWritePrompt: async prompt =>
+        fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3000.12.7", onWritePrompt: async prompt =>
         {
             if (prompt.Contains("challengePath", StringComparison.Ordinal)) await ScmDispatchFixture.CompleteProbeAsync(prompt);
             else prompts.Add(prompt);
@@ -93,7 +93,7 @@ public sealed class ScmEventDispatchTests_Devin
     [Fact]
     public async Task DevinTask_WithUnsupportedVersion_WaitsWithHonestReason()
     {
-        await using var fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3000.12.7"));
+        await using var fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3001.0.0"));
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync(configured: true);
 
@@ -101,7 +101,7 @@ public sealed class ScmEventDispatchTests_Devin
 
         var item = await fixture.EventAsync(eventId);
         item.Status.Should().Be("Wartend");
-        item.Reason.Should().Contain("Devin CLI").And.Contain("v3000.12.7").And.Contain("nicht unterstützt");
+        item.Reason.Should().Contain("Devin CLI").And.Contain("v3001.0.0").And.Contain("nicht unterstützt");
         fixture.Prompts.Should().BeEmpty();
     }
 
