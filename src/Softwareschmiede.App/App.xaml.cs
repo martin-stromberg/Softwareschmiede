@@ -99,6 +99,18 @@ public sealed partial class App : System.Windows.Application
             await promptVorlagenService.EnsureInitialPromptVorlagenAsync();
         }
 
+        // Re-Arm persistierter zeitgesteuerter Prompts bewusst NACH MigrateAsync: Bei einem Update,
+        // das die Tabelle neu erzeugt, darf der Zugriff nicht vor der Migration erfolgen.
+        try
+        {
+            var promptZeitVersandService = _host.Services.GetRequiredService<PromptZeitVersandService>();
+            await promptZeitVersandService.RestoreScheduledPromptsAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Error(ex, "Persistierte zeitgesteuerte Prompts konnten nicht wiederhergestellt werden. Die Anwendung läuft ohne deren Wiederherstellung weiter.");
+        }
+
         _host.Services.GetRequiredService<ScmEventStartupGate>().Ready();
 
         _host.Services.GetService<UpdateE2ETestKontext>()
@@ -242,6 +254,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<PluginSelectionService>();
         services.AddScoped<AufgabeRecoveryService>();
         services.AddScoped<PromptVorlagenService>();
+        services.AddScoped<ZeitgesteuerterPromptStore>();
         services.AddSingleton<AufgabeLaufdatenChangedNotifier>();
         services.AddSingleton<PromptVorlagenPlatzhalterService>();
         services.AddScoped<IGitWorkspaceBrowserService, GitWorkspaceBrowserService>();

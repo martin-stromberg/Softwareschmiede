@@ -1193,6 +1193,36 @@ namespace Softwareschmiede.Migrations
                     b.ToTable("Todos");
                 });
 
+            modelBuilder.Entity("Softwareschmiede.Domain.Entities.ZeitgesteuerterPrompt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("AktualisiertAmUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("AufgabeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ErstelltAmUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PromptText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ZielZeitpunktUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AufgabeId")
+                        .IsUnique();
+
+                    b.ToTable("ZeitgesteuertePrompts");
+                });
+
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.AlertReferenz", b =>
                 {
                     b.HasOne("Softwareschmiede.Domain.Entities.Aufgabe", "Aufgabe")
@@ -1377,6 +1407,15 @@ namespace Softwareschmiede.Migrations
                         .IsRequired();
 
                     b.Navigation("Aufgabe");
+                });
+
+            modelBuilder.Entity("Softwareschmiede.Domain.Entities.ZeitgesteuerterPrompt", b =>
+                {
+                    b.HasOne("Softwareschmiede.Domain.Entities.Aufgabe", null)
+                        .WithMany()
+                        .HasForeignKey("AufgabeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.Aufgabe", b =>

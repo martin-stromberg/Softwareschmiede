@@ -160,11 +160,13 @@ Statt einen Prompt sofort zu versenden, kannst du ihn auch für eine später Uhr
 2. Gib die Zielzeit ein, zu der der Prompt versendet werden soll (z.B. 16 und 30 für 16:30 Uhr).
 3. Wähle eine Promptvorlage aus dem Dropdown **Promptvorlage**.
 4. Klicke auf **Zeitgesteuert senden** (⏰-Button).
-5. Der Status „Prompt in Wartestellung" mit der Zielzeit (z.B. „16:30") wird angezeigt.
+5. Der Status „Prompt in Wartestellung" mit der Zielzeit (z.B. „16:30") wird angezeigt — darunter steht der Button **Wartestellung aufheben**, mit dem du den Plan jederzeit abbrechen kannst.
 6. Die Eingabefelder werden geleert, die Vorlagenauswahl wird zurückgesetzt.
 7. Bei Erreichen der Zielzeit wird der Prompt automatisch an die CLI versendet; die Status-Anzeige verschwindet.
 
-> **Hinweis:** Die eingegebene Uhrzeit wird als lokale Zeit deines Computers interpretiert. Liegt die Zielzeit in der Vergangenheit, wird der Prompt sofort versendet. Falls die CLI bis zur Zielzeit beendet wird, kann der Prompt nicht mehr versendet werden — es gibt aber keinen visuellen Fehler.
+> **Hinweis:** Die eingegebene Uhrzeit wird als lokale Zeit deines Computers am heutigen Tag interpretiert. Liegt die Zielzeit in der Vergangenheit, wird der Prompt sofort versendet.
+>
+> Der Plan bleibt gespeichert, auch wenn du die Detailansicht verlässt, die CLI stoppst oder die Anwendung neu startest — er wird dir beim nächsten Öffnen der Aufgabe wieder angezeigt. Läuft die CLI zum Zielzeitpunkt nicht, steht in der Statusanzeige „Prompt wartet auf CLI-Start"; der Prompt wird zugestellt, sobald die CLI der Aufgabe das nächste Mal startet (die CLI wird dafür nicht automatisch gestartet). Diese Zustellung findest du danach als Systemmeldung im Aufgabenprotokoll.
 >
 > Wenn du einen neuen Prompt zur gleichen oder anderen Uhrzeit planst, wird der vorherige Plan ersetzt.
 

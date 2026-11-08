@@ -8,7 +8,8 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 
 - `AufgabeService` — Persistente Datenbankoperationen für Aufgaben, einschließlich `SetPauseAsync`
 - `KiPluginLimitService` — Persistenz und Anwendung von KI-Plugin-Session-Limits
-- `PromptZeitVersandService` — Laufzeit-Verwaltung zeitgesteuerter Prompts (inkl. Pausen-Verschiebung)
+- `PromptZeitVersandService` — Laufzeit-Verwaltung zeitgesteuerter Prompts (inkl. Persistenz, Pausen-Verschiebung und Nachzustellung)
+- `ZeitgesteuerterPromptStore` — Scoped Service für den EF-Zugriff auf persistierte geplante Prompts
 - `ProtokollService` — Persistente Protokolleinträge, einschließlich automatischer CLI-Ausgaben und Rate-Limit-Marker
 - `ICliRawExportService` — Exportiert die gespeicherte CLI-Rohausgabe einer Aufgabe als `.raw`
 - `IDialogService` — UI-Abstraktion für Dialoge (Speichern-Dialog, Pause-Dialog)
@@ -114,7 +115,7 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 
 ### Übersicht
 
-`PromptZeitVersandService` ist ein Singleton-Service, der zeitgesteuerte Prompts pro Aufgabe in einer Laufzeit-Warteschlange verwaltet. Der Service ist registriert in der Dependency Injection und wird vom `TaskDetailViewModel` genutzt.
+`PromptZeitVersandService` ist ein Singleton-Service, der zeitgesteuerte Prompts pro Aufgabe in einer Laufzeit-Warteschlange verwaltet. Geplante Prompts werden zusätzlich über den scoped `ZeitgesteuerterPromptStore` in der Tabelle `ZeitgesteuertePrompts` persistiert, beim App-Start via `RestoreScheduledPromptsAsync` wiederhergestellt und — wenn zum Fälligkeitszeitpunkt keine Session zustellfähig ist — beim nächsten CLI-Start der Aufgabe nachgestellt (`CliProcessStatusChanged` → `Gestartet`). Der Service ist registriert in der Dependency Injection und wird vom `TaskDetailViewModel` genutzt.
 
 ### Öffentliche Methoden
 
@@ -132,17 +133,17 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 
 **Verhalten:**
 
-- Liegt `targetTime` in der Vergangenheit oder Gegenwart: Prompt wird sofort an die Session geschrieben (kein Eintrag in der Warteschlange).
-- Liegt `targetTime` in der Zukunft: `ScheduledPromptInfo`-Eintrag wird im internen Dictionary abgelegt; ein `ITimer` wird mit der Restlaufzeit gestartet.
-- **Pausen-Berücksichtigung:** Über die optionale `IServiceScopeFactory` wird der aktuelle `Aufgabe.PausiertBisUtc`-Wert geladen. Endet eine aktive Pause später als `targetTime`, wird die Zielzeit auf das Pausenende verschoben statt verworfen — sowohl bei der Planung als auch erneut im Timer-Callback (`HandleTimerElapsedAsync`), falls die Pause nachträglich gesetzt wurde. Ohne registrierte Scope-Factory (z. B. Unit-Tests) entfällt die Prüfung.
-- Ein bereits geplanter Prompt für dieselbe `aufgabeId` wird ersetzt (Timer wird abgebrochen).
-- Bei Erfolg wird kein Event ausgelöst, solange die Planung (nicht der Versand) stattfindet.
+- Liegt `targetTime` in der Vergangenheit oder Gegenwart: Prompt wird sofort an die Session geschrieben (kein Eintrag in der Warteschlange, kein persistierter Datensatz). Schlägt auch der Sofortversand fehl, geht der Plan in „wartet auf Session" über und wird persistiert.
+- Liegt `targetTime` in der Zukunft: `ZeitgesteuerterPromptStore.UpsertAsync` schreibt zuerst den Datensatz (DB vor Timer-Armierung); danach wird ein `ScheduledPromptInfo`-Eintrag im internen Dictionary abgelegt und ein `ITimer` mit der Restlaufzeit gestartet.
+- **Pausen-Berücksichtigung:** Über die optionale `IServiceScopeFactory` wird der aktuelle `Aufgabe.PausiertBisUtc`-Wert geladen. Endet eine aktive Pause später als `targetTime`, wird die Zielzeit auf das Pausenende verschoben statt verworfen — sowohl bei der Planung als auch erneut im Timer-Callback (`HandleTimerElapsedAsync`), falls die Pause nachträglich gesetzt wurde. Ohne registrierte Scope-Factory (z. B. Unit-Tests) entfallen die Prüfung und die Persistenz.
+- Ein bereits geplanter Prompt für dieselbe `aufgabeId` wird ersetzt (Timer wird abgebrochen, Datensatz per Upsert überschrieben).
+- Nach dem Eintragen wird `ScheduledPromptChanged` ausgelöst.
 
 **Rückgabe:** `Task` — abwartet die Planung (nicht den tatsächlichen Versand).
 
 **Fehlerbehandlung:**
 
-- Exceptions beim Schreiben auf die Session werden geloggt. Bei stillschweigendem Verwerfen (Session `null` bei Fälligkeit) gibt es keine Exception, nur eine `LogWarning`.
+- Exceptions beim Schreiben auf die Session werden geloggt und überführen den Plan in „wartet auf Session" (kein Verwerfen). Fehler beim Persistieren werden geloggt; der Plan bleibt dann sitzungsgebunden.
 
 **Beispiel:**
 
@@ -156,9 +157,9 @@ await _promptZeitVersandService.SchedulePromptAsync(
 
 ---
 
-#### `CancelScheduledPrompt(Guid aufgabeId) : void`
+#### `CancelScheduledPromptAsync(Guid aufgabeId) : Task`
 
-**Beschreibung:** Bricht einen für die Aufgabe geplanten Prompt-Versand ab, falls vorhanden.
+**Beschreibung:** Bricht einen für die Aufgabe geplanten Prompt-Versand ab, falls vorhanden — entfernt den In-Memory-Eintrag und den persistierten Datensatz.
 
 **Parameter:**
 
@@ -169,15 +170,32 @@ await _promptZeitVersandService.SchedulePromptAsync(
 **Verhalten:**
 
 - Falls ein Prompt für `aufgabeId` geplant ist: Eintrag wird aus der Warteschlange entfernt, Timer wird abgebrochen und disposed.
+- Der persistierte `ZeitgesteuerterPrompt`-Datensatz wird via `ZeitgesteuerterPromptStore.LoeschenAsync` gelöscht.
+- `ScheduledPromptChanged` wird ausgelöst.
 - Falls kein Prompt geplant ist: Keine Aktion (keine Exception).
 
-**Rückgabe:** Kein Rückgabewert.
+**Rückgabe:** `Task` — abwartet die Stornierung einschließlich Datensatz-Löschung.
 
 **Beispiel:**
 
 ```csharp
-_promptZeitVersandService.CancelScheduledPrompt(aufgabeId);
+await _promptZeitVersandService.CancelScheduledPromptAsync(aufgabeId);
 ```
+
+---
+
+#### `RestoreScheduledPromptsAsync() : Task`
+
+**Beschreibung:** Stellt persistierte geplante Prompts beim App-Start wieder her; wird in `App.OnStartup` nach `db.Database.MigrateAsync()` aufgerufen.
+
+**Verhalten:**
+
+- Lädt alle `ZeitgesteuerterPrompt`-Datensätze via `ZeitgesteuerterPromptStore.GetAlleAsync`.
+- Aufgabe nicht mehr vorhanden → Datensatz wird defensiv gelöscht.
+- Aktive Pause jenseits der Zielzeit → Zielzeit wird auf das Pausenende vorgeladen und der Datensatz via `UpdateZielZeitpunktAsync` aktualisiert.
+- Zielzeit in Zukunft → In-Memory-Eintrag + armiertem Timer.
+- Zielzeit verstrichen → Eintrag im Zustand „wartet auf Session" (kein Timer); Zustellung beim nächsten `CliProcessStatusChanged` → `Gestartet`.
+- Fehler werden pro Datensatz isoliert geloggt; ohne `IServiceScopeFactory` ist die Methode ein No-Op.
 
 ---
 
@@ -195,7 +213,7 @@ _promptZeitVersandService.CancelScheduledPrompt(aufgabeId);
 
 | Typ | Beschreibung |
 |-----|--------------|
-| `ScheduledPromptInfo?` | Objekt mit `AufgabeId`, `PromptText` und `TargetTime`, oder `null` wenn kein Prompt geplant ist. |
+| `ScheduledPromptInfo?` | Objekt mit `AufgabeId`, `PromptText`, `TargetTime` und `WartetAufSession`, oder `null` wenn kein Prompt geplant ist. |
 
 **Beispiel:**
 
@@ -219,9 +237,10 @@ if (scheduled is not null)
 
 **Verhalten:**
 
-- Dieses Event wird ausgelöst **nach** `PseudoConsoleSession.WritePromptAsync()` erfolgreich abgeschlossen hat.
-- Falls die Session zur Zielzeit nicht mehr vorhanden ist, wird dieses Event **nicht** ausgelöst; der Prompt wird still verworfen.
-- Das Event wird immer auf dem Thread-Pool-Thread des Timer-Callbacks ausgelöst, **nicht** auf dem UI-Thread.
+- Dieses Event wird ausgelöst **nach** `PseudoConsoleSession.WritePromptAsync()` erfolgreich abgeschlossen hat — sowohl beim Timer-/Sofortversand als auch bei der Nachzustellung nach einem CLI-Start.
+- Ist die Session zur Zielzeit nicht zustellfähig oder schlägt der Versand fehl, wird dieses Event **nicht** ausgelöst; der Plan geht in „wartet auf Session" über und bleibt persistiert.
+- Die Anzahl der Abonnenten steuert, ob ein `SystemMeldung`-Protokolleintrag geschrieben wird: ohne Abonnenten (keine geöffnete Detailansicht) wird nach Timer-/Sofortversand ein Eintrag geschrieben.
+- Das Event wird auf dem Thread-Pool-Thread des Timer-Callbacks bzw. des Session-Start-Handlers ausgelöst, **nicht** auf dem UI-Thread.
 
 **Beispiel:**
 
@@ -231,6 +250,19 @@ _promptZeitVersandService.PromptSent += (aufgabeId) =>
     Console.WriteLine($"Prompt für Aufgabe {aufgabeId} versendet");
 };
 ```
+
+---
+
+#### `ScheduledPromptChanged : event Action<Guid>?`
+
+**Beschreibung:** Wird ausgelöst, wenn sich der Wartestellungs-Zustand eines geplanten Prompts ändert — beim Planen, beim Storno, nach erfolgreichem Versand und beim Übergang in „wartet auf Session".
+
+**Parameter:** `Guid aufgabeId` — ID der Aufgabe, deren Plan-Zustand sich geändert hat.
+
+**Verhalten:**
+
+- Signal für Beobachter, `GetScheduledPromptStatus` neu zu lesen (z. B. `TaskDetailViewModel.OnScheduledPromptChanged` → `AktualisiereWartestellungsAnzeige`).
+- Trägt externe Stornos (Aufgabenabschluss, Ersetzung) und den „wartet auf Session"-Übergang in die UI.
 
 ---
 
@@ -247,6 +279,7 @@ _promptZeitVersandService.PromptSent += (aufgabeId) =>
 | `AufgabeId` | `Guid` | ID der Aufgabe, deren Session den Prompt erhalten wird. |
 | `PromptText` | `string` | Der bereits aufgelöste Prompttext. |
 | `TargetTime` | `DateTimeOffset` | Der Zeitpunkt, zu dem der Prompt versendet werden soll. |
+| `WartetAufSession` | `bool` | `true`, wenn die Zielzeit bereits verstrichen ist, der Versand aber mangels zustellfähiger CLI-Session aussteht — der Plan bleibt gültig und wird beim nächsten CLI-Start zugestellt. |
 
 **Beispiel:**
 
@@ -256,6 +289,36 @@ var info = new ScheduledPromptInfo(
     promptText: "Analyt den Bug",
     targetTime: DateTimeOffset.Now.AddHours(1));
 ```
+
+---
+
+## ZeitgesteuerterPromptStore — Persistenz geplanter Prompts
+
+**Registrierung:** Scoped in DI; Abhängigkeiten: `SoftwareschmiededDbContext`. Wird vom Singleton `PromptZeitVersandService` ausschließlich über einen eigenen Scope (`IServiceScopeFactory` → `MitStoreAsync`) aufgelöst — Fehler beim Store-Zugriff werden geloggt und brechen den Versandpfad nicht.
+
+### `GetAlleAsync(CancellationToken ct = default) : Task<IReadOnlyList<ZeitgesteuerterPrompt>>`
+
+**Beschreibung:** Liefert alle persistierten geplanten Prompts (`AsNoTracking`); Grundlage für `RestoreScheduledPromptsAsync`.
+
+### `UpsertAsync(Guid aufgabeId, string promptText, DateTimeOffset zielZeitpunktUtc, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Schreibt den geplanten Prompt der Aufgabe oder ersetzt einen vorhandenen Datensatz (Ersetzungsregel — pro Aufgabe maximal ein Plan, datenbankseitig über Unique-Index auf `AufgabeId` abgesichert). Aktualisiert bei Ersetzung `PromptText`, `ZielZeitpunktUtc` und `AktualisiertAmUtc`.
+
+### `UpsertWennUebereinstimmendAsync(Guid aufgabeId, string promptText, DateTimeOffset zielZeitpunktUtc, ScheduledPromptInfo? erwartet, CancellationToken ct = default) : Task<bool>`
+
+**Beschreibung:** Schreibt den Plan nur, wenn der vorhandene Datensatz noch dem erwarteten Vorgängerstand entspricht (`PromptText` + `ZielZeitpunktUtc` auf Unix-Millisekunden normiert) bzw. kein Datensatz existiert und keiner erwartet wird — Lost-Update-Schutz für den Sofortversand-Fehlerpfad. Gibt `false` zurück, wenn ein abweichender (neuerer) Datensatz den Schreibzugriff verweigert.
+
+### `LoeschenAsync(Guid aufgabeId, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Entfernt den persistierten Plan der Aufgabe, falls vorhanden (Storno).
+
+### `LoeschenNachVersandAsync(Guid aufgabeId, string promptText, DateTimeOffset zielZeitpunktUtc, bool neuererPlanAktiv, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Entfernt den Datensatz nach erfolgreichem Versand. Entspricht der Datensatz dem versendeten Plan, wird er immer gelöscht; weicht er ab, bleibt er nur bei `neuererPlanAktiv == true` erhalten (Lost-Update-Schutz), sonst wird er als Leiche des versendeten Plans mitgelöscht.
+
+### `UpdateZielZeitpunktAsync(Guid aufgabeId, DateTimeOffset zielZeitpunktUtc, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Aktualisiert `ZielZeitpunktUtc` (und `AktualisiertAmUtc`) des persistierten Plans, z. B. bei Pausenverschiebung; No-Op, wenn kein Datensatz existiert.
 
 ---
 
@@ -287,9 +350,11 @@ var info = new ScheduledPromptInfo(
 
 **Bindung:** TextBlock zur Anzeige des Status während der Wartestellung.
 
-**Wert:** `"Prompt in Wartestellung"` während ein Prompt geplant ist, oder `null`.
+**Wert:** `"Prompt in Wartestellung"` während ein Prompt geplant ist, `"Prompt wartet auf CLI-Start"` wenn die Zielzeit verstrichen ist, aber noch keine zustellfähige CLI-Session existiert, oder `null`.
 
-**Sichtbarkeit:** TextBlock ist sichtbar nur wenn dieser Wert nicht `null` ist (via `NullOrEmptyToVisibilityConverter`).
+**Sichtbarkeit:** TextBlock (und der „Wartestellung aufheben"-Button) sind nur sichtbar, wenn dieser Wert nicht `null` ist (via `NullOrEmptyToVisibilityConverter`).
+
+**Befüllung:** Zentral über `AktualisiereWartestellungsAnzeige()` aus `GetScheduledPromptStatus` — beim Laden der Ansicht (`LadenAsync`, auch für Pläne aus früheren Sitzungen/App-Läufen) sowie nach `ScheduledPromptChanged`/`PromptSent`.
 
 ---
 
@@ -297,7 +362,7 @@ var info = new ScheduledPromptInfo(
 
 **Bindung:** TextBlock zur Anzeige der Zielzeit.
 
-**Wert:** Zielzeit im Format `HH:mm`, oder `null`.
+**Wert:** Zielzeit im Format `HH:mm` (lokal), oder `null` — im Zustand „Prompt wartet auf CLI-Start" bewusst leer (keine vergangene Uhrzeit).
 
 ---
 
@@ -311,7 +376,7 @@ var info = new ScheduledPromptInfo(
 
 ---
 
-### Neues Command
+### Neue Commands
 
 #### `SchedulePromptCommand : ICommand`
 
@@ -323,8 +388,18 @@ var info = new ScheduledPromptInfo(
 - Validiert Zeitfelder
 - Berechnet `targetTime`
 - Ruft `PromptZeitVersandService.SchedulePromptAsync()` auf
-- Setzt `ScheduledPromptStatus` und `ScheduledPromptTimeDisplay`
+- Aktualisiert `ScheduledPromptStatus` und `ScheduledPromptTimeDisplay` via `AktualisiereWartestellungsAnzeige()`
 - Leert Zeitfelder und Vorlage-Auswahl
+
+---
+
+#### `CancelScheduledPromptCommand : ICommand`
+
+**Typ:** `AsyncRelayCommand`
+
+**Bindung:** Button „Wartestellung aufheben" (`AutomationProperties.Name="WartestellungAufheben"`) im Status-`StackPanel`; sichtbar nur solange `ScheduledPromptStatus` gesetzt ist.
+
+**Ausgeführte Aktion:** `PromptZeitVersandService.CancelScheduledPromptAsync(_aufgabeId)` — entfernt Plan und Datensatz; die Statusanzeige wird anschließend über `ScheduledPromptChanged` → `AktualisiereWartestellungsAnzeige` geleert.
 
 ---
 
@@ -332,11 +407,13 @@ var info = new ScheduledPromptInfo(
 
 | Fehler | Verhalten |
 |--------|-----------|
-| Session nicht gefunden bei Fälligkeit | Prompt wird still verworfen; Log-Warnung wird geschrieben; **kein** `PromptSent`-Event |
-| Session disposed zwischen Planung und Versand | `ObjectDisposedException` wird geloggt; Prompt verworfen; **kein** Event |
-| Schreiboperation auf InputStream schlägt fehl | Exception wird geloggt; kein UI-Feedback; `PromptSent`-Event wird **nicht** ausgelöst |
+| Session nicht gefunden bei Fälligkeit | Log-Warnung; Plan + Datensatz bleiben erhalten und gehen in „wartet auf Session" über (Status „Prompt wartet auf CLI-Start"); Zustellung beim nächsten `CliProcessStatusChanged` → `Gestartet`; **kein** `PromptSent`-Event |
+| Session disposed zwischen Planung und Versand | `ObjectDisposedException` wird geloggt; gleiche Behandlung — „wartet auf Session" |
+| Schreiboperation auf InputStream schlägt fehl | Exception wird geloggt; Plan + Datensatz bleiben erhalten („wartet auf Session"); erneuter Versuch beim nächsten Session-Start; `PromptSent`-Event wird **nicht** ausgelöst |
+| Fehler beim Persistieren des Plans | Store-Ausnahme wird geloggt; der Plan bleibt sitzungsgebunden in der Warteschlange |
+| Fehler beim Protokolleintrag (z. B. Aufgabe gelöscht) | Wird geloggt; der erfolgreiche Versand bleibt gültig |
 | Ungültige Zeitfelder im ViewModel | `FehlerMeldung` wird gesetzt; Service wird nicht aufgerufen; ViewModel-seitige Validierung |
-| Aktive Pause bei Planung oder Fälligkeit | Zielzeit/Timer werden auf das Pausenende verschoben; Eintrag in `ScheduledPromptInfo` bleibt bestehen; **kein** `PromptSent`-Event vor dem Pausenende |
+| Aktive Pause bei Planung oder Fälligkeit | Zielzeit/Timer und persistierter `ZielZeitpunktUtc` werden auf das Pausenende verschoben; **kein** `PromptSent`-Event vor dem Pausenende |
 
 ---
 

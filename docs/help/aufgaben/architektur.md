@@ -70,7 +70,7 @@ Die Pause einer regulären Aufgabe ist als zeitbasiertes Overlay (`Aufgabe.Pausi
 | `AufgabePausierenDialog` / `IDialogService` | WPF-View / UI-Abstraktion | Modaler Dialog zur Datum-/Uhrzeitwahl |
 | `EntwicklungsprozessService.WirfWennPausiert` | Application Service | Guard für Prozessstart, CLI-Neustart und Plugin-Wechsel |
 | `AufgabeRecoveryService` | Application Service | Filtert pausierte Aufgaben aus den Recovery-Kandidaten, lehnt manuelle Recovery ab |
-| `PromptZeitVersandService` | Application Service (Singleton) | Verschiebt geplante Prompts auf das Pausenende statt sie zu verwerfen |
+| `PromptZeitVersandService` | Application Service (Singleton) | Verwaltet geplante zeitgesteuerte Prompts (persistiert via `ZeitgesteuerterPromptStore`, Wiederherstellung beim App-Start, Nachzustellung bei CLI-Start); verschiebt sie bei Pause auf das Pausenende statt sie zu verwerfen |
 | `KiPluginLimitService` | Application Service (scoped) | Persistiert Session-Limits als `AppEinstellung` (`plugins.sessionlimit.<Prefix>`) und wendet die Pause prefix-weit an |
 | `CliOutputProtokollWriter` / `ProtokollService` | Infrastruktur / Application Service | Erkennen den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` im CLI-Output-Stream |
 | `CliUpdateSafetyService` | Application Service | Behandelt Aufgaben mit zukünftigem Session-Limit als nicht riskant |

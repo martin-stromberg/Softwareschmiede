@@ -5,4 +5,11 @@ namespace Softwareschmiede.Application.Services;
 /// <param name="PromptText">Der bereits platzhalteraufgelöste Prompttext.</param>
 /// <param name="TargetTime">Der Zeitpunkt, zu dem der Prompt versendet werden soll.</param>
 /// <returns>Kein Rückgabewert (Datencontainer).</returns>
-public sealed record ScheduledPromptInfo(Guid AufgabeId, string PromptText, DateTimeOffset TargetTime);
+public sealed record ScheduledPromptInfo(Guid AufgabeId, string PromptText, DateTimeOffset TargetTime)
+{
+    /// <summary>
+    /// <c>true</c>, wenn die Zielzeit bereits verstrichen ist, der Versand aber mangels aktiver
+    /// CLI-Session aussteht — der Plan bleibt gültig und wird beim nächsten CLI-Start zugestellt.
+    /// </summary>
+    public bool WartetAufSession { get; init; }
+}
