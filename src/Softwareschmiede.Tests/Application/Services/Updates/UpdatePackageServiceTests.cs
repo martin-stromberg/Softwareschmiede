@@ -13,6 +13,9 @@ namespace Softwareschmiede.Tests.Application.Services.Updates;
 /// <summary>Tests für <see cref="UpdatePackageService"/>.</summary>
 public sealed class UpdatePackageServiceTests
 {
+    private static readonly Uri PrimaryDownloadUrl = new("https://example.invalid/release.zip");
+    private static readonly Uri FallbackAssetApiUrl = new("https://api.github.com/repos/martin-stromberg/Softwareschmiede/releases/assets/91001");
+
     /// <summary>Ein gültiges Release-ZIP wird heruntergeladen, entpackt und validiert.</summary>
     [Fact]
     public async Task PreparePackageAsync_ShouldDownloadExtractAndCreateScript_WhenZipIsValid()
@@ -111,24 +114,21 @@ public sealed class UpdatePackageServiceTests
     {
         using var temp = new TempDirectory();
         var zipBytes = CreateZip(includeExe: true, includeVersion: true);
-        var primaryUrl = new Uri("https://example.invalid/release.zip");
-        var fallbackUrl = new Uri("https://api.github.com/repos/martin-stromberg/Softwareschmiede/releases/assets/91001");
         var handler = new RoutingHttpHandler();
-        handler.AddHandler(primaryUrl.AbsoluteUri,
-            _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)));
-        handler.AddHandler(fallbackUrl.AbsoluteUri,
+        RegistriereFehler(handler, PrimaryDownloadUrl, HttpStatusCode.InternalServerError);
+        handler.AddHandler(FallbackAssetApiUrl.AbsoluteUri,
             _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new ByteArrayContent(zipBytes)
             }));
         var sut = CreateSut(temp.Path, handler);
 
-        var result = await sut.PreparePackageAsync(CreateUpdateInfo(fallbackDownloadUrl: fallbackUrl), null);
+        var result = await sut.PreparePackageAsync(CreateUpdateInfo(fallbackDownloadUrl: FallbackAssetApiUrl), null);
 
         File.Exists(result.ZipPath).Should().BeTrue();
         File.Exists(Path.Combine(result.ExtractedDirectory, "Softwareschmiede.exe")).Should().BeTrue();
         File.Exists(result.ScriptPath).Should().BeTrue();
-        handler.RequestedUrls.Should().Equal(primaryUrl.AbsoluteUri, fallbackUrl.AbsoluteUri);
+        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, FallbackAssetApiUrl.AbsoluteUri);
         handler.RequestedAcceptHeaders.Should().HaveCount(2);
         handler.RequestedAcceptHeaders[1].Should().Contain("application/octet-stream");
     }
@@ -138,21 +138,17 @@ public sealed class UpdatePackageServiceTests
     public async Task PreparePackageAsync_ShouldThrow_WhenPrimaryAndFallbackReturn5xx()
     {
         using var temp = new TempDirectory();
-        var primaryUrl = new Uri("https://example.invalid/release.zip");
-        var fallbackUrl = new Uri("https://api.github.com/repos/martin-stromberg/Softwareschmiede/releases/assets/91001");
         var handler = new RoutingHttpHandler();
-        handler.AddHandler(primaryUrl.AbsoluteUri,
-            _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)));
-        handler.AddHandler(fallbackUrl.AbsoluteUri,
-            _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadGateway)));
+        RegistriereFehler(handler, PrimaryDownloadUrl, HttpStatusCode.InternalServerError);
+        RegistriereFehler(handler, FallbackAssetApiUrl, HttpStatusCode.BadGateway);
         var sut = CreateSut(temp.Path, handler);
 
-        var act = () => sut.PreparePackageAsync(CreateUpdateInfo(fallbackDownloadUrl: fallbackUrl), null);
+        var act = () => sut.PreparePackageAsync(CreateUpdateInfo(fallbackDownloadUrl: FallbackAssetApiUrl), null);
 
         await act.Should().ThrowAsync<HttpRequestException>();
         File.Exists(Path.Combine(temp.Path, "updates", "download", "release.zip")).Should().BeFalse();
         File.Exists(Path.Combine(temp.Path, "updates", "download", "release.zip.download")).Should().BeFalse();
-        handler.RequestedUrls.Should().Equal(primaryUrl.AbsoluteUri, fallbackUrl.AbsoluteUri);
+        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, FallbackAssetApiUrl.AbsoluteUri);
     }
 
     /// <summary>Ein Nicht-5xx-Fehler der primären URL wirft sofort - ohne Fallback-Request.</summary>
@@ -161,22 +157,19 @@ public sealed class UpdatePackageServiceTests
     {
         using var temp = new TempDirectory();
         var zipBytes = CreateZip(includeExe: true, includeVersion: true);
-        var primaryUrl = new Uri("https://example.invalid/release.zip");
-        var fallbackUrl = new Uri("https://api.github.com/repos/martin-stromberg/Softwareschmiede/releases/assets/91001");
         var handler = new RoutingHttpHandler();
-        handler.AddHandler(primaryUrl.AbsoluteUri,
-            _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)));
-        handler.AddHandler(fallbackUrl.AbsoluteUri,
+        RegistriereFehler(handler, PrimaryDownloadUrl, HttpStatusCode.NotFound);
+        handler.AddHandler(FallbackAssetApiUrl.AbsoluteUri,
             _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new ByteArrayContent(zipBytes)
             }));
         var sut = CreateSut(temp.Path, handler);
 
-        var act = () => sut.PreparePackageAsync(CreateUpdateInfo(fallbackDownloadUrl: fallbackUrl), null);
+        var act = () => sut.PreparePackageAsync(CreateUpdateInfo(fallbackDownloadUrl: FallbackAssetApiUrl), null);
 
         await act.Should().ThrowAsync<HttpRequestException>();
-        handler.RequestedUrls.Should().Equal(primaryUrl.AbsoluteUri);
+        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri);
     }
 
     /// <summary>Bereinigung und Vorbereitung dürfen nicht über eine Verzeichnisgrenze aus dem Programmverzeichnis ausbrechen.</summary>
@@ -230,8 +223,11 @@ public sealed class UpdatePackageServiceTests
             baseDirectory);
     }
 
+    private static void RegistriereFehler(RoutingHttpHandler handler, Uri url, HttpStatusCode statusCode)
+        => handler.AddHandler(url.AbsoluteUri, _ => Task.FromResult(new HttpResponseMessage(statusCode)));
+
     private static UpdateInfo CreateUpdateInfo(string version = "1.2.3", bool isPrerelease = false, Uri? fallbackDownloadUrl = null)
-        => new(version, $"v{version}", "release.zip", new Uri("https://example.invalid/release.zip"), DateTimeOffset.UtcNow, IsPrerelease: isPrerelease, fallbackDownloadUrl);
+        => new(version, $"v{version}", "release.zip", PrimaryDownloadUrl, DateTimeOffset.UtcNow, IsPrerelease: isPrerelease, fallbackDownloadUrl);
 
     private static byte[] CreateZip(bool includeExe, bool includeVersion, string version = "1.2.3")
     {

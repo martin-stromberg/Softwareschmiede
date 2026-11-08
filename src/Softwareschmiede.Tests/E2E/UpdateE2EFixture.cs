@@ -31,8 +31,10 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <summary>Release-Listendaten-Dateiname relativ zur Testwurzel.</summary>
     public const string ReleaseListDateiName = "releases.json";
 
+    private static readonly UpdateOptions StandardOptionen = new();
+
     private static readonly string RepositoryApiUrl =
-        $"https://api.github.com/repos/{new UpdateOptions().RepositoryOwner}/{new UpdateOptions().RepositoryName}";
+        $"https://api.github.com/repos/{StandardOptionen.RepositoryOwner}/{StandardOptionen.RepositoryName}";
 
     /// <summary>Der Release-API-Endpunkt, den <c>GitHubReleaseClient</c> mit den Standard-<see cref="UpdateOptions"/> anfragt.</summary>
     public static readonly string ReleaseApiUrl = $"{RepositoryApiUrl}/releases?per_page=100";
@@ -153,30 +155,21 @@ public sealed class UpdateE2EFixture : IDisposable
             Status = 200,
             Inhalt = ErzeugeReleaseListenJson(mitRcRelease)
         });
-        _szenario.Antworten.Add(new UpdateE2EAntwort
+        foreach (var (url, zipPfad) in new[]
         {
-            Url = StableDownloadUrl,
-            Status = 200,
-            BodyDatei = RelativZurWurzel(StableZipPfad)
-        });
-        _szenario.Antworten.Add(new UpdateE2EAntwort
+            (StableDownloadUrl, StableZipPfad),
+            (RcDownloadUrl, RcZipPfad),
+            (StableAssetApiUrl, StableZipPfad),
+            (RcAssetApiUrl, RcZipPfad)
+        })
         {
-            Url = RcDownloadUrl,
-            Status = 200,
-            BodyDatei = RelativZurWurzel(RcZipPfad)
-        });
-        _szenario.Antworten.Add(new UpdateE2EAntwort
-        {
-            Url = StableAssetApiUrl,
-            Status = 200,
-            BodyDatei = RelativZurWurzel(StableZipPfad)
-        });
-        _szenario.Antworten.Add(new UpdateE2EAntwort
-        {
-            Url = RcAssetApiUrl,
-            Status = 200,
-            BodyDatei = RelativZurWurzel(RcZipPfad)
-        });
+            _szenario.Antworten.Add(new UpdateE2EAntwort
+            {
+                Url = url,
+                Status = 200,
+                BodyDatei = RelativZurWurzel(zipPfad)
+            });
+        }
     }
 
     /// <summary>Mutiert das Szenario thread-sicher und schreibt die Szenariodatei anschließend neu.</summary>
@@ -381,10 +374,26 @@ public sealed class UpdateE2EFixture : IDisposable
     public static object ErstelleAssetJson(string apiUrl, long assetId, string downloadUrl)
         => new
         {
-            name = new UpdateOptions().AssetName,
+            name = StandardOptionen.AssetName,
             url = apiUrl,
             id = assetId,
             browser_download_url = downloadUrl
+        };
+
+    /// <summary>Erzeugt das JSON-Objekt eines Releases für die simulierte Release-Liste.</summary>
+    /// <param name="version">Die Release-Version (Tag wird als <c>v{version}</c> gesetzt).</param>
+    /// <param name="prerelease">Ob das Release als Vorabversion markiert ist.</param>
+    /// <param name="publishedAt">Der Veröffentlichungszeitpunkt (<c>published_at</c>-Feld).</param>
+    /// <param name="assetJson">Das Asset-Objekt des Releases (aus <see cref="ErstelleAssetJson"/>).</param>
+    /// <returns>Das anonyme Release-Objekt.</returns>
+    public static object ErstelleReleaseJson(string version, bool prerelease, DateTimeOffset publishedAt, object assetJson)
+        => new
+        {
+            tag_name = $"v{version}",
+            prerelease,
+            draft = false,
+            published_at = publishedAt,
+            assets = new[] { assetJson }
         };
 
     /// <summary>
@@ -399,7 +408,7 @@ public sealed class UpdateE2EFixture : IDisposable
         if (File.Exists(zipPfad))
             File.Delete(zipPfad);
 
-        var executableName = new UpdateOptions().ExecutableName;
+        var executableName = StandardOptionen.ExecutableName;
         using var archiv = ZipFile.Open(zipPfad, ZipArchiveMode.Create);
 
         var exe = archiv.CreateEntry(executableName);
@@ -416,7 +425,7 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <returns>Der Inhalt der Paket-Exe oder <c>null</c>.</returns>
     public static string? LesePaketExeInhalt(string verzeichnis)
     {
-        var pfad = Path.Combine(verzeichnis, new UpdateOptions().ExecutableName);
+        var pfad = Path.Combine(verzeichnis, StandardOptionen.ExecutableName);
         return File.Exists(pfad) ? File.ReadAllText(pfad) : null;
     }
 
@@ -479,32 +488,20 @@ public sealed class UpdateE2EFixture : IDisposable
     {
         var releases = new List<object>
         {
-            new
-            {
-                tag_name = $"v{StableVersion}",
-                prerelease = false,
-                draft = false,
-                published_at = DateTimeOffset.UtcNow.AddDays(-7),
-                assets = new[]
-                {
-                    ErstelleAssetJson(StableAssetApiUrl, StableAssetId, StableDownloadUrl)
-                }
-            }
+            ErstelleReleaseJson(
+                StableVersion,
+                prerelease: false,
+                DateTimeOffset.UtcNow.AddDays(-7),
+                ErstelleAssetJson(StableAssetApiUrl, StableAssetId, StableDownloadUrl))
         };
 
         if (mitRcRelease)
         {
-            releases.Insert(0, new
-            {
-                tag_name = $"v{RcVersion}",
-                prerelease = true,
-                draft = false,
-                published_at = DateTimeOffset.UtcNow,
-                assets = new[]
-                {
-                    ErstelleAssetJson(RcAssetApiUrl, RcAssetId, RcDownloadUrl)
-                }
-            });
+            releases.Insert(0, ErstelleReleaseJson(
+                RcVersion,
+                prerelease: true,
+                DateTimeOffset.UtcNow,
+                ErstelleAssetJson(RcAssetApiUrl, RcAssetId, RcDownloadUrl)));
         }
 
         return JsonSerializer.Serialize(releases);

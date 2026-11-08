@@ -1458,32 +1458,20 @@ public partial class End2EndTest
     /// <summary>Erzeugt eine Release-Liste mit dem RC-Paket und einer semantisch höheren stabilen Version.</summary>
     private static string ErzeugeRcUndHoeheresStableReleaseJson(UpdateE2EFixture fixture)
     {
-        var releases = new object[]
+        var releases = new[]
         {
-            new
-            {
-                tag_name = $"v{UpdateE2EFixture.RcVersion}",
-                prerelease = true,
-                draft = false,
-                published_at = DateTimeOffset.UtcNow,
-                assets = new[]
-                {
-                    UpdateE2EFixture.ErstelleAssetJson(
-                        UpdateE2EFixture.RcAssetApiUrl, UpdateE2EFixture.RcAssetId, fixture.RcDownloadUrl)
-                }
-            },
-            new
-            {
-                tag_name = "v9.9.9",
-                prerelease = false,
-                draft = false,
-                published_at = DateTimeOffset.UtcNow,
-                assets = new[]
-                {
-                    UpdateE2EFixture.ErstelleAssetJson(
-                        UpdateE2EFixture.AssetApiUrl(91999), 91999L, "https://e2e.invalid/unused-stable.zip")
-                }
-            }
+            UpdateE2EFixture.ErstelleReleaseJson(
+                UpdateE2EFixture.RcVersion,
+                prerelease: true,
+                DateTimeOffset.UtcNow,
+                UpdateE2EFixture.ErstelleAssetJson(
+                    UpdateE2EFixture.RcAssetApiUrl, UpdateE2EFixture.RcAssetId, fixture.RcDownloadUrl)),
+            UpdateE2EFixture.ErstelleReleaseJson(
+                "9.9.9",
+                prerelease: false,
+                DateTimeOffset.UtcNow,
+                UpdateE2EFixture.ErstelleAssetJson(
+                    UpdateE2EFixture.AssetApiUrl(91999), 91999L, "https://e2e.invalid/unused-stable.zip"))
         };
         return JsonSerializer.Serialize(releases);
     }
@@ -1491,18 +1479,12 @@ public partial class End2EndTest
     /// <summary>Erzeugt eine Release-Listen-JSON mit den angegebenen Stable-Versionen.</summary>
     private static string ErzeugeReleaseListenJson(UpdateE2EFixture fixture, params string[] versionen)
     {
-        var releases = versionen.Select(version => new
-        {
-            tag_name = $"v{version}",
-            prerelease = false,
-            draft = false,
-            published_at = DateTimeOffset.UtcNow.AddDays(-7),
-            assets = new[]
-            {
-                UpdateE2EFixture.ErstelleAssetJson(
-                    UpdateE2EFixture.StableAssetApiUrl, UpdateE2EFixture.StableAssetId, fixture.StableDownloadUrl)
-            }
-        });
+        var releases = versionen.Select(version => UpdateE2EFixture.ErstelleReleaseJson(
+            version,
+            prerelease: false,
+            DateTimeOffset.UtcNow.AddDays(-7),
+            UpdateE2EFixture.ErstelleAssetJson(
+                UpdateE2EFixture.StableAssetApiUrl, UpdateE2EFixture.StableAssetId, fixture.StableDownloadUrl)));
         return JsonSerializer.Serialize(releases);
     }
 }
