@@ -17,6 +17,9 @@ concurrency:
   group: security-scan-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   security-scan:
     runs-on: windows-latest
