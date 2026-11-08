@@ -1,3 +1,10 @@
+## 2026-11-08 — Update-Download mit einmaligem Fallback auf die GitHub-API-Asset-URL
+
+- `UpdateInfo` trägt neu eine optionale `FallbackDownloadUrl` (GitHub-API-Asset-URL). `GitHubReleaseClient.CreateFallbackDownloadUrl` leitet sie beim Aufbau des Release-Kandidaten bevorzugt aus dem servergelieferten Asset-Feld `url` ab (validiert per `IsAllowedAssetApiUrl`: absolut, HTTPS, Host `api.github.com`), ersatzweise aus der Asset-`id` (`RepositoryApiUrl`) — ohne gültige Quelle bleibt sie `null`.
+- `UpdatePackageService.DownloadAsync` arbeitet zweistufig: Liefert die primäre `browser_download_url` einen HTTP-Status ≥ 500, wird einmalig ein zweiter GET über `SendDownloadRequestAsync` gegen die `FallbackDownloadUrl` gesendet — mit `Accept: application/octet-stream` und `User-Agent: Softwareschmiede/1.0` sowie `LogWarning` beim Umschalten. Scheitert auch der Fallback oder liegt keine Fallback-URL vor, bleibt der bisherige Fehlerpfad (`HttpRequestException` → „Update konnte nicht vorbereitet werden.") unverändert.
+- Der Fallback greift ausschließlich bei empfangenen 5xx-Antworten vor Stream-Beginn — nicht bei Transportfehlern ohne HTTP-Antwort, 429, Timeout oder Abriss mitten im Download. Er ist ein interner Mechanismus ohne UI-Hinweis, Konfiguration oder Opt-out.
+- E2E/Test-Infrastruktur: `UpdateFixtureHttpMessageHandler.Klassifiziere` ordnet Requests auf `.../releases/assets/...`-URLs nun der Art „asset" zu; `UpdateE2EFixture` und `E2E_UpdateSettings` liefern Asset-`url`/`id` im Release-JSON und registrieren Standard-Antworten für die API-Asset-URLs; Unit-Tests um Fallback-Fälle (5xx→Erfolg, beide Pfade scheitern, Header-Nachweis) erweitert.
+
 ## 2026-11-07 — Persistierter zeitgesteuerter Prompt
 
 - Geplante zeitgesteuerte Prompts werden dauerhaft gespeichert: neue Entity `ZeitgesteuerterPrompt` (Tabelle `ZeitgesteuertePrompts`, EF-Migration `AddZeitgesteuerterPrompt`, Unique-Index auf `AufgabeId`) mit EF-Zugriff über den neuen scoped Service `ZeitgesteuerterPromptStore`.

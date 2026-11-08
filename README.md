@@ -108,6 +108,8 @@ Die Anwendung kann sich selbst gegen die GitHub-Releases von `martin-stromberg/S
 - Vor der Installation prüft ein Sicherheitsdialog, ob laufende CLI-Aufgaben das Update blockieren würden. Ein Fortschrittsdialog zeigt die Phasen Download, Entpacken und Update-Vorbereitung an und erlaubt den Abbruch.
 - Der eigentliche Austausch der Dateien erfolgt durch ein externes Update-Skript nach dem Beenden der Anwendung.
 
+Der Paket-Download läuft primär über die `browser_download_url` des Release-Assets; liefert diese Route einen transienten 5xx-Fehler, versucht `UpdatePackageService` einmalig automatisch die GitHub-API-Asset-URL (`api.github.com/.../releases/assets/{id}` mit `Accept: application/octet-stream`) — scheitert auch dieser Fallback, bleibt das bisherige Fehlerverhalten unverändert.
+
 Der Update-Modus ist in den **Einstellungen** im Tab **„Allgemein"** unter **„Updates"** über die Auswahlbox **„Update-Modus"** konfigurierbar:
 
 | Option | Wirkung |
@@ -122,7 +124,7 @@ Passt der aus dem Update-Pfad abgeleitete Kanal nicht zum Kanal der installierte
 
 Beide Werte werden in der SQLite-Einstellungstabelle unter den Schlüsseln `updates.mode` und `updates.pfad` gespeichert (`AppEinstellungService.GetUpdateSettingsAsync`/`SetUpdateSettingsAsync`); der frühere Schlüssel `updates.includePrereleases` wird nicht mehr gelesen und verfällt still. Fehlende oder unbekannte gespeicherte Pfadwerte fallen beim Lesen auf `Produktivversionen` zurück; beim Schreiben akzeptiert der Service nur die zwei bekannten Pfadwerte. Beim Speichern löst `SettingsViewModel` das Event `UpdateSettingsSaved` aus: `MainWindowViewModel` invalidiert ein bestehendes Update-Angebot und bricht einen noch nicht übergebenen Update-Vorgang ab. Vor jeder Prüfung und vor dem Updater-Start werden die gespeicherten Werte erneut gelesen.
 
-Die Implementierung liegt in `UpdateService`, `GitHubReleaseClient`, `UpdatePfadKanalResolver`, `UpdateVersionComparer`/`SemanticUpdateVersion`, `AppEinstellungService`, `SettingsViewModel`/`UpdatePfadOption` und `MainWindowViewModel` (einmalige Startprüfung über `MainWindow.ContentRendered` → `InitializeUpdatesAfterWindowReadyAsync`). Abgedeckt wird das Feature u. a. durch `AppEinstellungServiceTests_UpdateSettings`, `UpdatePfadKanalResolverTests`, `UpdateServiceTests_Options`, `UpdateServiceTests_PrereleaseChain`, `UpdateVersionComparerTests_SemVer`, `GitHubReleaseClientTests_Filters`, `GitHubReleaseClientTests_Pagination`, `MainWindowViewModelTests_UpdateStartup`, `MainWindowViewModelTests_UpdateSettingsReadFailure` und `E2E_UpdateSettings`.
+Die Implementierung liegt in `UpdateService`, `GitHubReleaseClient`, `UpdatePackageService`, `UpdatePfadKanalResolver`, `UpdateVersionComparer`/`SemanticUpdateVersion`, `AppEinstellungService`, `SettingsViewModel`/`UpdatePfadOption` und `MainWindowViewModel` (einmalige Startprüfung über `MainWindow.ContentRendered` → `InitializeUpdatesAfterWindowReadyAsync`). Abgedeckt wird das Feature u. a. durch `AppEinstellungServiceTests_UpdateSettings`, `UpdatePfadKanalResolverTests`, `UpdateServiceTests_Options`, `UpdateServiceTests_PrereleaseChain`, `UpdateVersionComparerTests_SemVer`, `GitHubReleaseClientTests_Filters`, `GitHubReleaseClientTests_Pagination`, `MainWindowViewModelTests_UpdateStartup`, `MainWindowViewModelTests_UpdateSettingsReadFailure` und `E2E_UpdateSettings`.
 
 ## GitHub-Ereignisüberwachung
 

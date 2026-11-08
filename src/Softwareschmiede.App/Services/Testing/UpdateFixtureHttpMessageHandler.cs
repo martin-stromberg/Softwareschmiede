@@ -121,6 +121,8 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
 
     private static string Klassifiziere(string url)
     {
+        if (url.Contains("/releases/assets/", StringComparison.OrdinalIgnoreCase))
+            return "asset";
         if (url.Contains("/releases", StringComparison.OrdinalIgnoreCase))
             return "release";
         if (url.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))

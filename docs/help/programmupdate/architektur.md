@@ -87,8 +87,8 @@ flowchart LR
 
 | Komponente | Rolle |
 |------------|-------|
-| `GitHubReleaseClient` (`IUpdateReleaseClient`) | Paginierte Release-Suche über die GitHub-REST-API, exklusiver Kandidatenfilter je `UpdateCheckOptions.Kanal` (Draft/Tag/Asset/Kanalzugehörigkeit), SemVer-Maximum, `UpdateReleaseLookupResult`. |
-| `UpdatePackageService` (`IUpdatePackageService`) | Download (`*.download` → `release.zip`), Entpacken nach `updates/extracted/{Version}`, Paketvalidierung (Executable + `version.json`), Schreibrechte-Probe (`RequiresElevation`), Pfadsicherung gegen Verzeichnisaustritt (`EnsureInsideBase`). |
+| `GitHubReleaseClient` (`IUpdateReleaseClient`) | Paginierte Release-Suche über die GitHub-REST-API, exklusiver Kandidatenfilter je `UpdateCheckOptions.Kanal` (Draft/Tag/Asset/Kanalzugehörigkeit), SemVer-Maximum, `UpdateReleaseLookupResult`. Leitet pro Kandidat zusätzlich `UpdateInfo.FallbackDownloadUrl` aus den Asset-Feldern `url`/`id` ab (`CreateFallbackDownloadUrl`, Host auf `api.github.com` gepinnt via `IsAllowedAssetApiUrl`). |
+| `UpdatePackageService` (`IUpdatePackageService`) | Download (`*.download` → `release.zip`; einmaliger Fallback auf `UpdateInfo.FallbackDownloadUrl` bei HTTP-Status ≥ 500, via `SendDownloadRequestAsync` mit API-Headern), Entpacken nach `updates/extracted/{Version}`, Paketvalidierung (Executable + `version.json`), Schreibrechte-Probe (`RequiresElevation`), Pfadsicherung gegen Verzeichnisaustritt (`EnsureInsideBase`). |
 | `UpdateScriptService` (`IUpdateScriptService`) | Schreibt `updates/update.ps1` (wartet auf App-Exit, kopiert Dateien, startet App neu, Logdatei) und startet es via `IUpdateProcessLauncher`. |
 | `UpdateProcessLauncher` (`IUpdateProcessLauncher`) | `ProcessStartInfo`-Kapselung; `Verb = "runas"` bei `RequiresElevation`. |
 
@@ -117,7 +117,7 @@ Der Altbestand `updates.includePrereleases` verfällt still — er wird nicht me
 
 Für E2E-Tests existiert eine kontrollierte Update-Umgebung unter `Softwareschmiede.App/Services/Testing/`, die sich nur bei gesetzter Szenario-Konfiguration aktiviert (`UpdateE2ETestConfiguration.LadeAusUmgebung`):
 
-- `UpdateFixtureHttpMessageHandler` — ersetzt den HTTP-Transport (Release-JSON-Seiten, ZIP-Streams, Fehler, Freigaben).
+- `UpdateFixtureHttpMessageHandler` — ersetzt den HTTP-Transport (Release-JSON-Seiten, ZIP-Streams, Fehler, Freigaben). `Klassifiziere` ordnet Requests auf `.../releases/assets/...`-URLs der Request-Art „asset" zu (API-Fallback-Downloads zählen damit als Asset-Requests).
 - `RecordingUpdateProcessLauncher` / `RecordingApplicationShutdownService` — protokollieren Skriptstart/Shutdown ohne echte Prozess-/Systemgrenzen.
 - `FixtureCliUpdateSafetyService` — kontrollierte riskante Aufgaben für echte Bestätigungsdialoge.
 - `UpdateSettingsReadFailureInterceptor` — EF-Core-`DbCommandInterceptor`, der nur die getaggte `UpdateSettings.Read`-Abfrage gezielt fehlschlagen lässt.

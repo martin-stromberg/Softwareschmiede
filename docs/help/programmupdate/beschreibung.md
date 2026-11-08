@@ -63,7 +63,7 @@ Der Update-Vorgang läuft in mehreren Phasen ab:
 
 1. **Prüfung** — die installierte Version wird mit der neuesten passenden Version auf dem Update-Server verglichen. Je nach gewähltem Update-Pfad werden ausschließlich stabile Versionen („Produktivversionen") oder ausschließlich Vorabversionen („Vorabversionen") als Kandidaten berücksichtigt.
 2. **Sicherheitsprüfung** — vor der Installation wird geprüft, ob laufende CLI-Aufgaben das Update blockieren würden.
-3. **Download** — das Update-Paket wird heruntergeladen (Fortschritt in Prozent).
+3. **Download** — das Update-Paket wird heruntergeladen (Fortschritt in Prozent). Antwortet der Download-Server mit einem vorübergehenden Serverfehler (HTTP 5xx), versucht die Anwendung automatisch und einmalig einen alternativen Download-Pfad — ohne sichtbaren Hinweis oder Nutzereingriff.
 4. **Entpacken** — das Paket wird in ein Arbeitsverzeichnis entpackt und auf Vollständigkeit geprüft.
 5. **Update-Vorbereitung** — das Update-Skript wird erzeugt.
 6. **Installation** — das Skript wird gestartet, die Anwendung beendet sich, das Skript tauscht die Programmdateien aus und startet die Anwendung neu.
@@ -76,4 +76,5 @@ Der Update-Vorgang läuft in mehreren Phasen ab:
 - Während der Update-Vorbereitung können keine anderen Operationen in der Anwendung ausgeführt werden (modaler Dialog).
 - Der Update-Pfad akzeptiert nur die zwei festen Auswahlwerte „Produktivversionen" und „Vorabversionen" — eine Mischform („stabile und Vorabversionen gemeinsam") ist nicht wählbar.
 - Kann der Update-Server nicht erreicht werden oder sind die Update-Einstellungen nicht lesbar, wird ein Hinweistext statt eines Update-Angebots angezeigt; es findet dann keine Installation statt.
+- Der interne Download-Fallback hilft nur bei vorübergehenden Serverfehlern (HTTP 5xx) auf der regulären Download-Route — bei Verbindungsabbrüchen, Zeitüberschreitungen, anderen Fehlercodes oder einem Abriss mitten im Download findet kein zweiter Versuch statt.
 - Schlägt das externe Update-Skript fehl, wird die Anwendung möglicherweise in einem inkonsistenten Zustand hinterlassen. Dies liegt außerhalb des Features; das Skript schreibt ein eigenes Protokoll.

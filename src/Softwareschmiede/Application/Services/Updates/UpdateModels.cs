@@ -18,13 +18,15 @@ public sealed record InstalledVersionInfo(
 /// <param name="DownloadUrl">Direkte Download-URL des Release-Assets.</param>
 /// <param name="PublishedAt">Optionaler Veröffentlichungszeitpunkt.</param>
 /// <param name="IsPrerelease">Gibt an, ob das Release als Prerelease klassifiziert ist (GitHub-Flag <c>prerelease</c> oder SemVer-Prerelease-Suffix).</param>
+/// <param name="FallbackDownloadUrl">Optionale GitHub-API-Asset-URL für den einmaligen Download-Fallback bei 5xx der primären <paramref name="DownloadUrl"/>.</param>
 public sealed record UpdateInfo(
     string Version,
     string TagName,
     string AssetName,
     Uri DownloadUrl,
     DateTimeOffset? PublishedAt,
-    bool IsPrerelease);
+    bool IsPrerelease,
+    Uri? FallbackDownloadUrl = null);
 
 /// <summary>Persistierter Modus der Update-Prüfung mit festen Speicherwerten.</summary>
 public enum UpdateMode

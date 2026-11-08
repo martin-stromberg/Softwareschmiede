@@ -625,7 +625,9 @@ public partial class End2EndTest
     /// Vorbereitung/Asset/Start/Shutdown. (b) Ja bestätigt, echter blockierter
     /// Downloadfortschritt, Abbrechen - Abbruchzustand ohne Start/Shutdown. (c) Asset-HTTP-
     /// Fehler (automatisch) und defektes ZIP (manuell): sichtbarer Vorbereitungsfehler ohne
-    /// Start/Shutdown. (d) Gültige Vorbereitung mit Launcherfehler: genau ein Versuch, kein
+    /// Start/Shutdown. (c3) Primärer Asset-Abruf liefert 5xx: einmaliger Fallback auf die
+    /// GitHub-API-Asset-URL - die Installation läuft vollständig durch. (d) Gültige
+    /// Vorbereitung mit Launcherfehler: genau ein Versuch, kein
     /// erfolgreicher Start, kein Shutdown, sichtbarer Fehler. Anschließend alle T-09-
     /// Lesefehler-Grenzen (Initial, BeforePreparation, BeforeUpdaterStart) je einmal
     /// automatisch (Start) und manuell (Prüfen/Starten) mit Gate-Freigabe, ohne
@@ -666,6 +668,10 @@ public partial class End2EndTest
             // kein Shutdown.
             (mainWindow, menu) = await LauncherFehlerPhaseAsync(fixture);
             fixture.AktualisiereSzenario(s => s.ProzessStart = new UpdateE2EProzessStart { Ergebnis = "Erfolg" });
+
+            // (c3) Primärer Asset-Abruf 5xx, einmaliger Fallback auf die API-Asset-URL:
+            // die Installation läuft vollständig durch.
+            (mainWindow, menu) = await AssetFallbackErfolgPhaseAsync(fixture);
 
             // T-09 automatisch: Lesefehler an allen drei Grenzen (Initial, BeforePreparation,
             // BeforeUpdaterStart) stoppen den Startversuch sicher.
@@ -775,14 +781,18 @@ public partial class End2EndTest
     }
 
     /// <summary>
-    /// E-06 (c1): Asset-HTTP-Fehler beim automatischen Versuch - sichtbarer
-    /// Vorbereitungsfehler ohne Start/Shutdown.
+    /// E-06 (c1): Asset-HTTP-Fehler beim automatischen Versuch - primäre Download-URL und
+    /// API-Asset-Fallback-URL liefern beide 500, sichtbarer Vorbereitungsfehler ohne
+    /// Start/Shutdown.
     /// </summary>
     private async Task<(Window MainWindow, MenuView Menu)> AssetHttpFehlerPhaseAsync(
         UpdateE2EFixture fixture)
     {
         fixture.AktualisiereSzenario(s =>
-            s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl).Status = 500);
+        {
+            s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl).Status = 500;
+            s.Antworten.Single(a => a.Url == UpdateE2EFixture.StableAssetApiUrl).Status = 500;
+        });
         var basis = ProtokollBasis(fixture);
         var mainWindow = RestartAppPreservingDatabase();
         var menu = new MenuView(mainWindow);
@@ -792,6 +802,8 @@ public partial class End2EndTest
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
         Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.HttpRequest,
             e => DatenText(e, "url") == fixture.StableDownloadUrl));
+        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.HttpRequest,
+            e => DatenText(e, "url") == UpdateE2EFixture.StableAssetApiUrl));
         Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateStartAttempt));
         Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateProcessStartRecorded));
         Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.ShutdownRequested));
@@ -858,6 +870,35 @@ public partial class End2EndTest
         fortschritt.Close();
         await PruefeSettingsBedienbarAsync(fixture, menu);
         Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateAttemptStarted));
+        return (mainWindow, menu);
+    }
+
+    /// <summary>
+    /// E-06 (c3): Primärer Asset-Abruf liefert 5xx - der einmalige Fallback auf die
+    /// GitHub-API-Asset-URL rettet den Download; die Installation läuft vollständig durch.
+    /// Genau ein Request je Download-Route; der vollständige Installationsnachweis läuft
+    /// über <c>AssertiereInstallationsNachweis</c> mit beiden erwarteten Asset-URLs.
+    /// </summary>
+    private async Task<(Window MainWindow, MenuView Menu)> AssetFallbackErfolgPhaseAsync(
+        UpdateE2EFixture fixture)
+    {
+        fixture.AktualisiereSzenario(s =>
+        {
+            s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl).Status = 500;
+            s.Antworten.Single(a => a.Url == UpdateE2EFixture.StableAssetApiUrl).Status = 200;
+        });
+        var basis = ProtokollBasis(fixture);
+        var mainWindow = RestartAppPreservingDatabase();
+        var menu = new MenuView(mainWindow);
+        var fortschritt = new UpdateProgressDialogView(mainWindow);
+        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
+
+        AssertiereInstallationsNachweis(fixture, basis,
+            UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, "stable-marker",
+            [UpdateE2EFixture.StableAssetApiUrl]);
+        fortschritt.Close();
+        fixture.AktualisiereSzenario(s =>
+            s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl).Status = 200);
         return (mainWindow, menu);
     }
 
@@ -1217,19 +1258,24 @@ public partial class End2EndTest
 
     /// <summary>
     /// Nachweis einer echten Installation bis zur kontrollierten Launcher-/Shutdown-Grenze:
-    /// genau ein Asset-Abruf auf die erwartete URL, entpacktes Paket mit passender
-    /// <c>version.json</c> und Markerinhalt, Skript mit <c>-ExtractedDirectory</c> auf das
-    /// entpackte Verzeichnis der Version, genau ein Launcher-Erfolg vor genau einem Shutdown.
+    /// Asset-Abrufe genau auf den erwarteten URLs (primäre Download-URL, optional weitere
+    /// wie die API-Asset-Fallback-URL), entpacktes Paket mit passender <c>version.json</c>
+    /// und Markerinhalt, Skript mit <c>-ExtractedDirectory</c> auf das entpackte Verzeichnis
+    /// der Version, genau ein Launcher-Erfolg vor genau einem Shutdown.
     /// </summary>
     private static void AssertiereInstallationsNachweis(
         UpdateE2EFixture fixture, int basis, string erwarteteVersion, string erwarteteDownloadUrl,
-        string erwarteterMarker)
+        string erwarteterMarker, IReadOnlyList<string>? weitereErwarteteAssetUrls = null)
     {
         var eintraege = EintraegeSeit(fixture, basis);
 
-        var assetAbruf = Assert.Single(eintraege, e => e.Ereignis == UpdateE2EEreignisse.HttpRequest
-            && DatenText(e, "art") == "asset");
-        Assert.Equal(erwarteteDownloadUrl, DatenText(assetAbruf, "url"));
+        var erwarteteAssetUrls = new List<string?> { erwarteteDownloadUrl };
+        if (weitereErwarteteAssetUrls is not null)
+            erwarteteAssetUrls.AddRange(weitereErwarteteAssetUrls);
+        Assert.Equal(erwarteteAssetUrls, eintraege
+            .Where(e => e.Ereignis == UpdateE2EEreignisse.HttpRequest && DatenText(e, "art") == "asset")
+            .Select(e => DatenText(e, "url"))
+            .ToList());
 
         var vorbereitung = Assert.Single(eintraege,
             e => e.Ereignis == UpdateE2EEreignisse.PreparationCompleted);
@@ -1412,24 +1458,20 @@ public partial class End2EndTest
     /// <summary>Erzeugt eine Release-Liste mit dem RC-Paket und einer semantisch höheren stabilen Version.</summary>
     private static string ErzeugeRcUndHoeheresStableReleaseJson(UpdateE2EFixture fixture)
     {
-        var releases = new object[]
+        var releases = new[]
         {
-            new
-            {
-                tag_name = $"v{UpdateE2EFixture.RcVersion}",
-                prerelease = true,
-                draft = false,
-                published_at = DateTimeOffset.UtcNow,
-                assets = new[] { new { name = new UpdateOptions().AssetName, browser_download_url = fixture.RcDownloadUrl } }
-            },
-            new
-            {
-                tag_name = "v9.9.9",
-                prerelease = false,
-                draft = false,
-                published_at = DateTimeOffset.UtcNow,
-                assets = new[] { new { name = new UpdateOptions().AssetName, browser_download_url = "https://e2e.invalid/unused-stable.zip" } }
-            }
+            UpdateE2EFixture.ErstelleReleaseJson(
+                UpdateE2EFixture.RcVersion,
+                prerelease: true,
+                DateTimeOffset.UtcNow,
+                UpdateE2EFixture.ErstelleAssetJson(
+                    UpdateE2EFixture.RcAssetApiUrl, UpdateE2EFixture.RcAssetId, fixture.RcDownloadUrl)),
+            UpdateE2EFixture.ErstelleReleaseJson(
+                "9.9.9",
+                prerelease: false,
+                DateTimeOffset.UtcNow,
+                UpdateE2EFixture.ErstelleAssetJson(
+                    UpdateE2EFixture.AssetApiUrl(91999), 91999L, "https://e2e.invalid/unused-stable.zip"))
         };
         return JsonSerializer.Serialize(releases);
     }
@@ -1437,17 +1479,12 @@ public partial class End2EndTest
     /// <summary>Erzeugt eine Release-Listen-JSON mit den angegebenen Stable-Versionen.</summary>
     private static string ErzeugeReleaseListenJson(UpdateE2EFixture fixture, params string[] versionen)
     {
-        var releases = versionen.Select(version => new
-        {
-            tag_name = $"v{version}",
-            prerelease = false,
-            draft = false,
-            published_at = DateTimeOffset.UtcNow.AddDays(-7),
-            assets = new[]
-            {
-                new { name = new UpdateOptions().AssetName, browser_download_url = fixture.StableDownloadUrl }
-            }
-        });
+        var releases = versionen.Select(version => UpdateE2EFixture.ErstelleReleaseJson(
+            version,
+            prerelease: false,
+            DateTimeOffset.UtcNow.AddDays(-7),
+            UpdateE2EFixture.ErstelleAssetJson(
+                UpdateE2EFixture.StableAssetApiUrl, UpdateE2EFixture.StableAssetId, fixture.StableDownloadUrl)));
         return JsonSerializer.Serialize(releases);
     }
 }

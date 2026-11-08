@@ -12,11 +12,13 @@ namespace Softwareschmiede.Tests.Infrastructure.Services;
 /// <summary>Tests für <see cref="GitHubReleaseClient"/>.</summary>
 public sealed class GitHubReleaseClientTests
 {
+    private const string AssetApiUrl = "https://api.github.com/repos/martin-stromberg/Softwareschmiede/releases/assets/91001";
+
     /// <summary>Ein stabiles Release mit release.zip wird als UpdateInfo zurückgegeben.</summary>
     [Fact]
     public async Task GetLatestReleaseAsync_ShouldReturnRelease_WhenAssetExists()
     {
-        var httpClient = new HttpClient(new StaticHttpHandler(HttpStatusCode.OK, """
+        var httpClient = new HttpClient(new StaticHttpHandler(HttpStatusCode.OK, $$"""
 [
   {
     "tag_name": "v1.2.3",
@@ -24,7 +26,12 @@ public sealed class GitHubReleaseClientTests
     "draft": false,
     "published_at": "2026-07-14T00:00:00Z",
     "assets": [
-      { "name": "release.zip", "browser_download_url": "https://example.invalid/release.zip" }
+      {
+        "name": "release.zip",
+        "browser_download_url": "https://example.invalid/release.zip",
+        "url": "{{AssetApiUrl}}",
+        "id": 91001
+      }
     ]
   }
 ]
@@ -38,6 +45,65 @@ public sealed class GitHubReleaseClientTests
         result.Release!.Version.Should().Be("1.2.3");
         result.Release.IsPrerelease.Should().BeFalse();
         result.Release.DownloadUrl.Should().Be("https://example.invalid/release.zip");
+        result.Release.FallbackDownloadUrl.Should().Be(AssetApiUrl);
+    }
+
+    /// <summary>Fehlt die API-Asset-URL, wird die Fallback-Download-URL aus der Asset-ID auf dem GitHub-API-Host abgeleitet.</summary>
+    [Fact]
+    public async Task GetLatestReleaseAsync_ShouldDeriveFallbackUrlFromAssetId_WhenUrlIsMissing()
+    {
+        var httpClient = new HttpClient(new StaticHttpHandler(HttpStatusCode.OK, """
+[
+  {
+    "tag_name": "v1.2.3",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-07-14T00:00:00Z",
+    "assets": [
+      { "name": "release.zip", "browser_download_url": "https://example.invalid/release.zip", "id": 91001 }
+    ]
+  }
+]
+"""));
+        var sut = CreateSut(httpClient);
+
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
+
+        result.Erfolg.Should().BeTrue();
+        result.Release.Should().NotBeNull();
+        result.Release!.FallbackDownloadUrl.Should().Be(AssetApiUrl);
+    }
+
+    /// <summary>Eine ungültige oder fremde API-Asset-URL führt zur ID-Ableitung; ohne ID entfällt der Fallback, das Release bleibt nutzbar.</summary>
+    [Theory]
+    [InlineData("https://evil.example/assets/91001", 91001, AssetApiUrl)]
+    [InlineData("keine-url", 91001, AssetApiUrl)]
+    [InlineData("https://evil.example/assets/91001", 0, null)]
+    public async Task GetLatestReleaseAsync_ShouldDeriveFallbackUrlFromAssetId_WhenUrlIsInvalid(string assetUrl, long assetId, string? expectedFallbackUrl)
+    {
+        var httpClient = new HttpClient(new StaticHttpHandler(HttpStatusCode.OK, $$"""
+[
+  {
+    "tag_name": "v1.2.3",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-07-14T00:00:00Z",
+    "assets": [
+      { "name": "release.zip", "browser_download_url": "https://example.invalid/release.zip", "url": "{{assetUrl}}", "id": {{assetId}} }
+    ]
+  }
+]
+"""));
+        var sut = CreateSut(httpClient);
+
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
+
+        result.Erfolg.Should().BeTrue();
+        result.Release.Should().NotBeNull();
+        if (expectedFallbackUrl is null)
+            result.Release!.FallbackDownloadUrl.Should().BeNull();
+        else
+            result.Release!.FallbackDownloadUrl.Should().Be(expectedFallbackUrl);
     }
 
     /// <summary>Leere Listen und unbrauchbare Einträge gelten als erfolgreiche Abfrage ohne Kandidaten; HTTP-Fehler als fehlgeschlagene Abfrage.</summary>
