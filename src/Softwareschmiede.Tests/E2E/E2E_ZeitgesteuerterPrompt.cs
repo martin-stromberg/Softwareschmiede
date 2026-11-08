@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
@@ -17,9 +18,11 @@ public partial class End2EndTest
     /// <summary>
     /// Szenario: Nutzer startet die CLI, trägt eine in der Zukunft liegende Zielzeit ein, wählt eine
     /// Promptvorlage und klickt "Zeitgesteuert senden". Die Statusanzeige "Prompt in Wartestellung"
-    /// muss erscheinen, ohne dass ein Fehlerbanner sichtbar wird.
+    /// muss erscheinen, ohne dass ein Fehlerbanner sichtbar wird. Der Plan überlebt das Verlassen
+    /// der Detailansicht (persistierter Datensatz), ist beim Wiederöffnen weiterhin sichtbar und
+    /// lässt sich über den Button "Wartestellung aufheben" stornieren (Anzeige weg, Datensatz gelöscht).
     /// </summary>
-    protected void ZeitgesteuerterPrompt_NachPlanen_ZeigtWartestellungStatus_E2E(Window mainWindow)
+    protected async Task ZeitgesteuerterPrompt_NachPlanen_ZeigtWartestellungStatus_E2E(Window mainWindow)
     {
         SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
@@ -52,9 +55,32 @@ public partial class End2EndTest
 
         Assert.False(new ErrorView(mainWindow).IsVisible);
 
-        taskDetail.ForceClose(recurseToDashboard: false);
+        // Detailansicht verlassen — der persistierte Plan darf dadurch nicht verloren gehen.
+        taskDetail.GoBack();
         var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
-        projectDetail.DeleteProject();
-        projectDetail.Menu.NavigateToDashboard();
+
+        await using (var db = OpenTestDbContext())
+        {
+            var aufgabe = await db.Aufgaben.SingleAsync();
+            var datensatz = await db.ZeitgesteuertePrompts.SingleOrDefaultAsync(z => z.AufgabeId == aufgabe.Id);
+            Assert.NotNull(datensatz);
+        }
+
+        // Wiederöffnen: Wartestellung und Storno-Button müssen weiterhin sichtbar sein.
+        var taskDetailReopened = projectDetail.OpenFirstTask();
+        taskDetailReopened.WaitForScheduledPromptStatus();
+
+        // Manueller Storno: Anzeige verschwindet und der Datensatz wird gelöscht.
+        taskDetailReopened.CancelScheduledPrompt();
+
+        await using (var db = OpenTestDbContext())
+        {
+            Assert.False(await db.ZeitgesteuertePrompts.AnyAsync());
+        }
+
+        taskDetailReopened.ForceClose(recurseToDashboard: false);
+        var projectDetailNachStorno = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetailNachStorno.DeleteProject();
+        projectDetailNachStorno.Menu.NavigateToDashboard();
     }
 }

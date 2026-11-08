@@ -155,13 +155,13 @@ Die Promptvorlagen-Auswahlbox im Ribbon wird durch zwei Eingabefelder (Stunde un
 
 - **Eingabefelder:** Zwei `TextBox`-Felder für Stunde (0–23) und Minute (0–59). Sind beide leer, wird der Prompt über die ComboBox-Auswahl sofort versendet (bisheriges Verhalten). Sind die Felder befüllt, erfolgt kein Sofortversand.
 - **Zeitgesteuert senden Button:** Nur aktiv, wenn eine Vorlage ausgewählt, die Zeitfelder valide gefüllt und die CLI läuft. Klick plant den Prompt zur angegebenen Uhrzeit.
-- **Zielzeitberechnung:** Die eingegebene Uhrzeit wird als lokale Zeit des Anwenders (via `DateTime.Now`) interpretiert. Liegt die Zielzeit in der Vergangenheit/Gegenwart, wird der Prompt sofort versendet.
-- **Statusanzeige:** Während der Prompt geplant ist, zeigt ein `TextBlock` „Prompt in Wartestellung" mit der Zielzeit im Format `HH:mm`. Nach erfolgreichem Versand oder beim CLI-Stop wird dieser Status automatisch gelöscht.
+- **Zielzeitberechnung:** Die eingegebene Uhrzeit wird als lokale Zeit des Anwenders des heutigen Tages interpretiert. Liegt die Zielzeit in der Vergangenheit/Gegenwart, wird der Prompt sofort versendet.
+- **Statusanzeige:** Während der Prompt geplant ist, zeigt die Statusanzeige „Prompt in Wartestellung" mit der Zielzeit im Format `HH:mm`. Nach erfolgreichem Versand verschwindet dieser Status automatisch.
+- **Wartestellung aufheben:** Unter der Statusanzeige steht der Button „Wartestellung aufheben" bereit, der den geplanten Versand jederzeit abbricht.
 - **Statusanzeige in der Seitenleiste:** Solange ein Prompt für eine Aufgabe geplant ist, zeigt auch die Kachel der Aufgabe in der Seitenleisten-Sektion „Aktive Aufgaben" (siehe oben) das Symbol `⏳` anstelle des üblichen Laufzeitstatus; der Tooltip lautet „⏳ Prompt in Wartestellung".
-- **Automatische Stornierung:** Beim Wechsel der Aufgabendetailansicht, beim Schließen der Ansicht oder beim Aufgabenabschluss wird der geplante Prompt storniert; der Timer wird abgebrochen.
-- **Keine Persistierung:** Die Planung ist rein sitzungsgebunden. Ein App-Neustart löscht alle geplanten Prompts. Ein Prompt wird **nicht** persistiert und bei Wiederstart automatisch versendet.
-
-Der neue `PromptZeitVersandService` (Singleton) verwaltet intern pro Aufgabe einen geplanten Prompt in einer Laufzeit-Warteschlange und einen Timer. Bei Erreichen der Zielzeit ruft der Timer-Callback automatisch `PseudoConsoleSession.WritePromptAsync()` auf und versendet den Prompt. Ist die CLI zwischenzeitlich beendet worden, wird der Prompt still verworfen (nur Log-Warnung, kein UI-Feedback).
+- **Persistenz:** Der Plan wird dauerhaft gespeichert. Das Verlassen oder Schließen der Detailansicht, das Stoppen der CLI und ein Neustart der Anwendung löschen den Plan **nicht** — beim nächsten Programmstart wird er automatisch wieder scharf geschaltet, und die Wartestellungs-Anzeige erscheint beim Öffnen der Aufgabe erneut.
+- **Versand ohne laufende CLI:** Läuft die CLI zum Zielzeitpunkt nicht (oder wurde die Anwendung zwischenzeitlich neu gestartet), geht der Plan in den Zustand „Prompt wartet auf CLI-Start" über. Sobald die CLI der Aufgabe das nächste Mal startet, wird der Prompt zugestellt — die CLI wird dafür nicht automatisch gestartet. Die Nachzustellung wird als Systemmeldung im Aufgabenprotokoll festgehalten; ebenso wird ein Versand protokolliert, der im Hintergrund ohne geöffnete Detailansicht erfolgt.
+- **Stornierung:** Neben dem Button „Wartestellung aufheben" wird der Plan beim Abschließen oder Löschen der Aufgabe sowie durch das Planen eines neuen zeitgesteuerten Prompts (Ersetzung) aufgehoben.
 
 ### CLI-Prozess-Management
 
@@ -230,10 +230,10 @@ Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Ges
 2. Im Ribbon-Feld „Zielzeit" 16 als Stunde und 30 als Minute eingeben (16:30 Uhr).
 3. Eine Promptvorlage aus der ComboBox auswählen (z.B. „Fehleranalyse").
 4. Button „Zeitgesteuert senden" klicken.
-5. Status „Prompt in Wartestellung" erscheint mit „16:30" unter dem Button.
+5. Status „Prompt in Wartestellung" erscheint mit „16:30" unter dem Button, daneben der Button „Wartestellung aufheben".
 6. Die Zeitfelder werden geleert, die Vorlage wird zurückgesetzt.
 7. Bei Erreichen von 16:30 Uhr wird der Prompt automatisch an die CLI versendet; die Status-Anzeige verschwindet.
-8. Falls die CLI zwischenzeitlich beendet wurde, wird der Prompt still verworfen (ohne Fehlermeldung).
+8. Läuft die CLI zum Zielzeitpunkt nicht mehr, bleibt der Plan bestehen („Prompt wartet auf CLI-Start") und wird beim nächsten CLI-Start der Aufgabe zugestellt — auch nach einem App-Neustart.
 
 ### CLI-Rohausgabe exportieren
 
@@ -275,7 +275,7 @@ Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-
 - Das CLI-Fenster-Einbetten via `SetParent` funktioniert nur auf Windows; bei Scheitern erscheint das Fenster separat.
 - Die Aufgabenwiederherstellung (Recovery) steht nur zur Verfügung, wenn der letzte Heartbeat älter als 5 Minuten ist.
 - Der Status `Gestartet` bedeutet: Repository geklont und CLI läuft (oder sollte laufen). Wenn die Ansicht eines Status-`Gestartet`-Tasks ohne laufende CLI geöffnet wird, wird die CLI automatisch neu gestartet.
-- Zeitgesteuerter Prompt-Versand: Pro Aufgabe kann maximal ein Prompt gleichzeitig geplant sein; erneutes Planen ersetzt den vorhandenen Eintrag. Die Planung ist rein sitzungsgebunden und wird nicht persistiert — ein App-Neustart löscht alle geplanten Prompts. Ist die CLI zur Zielzeit nicht mehr aktiv, wird der Prompt still verworfen.
+- Zeitgesteuerter Prompt-Versand: Pro Aufgabe kann maximal ein Prompt gleichzeitig geplant sein; erneutes Planen ersetzt den vorhandenen Plan. Der Plan wird dauerhaft gespeichert und überlebt Ansichtwechsel, CLI-Stopp und App-Neustart. Ein Versand ist nur bei laufender Anwendung und laufender CLI möglich: Läuft die CLI zur Zielzeit nicht, wartet der Plan („Prompt wartet auf CLI-Start") bis zum nächsten CLI-Start — die CLI wird dafür nicht automatisch gestartet, und bei vollständig beendeter Anwendung erfolgt kein Versand. Die Zielzeit umfasst nur eine Uhrzeit des aktuellen Tages (keine Datumsauswahl).
 - Das CLI-Ausgabeprotokoll speichert dekodierte Zeilen aus dem Terminal-Rohstream. ANSI- und Control-Sequenzen werden nicht bereinigt und können im Protokoll sichtbar sein.
 - Der CLI-Rohausgabe-Export enthält ausschließlich gespeicherte `CliOutput`-Zeilen; andere Protokolltypen oder Zusatzinformationen werden nicht exportiert.
 - Der CLI-Aufzeichnungs-Export (`.clireplay`) benötigt einen Mitschnitt der letzten Terminal-Session der Aufgabe: Ohne vorherigen CLI-Lauf (oder bei deaktiviertem Aufzeichnungs-Budget) liegt keine Aufzeichnung vor. Es werden nur die letzten 8 Aufgaben mit Mitschnitt vorgehalten — ältere sowie nicht exportierte Aufzeichnungen gehen beim Anwendungsende verloren.

@@ -597,6 +597,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Plant den Versand der aktuell gewählten Promptvorlage zur eingegebenen Zielzeit.</summary>
     public ICommand SchedulePromptCommand { get; }
 
+    /// <summary>Hebt die Wartestellung eines geplanten zeitgesteuerten Prompts auf.</summary>
+    public ICommand CancelScheduledPromptCommand { get; }
+
     /// <summary>Öffnet das Arbeitsverzeichnis der Aufgabe im OS-Dateiexplorer.</summary>
     public ICommand OeffneArbeitsverzeichnisCommand { get; }
 
@@ -670,6 +673,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
         _promptZeitVersandService.PromptSent += OnPromptSent;
+        _promptZeitVersandService.ScheduledPromptChanged += OnScheduledPromptChanged;
         _todoListViewModel.AnsichtAktivierenCallback = () => WaehleAnsicht(DetailAnsicht.Todos);
         _todoListViewModel.FehlerCallback = meldung => FehlerMeldung = meldung;
 
@@ -709,6 +713,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
         SchedulePromptCommand = new AsyncRelayCommand(SchedulePromptAsync, () => KannPromptPlanen);
+        CancelScheduledPromptCommand = new AsyncRelayCommand(ct => _promptZeitVersandService.CancelScheduledPromptAsync(_aufgabeId));
         OeffneArbeitsverzeichnisCommand = new AsyncRelayCommand(OeffneArbeitsverzeichnisAsync, () => ShowFileExplorerPanel);
         OeffneIdeCommand = new AsyncRelayCommand(OeffneIdeAsync, () => KannIdeOeffnen);
         OeffneIdeAuswahlCommand = new AsyncRelayCommand(OeffneIdeAuswahlAsync, () => KannIdeOeffnen);
@@ -759,6 +764,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             await AktualisierePullRequestCapabilityAsync(ct);
             await AktualisiereIssueCreateCapabilityAsync(ct);
             await AktualisiereKannIdeAuswaehlenAsync(ct);
+
+            // Ein persistierter Plan (auch aus früheren Sitzungen/App-Läufen) wird beim
+            // (Wieder-)Öffnen der Ansicht sofort in der Statusanzeige sichtbar.
+            AktualisiereWartestellungsAnzeige();
 
             // LadenAsync bindet nur vorhandene laufende Sitzungen wieder an. Ein neuer CLI-Prozess
             // wird ausschließlich über explizite Start-/Neustartaktionen gestartet.
@@ -1529,9 +1538,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                     if (!isRunning)
                     {
                         AttachCliStatusSession(null);
-                        _promptZeitVersandService.CancelScheduledPrompt(aufgabeId);
-                        ScheduledPromptStatus = null;
-                        ScheduledPromptTimeDisplay = null;
+                        // Ein geplanter zeitgesteuerter Prompt überlebt den CLI-Stopp (persistierter
+                        // Plan) — die Statusanzeige wird ausschließlich über ScheduledPromptChanged
+                        // bzw. PromptSent synchronisiert.
                     }
 
                     CliStatusText = status == CliProcessStatus.Fehler
@@ -1556,7 +1565,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
         _promptZeitVersandService.PromptSent -= OnPromptSent;
-        _promptZeitVersandService.CancelScheduledPrompt(_aufgabeId);
+        _promptZeitVersandService.ScheduledPromptChanged -= OnScheduledPromptChanged;
+        // Kein CancelScheduledPrompt mehr: Ein persistierter Plan überlebt das Verlassen der Ansicht.
         AttachCliStatusSession(null);
         _ladenCts?.Cancel();
         _ladenCts?.Dispose();
@@ -1828,15 +1838,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         await _promptZeitVersandService.SchedulePromptAsync(_aufgabeId, prompt, targetTime);
 
-        // targetTime kann bereits erreicht/vergangen sein (z. B. Uhrzeit des heutigen Tages liegt vor "jetzt").
-        // Der Service versendet in diesem Fall sofort statt zu puffern — dann existiert kein Warteschlangeneintrag
-        // mehr, und der "Wartestellung"-Status darf nicht gesetzt werden, da er dem Nutzer sonst einen nicht
-        // (mehr) gepufferten Prompt als wartend anzeigen würde.
-        if (_promptZeitVersandService.GetScheduledPromptStatus(_aufgabeId) is not null)
-        {
-            ScheduledPromptStatus = "Prompt in Wartestellung";
-            ScheduledPromptTimeDisplay = targetTime.ToString("HH:mm");
-        }
+        // targetTime kann bereits erreicht/vergangen sein (z. B. Uhrzeit des heutigen Tages liegt vor "jetzt")
+        // oder vom Service auf ein Pausenende verschoben worden sein — die Anzeige wird daher immer aus
+        // dem tatsächlichen Service-Zustand befüllt (ScheduledPromptChanged feuert bereits synchron).
+        AktualisiereWartestellungsAnzeige();
 
         ScheduledPromptTargetHours = null;
         ScheduledPromptTargetMinutes = null;
@@ -1854,6 +1859,40 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             ScheduledPromptTimeDisplay = null;
             WaehleAnsicht(DetailAnsicht.Cli);
         });
+    }
+
+    private void OnScheduledPromptChanged(Guid aufgabeId)
+    {
+        if (aufgabeId != _aufgabeId)
+            return;
+
+        _dispatcherInvoke(AktualisiereWartestellungsAnzeige);
+    }
+
+    /// <summary>Spiegelt den Wartestellungs-Zustand des <see cref="PromptZeitVersandService"/> in die Statusanzeige.</summary>
+    private void AktualisiereWartestellungsAnzeige()
+    {
+        if (_promptZeitVersandService.GetScheduledPromptStatus(_aufgabeId) is { } status)
+        {
+            if (status.WartetAufSession)
+            {
+                // Zielzeit ist verstrichen, aber es gab keine zustellfähige CLI-Session: Der Plan
+                // bleibt gültig und wartet auf den nächsten CLI-Start. Bewusst keine vergangene
+                // Uhrzeit anzeigen — die würde den Plan als verfallen/defekt wirken lassen.
+                ScheduledPromptStatus = "Prompt wartet auf CLI-Start";
+                ScheduledPromptTimeDisplay = null;
+            }
+            else
+            {
+                ScheduledPromptStatus = "Prompt in Wartestellung";
+                ScheduledPromptTimeDisplay = status.TargetTime.ToLocalTime().ToString("HH:mm");
+            }
+        }
+        else
+        {
+            ScheduledPromptStatus = null;
+            ScheduledPromptTimeDisplay = null;
+        }
     }
 
     private Task<string> ErmittleEffektivesArbeitsverzeichnisAsync(string lokalerKlonPfad, CancellationToken ct)

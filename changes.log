@@ -1,3 +1,11 @@
+## 2026-11-07 — Persistierter zeitgesteuerter Prompt
+
+- Geplante zeitgesteuerte Prompts werden dauerhaft gespeichert: neue Entity `ZeitgesteuerterPrompt` (Tabelle `ZeitgesteuertePrompts`, EF-Migration `AddZeitgesteuerterPrompt`, Unique-Index auf `AufgabeId`) mit EF-Zugriff über den neuen scoped Service `ZeitgesteuerterPromptStore`.
+- Ein geplanter Prompt überlebt jetzt das Verlassen der Aufgabendetailansicht, einen CLI-Stopp und einen App-Neustart. `TaskDetailViewModel.Dispose` und `OnCliProcessStatusChanged` stornieren den Plan nicht mehr; `App.OnStartup` ruft `PromptZeitVersandService.RestoreScheduledPromptsAsync` nach der Datenbankmigration auf und armiert die Timer erneut.
+- Ist zum Zielzeitpunkt keine CLI-Session aktiv (oder schlägt der Versand fehl), wird der Plan nicht mehr verworfen: Er geht in den Zustand „wartet auf Session" über (Statusanzeige „Prompt wartet auf CLI-Start") und wird beim nächsten CLI-Start der Aufgabe zugestellt. Überfällige Pläne nach einem App-Neustart verhalten sich ebenso — es gibt keinen automatischen CLI-Start und keinen Versand bei beendeter App.
+- Neuer Button „Wartestellung aufheben" in der Aufgabendetailansicht (`CancelScheduledPromptCommand` → `CancelScheduledPromptAsync`) storniert den Plan inklusive Datensatz; der Aufgabenabschluss storniert weiterhin (`EntwicklungsprozessService`), das Löschen der Aufgabe entfernt den Datensatz per Cascade.
+- Versand ohne geöffnete Detailansicht sowie jede Nachzustellung nach CLI-Start schreiben einen `SystemMeldung`-Protokolleintrag auf der Aufgabe; das neue `ScheduledPromptChanged`-Event synchronisiert die Statusanzeige.
+
 ## 2026-11-03 — Update-Pfad mit exklusivem Update-Kanal ersetzt die Prerelease-Checkbox
 
 - Die Checkbox „Prerelease-Versionen laden" entfällt; stattdessen wählt der Anwender unter **Einstellungen → Allgemein → Updates** den „Update-Pfad" aus genau zwei festen Werten: **Produktivversionen** (ausschließlich stabile Releases) oder **Vorabversionen** (ausschließlich Release-Kandidaten/Prereleases) — strikt exklusiv, niemals gemischt. Persistiert als `updates.pfad` (`AppEinstellungService.UpdatePfadKey`); der Altbestand `updates.includePrereleases` verfällt still und wird nicht mehr gelesen oder geschrieben.

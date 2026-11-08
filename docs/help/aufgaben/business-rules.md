@@ -380,24 +380,26 @@
 
 ## Zeitgesteuerter Prompt-Versand
 
-**Beschreibung:** Pro Aufgabe kann maximal ein Prompt zeitgesteuert geplant sein. Ein erneut geplanter Prompt ersetzt den vorherigen.
+**Beschreibung:** Pro Aufgabe kann maximal ein Prompt zeitgesteuert geplant sein. Ein erneut geplanter Prompt ersetzt den vorherigen. Der Plan wird persistiert (Tabelle `ZeitgesteuertePrompts`) und überlebt das Verlassen der Detailansicht, einen CLI-Stopp und einen App-Neustart.
 
 **Bedingungen:**
-- Eine CLI für die Aufgabe läuft (`IsCliRunning == true`).
+- Eine CLI für die Aufgabe läuft (`IsCliRunning == true`) — gilt nur für das Planen; die Zustellung erfolgt auch an eine später (neu) gestartete Session.
 - Eine Promptvorlage ist ausgewählt.
 - Mindestens eines der Zeitfelder (Stunde oder Minute) ist gesetzt.
 - Die Zeit ist valide (Stunde: 0–23, Minute: 0–59).
 
 **Verhalten:**
-- Liegt die Zielzeit in der Vergangenheit/Gegenwart: Prompt wird sofort versendet (kein Eintrag in der Warteschlange).
-- Liegt die Zielzeit in der Zukunft: Prompt wird gepuffert; ein Timer wird gestartet; bei Fälligkeit wird der Prompt automatisch versendet.
-- Ein bereits geplanter Prompt für dieselbe Aufgabe wird ersetzt (vorheriger Timer wird abgebrochen).
-- Ist die Aufgabe zum Planungs- oder Fälligkeitszeitpunkt pausiert (`PausiertBisUtc` in der Zukunft), wird die Zielzeit auf das Pausenende verschoben — der Prompt bleibt geplant und wird nicht verworfen.
-- Falls die CLI zur Zielzeit nicht mehr aktiv ist, wird der Prompt still verworfen (keine `FehlerMeldung`, nur Log-Warnung).
-- Beim Wechsel der Aufgabendetailansicht, beim `Dispose` des ViewModels oder beim Aufgabenabschluss wird ein geplanter Prompt storniert.
-- Die Planung ist rein sitzungsgebunden und wird nicht persistiert — ein App-Neustart löscht alle geplanten Prompts.
+- Liegt die Zielzeit in der Vergangenheit/Gegenwart: Prompt wird sofort versendet (kein Eintrag in der Warteschlange, kein persistierter Datensatz). Schlägt auch der Sofortversand fehl, wird der Plan persistiert und wartet auf die nächste Session.
+- Liegt die Zielzeit in der Zukunft: Der Plan wird zuerst als `ZeitgesteuerterPrompt`-Datensatz persistiert, danach wird ein Timer gestartet; bei Fälligkeit wird der Prompt automatisch versendet und der Datensatz gelöscht.
+- Ein bereits geplanter Prompt für dieselbe Aufgabe wird ersetzt (vorheriger Timer wird abgebrochen, Datensatz per Upsert überschrieben); die Ersetzungsregel ist datenbankseitig über einen Unique-Index auf `AufgabeId` abgesichert.
+- Ist die Aufgabe zum Planungs- oder Fälligkeitszeitpunkt pausiert (`PausiertBisUtc` in der Zukunft), wird die Zielzeit auf das Pausenende verschoben — der Prompt bleibt geplant, der persistierte Zielzeitpunkt wird mitaktualisiert.
+- Ist zum Fälligkeitszeitpunkt keine CLI-Session aktiv oder schlägt der Versand fehl, wird der Plan **nicht** verworfen: Er geht in den Zustand „wartet auf Session" über (Statusanzeige „Prompt wartet auf CLI-Start") und wird beim nächsten CLI-Start der Aufgabe zugestellt (`CliProcessStatusChanged` → `Gestartet`). Es gibt keinen Retry-Timer und keinen Verfall — ein wartender Plan bleibt unbegrenzt bestehen.
+- Beim App-Start werden alle persistierten Pläne wiederhergestellt: zukünftige Zielzeiten armierten einen neuen Timer, verstrichene Zielzeiten gehen in „wartet auf Session" über (nach einem Neustart existiert noch keine Session). Datensätze zu nicht mehr vorhandenen Aufgaben werden verworfen.
+- Verlassen oder Schließen der Detailansicht sowie ein CLI-Stopp stornieren den Plan **nicht**. Storniert wird er über den Button „Wartestellung aufheben", durch Ersetzen, beim Aufgabenabschluss oder beim Löschen der Aufgabe (Cascade).
+- Versendet der Timer- oder Sofortpfad ohne geöffnete Detailansicht bzw. erfolgt eine Nachzustellung nach einem CLI-Start, wird ein `ProtokollTyp.SystemMeldung`-Eintrag auf der Aufgabe geschrieben; ein Fehler beim Protokollieren beeinflusst den erfolgreichen Versand nicht.
+- Es findet **kein** Versand bei vollständig beendeter App statt und **kein** automatischer CLI-Start, um einen fälligen Plan zuzustellen; die Zielzeit bleibt auf eine Uhrzeit (HH:mm) des aktuellen Tages beschränkt (keine Datumsauswahl).
 
-**Umsetzung:** `PromptZeitVersandService` — verwaltet geplante Prompts pro Aufgabe in `Dictionary<Guid, ScheduledPromptEntry>` mit pro-Eintrag-Timer via `TimeProvider.CreateTimer`. `TaskDetailViewModel.SchedulePromptAsync` mit UI-Validierung und Status-Rendering.
+**Umsetzung:** `PromptZeitVersandService` — verwaltet geplante Prompts pro Aufgabe in `Dictionary<Guid, ScheduledPromptEntry>` mit pro-Eintrag-Timer via `TimeProvider.CreateTimer`; persistiert über den scoped `ZeitgesteuerterPromptStore` (aufgelöst per `IServiceScopeFactory`), stellt beim App-Start via `RestoreScheduledPromptsAsync` wieder her und liefert wartende Pläne über ein `CliProcessStatusChanged`-Abonnement zu. `TaskDetailViewModel.SchedulePromptAsync` mit UI-Validierung; `CancelScheduledPromptCommand` für den Button „Wartestellung aufheben"; `ScheduledPromptChanged`-Event zur UI-Synchronisation.
 
 ## Anzeigemodus und Gruppierung der aktiven Aufgabenliste
 

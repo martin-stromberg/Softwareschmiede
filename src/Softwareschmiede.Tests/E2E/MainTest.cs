@@ -230,7 +230,7 @@ public partial class End2EndTest : WpfTestBase
         var app = LaunchApp(true);
         var mainWindow = WarteAufEchtesHauptfenster(app);
 
-        ZeitgesteuerterPrompt_NachPlanen_ZeigtWartestellungStatus_E2E(mainWindow);
+        await ZeitgesteuerterPrompt_NachPlanen_ZeigtWartestellungStatus_E2E(mainWindow);
         await AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E(mainWindow);
         await VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E(mainWindow);
         await VerzeichnisAktionen_KonfiguriertesArbeitsverzeichnisWirdAufgeloest_E2E(mainWindow);
