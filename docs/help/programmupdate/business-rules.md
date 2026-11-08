@@ -52,6 +52,15 @@ Regeln:
 - HTTP-, JSON- oder Timeout-Fehler auf irgendeiner Seite erzeugen keinen Teiltreffer, sondern `Fehlgeschlagen` → `NichtPruefbar`.
 - Ein gemeinsamer Timeout (`UpdateOptions.CheckTimeout`, 15 s) begrenzt alle Seiten zusammen.
 
+## Download-Fallback auf die API-Asset-URL
+
+- `UpdateInfo` trägt neben der primären `DownloadUrl` (`browser_download_url`) eine optionale `FallbackDownloadUrl` — die GitHub-API-Asset-URL der Form `https://api.github.com/repos/{owner}/{repo}/releases/assets/{id}`.
+- Herkunft: `GitHubReleaseClient.CreateFallbackDownloadUrl` bevorzugt das servergelieferte Asset-Feld `url` (`GitHubAsset.Url`), sofern es `IsAllowedAssetApiUrl` besteht — absolut, HTTPS, Host `api.github.com` (OrdinalIgnoreCase). Das Host-Pinning verhindert, dass eine servergelieferte URL den Download auf einen Fremdhost lenkt. Fehlt `url` oder ist sie ungültig, wird die Fallback-URL aus `GitHubAsset.Id > 0` aufgebaut; ohne beides bleibt `FallbackDownloadUrl` `null` und das Asset bleibt fallbacklos nutzbar.
+- Auslöser: ausschließlich ein empfangener HTTP-Status ≥ 500 (5xx) auf der primären Antwort — vor Stream-Beginn. Transportfehler ohne HTTP-Antwort, `429`, Timeout und ein Abriss mitten im Download lösen **keinen** Fallback aus.
+- Umfang: genau ein Zweitversuch, ohne Verzögerung und ohne weitere Wiederholungen. Der Fallback-Request trägt `Accept: application/octet-stream` (sonst liefert die API JSON-Metadaten statt des Binärstroms) und `User-Agent: Softwareschmiede/1.0` (die GitHub-API lehnt Requests ohne User-Agent mit 403 ab); der primäre Request bleibt headerlos.
+- Scheitert auch der Fallback oder liegt keine `FallbackDownloadUrl` vor, gilt der bisherige Fehlerpfad: `EnsureSuccessStatusCode` → `HttpRequestException` → „Update konnte nicht vorbereitet werden."
+- Der Mechanismus ist intern: kein UI-Hinweis, keine Konfiguration, kein Opt-out — sichtbar nur als `LogWarning` (mit Statuscode und beiden URLs) im Anwendungsprotokoll. Der Fallback gilt ausschließlich für `UpdatePackageService.DownloadAsync` — der einzige Abruf einer `browser_download_url`.
+
 ## Aktualitäts- und Concurrency-Regeln
 
 - Alle Update-Eintritte (Startautomatik, manuelle Prüfung, manueller Start) laufen über dasselbe nicht wartende `_updateGate` — ein zweiter Versuch während eines laufenden Vorgangs wird verworfen.

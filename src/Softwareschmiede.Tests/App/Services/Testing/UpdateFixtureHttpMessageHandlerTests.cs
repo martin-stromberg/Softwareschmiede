@@ -88,6 +88,24 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         AssertProtokollEnthaelt(UpdateE2EEreignisse.UnknownHttpRequest);
     }
 
+    /// <summary>Eine GitHub-API-Asset-URL (<c>.../releases/assets/{id}</c>) wird als <c>asset</c>-Abruf protokolliert, nicht als Release-Abruf.</summary>
+    [Fact]
+    public async Task SendAsync_KlassifiziertApiAssetUrlAlsAsset()
+    {
+        var assetApiUrl = "https://api.github.com/repos/o/r/releases/assets/91001";
+        SchreibeSzenario(new UpdateE2ESzenario
+        {
+            Antworten = [new UpdateE2EAntwort { Url = assetApiUrl, Inhalt = "ok" }],
+        });
+
+        using var antwort = await _client.GetAsync(assetApiUrl);
+
+        Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
+        var zeilen = File.ReadAllLines(_kontext.Konfiguration.ProtokollDateiPfad);
+        Assert.Contains(zeilen, z => z.Contains($"\"event\":\"{UpdateE2EEreignisse.HttpRequest}\"", StringComparison.Ordinal)
+            && z.Contains("\"art\":\"asset\"", StringComparison.Ordinal));
+    }
+
     /// <summary>Eine per <c>fault</c> markierte Antwort wirft den kontrollierten Transportfehler.</summary>
     [Fact]
     public async Task SendAsync_Transportfehler_WirftKontrollierteAusnahme()

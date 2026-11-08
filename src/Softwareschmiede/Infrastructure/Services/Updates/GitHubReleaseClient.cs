@@ -10,6 +10,8 @@ namespace Softwareschmiede.Infrastructure.Services.Updates;
 /// <summary>Ruft GitHub-Releases per REST API ab.</summary>
 public sealed class GitHubReleaseClient : IUpdateReleaseClient
 {
+    private const string GitHubApiHost = "api.github.com";
+
     private readonly HttpClient _httpClient;
     private readonly UpdateOptions _options;
     private readonly ILogger<GitHubReleaseClient> _logger;
@@ -28,7 +30,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(_options.CheckTimeout);
 
-        string? requestUri = $"https://api.github.com/repos/{_options.RepositoryOwner}/{_options.RepositoryName}/releases?per_page=100";
+        string? requestUri = RepositoryApiUrl("/releases?per_page=100");
         var visitedUris = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         UpdateInfo? best = null;
@@ -138,15 +140,29 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
             asset.Name,
             new Uri(asset.BrowserDownloadUrl, UriKind.Absolute),
             release.PublishedAt,
-            isPrerelease);
+            isPrerelease,
+            CreateFallbackDownloadUrl(asset));
     }
+
+    private Uri? CreateFallbackDownloadUrl(GitHubAsset asset)
+    {
+        if (IsAllowedAssetApiUrl(asset.Url))
+            return new Uri(asset.Url, UriKind.Absolute);
+
+        return asset.Id > 0
+            ? new Uri(RepositoryApiUrl($"/releases/assets/{asset.Id}"), UriKind.Absolute)
+            : null;
+    }
+
+    private string RepositoryApiUrl(string path)
+        => $"https://{GitHubApiHost}/repos/{_options.RepositoryOwner}/{_options.RepositoryName}{path}";
 
     private bool IsAllowedFollowUpUri(Uri uri)
     {
         var expectedPath = $"/repos/{_options.RepositoryOwner}/{_options.RepositoryName}/releases";
         var path = uri.AbsolutePath.TrimEnd('/');
         return uri.Scheme == Uri.UriSchemeHttps
-            && string.Equals(uri.Host, "api.github.com", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(uri.Host, GitHubApiHost, StringComparison.OrdinalIgnoreCase)
             && (string.Equals(path, expectedPath, StringComparison.OrdinalIgnoreCase) || IsRepositoryIdReleasesPath(path));
     }
 
@@ -206,6 +222,11 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
         => Uri.TryCreate(url, UriKind.Absolute, out var uri)
             && uri.Scheme == Uri.UriSchemeHttps;
 
+    private static bool IsAllowedAssetApiUrl(string url)
+        => Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            && uri.Scheme == Uri.UriSchemeHttps
+            && string.Equals(uri.Host, GitHubApiHost, StringComparison.OrdinalIgnoreCase);
+
     private sealed class GitHubRelease
     {
         [JsonPropertyName("tag_name")]
@@ -231,5 +252,11 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
 
         [JsonPropertyName("browser_download_url")]
         public string BrowserDownloadUrl { get; set; } = string.Empty;
+
+        [JsonPropertyName("url")]
+        public string Url { get; set; } = string.Empty;
+
+        [JsonPropertyName("id")]
+        public long Id { get; set; }
     }
 }
