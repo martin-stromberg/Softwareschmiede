@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Net.Http.Headers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Application.Services.Updates;
@@ -63,7 +64,7 @@ public sealed class UpdatePackageService : IUpdatePackageService
         try
         {
             progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.Download, 0, "Update wird heruntergeladen."));
-            await DownloadAsync(update.DownloadUrl, partialZipPath, progress, ct);
+            await DownloadAsync(update, partialZipPath, progress, ct);
             File.Move(partialZipPath, zipPath, overwrite: true);
 
             if (new FileInfo(zipPath).Length == 0)
@@ -89,32 +90,59 @@ public sealed class UpdatePackageService : IUpdatePackageService
     }
 
     private async Task DownloadAsync(
-        Uri downloadUrl,
+        UpdateInfo update,
         string partialZipPath,
         IProgress<UpdatePreparationProgress>? progress,
         CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
-        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
-
-        var total = response.Content.Headers.ContentLength;
-        await using var remoteStream = await response.Content.ReadAsStreamAsync(ct);
-        await using var fileStream = new FileStream(partialZipPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-
-        var buffer = new byte[81920];
-        long downloaded = 0;
-        int read;
-        while ((read = await remoteStream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+        var response = await SendDownloadRequestAsync(update.DownloadUrl, useApiHeaders: false, ct);
+        if (!response.IsSuccessStatusCode
+            && (int)response.StatusCode >= 500
+            && update.FallbackDownloadUrl is not null)
         {
-            await fileStream.WriteAsync(buffer.AsMemory(0, read), ct);
-            downloaded += read;
-            if (total is > 0)
+            _logger.LogWarning(
+                "Update-Download über {DownloadUrl} lieferte HTTP {StatusCode}; versuche einmalig die API-Asset-URL {FallbackDownloadUrl}.",
+                update.DownloadUrl,
+                (int)response.StatusCode,
+                update.FallbackDownloadUrl);
+            response.Dispose();
+            response = await SendDownloadRequestAsync(update.FallbackDownloadUrl, useApiHeaders: true, ct);
+        }
+
+        using (response)
+        {
+            response.EnsureSuccessStatusCode();
+
+            var total = response.Content.Headers.ContentLength;
+            await using var remoteStream = await response.Content.ReadAsStreamAsync(ct);
+            await using var fileStream = new FileStream(partialZipPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+
+            var buffer = new byte[81920];
+            long downloaded = 0;
+            int read;
+            while ((read = await remoteStream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
             {
-                var percent = Math.Min(100, downloaded * 100d / total.Value);
-                progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.Download, percent, "Update wird heruntergeladen."));
+                await fileStream.WriteAsync(buffer.AsMemory(0, read), ct);
+                downloaded += read;
+                if (total is > 0)
+                {
+                    var percent = Math.Min(100, downloaded * 100d / total.Value);
+                    progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.Download, percent, "Update wird heruntergeladen."));
+                }
             }
         }
+    }
+
+    private async Task<HttpResponseMessage> SendDownloadRequestAsync(Uri url, bool useApiHeaders, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        if (useApiHeaders)
+        {
+            request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Softwareschmiede", "1.0"));
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
+        }
+
+        return await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
     }
 
     private void ValidateExtractedPackage(string extractedDirectory)

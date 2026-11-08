@@ -12,6 +12,7 @@ public sealed class RoutingHttpHandler : HttpMessageHandler
 {
     private readonly Dictionary<string, Func<CancellationToken, Task<HttpResponseMessage>>> _routes = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> _requestedUrls = [];
+    private readonly List<string?> _requestedAcceptHeaders = [];
 
     /// <inheritdoc cref="RoutingHttpHandler"/>
     public RoutingHttpHandler()
@@ -28,6 +29,9 @@ public sealed class RoutingHttpHandler : HttpMessageHandler
 
     /// <summary>Die in Aufrufreihenfolge angefragten URLs.</summary>
     public IReadOnlyList<string> RequestedUrls => _requestedUrls;
+
+    /// <summary>Die <c>Accept</c>-Header der Requests in Aufrufreihenfolge (parallel zu <see cref="RequestedUrls"/>).</summary>
+    public IReadOnlyList<string?> RequestedAcceptHeaders => _requestedAcceptHeaders;
 
     /// <summary>Registriert eine Seitenantwort, optional mit Link-Header auf eine Folgeseite.</summary>
     /// <param name="url">Die URL der Seite.</param>
@@ -59,6 +63,7 @@ public sealed class RoutingHttpHandler : HttpMessageHandler
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         _requestedUrls.Add(request.RequestUri!.AbsoluteUri);
+        _requestedAcceptHeaders.Add(request.Headers.Accept?.ToString());
         return _routes.TryGetValue(request.RequestUri!.AbsoluteUri, out var handler)
             ? handler(cancellationToken)
             : Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)

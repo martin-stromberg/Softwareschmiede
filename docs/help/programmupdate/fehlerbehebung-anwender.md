@@ -69,6 +69,8 @@ Der Vorgang wurde abgebrochen — durch den **Abbrechen**-Button im Fortschritts
 
 Das Herunterladen, Entpacken oder die Vorbereitung des Update-Pakets ist fehlgeschlagen.
 
+> **Hinweis:** Bei einem vorübergehenden Serverfehler (HTTP 5xx) versucht die Anwendung automatisch einmalig einen alternativen Download-Pfad — dieser interne Mechanismus ist nicht sichtbar und benötigt kein Zutun. Erscheint die Fehlermeldung dennoch, sind beide Pfade gescheitert oder es lag eine andere Fehlerart vor (z. B. Verbindungsabbruch, Zeitüberschreitung).
+
 1. Prüfen Sie die Internetverbindung und den freien Speicherplatz im Programmverzeichnis.
 2. Prüfen Sie, ob ein Virenscanner oder fehlende Schreibrechte den Dateizugriff blockieren.
 3. Wiederholen Sie den Vorgang über **⇧ Update**.

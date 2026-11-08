@@ -65,9 +65,10 @@ Serialisiert über ein eigenes `SemaphoreSlim` (`_checkGate`):
 - Pro Release-Eintrag (`TryCreateCandidate`):
   - `draft == true`, fehlender/ungültiger Tag (`UpdateVersionComparer.TryParse`) oder fehlendes `release.zip`-Asset (`UpdateOptions.AssetName`, absolute HTTPS-Download-URL) → Eintrag wird übersprungen; ein einzelner unbrauchbarer Eintrag verhindert andere Kandidaten nicht.
   - Prerelease-Klassifikation: GitHub-Flag `prerelease` **oder** SemVer-Prerelease-Suffix (`SemanticUpdateVersion.IsPrerelease`). Die Filterung ist exklusiv je `options.Kanal`: `Produktiv` überspringt alle Prerelease-Kandidaten, `ReleaseCandidate` überspringt alle Nicht-Prerelease-Kandidaten.
+  - Fallback-URL: `CreateFallbackDownloadUrl` leitet `UpdateInfo.FallbackDownloadUrl` ab — bevorzugt aus dem servergelieferten Asset-Feld `url` (`GitHubAsset.Url`, validiert per `IsAllowedAssetApiUrl`: absolut, HTTPS, Host `api.github.com`), sonst aus der Asset-ID (`GitHubAsset.Id > 0`) als `https://api.github.com/repos/{RepositoryOwner}/{RepositoryName}/releases/assets/{id}` via `RepositoryApiUrl`; ohne beides `null`.
   - Gewinner ist die höchste zulässige `SemanticUpdateVersion` über **alle** Seiten — unabhängig von Reihenfolge oder Veröffentlichungsdatum; bei Gleichstand bleibt die erste Fundstelle.
 - Ergebnis: Kein zulässiger Kandidat → `KeinTreffer`. HTTP-, JSON-, Timeout- oder Pagination-Fehler auf **irgendeiner** Seite → `Fehlgeschlagen` (keine Teiltreffer). Caller-Cancellation propagiert als `OperationCanceledException`.
-- Das gelieferte `UpdateInfo` trägt die normalisierte Version (`UpdateVersionComparer.Normalize`), den Original-Tag, Asset-Name, Download-URL, `PublishedAt` und `IsPrerelease`.
+- Das gelieferte `UpdateInfo` trägt die normalisierte Version (`UpdateVersionComparer.Normalize`), den Original-Tag, Asset-Name, Download-URL, `PublishedAt`, `IsPrerelease` und die optionale `FallbackDownloadUrl`.
 
 ### SemVer-Vergleich (`SemanticUpdateVersion`, `UpdateVersionComparer`)
 
@@ -84,10 +85,24 @@ Manueller Start (`StartenAsync`), Startautomatik und der Kern `InstalliereUpdate
 5. **Sicherheitsprüfung:** `ICliUpdateSafetyService.CheckAsync` liefert riskante Aufgaben — aktiv sind die, für die `AufgabeLaufAktivitaet.IstAktiv` über `AktiveRunId`/`LastHeartbeatUtc` (jünger als `AufgabeRecoveryService.HeartbeatTimeoutMinutes`, 5 Minuten) greift. Zusätzlich lädt `KiPluginLimitService.GetAktiveSessionLimitsAsync` persistierte, noch zukünftige Session-Limits (`AppEinstellung`-Schlüssel `plugins.sessionlimit.<Prefix>`): Aufgaben eines limitierten `KiPluginPrefix` gelten als nicht riskant — **auch bei frischem Heartbeat**, da das Plugin ohnehin nicht weiterarbeiten kann; für sie entfällt die Heartbeat-Toleranz komplett. Bei `RequiresConfirmation` zeigt `IDialogService.BestaetigenDialog` die Warnung „Update starten?" — Ablehnung beendet den Vorgang. Die Startautomatik umgeht diese Entscheidung nicht.
 6. **Fortschrittsdialog:** `IUpdateProgressDialogService.Show(progressViewModel)` öffnet den modalen `UpdateProgressDialog` mit dem Hauptfenster als Owner.
 7. **Aktualitätsnachweis vor der Vorbereitung:** Einstellungen werden erneut gelesen; Lesefehler oder Abweichung vom Snapshot (`vorVorbereitung != snapshot`) bzw. geänderte Generation beenden den Versuch — im Dialog als Fehler sichtbar, ohne Assetabruf.
-8. **Vorbereitung:** `UpdateService.PrepareUpdateAsync` → `UpdatePackageService.PreparePackageAsync` führt Download (`{AssetName}.download` → umbenannt), Entpacken nach `updates/extracted/{Version}`, Validierung (`Softwareschmiede.exe` + `version.json` im Paket-Root) und Skripterzeugung (`UpdateScriptService.CreateScriptAsync` → `updates/update.ps1`) aus. Fortschritt über `IProgress<UpdatePreparationProgress>`. Fehler räumen die angelegten Dateien/Verzeichnisse wieder auf.
+8. **Vorbereitung:** `UpdateService.PrepareUpdateAsync` → `UpdatePackageService.PreparePackageAsync` führt Download (`{AssetName}.download` → umbenannt; mit einmaligem API-Fallback, siehe nächsten Abschnitt), Entpacken nach `updates/extracted/{Version}`, Validierung (`Softwareschmiede.exe` + `version.json` im Paket-Root) und Skripterzeugung (`UpdateScriptService.CreateScriptAsync` → `updates/update.ps1`) aus. Fortschritt über `IProgress<UpdatePreparationProgress>`. Fehler räumen die angelegten Dateien/Verzeichnisse wieder auf.
 9. **Letzter Aktualitätsnachweis:** erneutes Lesen unmittelbar vor dem Updater-Start; Lesefehler oder geänderte Werte verhindern `MarkUpdaterStarting`, `StartPreparedUpdateAsync` und damit Prozessstart und Shutdown — auch wenn Paket und Skript bereits vorliegen.
 10. **Start:** `progressViewModel.MarkUpdaterStarting()`, dann `UpdateService.StartPreparedUpdateAsync` → `UpdateScriptService.StartScriptAsync` startet PowerShell mit `update.ps1` (Parameter `AppPid`, `TargetDirectory`, `ExtractedDirectory`, `ExecutablePath`, `LogPath`; optional elevated via `Verb = "runas"`, wenn das Programmverzeichnis nicht beschreibbar ist). Erst nach erfolgreichem Skriptstart ruft der `UpdateService` `IApplicationShutdownService.Shutdown()` — es gibt keinen zweiten Shutdown im ViewModel. Der synchrone Prozessstart ist die Übergabegrenze: Danach werden gespeicherte Änderungen nicht mehr berücksichtigt.
 11. **Abschluss:** Gate, `UpdateCheckLaeuft`/`UpdateWirdVorbereitet` und `_updateAblaufCts` werden im `finally` immer freigegeben; Fehler landen im Dialog (`SetError`) bzw. `UpdateHinweis`.
+
+## Paket-Download mit einmaligem API-Fallback
+
+`PreparePackageAsync` ruft `DownloadAsync(update, partialZipPath, progress, ct)` mit der gesamten `UpdateInfo` auf — nicht nur der primären Download-URL. Der zweistufige Ablauf:
+
+1. `SendDownloadRequestAsync(update.DownloadUrl, useApiHeaders: false, ct)` sendet einen GET gegen die `browser_download_url` ohne zusätzliche Header (`HttpCompletionOption.ResponseHeadersRead`).
+2. Ist die Antwort kein Erfolgsstatus **und** `(int)response.StatusCode >= 500` **und** `update.FallbackDownloadUrl is not null`, wird einmalig auf die API-Asset-URL umgeschaltet:
+   - `_logger.LogWarning(...)` mit Statuscode und beiden URLs.
+   - Die primäre Response wird disposed.
+   - `SendDownloadRequestAsync(update.FallbackDownloadUrl, useApiHeaders: true, ct)` sendet den zweiten GET mit `Accept: application/octet-stream` (sonst liefert die API JSON-Metadaten statt des Binärstroms) und `User-Agent: Softwareschmiede/1.0` (die GitHub-API lehnt Requests ohne User-Agent mit 403 ab; der geteilte `HttpClient` setzt keine Default-Header).
+3. Auf der finalen Response wird `EnsureSuccessStatusCode()` aufgerufen — wirft wie bisher `HttpRequestException`, wenn auch der Fallback (oder die primäre URL ohne Fallback-Option) scheitert. Die Exception läuft über den bestehenden Catch-all in `PreparePackageAsync` (Aufräumen der Partials) zu `MainWindowUpdateFlow` → „Update konnte nicht vorbereitet werden."
+4. Der Streaming-Teil (81920-Byte-Buffer, `FileMode.CreateNew`, `ContentLength`-basierte Prozentanzeige) läuft für beide Pfade identisch; die `.download`-Teildatei existiert zum Umschaltzeitpunkt noch nicht, da sie erst nach der Statusprüfung angelegt wird — der Fallback ist immer sauber, ohne Teildatei-Behandlung.
+
+Der Fallback ist bewusst eng gefasst: Er greift nur bei einem empfangenen HTTP-Status ≥ 500 auf der Response, vor Stream-Beginn — nicht bei Transportfehlern ohne HTTP-Antwort, `429`, Timeout oder einem Abriss mitten im Download. Es gibt genau einen Zweitversuch ohne Verzögerung, kein UI-Signal und keine Konfiguration/Opt-out — sichtbar ist der Mechanismus nur als `LogWarning` im Anwendungsprotokoll.
 
 ## Update-Fortschrittsdialog
 
@@ -149,6 +164,7 @@ flowchart TD
 | Update-Einstellungen nicht lesbar | Angebot invalidiert, `UpdateHinweis`/Dialog-Fehler, kein Releaseabruf, kein Updater-Start |
 | Einstellungen während des Vorgangs geändert | Generationssprung/Snapshot-Abweichung → Abbruch, Hinweis „Die Update-Einstellungen wurden geändert. Der Update-Vorgang wurde abgebrochen." |
 | Benutzer-Abbruch | `OperationCanceledException` → „Update-Vorbereitung wurde abgebrochen." |
+| 5xx-Antwort der Download-URL | Einmaliger Zweitversuch über `UpdateInfo.FallbackDownloadUrl` (nur Status ≥ 500); bei Erfolg normaler Download — sonst wie Vorbereitungsfehler |
 | Vorbereitungs-/Startfehler | `SetError` im Dialog + `UpdateHinweis` „Update konnte nicht vorbereitet werden."; kein Shutdown |
 | InvalidOperationException beim Binding-Aufbau | Alle Properties des `UpdateProgressViewModel` haben öffentliche Setter — siehe Binding-Tabelle oben |
 
