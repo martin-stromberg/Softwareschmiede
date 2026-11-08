@@ -78,6 +78,11 @@
 
 **Symptom:** Ein zeitgesteuert geplanter Prompt wird später als geplant ausgeführt.
 
-**Ursache:** Die Aufgabe war zum geplanten Zeitpunkt pausiert. Geplante Prompts werden nicht verworfen, sondern auf das Pausenende verschoben.
+**Mögliche Ursachen:**
+- Die Aufgabe war zum geplanten Zeitpunkt pausiert. Geplante Prompts werden nicht verworfen, sondern auf das Pausenende verschoben.
+- Die CLI der Aufgabe lief zum Zielzeitpunkt nicht (oder die Anwendung war zwischenzeitlich beendet). Der Plan geht dann in den Zustand „Prompt wartet auf CLI-Start" über und wird erst beim nächsten CLI-Start zugestellt — ein automatischer CLI-Start erfolgt nicht.
 
-**Lösung:** Hebe die Pause vorzeitig über **Pause einstellen** → **Pause aufheben** auf oder warte das Pausenende ab; danach wird der Prompt zur verschobenen Zeit versendet.
+**Lösung:**
+1. Bei Pause: die Pause vorzeitig über **Pause einstellen** → **Pause aufheben** aufheben oder das Pausenende abwarten; danach wird der Prompt zur verschobenen Zeit versendet.
+2. Bei „Prompt wartet auf CLI-Start": die CLI der Aufgabe starten bzw. neu starten — der Prompt wird dann zugestellt und die Zustellung als Systemmeldung im Aufgabenprotokoll festgehalten.
+3. Soll der Plan gar nicht mehr ausgeführt werden, kann er über den Button **Wartestellung aufheben** unter der Statusanzeige jederzeit entfernt werden.

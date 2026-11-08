@@ -215,9 +215,9 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id).Should().BeNull();
     }
 
-    /// <summary>Dispose storniert einen für die Aufgabe geplanten Prompt beim Service.</summary>
+    /// <summary>Dispose lässt einen für die Aufgabe geplanten Prompt bestehen — der persistierte Plan überlebt das Verlassen der Detailansicht.</summary>
     [Fact]
-    public async Task Dispose_StorniertGeplantePrompts()
+    public async Task Dispose_LaesstGeplantenPlanBestehen()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
@@ -229,13 +229,13 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
 
         sut.Dispose();
 
-        _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id).Should().BeNull(
-            "Dispose muss den geplanten Prompt für die Aufgabe stornieren");
+        _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id).Should().NotBeNull(
+            "Dispose darf den geplanten Prompt für die Aufgabe nicht mehr stornieren");
     }
 
-    /// <summary>Stoppt der CLI-Prozess (OnCliProcessStatusChanged mit Status ungleich Gestartet), muss der geplante Prompt beim Service storniert werden, damit ein verwaister Timer nicht bei CLI-Neustart in eine falsche Session feuert.</summary>
+    /// <summary>Stoppt der CLI-Prozess (OnCliProcessStatusChanged mit Status ungleich Gestartet), bleibt der geplante Prompt bestehen und wartet auf die nächste Session.</summary>
     [Fact]
-    public async Task OnCliProcessStatusChanged_CliGestoppt_StorniertGeplantenPrompt()
+    public async Task OnCliProcessStatusChanged_CliGestoppt_BehaeltGeplantenPrompt()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
@@ -248,8 +248,80 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         var method = typeof(TaskDetailViewModel).GetMethod("OnCliProcessStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
         method.Invoke(sut, new object[] { aufgabe.Id, CliProcessStatus.Gestoppt });
 
-        _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id).Should().BeNull(
-            "beim CLI-Stopp muss der geplante Prompt der Aufgabe im Service storniert werden");
+        _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id).Should().NotBeNull(
+            "ein CLI-Stopp darf den persistierten Plan nicht mehr stornieren");
+    }
+
+    /// <summary>Beim (Wieder-)Öffnen der Detailansicht wird die Statusanzeige aus dem Service-Zustand befüllt.</summary>
+    [Fact]
+    public async Task LadenAsync_MitGeplantemPrompt_ZeigtWartestellungStatus()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        var zielzeit = _timeProvider.GetUtcNow().AddMinutes(5);
+        await _promptZeitVersandService.SchedulePromptAsync(aufgabe.Id, "Test", zielzeit);
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.ScheduledPromptStatus.Should().Be("Prompt in Wartestellung");
+        sut.ScheduledPromptTimeDisplay.Should().Be(zielzeit.ToLocalTime().ToString("HH:mm"));
+    }
+
+    /// <summary>Ein Plan im Zustand „wartet auf Session" (Zielzeit verstrichen ohne CLI-Session) zeigt einen verständlichen Hinweis statt einer vergangenen Uhrzeit.</summary>
+    [Fact]
+    public async Task LadenAsync_MitPlanDerAufSessionWartet_ZeigtCliStartHinweis()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        // Vergangene Zielzeit + keine CLI-Session → Sofortversand schlägt fehl → Plan wartet auf Session.
+        await _promptZeitVersandService.SchedulePromptAsync(aufgabe.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(-1));
+        _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id)!.WartetAufSession.Should().BeTrue();
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.ScheduledPromptStatus.Should().Be("Prompt wartet auf CLI-Start");
+        sut.ScheduledPromptTimeDisplay.Should().BeNull(
+            "eine vergangene Uhrzeit würde den noch gültigen Plan als verfallen oder defekt wirken lassen");
+    }
+
+    /// <summary>Das ScheduledPromptChanged-Event des Service synchronisiert die Anzeige: externes Storno leert sie, ein neuer Plan setzt sie.</summary>
+    [Fact]
+    public async Task ScheduledPromptChanged_AktualisiertAnzeige()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await _promptZeitVersandService.SchedulePromptAsync(aufgabe.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(5));
+        sut.ScheduledPromptStatus.Should().Be("Prompt in Wartestellung",
+            "das Planen muss die Anzeige über ScheduledPromptChanged setzen");
+
+        await _promptZeitVersandService.CancelScheduledPromptAsync(aufgabe.Id);
+        sut.ScheduledPromptStatus.Should().BeNull(
+            "ein externes Storno muss die Anzeige über ScheduledPromptChanged leeren");
+        sut.ScheduledPromptTimeDisplay.Should().BeNull();
+    }
+
+    /// <summary>Das CancelScheduledPromptCommand ruft CancelScheduledPromptAsync; danach sind Anzeige und Plan entfernt.</summary>
+    [Fact]
+    public async Task CancelScheduledPromptCommand_EntferntPlanUndAnzeige()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await _promptZeitVersandService.SchedulePromptAsync(aufgabe.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(5));
+        sut.ScheduledPromptStatus.Should().Be("Prompt in Wartestellung");
+
+        await ((AsyncRelayCommand)sut.CancelScheduledPromptCommand).ExecuteAsync();
+
+        sut.ScheduledPromptStatus.Should().BeNull();
+        sut.ScheduledPromptTimeDisplay.Should().BeNull();
+        _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id).Should().BeNull();
     }
 
     /// <summary>KannPromptPlanen hängt auch von IsCliRunning ab; ein Wechsel des CLI-Laufstatus muss daher PropertyChanged für KannPromptPlanen auslösen.</summary>

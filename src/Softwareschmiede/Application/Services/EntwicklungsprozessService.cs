@@ -435,7 +435,10 @@ public sealed class EntwicklungsprozessService
             await _options.KiAusfuehrungsService.StopCliAsync(aufgabeId, ct);
         }
 
-        _options.PromptZeitVersandService?.CancelScheduledPrompt(aufgabeId);
+        if (_options.PromptZeitVersandService is not null)
+        {
+            await _options.PromptZeitVersandService.CancelScheduledPromptAsync(aufgabeId);
+        }
 
         var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");

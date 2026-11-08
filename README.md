@@ -28,6 +28,7 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 - **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Ereignisüberwachung
 - **GitHub-Ereignisüberwachung** für Issues und Pull Requests aktivierter Projekt-Repositories — umschaltbar zwischen repository-weiter Überwachung mit Trigger-Keyword und der Notifications-Inbox eines separaten Bot-Kontos (@mention) — mit persistenter Queue und kontrollierter CLI-Zustellung
 - **Pausierbare Aufgaben** mit manueller Pause und automatischer Pausierung bei erkannten KI-Session-Limits
+- **Zeitgesteuerte Prompts** mit persistenter Wartestellung — Pläne überleben Ansichtswechsel, CLI-Stopp und App-Neustart und werden zum Zielzeitpunkt bzw. beim nächsten CLI-Start zugestellt
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases mit konfigurierbarem Update-Modus und wählbarem Update-Pfad (ausschließlich stabile Versionen oder ausschließlich Release-Kandidaten)
 - **CLI-Aufzeichnung mit Konsolentestfenster** zur Diagnose des Terminal-Renderpfads — byte-exakter Mitschnitt, `.clireplay`-Export, zeitgesteuerte Wiedergabe in der aufgezeichneten Terminal-Geometrie und Einzelschritt-Modus (vor/zurück)
 
@@ -142,6 +143,18 @@ Die Seitenleisten-Sektion **„Aktive Aufgaben"** und die gleichnamige Liste im 
 - **Plugin-Symbole:** Die Symbole liefert der Plugin-Vertrag — `IPlugin.PluginSymbol` ist als binärkompatibles Default-Interface-Member deklariert (Fallback `◻`); alle mitgelieferten Plugins definieren eigene Glyphen (z. B. 🐙 GitHub, 🪣 BitBucket, 📁 Local Directory, ✳ Claude CLI, ✈ GitHub Copilot, ◈ Codex, 🤖 Devin, 🧪 KI-Simulator).
 
 Die Implementierung liegt in `ActiveTasksListControl`, `MainWindowViewModel`, `DashboardViewModel`, `AufgabenListenModus`, `AufgabenListenAnsicht`, `AufgabenListenModusService`, `AktiveAufgabePanelItem` und `KiAusfuehrungsStatusSymbolConverter`. Abgedeckt wird das Feature u. a. durch `AufgabenListenAnsichtTests`, `KiAusfuehrungsStatusSymbolConverterTests` und den E2E-Test `E2E_AufgabenListeModi`.
+
+## Zeitgesteuerter Prompt-Versand
+
+In der Aufgabendetailansicht lässt sich ein (platzhalteraufgelöster) Prompt zu einer Ziel-Uhrzeit an die CLI-Session der Aufgabe planen statt ihn sofort zu senden — pro Aufgabe ist maximal ein Plan aktiv, ein erneutes Planen ersetzt den vorherigen. Geplante Prompts werden vom Singleton `PromptZeitVersandService` verwaltet und sind persistent:
+
+- Der Plan wird als `ZeitgesteuerterPrompt`-Datensatz in der SQLite-Datenbank gespeichert (`ZeitgesteuerterPromptStore`, Unique-Index auf `AufgabeId`, `DeleteBehavior.Cascade` beim Löschen der Aufgabe) und überlebt damit das Verlassen der Detailansicht, einen CLI-Stopp und einen App-Neustart.
+- Beim App-Start stellt `PromptZeitVersandService.RestoreScheduledPromptsAsync` die persistierten Pläne wieder her (aufgerufen in `App.xaml.cs` nach `MigrateAsync`): zukünftige Zielzeiten erhalten einen Timer, verstrichene gehen in den Zustand „wartet auf Session" über und werden beim nächsten CLI-Start der Aufgabe nachgestellt (`KiAusfuehrungsService.CliProcessStatusChanged` → `ZustellungNachSessionStartAsync`). Liegt zum Fälligkeitszeitpunkt keine aktive `ITerminalSession` vor, wartet der Plan ebenfalls auf die nächste Session statt still verworfen zu werden. Verwaiste Datensätze (Aufgabe nicht mehr vorhanden) werden beim Restore entfernt.
+- Eine aktive Pause verschiebt den geplanten Prompt auf das Pausenende — der persistierte Zielzeitpunkt wird mit aktualisiert.
+- Die Detailansicht zeigt den persistierten Plan auch nach einem Wiederöffnen an („Prompt in Wartestellung" mit Zielzeit bzw. „Prompt wartet auf CLI-Start"); der `⏳`-Indikator in der aktiven Aufgabenliste folgt demselben Zustand (`ScheduledPromptChanged`-Event). Über den Button **„Wartestellung aufheben"** (`CancelScheduledPromptCommand` → `CancelScheduledPromptAsync`) lässt sich ein Plan explizit stornieren — Eintrag und Datensatz werden entfernt. Der Aufgabenabschluss storniert einen geplanten Prompt ebenfalls.
+- Jeder Versand ohne beobachtende Detailansicht (Hintergrundversand) schreibt einen `ProtokollTyp.SystemMeldung`-Eintrag („Zeitgesteuerter Prompt versendet." bzw. „Zeitgesteuerter Prompt nach CLI-Start zugestellt.").
+
+Die Implementierung liegt in `PromptZeitVersandService`, `ZeitgesteuerterPromptStore`, `ZeitgesteuerterPrompt`, `ScheduledPromptInfo`, `TaskDetailViewModel`, `EntwicklungsprozessService` und `App.xaml.cs`. Abgedeckt wird das Feature u. a. durch `PromptZeitVersandServiceTests`, `TaskDetailViewModelTests_ZeitgesteuerterPrompt`, `MainWindowViewModelTests_ZeitgesteuerterPrompt` und den E2E-Test `E2E_ZeitgesteuerterPrompt`.
 
 ## Aufgaben pausieren und Session-Limits erkennen
 

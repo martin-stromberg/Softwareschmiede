@@ -305,6 +305,23 @@ public sealed class TaskDetailView : BaseWindowView
         return this;
     }
 
+    /// <summary>Wartet, bis die Statusanzeige "Prompt in Wartestellung" sichtbar ist.</summary>
+    /// <returns>Diese Instanz.</returns>
+    public TaskDetailView WaitForScheduledPromptStatus()
+    {
+        WaitForElement(Window, cf => cf.ByName("ScheduledPromptStatus"), Medium);
+        return this;
+    }
+
+    /// <summary>Klickt den "Wartestellung aufheben"-Button und wartet, bis die Statusanzeige verschwunden ist.</summary>
+    /// <returns>Diese Instanz.</returns>
+    public TaskDetailView CancelScheduledPrompt()
+    {
+        WaitForElement(Window, cf => cf.ByName("WartestellungAufheben"), Short).AsButton().ClickInForeground();
+        WaitUntilGone(Window, cf => cf.ByName("ScheduledPromptStatus"), Medium);
+        return this;
+    }
+
     /// <summary>Klickt den Haupt-Button "IdeOeffnen" des IDE-Öffnen-Split-Buttons.</summary>
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView OpenIde()

@@ -87,6 +87,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>To-Do-Elemente von Aufgaben.</summary>
     public DbSet<Todo> Todos => Set<Todo>();
 
+    /// <summary>Persistierte geplante zeitgesteuerte Prompts (max. ein Plan pro Aufgabe).</summary>
+    public DbSet<ZeitgesteuerterPrompt> ZeitgesteuertePrompts => Set<ZeitgesteuerterPrompt>();
+
     /// <summary>Dauerhafte SCM-Eingangsqueue.</summary>
     public DbSet<ScmIncomingEvent> ScmIncomingEvents => Set<ScmIncomingEvent>();
     /// <summary>Beobachtete SCM-Textstände.</summary>
@@ -237,6 +240,23 @@ public sealed class SoftwareschmiededDbContext : DbContext
             // DateTimeOffset als Unix-Millisekunden (long) speichern, damit SQLite ORDER BY funktioniert.
             e.Property(t => t.ErstellungsDatum).HasConversion(UnixMillisConverter);
             e.Property(t => t.ErledigtAm).HasConversion(NullableUnixMillisConverter);
+        });
+
+        // ZeitgesteuerterPrompt
+        modelBuilder.Entity<ZeitgesteuerterPrompt>(e =>
+        {
+            e.HasKey(z => z.Id);
+            e.Property(z => z.PromptText).IsRequired();
+            // DateTimeOffset als Unix-Millisekunden (long) speichern, damit SQLite ORDER BY funktioniert.
+            e.Property(z => z.ZielZeitpunktUtc).HasConversion(UnixMillisConverter);
+            e.Property(z => z.ErstelltAmUtc).HasConversion(UnixMillisConverter);
+            e.Property(z => z.AktualisiertAmUtc).HasConversion(UnixMillisConverter);
+            // Ersetzungsregel: max. ein geplanter Prompt pro Aufgabe.
+            e.HasIndex(z => z.AufgabeId).IsUnique();
+            e.HasOne<Aufgabe>()
+                .WithMany()
+                .HasForeignKey(z => z.AufgabeId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // IssueReferenz

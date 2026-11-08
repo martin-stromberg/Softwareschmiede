@@ -125,6 +125,19 @@
 | `ErstellungsDatum` | `DateTimeOffset` | Zeitstempel der Erstellung |
 | `Aufgabe` | `Aufgabe` | Navigationseigenschaft zurück zur Aufgabe |
 
+### `ZeitgesteuerterPrompt`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Id` | `Guid` | Primärschlüssel |
+| `AufgabeId` | `Guid` | FK → Aufgabe (eindeutig, `DeleteBehavior.Cascade`) |
+| `PromptText` | `string` | Der bereits platzhalteraufgelöste Prompttext (required) |
+| `ZielZeitpunktUtc` | `DateTimeOffset` | UTC-Zielzeitpunkt des Versands |
+| `ErstelltAmUtc` | `DateTimeOffset` | Erstellungszeitpunkt des Datensatzes |
+| `AktualisiertAmUtc` | `DateTimeOffset` | Letzter Aktualisierungszeitpunkt (Ersetzen, Pausenverschiebung) |
+
+Persistierter Datensatz eines geplanten zeitgesteuerten Prompts (Tabelle `ZeitgesteuertePrompts`, Migration `20261107211018_AddZeitgesteuerterPrompt`). Die drei `DateTimeOffset`-Spalten werden als Unix-Millisekunden (`long`) über `UnixMillisConverter` gespeichert. Der Unique-Index `IX_ZeitgesteuertePrompts_AufgabeId` setzt die Ersetzungsregel „max. ein Plan pro Aufgabe" datenbankseitig durch. Der Datensatz wird beim erfolgreichen Versand, beim Storno („Wartestellung aufheben", Aufgabenabschluss) und per Cascade beim Löschen der Aufgabe entfernt; der EF-Zugriff läuft über den scoped Service `ZeitgesteuerterPromptStore`.
+
 ## Statusübergänge
 
 `Aufgabe.Status` beschreibt den fachlichen Gesamtstatus der Aufgabe. Die KI-Ausführung besitzt zusätzlich den unabhängigen Status `AufgabeAusfuehrungsStatus`:
@@ -203,11 +216,18 @@ erDiagram
         DateTimeOffset ErledaltAm
         DateTimeOffset ErstellungsDatum
     }
+    ZeitgesteuerterPrompt {
+        Guid Id
+        Guid AufgabeId
+        string PromptText
+        DateTimeOffset ZielZeitpunktUtc
+    }
     Aufgabe ||--o{ Protokolleintrag : "hat"
     Aufgabe ||--o| IssueReferenz : "hat"
     Aufgabe ||--o| AlertReferenz : "hat"
     Aufgabe ||--o{ PullRequestReferenz : "hat"
     Aufgabe ||--o{ Todo : "hat"
+    Aufgabe ||--o| ZeitgesteuerterPrompt : "hat"
     PullRequestReferenz ||--o{ PullRequestWorkflowRun : "hat"
 ```
 

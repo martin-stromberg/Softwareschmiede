@@ -160,6 +160,13 @@
                                     <TextBlock Text="{Binding ScheduledPromptTimeDisplay}"
                                                FontSize="11"
                                                Foreground="{DynamicResource SecondaryTextBrush}" />
+                                    <Button Content="Wartestellung aufheben"
+                                            AutomationProperties.Name="WartestellungAufheben"
+                                            Command="{Binding CancelScheduledPromptCommand}"
+                                            HorizontalAlignment="Left"
+                                            Margin="0,2,0,0"
+                                            Padding="6,2"
+                                            FontSize="11" />
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>
