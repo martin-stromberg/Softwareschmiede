@@ -17,12 +17,12 @@ Branch: `task/issue-342-9681647fac8542119b45ceca8f28f54f-ausfuehrungsstatus-bei-
 | [x] | 7 | Plan-Review (Unteragent, bedingt) | `review.md` |
 | [x] | 8 | Usability-Review (Unteragent, bei UI-Änderungen) | `review-usability.md` |
 | [x] | 9 | Code-Review (Unteragent) | `review-code.md` |
-| [ ] | 10 | Tests ausführen (Unteragent) — wartet auf Anwender-Entscheidung zu „Nicht durchführbar"-Szenarien | `test-results.md` |
+| [x] | 10 | Tests ausführen (Unteragent) — E2E/Abnahme durch Anwender manuell bestätigt (2026-11-09) | `test-results.md` |
 | [x] | 12 | Dokumentation erstellen (Unteragent) | `docs/help/` |
 | [x] | 12b | README aktualisieren (Unteragent) | `README.md` |
 | [x] | 12c | Release Notes aktualisieren (Unteragent) | `docs/RELEASE_NOTES.md` |
 | [x] | – | Iteration oder Abschluss entscheiden | – |
 | [x] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
-| [ ] | 13 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
-| [ ] | – | Feature-Verzeichnis löschen | – |
-| [ ] | – | Commit durchführen | – |
+| [x] | 13 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
+| [x] | – | Feature-Verzeichnis löschen | – |
+| [x] | – | Commit durchführen | – |
