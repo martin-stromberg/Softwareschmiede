@@ -149,8 +149,8 @@ internal static class KiAusfuehrungsStatusKlassifikation
 
         var status = value switch
         {
-            Aufgabe aufgabe => new StatusDaten(aufgabe.Status, aufgabe.AusfuehrungsStatus, aufgabe.AktiveRunId, aufgabe.LastHeartbeatUtc, aufgabe.LaufStatus, false, aufgabe.PausiertBisUtc),
-            AktiveAufgabePanelItem item => new StatusDaten(item.Status, item.AusfuehrungsStatus, item.AktiveRunId, item.LastHeartbeatUtc, item.LaufStatus, item.HasScheduledPrompt, item.PausiertBisUtc),
+            Aufgabe aufgabe => new StatusDaten(aufgabe.Status, aufgabe.AusfuehrungsStatus, aufgabe.AktiveRunId, aufgabe.LastHeartbeatUtc, aufgabe.LaufStatus, null, false, aufgabe.PausiertBisUtc),
+            AktiveAufgabePanelItem item => new StatusDaten(item.Status, item.AusfuehrungsStatus, item.AktiveRunId, item.LastHeartbeatUtc, item.LaufStatus, item.LiveLaufStatus, item.HasScheduledPrompt, item.PausiertBisUtc),
             _ => null
         };
 
@@ -172,6 +172,17 @@ internal static class KiAusfuehrungsStatusKlassifikation
             return KiAusfuehrungsZustand.PromptInWartestellung;
         }
 
+        // Live-Zweig (nur-aufwärts): Läuft nachweislich ein gehandelter Prozess, schlägt der
+        // Live-Substatus vor der Auswertung der persistierten Laufdaten immer auf Laeuft/Wartet
+        // durch — niemals auf Bereit (Issue 342: Fußzeile und Kachel speisen sich aus getrennten
+        // Quellen, die ohne diesen Zweig divergieren können).
+        if (status.LiveLaufStatus is { } liveLaufStatus)
+        {
+            return liveLaufStatus == AufgabeLaufStatus.WartetAufEingabe
+                ? KiAusfuehrungsZustand.Wartet
+                : KiAusfuehrungsZustand.Laeuft;
+        }
+
         if (status.AusfuehrungsStatus != AufgabeAusfuehrungsStatus.Aktiv)
         {
             return KiAusfuehrungsZustand.Bereit;
@@ -180,7 +191,7 @@ internal static class KiAusfuehrungsStatusKlassifikation
         if (AufgabeLaufAktivitaet.IstAktiv(status.AktiveRunId, status.LastHeartbeatUtc, DateTimeOffset.UtcNow))
         {
             // LaufStatus bildet den Laufzeit-Substatus der CLI ab (siehe PseudoConsoleSession.RuntimeStatus,
-            // persistiert über CliProcessManager/AufgabeService.AktualisiereLaufStatusAsync). Ohne diesen
+            // persistiert über CliProcessManager/AufgabeService.AktivenLaufSicherstellenAsync). Ohne diesen
             // Substatus (null, z. B. beim klassischen Start ohne ConPTY) bleibt es beim Zustand "Läuft".
             return status.LaufStatus == AufgabeLaufStatus.WartetAufEingabe
                 ? KiAusfuehrungsZustand.Wartet
@@ -201,6 +212,7 @@ internal static class KiAusfuehrungsStatusKlassifikation
         string? AktiveRunId,
         DateTimeOffset? LastHeartbeatUtc,
         AufgabeLaufStatus? LaufStatus,
+        AufgabeLaufStatus? LiveLaufStatus,
         bool HasScheduledPrompt,
         DateTimeOffset? PausiertBisUtc);
 }

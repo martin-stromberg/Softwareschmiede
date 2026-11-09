@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Infrastructure.Terminal;
 
 using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.Application.Services;
@@ -103,14 +104,79 @@ public sealed class CliProcessManagerTests : IDisposable
         await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync("AktivenLaufBeendenAsync", Guid.NewGuid());
     }
 
-    /// <summary>Shutdown-Race: AktualisiereLaufStatusAsync darf nicht fehlschlagen, wenn der DI-Provider bereits disposed ist.</summary>
+    /// <summary>Shutdown-Race: LaufdatenSicherstellenAsync darf nicht fehlschlagen, wenn der DI-Provider
+    /// bereits disposed ist. Damit der interne <c>IsRunning</c>-Guard den Persistenzpfad wirklich erreicht
+    /// (sonst wäre der Test wirkungslos), wird zuvor ein laufendes Handle gepflanzt.</summary>
     [Fact]
-    public async Task AktualisiereLaufStatusAsync_WithDisposedScopeFactory_Completes()
+    public async Task LaufdatenSicherstellenAsync_WithDisposedScopeFactory_Completes()
     {
-        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync(
-            "AktualisiereLaufStatusAsync",
-            Guid.NewGuid(),
-            AufgabeLaufStatus.WartetAufEingabe);
+        var aufgabeId = Guid.NewGuid();
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        scopeFactoryMock
+            .Setup(f => f.CreateScope())
+            .Throws(new ObjectDisposedException("ServiceProvider"));
+
+        using var kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+
+        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(kiService)!;
+        handles[aufgabeId] = new CliProcessHandle(aufgabeId, System.Diagnostics.Process.GetCurrentProcess());
+
+        using var manager = new CliProcessManager(
+            kiService,
+            scopeFactoryMock.Object,
+            NullLogger<CliProcessManager>.Instance,
+            new AufgabeLaufdatenChangedNotifier());
+
+        var method = typeof(CliProcessManager).GetMethod("LaufdatenSicherstellenAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var task = (Task)method.Invoke(manager, new object[] { aufgabeId })!;
+        await task;
+    }
+
+    /// <summary>
+    /// Dispose-Race (Issue 342): Verspätete Selbstheilungs-Aufrufe (in-flight Abgleich-/
+    /// Heartbeat-Ticks, Event-Aufrufe) dürfen nach <see cref="CliProcessManager.Dispose"/> keine neuen
+    /// Heartbeat-Timer oder RuntimeStatus-Subscriptions mehr anlegen — die landeten sonst in den
+    /// bereits geleerten Dictionaries, würden nie disposed/abgemeldet und tickten bei weiter
+    /// laufendem Prozess permanent weiter.
+    /// </summary>
+    [Fact]
+    public async Task Dispose_VerhindertNeuanlageVonTimerUndSubscription()
+    {
+        var aufgabeId = Guid.NewGuid();
+
+        // Laufendes Handle mit Session pflanzen, damit LaufdatenSicherstellenAsync den
+        // IsRunning-Check passiert und beide Anlagepfade (Timer + Subscription) erreicht würden.
+        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handles = (ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
+        var sessionMock = new Mock<ITerminalSession>();
+        handles[aufgabeId] = new CliProcessHandle(aufgabeId, System.Diagnostics.Process.GetCurrentProcess())
+        {
+            Session = sessionMock.Object
+        };
+
+        _sut.Dispose();
+
+        var method = typeof(CliProcessManager).GetMethod("LaufdatenSicherstellenAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        await (Task)method.Invoke(_sut, new object[] { aufgabeId })!;
+        _sut.StartHeartbeat(aufgabeId);
+
+        // SubscribeRuntimeStatus separat aufrufen, damit dessen _disposed-Guard nicht nur indirekt
+        // über den Early-Return in LaufdatenSicherstellenAsync abgedeckt ist.
+        var subscribeMethod = typeof(CliProcessManager).GetMethod("SubscribeRuntimeStatus", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        subscribeMethod.Invoke(_sut, new object[] { aufgabeId });
+
+        var heartbeatField = typeof(CliProcessManager).GetField("_heartbeatTimers", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var heartbeatTimers = (ConcurrentDictionary<Guid, Timer>)heartbeatField.GetValue(_sut)!;
+        heartbeatTimers.Should().BeEmpty("nach Dispose darf kein neuer Heartbeat-Timer angelegt werden");
+
+        var subscriptionsField = typeof(CliProcessManager).GetField("_runtimeStatusSubscriptions", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var subscriptions = (ConcurrentDictionary<Guid, (ITerminalSession, EventHandler<CliRuntimeStatusChangedEventArgs>)>)subscriptionsField.GetValue(_sut)!;
+        subscriptions.Should().BeEmpty("nach Dispose darf keine neue RuntimeStatus-Subscription angelegt werden");
+
+        sessionMock.VerifyAdd(
+            s => s.RuntimeStatusChanged += It.IsAny<EventHandler<CliRuntimeStatusChangedEventArgs>>(),
+            Times.Never);
     }
 
     private async Task InvokePersistierungsMethodeMitDisposedScopeFactoryAsync(string methodName, params object[] arguments)

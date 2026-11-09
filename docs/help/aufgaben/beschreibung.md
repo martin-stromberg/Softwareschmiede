@@ -31,6 +31,7 @@ Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `W
   - **Sofortreaktion auf Prozess-Änderungen:** Wenn eine Aufgabe gestartet oder beendet wird, wird die Seitenleiste sofort aktualisiert.
   - **Sofortreaktion auf persistierte Laufdaten:** Wenn eine aktive Run-ID, ein Heartbeat oder ein Laufstatus wie `Läuft` oder `WartetAufEingabe` gespeichert wurde, wird die sichtbare Aufgabenliste direkt neu geladen.
   - **Periodische Überprüfung:** Alle 5 Sekunden wird der Status neu abgerufen, um Heartbeat-Ablauf (▶ Läuft → ✓ Bereit nach 5 Minuten ohne Aktivität) und andere verpasste Änderungen zu erkennen.
+  - **Konsistenter Status in Kachel und Detailansicht:** Die Kachel folgt stets dem tatsächlichen Prozesszustand: Solange die KI-Ausführung nachweislich läuft, zeigt sie `▶ Läuft` bzw. `⏸ Wartet` — auch dann, wenn die gespeicherten Laufdaten kurzzeitig fehlen oder veralten (die Anwendung stellt sie selbstständig wieder her). `✓ Bereit` erscheint nur, wenn kein CLI-Prozess mehr läuft; Fußzeile der Detailansicht und Kachel können sich damit nicht widersprechen.
   - **Visuelle Übergangsanimation:** Wenn der Status einer Aufgabe sich ändert, wird ein dezenter Opacity-Fade (250 ms) auf dem Statussymbol angezeigt, um den Wechsel hervorzuheben.
 
 ### Navigation zwischen Projekt und Aufgabe
@@ -129,7 +130,7 @@ Unter jedem Pull Request zeigt die Ansicht die zugeordneten GitHub-Actions-/Work
 Aktionsgruppen:
 - **Navigation:** „Zurück"-Button zur Rückkehr zur Projektdetailansicht
 - **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet mit kombiniertem Klone+CLI-Start), Beenden (Status=Gestartet/Wartend→Beendet), Pause einstellen (Status ∈ {Neu, Gestartet, Wartend}), Plugin ändern (nur bei laufender CLI). Bei aktiver Pause wird neben den Buttons der Hinweis „⏸ Pausiert bis {Datum Uhrzeit}" angezeigt.
-- **CLI:** „CLI stoppen" Button (nur sichtbar wenn aktiv)
+- **CLI:** „CLI stoppen" Button (nur sichtbar wenn aktiv). Lässt sich der Prozess nicht beenden, erscheint eine Fehlermeldung („Der CLI-Prozess konnte nicht beendet werden und läuft weiter. Bitte erneut versuchen."); die Anzeige bleibt dabei auf dem laufenden Zustand und der Stopp kann erneut ausgelöst werden.
 - **Issue:** „Issue anlegen" wird angeboten, wenn das Repository die Anlage unterstützt und der Aufgabe noch kein Issue zugeordnet ist. „Issue zuweisen" bleibt für die Auswahl eines vorhandenen Issues verfügbar; nach erfolgreicher Anlage zeigt „Issue öffnen" die gespeicherte Referenz.
 - **Pull Request:** „PR erstellen" Button, sobald Branch, verknüpftes Git-Repository und Pull-Request-Unterstützung des Git-Plugins vorhanden sind
 

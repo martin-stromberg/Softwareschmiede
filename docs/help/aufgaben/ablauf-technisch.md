@@ -150,10 +150,13 @@ Ablauf:
    - Die Session meldet gelesene Terminal-Output-Chunks an den Writer; dieser speichert Ausgabezeilen als `ProtokollTyp.CliOutput`
    - Event `CliProcessStatusChanged` → `IsCliRunning = true`
    - `CliProcessManager.OnCliProcessStatusChanged` (ebenfalls auf das Event abonniert) startet den
-     30s-Heartbeat-Timer **und** persistiert sofort `Aufgabe.AktiveRunId` (neue Lauf-ID) sowie
-     `Aufgabe.LastHeartbeatUtc` und `Aufgabe.AusfuehrungsStatus = Aktiv` über `AufgabeService.AktivenLaufSetzenAsync` beziehungsweise `AusfuehrungAktivSetzenAsync` — dadurch zeigt die
+     30s-Heartbeat-Timer, abonniert den `RuntimeStatusChanged`-Substatus der Session (`SubscribeRuntimeStatus`)
+     **und** persistiert sofort `Aufgabe.AktiveRunId` (neue Lauf-ID) sowie
+     `Aufgabe.LastHeartbeatUtc` und `Aufgabe.AusfuehrungsStatus = Aktiv` über `AufgabeService.AktivenLaufSetzenAsync` — dadurch zeigt die
      Seitenleisten-Kachel (siehe „KI-Ausführungsstatus-Konvertierung") sofort `"▶ Läuft"`, ohne auf den
-     ersten periodischen Heartbeat warten zu müssen
+     ersten periodischen Heartbeat warten zu müssen. Der Persistenzaufruf trägt einen `laeuftGuard`
+     (`IsRunning`), der innerhalb der `LaufGates`-Sperre erneut geprüft wird — endet der Prozess
+     vor dem Schreiben, wird nichts persistiert (siehe Abschnitt „Status-Synchronisation").
 10. Fenster wird eingebettet (siehe Abschnitt „Fenster einbetten")
 11. UI wählt die CLI-Ansicht mit laufendem Prozess; Anwender sieht die KI-Agenten-Ausgabe
 12. Bei Fehler (Klonen oder CLI-Start fehlgeschlagen): Fehler wird angezeigt; beim Erststart bleibt der Status `Neu`, Rollback des Klonverzeichnisses erfolgt falls nötig
@@ -534,10 +537,88 @@ Ablauf:
 - `Process.Exited`-Event wird ausgelöst
 - `KiAusfuehrungsService.CliProcessStatusChanged` → `CliProcessStatus.Gestoppt` (oder `Fehler`)
 - `TaskDetailViewModel.OnCliProcessStatusChanged` → `IsCliRunning = false`
-- `CliProcessManager.OnCliProcessStatusChanged` stoppt den Heartbeat-Timer **und** entfernt
+- `CliProcessManager.OnCliProcessStatusChanged` stoppt den Heartbeat-Timer, meldet die
+  `RuntimeStatusChanged`-Subscription der Session ab (`UnsubscribeRuntimeStatus`) **und** entfernt
   `Aufgabe.AktiveRunId` über `AufgabeService.AktivenLaufBeendenAsync` — die Seitenleisten-Kachel zeigt
   daraufhin wieder `"✓ Bereit"` (nicht mehr `"▶ Läuft"`), auch wenn `Aufgabe.Status` noch `Gestartet` bleibt
 - Anwender kann Status manuell auf `Beendet` setzen oder via `AufgabeAbschliessenCommand`
+
+### 6.1 Status-Synchronisation zwischen Fußzeile und Aufgabenkachel
+
+Die Fußzeile der Aufgabendetailansicht (`TaskDetailViewModel.CliStatusText`) zeigt den Live-Zustand der `ITerminalSession` (`CliRuntimeStatus` aus `CliRuntimeStatusEvaluator`), während die Aufgabenkachel in Seitenleiste und Dashboard die persistierten Laufdaten der `Aufgabe` (`AusfuehrungsStatus`, `AktiveRunId`, `LastHeartbeatUtc`, `LaufStatus`) über `KiAusfuehrungsStatusKlassifikation` auswertet. Damit beide Anzeigen für denselben Lauf stets denselben fachlichen Zustand zeigen — auch wenn ein Lauf über einen Wiederverwendungspfad ohne `Gestartet`-Ereignis entstand oder ein Persistenzschritt fehlschlug — existieren zwei komplementäre Mechanismen (Issue #342): ein Live-Zweig in der Kachel-Klassifikation (Anzeigeseite) und eine selbstheilende Laufdaten-Persistenz (Datenseite).
+
+#### Live-Zweig in der Kachel-Klassifikation
+
+Beteiligte Komponenten:
+- `IRunningAutomationStatusSource.GetLiveLaufStatus` — Interface-Methode, implementiert in `KiAusfuehrungsService`
+- `MainWindowViewModel.MapAktiveAufgabePanelItem` — befüllt `LiveLaufStatus` bei jedem Listen-Refresh
+- `AktiveAufgabePanelItem.LiveLaufStatus` — `AufgabeLaufStatus?`-Projektionsfeld der Kachel
+- `KiAusfuehrungsStatusKlassifikation.StatusDaten` — trägt `LiveLaufStatus` als zusätzliches Feld
+
+Ablauf:
+1. `GetLiveLaufStatus(aufgabeId)` liefert `null`, wenn `IsRunning(aufgabeId)` nicht zutrifft (kein gehandelter, nicht beendeter Prozess); `WartetAufEingabe`, wenn die Session `CliRuntimeStatus.WartetAufEingabe` meldet; sonst `Laeuft` — auch bei laufendem Handle ohne Session oder `RuntimeStatus.Inaktiv` (ein nachweislich laufender Prozess ohne Wartet-Meldung gilt fachlich als „Läuft").
+2. `MapAktiveAufgabePanelItem` schreibt den Wert bei jeder Aktualisierung der `AktiveAufgabenListe` in `AktiveAufgabePanelItem.LiveLaufStatus`.
+3. `Klassifiziere` wertet `StatusDaten` in der Reihenfolge `Pausiert` → `PromptInWartestellung` → **Live-Zweig** → `AusfuehrungsStatus != Aktiv` → `IstAktiv(Heartbeat)` → `Status == Wartend` → `Bereit` aus. Im Live-Zweig gilt: `LiveLaufStatus == WartetAufEingabe` → `Wartet`, sonst gesetzt → `Laeuft`.
+4. Der Zweig wirkt ausschließlich aufwärts: Er kann nie auf `Bereit` zurückfallen, und bei `LiveLaufStatus == null` entscheiden unverändert die persistierten Laufdaten (Heartbeat-Regel bleibt einzige Lebendigkeits-Prüfung für persistierte Läufe). `Pausiert` und `PromptInWartestellung` behalten Vorrang (bestehende Überlagerungssemantik).
+5. Der `Aufgabe`-Entity-Eingang der Klassifikation befüllt `LiveLaufStatus` mit `null` — der Live-Zustand ist ein reines UI-Projektionsdetail des Kachel-Items, kein persistierter Zustand.
+
+#### Wiederverwendungs-Signal `CliLaufAktiv`
+
+Startanforderungen, die einen bereits laufenden Prozess zurückliefern, feuern kein `CliProcessStatus.Gestartet` — damit die Laufdaten-Persistenz dennoch nachgezogen wird, existiert das dedizierte Signal `KiAusfuehrungsService.CliLaufAktiv` (`event Action<Guid>`).
+
+Ablauf:
+1. `KiAusfuehrungsService.StartCliCoreAsync` und `StartTerminalSessionCoreAsync`: Trifft die Prüfung „Handle vorhanden + `!HasExited`" zu („zweiter Start abgewiesen"), wird vor `return existing` `CliLaufAktiv` mit der Aufgaben-ID gefeuert — bewusst **kein** `Gestartet`-Ereignis und kein `RunningCountChanged` (sonst würden Prompt-Nachzustellung, Fußzeilen-„Gestartet"-Flackern und ein Neuschreiben von `AktiveRunId`/`LetzterCliStartUtc` ausgelöst).
+2. `EntwicklungsprozessService.CliNeustartenCoordinatedAsync`: Im Session-Alive-Early-Return wird `_options.KiAusfuehrungsService.NotifyLaufAktiv(aufgabeId)` aufgerufen; `NotifyLaufAktiv` feuert `CliLaufAktiv` nur, wenn `IsRunning(aufgabeId)` zutrifft. Deckt indirekt die Aufrufer `ProzessUndCliCoordinatedAsync` und `ScmEventOrchestrator` ab.
+3. `CliProcessManager.OnCliLaufAktiv` (einziger produktiver Abonnent; Anmeldung im Konstruktor, Abmeldung in `Dispose`) ruft `LaufdatenSicherstellenAsync(aufgabeId)` per `SafeFireAndForget` auf.
+
+Vertrag wie bei `CliProcessStatusChanged`: Der Invoke aus den Startpfaden läuft unter der klassenweiten Start-Sperre (`KiAusfuehrungsService._startLock`) — Abonnenten müssen non-blocking sein und dürfen nicht reentrant `StartCliAsync`/`StartTerminalSessionAsync` aufrufen.
+
+#### `CliProcessManager.LaufdatenSicherstellenAsync` (zentraler Selbstheilungspunkt)
+
+Wird aus vier Pfaden aufgerufen: `OnCliLaufAktiv` (`CliLaufAktiv`-Signal), `OnRuntimeStatusChanged` (bei `Laeuft`/`WartetAufEingabe`; `Inaktiv` wird weiterhin ignoriert), `AktualisierungAsync` (Heartbeat-Tick) und `AbgleichAsync` (periodischer Abgleich).
+
+Ablauf:
+1. `KiAusfuehrungsService.IsRunning(aufgabeId)` `false` → Rückkehr ohne Aktion (beendete oder verwaiste Zustände werden nie wieder aktiv geschrieben).
+2. Unter `_lifecycleLock`: Bei `_disposed` Rückkehr; sonst `StartHeartbeatCore(aufgabeId)` nur, wenn für die Aufgabe noch kein Timer in `_heartbeatTimers` läuft (setzt den Takt nicht zurück).
+3. `SubscribeRuntimeStatus(aufgabeId)` — idempotent und unter `_lifecycleLock` atomar: Ist für die Aufgabe bereits dieselbe Session registriert, erfolgt keine erneute Registrierung; eine abweichende Alt-Registrierung wird zuvor bereinigt.
+4. `ExecuteWithAufgabeServiceAsync(aufgabeId, "Sicherstellen der Laufdaten", s => s.AktivenLaufSicherstellenAsync(aufgabeId, laufStatusProvider, laeuftGuard))` — `laufStatusProvider` liefert `GetTerminalSession(aufgabeId)?.RuntimeStatus.ToAufgabeLaufStatus()`, `laeuftGuard` liefert `IsRunning(aufgabeId)`; beide werden erst innerhalb der `LaufGates`-Sperre ausgewertet.
+5. Nach erfolgreicher Persistenz feuert `NotifyLaufdatenChanged` den Kachel-Refresh an.
+
+#### `AufgabeService.AktivenLaufSicherstellenAsync` (idempotente Persistenz)
+
+Signatur: `AktivenLaufSicherstellenAsync(Guid id, Func<AufgabeLaufStatus?>? laufStatusProvider = null, CancellationToken ct = default, Func<bool>? laeuftGuard = null)`.
+
+Ablauf (innerhalb der `LaufGates`-Sperre, siehe unten):
+1. `laeuftGuard?.Invoke() == false` → `LogDebug` + Rückkehr ohne Schreibzugriff (TOCTOU-Schutz: ein zwischen Ereignis und Sperreintritt beendeter Prozess schreibt keinen Phantom-Lauf; ein gleichzeitig anstehendes `AktivenLaufBeendenAsync` serialisiert unter derselben Sperre entweder davor — Guard wird `false` — oder danach und hat damit das letzte Wort).
+2. `laufStatusProvider?.Invoke()` liefert den frischesten Session-Substatus — erst jetzt ausgewertet, damit kein vor dem Sperreintritt gelesener, veralteter Wert als letzter Schreiber landet (Stale-Write-Schutz).
+3. Aufgabe nicht gefunden → `InvalidOperationException` (konsistent zu `AktivenLaufSetzenAsync`).
+4. `Status` `Beendet`/`Archiviert` → `LogDebug` + Rückkehr ohne Wurf (terminale Aufgaben werden nicht wiederbelebt; der periodische Abgleich erzeugt keine Warnungsflut).
+5. `AktiveRunId == null` → vollständiger Lauf-Zustand: `AusfuehrungsStatus = Aktiv`, neue `AktiveRunId`, `LastHeartbeatUtc = now`, `LetzterCliStartUtc ??= now` (ein bekannter echter Startzeitpunkt bleibt erhalten — Sortierstabilität der Liste), `LaufStatus = laufStatus ?? Laeuft`.
+6. `AktiveRunId != null` → nur `LastHeartbeatUtc = now`; `LaufStatus` wird nur überschrieben, wenn der Provider einen Wert liefert.
+7. `SaveChangesAsync`.
+
+#### Prozessweite Serialisierung der Laufdaten (`AufgabeService.LaufGates`)
+
+Alle Laufdaten-Mutationen einer Aufgabe laufen unter der statischen `ConcurrentDictionary<Guid, SemaphoreSlim> LaufGates`: `StartenAsync`, `AbschliessenAsync`, `StartZuruecksetzenAsync` (die die Laufdaten zurücksetzen) sowie `AktivenLaufSetzenAsync`, `AktivenLaufBeendenAsync` und `AktivenLaufSicherstellenAsync`. `AufgabeService`-Instanzen sind scoped — die Schreibpfade konvergieren aber aus mehreren Quellen (Selbstheilung, Prozess-Exit, ViewModel) in unterschiedlichen DbContexts auf derselben Datenbankzeile; ohne gemeinsame Sperre könnte ein Sicherstellen-Save nach einem Beenden-Save landen und einen Phantom-Lauf wiederbeleben. Einträge werden bewusst nie entfernt (das Entfernen während wartender Aufrufer wäre selbst eine Race-Bedingung; der Speicherbedarf bleibt durch die Anzahl der Aufgaben begrenzt). `AktivenLaufSetzenAsync` trägt ebenfalls einen optionalen `laeuftGuard`-Parameter mit identischer In-Sperre-Semantik.
+
+#### Periodischer Abgleich (letztes Sicherheitsnetz)
+
+- Der `CliProcessManager`-Konstruktor startet `_abgleichTimer` mit `AbgleichIntervall` = `HeartbeatInterval` = 30 s (erster Tick nach Intervall).
+- `AbgleichTickAsync` überspringt Ticks bei noch laufendem Durchlauf über den `Interlocked`-Guard `_abgleichLaeuft` — kein Aufstauen der Durchläufe.
+- `AbgleichAsync` iteriert `KiAusfuehrungsService.GetLaufendeAufgabenIds()` (Handles mit `!HasExited`, Exception-tolerant) und ruft pro ID `LaufdatenSicherstellenAsync` auf — fehlerisoliert (`LogWarning` je Aufgabe). Der Abgleich ist der einzige Mechanismus, der „Prozess läuft ⇒ Laufdaten persistiert" unabhängig von jeglicher Event-Zustellung garantiert.
+- `Dispose` räumt den Timer ab und setzt unter `_lifecycleLock` `_disposed`, bevor die Dictionaries geleert werden — in-flight Ticks oder knapp vor der Event-Abmeldung eintreffende Aufrufe können danach keine Timer/Subscriptions mehr anlegen (Dispose-Race).
+
+#### Stopp bei weiterlaufendem Prozess (Divergenzpfad F1)
+
+`TaskDetailViewModel.CliStoppenAsync` prüft nach `KiAusfuehrungsService.StopCliAsync` `IsRunning(_aufgabeId)`: Läuft der Prozess noch (Beendigungsfehler werden in `StopCliAsync` nur geloggt), wird `FehlerMeldung` auf „Der CLI-Prozess konnte nicht beendet werden und läuft weiter. Bitte erneut versuchen." gesetzt und die Methode kehrt zurück — `AktivenLaufBeendenAsync` wird **nicht** aufgerufen, `IsCliRunning` bleibt `true`, Session-Anbindung und Fußzeile bleiben live; `KannCliStoppen` bleibt erneut auslösbar. Nur bei tatsächlich beendetem Prozess läuft der bisherige Pfad (`AktivenLaufBeendenAsync` + UI-Update).
+
+#### Halb-Persistierung im Wiederverwendungspfad geschlossen (Divergenzpfad F2)
+
+`TaskDetailViewModel.StartCliAndUpdateStateAsync` ruft bei `IsRunning == true` nach `CliNeustartenAsync` `AufgabeService.AktivenLaufSicherstellenAsync` mit `laufStatusProvider` und `laeuftGuard` auf (zuvor `AusfuehrungAktivSetzenAsync`, das nur `AusfuehrungsStatus = Aktiv` ohne `AktiveRunId`/`LastHeartbeatUtc`/`LaufStatus` setzte) und stößt danach `_laufdatenChangedNotifier.NotifyLaufdatenChanged` an — der Pfad persistiert denselben vollständigen Lauf-Zustand wie ein echter `Gestartet`-Lauf, auch wenn `CliNeustartenAsync` in einen Wiederverwendungs-Early-Return ohne `Gestartet`-Ereignis lief.
+
+#### Zentrales Substatus-Mapping
+
+`CliRuntimeStatusExtensions.ToAufgabeLaufStatus` (`Infrastructure/Terminal`) bildet `CliRuntimeStatus` auf `AufgabeLaufStatus?` ab: `WartetAufEingabe` → `WartetAufEingabe`, `Laeuft` → `Laeuft`, `Inaktiv` → `null`. Es ist die einzige Quelle dieser Abbildung in `CliProcessManager`, `TaskDetailViewModel` und `KiAusfuehrungsService.GetLiveLaufStatus` (dort mit Fallback `?? AufgabeLaufStatus.Laeuft`).
 
 ### 7. Aufgabe abschließen (`AbschliessenAsync`)
 
@@ -863,8 +944,8 @@ Beteiligte Komponenten:
 - `AufgabeService.GetAktiveAufgabenAsync()` — liest die persistierten Laufdaten für die sichtbaren Kacheln neu
 
 Ablauf:
-1. `CliProcessManager` speichert Laufdaten über `AktivenLaufSetzenAsync`, `AktualisiereLaufStatusAsync` oder `AktivenLaufBeendenAsync`.
-2. Erst nach erfolgreicher Persistenz ruft `CliProcessManager` `NotifyLaufdatenChanged(aufgabeId)` auf.
+1. `CliProcessManager` speichert Laufdaten über `AktivenLaufSetzenAsync`, `AktivenLaufSicherstellenAsync` oder `AktivenLaufBeendenAsync` (im Wiederverwendungspfad der Detailansicht ruft zusätzlich `TaskDetailViewModel.StartCliAndUpdateStateAsync` `AktivenLaufSicherstellenAsync` auf).
+2. Erst nach erfolgreicher Persistenz ruft `CliProcessManager` (bzw. das `TaskDetailViewModel` im eigenen Sicherstellungspfad) `NotifyLaufdatenChanged(aufgabeId)` auf.
 3. `MainWindowViewModel.OnLaufdatenChanged(aufgabeId)` marshallt über `_dispatcherInvoke` auf den UI-Thread.
 4. `AktiveAufgabenImHintergrundAktualisieren()` lädt die aktive Aufgabenliste neu und verwendet weiter den bestehenden `_refreshGate` gegen überlappende Refreshes.
 5. Die Kachel erhält neue `AktiveRunId`-, `LastHeartbeatUtc`- und `LaufStatus`-Werte; der Converter zeigt dadurch zeitnah `Läuft`, `Wartet` oder `Bereit`.
@@ -888,6 +969,7 @@ Ablauf:
 - **Verpasster Statuswechsel:** Falls ein Event nicht verarbeitet wurde, wird der gespeicherte Laufstatus beim nächsten Timerlauf neu gelesen.
 - **Heartbeat-Ablauf:** Status wechselt von `Läuft` zu `Bereit`, wenn `LastHeartbeatUtc` älter als 5 Minuten wird (passiert automatisch, kein Event)
 - **Routinerefresh:** Kontinuierliches Vorrücken von `LastHeartbeatUtc` wird erfasst
+- **Live-Laufstatus:** Jeder Refresh befüllt `AktiveAufgabePanelItem.LiveLaufStatus` erneut aus `GetLiveLaufStatus` — die Kachel folgt dem tatsächlichen Prozesszustand auch dann, wenn zwischenzeitlich weder `RunningCountChanged` noch `LaufdatenChanged` gefeuert wurde (siehe Abschnitt „Status-Synchronisation").
 
 ### Übergangsanimation bei Statuswechsel
 
@@ -944,6 +1026,7 @@ Beteiligte Komponenten:
 - `KiAusfuehrungsStatusConverter : IValueConverter` — Konvertiert `Aufgabe`/`AktiveAufgabePanelItem` zum Status-Volltext (Tooltip/`HelpText` der Kachel)
 - `KiAusfuehrungsStatusSymbolConverter : IValueConverter` — Konvertiert dieselbe Eingabe zum reinen Status-Glyph (sichtbarer Text der Kachel); in `App.xaml` registriert
 - `KiAusfuehrungsStatusKlassifikation` / `KiAusfuehrungsZustand` — gemeinsame, aus dem Volltext-Converter extrahierte Statusklassifikation (`Pausiert`, `PromptInWartestellung`, `Laeuft`, `Wartet`, `Bereit`), damit Volltext und Glyph nicht divergieren
+- `AktiveAufgabePanelItem.LiveLaufStatus` — Live-Substatus aus `IRunningAutomationStatusSource.GetLiveLaufStatus` (siehe Abschnitt „Status-Synchronisation"); `null` bei der `Aufgabe`-Entity-Variante und bei nicht laufendem Prozess
 - Referenz: `AufgabeRecoveryService.HeartbeatTimeoutMinutes` (standardmäßig 5 Minuten)
 
 Konvertierungs-Logik in `Convert()` (Volltext):
@@ -952,16 +1035,20 @@ Konvertierungs-Logik in `Convert()` (Volltext):
    - Output: `"⏸ Pausiert (noch {hh\:mm\:ss})"`; ab einer Restzeit von ≥ 24 Stunden im Format `{d\.hh\:mm\:ss}`
 3. Wenn für ein Panel-Item ein geplanter Prompt existiert:
    - Output: `"⏳ Prompt in Wartestellung"`
-4. Wenn `AusfuehrungsStatus != Aktiv`:
+4. Wenn `LiveLaufStatus` gesetzt ist (nur `AktiveAufgabePanelItem`; ein gehandelter Prozess läuft nachweislich):
+   - Bei `LiveLaufStatus == AufgabeLaufStatus.WartetAufEingabe`: Output `"⏸ Wartet"`
+   - Sonst: Output `"▶ Läuft"`
+   - Der Zweig wirkt nur aufwärts (nie `Bereit`) und steht vor der Auswertung der persistierten Laufdaten — er verhindert, dass die Kachel bei laufendem Prozess fälschlich `"✓ Bereit"` anzeigt, wenn die Laufdaten fehlen oder veraltet sind (Issue 342).
+5. Wenn `AusfuehrungsStatus != Aktiv`:
    - Output: `"✓ Bereit"`
-5. Wenn `AktiveRunId != null` UND `LastHeartbeatUtc != null` UND `(Jetzt - LastHeartbeatUtc) < 5 Minuten`:
+6. Wenn `AktiveRunId != null` UND `LastHeartbeatUtc != null` UND `(Jetzt - LastHeartbeatUtc) < 5 Minuten`:
    - Bei `LaufStatus == AufgabeLaufStatus.WartetAufEingabe`: Output `"⏸ Wartet"`
    - Sonst: Output `"▶ Läuft"`
-6. Wenn `Status == AufgabeStatus.Wartend`:
+7. Wenn `Status == AufgabeStatus.Wartend`:
    - Output: `"⏸ Wartet"`
-7. Sonst (Default):
+8. Sonst (Default):
    - Output: `"✓ Bereit"`
-8. `ConvertBack()` ist nicht implementiert (Converter ist One-Way)
+9. `ConvertBack()` ist nicht implementiert (Converter ist One-Way)
 
 Der Pausiert-Zweig steht bewusst vor allen übrigen Anzeigen: Eine aktive Pause überlagert den Laufzeitstatus — die Kachel zeigt das `⏸`-Glyph statt `Läuft` oder `Prompt in Wartestellung`; der Countdown-Volltext bleibt im Tooltip/`HelpText`. `PausiertBisUtc` wird aus `Aufgabe` übernommen bzw. über `AktiveAufgabePanelItem.PausiertBisUtc` (gemappt in `MainWindowViewModel.MapAktiveAufgabePanelItem`) bereitgestellt; das abgeleitete `AktiveAufgabePanelItem.IstPausiert` steuert zusätzlich die Kachel-Abblendung (`Opacity = 0.55` per `DataTrigger` in `ActiveTasksListControl.xaml`). Der Countdown tickt ohne eigenen Timer, weil der 5-Sekunden-Refresh die Panel-Items neu erzeugt.
 
@@ -1119,7 +1206,12 @@ Ablauf:
 | Rate-Limit-Marker ohne gültigen Zeitstempel oder ohne `KiPluginPrefix` | Nur `RateLimit`-Protokolleintrag; kein persistiertes Plugin-Limit, keine Pause |
 | Session-Limit-Zeitpunkt liegt in der Vergangenheit | Wert wird als `AppEinstellung` persistiert, löst aber keine Pause aus |
 | `KiPluginLimitService` in Scope nicht registriert | `CliOutputProtokollWriter` löst via `GetService` auf — fehlertolerant, nur der `RateLimit`-Eintrag wird geschrieben |
-| Zweiter CLI-Start für gleiche Aufgabe | `KiAusfuehrungsService` gibt vorhandenes Handle zurück (kein doppelter Start) |
+| Zweiter CLI-Start für gleiche Aufgabe | `KiAusfuehrungsService` gibt vorhandenes Handle zurück (kein doppelter Start) und feuert `CliLaufAktiv` — `CliProcessManager` stellt die Laufdaten über `LaufdatenSicherstellenAsync` sicher |
+| „CLI stoppen" beendet den Prozess nicht | `TaskDetailViewModel.CliStoppenAsync` setzt `FehlerMeldung` („Der CLI-Prozess konnte nicht beendet werden und läuft weiter. Bitte erneut versuchen."), lässt Laufdaten, `IsCliRunning` und Session-Anbindung bestehen — `AktivenLaufBeendenAsync` wird nicht aufgerufen; der Button bleibt erneut auslösbar |
+| Laufdaten fehlen/verfallen bei laufendem Prozess (Wiederverwendung ohne `Gestartet`-Ereignis, verschluckter Persistenzfehler, Heartbeat-Ausfall) | Kachel zeigt über den `LiveLaufStatus`-Zweig sofort `▶ Läuft`/`⏸ Wartet`; `CliProcessManager.LaufdatenSicherstellenAsync` → `AufgabeService.AktivenLaufSicherstellenAsync` stellt die Laufdaten ereignisgetrieben (`CliLaufAktiv`, `RuntimeStatusChanged`, Heartbeat-Tick) oder spätestens im 30-s-Abgleich wieder her |
+| Sicherstellen-/Setzen-Save konkurriert mit Beenden-Save | `AufgabeService.LaufGates` serialisiert alle Laufdaten-Mutationen pro Aufgabe prozessweit; `laeuftGuard` (erneute `IsRunning`-Prüfung in der Sperre) verhindert Phantom-Läufe, `laufStatusProvider` (Auswertung in der Sperre) verhindert Stale-Writes |
+| Timer-/Subscription-Anlage parallel aus Event-, Heartbeat- und Abgleichpfaden bzw. nach `CliProcessManager.Dispose` | `_lifecycleLock` serialisiert alle mutierenden Zugriffe auf `_heartbeatTimers`/`_updateSemaphores`/`_runtimeStatusSubscriptions`; `_disposed` blockt verspätete Anlagepfade — kein dauerhaft tickender verwaister Heartbeat, keine nicht abmeldbare Subscription |
+| Abgleich-Durchlauf dauert länger als 30 s | `AbgleichTickAsync` überspringt überlappende Ticks per `Interlocked`-Guard `_abgleichLaeuft` |
 | Fehler innerhalb des `Process.Exited`-Handlers (z. B. Dispose-Fehler) | `KiAusfuehrungsService.HandleExitedCoreAsync` fängt den gesamten Handler-Body ab und loggt; Anwendung stürzt nicht ab (Details: [Stabilität & Fehlerbehandlung](../stabilitaet/index.md)) |
 | Überlappende Heartbeat-Ticks derselben Aufgabe | `CliProcessManager` serialisiert pro Aufgabe über ein eigenes `SemaphoreSlim`; Heartbeats anderer Aufgaben bleiben unbeeinflusst |
 | Event-Handler wird aus dem `Process.Exited`-Hintergrund-Thread ausgelöst | `MainWindowViewModel.OnRunningCountChanged` marshallt via `_dispatcherInvoke` auf den UI-Thread; kein Zugriff auf UI-Elements ohne Marshalling |

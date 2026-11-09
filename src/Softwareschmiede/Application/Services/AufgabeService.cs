@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -19,6 +20,17 @@ public sealed class AufgabeService : IAktiveAufgabenService
     // AufgabeStatus.IstAktivOderWartend() verwendet (z. B. in DeleteAsync).
     private static readonly Expression<Func<Aufgabe, bool>> IstAktivOderWartendPredicate =
         a => AufgabeStatusExtensions.AktivOderWartendStatus.Contains(a.Status);
+
+    // Serialisiert prozessweit alle Laufdaten-Mutationen einer Aufgabe (AktivenLaufSetzen/
+    // Sicherstellen/Beenden sowie die laufdatenrücksetzenden Lebenszyklus-Pfade Starten/
+    // Abschliessen/StartZuruecksetzen). AufgabeService-Instanzen sind scoped, die Schreibpfade
+    // konvergieren aber aus mehreren Quellen (CliProcessManager-Selbstheilung,
+    // KiAusfuehrungsService-Exit-Pfad, ViewModel-Aufrufe) in unterschiedlichen DbContexts auf
+    // derselben Row: ohne gemeinsame Sperre kann ein Sicherstellen-Save nach dem Beenden-Save
+    // landen und einen Phantom-Lauf wiederbeleben (Issue 342). Einträge werden bewusst nie
+    // entfernt — das Entfernen während wartender Aufrufer wäre selbst eine Race-Bedingung, und
+    // der Speicherbedarf bleibt durch die Anzahl der Aufgaben begrenzt.
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> LaufGates = new();
 
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AufgabeService> _logger;
@@ -764,23 +776,33 @@ public sealed class AufgabeService : IAktiveAufgabenService
     {
         _logger.LogInformation("Aufgabe {AufgabeId} starten (Branch: {BranchName}).", id, branchName);
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
-            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
-
-        if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+        var gate = LaufGates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct);
+        try
         {
-            throw new InvalidOperationException("Beendete oder archivierte Aufgaben können nicht gestartet werden.");
+            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+                ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+            if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+            {
+                throw new InvalidOperationException("Beendete oder archivierte Aufgaben können nicht gestartet werden.");
+            }
+
+            aufgabe.Status = AufgabeStatus.Gestartet;
+            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
+            aufgabe.GitArbeitsbereich = new GitArbeitsbereich(branchName, lokalerKlonPfad, basisBranchName);
+            aufgabe.AktiveRunId = null;
+            aufgabe.LastHeartbeatUtc = null;
+            aufgabe.LetzterCliStartUtc = null;
+            aufgabe.LaufStatus = null;
+
+            await _db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            gate.Release();
         }
 
-        aufgabe.Status = AufgabeStatus.Gestartet;
-        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-        aufgabe.GitArbeitsbereich = new GitArbeitsbereich(branchName, lokalerKlonPfad, basisBranchName);
-        aufgabe.AktiveRunId = null;
-        aufgabe.LastHeartbeatUtc = null;
-        aufgabe.LetzterCliStartUtc = null;
-        aufgabe.LaufStatus = null;
-
-        await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Aufgabe {AufgabeId} gestartet (Status: Gestartet).", id);
     }
 
@@ -874,19 +896,29 @@ public sealed class AufgabeService : IAktiveAufgabenService
     {
         _logger.LogInformation("Aufgabe {AufgabeId} abschließen.", id);
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
-            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+        var gate = LaufGates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct);
+        try
+        {
+            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+                ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        aufgabe.Status = AufgabeStatus.Beendet;
-        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
-        aufgabe.AbschlussDatum = DateTimeOffset.UtcNow;
-        aufgabe.GitArbeitsbereich = null;
-        aufgabe.AktiveRunId = null;
-        aufgabe.LastHeartbeatUtc = null;
-        aufgabe.LetzterCliStartUtc = null;
-        aufgabe.LaufStatus = null;
+            aufgabe.Status = AufgabeStatus.Beendet;
+            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
+            aufgabe.AbschlussDatum = DateTimeOffset.UtcNow;
+            aufgabe.GitArbeitsbereich = null;
+            aufgabe.AktiveRunId = null;
+            aufgabe.LastHeartbeatUtc = null;
+            aufgabe.LetzterCliStartUtc = null;
+            aufgabe.LaufStatus = null;
 
-        await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            gate.Release();
+        }
+
         _logger.LogInformation("Aufgabe {AufgabeId} abgeschlossen (Status: Beendet).", id);
     }
 
@@ -925,43 +957,27 @@ public sealed class AufgabeService : IAktiveAufgabenService
     {
         _logger.LogInformation("Aufgabe {AufgabeId}: Start zurücksetzen.", id);
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
-            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
-
-        aufgabe.Status = AufgabeStatus.Neu;
-        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet;
-        aufgabe.GitArbeitsbereich = null;
-        aufgabe.AktiveRunId = null;
-        aufgabe.LastHeartbeatUtc = null;
-        aufgabe.LetzterCliStartUtc = null;
-        aufgabe.LaufStatus = null;
-
-        await _db.SaveChangesAsync(ct);
-    }
-
-    /// <summary>Aktualisiert LastHeartbeatUtc der Aufgabe.</summary>
-    public async Task UpdateHeartbeatAsync(Guid id, CancellationToken ct = default)
-    {
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
-            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
-
-        aufgabe.LastHeartbeatUtc = DateTimeOffset.UtcNow;
-        await _db.SaveChangesAsync(ct);
-    }
-
-    /// <summary>Setzt den persistenten KI-Ausführungsstatus einer nicht terminalen Aufgabe auf aktiv.</summary>
-    public async Task AusfuehrungAktivSetzenAsync(Guid id, CancellationToken ct = default)
-    {
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
-            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
-
-        if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+        var gate = LaufGates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct);
+        try
         {
-            throw new InvalidOperationException("Für beendete oder archivierte Aufgaben kann keine aktive Ausführung gesetzt werden.");
-        }
+            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+                ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-        await _db.SaveChangesAsync(ct);
+            aufgabe.Status = AufgabeStatus.Neu;
+            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet;
+            aufgabe.GitArbeitsbereich = null;
+            aufgabe.AktiveRunId = null;
+            aufgabe.LastHeartbeatUtc = null;
+            aufgabe.LetzterCliStartUtc = null;
+            aufgabe.LaufStatus = null;
+
+            await _db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     /// <summary>
@@ -973,25 +989,49 @@ public sealed class AufgabeService : IAktiveAufgabenService
     /// <param name="id">ID der Aufgabe.</param>
     /// <param name="laufId">Eindeutige ID des aktiven Laufs.</param>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    public async Task AktivenLaufSetzenAsync(Guid id, string laufId, CancellationToken ct = default)
+    /// <param name="laeuftGuard">
+    /// Optionaler Guard, der innerhalb der serialisierten Schreibphase (siehe <c>LaufGates</c>)
+    /// ausgewertet wird: liefert er <c>false</c> (z. B. weil der Prozess zwischen dem Ereignis und dem
+    /// Eintritt in die Sperre bereits beendet wurde), wird nichts geschrieben — so kann kein
+    /// Phantom-Lauf nach einem bereits erfolgten <see cref="AktivenLaufBeendenAsync"/> wiederbelebt
+    /// werden (Issue 342, TOCTOU).
+    /// </param>
+    public async Task AktivenLaufSetzenAsync(Guid id, string laufId, CancellationToken ct = default, Func<bool>? laeuftGuard = null)
     {
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
-            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
-
-        var now = DateTimeOffset.UtcNow;
-        if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+        var gate = LaufGates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct);
+        try
         {
-            throw new InvalidOperationException("Für beendete oder archivierte Aufgaben kann kein aktiver Lauf gesetzt werden.");
-        }
+            if (laeuftGuard?.Invoke() == false)
+            {
+                _logger.LogDebug(
+                    "Setzen des aktiven Laufs für Aufgabe {AufgabeId} übersprungen (Prozess nicht mehr aktiv).",
+                    id);
+                return;
+            }
 
-        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-        aufgabe.AktiveRunId = laufId;
-        aufgabe.LastHeartbeatUtc = now;
-        aufgabe.LetzterCliStartUtc = now;
-        // LaufStatus startet mit Laeuft (Standardwert von PseudoConsoleSession.RuntimeStatus beim Start),
-        // damit die Kachel unmittelbar "▶ Läuft" statt eines veralteten Werts eines vorherigen Laufs zeigt.
-        aufgabe.LaufStatus = AufgabeLaufStatus.Laeuft;
-        await _db.SaveChangesAsync(ct);
+            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+                ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+            var now = DateTimeOffset.UtcNow;
+            if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+            {
+                throw new InvalidOperationException("Für beendete oder archivierte Aufgaben kann kein aktiver Lauf gesetzt werden.");
+            }
+
+            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
+            aufgabe.AktiveRunId = laufId;
+            aufgabe.LastHeartbeatUtc = now;
+            aufgabe.LetzterCliStartUtc = now;
+            // LaufStatus startet mit Laeuft (Standardwert von PseudoConsoleSession.RuntimeStatus beim Start),
+            // damit die Kachel unmittelbar "▶ Läuft" statt eines veralteten Werts eines vorherigen Laufs zeigt.
+            aufgabe.LaufStatus = AufgabeLaufStatus.Laeuft;
+            await _db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     /// <summary>
@@ -1003,42 +1043,112 @@ public sealed class AufgabeService : IAktiveAufgabenService
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
     public async Task AktivenLaufBeendenAsync(Guid id, CancellationToken ct = default)
     {
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
-            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+        var gate = LaufGates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct);
+        try
+        {
+            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+                ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        aufgabe.AktiveRunId = null;
-        aufgabe.LastHeartbeatUtc = null;
-        aufgabe.LetzterCliStartUtc = null;
-        // LaufStatus gehört nur zu einem aktiven Lauf (siehe AktivenLaufSetzenAsync) — beim Beenden
-        // entfernen, damit kein veralteter Substatus eines beendeten Laufs zurückbleibt.
-        aufgabe.LaufStatus = null;
-        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
-        await _db.SaveChangesAsync(ct);
+            aufgabe.AktiveRunId = null;
+            aufgabe.LastHeartbeatUtc = null;
+            aufgabe.LetzterCliStartUtc = null;
+            // LaufStatus gehört nur zu einem aktiven Lauf (siehe AktivenLaufSetzenAsync) — beim Beenden
+            // entfernen, damit kein veralteter Substatus eines beendeten Laufs zurückbleibt.
+            aufgabe.LaufStatus = null;
+            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
+            await _db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     /// <summary>
-    /// Aktualisiert den Laufzeit-Substatus (<see cref="Aufgabe.LaufStatus"/>) einer Aufgabe mit aktivem Lauf.
-    /// Wird von <c>CliProcessManager</c> aufgerufen, sobald <c>PseudoConsoleSession.RuntimeStatusChanged</c>
-    /// meldet, dass die CLI zwischen "arbeitet" und "wartet auf Eingabe" gewechselt hat, damit
-    /// <c>KiAusfuehrungsStatusConverter</c> zwischen "▶ Läuft" und "⏸ Wartet" unterscheiden kann, während der
-    /// CLI-Prozess noch lebt (Issue 108, Folgefehler des Rückwegs Läuft → Wartet).
+    /// Stellt die Laufdaten eines aktiven CLI-Laufs idempotent sicher: Fehlt <see cref="Aufgabe.AktiveRunId"/>
+    /// (z. B. weil der Lauf über einen Wiederverwendungspfad ohne Gestartet-Ereignis zustande kam oder ein
+    /// früherer Persistierungsversuch scheiterte), wird der vollständige Lauf-Zustand gesetzt
+    /// (<see cref="Aufgabe.AusfuehrungsStatus"/> = Aktiv, neue <see cref="Aufgabe.AktiveRunId"/>,
+    /// <see cref="Aufgabe.LastHeartbeatUtc"/>, <see cref="Aufgabe.LaufStatus"/>); bei bereits vorhandenem Lauf
+    /// wird nur der Heartbeat aufgefrischt (und optional der Substatus). Ein bekannter echter
+    /// <see cref="Aufgabe.LetzterCliStartUtc"/>-Wert bleibt erhalten (Sortierstabilität der Aufgabenliste).
+    /// Aufgaben in terminalem Status (<see cref="AufgabeStatus.Beendet"/>/<see cref="AufgabeStatus.Archiviert"/>)
+    /// werden ohne Änderung übersprungen, damit der periodische Abgleich keine Warnungsflut erzeugt.
+    /// Wird von <c>CliProcessManager</c> aus den Selbstheilungspfaden (CliLaufAktiv, RuntimeStatusChanged,
+    /// Heartbeat-Tick, periodischer Abgleich) aufgerufen.
     /// </summary>
     /// <param name="id">ID der Aufgabe.</param>
-    /// <param name="laufStatus">Neuer Laufzeit-Substatus.</param>
+    /// <param name="laufStatusProvider">
+    /// Optionaler Provider für den Laufzeit-Substatus (Live-Status der Session); wird — ebenso wie
+    /// <paramref name="laeuftGuard"/> — erst innerhalb der serialisierten Schreibphase ausgewertet,
+    /// damit beim Schreiben der frischeste Session-Stand gilt und nicht ein vor dem Sperreintritt
+    /// gelesener, möglicherweise veralteter Wert als letzter Schreiber landet (Issue 342,
+    /// Stale-Write). Liefert er <c>null</c> (oder fehlt er), wird bei neu angelegtem Lauf
+    /// <see cref="AufgabeLaufStatus.Laeuft"/> gesetzt und bei bestehendem Lauf der Substatus nicht
+    /// verändert.
+    /// </param>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    public async Task AktualisiereLaufStatusAsync(Guid id, AufgabeLaufStatus laufStatus, CancellationToken ct = default)
+    /// <param name="laeuftGuard">
+    /// Optionaler Guard, der innerhalb der serialisierten Schreibphase (siehe <c>LaufGates</c>)
+    /// ausgewertet wird: liefert er <c>false</c> (z. B. weil der Prozess zwischen dem Aufruf-Check
+    /// und dem Eintritt in die Sperre bereits beendet wurde), wird nichts geschrieben — so kann kein
+    /// Phantom-Lauf nach einem bereits erfolgten <see cref="AktivenLaufBeendenAsync"/> wiederbelebt
+    /// werden (Issue 342, TOCTOU). Aufrufer aus den Selbstheilungspfaden übergeben
+    /// <c>KiAusfuehrungsService.IsRunning</c>.
+    /// </param>
+    public async Task AktivenLaufSicherstellenAsync(Guid id, Func<AufgabeLaufStatus?>? laufStatusProvider = null, CancellationToken ct = default, Func<bool>? laeuftGuard = null)
     {
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
-            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+        var gate = LaufGates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct);
+        try
+        {
+            if (laeuftGuard?.Invoke() == false)
+            {
+                _logger.LogDebug(
+                    "Laufdaten-Sicherstellung für Aufgabe {AufgabeId} übersprungen (Prozess nicht mehr aktiv).",
+                    id);
+                return;
+            }
 
-        // Nur relevant, solange ein aktiver Lauf bekannt ist. Ist AktiveRunId zwischenzeitlich entfernt
-        // worden (Prozess bereits beendet, Event kam verspätet), soll kein neuer Substatus mehr gesetzt
-        // werden, damit LaufStatus nicht nach einem AktivenLaufBeendenAsync erneut aufgefüllt wird.
-        if (aufgabe.AktiveRunId is null)
-            return;
+            var laufStatus = laufStatusProvider?.Invoke();
 
-        aufgabe.LaufStatus = laufStatus;
-        await _db.SaveChangesAsync(ct);
+            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+                ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+            if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+            {
+                _logger.LogDebug(
+                    "Laufdaten-Sicherstellung für Aufgabe {AufgabeId} übersprungen (terminaler Status {Status}).",
+                    id,
+                    aufgabe.Status);
+                return;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            if (aufgabe.AktiveRunId is null)
+            {
+                aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
+                aufgabe.AktiveRunId = Guid.NewGuid().ToString("N");
+                aufgabe.LastHeartbeatUtc = now;
+                aufgabe.LetzterCliStartUtc ??= now;
+                aufgabe.LaufStatus = laufStatus ?? AufgabeLaufStatus.Laeuft;
+            }
+            else
+            {
+                aufgabe.LastHeartbeatUtc = now;
+                if (laufStatus is not null)
+                {
+                    aufgabe.LaufStatus = laufStatus;
+                }
+            }
+
+            await _db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     /// <summary>Gibt die Minuten seit dem letzten Heartbeat zurück (null wenn kein Heartbeat gesetzt).</summary>

@@ -917,6 +917,17 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             await _kiService.StopCliAsync(_aufgabeId, ct);
+
+            if (_kiService.IsRunning(_aufgabeId))
+            {
+                // Der Prozess konnte nicht beendet werden (Beendigungsfehler werden in StopCliAsync
+                // nur geloggt): Laufdaten und Session-Anbindung bleiben bestehen, damit Fußzeile
+                // und Kachel den tatsächlich weiterlaufenden Prozess zeigen statt fälschlich
+                // "Bereit" (Issue 342, Divergenzpfad F1). KannCliStoppen bleibt erneut auslösbar.
+                FehlerMeldung = "Der CLI-Prozess konnte nicht beendet werden und läuft weiter. Bitte erneut versuchen.";
+                return;
+            }
+
             await _aufgabeService.AktivenLaufBeendenAsync(_aufgabeId, ct);
             _dispatcherInvoke(() =>
             {
@@ -1709,7 +1720,19 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            await _aufgabeService.AusfuehrungAktivSetzenAsync(_aufgabeId, ct);
+            // Vollständige Laufdaten sicherstellen statt nur AusfuehrungsStatus=Aktiv (Issue 342,
+            // Divergenzpfad F2): Der Pfad persistiert denselben Lauf-Zustand wie ein echter
+            // Gestartet-Lauf — auch wenn CliNeustartenAsync in einen Wiederverwendungs-Early-Return
+            // ohne Gestartet-Ereignis lief. Der laeuftGuard und der Live-Substatus-Provider werden
+            // innerhalb der serialisierten Schreibphase erneut ausgewertet: Endet der Prozess zwischen
+            // dem IsRunning-Check oben und der Persistenz, wird kein Phantom-Lauf geschrieben, und der
+            // geschriebene Substatus ist der frischeste Session-Stand (TOCTOU-/Stale-Write-Fix).
+            await _aufgabeService.AktivenLaufSicherstellenAsync(
+                _aufgabeId,
+                laufStatusProvider: () => _kiService.GetTerminalSession(_aufgabeId)?.RuntimeStatus.ToAufgabeLaufStatus(),
+                ct,
+                laeuftGuard: () => _kiService.IsRunning(_aufgabeId));
+            _laufdatenChangedNotifier?.NotifyLaufdatenChanged(_aufgabeId);
 
             var session = _kiService.GetTerminalSession(_aufgabeId);
             if (session != null)

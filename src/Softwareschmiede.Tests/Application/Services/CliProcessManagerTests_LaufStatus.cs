@@ -18,7 +18,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>
 /// Regressionstests für Issue 108 (Folgefehler des Rückwegs Läuft → Wartet): <see cref="CliProcessManager"/>
 /// muss den Laufzeit-Substatus einer <see cref="PseudoConsoleSession"/> (<see cref="PseudoConsoleSession.RuntimeStatusChanged"/>)
-/// über <see cref="AufgabeService.AktualisiereLaufStatusAsync"/> persistieren, damit
+/// über <see cref="AufgabeService.AktivenLaufSicherstellenAsync"/> persistieren, damit
 /// <c>KiAusfuehrungsStatusConverter</c> die Seitenleisten-Kachel zwischen "▶ Läuft" und "⏸ Wartet"
 /// umschalten kann, während der CLI-Prozess noch lebt. Vor dem Fix wurde dieser Substatus ausschließlich
 /// lokal in der <see cref="PseudoConsoleSession"/> gehalten und speiste nur die Fußzeile der
@@ -199,11 +199,38 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
         await RaiseStatusChangedAsync(CliProcessStatus.Gestoppt, a => a.AktiveRunId == null);
 
         // Verspätetes Event nach dem Stopp: darf keinen Effekt mehr haben (weder über die Abmeldung in
-        // CliProcessManager, noch nachgelagert über die AktiveRunId-Prüfung in AktualisiereLaufStatusAsync).
+        // CliProcessManager, noch nachgelagert über den IsRunning-Guard der Laufdaten-Sicherstellung).
         ForceRuntimeStatusRefresh(session);
         await Task.Delay(200);
 
         LadeAufgabe().LaufStatus.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Auch ein RuntimeStatusChanged-Pfad heilt fehlende Laufdaten bei laufendem Prozess: Ist kein
+    /// Gestartet-Ereignis gelaufen (z. B. Wiederverwendungs-Early-Return), stellt das Ereignis die
+    /// vollständigen Laufdaten inkl. Substatus her statt nur den Substatus zu schreiben (Issue 342, H2).
+    /// </summary>
+    [Fact]
+    public async Task OnRuntimeStatusChanged_HeiltFehlendeAktiveRunId()
+    {
+        var session = RegisterFakeSessionForAufgabe(_aufgabeId);
+        LadeAufgabe().AktiveRunId.Should().BeNull("Ausgangslage: keine Gestartet-Persistierung");
+
+        // Session deterministisch in den Wartezustand bringen (Schwelle: 1 ms), damit die
+        // Selbstheilung den Live-Substatus WartetAufEingabe persistiert.
+        await Task.Delay(50);
+        ForceRuntimeStatusRefresh(session);
+
+        var method = typeof(CliProcessManager).GetMethod("OnRuntimeStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        method.Invoke(_sut, new object[] { _aufgabeId, CliRuntimeStatus.WartetAufEingabe });
+
+        await PollUntilAsync(() => LadeAufgabe().AktiveRunId is not null);
+        var aufgabe = LadeAufgabe();
+        aufgabe.AktiveRunId.Should().NotBeNullOrEmpty();
+        aufgabe.LastHeartbeatUtc.Should().NotBeNull();
+        aufgabe.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+        aufgabe.LaufStatus.Should().Be(AufgabeLaufStatus.WartetAufEingabe);
     }
 
     /// <summary>Stream, dessen Lesevorgang niemals zurückkehrt — verhindert, dass die Leseschleife der

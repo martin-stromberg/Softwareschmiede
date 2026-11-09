@@ -150,6 +150,9 @@ public sealed class AutoShutdownOrchestratorTests
         public int GetRunningCount() => _runningCount;
         /// <summary>IsRunning.</summary>
         public bool IsRunning(Guid aufgabeId) => _runningCount > 0;
+        /// <summary>GetLiveLaufStatus.</summary>
+        public Softwareschmiede.Domain.Enums.AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId)
+            => _runningCount > 0 ? Softwareschmiede.Domain.Enums.AufgabeLaufStatus.Laeuft : null;
 
         /// <summary>Raise.</summary>
         public void Raise(int previous, int current, int observedCurrentCount)

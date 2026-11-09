@@ -167,6 +167,101 @@ public sealed class KiAusfuehrungsStatusConverterTests
         result.Should().Be("⏸ Wartet");
     }
 
+    /// <summary>
+    /// Live-Zweig (Issue 342): Zeigt <see cref="AktiveAufgabePanelItem.LiveLaufStatus"/> einen laufenden
+    /// Prozess an, zeigt die Kachel "▶ Läuft" — selbst ohne persistierte Laufdaten (AktiveRunId null)
+    /// und selbst wenn der persistierte Ausführungsstatus noch Beendet lautet.
+    /// </summary>
+    [Fact]
+    public void Convert_ShouldReturnLaeuftString_WhenPanelItemHasLiveLaufStatusOhneLaufdaten()
+    {
+        var item = new AktiveAufgabePanelItem
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Aufgabe mit lebendem Prozess ohne Laufdaten",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet,
+            AktiveRunId = null,
+            LastHeartbeatUtc = null,
+            LiveLaufStatus = AufgabeLaufStatus.Laeuft
+        };
+
+        var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().Be("▶ Läuft");
+    }
+
+    /// <summary>Live-Zweig (Issue 342): LiveLaufStatus WartetAufEingabe zeigt "⏸ Wartet".</summary>
+    [Fact]
+    public void Convert_ShouldReturnWartetString_WhenPanelItemHasLiveLaufStatusWartetAufEingabe()
+    {
+        var item = new AktiveAufgabePanelItem
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Aufgabe mit wartender Live-CLI",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet,
+            LiveLaufStatus = AufgabeLaufStatus.WartetAufEingabe
+        };
+
+        var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().Be("⏸ Wartet");
+    }
+
+    /// <summary>
+    /// Der Live-Zweig wertet nur aufwärts (Laeuft/Wartet): Pausiert und PromptInWartestellung dürfen
+    /// nicht durch einen Live-Status überschrieben werden.
+    /// </summary>
+    [Fact]
+    public void Convert_ShouldKeepPausiertUndWartestellung_VorLiveLaufStatus()
+    {
+        var pausiert = new AktiveAufgabePanelItem
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Pausierte Aufgabe mit Live-Prozess",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            LiveLaufStatus = AufgabeLaufStatus.Laeuft,
+            PausiertBisUtc = DateTimeOffset.UtcNow.AddMinutes(30)
+        };
+        var wartestellung = new AktiveAufgabePanelItem
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Aufgabe mit Prompt-Wartestellung",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            LiveLaufStatus = AufgabeLaufStatus.Laeuft,
+            HasScheduledPrompt = true
+        };
+
+        _sut.Convert(pausiert, typeof(string), null!, CultureInfo.InvariantCulture)
+            .Should().BeOfType<string>().Which.Should().StartWith("⏸ Pausiert (noch ");
+        _sut.Convert(wartestellung, typeof(string), null!, CultureInfo.InvariantCulture)
+            .Should().Be("⏳ Prompt in Wartestellung");
+    }
+
+    /// <summary>
+    /// Live-Zweig (Issue 342): <see cref="AktiveAufgabePanelItem.LiveLaufStatus"/> == null darf die
+    /// bisherige persistenzbasierte Bewertung nicht verändern — keine erzwungene Beendigung.
+    /// </summary>
+    [Fact]
+    public void Convert_ShouldReturnBereitString_WhenPanelItemLiveLaufStatusNullUndBeendet()
+    {
+        var item = new AktiveAufgabePanelItem
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Beendete Aufgabe ohne Live-Prozess",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet,
+            LiveLaufStatus = null
+        };
+
+        var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().Be("✓ Bereit");
+    }
+
     /// <summary>Convert ignoriert den alten Gesamtstatus Wartend, wenn die KI-Ausführung beendet ist.</summary>
     [Fact]
     public void Convert_ShouldReturnBereitString_WhenWartendAufgabeHasBeendeteAusfuehrung()

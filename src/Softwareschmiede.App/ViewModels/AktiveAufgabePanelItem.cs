@@ -47,6 +47,9 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
     /// <summary>Optionaler Laufzeit-Substatus der aktiven CLI-Ausführung.</summary>
     public AufgabeLaufStatus? LaufStatus { get; init; }
 
+    /// <summary>Live-Substatus aus der Laufzeitquelle (<see cref="Domain.Interfaces.IRunningAutomationStatusSource.GetLiveLaufStatus"/>); <c>null</c> = kein laufender gehandelter Prozess.</summary>
+    public AufgabeLaufStatus? LiveLaufStatus { get; init; }
+
     /// <summary>Aktueller Aufgabenstatus.</summary>
     public AufgabeStatus Status { get; init; }
 

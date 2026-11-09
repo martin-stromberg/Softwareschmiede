@@ -607,17 +607,22 @@ public sealed class AufgabeServiceTests : IDisposable
         result!.Status.Should().Be(AufgabeStatus.Beendet);
     }
 
-    /// <summary>TestHeartbeatUpdate: LastHeartbeatUtc wird aktualisiert; Alter wird korrekt berechnet.</summary>
+    /// <summary>GetHeartbeatAgeMinutesAsync berechnet das Alter bei gesetztem Heartbeat korrekt.
+    /// Der Heartbeat wird direkt an der Entity gesetzt (UpdateHeartbeatAsync wurde als toter Code
+    /// entfernt — produktiv wird LastHeartbeatUtc ausschließlich über die LaufGates-serialisierten
+    /// Laufpfade AktivenLaufSetzen-/Sicherstellen-/BeendenAsync geschrieben, Issue 342).</summary>
     [Fact]
-    public async Task TestHeartbeatUpdate()
+    public async Task GetHeartbeatAgeMinutesAsync_BerechnetAlter_BeiGesetztemHeartbeat()
     {
         // Arrange
         var aufgabe = await _sut.CreateAsync(_projektId, "Heartbeat-Aufgabe", null);
         aufgabe.LastHeartbeatUtc.Should().BeNull();
 
-        // Act – Heartbeat aktualisieren
+        // Act – Heartbeat direkt an der Entity setzen
         var vorUpdate = DateTimeOffset.UtcNow;
-        await _sut.UpdateHeartbeatAsync(aufgabe.Id);
+        var tracked = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        tracked!.LastHeartbeatUtc = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync();
         var nachUpdate = DateTimeOffset.UtcNow;
 
         // Assert – Heartbeat wurde gesetzt

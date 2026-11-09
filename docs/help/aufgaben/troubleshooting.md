@@ -74,6 +74,28 @@
 
 **Lösung:** Pausiere betroffene Aufgaben bei Bedarf manuell über **Pause einstellen**.
 
+## „Der CLI-Prozess konnte nicht beendet werden und läuft weiter"
+
+**Symptom:** Nach Klick auf **Stoppen** erscheint die Meldung „Der CLI-Prozess konnte nicht beendet werden und läuft weiter. Bitte erneut versuchen."; Fußzeile und Aufgabenkachel zeigen weiterhin einen laufenden Lauf.
+
+**Ursache:** Der Stopp-Auftrag erreichte den Prozess, konnte ihn aber nicht beenden — etwa weil der Prozess nicht mehr auf Beendigungssignale reagiert.
+
+**Lösung:**
+1. Klicke erneut auf **Stoppen** — die Schaltfläche bleibt in diesem Fall weiterhin auslösbar.
+2. Hilft auch das nicht, beende den Prozess außerhalb der Anwendung (z. B. über den Task-Manager). Anzeige und gespeicherter Status gleichen sich danach automatisch ab.
+
+> **Hinweis:** Die Anwendung markiert den Lauf in diesem Fall bewusst nicht als beendet — sonst würden Kachel und Fußzeile fälschlich „Bereit" anzeigen, obwohl der Prozess noch läuft.
+
+## Kachel zeigt „✓ Bereit", obwohl die CLI noch läuft
+
+**Symptom:** Die Aufgabenkachel in der Seitenleiste oder auf dem Dashboard zeigt `✓ Bereit`, während in der geöffneten Detailansicht die Ausführung läuft.
+
+**Ursache:** Gespeicherte Laufdaten fehlen oder sind veraltet (z. B. nach einem unterbrochenen Schreibvorgang), obwohl der CLI-Prozess faktisch läuft.
+
+**Lösung:**
+1. In der Regel ist nichts zu tun: Die Kachel zeigt den laufenden Prozess direkt über seinen Ist-Zustand an, und die gespeicherten Laufdaten werden automatisch wiederhergestellt — spätestens innerhalb von rund 30 Sekunden.
+2. Bleibt der Zustand dauerhaft falsch, wende dich an den Administrator — Details stehen in den Fehlerprotokollen der Anwendung (siehe [Stabilität & Fehlerbehandlung](../stabilitaet/troubleshooting.md)).
+
 ## Geplanter Prompt wird nicht zur eingestellten Zeit versendet
 
 **Symptom:** Ein zeitgesteuert geplanter Prompt wird später als geplant ausgeführt.

@@ -400,6 +400,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             AktiveRunId = aufgabe.AktiveRunId,
             LastHeartbeatUtc = aufgabe.LastHeartbeatUtc,
             LaufStatus = aufgabe.LaufStatus,
+            LiveLaufStatus = _runningStatusSource.GetLiveLaufStatus(aufgabe.Id),
             LetzterCliStartUtc = aufgabe.LetzterCliStartUtc,
             PausiertBisUtc = aufgabe.PausiertBisUtc,
             IsAktiv = GetAktiveAufgabeId() == aufgabe.Id,
