@@ -59,7 +59,27 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     }
 
     /// <summary>Wird ausgelöst, wenn ein CLI-Prozess gestartet, gestoppt oder ein Fehler aufgetreten ist.</summary>
+    /// <remarks>
+    /// Der <see cref="CliProcessStatus.Gestartet"/>-Invoke läuft unter der klassenweiten Start-Sperre
+    /// (<c>_startLock</c>). Abonnenten müssen daher non-blocking sein und dürfen nicht reentrant
+    /// <see cref="StartCliAsync"/>/<see cref="StartTerminalSessionAsync"/> aufrufen — sonst
+    /// blockieren/deadlocken sie sämtliche Prozessstarts aller Aufgaben.
+    /// </remarks>
     public event Action<Guid, CliProcessStatus>? CliProcessStatusChanged;
+
+    /// <summary>
+    /// Wird ausgelöst, wenn eine Startanforderung einen bereits laufenden Prozess zurückgibt
+    /// (Early-Return ohne <see cref="CliProcessStatus.Gestartet"/>-Ereignis) bzw. ein laufender
+    /// Prozess über <see cref="NotifyLaufAktiv"/> bestätigt wird. Abonnenten können damit die
+    /// Laufdaten-Persistenz für laufende Prozesse ohne Gestartet-Ereignis sicherstellen.
+    /// </summary>
+    /// <remarks>
+    /// Vertrag wie bei <see cref="CliProcessStatusChanged"/>: Der Invoke aus den Startpfaden läuft
+    /// unter der klassenweiten Start-Sperre (<c>_startLock</c>). Abonnenten müssen non-blocking sein
+    /// und dürfen nicht reentrant <see cref="StartCliAsync"/>/<see cref="StartTerminalSessionAsync"/>
+    /// aufrufen — sonst blockieren/deadlocken sie sämtliche Prozessstarts aller Aufgaben.
+    /// </remarks>
+    public event Action<Guid>? CliLaufAktiv;
 
     /// <inheritdoc/>
     public event Action<int, int>? RunningCountChanged;
@@ -94,6 +114,48 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             try { return !h.Process.HasExited; }
             catch { return false; }
         });
+
+    /// <summary>
+    /// Feuert <see cref="CliLaufAktiv"/> für eine Aufgabe, sofern für sie ein Prozess läuft —
+    /// sonst No-Op. Für Aufrufer außerhalb des Service, die einen laufenden Prozess bestätigt
+    /// haben (z. B. der Session-Alive-Early-Return in <c>EntwicklungsprozessService</c>).
+    /// </summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    public void NotifyLaufAktiv(Guid aufgabeId)
+    {
+        if (IsRunning(aufgabeId))
+        {
+            CliLaufAktiv?.Invoke(aufgabeId);
+        }
+    }
+
+    /// <summary>Liefert die IDs aller Aufgaben mit einem laufenden Handle (<c>!HasExited</c>,
+    /// Exception-tolerant wie <see cref="GetRunningCount"/>).</summary>
+    /// <returns>Die Aufgaben-IDs mit nachweislich laufendem Prozess.</returns>
+    public IReadOnlyCollection<Guid> GetLaufendeAufgabenIds()
+        => _handles
+            .Where(pair =>
+            {
+                try { return !pair.Value.Process.HasExited; }
+                catch { return false; }
+            })
+            .Select(pair => pair.Key)
+            .ToList();
+
+    /// <inheritdoc/>
+    public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId)
+    {
+        if (!IsRunning(aufgabeId))
+        {
+            return null;
+        }
+
+        // Abweichung bewusst explizit: Der Live-Substatus kennt kein "null bei Inaktiv/keiner Session"
+        // — ein nachweislich laufender Prozess ohne Wartet-Meldung ist fachlich "Läuft" (Issue 342:
+        // Live-Zweig des Klassifikators darf nie auf Bereit zurückfallen, solange ein Handle lebt).
+        return GetTerminalSession(aufgabeId)?.RuntimeStatus.ToAufgabeLaufStatus()
+            ?? AufgabeLaufStatus.Laeuft;
+    }
 
     private readonly SemaphoreSlim _startLock = new(1, 1);
 
@@ -135,6 +197,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 if (istNochAktiv)
                 {
                     _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", aufgabeId);
+                    CliLaufAktiv?.Invoke(aufgabeId);
                     return existing;
                 }
             }
@@ -230,6 +293,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 if (istNochAktiv)
                 {
                     _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", aufgabeId);
+                    CliLaufAktiv?.Invoke(aufgabeId);
                     return existing;
                 }
             }

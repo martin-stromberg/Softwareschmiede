@@ -769,6 +769,102 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         }
     }
 
+    /// <summary>Ein zweiter Start bei laufendem Handle feuert CliLaufAktiv (nicht ein zweites Gestartet) —
+    /// sowohl auf dem StartCliAsync- als auch auf dem StartTerminalSessionAsync-Pfad (Issue 342, H1).</summary>
+    [Fact]
+    public async Task ZweiterStart_FeuertCliLaufAktiv_StattGestartet()
+    {
+        var aufgabeId = Guid.NewGuid();
+        var pluginMock = CreateNoOpPlugin();
+
+        var gestartetCount = 0;
+        var laufAktivCount = 0;
+        _sut.CliProcessStatusChanged += (_, status) =>
+        {
+            if (status == CliProcessStatus.Gestartet)
+                gestartetCount++;
+        };
+        _sut.CliLaufAktiv += _ => laufAktivCount++;
+
+        var handle = await _sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        gestartetCount.Should().Be(1);
+
+        var handle2 = await _sut.StartCliAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle3 = await _sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+
+        handle2.Should().BeSameAs(handle, "der zweite Start liefert das bereits laufende Handle zurück");
+        handle3.Should().BeSameAs(handle);
+        gestartetCount.Should().Be(1, "bei Wiederverwendung darf kein zweites Gestartet-Ereignis feuern");
+        laufAktivCount.Should().Be(2, "beide Early-Returns melden den laufenden Prozess über CliLaufAktiv");
+    }
+
+    /// <summary>NotifyLaufAktiv feuert CliLaufAktiv nur, wenn für die Aufgabe ein Prozess läuft.</summary>
+    [Fact]
+    public async Task NotifyLaufAktiv_FeuertNur_BeiLaufendemProzess()
+    {
+        var aufgabeId = Guid.NewGuid();
+        var laufAktivCount = 0;
+        _sut.CliLaufAktiv += _ => laufAktivCount++;
+
+        _sut.NotifyLaufAktiv(aufgabeId);
+        laufAktivCount.Should().Be(0, "ohne laufendes Handle ist NotifyLaufAktiv ein No-Op");
+
+        await _sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+        _sut.NotifyLaufAktiv(aufgabeId);
+
+        laufAktivCount.Should().Be(1);
+    }
+
+    /// <summary>GetLiveLaufStatus liefert null ohne laufendes Handle und bildet den Session-Status ab:
+    /// laufend ohne/mit Session (Laeuft) bzw. WartetAufEingabe → die persistierten Substatus-Werte.</summary>
+    [Fact]
+    public void GetLiveLaufStatus_BildetSessionStatusAb()
+    {
+        var ohneHandle = Guid.NewGuid();
+        _sut.GetLiveLaufStatus(ohneHandle).Should().BeNull("ohne laufendes Handle gibt es keinen Live-Substatus");
+
+        var laufendOhneSession = Guid.NewGuid();
+        PlantHandle(laufendOhneSession, new CliProcessHandle(laufendOhneSession, System.Diagnostics.Process.GetCurrentProcess()));
+        _sut.GetLiveLaufStatus(laufendOhneSession).Should().Be(AufgabeLaufStatus.Laeuft);
+
+        var laufendMitSession = Guid.NewGuid();
+        var session = TestPseudoConsoleSessionFactory.Create(
+            new MemoryStream(),
+            new MemoryStream(),
+            NullLogger.Instance);
+        PlantHandle(laufendMitSession, new CliProcessHandle(laufendMitSession, System.Diagnostics.Process.GetCurrentProcess()) { Session = session });
+        try
+        {
+            _sut.GetLiveLaufStatus(laufendMitSession).Should().Be(AufgabeLaufStatus.Laeuft);
+        }
+        finally
+        {
+            session.Dispose();
+        }
+    }
+
+    /// <summary>GetLaufendeAufgabenIds listet nur Aufgaben mit nachweislich laufendem Handle.</summary>
+    [Fact]
+    public void GetLaufendeAufgabenIds_ListetNurLaufendeHandles()
+    {
+        var laufend = Guid.NewGuid();
+        var nichtZugeordnet = Guid.NewGuid();
+
+        PlantHandle(laufend, new CliProcessHandle(laufend, System.Diagnostics.Process.GetCurrentProcess()));
+        // Ein Process-Objekt ohne zugeordneten Prozess wirft bei HasExited — wird als nicht laufend gewertet.
+        PlantHandle(nichtZugeordnet, new CliProcessHandle(nichtZugeordnet, new System.Diagnostics.Process()));
+
+        _sut.GetLaufendeAufgabenIds().Should().ContainSingle()
+            .Which.Should().Be(laufend);
+    }
+
+    private void PlantHandle(Guid aufgabeId, CliProcessHandle handle)
+    {
+        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_sut)!;
+        handles[aufgabeId] = handle;
+    }
+
     private static async Task<IReadOnlyList<Softwareschmiede.Domain.Entities.Protokolleintrag>> WaitForCliOutputAsync(
         ServiceProvider provider,
         Guid aufgabeId,

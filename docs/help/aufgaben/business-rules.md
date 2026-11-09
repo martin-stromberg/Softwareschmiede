@@ -15,6 +15,24 @@
 
 ---
 
+## Statusanzeige folgt dem faktischen Prozesszustand
+
+**Beschreibung:** Die Aufgabenkachel (Seitenleiste, Dashboard) und die Fußzeile der Aufgabendetailansicht zeigen für denselben KI-Lauf stets denselben fachlichen Zustand. Maßgeblich ist der faktische Prozesszustand — nicht allein der zuletzt gespeicherte Datenstand.
+
+**Bedingungen:**
+- Für die Aufgabe läuft ein gehandelter CLI-Prozess (`KiAusfuehrungsService.IsRunning` bzw. `GetLaufendeAufgabenIds`).
+
+**Verhalten:**
+- Läuft der Prozess nachweislich, zeigt die Kachel `▶ Läuft` bzw. `⏸ Wartet`: Der Live-Substatus (`AktiveAufgabePanelItem.LiveLaufStatus`, befüllt aus `IRunningAutomationStatusSource.GetLiveLaufStatus`) schlägt in `KiAusfuehrungsStatusKlassifikation` vor der Auswertung der persistierten Laufdaten immer aufwärts durch — niemals auf `Bereit`. `Pausiert` und `PromptInWartestellung` behalten Vorrang.
+- Fehlende persistierte Laufdaten werden durch `AufgabeService.AktivenLaufSicherstellenAsync` wiederhergestellt — ereignisgetrieben (`CliLaufAktiv` auf Session-Wiederverwendungspfaden, `RuntimeStatusChanged`, Heartbeat-Tick) und spätestens über den 30-s-Abgleich des `CliProcessManager`.
+- Ein persistierter „aktiver" Lauf ohne laufenden Prozess verfällt weiterhin über die Heartbeat-Regel (älter als 5 Minuten → `✓ Bereit` + Recovery-Kandidat): Der Live-Zweig liefert ohne Prozess `null` und greift nicht — verwaiste Zustände erscheinen nicht wieder aktiv.
+- Alle Laufdaten-Mutationen laufen unter der prozessweiten `AufgabeService.LaufGates`-Sperre; `laeuftGuard`/`laufStatusProvider` werden innerhalb der Sperre ausgewertet, damit kein Phantom-Lauf nach einem Beenden entsteht und kein veralteter Substatus als letzter Schreiber landet.
+- Eine nicht beendbare CLI bleibt als laufend sichtbar: `CliStoppenAsync` beendet die Laufdaten nur bei tatsächlich beendetem Prozess — andernfalls erscheint eine Fehlermeldung und `KannCliStoppen` bleibt erneut auslösbar.
+
+**Umsetzung:** `KiAusfuehrungsService.GetLiveLaufStatus`/`CliLaufAktiv`/`NotifyLaufAktiv`/`GetLaufendeAufgabenIds`, `CliProcessManager.LaufdatenSicherstellenAsync`/`AbgleichAsync`, `AufgabeService.AktivenLaufSicherstellenAsync`/`LaufGates`, `MainWindowViewModel.MapAktiveAufgabePanelItem`, `KiAusfuehrungsStatusKlassifikation`, `TaskDetailViewModel.CliStoppenAsync`/`StartCliAndUpdateStateAsync`.
+
+---
+
 ## Branch-Strategie beim Prozessstart
 
 **Beschreibung:** Die Branch-Wahl hängt davon ab, ob ein vorhandener Remote-Branch angegeben wurde und ob dieser der Hauptbranch ist.

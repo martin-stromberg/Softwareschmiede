@@ -208,6 +208,8 @@ Beendet sich das CLI-Programm selbst, aktualisiert die Ansicht automatisch. Alte
 
 Das Beenden der KI-Ausführung ist nicht dasselbe wie das Beenden der Aufgabe. Der lokale Klon bleibt erhalten, der Gesamtstatus der Aufgabe bleibt bestehen. **Die CLI-Ansicht bleibt auch nach Beendigung noch sichtbar**, sodass du die letzte Ausgabe anschauen und die CLI über **Starten** neu starten kannst, ohne die Aufgabe fachlich zu beenden. Ein erneuter Lauf erfolgt nur über **Starten** im Ribbon.
 
+> **Hinweis:** Lässt sich der CLI-Prozess nicht beenden, zeigt die Detailansicht die Meldung „Der CLI-Prozess konnte nicht beendet werden und läuft weiter. Bitte erneut versuchen." — Fußzeile und Kachel zeigen weiterhin den laufenden Zustand, und du kannst **Stoppen** erneut auslösen.
+
 ### 8. Aufgabe abschließen
 
 Im Status **Gestartet** oder **Wartend**, klicke im Ribbon (Gruppe „Aufgabe") auf **Beenden**. Erst diese Aktion schließt die Aufgabe endgültig ab: Der Gesamtstatus wechselt auf **Beendet**, das lokale Arbeitsverzeichnis wird bereinigt und die **Diff-Ansicht** zeigt die Änderungen im Repository. Die **Info-Ansicht** bleibt weiterhin auswählbar.

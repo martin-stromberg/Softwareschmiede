@@ -166,6 +166,26 @@ public sealed class MainWindowViewModelTests : IDisposable
         sut.AktiveAufgabenListe.Single(a => a.Id == ohneTodos.Id).OffeneTodoLabelText.Should().Be("0 Todos");
     }
 
+    /// <summary>AktiveAufgabenAktualisierenAsync befüllt LiveLaufStatus aus der Live-Laufzeitquelle (Issue 342).</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldMapLiveLaufStatus()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Live-Status-Aufgabe", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/live", "/tmp/live");
+        _runningStatusSourceMock
+            .Setup(s => s.GetLiveLaufStatus(aufgabe.Id))
+            .Returns(AufgabeLaufStatus.WartetAufEingabe);
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        var item = sut.AktiveAufgabenListe.Single(a => a.Id == aufgabe.Id);
+        item.LiveLaufStatus.Should().Be(AufgabeLaufStatus.WartetAufEingabe);
+    }
+
     /// <summary>AktiveAufgabenAktualisierenAsync mappt PausiertBisUtc und das abgeleitete IstPausiert auf das Panel-Item (Issue 151).</summary>
     [Fact]
     public async Task AktiveAufgabenAktualisierenAsync_ShouldMapPausiertBisUtc_WhenTaskIsPaused()

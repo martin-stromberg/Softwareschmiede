@@ -263,7 +263,16 @@ public sealed class EntwicklungsprozessService
         var current = _options.KiAusfuehrungsService.GetTerminalSession(aufgabeId);
         if (current is not null)
         {
-            try { if (current.ExitCode is null && current.Failure is null && !current.Process.HasExited) return; }
+            try
+            {
+                if (current.ExitCode is null && current.Failure is null && !current.Process.HasExited)
+                {
+                    // Lebende Session wird wiederverwendet: kein Gestartet-Ereignis — stattdessen das
+                    // dedizierte CliLaufAktiv-Signal, damit die Laufdaten-Persistenz nachgezogen wird.
+                    _options.KiAusfuehrungsService.NotifyLaufAktiv(aufgabeId);
+                    return;
+                }
+            }
             catch (InvalidOperationException) { }
         }
 

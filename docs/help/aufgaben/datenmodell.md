@@ -22,6 +22,7 @@
 | `AbschlussDatum` | `DateTimeOffset?` | Abschlusszeitpunkt |
 | `AktiveRunId` | `string?` | Run-ID eines laufenden KI-Prozesses |
 | `LastHeartbeatUtc` | `DateTimeOffset?` | Letzter Heartbeat-Zeitstempel |
+| `LaufStatus` | `AufgabeLaufStatus?` | Persistierter Laufzeit-Substatus des aktiven Laufs (`Laeuft`/`WartetAufEingabe`); wird über `AktivenLaufSicherstellenAsync` gepflegt und beim Beenden zurückgesetzt |
 | `LetzterCliStartUtc` | `DateTimeOffset?` | Zeitpunkt des letzten echten CLI-Prozessstarts; dient als stabile Sortiergrundlage fuer aktive Aufgabenlisten |
 | `PausiertBisUtc` | `DateTimeOffset?` | Endzeitpunkt einer aktiven Pause; `null` = keine Pause |
 | `RecoveryVersion` | `int` | Concurrency-Token für Recovery |
