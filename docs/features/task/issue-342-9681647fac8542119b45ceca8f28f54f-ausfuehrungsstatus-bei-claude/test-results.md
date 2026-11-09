@@ -2,7 +2,9 @@
 
 ## Ergebnis
 
-**Status:** Fehler vorhanden
+**Status:** Keine Fehler
+
+Hinweis (Abschluss, 2026-11-09): Der Anwender hat die komplette Testsuite in einer echten interaktiven Umgebung ausgeführt und bestätigt, dass alle Tests — einschließlich des Pflicht-E2E `ConPty_WeitereLebenszyklusSzenarien_E2E` — erfolgreich sind (Issue-Kommentar: „Der Test ist nun erfolgreich, so wie alle anderen auch."). Damit gelten die zuvor `Nicht durchführbar` gemeldeten E2E-/Abnahmeszenarien als **Bestanden (manuell, 2026-11-09)**.
 
 Hinweis (Iteration 3): Alle **ausgeführten** Tests sind fehlerfrei bestanden (0 Fehlschläge in 2.561 Tests, siehe Zusammenfassung). Der Status `Fehler vorhanden` resultiert ausschließlich daraus, dass (a) der geplante Pflicht-E2E-Test in dieser Sandbox nicht ausgeführt wurde (ConPTY/WPF-E2E sind hier bestätigt nicht lauffähig → `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` / `SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1` → `Skipped`) und (b) die reale End-to-End-Abnahme der UI-Szenarien nicht durchführbar war. Nach den Regeln des `/run-tests`-Kommandos gelten nicht ausgeführte geplante E2E-Szenarien und unaufgelöste `Nicht durchführbar`-Abnahmen nicht als Erfolg. Die Entscheidung (manuelle Abnahme durch Anwender oder dokumentierter Verzicht) steht aus.
 
@@ -30,7 +32,7 @@ Kein einziger ausgeführter Test ist fehlgeschlagen. Die folgenden Punkte werden
 ### E2E / Reale Abnahme (offen, Anwender-Entscheidung erforderlich)
 
 - **`End2EndTest.ConPty_WeitereLebenszyklusSzenarien_E2E` (enthält den Pflicht-E2E `SeitenleistenKachel_AktualisiertStatusAutomatisch_OhneManuellesNeuladen_E2E`)** — Nicht ausgeführt: `Skipped` via `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` (bestätigte Sandbox-Limitation: ConPTY-Kindprozess wird in dieser Agent-Sandbox nicht an die Pseudo-Konsole isoliert; der Test läuft regulär in Visual Studio / interaktiver Desktop-Session, siehe CLAUDE.md und `plan.md` Abschnitt „E2E-Tests – Hinweis zur Ausführbarkeit").
-- **Reale End-to-End-Abnahme der Akzeptanzszenarien 1–6 (siehe Abschnitt „Reale End-to-End-Abnahme")** — `Nicht durchführbar` in dieser Sandbox; erfordert manuelle Abnahme durch den Anwender oder dokumentierten Verzicht.
+- **Reale End-to-End-Abnahme der Akzeptanzszenarien 1–6 (siehe Abschnitt „Reale End-to-End-Abnahme")** — Bestanden (manuell, 2026-11-09) — Anwender-Bestätigung in echter Umgebung.
 
 ## E2E-Abdeckung
 
@@ -48,12 +50,12 @@ Die Anforderung berührt die Benutzeroberfläche (Kachel-Statusanzeige ↔ Fußz
 
 | Szenario | Durchgeführt über | Ergebnis |
 |----------|-------------------|----------|
-| 1 – Happy Path: Start ↔ Stopp synchron (Fußzeile „Ausführung läuft" ↔ Kachel „▶ Läuft"; nach Stopp beide „✓ Bereit"/„CLI inaktiv") | Vorgesehen: realer App-Start + Claude-CLI-Prozess (Pflicht-E2E `ConPty_WeitereLebenszyklusSzenarien_E2E`) | **Nicht durchführbar** (Sandbox: keine interaktive Desktop-Session, ConPTY nicht lauffähig) |
-| 2 – Session-Wiederverwendung ohne `Gestartet` (H1): Detailansicht erneut öffnen bei lebender Session | E2E-Abschnitt `taskDetail.Reload()` in derselben Methode | **Nicht durchführbar** (gleiche Begründung; Mechanismus zusätzlich per `ZweiterStart_FeuertCliLaufAktiv_StattGestartet`, `CliNeustartenAsync_MeldetLaufAktiv_BeiLebenderSession` auf Unit-Ebene abgesichert) |
-| 3 – Verschluckter Persistenzfehler (H2) → Selbstheilung | E2E-Divergenz-Nachspiel (DB-Löschung) | **Nicht durchführbar** (Sandbox; Unit-Pendants bestanden, s. o.) |
-| 4 – Stopp ohne Prozessende (F1) | UI-Klick „CLI stoppen" bei überlebendem Prozess | **Nicht durchführbar** (Sandbox; Unit-Test `CliStoppenAsync_BehaeltLaufdaten_BeiWeiterlaufendemProzess` bestanden) |
-| 5 – Heartbeat-Ausfall bei lebendem Prozess (H4) | E2E-Divergenz-Nachspiel / 30-s-Abgleich | **Nicht durchführbar** (Sandbox; Unit-Pendant `AbgleichAsync_StelltLaufdatenSicher_FuerLaufendeAufgaben` bestanden) |
-| 6 – Tatsächlich beendeter/verwaister Lauf → „✓ Bereit" (kein falsches Wieder-Aktiv) | E2E-Stopp-Abschnitt + Heartbeat-Timeout | **Nicht durchführbar** (Sandbox; Unit-Pendants bestanden: `Convert_ShouldReturnBereitString_WhenPanelItemLiveLaufStatusNullUndBeendet`, `AktivenLaufSicherstellenAsync_SchreibtNichts_WennLaeuftGuardNichtMehrLaeuft` (neu in Iteration 3 — TOCTOU-Guard gegen Phantom-Wiederbelebung), bestehende Gestoppt/Fehler-Tests) |
+| 1 – Happy Path: Start ↔ Stopp synchron (Fußzeile „Ausführung läuft" ↔ Kachel „▶ Läuft"; nach Stopp beide „✓ Bereit"/„CLI inaktiv") | Vorgesehen: realer App-Start + Claude-CLI-Prozess (Pflicht-E2E `ConPty_WeitereLebenszyklusSzenarien_E2E`) | **Bestanden (manuell, 2026-11-09)** ~~Nicht durchführbar~~ (Sandbox: keine interaktive Desktop-Session, ConPTY nicht lauffähig) |
+| 2 – Session-Wiederverwendung ohne `Gestartet` (H1): Detailansicht erneut öffnen bei lebender Session | E2E-Abschnitt `taskDetail.Reload()` in derselben Methode | **Bestanden (manuell, 2026-11-09)** ~~Nicht durchführbar~~ (gleiche Begründung; Mechanismus zusätzlich per `ZweiterStart_FeuertCliLaufAktiv_StattGestartet`, `CliNeustartenAsync_MeldetLaufAktiv_BeiLebenderSession` auf Unit-Ebene abgesichert) |
+| 3 – Verschluckter Persistenzfehler (H2) → Selbstheilung | E2E-Divergenz-Nachspiel (DB-Löschung) | **Bestanden (manuell, 2026-11-09)** ~~Nicht durchführbar~~ (Sandbox; Unit-Pendants bestanden, s. o.) |
+| 4 – Stopp ohne Prozessende (F1) | UI-Klick „CLI stoppen" bei überlebendem Prozess | **Bestanden (manuell, 2026-11-09)** ~~Nicht durchführbar~~ (Sandbox; Unit-Test `CliStoppenAsync_BehaeltLaufdaten_BeiWeiterlaufendemProzess` bestanden) |
+| 5 – Heartbeat-Ausfall bei lebendem Prozess (H4) | E2E-Divergenz-Nachspiel / 30-s-Abgleich | **Bestanden (manuell, 2026-11-09)** ~~Nicht durchführbar~~ (Sandbox; Unit-Pendant `AbgleichAsync_StelltLaufdatenSicher_FuerLaufendeAufgaben` bestanden) |
+| 6 – Tatsächlich beendeter/verwaister Lauf → „✓ Bereit" (kein falsches Wieder-Aktiv) | E2E-Stopp-Abschnitt + Heartbeat-Timeout | **Bestanden (manuell, 2026-11-09)** ~~Nicht durchführbar~~ (Sandbox; Unit-Pendants bestanden: `Convert_ShouldReturnBereitString_WhenPanelItemLiveLaufStatusNullUndBeendet`, `AktivenLaufSicherstellenAsync_SchreibtNichts_WennLaeuftGuardNichtMehrLaeuft` (neu in Iteration 3 — TOCTOU-Guard gegen Phantom-Wiederbelebung), bestehende Gestoppt/Fehler-Tests) |
 
 Auflösungswege (Entscheidung liegt beim Anwender, nicht beim Agenten): **(a)** manuelle Abnahme — Anwender führt die Szenarien in einer realen Desktop-Session aus (z. B. `ConPty_WeitereLebenszyklusSzenarien_E2E` aus Visual Studio) und bestätigt die sichtbare Wirkung → `Bestanden (manuell, Datum)`; **(b)** dokumentierter Verzicht mit Begründung → `Verzichtet (Anwender, Datum, Begründung)`.
 
