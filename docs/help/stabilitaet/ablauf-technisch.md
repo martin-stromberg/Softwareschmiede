@@ -54,17 +54,43 @@ Beteiligte Komponenten:
 - `CliProcessManager.StartHeartbeat(Guid aufgabeId)` / `StopHeartbeat(Guid aufgabeId)`
 - `CliProcessManager._updateSemaphores` — `ConcurrentDictionary<Guid, SemaphoreSlim>`, ein Semaphore je Aufgabe statt eines einzigen klassenweiten Semaphores
 - `CliProcessManager.AktualisierungAsync(Guid aufgabeId)`
+- `CliProcessManager._lifecycleLock` / `_disposed` — Blattsperre und Abschaltsignal aller Timer-/Subscription-Anlagepfade
 
 Ablauf:
-1. `StartHeartbeat(aufgabeId)` legt zunächst `_updateSemaphores[aufgabeId] = new SemaphoreSlim(1, 1)` an und startet danach einen `Timer` mit 30-Sekunden-Intervall.
+1. `StartHeartbeat(aufgabeId)` läuft unter `_lifecycleLock`: Bei gesetztem `_disposed` kehrt es sofort zurück; sonst ersetzt `StartHeartbeatCore` einen etwaigen Alt-Timer — es legt `_updateSemaphores[aufgabeId] = new SemaphoreSlim(1, 1)` an und startet danach einen `Timer` mit 30-Sekunden-Intervall. Eine zweite, konditionalisierte Anlage existiert in `LaufdatenSicherstellenAsync` (nur wenn noch kein Timer läuft — siehe Abschnitt 4a).
 2. Jeder Timer-Tick ruft `AktualisierungAsync(aufgabeId).SafeFireAndForget(_logger, "CliProcessManager.AktualisierungAsync")` auf.
 3. `AktualisierungAsync`:
    - Ermittelt das zur Aufgabe gehörende Semaphore; ist es nicht mehr vorhanden (Heartbeat zwischenzeitlich gestoppt), kehrt die Methode sofort zurück.
    - `await semaphore.WaitAsync()` serialisiert überlappende Ticks **derselben** Aufgabe. Heartbeats anderer Aufgaben sind davon unberührt, da jede Aufgabe ihr eigenes Semaphore besitzt.
-   - Im try-Block: Prüft, ob der Prozess noch läuft (`KiAusfuehrungsService.IsRunning`); wenn nicht, wird der Heartbeat gestoppt. Sonst wird `LastHeartbeat` aktualisiert und der Datenbank-Heartbeat über `AufgabeService.UpdateHeartbeatAsync` geschrieben.
+   - Im try-Block: Prüft, ob der Prozess noch läuft (`KiAusfuehrungsService.IsRunning`); wenn nicht, wird der Heartbeat gestoppt. Sonst wird der In-Memory-`LastHeartbeat` des Handles aktualisiert und die Laufdaten über `LaufdatenSicherstellenAsync` → `AufgabeService.AktivenLaufSicherstellenAsync` sichergestellt (heilt zugleich fehlende `AktiveRunId`-Werte — siehe Abschnitt 4a).
    - Bei Exception: `LogWarning`, kein Rethrow — der nächste Tick versucht es erneut.
    - Im finally-Block: `semaphore.Release()`, abgesichert gegen `ObjectDisposedException` (falls das Semaphore innerhalb desselben Aufrufs durch `StopHeartbeat` bereits disposed wurde).
-4. `StopHeartbeat(aufgabeId)` entfernt sowohl den Timer als auch das Semaphore aus den jeweiligen Dictionaries und disposed beide.
+4. `StopHeartbeat(aufgabeId)` entfernt unter `_lifecycleLock` sowohl den Timer als auch das Semaphore aus den jeweiligen Dictionaries und disposed beide.
+
+### 4a. Laufdaten-Selbstheilung und periodischer Abgleich
+
+Damit die persistierten Laufdaten (`AktiveRunId`, `LastHeartbeatUtc`, `LaufStatus`, `AusfuehrungsStatus`) eines laufenden CLI-Prozesses auch dann (wieder)hergestellt werden, wenn das `Gestartet`-Ereignis nie feuerte (Session-Wiederverwendung) oder ein Persistenzschritt scheiterte, existiert im `CliProcessManager` ein zentraler Selbstheilungspunkt mit vier Auslösern — davon einer unabhängig von jeglicher Event-Zustellung (Issue #342).
+
+Beteiligte Komponenten:
+- `CliProcessManager.LaufdatenSicherstellenAsync(Guid aufgabeId)` — zentraler Selbstheilungspunkt
+- `CliProcessManager._abgleichTimer` / `AbgleichTickAsync` / `AbgleichAsync` — periodischer Abgleich im 30-s-Rhythmus (`AbgleichIntervall` = `HeartbeatInterval`)
+- `CliProcessManager._abgleichLaeuft` — `Interlocked`-Überlappungswächter des Abgleichs
+- `CliProcessManager._lifecycleLock` / `_disposed` — atomare, dispose-sichere Anlage von Heartbeat-Timern und `RuntimeStatusChanged`-Subscriptions aus allen parallelen Auslösepfaden
+- `KiAusfuehrungsService.GetLaufendeAufgabenIds` — IDs aller Aufgaben mit laufendem Handle (`!HasExited`, Exception-tolerant)
+- `KiAusfuehrungsService.CliLaufAktiv` / `NotifyLaufAktiv` — Signal „laufender Prozess ohne Gestartet-Ereignis" (Wiederverwendungspfade)
+- `AufgabeService.LaufGates` — statische `ConcurrentDictionary<Guid, SemaphoreSlim>`; serialisiert prozessweit alle Laufdaten-Mutationen einer Aufgabe (`StartenAsync`, `AbschliessenAsync`, `StartZuruecksetzenAsync`, `AktivenLaufSetzen/Beenden/SicherstellenAsync`)
+- `AufgabeService.AktivenLaufSicherstellenAsync` — idempotente Persistenzoperation; `laeuftGuard` und `laufStatusProvider` werden erst innerhalb der gehaltenen Sperre ausgewertet
+- `CliRuntimeStatusExtensions.ToAufgabeLaufStatus` — zentrales Mapping `CliRuntimeStatus` → `AufgabeLaufStatus?`
+
+Ablauf:
+1. **Auslöser:** `OnCliLaufAktiv` (Signal auf Wiederverwendungspfaden), `OnRuntimeStatusChanged` (Session wechselt zu `Laeuft`/`WartetAufEingabe`), `AktualisierungAsync` (Heartbeat-Tick) und `AbgleichAsync` rufen jeweils `LaufdatenSicherstellenAsync(aufgabeId)` auf.
+2. `LaufdatenSicherstellenAsync`:
+   - `IsRunning` `false` → Rückkehr ohne Aktion (verwaiste Zustände werden nie wieder aktiv geschrieben).
+   - Unter `_lifecycleLock`: `_disposed` → Rückkehr; sonst `StartHeartbeatCore` nur, wenn noch kein Timer läuft (der Takt wird nicht zurückgesetzt).
+   - `SubscribeRuntimeStatus` — unter `_lifecycleLock` atomar und idempotent (dieselbe Session → keine Doppel-Registrierung; Alt-Registrierung wird vorab bereinigt).
+   - `ExecuteWithAufgabeServiceAsync` → `AktivenLaufSicherstellenAsync` mit `laeuftGuard` (`IsRunning`) und `laufStatusProvider` (Live-Substatus der Session) — TOCTOU-/Stale-Write-Schutz durch Auswertung innerhalb der `LaufGates`-Sperre.
+3. `AbgleichTickAsync` (Timer-Callback, fire-and-forget): `Interlocked.Exchange(ref _abgleichLaeuft, 1)` — läuft noch ein vorheriger Durchlauf, wird der Tick übersprungen statt sich aufzustauen; danach `AbgleichAsync`: `GetLaufendeAufgabenIds()` iterieren und pro Aufgabe `LaufdatenSicherstellenAsync` aufrufen. Fehler je Aufgabe werden isoliert geloggt (`LogWarning`) und brechen den Durchlauf nicht ab.
+4. `Dispose()` räumt `_abgleichTimer` ab, meldet beide Events ab und setzt unter `_lifecycleLock` `_disposed = true`, **bevor** die Dictionaries geleert werden — ein in-flight Abgleich-/Heartbeat-Tick oder ein knapp vor der Event-Abmeldung eintreffender Aufruf kann danach keine Timer oder Subscriptions mehr anlegen (Dispose-Race).
 
 ### 5. Geschützte Prozessende-Behandlung (klassischer Start und Terminal-Session)
 
@@ -157,3 +183,9 @@ flowchart TD
 | Fehler bei einem Abonnenten von `CliProcessStatusChanged` | Try-catch im jeweiligen Abonnenten (`CliProcessManager`, `TaskDetailViewModel`) verhindert Abbruch der Multicast-Kette. |
 | Fehler beim Erstellen der ConPTY-Streams | `CreatePseudoConsoleSession` disposed bereits erstellte Streams, loggt und wirft weiter. |
 | Überlappende Heartbeat-Ticks derselben Aufgabe | Pro-Aufgabe-`SemaphoreSlim` serialisiert; andere Aufgaben bleiben unbeeinflusst. |
+| Abgleich-Durchlauf dauert länger als das Timer-Intervall | `AbgleichTickAsync` überspringt überlappende Ticks per `Interlocked`-Guard `_abgleichLaeuft` — kein Aufstauen der Durchläufe. |
+| Timer-/Subscription-Anlage parallel aus Event-, Heartbeat- und Abgleichpfaden | `_lifecycleLock` serialisiert alle mutierenden Zugriffe auf `_heartbeatTimers`/`_updateSemaphores`/`_runtimeStatusSubscriptions` — keine verwaisten Doppel-Anlagen oder nicht abmeldbare Subscriptions. |
+| `CliProcessManager.Dispose` während in-flight Tick/Event-Aufruf | `_disposed` (unter `_lifecycleLock` gesetzt und geprüft) verhindert nachträgliche Timer-/Subscription-Anlage — kein dauerhaft tickender Leichnam. |
+| Sicherstellen-/Setzen-Save konkurriert mit Beenden-Save | `AufgabeService.LaufGates` serialisiert alle Laufdaten-Mutationen pro Aufgabe prozessweit; `laeuftGuard` (erneute `IsRunning`-Prüfung in der Sperre) lässt die Sicherstellung verstummen, wenn der Prozess bereits endete — kein Phantom-Lauf. |
+| Veralteter Live-Substatus als letzter Schreiber | `laufStatusProvider` wird erst innerhalb der `LaufGates`-Sperre ausgewertet — geschrieben wird der frischeste Session-Stand, kein Stale-Write. |
+| Persistenzfehler in `ExecuteWithAufgabeServiceAsync` | Wird geloggt und geschluckt — heilt aber strukturell: Der nächste Heartbeat-Tick, `RuntimeStatusChanged`-Wechsel oder der 30-s-Abgleich wiederholt `LaufdatenSicherstellenAsync` automatisch. |

@@ -413,8 +413,12 @@ public sealed class SettingsView : BaseWindowView
 
     /// <summary>Liest den schreibgeschützten Anzeigetext des abgeleiteten Update-Kanals im "Allgemein"-Tab.</summary>
     /// <returns>Der Kanal-Anzeigetext (siehe <c>UpdatePfadTexte</c>).</returns>
+    /// <remarks>
+    /// Das Element trägt kein <c>AutomationProperties.Name</c> — der gebundene Kanaltext ist
+    /// daher als UIA-Name des TextBlocks lesbar (Muster wie <c>UpdateHinweis</c>).
+    /// </remarks>
     public string GetAbgeleitetenUpdateKanal()
-        => WaitForElement(Window, cf => cf.ByName("Update-Kanal"), Short).AsLabel().Text;
+        => WaitForElement(Window, cf => cf.ByAutomationId("Update-Kanal"), Short).Name;
 
     /// <summary>Wartet auf die Speicher-Bestätigung "Einstellungen gespeichert.".</summary>
     /// <returns>Diese Instanz.</returns>

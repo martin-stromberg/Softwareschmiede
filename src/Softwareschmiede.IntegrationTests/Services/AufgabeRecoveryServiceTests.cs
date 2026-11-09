@@ -143,6 +143,7 @@ public sealed class AufgabeRecoveryServiceTests
 #pragma warning restore CS0067
         public int GetRunningCount() => 0;
         public bool IsRunning(Guid aufgabeId) => false;
+        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => null;
     }
 
     private sealed class AlwaysRunningAutomationStatusSource : IRunningAutomationStatusSource
@@ -152,6 +153,7 @@ public sealed class AufgabeRecoveryServiceTests
 #pragma warning restore CS0067
         public int GetRunningCount() => 1;
         public bool IsRunning(Guid aufgabeId) => true;
+        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => AufgabeLaufStatus.Laeuft;
     }
 
     private sealed class MutatingNotRunningAutomationStatusSource(Action beforeReturn) : IRunningAutomationStatusSource
@@ -171,6 +173,8 @@ public sealed class AufgabeRecoveryServiceTests
 
             return false;
         }
+
+        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => null;
     }
 
     // Ensures all participant tasks have completed their initial DB read before any proceeds to
@@ -189,6 +193,8 @@ public sealed class AufgabeRecoveryServiceTests
             _barrier.SignalAndWait(TimeSpan.FromSeconds(10));
             return false;
         }
+
+        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => null;
     }
 
     private static async Task<Aufgabe> CreateTaskAsync(DatabaseFixture db, AufgabeStatus status)
@@ -200,7 +206,11 @@ public sealed class AufgabeRecoveryServiceTests
         await aufgabeService.StatusSetzenAsync(aufgabe.Id, status);
         if (status.IstAktivOderWartend())
         {
-            await aufgabeService.AusfuehrungAktivSetzenAsync(aufgabe.Id);
+            // Aktiven Ausführungsstatus direkt auf der Entity setzen (das frühere
+            // AufgabeService.AusfuehrungAktivSetzenAsync wurde entfernt): simuliert den Zustand
+            // einer gestarteten Aufgabe ohne zugehörige Laufdaten (AktiveRunId bleibt null).
+            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
+            await db.Context.SaveChangesAsync();
         }
 
         return aufgabe;

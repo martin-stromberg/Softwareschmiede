@@ -71,6 +71,24 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
         result.Should().Be("⏸");
     }
 
+    /// <summary>Live-Zweig (Issue 342): LiveLaufStatus WartetAufEingabe liefert "⏸" auch ohne persistierte Laufdaten.</summary>
+    [Fact]
+    public void Convert_ShouldReturnSymbolOnly_WhenLiveLaufStatusWartetAufEingabe()
+    {
+        var item = new AktiveAufgabePanelItem
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Aufgabe mit wartender Live-CLI",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet,
+            LiveLaufStatus = AufgabeLaufStatus.WartetAufEingabe
+        };
+
+        var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().Be("⏸");
+    }
+
     /// <summary>Convert gibt "⏸" zurück, wenn der Laufzeit-Substatus WartetAufEingabe meldet.</summary>
     [Fact]
     public void Convert_ShouldReturnSymbolOnly_WhenWartetAufEingabe()

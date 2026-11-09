@@ -469,7 +469,7 @@
                             <TextBlock Text="Kanal: "
                                        Foreground="{DynamicResource PrimaryTextBrush}" />
                             <TextBlock Text="{Binding AbgeleiteterUpdateKanal}"
-                                       AutomationProperties.Name="Update-Kanal"
+                                       AutomationProperties.AutomationId="Update-Kanal"
                                        Foreground="{DynamicResource SecondaryTextBrush}" />
                         </StackPanel>
                         <TextBlock Text="Der Update-Pfad legt ausschließlich den Update-Kanal fest: „Produktivversionen“ berücksichtigt nur stabile Versionen, „Vorabversionen“ nur Release-Kandidaten — niemals gemischt. Vorabversionen können noch Fehler enthalten."

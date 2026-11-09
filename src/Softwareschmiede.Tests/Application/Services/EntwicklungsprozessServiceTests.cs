@@ -1244,4 +1244,27 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         defaultGitPluginMock.Verify(plugin => plugin.GetRemoteBranchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    /// <summary>
+    /// CliNeustartenAsync meldet bei einer noch lebenden Terminal-Session den laufenden Prozess über
+    /// CliLaufAktiv (statt eines fehlenden Gestartet-Ereignisses), damit CliProcessManager die
+    /// Laufdaten-Persistenz nachziehen kann (Issue 342, H3).
+    /// </summary>
+    [Fact]
+    public async Task CliNeustartenAsync_MeldetLaufAktiv_BeiLebenderSession()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Neustart mit lebender Session", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/live-session", Path.GetTempPath());
+
+        _kiPluginMock.SetupTerminalSpec("cmd.exe", "/k");
+        var handle = await _kiAusfuehrungsService.StartTerminalSessionAsync(aufgabe.Id, _kiPluginMock.Object, Path.GetTempPath());
+        var laufAktivCount = 0;
+        _kiAusfuehrungsService.CliLaufAktiv += _ => laufAktivCount++;
+
+        var sut = CreateSut(new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: _kiAusfuehrungsService));
+        await sut.CliNeustartenAsync(aufgabe.Id, "Softwareschmiede.TestKi", null);
+
+        laufAktivCount.Should().Be(1, "der Early-Return bei lebender Session meldet den laufenden Prozess");
+        _kiAusfuehrungsService.GetTerminalSession(aufgabe.Id).Should().BeSameAs(handle.Session);
+    }
+
 }

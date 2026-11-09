@@ -404,6 +404,23 @@ Beendet den laufenden Prozess für eine Aufgabe.
 **Exceptions:**
 - `KeyNotFoundException`: Keine aktive Aufgabe mit dieser ID
 
+#### `GetLiveLaufStatus(Guid aufgabeId)`
+
+Live-Substatus der Aufgabe für Statusprojektionen (Implementierung von `IRunningAutomationStatusSource.GetLiveLaufStatus`).
+
+**Parameter:**
+- `aufgabeId`: Aufgaben-ID
+
+**Rückgabe:** `AufgabeLaufStatus?` — `null`, wenn kein gehandelter Prozess läuft (`IsRunning` `false`); `WartetAufEingabe`, wenn die Session `CliRuntimeStatus.WartetAufEingabe` meldet; sonst `Laeuft` (Fallback bei laufendem Handle ohne Session oder `RuntimeStatus.Inaktiv` — ein nachweislich laufender Prozess gilt fachlich als „Läuft"). Datenquelle des Live-Zweigs der Kachel-Klassifikation (siehe [Aufgaben — Technischer Ablauf](../aufgaben/ablauf-technisch.md)).
+
+#### `GetLaufendeAufgabenIds()`
+
+**Rückgabe:** `IReadOnlyCollection<Guid>` — IDs aller Aufgaben mit laufendem Handle (`!HasExited`, Exception-tolerant wie `GetRunningCount`); Datenquelle des periodischen Laufdaten-Abgleichs im `CliProcessManager`.
+
+#### `NotifyLaufAktiv(Guid aufgabeId)`
+
+Feuert `CliLaufAktiv`, sofern `IsRunning(aufgabeId)` zutrifft — sonst No-Op. Für Aufrufer außerhalb des Service, die einen laufenden Prozess bestätigt haben (z. B. `EntwicklungsprozessService.CliNeustartenCoordinatedAsync` im Session-Alive-Early-Return).
+
 ## Events
 
 ### TaskDetailViewModel.TerminalSessionGestartet
@@ -431,6 +448,16 @@ Wird gefeuert, wenn der Prozess seine Zustand ändert (z.B. startet, stoppt, feh
 **EventArgs:**
 - `AufgabeId`: Betroffene Aufgaben-ID
 - `Status`: Neuer Status (Gestartet, Gestoppt, Fehler)
+
+### KiAusfuehrungsService.CliLaufAktiv
+
+Wird gefeuert, wenn eine Startanforderung einen bereits laufenden Prozess zurückgibt (Early-Return „zweiter Start abgewiesen" in `StartCliCoreAsync`/`StartTerminalSessionCoreAsync` — dort feuert kein `Gestartet`-Ereignis) oder ein laufender Prozess über `NotifyLaufAktiv` bestätigt wird.
+
+**Typ:** `event Action<Guid>?`
+
+**Parameter:** Die Aufgaben-ID mit dem laufenden Prozess.
+
+**Verwendung:** Erlaubt Abonnenten (produktiv: `CliProcessManager`), die Laufdaten-Persistenz auch ohne `Gestartet`-Ereignis sicherzustellen. Wie `CliProcessStatusChanged` wird das Event unter der klassenweiten Start-Sperre (`_startLock`) aufgerufen — Abonnenten müssen non-blocking sein und dürfen nicht reentrant `StartCliAsync`/`StartTerminalSessionAsync` aufrufen.
 
 ## ITerminalOutputSink
 

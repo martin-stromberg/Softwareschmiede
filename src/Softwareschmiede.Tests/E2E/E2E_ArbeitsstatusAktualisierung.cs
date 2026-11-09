@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
@@ -55,6 +56,46 @@ public partial class End2EndTest
         // gesetzt, sodass die Kachel fälschlich dauerhaft "✓ Bereit" gezeigt hätte).
         taskDetail.Menu.WaitForTaskStatus(AufgabenTitel, "▶ Läuft", Medium);
 
+        // Issue 342: Sitzungs-Wiederverwendung — die Detailansicht verlassen und dieselbe Aufgabe
+        // erneut öffnen. Die Fußzeile muss den Live-CLI-Status der wiederangebundenen Session zeigen
+        // und die Kachel weiterhin synchron "▶ Läuft" melden.
+        taskDetail = taskDetail.Reload();
+        taskDetail.WaitForCliRunning();
+        WarteAufCliStatusText(taskDetail, "Ausführung läuft");
+        taskDetail.Menu.WaitForTaskStatus(AufgabenTitel, "▶ Läuft", Medium);
+
+        // Issue 342 (Divergenz-F1/H4-Bild): Fehlende oder veraltete persistierte Laufdaten bei
+        // weiterlaufendem Prozess — Laufdaten direkt in der DB löschen. Die Kachel muss über den
+        // Live-Zweig weiter "▶ Läuft" zeigen, und die Selbstheilung (Heartbeat-Tick/Abgleich,
+        // Intervall 30 s) muss die Laufdaten wieder herstellen.
+        Guid aufgabeId;
+        using (var db = OpenTestDbContext())
+        {
+            aufgabeId = db.Aufgaben.AsNoTracking().Single(a => a.Titel == AufgabenTitel).Id;
+        }
+        using (var db = OpenTestDbContext())
+        {
+            var tracked = db.Aufgaben.Single(a => a.Id == aufgabeId);
+            tracked.AktiveRunId = null;
+            tracked.LastHeartbeatUtc = null;
+            tracked.LaufStatus = null;
+            tracked.AusfuehrungsStatus = Softwareschmiede.Domain.Enums.AufgabeAusfuehrungsStatus.Beendet;
+            db.SaveChanges();
+        }
+
+        taskDetail.Menu.WaitForTaskStatus(AufgabenTitel, "▶ Läuft", Medium);
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(45);
+        var laufdatenGeheilt = false;
+        while (DateTime.UtcNow < deadline && !laufdatenGeheilt)
+        {
+            using var db = OpenTestDbContext();
+            laufdatenGeheilt = db.Aufgaben.AsNoTracking().Single(a => a.Id == aufgabeId).AktiveRunId is not null;
+            if (!laufdatenGeheilt)
+                Thread.Sleep(500);
+        }
+        Assert.True(laufdatenGeheilt, "Die Selbstheilung hat die gelöschten Laufdaten nicht innerhalb von 45 s wieder hergestellt.");
+
         taskDetail.StopCli();
 
         // Assert: Kachel wechselt automatisch zurück auf "✓ Bereit", nachdem der CLI-Prozess beendet wurde
@@ -64,5 +105,22 @@ public partial class End2EndTest
         taskDetail.ForceClose(recurseToDashboard: false);
         var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
         projectDetail.DeleteProject();
+    }
+
+    /// <summary>Wartet, bis die Fußzeile der Aufgabendetailansicht den erwarteten CLI-Status enthält.</summary>
+    private static void WarteAufCliStatusText(TaskDetailView taskDetail, string expected)
+    {
+        var deadline = DateTime.UtcNow + Medium;
+        while (DateTime.UtcNow < deadline)
+        {
+            var text = taskDetail.GetCliStatusText();
+            if (text.Contains(expected, StringComparison.Ordinal))
+                return;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException(
+            $"Die Fußzeile zeigte innerhalb von {Medium.TotalSeconds}s nicht '{expected}' (zuletzt: '{taskDetail.GetCliStatusText()}').");
     }
 }

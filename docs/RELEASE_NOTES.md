@@ -6,9 +6,9 @@
 
 ## What's New
 
-- Scheduled prompts are now persisted in the database: they no longer get lost when leaving the task, stopping the CLI or restarting the app — delivery happens at the scheduled time or on the next CLI start.
-- New "Wartestellung aufheben" button cancels a queued scheduled prompt.
-- Background delivery of a scheduled prompt is recorded in the task protocol.
+- Fixed: the task tile in the task list (sidebar menu and dashboard) could show "✓ Bereit" while the CLI execution was still running — the tile status now follows the live state of the CLI session and consistently shows "▶ Läuft" / "⏸ Wartet" in sync with the task footer.
+- Missing run data for a running CLI process is now restored automatically (self-healing), so the status stays correct after restarts and reused sessions.
+- New error message when stopping a task fails: if the CLI process keeps running, the app reports "Der CLI-Prozess konnte nicht beendet werden und läuft weiter. Bitte erneut versuchen." instead of wrongly showing the task as ready.
 
 ## Wichtige Hinweise vor dem Update
 
@@ -16,6 +16,6 @@
 
 ## Neuerungen
 
-- Zeitgesteuerte Prompts werden jetzt persistent in der Datenbank gespeichert: Sie gehen beim Verlassen der Aufgabe, bei einem CLI-Stopp und bei einem App-Neustart nicht mehr verloren — die Zustellung erfolgt zum Zielzeitpunkt oder beim nächsten CLI-Start.
-- Neuer Button „Wartestellung aufheben" bricht einen geplanten zeitgesteuerten Prompt ab.
-- Der Hintergrundversand eines zeitgesteuerten Prompts wird im Aufgabenprotokoll vermerkt.
+- Behoben: Die Aufgabenkachel in der Aufgabenliste (Menü-Seitenleiste und Dashboard) konnte „✓ Bereit" anzeigen, obwohl die CLI-Ausführung noch lief — der Kachel-Status folgt jetzt dem Live-Zustand der CLI-Session und zeigt konsistent zur Aufgaben-Fußzeile „▶ Läuft" bzw. „⏸ Wartet".
+- Fehlende Laufdaten zu einem laufenden CLI-Prozess werden jetzt selbstheilend ergänzt, sodass der Status auch nach Neustarts und wiederverwendeten Sitzungen korrekt bleibt.
+- Neue Fehlermeldung beim Stoppen: Läuft der CLI-Prozess nach dem Stoppen weiter, meldet die App „Der CLI-Prozess konnte nicht beendet werden und läuft weiter. Bitte erneut versuchen." statt die Aufgabe fälschlich als bereit anzuzeigen.

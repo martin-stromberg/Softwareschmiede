@@ -79,6 +79,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         zweitesKiPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.ZweitesKi");
         zweitesKiPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation);
         zweitesKiPluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
+        // Terminal-Startspec auch für das zweite Plugin: Nach einem Plugin-Wechsel mit
+        // anschließendem echten Neustart ruft CliNeustartenAsync GetTerminalStartSpecAsync auf.
+        zweitesKiPluginMock.SetupTerminalSpec("cmd.exe", "/k");
 
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object, zweitesKiPluginMock.Object]);
@@ -202,7 +205,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         {
             await _aufgabeService.StatusSetzenAsync(aufgabe.Id, status);
             if (status.IstAktivOderWartend())
-                await _aufgabeService.AusfuehrungAktivSetzenAsync(aufgabe.Id);
+            {
+                // Aktiven Ausführungsstatus direkt auf der Entity setzen (das frühere
+                // AufgabeService.AusfuehrungAktivSetzenAsync wurde entfernt): simuliert den Zustand
+                // einer gestarteten Aufgabe ohne zugehörige Laufdaten (AktiveRunId bleibt null).
+                aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
+                await _db.SaveChangesAsync();
+            }
         }
         return await _aufgabeService.GetByIdAsync(aufgabe.Id) ?? aufgabe;
     }
@@ -1137,9 +1146,91 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
         sut.AktiverCliName.Should().Be("Test KI");
 
-        await ((AsyncRelayCommand)sut.CliStoppenCommand).ExecuteAsync();
+        await FuehreCliStoppenMitProzessendeAusAsync(sut, aufgabe.Id);
 
         sut.AktiverCliName.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Führt CliStoppenCommand aus und simuliert während des internen StopCliAsync-Wartens das
+    /// tatsächliche Prozessende: Der deterministische Testlauncher bindet den eigenen Testprozess
+    /// (<see cref="System.Diagnostics.Process.GetCurrentProcess"/>), der niemals beendet — ohne
+    /// Handle-Entfernung würde <c>KiAusfuehrungsService.IsRunning</c> dauerhaft true liefern.
+    /// </summary>
+    private async Task FuehreCliStoppenMitProzessendeAusAsync(TaskDetailViewModel sut, Guid aufgabeId)
+    {
+        var stopTask = ((AsyncRelayCommand)sut.CliStoppenCommand).ExecuteAsync();
+        await Task.Delay(200);
+        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
+        handles.TryRemove(aufgabeId, out _);
+        await stopTask;
+    }
+
+    /// <summary>
+    /// Divergenzpfad F1 (Issue 342): Konnte der CLI-Prozess nicht beendet werden (StopCliAsync
+    /// schlägt fehl, Prozess lebt weiter), dürfen die Laufdaten nicht als beendet persistiert und
+    /// die UI nicht auf "inaktiv" geschaltet werden — sonst meldet die Kachel fälschlich "Bereit",
+    /// während die Fußzeile einen lebenden Prozess zeigt.
+    /// </summary>
+    [Fact]
+    public async Task CliStoppenAsync_BehaeltLaufdaten_BeiWeiterlaufendemProzess()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        sut.IsCliRunning.Should().BeTrue();
+        await _aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, "run-lebendig");
+
+        // Der deterministische Testlauncher bindet den eigenen (nicht beendbaren) Testprozess —
+        // StopCliAsync schlägt damit genau wie bei einem echten, nicht terminierbaren Prozess fehl.
+        await ((AsyncRelayCommand)sut.CliStoppenCommand).ExecuteAsync();
+
+        sut.IsCliRunning.Should().BeTrue("der Prozess läuft nach dem fehlgeschlagenen Stopp weiter");
+        sut.FehlerMeldung.Should().NotBeNullOrEmpty("der Benutzer erhält eine Fehlermeldung statt eines falschen Bereit-Zustands");
+        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        geladen!.AktiveRunId.Should().Be("run-lebendig",
+            "die Laufdaten dürfen bei einem weiterlaufenden Prozess nicht als beendet geschrieben werden");
+        geladen.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+    }
+
+    /// <summary>
+    /// Divergenzpfad F2 (Issue 342): StartCliAndUpdateStateAsync persistiert bei laufendem Prozess
+    /// die vollständigen Laufdaten (AktiveRunId, Heartbeat, LaufStatus, AusfuehrungsStatus) —
+    /// auch wenn CliNeustartenAsync in den Wiederverwendungs-Early-Return ohne Gestartet-Ereignis
+    /// lief, statt nur AusfuehrungsStatus=Aktiv zu schreiben.
+    /// </summary>
+    [Fact]
+    public async Task StartCliAndUpdateStateAsync_SchreibtVolleLaufdaten_BeiWiederverwendeterSession()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        sut.IsCliRunning.Should().BeTrue();
+
+        (await _aufgabeService.GetByIdAsync(aufgabe.Id))!.AktiveRunId.Should().BeNull(
+            "ohne CliProcessManager in diesem Test fehlen die persistierten Laufdaten bereits — die Divergenz ist die Ausgangslage");
+
+        var method = typeof(TaskDetailViewModel).GetMethod("StartCliAndUpdateStateAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        await (Task)method.Invoke(sut, new object?[] { "Softwareschmiede.TestKi", "/tmp/klon", null, CancellationToken.None })!;
+
+        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        geladen!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+        geladen.AktiveRunId.Should().NotBeNullOrEmpty();
+        geladen.LastHeartbeatUtc.Should().NotBeNull();
+        geladen.LaufStatus.Should().Be(AufgabeLaufStatus.Laeuft);
     }
 
     /// <summary>
@@ -1353,7 +1444,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.PluginAendernCommand).ExecuteAsync();
         sut.AktiverCliName.Should().Be("Zweites KI");
 
-        await ((AsyncRelayCommand)sut.CliStoppenCommand).ExecuteAsync();
+        await FuehreCliStoppenMitProzessendeAusAsync(sut, aufgabe.Id);
         sut.IsCliRunning.Should().BeFalse();
 
         await ((AsyncRelayCommand)sut.CliNeustartenCommand).ExecuteAsync();

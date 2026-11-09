@@ -148,6 +148,10 @@ internal sealed class E2EFakeRunningStatusSource : IRunningAutomationStatusSourc
     /// <summary>IsRunning.</summary>
     public bool IsRunning(Guid aufgabeId) => _isRunning;
 
+    /// <summary>GetLiveLaufStatus.</summary>
+    public Softwareschmiede.Domain.Enums.AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId)
+        => _isRunning ? Softwareschmiede.Domain.Enums.AufgabeLaufStatus.Laeuft : null;
+
     /// <summary>GetRunningCount.</summary>
     public int GetRunningCount() => _isRunning ? 1 : 0;
 }

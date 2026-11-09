@@ -312,6 +312,8 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         public int GetRunningCount() => isRunning ? 1 : 0;
         /// <summary>IsRunning.</summary>
         public bool IsRunning(Guid aufgabeId) => isRunning;
+        /// <summary>GetLiveLaufStatus.</summary>
+        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => isRunning ? AufgabeLaufStatus.Laeuft : null;
     }
 
     private sealed class ThrowingRunningAutomationStatusSource : IRunningAutomationStatusSource
@@ -323,5 +325,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         public int GetRunningCount() => 0;
         /// <summary>IsRunning.</summary>
         public bool IsRunning(Guid aufgabeId) => throw new TimeoutException("simulated");
+        /// <summary>GetLiveLaufStatus.</summary>
+        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => throw new TimeoutException("simulated");
     }
 }

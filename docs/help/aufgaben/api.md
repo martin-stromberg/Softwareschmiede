@@ -6,7 +6,8 @@
 
 Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die Verwaltung von Aufgaben, zeitgesteuerten Prompt-Versänden, Aufgaben-Pausen und dem Export der CLI-Rohausgabe:
 
-- `AufgabeService` — Persistente Datenbankoperationen für Aufgaben, einschließlich `SetPauseAsync`
+- `AufgabeService` — Persistente Datenbankoperationen für Aufgaben, einschließlich `SetPauseAsync` und der Laufdaten-Operationen
+- `KiAusfuehrungsService` / `IRunningAutomationStatusSource` — Live-Laufquelle und `CliLaufAktiv`-Signal für die Status-Synchronisation
 - `KiPluginLimitService` — Persistenz und Anwendung von KI-Plugin-Session-Limits
 - `PromptZeitVersandService` — Laufzeit-Verwaltung zeitgesteuerter Prompts (inkl. Persistenz, Pausen-Verschiebung und Nachzustellung)
 - `ZeitgesteuerterPromptStore` — Scoped Service für den EF-Zugriff auf persistierte geplante Prompts
@@ -71,6 +72,51 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 - Beim Setzen muss `pausiertBisUtc` in der Zukunft liegen; andernfalls `InvalidOperationException`.
 - Schreibt pro Aufruf einen `ProtokollTyp.SystemMeldung`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben").
 - Wirft `InvalidOperationException`, wenn die Aufgabe nicht gefunden wird.
+
+## AufgabeService — KI-Laufdaten
+
+Alle Laufdaten-Mutationen laufen unter der statischen Sperrung `AufgabeService.LaufGates` (`ConcurrentDictionary<Guid, SemaphoreSlim>`): Sie serialisiert prozessweit alle Schreibzugriffe auf `AktiveRunId`/`LastHeartbeatUtc`/`LetzterCliStartUtc`/`LaufStatus`/`AusfuehrungsStatus` einer Aufgabe — einschließlich der laufdatenrücksetzenden Lebenszyklus-Pfade `StartenAsync`, `AbschliessenAsync` und `StartZuruecksetzenAsync`. Die optionalen Callbacks `laeuftGuard` und `laufStatusProvider` werden grundsätzlich erst innerhalb der gehaltenen Sperre ausgewertet (TOCTOU-/Stale-Write-Schutz).
+
+### `AktivenLaufSetzenAsync(Guid id, string laufId, CancellationToken ct = default, Func<bool>? laeuftGuard = null) : Task`
+
+**Beschreibung:** Setzt den vollständigen Lauf-Zustand für einen gestarteten CLI-Prozess (`AusfuehrungsStatus = Aktiv`, `AktiveRunId = laufId`, `LastHeartbeatUtc`, `LetzterCliStartUtc`, `LaufStatus = Laeuft`).
+
+**Verhalten:**
+
+- Liefert `laeuftGuard` innerhalb der Sperre `false` (Prozess zwischenzeitlich beendet): `LogDebug`, kein Schreibzugriff — kein Phantom-Lauf nach `AktivenLaufBeendenAsync`.
+- Terminale Aufgaben (`Beendet`/`Archiviert`) oder unbekannte ID: `InvalidOperationException`.
+
+### `AktivenLaufSicherstellenAsync(Guid id, Func<AufgabeLaufStatus?>? laufStatusProvider = null, CancellationToken ct = default, Func<bool>? laeuftGuard = null) : Task`
+
+**Beschreibung:** Stellt die Laufdaten eines laufenden CLI-Laufs idempotent sicher: Fehlt `AktiveRunId`, wird der vollständige Lauf-Zustand geschrieben (`AusfuehrungsStatus = Aktiv`, neue `AktiveRunId`, `LastHeartbeatUtc`, `LaufStatus = Provider-Wert ?? Laeuft`; ein bekannter `LetzterCliStartUtc` bleibt erhalten — Sortierstabilität). Bei bestehendem Lauf wird nur `LastHeartbeatUtc` aufgefrischt und `LaufStatus` nur bei geliefertem Wert überschrieben. Zentraler Persistenzpunkt aller Selbstheilungspfade des `CliProcessManager` (`CliLaufAktiv`, `RuntimeStatusChanged`, Heartbeat-Tick, periodischer Abgleich) sowie des Wiederverwendungspfads in `TaskDetailViewModel.StartCliAndUpdateStateAsync`.
+
+**Verhalten:**
+
+- `laeuftGuard` liefert innerhalb der Sperre `false`: `LogDebug`, kein Schreibzugriff.
+- `Status` `Beendet`/`Archiviert`: `LogDebug`, Rückkehr ohne Wurf — der periodische Abgleich erzeugt keine Warnungsflut.
+- Unbekannte Aufgabe: `InvalidOperationException` (konsistent zu `AktivenLaufSetzenAsync`).
+
+### `AktivenLaufBeendenAsync(Guid id, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Entfernt die Laufdaten (`AktiveRunId`, `LastHeartbeatUtc`, `LetzterCliStartUtc`, `LaufStatus`) und setzt `AusfuehrungsStatus = Beendet` — serialisiert unter `LaufGates`, sodass ein gleichzeitig anstehendes Setzen/Sicherstellen entweder davor (dann greift dessen Guard nicht mehr) oder danach (Beenden hat das letzte Wort) serialisiert.
+
+## KiAusfuehrungsService / IRunningAutomationStatusSource — Live-Laufquelle
+
+### `AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId)` (Interface-Methode)
+
+**Beschreibung:** Live-Substatus aus der Laufzeitquelle: `null`, wenn kein gehandelter Prozess läuft (`IsRunning` `false`); `WartetAufEingabe`, wenn die Session `CliRuntimeStatus.WartetAufEingabe` meldet; sonst `Laeuft` — auch bei laufendem Handle ohne Session oder `RuntimeStatus.Inaktiv`. Datenquelle für `AktiveAufgabePanelItem.LiveLaufStatus`; der Live-Zweig der Kachel-Klassifikation darf bei laufendem Prozess damit nie auf `Bereit` zurückfallen.
+
+### `IReadOnlyCollection<Guid> GetLaufendeAufgabenIds()`
+
+**Beschreibung:** IDs aller Aufgaben mit laufendem Handle (`!HasExited`, Exception-tolerant wie `GetRunningCount`) — Datenquelle des periodischen Abgleichs im `CliProcessManager`.
+
+### `void NotifyLaufAktiv(Guid aufgabeId)`
+
+**Beschreibung:** Feuert `CliLaufAktiv`, sofern `IsRunning(aufgabeId)` zutrifft — sonst No-Op. Für Aufrufer außerhalb des Service, die einen laufenden Prozess bestätigt haben (produktiv: `EntwicklungsprozessService.CliNeustartenCoordinatedAsync` im Session-Alive-Early-Return).
+
+### `event Action<Guid>? CliLaufAktiv`
+
+**Beschreibung:** Signal, dass eine Startanforderung einen bereits laufenden Prozess zurückgibt (Early-Return „zweiter Start abgewiesen" in `StartCliCoreAsync`/`StartTerminalSessionCoreAsync` — dort feuert kein `CliProcessStatus.Gestartet`) bzw. ein laufender Prozess über `NotifyLaufAktiv` bestätigt wurde. Einziger produktiver Abonnent: `CliProcessManager.OnCliLaufAktiv` → `LaufdatenSicherstellenAsync`. Vertrag wie `CliProcessStatusChanged`: Der Invoke läuft unter der klassenweiten Start-Sperre (`_startLock`) — Abonnenten müssen non-blocking sein und dürfen nicht reentrant `StartCliAsync`/`StartTerminalSessionAsync` aufrufen.
 
 ## KiPluginLimitService — Plugin-Session-Limits
 

@@ -81,6 +81,39 @@
 
 ---
 
+## Laufdaten-Mutationen laufen unter einer prozessweiten Aufgabensperre
+
+**Beschreibung:** Alle persistierten Laufdaten einer Aufgabe (`AktiveRunId`, `LastHeartbeatUtc`, `LetzterCliStartUtc`, `LaufStatus`, `AusfuehrungsStatus`) werden ausschließlich in `LaufGates`-serialisierten Schreibphasen verändert — unabhängig davon, aus welchem Pfad (Laufdaten-Selbstheilung, Prozess-Exit, ViewModel, Lebenszyklus) die Schreiboperation kommt.
+
+**Bedingungen:**
+- Ein `AufgabeService`-Aufruf mutiert Laufdaten (`StartenAsync`, `AbschliessenAsync`, `StartZuruecksetzenAsync`, `AktivenLaufSetzenAsync`, `AktivenLaufBeendenAsync`, `AktivenLaufSicherstellenAsync`).
+
+**Verhalten:**
+- Pro Aufgabe wird ein `SemaphoreSlim(1,1)` aus der statischen `ConcurrentDictionary` `LaufGates` gehalten — die Sperre gilt prozessweit über alle (scoped) `AufgabeService`-Instanzen und deren getrennte DbContexts hinweg.
+- Optionale Guards und Provider werden erst innerhalb der Sperre ausgewertet: Liefert `laeuftGuard` dort `false` (Prozess zwischen Aufruf und Sperreintritt beendet), wird nichts geschrieben — ein Phantom-Lauf nach einem bereits erfolgten `AktivenLaufBeendenAsync` kann nicht wiederbelebt werden (TOCTOU). `laufStatusProvider` liefert analog den frischesten Session-Stand statt eines vor dem Sperreintritt gelesenen, veralteten Werts (Stale-Write-Schutz).
+- Einträge werden bewusst nie entfernt — das Entfernen während wartender Aufrufer wäre selbst eine Race-Bedingung; der Speicherbedarf bleibt durch die Anzahl der Aufgaben begrenzt.
+
+**Umsetzung:** `AufgabeService.LaufGates` (`src/Softwareschmiede/Application/Services/AufgabeService.cs`), aufgerufen aus `CliProcessManager.LaufdatenSicherstellenAsync` und den übrigen Laufdaten-Pfaden.
+
+---
+
+## Laufdaten-Selbstheilung ist ereignis- UND periodengetrieben
+
+**Beschreibung:** Die Wiederherstellung fehlender Laufdaten bei nachweislich laufendem Prozess darf nicht von einer einzelnen Event-Zustellung abhängen — ein verpasstes `Gestartet`-Ereignis (Session-Wiederverwendung) oder ein geschluckter Persistenzfehler darf die Datenbasis nicht dauerhaft unvollständig lassen.
+
+**Bedingungen:**
+- Ein gehandelter CLI-Prozess läuft (`KiAusfuehrungsService.IsRunning` / `GetLaufendeAufgabenIds`).
+
+**Verhalten:**
+- `CliProcessManager.LaufdatenSicherstellenAsync` wird aus vier unabhängigen Pfaden aufgerufen: `CliLaufAktiv`-Signal, `RuntimeStatusChanged`, Heartbeat-Tick und dem 30-s-`AbgleichAsync` über `GetLaufendeAufgabenIds`.
+- Jeder Pfad ist in sich `IsRunning`-geschützt und idempotent — wiederholte Auslösung frischt nur Heartbeat/Substatus auf, ohne `AktiveRunId`/`LetzterCliStartUtc` zu überschreiben.
+- Der periodische Abgleich ist das letzte Sicherheitsnetz: Er garantiert „Prozess läuft ⇒ Laufdaten persistiert" auch bei vollständig ausgebliebener Event-Zustellung.
+- Fehler pro Aufgabe werden isoliert geloggt; ein einzelner Fehlschlag bricht weder den Abgleich-Durchlauf noch andere Aufgaben ab.
+
+**Umsetzung:** `CliProcessManager.LaufdatenSicherstellenAsync`/`AbgleichTickAsync`/`AbgleichAsync`, `AufgabeService.AktivenLaufSicherstellenAsync`, `KiAusfuehrungsService.CliLaufAktiv`/`NotifyLaufAktiv`/`GetLaufendeAufgabenIds` (`src/Softwareschmiede/Application/Services/`).
+
+---
+
 ## Native ConPTY-Ressourcen werden bei Fehlern vollständig freigegeben
 
 **Beschreibung:** Schlägt der Aufbau der ConPTY-Ein-/Ausgabe-Streams oder des zugehörigen Prozesses fehl, dürfen keine nativen Handles offen bleiben.
