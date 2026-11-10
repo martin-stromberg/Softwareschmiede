@@ -184,6 +184,184 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         Assert.All(await db.ScmIncomingEvents.ToListAsync(), x => Assert.Equal(taskId, x.AufgabeId));
     }
 
+    /// <summary>Ein Ereignis auf einem Pull Request, dessen Head-Branch dem Branch einer aktiven
+    /// Aufgabe ohne PullRequestReferenz entspricht, wird dieser Aufgabe zugeordnet — ohne Zweitanlage
+    /// und ohne implizit persistierte Referenz.</summary>
+    [Fact]
+    public async Task Monitor_PullRequestOnActiveTaskBranch_AssignsWithoutSecondCreation()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var repositoryId = await AddRepositoryAsync(fixture);
+        var taskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, branchName: "feature/branch");
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
+        ConfigureObservations(fixture);
+        ConfigurePullRequest(fixture, 5);
+
+        await Monitor(fixture).RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        Assert.Equal(taskId, Assert.Single(await db.Aufgaben.ToListAsync()).Id);
+        Assert.Empty(await db.PullRequestReferenzen.ToListAsync());
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        Assert.Equal(taskId, item.AufgabeId);
+    }
+
+    /// <summary>Ein nur in der Groß-/Kleinschreibung abweichender PR-Head-Branch trifft die aktive
+    /// Aufgabe weiterhin (OrdinalIgnoreCase). Guard gegen die eingeschränkte Kontextabfrage in
+    /// <see cref="ScmEventTaskResolver"/>: der Befund war ein Effizienzproblem ohne Fehlverhalten,
+    /// daher ist der Test als Semantik-Sicherung grün und schlägt nur fehl, wenn der
+    /// Branchvergleich künftig case-sensitiv in die Datenbankabfrage wandert.</summary>
+    [Fact]
+    public async Task Monitor_PullRequestBranchWithDifferentCasing_AssignsWithoutSecondCreation()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var repositoryId = await AddRepositoryAsync(fixture);
+        var taskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, branchName: "Feature/Branch");
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
+        ConfigureObservations(fixture);
+        ConfigurePullRequest(fixture, 5);
+
+        await Monitor(fixture).RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        Assert.Equal(taskId, Assert.Single(await db.Aufgaben.ToListAsync()).Id);
+        Assert.Empty(await db.PullRequestReferenzen.ToListAsync());
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        Assert.Equal(taskId, item.AufgabeId);
+    }
+
+    /// <summary>Eine Closing-Direktive im PR-Body ordnet das Ereignis der aktiven Aufgabe mit der
+    /// referenzierten Issue-Nummer zu, statt eine neue Aufgabe anzulegen.</summary>
+    [Fact]
+    public async Task Monitor_PullRequestClosingActiveTaskIssue_AssignsWithoutSecondCreation()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var repositoryId = await AddRepositoryAsync(fixture);
+        var taskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, issueNummer: 9);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
+        ConfigureObservations(fixture);
+        ConfigurePullRequest(fixture, 5, body: "PR Beschreibung\n\nCloses #9");
+
+        await Monitor(fixture).RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        Assert.Equal(taskId, Assert.Single(await db.Aufgaben.ToListAsync()).Id);
+        var events = await db.ScmIncomingEvents.ToListAsync();
+        Assert.Contains(events, x => ScmEventStore.Observation(x).Reference.Kind == ScmReferenceKind.PullRequest);
+        Assert.All(events, x => Assert.Equal(taskId, x.AufgabeId));
+    }
+
+    /// <summary>Der Branch-Match greift nur bei aktiven Aufgaben; trifft der Kontext ausschließlich
+    /// eine beendete Aufgabe, entsteht wie bisher eine ReviewSource-Aufgabe.</summary>
+    [Fact]
+    public async Task Monitor_PullRequestBranchOfEndedTask_CreatesReviewSourceTask()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var repositoryId = await AddRepositoryAsync(fixture);
+        var endedTaskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Beendet, branchName: "feature/branch");
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
+        ConfigureObservations(fixture);
+        ConfigurePullRequest(fixture, 5);
+
+        await Monitor(fixture).RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var tasks = await db.Aufgaben.Include(x => x.PullRequests).ToListAsync();
+        Assert.Equal(2, tasks.Count);
+        var created = Assert.Single(tasks, x => x.Id != endedTaskId);
+        var reference = Assert.Single(created.PullRequests);
+        Assert.Equal(PullRequestReferenzRolle.ReviewSource, reference.Rolle);
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        Assert.Equal(created.Id, item.AufgabeId);
+    }
+
+    /// <summary>Zeigen Branch- und Issue-Signal auf unterschiedliche aktive Aufgaben, bleibt das
+    /// Ereignis mit Mehrdeutigkeitsdiagnose unzugeordnet; es entsteht weder Aufgabe noch Inbox-Eintrag.</summary>
+    [Fact]
+    public async Task Monitor_PullRequestConflictingContextSignals_ReportsAmbiguityWithoutTask()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var repositoryId = await AddRepositoryAsync(fixture);
+        await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, branchName: "feature/branch");
+        await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, issueNummer: 9);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
+        ConfigureObservations(fixture);
+        ConfigurePullRequest(fixture, 5, body: "PR Beschreibung\n\nCloses #9");
+
+        await Monitor(fixture).RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        Assert.Equal(2, await db.Aufgaben.CountAsync());
+        var events = await db.ScmIncomingEvents.ToListAsync();
+        Assert.DoesNotContain(events, x => ScmEventStore.Observation(x).Reference.Kind == ScmReferenceKind.PullRequest);
+        var snapshots = await db.ScmContentSnapshots.Where(x => x.ContentKey.Contains("/PullRequest/")).ToListAsync();
+        Assert.NotEmpty(snapshots);
+        Assert.All(snapshots, x => Assert.Equal(ScmEventStore.AmbiguousAssignmentDiagnostic, x.Diagnostic));
+    }
+
+    /// <summary>Ein Fork-PR mit gleichem Branchnamen ist kein Kontexttreffer; es entsteht eine
+    /// ReviewSource-Aufgabe.</summary>
+    [Fact]
+    public async Task Monitor_ForkedPullRequestWithSameBranch_CreatesReviewSourceTask()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var repositoryId = await AddRepositoryAsync(fixture);
+        var taskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, branchName: "feature/branch");
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
+        ConfigureObservations(fixture);
+        ConfigurePullRequest(fixture, 5, sourceRepositoryId: "fork/repo");
+
+        await Monitor(fixture).RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var tasks = await db.Aufgaben.Include(x => x.PullRequests).ToListAsync();
+        Assert.Equal(2, tasks.Count);
+        var created = Assert.Single(tasks, x => x.Id != taskId);
+        var reference = Assert.Single(created.PullRequests);
+        Assert.Equal(PullRequestReferenzRolle.ReviewSource, reference.Rolle);
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        Assert.Equal(created.Id, item.AufgabeId);
+    }
+
+    /// <summary>Eine pausierte Aufgabe ist ein gültiger Kontexttreffer: Das Ereignis wird zugeordnet
+    /// und bleibt mit der Pausier-Begründung wartend, statt eine Doppelaufgabe zu erzeugen.</summary>
+    [Fact]
+    public async Task Monitor_PullRequestOnPausedTaskBranch_AssignsAndWaits()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var repositoryId = await AddRepositoryAsync(fixture);
+        var taskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet,
+            branchName: "feature/branch", pausiertBisUtc: DateTimeOffset.UtcNow.AddHours(1));
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
+        ConfigureObservations(fixture);
+        ConfigurePullRequest(fixture, 5);
+
+        await Monitor(fixture).RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        Assert.Equal(taskId, Assert.Single(await db.Aufgaben.ToListAsync()).Id);
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        Assert.Equal(taskId, item.AufgabeId);
+        Assert.Equal("Wartend", item.Status);
+        Assert.Contains("pausiert", item.Reason);
+        Assert.Empty(fixture.Sessions);
+        Assert.Empty(fixture.Prompts);
+    }
+
     private static ScmEventMonitoringService Monitor(ScmDispatchFixture fixture)
         => fixture.Services.GetRequiredService<ScmEventMonitoringService>();
 
@@ -218,6 +396,33 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         return repository.Id;
     }
 
+    private static async Task<Guid> AddTaskAsync(ScmDispatchFixture fixture, Guid repositoryId,
+        AufgabeStatus status, string? branchName = null, DateTimeOffset? pausiertBisUtc = null, int? issueNummer = null)
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var projektId = await db.GitRepositories.Where(x => x.Id == repositoryId).Select(x => x.ProjektId).SingleAsync();
+        var task = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = projektId,
+            GitRepositoryId = repositoryId,
+            Titel = "Kontextaufgabe",
+            Status = status,
+            BranchName = branchName,
+            PausiertBisUtc = pausiertBisUtc,
+            IssueReferenz = issueNummer is null ? null : new IssueReferenz
+            {
+                Id = Guid.NewGuid(),
+                IssueNummer = issueNummer,
+                Titel = "Issue " + issueNummer
+            }
+        };
+        db.Add(task);
+        await db.SaveChangesAsync();
+        return task.Id;
+    }
+
     private static void ConfigureEnumeration(ScmDispatchFixture fixture, params ScmEventReference[] references)
         => fixture.Git.As<IScmEventSource>().Setup(x => x.EnumerateReferencesAsync(
                 It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
@@ -248,12 +453,13 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
                 "Issue Titel " + reference.Number, "Beschreibungstext", Array.Empty<string>(), null,
                 "https://github.com/owner/repo/issues/" + reference.Number));
 
-    private static void ConfigurePullRequest(ScmDispatchFixture fixture, int number)
+    private static void ConfigurePullRequest(ScmDispatchFixture fixture, int number,
+        string branchName = "feature/branch", string body = "PR Beschreibung", string sourceRepositoryId = "owner/repo")
         => fixture.Git.As<IScmEventSource>().Setup(x => x.ReadPullRequestAsync(
                 It.Is<ScmEventReference>(r => r.Kind == ScmReferenceKind.PullRequest && r.Number == number), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ScmEventReference reference, CancellationToken _) => new PullRequest(reference.Number,
                 "PR Titel " + reference.Number, "https://github.com/owner/repo/pull/" + reference.Number,
-                "feature/branch", PullRequestProvider.GitHub, "owner/repo", "PR_node",
-                "main", "sha1", "owner/repo", "https://github.com/owner/repo.git", "refs/heads/feature/branch",
-                "PR Beschreibung"));
+                branchName, PullRequestProvider.GitHub, "owner/repo", "PR_node",
+                "main", "sha1", sourceRepositoryId, "https://github.com/owner/repo.git", "refs/heads/" + branchName,
+                body));
 }
