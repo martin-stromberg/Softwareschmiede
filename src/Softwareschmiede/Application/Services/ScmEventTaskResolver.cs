@@ -88,6 +88,9 @@ public sealed class ScmEventTaskResolver(
         var taskIds = await PullRequestTaskIdsAsync(pullRequest.Provider, repositoryId, reference.Number, ct);
         if (taskIds.Count > 1) return ScmTaskResolution.Ambiguous;
         if (taskIds.Count == 1) return ScmTaskResolution.Assigned(taskIds[0]);
+        var contextTaskIds = await FindActiveContextTaskIdsAsync(pullRequest, repositories, repositoryId, ct);
+        if (contextTaskIds.Count > 1) return ScmTaskResolution.Ambiguous;
+        if (contextTaskIds.Count == 1) return ScmTaskResolution.Assigned(contextTaskIds[0]);
         var repository = ChooseRepository(repositories);
         var context = new ScmRepositoryContext(repository.Id, repository.PluginTyp, repositoryId, reference.Repository.Konto);
         var composed = pullRequest with { Body = ComposeBody(pullRequest.Body, trigger) };
@@ -110,6 +113,43 @@ public sealed class ScmEventTaskResolver(
         => db.PullRequestReferenzen.AsNoTracking()
             .Where(p => p.Provider == provider && p.RepositoryId == repositoryId && p.PullRequestNumber == number)
             .Select(p => p.AufgabeId).Distinct().ToListAsync(ct);
+
+    /// <summary>Projektion der für den Kontextabgleich benötigten Aufgabenfelder.</summary>
+    private sealed record ContextCandidate(Guid Id, string? BranchName, int? IssueNummer);
+
+    /// <summary>Aktive Aufgaben (Status nicht <see cref="AufgabeStatus.Beendet"/>/<see cref="AufgabeStatus.Archiviert"/>)
+    /// im Repository-Scope, deren Branch- oder Issue-Bezug denselben Aufgabenkontext wie der Pull Request beschreibt.
+    /// Die Datenbankabfrage lädt nur potenzielle Treffer (Branch-Kandidat oder passende Issue-Nummer) als Projektion;
+    /// der abschließende Groß-/Kleinschreibungsvergleich des Branchnamens bleibt im Speicher, weil die SQLite-Provider
+    /// kein <see cref="StringComparison.OrdinalIgnoreCase"/> übersetzen.</summary>
+    private async Task<List<Guid>> FindActiveContextTaskIdsAsync(PullRequest pullRequest,
+        IReadOnlyList<GitRepository> repositories, string repositoryId, CancellationToken ct)
+    {
+        var repositoryIds = repositories.Select(x => (Guid?)x.Id).ToArray();
+        var closingNumbers = PullRequestBodyBuilder.ExtractClosingIssueNumbers(pullRequest.Body, repositoryId).ToArray();
+        var branchMatchPossible = !string.IsNullOrWhiteSpace(pullRequest.BranchName)
+            && string.Equals(pullRequest.SourceRepositoryId, repositoryId, StringComparison.OrdinalIgnoreCase);
+        var candidates = await db.Aufgaben.AsNoTracking()
+            .Where(a => repositoryIds.Contains(a.GitRepositoryId)
+                && a.Status != AufgabeStatus.Beendet && a.Status != AufgabeStatus.Archiviert
+                && ((branchMatchPossible && a.BranchName != null)
+                    || (a.IssueReferenz != null && a.IssueReferenz.IssueNummer != null
+                        && closingNumbers.Contains(a.IssueReferenz.IssueNummer.Value))))
+            .Select(a => new ContextCandidate(a.Id, a.BranchName,
+                a.IssueReferenz == null ? null : a.IssueReferenz.IssueNummer))
+            .ToListAsync(ct);
+        return candidates
+            .Where(a => MatchesBranch(pullRequest, repositoryId, a) || MatchesClosingIssue(closingNumbers, a))
+            .Select(a => a.Id).Distinct().ToList();
+    }
+
+    private static bool MatchesBranch(PullRequest pullRequest, string repositoryId, ContextCandidate kandidat)
+        => !string.IsNullOrWhiteSpace(pullRequest.BranchName)
+            && string.Equals(pullRequest.SourceRepositoryId, repositoryId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(kandidat.BranchName, pullRequest.BranchName, StringComparison.OrdinalIgnoreCase);
+
+    private static bool MatchesClosingIssue(IReadOnlyCollection<int> closingNumbers, ContextCandidate kandidat)
+        => kandidat.IssueNummer is { } issueNummer && closingNumbers.Contains(issueNummer);
 
     private static GitRepository ChooseRepository(IReadOnlyList<GitRepository> repositories)
         => repositories.OrderBy(x => x.RepositoryUrl, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Id).FirstOrDefault()
