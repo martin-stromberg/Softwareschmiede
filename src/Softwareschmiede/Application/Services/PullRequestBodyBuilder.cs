@@ -41,16 +41,37 @@ internal static class PullRequestBodyBuilder
         return Build(aufgabe, $"## Commits{Environment.NewLine}{Environment.NewLine}{body}");
     }
 
-    private static bool ContainsClosingDirectiveForIssue(string body, int issueNummer)
+    /// <summary>Extrahiert die Issue-Nummern aller Closing-Direktiven im Text. Mit gesetztem
+    /// <paramref name="repositoryId"/> zählen repository-qualifizierte Direktiven nur bei Übereinstimmung.</summary>
+    internal static IReadOnlyCollection<int> ExtractClosingIssueNumbers(string? body, string? repositoryId = null)
     {
         if (string.IsNullOrWhiteSpace(body))
         {
-            return false;
+            return Array.Empty<int>();
         }
 
-        var pattern = $@"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#{issueNummer}\b";
-        return Regex.IsMatch(body, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        const string pattern = @"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(?<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#(?<number>\d+)\b";
+        var numbers = new HashSet<int>();
+        foreach (Match match in Regex.Matches(body, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        {
+            var qualifier = match.Groups["repository"].Value;
+            if (repositoryId is not null && qualifier.Length > 0
+                && !string.Equals(qualifier, repositoryId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (int.TryParse(match.Groups["number"].Value, out var number))
+            {
+                numbers.Add(number);
+            }
+        }
+
+        return numbers;
     }
+
+    private static bool ContainsClosingDirectiveForIssue(string body, int issueNummer)
+        => ExtractClosingIssueNumbers(body).Contains(issueNummer);
 
     private static string ResolveShortSha(BranchCommit commit)
     {

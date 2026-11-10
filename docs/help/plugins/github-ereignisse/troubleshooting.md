@@ -58,6 +58,12 @@
 
 > **Hinweis:** Im Modus „Separates Konto" werden ausschließlich Benachrichtigungen ausgewertet — weder die repository-weite Enumeration noch verknüpfte Referenzen vorhandener Aufgaben noch Backmerge-Entdeckungen laufen in diesem Modus.
 
+## Ein Pull-Request-Ereignis hat eine neue Aufgabe angelegt, obwohl dazu schon eine Aufgabe existiert
+
+**Ursache:** Die Kontextzuordnung greift nur bei genau einer **aktiven** Aufgabe: Ist die frühere Aufgabe bereits beendet oder archiviert, stammt der Pull Request aus einem Fork/Fremd-Repository, weicht sein Head-Branch vom `BranchName` der Aufgabe ab oder referenziert sein Text nicht das verknüpfte Issue (`Closes`/`Fixes`/`Resolves #N`), gilt die Referenz als ohne lokale Aufgabe — und die Anwendung legt bewusst eine neue Aufgabe aus dem Ereignis an. Zeigen die Kontextsignale dagegen auf mehrere unterschiedliche Aufgaben, bleibt das Ereignis mit der Diagnose „Mehrdeutige Zuordnung zu Aufgaben" stehen und es wird gar keine Aufgabe angelegt.
+
+**Lösung:** Prüfe die neue sowie die frühere Aufgabe in der Aufgabenverwaltung. War die frühere Aufgabe bereits beendet, ist die Neuanlage das vorgesehene Verhalten — die neue Aufgabe kann regulär genutzt oder gelöscht werden. Soll das Ereignis doch an eine laufende Aufgabe gehen, sicherstellen, dass der Pull Request auf deren Aufgaben-Branch liegt oder im PR-Text das Aufgaben-Issue per Closing-Direktive referenziert wird, und den Eintrag anschließend über **Erneut prüfen** erneut einlesen lassen.
+
 ## Der Ausgang einer CLI-Zustellung ist ungewiss
 
 **Ursache:** Die Eingabe könnte die CLI erreicht haben, bevor eine lokale Bestätigung gespeichert werden konnte.
