@@ -60,6 +60,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private UpdatePfadOption? _selectedUpdatePfad = UpdatePfadOption.FuerPfad(null);
     private ScmBackmergeModusOption? _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Deaktiviert);
     private ScmKontoModusOption? _selectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.Benutzerkonto);
+    private ScmTaskCompletionPruefmodusOption? _selectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionPruefmodus.Ereignisgesteuert);
+    private bool _isScmBackmergeDraftAktivierung;
+    private bool _isScmBackmergeAdminMerge;
 
     /// <summary>Wird direkt nach erfolgreichem Speichern der Update-Einstellungen mit dem gespeicherten Snapshot ausgelöst.</summary>
     public event EventHandler<UpdateSettings>? UpdateSettingsSaved;
@@ -101,17 +104,50 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public ScmBackmergeModusOption? SelectedBackmergeModus
     {
         get => _selectedBackmergeModus;
-        set => SetProperty(ref _selectedBackmergeModus, value);
+        set
+        {
+            if (!SetProperty(ref _selectedBackmergeModus, value)) return;
+            OnPropertyChanged(nameof(IsProzessablaeufeFelderEnabled));
+            OnPropertyChanged(nameof(ProzessablaeufeStatusText));
+        }
     }
 
-    /// <summary>Feste Auswahlliste der SCM-Konto-Modi (Steuerwert + Anzeige-Label).</summary>
+    /// <summary>Feste Auswahlliste der SCM-Überwachungsmodi (Steuerwert + Anzeige-Label).</summary>
     public IReadOnlyList<ScmKontoModusOption> KontoModusOptionen => ScmKontoModusOption.Alle;
 
-    /// <summary>Aktuell ausgewählte Konto-Modus-Option aus <see cref="KontoModusOptionen"/>.</summary>
+    /// <summary>Aktuell ausgewählte Überwachungsmodus-Option aus <see cref="KontoModusOptionen"/>.</summary>
     public ScmKontoModusOption? SelectedKontoModus
     {
         get => _selectedKontoModus;
-        set => SetProperty(ref _selectedKontoModus, value);
+        set
+        {
+            if (SetProperty(ref _selectedKontoModus, value))
+                OnPropertyChanged(nameof(IsTriggerKeywordSichtbar));
+        }
+    }
+
+    /// <summary>Feste Auswahlliste der Prüfmodi der SCM-Abschlussüberwachung (Steuerwert + Anzeige-Label).</summary>
+    public IReadOnlyList<ScmTaskCompletionPruefmodusOption> ScmTaskCompletionPruefmodusOptionen => ScmTaskCompletionPruefmodusOption.Alle;
+
+    /// <summary>Aktuell ausgewählte Prüfmodus-Option aus <see cref="ScmTaskCompletionPruefmodusOptionen"/>.</summary>
+    public ScmTaskCompletionPruefmodusOption? SelectedScmTaskCompletionPruefmodus
+    {
+        get => _selectedScmTaskCompletionPruefmodus;
+        set => SetProperty(ref _selectedScmTaskCompletionPruefmodus, value);
+    }
+
+    /// <summary>Gibt an, ob Draft-Backmerge-Pull-Requests vor dem Merge automatisch aktiviert werden.</summary>
+    public bool IsScmBackmergeDraftAktivierung
+    {
+        get => _isScmBackmergeDraftAktivierung;
+        set => SetProperty(ref _isScmBackmergeDraftAktivierung, value);
+    }
+
+    /// <summary>Gibt an, ob nach einem blockierten regulären Merge ein Admin-Merge-Fallback erlaubt ist.</summary>
+    public bool IsScmBackmergeAdminMerge
+    {
+        get => _isScmBackmergeAdminMerge;
+        set => SetProperty(ref _isScmBackmergeAdminMerge, value);
     }
 
     /// <summary>Arbeitsverzeichnis für Repository-Klone.</summary>
@@ -248,15 +284,51 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public bool IsScmMonitoringEnabled
     {
         get => _isScmMonitoringEnabled;
-        set => SetProperty(ref _isScmMonitoringEnabled, value);
+        set
+        {
+            if (!SetProperty(ref _isScmMonitoringEnabled, value)) return;
+            OnPropertyChanged(nameof(IsUeberwachungsmodusEnabled));
+            OnPropertyChanged(nameof(IsTriggerKeywordSichtbar));
+            OnPropertyChanged(nameof(IsPromptAnhaengeSichtbar));
+            OnPropertyChanged(nameof(AufgabenAusfuehrenStatusText));
+        }
     }
 
-    /// <summary>Gibt an, ob die Abschlussüberwachung ereignisgesteuerter Aufgaben aktiviert ist (Laufzeit-Schalter, ohne Neustart wirksam).</summary>
+    /// <summary>Gibt an, ob die Abschlussüberwachung von Aufgaben mit SCM-Referenz aktiviert ist (Laufzeit-Schalter, ohne Neustart wirksam).</summary>
     public bool IsScmTaskCompletionEnabled
     {
         get => _isScmTaskCompletionEnabled;
-        set => SetProperty(ref _isScmTaskCompletionEnabled, value);
+        set
+        {
+            if (!SetProperty(ref _isScmTaskCompletionEnabled, value)) return;
+            OnPropertyChanged(nameof(IsTaskCompletionFelderEnabled));
+            OnPropertyChanged(nameof(AufgabenBeendenStatusText));
+        }
     }
+
+    /// <summary>Der Überwachungsmodus ist nur bei aktivierter Ereignisüberwachung bedienbar.</summary>
+    public bool IsUeberwachungsmodusEnabled => IsScmMonitoringEnabled;
+
+    /// <summary>Das Trigger-Keyword wird nur bei aktivierter Ereignisüberwachung im Benutzerkonto-Modus benötigt.</summary>
+    public bool IsTriggerKeywordSichtbar => IsScmMonitoringEnabled && SelectedKontoModus?.Modus == ScmKontoModus.Benutzerkonto;
+
+    /// <summary>Die Prompt-Anhänge sind nur bei aktivierter Ereignisüberwachung relevant.</summary>
+    public bool IsPromptAnhaengeSichtbar => IsScmMonitoringEnabled;
+
+    /// <summary>Prüfmodus und Wartezeit sind nur bei aktivierter Abschlussüberwachung bedienbar.</summary>
+    public bool IsTaskCompletionFelderEnabled => IsScmTaskCompletionEnabled;
+
+    /// <summary>Die Backmerge-Optionen sind nur bei aktiviertem Backmerge-Modus bedienbar.</summary>
+    public bool IsProzessablaeufeFelderEnabled => SelectedBackmergeModus?.Modus != ScmBackmergeModus.Deaktiviert;
+
+    /// <summary>Statuszeile des „Aufgaben ausführen“-Bereichs im Ausklapp-Header.</summary>
+    public string AufgabenAusfuehrenStatusText => IsScmMonitoringEnabled ? "aktiviert" : "deaktiviert";
+
+    /// <summary>Statuszeile des „Aufgaben beenden“-Bereichs im Ausklapp-Header.</summary>
+    public string AufgabenBeendenStatusText => IsScmTaskCompletionEnabled ? "aktiviert" : "deaktiviert";
+
+    /// <summary>Statuszeile des „Prozessabläufe“-Bereichs im Ausklapp-Header.</summary>
+    public string ProzessablaeufeStatusText => SelectedBackmergeModus?.Modus != ScmBackmergeModus.Deaktiviert ? "aktiviert" : "deaktiviert";
 
     /// <summary>Wartezeit in Minuten zwischen dem erkannten Referenz-Schluss und dem automatischen Beenden der Aufgabe.</summary>
     public string ScmTaskCompletionWaitMinutes
@@ -462,10 +534,15 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             ScmPromptAppendixPullRequest = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendPullRequestKey) ?? string.Empty;
             ScmPromptAppendixPullRequestComment = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendPullRequestCommentKey) ?? string.Empty;
 
-            _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(await _einstellungService.GetScmBackmergeModusAsync(ct));
-            OnPropertyChanged(nameof(SelectedBackmergeModus));
-            _selectedKontoModus = ScmKontoModusOption.FuerModus(await _einstellungService.GetScmKontoModusAsync(ct));
-            OnPropertyChanged(nameof(SelectedKontoModus));
+            // Die öffentlichen Setter benachrichtigen die abgeleiteten Anzeige-Properties
+            // (Sichtbarkeit, Enabled, Panel-Status) — nach „Verwerfen“ bleibt die UI sonst
+            // auf dem Stand der verworfenen Auswahl.
+            SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(await _einstellungService.GetScmBackmergeModusAsync(ct));
+            SelectedKontoModus = ScmKontoModusOption.FuerModus(await _einstellungService.GetScmKontoModusAsync(ct));
+            SelectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(
+                await _einstellungService.GetScmTaskCompletionPruefmodusAsync(ct));
+            IsScmBackmergeDraftAktivierung = await _einstellungService.GetScmBackmergeDraftAktivierungAsync(ct);
+            IsScmBackmergeAdminMerge = await _einstellungService.GetScmBackmergeAdminMergeAsync(ct);
 
             var updateSettings = await _einstellungService.GetUpdateSettingsAsync(ct);
             _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Modus);
@@ -517,7 +594,13 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
             if (SelectedKontoModus is not { Modus: var kontoModus })
             {
-                FehlerMeldung = "Der ausgewählte Konto-Modus ist ungültig.";
+                FehlerMeldung = "Der ausgewählte Überwachungsmodus ist ungültig.";
+                return;
+            }
+
+            if (SelectedScmTaskCompletionPruefmodus is not { Modus: var pruefmodus })
+            {
+                FehlerMeldung = "Der ausgewählte Prüfmodus ist ungültig.";
                 return;
             }
 
@@ -543,16 +626,24 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 AppEinstellungService.ScmTaskCompletionEnabledKey,
                 IsScmTaskCompletionEnabled,
                 ct);
-            await _einstellungService.SetIntSettingAsync(
-                AppEinstellungService.ScmTaskCompletionWaitMinutesKey,
-                int.Parse(ScmTaskCompletionWaitMinutes.Trim(), System.Globalization.CultureInfo.InvariantCulture),
-                ct);
+            // Bei deaktivierter Abschlussüberwachung ist die Wartezeit nicht wirksam und wird
+            // nicht überschrieben — ihr Feld ist dann deaktiviert und unvalidiert.
+            if (IsScmTaskCompletionEnabled)
+            {
+                await _einstellungService.SetIntSettingAsync(
+                    AppEinstellungService.ScmTaskCompletionWaitMinutesKey,
+                    int.Parse(ScmTaskCompletionWaitMinutes.Trim(), System.Globalization.CultureInfo.InvariantCulture),
+                    ct);
+            }
             await _einstellungService.SetSettingAsync(
                 AppEinstellungService.ScmTriggerKeywordKey,
                 ScmTriggerKeyword.Trim(),
                 ct);
             await _einstellungService.SetScmBackmergeModusAsync(backmergeModus, ct);
             await _einstellungService.SetScmKontoModusAsync(kontoModus, ct);
+            await _einstellungService.SetScmTaskCompletionPruefmodusAsync(pruefmodus, ct);
+            await _einstellungService.SetScmBackmergeDraftAktivierungAsync(IsScmBackmergeDraftAktivierung, ct);
+            await _einstellungService.SetScmBackmergeAdminMergeAsync(IsScmBackmergeAdminMerge, ct);
             await _einstellungService.SetSettingAsync(
                 AppEinstellungService.ScmPromptAppendGeneralKey,
                 NullWennLeer(ScmPromptAppendixGeneral),
@@ -777,7 +868,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     /// eingegebener, noch ungespeicherter Wert im geöffneten GitHub-Einstellungspanel zählt bereits.</summary>
     private bool ValidiereScmKontoModus()
     {
-        if (SelectedKontoModus?.Modus != ScmKontoModus.SeparatesKonto)
+        // Der Überwachungsmodus ist nur bei aktivierter Ereignisüberwachung wirksam.
+        if (!IsScmMonitoringEnabled || SelectedKontoModus?.Modus != ScmKontoModus.SeparatesKonto)
             return true;
 
         var github = SourceCodeManagementPlugins.FirstOrDefault(x =>
@@ -795,16 +887,20 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
         if (string.IsNullOrWhiteSpace(effektiv))
         {
-            FehlerMeldung = "Für den Konto-Modus „Separates Konto“ ist ein Personal Access Token des separaten Kontos erforderlich. Tragen Sie ihn unter Einstellungen → Plugins → GitHub → Authentifizierung im Feld „Personal Access Token des separaten Kontos“ ein.";
+            FehlerMeldung = "Für den Überwachungsmodus „Separates Konto“ ist ein Personal Access Token des separaten Kontos erforderlich. Tragen Sie ihn unter Einstellungen → Plugins → GitHub → Authentifizierung im Feld „Personal Access Token des separaten Kontos“ ein.";
             return false;
         }
 
         return true;
     }
 
-    /// <summary>Die Abschluss-Wartezeit muss eine nicht negative Ganzzahl in Minuten sein.</summary>
+    /// <summary>Die Abschluss-Wartezeit muss eine nicht negative Ganzzahl in Minuten sein;
+    /// bei deaktivierter Abschlussüberwachung ist das Feld deaktiviert und nicht wirksam.</summary>
     private bool ValidiereScmTaskCompletionWait()
     {
+        if (!IsTaskCompletionFelderEnabled)
+            return true;
+
         if (!int.TryParse(ScmTaskCompletionWaitMinutes?.Trim(), System.Globalization.NumberStyles.Integer,
                 System.Globalization.CultureInfo.InvariantCulture, out var minuten) || minuten < 0)
         {
@@ -818,9 +914,14 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     /// <summary>Leere oder nur aus Leerraum bestehende Prompt-Anhänge werden nicht gespeichert (leer = nichts anhängen).</summary>
     private static string? NullWennLeer(string? wert) => string.IsNullOrWhiteSpace(wert) ? null : wert;
 
-    /// <summary>Das Trigger-Keyword darf nicht leer sein; der Dienst fällt sonst auf den Standard zurück.</summary>
+    /// <summary>Das Trigger-Keyword darf nicht leer sein; der Dienst fällt sonst auf den Standard
+    /// zurück. Das Feld ist nur wirksam, wenn es auch sichtbar ist (aktive Überwachung im
+    /// Benutzerkonto-Modus).</summary>
     private bool ValidiereScmTriggerKeyword()
     {
+        if (!IsTriggerKeywordSichtbar)
+            return true;
+
         if (string.IsNullOrWhiteSpace(ScmTriggerKeyword))
         {
             FehlerMeldung = $"Das Trigger-Keyword für SCM-Ereignisse darf nicht leer sein. Standard: {ScmEventValidationService.DefaultTriggerKeyword}";

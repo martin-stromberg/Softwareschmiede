@@ -276,158 +276,6 @@
                                  BorderBrush="{DynamicResource BorderBrush}" />
                     </StackPanel>
 
-                    <!-- SCM-Ereignisse -->
-                    <StackPanel Margin="0,0,0,16" MaxWidth="600" HorizontalAlignment="Left">
-                        <TextBlock Text="SCM-Ereignisse"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="0,0,0,4" />
-                        <CheckBox IsChecked="{Binding IsScmMonitoringEnabled, Mode=TwoWay}"
-                                  AutomationProperties.Name="IsScmMonitoringEnabled"
-                                  Content="SCM-Ereignisüberwachung aktivieren"
-                                  Foreground="{DynamicResource PrimaryTextBrush}" />
-                        <TextBlock Text="Bei deaktivierter Überwachung werden keine SCM-Quellen abgefragt und keine Ereignisse automatisch zugestellt. Bereits eingegangene Ereignisse bleiben erhalten und können weiterhin manuell geöffnet, geprüft oder abgebrochen werden. Die Änderung wirkt ohne Neustart."
-                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="22,4,0,0" />
-                        <CheckBox IsChecked="{Binding IsScmTaskCompletionEnabled, Mode=TwoWay}"
-                                  AutomationProperties.Name="IsScmTaskCompletionEnabled"
-                                  Content="Abschlussüberwachung ereignisgesteuerter Aufgaben aktivieren"
-                                  Foreground="{DynamicResource PrimaryTextBrush}"
-                                  Margin="0,12,0,0" />
-                        <TextBlock Text="Beobachtet zyklisch die verknüpften Pull Requests bzw. Issues von Aufgaben, die über die SCM-Ereignisüberwachung bearbeitet wurden. Ist die Referenz geschlossen oder gemergt, wird die Aufgabe nach der eingestellten Wartezeit automatisch beendet — inklusive einer noch laufenden KI-Ausführung. Die Änderung wirkt ohne Neustart."
-                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="22,4,0,0" />
-                        <TextBlock Text="Wartezeit bis zum Beenden (Minuten)"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="22,8,0,4" />
-                        <TextBox Text="{Binding ScmTaskCompletionWaitMinutes, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.Name="ScmTaskCompletionWaitMinutes"
-                                 Width="120"
-                                 HorizontalAlignment="Left"
-                                 Margin="22,0,0,0"
-                                 Padding="8,6"
-                                 BorderBrush="{DynamicResource BorderBrush}" />
-                        <TextBlock Text="Zeit zwischen dem erkannten Schließen bzw. Mergen der verknüpften Referenz und dem automatischen Beenden der Aufgabe. Ganzzahl in Minuten; Standard: 60."
-                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="22,4,0,0" />
-                        <TextBlock Text="Trigger-Keyword"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="0,12,0,4" />
-                        <TextBox Text="{Binding ScmTriggerKeyword, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.Name="ScmTriggerKeyword"
-                                 Padding="8,6"
-                                 BorderBrush="{DynamicResource BorderBrush}" />
-                        <TextBlock Text="Schlüsselwort, mit dem SCM-Ereignisse in Issues und Pull Requests markiert werden. Nur frei stehende Vorkommen ohne direkt angrenzende Zitatzeichen lösen aus; die Groß-/Kleinschreibung wird nicht beachtet. Leer lassen ist nicht zulässig; Standard: $Softwareschmiede."
-                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,4,0,0" />
-                        <TextBlock Text="Backmerge-Pull-Requests"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="0,12,0,4" />
-                        <ComboBox SelectedItem="{Binding SelectedBackmergeModus, UpdateSourceTrigger=PropertyChanged}"
-                                  AutomationProperties.Name="Backmerge-Modus"
-                                  ItemsSource="{Binding BackmergeModusOptionen}"
-                                  HorizontalAlignment="Stretch"
-                                  Padding="8,6">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <TextBlock Text="Ein Backmerge-Pull-Request (head = Hauptbranch des Repositories, base = konfigurierter Basis-Branch eines Projekts) aktualisiert nur den Arbeitsbranch. Bei „Global aktiviert“ wird er in allen Projekten automatisch gemergt, sobald der Provider ihn als mergebar meldet; bei „Projektbezogen aktivierbar“ zusätzlich nur in Projekten, in denen die Option in der Projektdetailansicht eingeschaltet ist. Voraussetzung ist ein eingerichteter, vom Hauptbranch abweichender Basis-Branch sowie ein Token mit Schreibrecht."
-                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,4,0,0" />
-                        <TextBlock Text="Konto-Modus"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="0,12,0,4" />
-                        <ComboBox SelectedItem="{Binding SelectedKontoModus, UpdateSourceTrigger=PropertyChanged}"
-                                  AutomationProperties.Name="Konto-Modus"
-                                  ItemsSource="{Binding KontoModusOptionen}"
-                                  HorizontalAlignment="Stretch"
-                                  Padding="8,6">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <TextBlock Text="„Benutzerkonto“ überwacht die registrierten Projekt-Repositories direkt und reagiert auf das Trigger-Keyword. „Separates Konto“ überwacht stattdessen die GitHub-Benachrichtigungen eines separaten Kontos und reagiert auf Erwähnungen (@Kontoname); dafür ist unter Plugins → GitHub → Authentifizierung ein eigener Token mit den Scopes notifications und repo erforderlich. Hinweis: Im separaten Modus entfällt die repository-weite Enumeration — Backmerge-Pull-Requests werden dann nicht automatisch entdeckt."
-                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,4,0,0" />
-                        <TextBlock Text="Prompt-Anhänge"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="0,16,0,4" />
-                        <TextBlock Text="Texte, die bei der Zustellung automatisch an das SCM-Ereignis angehängt werden — z. B. Hinweise auf verfügbare Skills oder Bearbeitungsregeln, ohne sie in jedem Kommentar zu nennen. Der allgemeine Anhang wird zuerst eingefügt, danach der zur Ereignisart passende. Ein leeres Feld hängt nichts an. Die Anhänge verändern weder den gespeicherten Ereignistext noch die Trigger-Prüfung."
-                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,8" />
-                        <TextBlock Text="Allgemein (alle Ereignisarten)"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="0,0,0,4" />
-                        <TextBox Text="{Binding ScmPromptAppendixGeneral, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.Name="ScmPromptAppendixGeneral"
-                                 AcceptsReturn="True"
-                                 MinHeight="48"
-                                 TextWrapping="Wrap"
-                                 VerticalScrollBarVisibility="Auto"
-                                 Padding="8,6"
-                                 BorderBrush="{DynamicResource BorderBrush}" />
-                        <TextBlock Text="Issue"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="0,8,0,4" />
-                        <TextBox Text="{Binding ScmPromptAppendixIssue, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.Name="ScmPromptAppendixIssue"
-                                 AcceptsReturn="True"
-                                 MinHeight="48"
-                                 TextWrapping="Wrap"
-                                 VerticalScrollBarVisibility="Auto"
-                                 Padding="8,6"
-                                 BorderBrush="{DynamicResource BorderBrush}" />
-                        <TextBlock Text="Issue-Kommentar"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="0,8,0,4" />
-                        <TextBox Text="{Binding ScmPromptAppendixIssueComment, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.Name="ScmPromptAppendixIssueComment"
-                                 AcceptsReturn="True"
-                                 MinHeight="48"
-                                 TextWrapping="Wrap"
-                                 VerticalScrollBarVisibility="Auto"
-                                 Padding="8,6"
-                                 BorderBrush="{DynamicResource BorderBrush}" />
-                        <TextBlock Text="Pull Request"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="0,8,0,4" />
-                        <TextBox Text="{Binding ScmPromptAppendixPullRequest, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.Name="ScmPromptAppendixPullRequest"
-                                 AcceptsReturn="True"
-                                 MinHeight="48"
-                                 TextWrapping="Wrap"
-                                 VerticalScrollBarVisibility="Auto"
-                                 Padding="8,6"
-                                 BorderBrush="{DynamicResource BorderBrush}" />
-                        <TextBlock Text="Pull-Request-Kommentar (inkl. Reviews)"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="0,8,0,4" />
-                        <TextBox Text="{Binding ScmPromptAppendixPullRequestComment, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.Name="ScmPromptAppendixPullRequestComment"
-                                 AcceptsReturn="True"
-                                 MinHeight="48"
-                                 TextWrapping="Wrap"
-                                 VerticalScrollBarVisibility="Auto"
-                                 Padding="8,6"
-                                 BorderBrush="{DynamicResource BorderBrush}" />
-                    </StackPanel>
-
                     <!-- Updates -->
                     <StackPanel Margin="0,0,0,16" MaxWidth="600" HorizontalAlignment="Left">
                         <TextBlock Text="Updates"
@@ -493,6 +341,271 @@
                                 Padding="12,6"
                                 HorizontalAlignment="Left" />
                     </StackPanel>
+                </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem>
+                <TabItem.Header >
+                    <StackPanel Orientation="Horizontal" Margin="0">
+                        <TextBlock Margin="0,0,8,0" Foreground="{DynamicResource SecondaryTextBrush}" Opacity="0.88" >⚙</TextBlock>
+                        <TextBlock Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}">Automatisierung</TextBlock>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="16" MaxWidth="640" HorizontalAlignment="Left">
+                    <!-- Aufgaben ausführen -->
+                    <Expander AutomationProperties.Name="AufgabenAusfuehrenExpander"
+                              IsExpanded="False"
+                              Foreground="{DynamicResource PrimaryTextBrush}"
+                              Margin="0,0,0,16">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Aufgaben ausführen"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock Text="{Binding AufgabenAusfuehrenStatusText}"
+                                           AutomationProperties.Name="AufgabenAusfuehrenStatus"
+                                           AutomationProperties.HelpText="{Binding AufgabenAusfuehrenStatusText}"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Expander.Header>
+                        <StackPanel Margin="0,8,0,0">
+                            <CheckBox IsChecked="{Binding IsScmMonitoringEnabled, Mode=TwoWay}"
+                                      AutomationProperties.Name="IsScmMonitoringEnabled"
+                                      Content="Aufgaben automatisch starten"
+                                      Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Bei deaktivierter Funktion werden keine SCM-Quellen abgefragt und keine Aufgaben automatisch gestartet. Bereits eingegangene Ereignisse bleiben erhalten und können weiterhin manuell geöffnet, geprüft oder abgebrochen werden. Die Änderung wirkt ohne Neustart."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="22,4,0,0" />
+                            <TextBlock Text="Überwachungsmodus"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       Margin="0,12,0,4" />
+                            <ComboBox SelectedItem="{Binding SelectedKontoModus, UpdateSourceTrigger=PropertyChanged}"
+                                      AutomationProperties.Name="Ueberwachungsmodus"
+                                      ItemsSource="{Binding KontoModusOptionen}"
+                                      IsEnabled="{Binding IsUeberwachungsmodusEnabled}"
+                                      HorizontalAlignment="Stretch"
+                                      Padding="8,6">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Text="„Benutzerkonto“ überwacht die registrierten Projekt-Repositories direkt und reagiert auf das Trigger-Keyword. „Separates Konto“ überwacht stattdessen die GitHub-Benachrichtigungen eines separaten Kontos und reagiert auf Erwähnungen (@Kontoname); dafür ist unter Plugins → GitHub → Authentifizierung ein eigener Token mit den Scopes notifications und repo erforderlich."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0" />
+                            <StackPanel AutomationProperties.Name="TriggerKeywordBereich"
+                                        Visibility="{Binding IsTriggerKeywordSichtbar, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="Trigger-Keyword"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,12,0,4" />
+                                <TextBox Text="{Binding ScmTriggerKeyword, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="ScmTriggerKeyword"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                                <TextBlock Text="Schlüsselwort, mit dem SCM-Ereignisse in Issues und Pull Requests markiert werden. Nur frei stehende Vorkommen ohne direkt angrenzende Zitatzeichen lösen aus; die Groß-/Kleinschreibung wird nicht beachtet. Leer lassen ist nicht zulässig; Standard: $Softwareschmiede."
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel AutomationProperties.Name="PromptAnhaengeBereich"
+                                        Visibility="{Binding IsPromptAnhaengeSichtbar, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="Prompt-Anhänge"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,16,0,4" />
+                                <TextBlock Text="Texte, die bei der Zustellung automatisch an das SCM-Ereignis angehängt werden — z. B. Hinweise auf verfügbare Skills oder Bearbeitungsregeln, ohne sie in jedem Kommentar zu nennen. Der allgemeine Anhang wird zuerst eingefügt, danach der zur Ereignisart passende. Ein leeres Feld hängt nichts an. Die Anhänge verändern weder den gespeicherten Ereignistext noch die Trigger-Prüfung."
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,8" />
+                                <TextBlock Text="Allgemein (alle Ereignisarten)"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,0,0,4" />
+                                <TextBox Text="{Binding ScmPromptAppendixGeneral, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="ScmPromptAppendixGeneral"
+                                         AcceptsReturn="True"
+                                         MinHeight="48"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                                <TextBlock Text="Issue"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,8,0,4" />
+                                <TextBox Text="{Binding ScmPromptAppendixIssue, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="ScmPromptAppendixIssue"
+                                         AcceptsReturn="True"
+                                         MinHeight="48"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                                <TextBlock Text="Issue-Kommentar"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,8,0,4" />
+                                <TextBox Text="{Binding ScmPromptAppendixIssueComment, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="ScmPromptAppendixIssueComment"
+                                         AcceptsReturn="True"
+                                         MinHeight="48"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                                <TextBlock Text="Pull Request"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,8,0,4" />
+                                <TextBox Text="{Binding ScmPromptAppendixPullRequest, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="ScmPromptAppendixPullRequest"
+                                         AcceptsReturn="True"
+                                         MinHeight="48"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                                <TextBlock Text="Pull-Request-Kommentar (inkl. Reviews)"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,8,0,4" />
+                                <TextBox Text="{Binding ScmPromptAppendixPullRequestComment, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="ScmPromptAppendixPullRequestComment"
+                                         AcceptsReturn="True"
+                                         MinHeight="48"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- Aufgaben beenden -->
+                    <Expander AutomationProperties.Name="AufgabenBeendenExpander"
+                              IsExpanded="False"
+                              Foreground="{DynamicResource PrimaryTextBrush}"
+                              Margin="0,0,0,16">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Aufgaben beenden"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock Text="{Binding AufgabenBeendenStatusText}"
+                                           AutomationProperties.Name="AufgabenBeendenStatus"
+                                           AutomationProperties.HelpText="{Binding AufgabenBeendenStatusText}"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Expander.Header>
+                        <StackPanel Margin="0,8,0,0">
+                            <CheckBox IsChecked="{Binding IsScmTaskCompletionEnabled, Mode=TwoWay}"
+                                      AutomationProperties.Name="IsScmTaskCompletionEnabled"
+                                      Content="Aufgaben automatisch beenden"
+                                      Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Beobachtet zyklisch die verknüpften Pull Requests bzw. Issues der durch den Prüfmodus bestimmten Aufgaben. Beobachtet werden ausschließlich Aufgaben mit SCM-Referenz (Issue oder Pull Request). Ist die Referenz geschlossen oder gemergt, wird die Aufgabe nach der eingestellten Wartezeit automatisch beendet — inklusive einer noch laufenden KI-Ausführung. Die Änderung wirkt ohne Neustart."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="22,4,0,0" />
+                            <TextBlock Text="Prüfmodus"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       Margin="22,8,0,4" />
+                            <ComboBox SelectedItem="{Binding SelectedScmTaskCompletionPruefmodus, UpdateSourceTrigger=PropertyChanged}"
+                                      AutomationProperties.Name="Pruefmodus"
+                                      ItemsSource="{Binding ScmTaskCompletionPruefmodusOptionen}"
+                                      IsEnabled="{Binding IsTaskCompletionFelderEnabled}"
+                                      HorizontalAlignment="Stretch"
+                                      Margin="22,0,0,0"
+                                      Padding="8,6">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Text="„Nur ereignisgesteuerte Aufgaben“ beobachtet ausschließlich Aufgaben mit SCM-Ereigniszuordnung. „Alle Aufgaben“ beobachtet zusätzlich manuell angelegte Aufgaben — weiterhin nur solche mit Issue- oder Pull-Request-Verknüpfung."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="22,4,0,0" />
+                            <TextBlock Text="Wartezeit für Beendigung"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       Margin="22,8,0,4" />
+                            <TextBox Text="{Binding ScmTaskCompletionWaitMinutes, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="ScmTaskCompletionWaitMinutes"
+                                     IsEnabled="{Binding IsTaskCompletionFelderEnabled}"
+                                     Width="120"
+                                     HorizontalAlignment="Left"
+                                     Margin="22,0,0,0"
+                                     Padding="8,6"
+                                     BorderBrush="{DynamicResource BorderBrush}" />
+                            <TextBlock Text="Zeit zwischen dem erkannten Schließen bzw. Mergen der verknüpften Referenz und dem automatischen Beenden der Aufgabe. Ganzzahl in Minuten; Standard: 60."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="22,4,0,0" />
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- Prozessabläufe -->
+                    <Expander AutomationProperties.Name="ProzessablaeufeExpander"
+                              IsExpanded="False"
+                              Foreground="{DynamicResource PrimaryTextBrush}"
+                              Margin="0,0,0,16">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Prozessabläufe"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock Text="{Binding ProzessablaeufeStatusText}"
+                                           AutomationProperties.Name="ProzessablaeufeStatus"
+                                           AutomationProperties.HelpText="{Binding ProzessablaeufeStatusText}"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Expander.Header>
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Text="Backmerge-Pull-Requests"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       Margin="0,0,0,4" />
+                            <ComboBox SelectedItem="{Binding SelectedBackmergeModus, UpdateSourceTrigger=PropertyChanged}"
+                                      AutomationProperties.Name="Backmerge-Modus"
+                                      ItemsSource="{Binding BackmergeModusOptionen}"
+                                      HorizontalAlignment="Stretch"
+                                      Padding="8,6">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Text="Ein Backmerge-Pull-Request (head = Hauptbranch des Repositories, base = konfigurierter Basis-Branch eines Projekts) aktualisiert nur den Arbeitsbranch. Bei „Global aktiviert“ wird er in allen Projekten automatisch gemergt, sobald der Provider ihn als mergebar meldet; bei „Projektbezogen aktivierbar“ zusätzlich nur in Projekten, in denen die Option in der Projektdetailansicht eingeschaltet ist. Voraussetzung ist ein eingerichteter, vom Hauptbranch abweichender Basis-Branch sowie ein Token mit Schreibrecht. Die Prüfung läuft in einem eigenen Zyklus unabhängig von den übrigen Automatisierungsfunktionen und immer unter dem Benutzerkonto."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0" />
+                            <CheckBox IsChecked="{Binding IsScmBackmergeDraftAktivierung, Mode=TwoWay}"
+                                      AutomationProperties.Name="IsScmBackmergeDraftAktivierung"
+                                      IsEnabled="{Binding IsProzessablaeufeFelderEnabled}"
+                                      Content="Draft-Pull-Requests vor dem Merge automatisch aktivieren"
+                                      Foreground="{DynamicResource PrimaryTextBrush}"
+                                      Margin="0,12,0,0" />
+                            <TextBlock Text="Ist ein erkannter Backmerge-Pull-Request noch als Entwurf markiert, wird er mit dieser Option vor dem Merge automatisch als bereit für Review markiert. Ohne die Option wartet der Merge, bis der Entwurf manuell aufgehoben wurde."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="22,4,0,0" />
+                            <CheckBox IsChecked="{Binding IsScmBackmergeAdminMerge, Mode=TwoWay}"
+                                      AutomationProperties.Name="IsScmBackmergeAdminMerge"
+                                      IsEnabled="{Binding IsProzessablaeufeFelderEnabled}"
+                                      Content="Bei blockiertem Merge Admin-Merge erlauben"
+                                      Foreground="{DynamicResource PrimaryTextBrush}"
+                                      Margin="0,12,0,0" />
+                            <TextBlock Text="Der Merge läuft zuerst regulär. Schlägt er am Branch-Schutz fehl (z. B. fehlende Statuschecks oder Reviews), wird er mit dieser Option einmalig als Admin-Merge wiederholt, der den Branch-Schutz umgeht. Voraussetzung ist ein Token mit Admin-Recht."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="22,4,0,0" />
+                        </StackPanel>
+                    </Expander>
                 </StackPanel>
                 </ScrollViewer>
             </TabItem>

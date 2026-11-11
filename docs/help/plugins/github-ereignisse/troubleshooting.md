@@ -6,7 +6,7 @@
 
 **Ursache:** Das Repository oder die Referenz ist nicht mit einer aktiven Aufgabe verknüpft, das konfigurierte Trigger-Keyword fehlt, Autor/Bearbeiter ist nicht der angemeldete Repository-Owner, oder die SCM-Ereignisüberwachung ist deaktiviert.
 
-**Lösung:** Prüfe die Verknüpfung und den Text in GitHub. Ergänze das Trigger-Keyword (Standard `$Softwareschmiede`, siehe **Einstellungen → Allgemein → SCM-Ereignisse**) und stelle sicher, dass der Owner die aktuelle Textfassung verfasst hat. Prüfe außerdem, ob die Überwachung in den Einstellungen aktiviert ist — bei deaktivierter Überwachung zeigt die Ereignisübersicht einen entsprechenden Hinweis und „Quellen erneut prüfen" ist wirkungslos. Öffne **SCM-Ereignisse** und klicke **Aktualisieren**.
+**Lösung:** Prüfe die Verknüpfung und den Text in GitHub. Ergänze das Trigger-Keyword (Standard `$Softwareschmiede`, siehe **Einstellungen → Automatisierung → Aufgaben ausführen**) und stelle sicher, dass der Owner die aktuelle Textfassung verfasst hat. Prüfe außerdem, ob die Überwachung in den Einstellungen aktiviert ist — bei deaktivierter Überwachung zeigt die Ereignisübersicht einen entsprechenden Hinweis und „Quellen erneut prüfen" liest keine neuen Ereignisse ein. Öffne **SCM-Ereignisse** und klicke **Aktualisieren**.
 
 ## Ein Eintrag bleibt wartend
 
@@ -42,13 +42,13 @@
 
 **Ursache:** Der Personal Access Token fehlt, ist ungültig oder hat keinen ausreichenden Zugriff.
 
-**Lösung:** Öffne **Einstellungen → Plugins → GitHub → Authentifizierung**, aktualisiere den **Personal Access Token**, speichere die Änderung und wähle beim Ereignis **Erneut prüfen**. Prüfe auch Repositoryzugriff sowie Lese- und Schreibrechte für Issues und Pull Requests. Im Konto-Modus „Separates Konto" gilt dieselbe Prüfung für den Token des separaten Kontos — das Bot-Konto benötigt Collaborator-Schreibrecht auf den überwachten Repositories.
+**Lösung:** Öffne **Einstellungen → Plugins → GitHub → Authentifizierung**, aktualisiere den **Personal Access Token**, speichere die Änderung und wähle beim Ereignis **Erneut prüfen**. Prüfe auch Repositoryzugriff sowie Lese- und Schreibrechte für Issues und Pull Requests. Im Überwachungsmodus „Separates Konto" gilt dieselbe Prüfung für den Token des separaten Kontos — das Bot-Konto benötigt Collaborator-Schreibrecht auf den überwachten Repositories.
 
 ## Das Speichern meldet einen fehlenden Token des separaten Kontos
 
-**Ursache:** Unter **Einstellungen → Allgemein → SCM-Ereignisse** wurde der **Konto-Modus „Separates Konto"** gewählt, ohne dass ein Token des separaten Kontos hinterlegt ist.
+**Ursache:** Unter **Einstellungen → Automatisierung → Aufgaben ausführen** wurde der **Überwachungsmodus „Separates Konto"** gewählt, ohne dass ein Token des separaten Kontos hinterlegt ist.
 
-**Lösung:** Trage unter **Einstellungen → Plugins → GitHub → Authentifizierung** im Feld **„Personal Access Token des separaten Kontos"** einen gültigen Personal Access Token des Bot-Kontos ein (empfohlene Scopes `notifications` und `repo`) und speichere erneut. Alternativ den Konto-Modus zurück auf **„Benutzerkonto"** stellen.
+**Lösung:** Trage unter **Einstellungen → Plugins → GitHub → Authentifizierung** im Feld **„Personal Access Token des separaten Kontos"** einen gültigen Personal Access Token des Bot-Kontos ein (empfohlene Scopes `notifications` und `repo`) und speichere erneut. Alternativ den Überwachungsmodus zurück auf **„Benutzerkonto"** stellen.
 
 ## Im Modus „Separates Konto" erscheint kein Ereignis
 
@@ -56,7 +56,7 @@
 
 **Lösung:** Erwähne das separate Konto als Repository-Owner frei stehend als `@Kontoname` in einer Beschreibung oder einem Kommentar. Prüfe die **Integrationshinweise** in der SCM-Ereignisübersicht: Verworfene Benachrichtigungen zu nicht registrierten Repositories werden dort gezählt. Stelle außerdem sicher, dass das Bot-Konto als Collaborator mit Schreibrecht auf dem Repository eingeladen ist.
 
-> **Hinweis:** Im Modus „Separates Konto" werden ausschließlich Benachrichtigungen ausgewertet — weder die repository-weite Enumeration noch verknüpfte Referenzen vorhandener Aufgaben noch Backmerge-Entdeckungen laufen in diesem Modus.
+> **Hinweis:** Im Modus „Separates Konto" wertet die Ereignisüberwachung ausschließlich Benachrichtigungen aus — weder die repository-weite Enumeration noch verknüpfte Referenzen vorhandener Aufgaben laufen in diesem Modus. Die Backmerge-Prüfung ist davon unberührt: Sie läuft in einem eigenen Zyklus immer unter dem Benutzerkonto.
 
 ## Ein Pull-Request-Ereignis hat eine neue Aufgabe angelegt, obwohl dazu schon eine Aufgabe existiert
 
@@ -69,3 +69,14 @@
 **Ursache:** Die Eingabe könnte die CLI erreicht haben, bevor eine lokale Bestätigung gespeichert werden konnte.
 
 **Lösung:** Klicke zuerst **Status erneut prüfen**. Verwende **Neu senden…** nur, wenn ein weiterer Versuch gewünscht ist; dadurch kann die Anfrage doppelt verarbeitet werden.
+
+## Ein erkannter Backmerge-Pull-Request wird nicht gemergt
+
+**Ursache:** Der Provider meldet den Pull Request noch nicht als mergebar (z. B. laufende oder fehlende Statuschecks, fehlende Reviews, Konflikte), der Pull Request ist noch als Entwurf markiert, oder der reguläre Merge scheitert am Branch-Schutz. Auch eine deaktivierte Funktion, ein fehlender Basis-Branch oder fehlendes Schreibrecht des Tokens kommen in Frage.
+
+**Lösung:**
+1. Öffne die **Integrationshinweise** in der SCM-Ereignisübersicht — die Diagnose des Backmerge-Checkpoints nennt den Grund (z. B. „wartet auf Mergebarkeit", „Pull Request ist ein Entwurf" oder „Merge fehlgeschlagen").
+2. Bei einem Entwurfs-PR: Entweder den Entwurf in GitHub manuell aufheben oder die Option **„Draft-Pull-Requests vor dem Merge automatisch aktivieren"** unter **Einstellungen → Automatisierung → Prozessabläufe** einschalten — dann wird der Pull Request vor dem Merge automatisch als bereit für Review markiert.
+3. Bei einem am Branch-Schutz scheiternden Merge: Die Option **„Bei blockiertem Merge Admin-Merge erlauben"** unter **Einstellungen → Automatisierung → Prozessabläufe** einschalten — dann wird der gescheiterte reguläre Merge einmalig als Admin-Merge wiederholt (Voraussetzung: Token mit Admin-Recht).
+4. Prüfe, dass der Modus **„Backmerge-Pull-Requests"** nicht auf „Deaktiviert" steht, ein vom Hauptbranch abweichender Basis-Branch konfiguriert ist und — im Modus „Projektbezogen aktivierbar" — die Freigabe in der Projektdetailansicht eingeschaltet ist.
+5. Mit **Quellen erneut prüfen** in der SCM-Ereignisübersicht lässt sich der Prüfzyklus sofort erneut anstoßen; dabei wird auch der Fehler-Backoff zurückgesetzt.

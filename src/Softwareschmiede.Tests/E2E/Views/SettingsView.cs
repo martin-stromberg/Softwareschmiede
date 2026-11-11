@@ -272,21 +272,182 @@ public sealed class SettingsView : BaseWindowView
         return this;
     }
 
-    /// <summary>Liest das aktuell ausgewählte Label der "Konto-Modus"-ComboBox im "Allgemein"-Tab.</summary>
+    /// <summary>Wechselt in den "Automatisierung"-Tab und klappt den Expander
+    /// "Aufgaben ausführen" auf, damit seine Steuerelemente in der UIA-Struktur existieren.</summary>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView OpenAufgabenAusfuehren() => OpenExpander("AufgabenAusfuehrenExpander");
+
+    /// <summary>Wechselt in den "Automatisierung"-Tab und klappt den Expander
+    /// "Aufgaben beenden" auf, damit seine Steuerelemente in der UIA-Struktur existieren.</summary>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView OpenAufgabenBeenden() => OpenExpander("AufgabenBeendenExpander");
+
+    /// <summary>Wechselt in den "Automatisierung"-Tab und klappt den Expander
+    /// "Prozessabläufe" auf, damit seine Steuerelemente in der UIA-Struktur existieren.</summary>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView OpenProzessablaeufe() => OpenExpander("ProzessablaeufeExpander");
+
+    /// <summary>Klappt den Expander "Aufgaben ausführen" zu (no-op, wenn er bereits zu ist).</summary>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView CollapseAufgabenAusfuehren() => CollapseExpander("AufgabenAusfuehrenExpander");
+
+    /// <summary>Klappt den Expander "Aufgaben beenden" zu (no-op, wenn er bereits zu ist).</summary>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView CollapseAufgabenBeenden() => CollapseExpander("AufgabenBeendenExpander");
+
+    /// <summary>Klappt den Expander "Prozessabläufe" zu (no-op, wenn er bereits zu ist).</summary>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView CollapseProzessablaeufe() => CollapseExpander("ProzessablaeufeExpander");
+
+    /// <summary>Klappt den benannten Expander im "Automatisierung"-Tab auf (no-op, wenn er
+    /// bereits geöffnet ist) und wartet kurz auf den Aufbau des Inhalts.</summary>
+    /// <param name="automationName">Der <c>AutomationProperties.Name</c> des Expanders.</param>
+    /// <returns>Diese Instanz.</returns>
+    private SettingsView OpenExpander(string automationName)
+    {
+        SwitchTab("Automatisierung");
+        var expander = WaitForElement(Window, cf => cf.ByName(automationName), Short);
+        if (expander.Patterns.ExpandCollapse.IsSupported
+            && expander.Patterns.ExpandCollapse.Pattern.ExpandCollapseState.Value != ExpandCollapseState.Expanded)
+            expander.Patterns.ExpandCollapse.Pattern.Expand();
+        return this;
+    }
+
+    /// <summary>Klappt den benannten Expander im "Automatisierung"-Tab zu (no-op, wenn er
+    /// bereits geschlossen ist).</summary>
+    /// <param name="automationName">Der <c>AutomationProperties.Name</c> des Expanders.</param>
+    /// <returns>Diese Instanz.</returns>
+    private SettingsView CollapseExpander(string automationName)
+    {
+        SwitchTab("Automatisierung");
+        var expander = WaitForElement(Window, cf => cf.ByName(automationName), Short);
+        if (expander.Patterns.ExpandCollapse.IsSupported
+            && expander.Patterns.ExpandCollapse.Pattern.ExpandCollapseState.Value == ExpandCollapseState.Expanded)
+            expander.Patterns.ExpandCollapse.Pattern.Collapse();
+        return this;
+    }
+
+    /// <summary>Liest den Schaltzustand der Titelleiste "Aufgaben ausführen" — auch im
+    /// zugeklappten Zustand, da der Status-TextBlock im Expander-Header liegt.</summary>
+    /// <returns>Der Status-Text ("aktiviert"/"deaktiviert").</returns>
+    public string GetAufgabenAusfuehrenStatus() => GetExpanderStatus("AufgabenAusfuehrenStatus");
+
+    /// <summary>Liest den Schaltzustand der Titelleiste "Aufgaben beenden" — auch im
+    /// zugeklappten Zustand, da der Status-TextBlock im Expander-Header liegt.</summary>
+    /// <returns>Der Status-Text ("aktiviert"/"deaktiviert").</returns>
+    public string GetAufgabenBeendenStatus() => GetExpanderStatus("AufgabenBeendenStatus");
+
+    /// <summary>Liest den Schaltzustand der Titelleiste "Prozessabläufe" — auch im
+    /// zugeklappten Zustand, da der Status-TextBlock im Expander-Header liegt.</summary>
+    /// <returns>Der Status-Text ("aktiviert"/"deaktiviert").</returns>
+    public string GetProzessablaeufeStatus() => GetExpanderStatus("ProzessablaeufeStatus");
+
+    /// <summary>Liest den Status-Text des benannten Expander-Status-TextBlocks über den
+    /// HelpText (der UIA-Name trägt den Automatisierungsnamen, nicht den Anzeigetext).</summary>
+    /// <param name="automationName">Der <c>AutomationProperties.Name</c> des Status-TextBlocks.</param>
+    /// <returns>Der gebundene Status-Text.</returns>
+    private string GetExpanderStatus(string automationName)
+    {
+        SwitchTab("Automatisierung");
+        return WaitForElement(Window, cf => cf.ByName(automationName), Short).HelpText;
+    }
+
+    /// <summary>Prüft, ob ein Element innerhalb eines per <c>Visibility</c>-Binding gesteuerten
+    /// Bereichs aktuell im UIA-Baum enthalten ist. Ein per <c>Visibility=Collapsed</c>
+    /// ausgeblendeter Bereich entfernt seinen gesamten Teilbaum aus dem UIA-Baum; ein sichtbarer
+    /// Bereich ist dagegen auffindbar, auch wenn er unterhalb des Scroll-Viewports liegt.
+    /// <c>IsOffscreen</c> ist dafür kein geeignetes Kriterium: schlichte WPF-Container
+    /// implementieren kein <c>ScrollItemPattern</c> und können nicht programmatisch in den
+    /// sichtbaren Bereich gerollt werden. Der Bereichs-Container selbst (StackPanel) kann nicht
+    /// als Prüfelement dienen — WPF-Panels besitzen keinen AutomationPeer und erscheinen nie im
+    /// UIA-Baum; gesucht wird daher ein benanntes Steuerelement innerhalb des Bereichs.
+    /// Gepollt wird auf einen stabilen Zustand, da UIA-Baum und Binding-Auswertung kurz nach
+    /// einem Umschalten auseinanderlaufen können (zwei aufeinanderfolgende gleiche Abfragen
+    /// gelten als stabil).</summary>
+    /// <param name="automationName">Der <c>AutomationProperties.Name</c> eines Elements innerhalb des Bereichs.</param>
+    /// <returns><c>true</c>, wenn das Element (und damit der Bereich) sichtbar ist.</returns>
+    private bool IsBereichSichtbar(string automationName)
+    {
+        var vorhanden = Window.FindFirstDescendant(cf => cf.ByName(automationName)) is not null;
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        while (DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(100);
+            var aktuell = Window.FindFirstDescendant(cf => cf.ByName(automationName)) is not null;
+            if (aktuell == vorhanden)
+                return aktuell;
+            vorhanden = aktuell;
+        }
+        return vorhanden;
+    }
+
+    /// <summary>Liest, ob die Checkbox "Aufgaben automatisch starten" gesetzt ist.</summary>
+    /// <returns><c>true</c>, wenn die Ereignisüberwachung aktiviert ist.</returns>
+    public bool IsScmMonitoringEnabledChecked()
+    {
+        OpenAufgabenAusfuehren();
+        return WaitForElement(Window, cf => cf.ByName("IsScmMonitoringEnabled"), Short).AsCheckBox().IsChecked ?? false;
+    }
+
+    /// <summary>Setzt die Checkbox "Aufgaben automatisch starten".</summary>
+    /// <param name="enabled">Der gewünschte Zustand.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetScmMonitoringEnabledChecked(bool enabled)
+    {
+        OpenAufgabenAusfuehren();
+        WaitForElement(Window, cf => cf.ByName("IsScmMonitoringEnabled"), Short).AsCheckBox().IsChecked = enabled;
+        return this;
+    }
+
+    /// <summary>Liest, ob die "Ueberwachungsmodus"-ComboBox bedienbar ist (nur bei aktivierter
+    /// Ereignisüberwachung).</summary>
+    /// <returns><c>true</c>, wenn die ComboBox aktiviert ist.</returns>
+    public bool IsUeberwachungsmodusEnabled()
+    {
+        OpenAufgabenAusfuehren();
+        return WaitForElement(Window, cf => cf.ByName("Ueberwachungsmodus").And(cf.ByControlType(ControlType.ComboBox)), Short).IsEnabled;
+    }
+
+    /// <summary>Prüft, ob der Trigger-Keyword-Bereich sichtbar ist (nur bei aktivierter
+    /// Ereignisüberwachung im Benutzerkonto-Modus). Geprüft wird über das enthaltene
+    /// "ScmTriggerKeyword"-Textfeld, da der Bereichs-StackPanel kein UIA-Element besitzt.</summary>
+    /// <returns><c>true</c>, wenn der Bereich sichtbar ist.</returns>
+    public bool IsTriggerKeywordBereichVisible()
+    {
+        OpenAufgabenAusfuehren();
+        return IsBereichSichtbar("ScmTriggerKeyword");
+    }
+
+    /// <summary>Prüft, ob der Prompt-Anhänge-Bereich sichtbar ist (nur bei aktivierter
+    /// Ereignisüberwachung). Geprüft wird über das enthaltene "ScmPromptAppendixGeneral"-Textfeld,
+    /// da der Bereichs-StackPanel kein UIA-Element besitzt.</summary>
+    /// <returns><c>true</c>, wenn der Bereich sichtbar ist.</returns>
+    public bool IsPromptAnhaengeBereichVisible()
+    {
+        OpenAufgabenAusfuehren();
+        return IsBereichSichtbar("ScmPromptAppendixGeneral");
+    }
+
+    /// <summary>Liest das aktuell ausgewählte Label der "Ueberwachungsmodus"-ComboBox
+    /// im "Automatisierung"-Tab (Expander "Aufgaben ausführen").</summary>
     /// <returns>Das Anzeige-Label des gewählten SCM-Konto-Modus (siehe <c>ScmKontoModusTexte</c>).</returns>
     public string GetKontoModus()
-        => WaitForElement(Window, cf => cf.ByName("Konto-Modus").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+    {
+        OpenAufgabenAusfuehren();
+        return WaitForElement(Window, cf => cf.ByName("Ueberwachungsmodus").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+    }
 
-    /// <summary>Wählt einen Eintrag der "Konto-Modus"-ComboBox und wartet, bis er übernommen wurde.</summary>
+    /// <summary>Wählt einen Eintrag der "Ueberwachungsmodus"-ComboBox und wartet, bis er übernommen wurde.</summary>
     /// <param name="label">Das Anzeige-Label (aus <c>ScmKontoModusTexte</c>: "Benutzerkonto" oder "Separates Konto").</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetKontoModus(string label)
     {
+        OpenAufgabenAusfuehren();
         // Die ComboBox liegt weit unten im ScrollViewer: ExpandCollapse öffnet sie auch ohne
         // sichtbaren Klickpunkt (das UIA-Element einer WPF-ComboBox ist selbst nicht
         // tastaturfokussierbar). Die Einträge liegen im Popup-Teilbaum der ComboBox; die
         // Auswahl erfolgt patternbasiert, da auch Items keinen eigenen Klickpunkt brauchen.
-        var box = WaitForElement(Window, cf => cf.ByName("Konto-Modus").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox();
+        var box = WaitForElement(Window, cf => cf.ByName("Ueberwachungsmodus").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox();
         box.Expand();
         AutomationElement? item = null;
         var deadline = DateTime.UtcNow + Short;
@@ -305,7 +466,7 @@ public sealed class SettingsView : BaseWindowView
     }
 
     /// <summary>
-    /// Wartet, bis die "Konto-Modus"-ComboBox das erwartete Label anzeigt. Dient als echtes
+    /// Wartet, bis die "Ueberwachungsmodus"-ComboBox das erwartete Label anzeigt. Dient als echtes
     /// Synchronisationssignal für das Neuladen der persistierten Einstellungen.
     /// </summary>
     /// <param name="label">Das erwartete Anzeige-Label.</param>
@@ -314,9 +475,142 @@ public sealed class SettingsView : BaseWindowView
     /// <exception cref="TimeoutException">Das Label wurde nicht rechtzeitig angezeigt.</exception>
     public SettingsView WaitForKontoModus(string label, TimeSpan timeout)
     {
+        OpenAufgabenAusfuehren();
         ElementWaitHelper.WaitForSelectedComboBoxItem(
-            WaitForElement(Window, cf => cf.ByName("Konto-Modus").And(cf.ByControlType(ControlType.ComboBox)), timeout), label, timeout);
+            WaitForElement(Window, cf => cf.ByName("Ueberwachungsmodus").And(cf.ByControlType(ControlType.ComboBox)), timeout), label, timeout);
         return this;
+    }
+
+    /// <summary>Liest, ob die Checkbox "Aufgaben automatisch beenden" gesetzt ist.</summary>
+    /// <returns><c>true</c>, wenn die Abschlussüberwachung aktiviert ist.</returns>
+    public bool IsScmTaskCompletionEnabledChecked()
+    {
+        OpenAufgabenBeenden();
+        return WaitForElement(Window, cf => cf.ByName("IsScmTaskCompletionEnabled"), Short).AsCheckBox().IsChecked ?? false;
+    }
+
+    /// <summary>Setzt die Checkbox "Aufgaben automatisch beenden".</summary>
+    /// <param name="enabled">Der gewünschte Zustand.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetScmTaskCompletionEnabledChecked(bool enabled)
+    {
+        OpenAufgabenBeenden();
+        WaitForElement(Window, cf => cf.ByName("IsScmTaskCompletionEnabled"), Short).AsCheckBox().IsChecked = enabled;
+        return this;
+    }
+
+    /// <summary>Liest, ob die "Pruefmodus"-ComboBox bedienbar ist (nur bei aktivierter
+    /// Abschlussüberwachung).</summary>
+    /// <returns><c>true</c>, wenn die ComboBox aktiviert ist.</returns>
+    public bool IsPruefmodusEnabled()
+    {
+        OpenAufgabenBeenden();
+        return WaitForElement(Window, cf => cf.ByName("Pruefmodus").And(cf.ByControlType(ControlType.ComboBox)), Short).IsEnabled;
+    }
+
+    /// <summary>Liest, ob das Wartezeit-Feld "ScmTaskCompletionWaitMinutes" bedienbar ist
+    /// (nur bei aktivierter Abschlussüberwachung).</summary>
+    /// <returns><c>true</c>, wenn das Feld aktiviert ist.</returns>
+    public bool IsScmTaskCompletionWaitEnabled()
+    {
+        OpenAufgabenBeenden();
+        return WaitForElement(Window, cf => cf.ByName("ScmTaskCompletionWaitMinutes"), Short).IsEnabled;
+    }
+
+    /// <summary>Wählt einen Eintrag der "Pruefmodus"-ComboBox (Expander "Aufgaben beenden")
+    /// und wartet, bis er übernommen wurde.</summary>
+    /// <param name="label">Das Anzeige-Label (aus <c>ScmTaskCompletionPruefmodusTexte</c>).</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetPruefmodus(string label)
+    {
+        OpenAufgabenBeenden();
+        var box = WaitForElement(Window, cf => cf.ByName("Pruefmodus").And(cf.ByControlType(ControlType.ComboBox)), Short);
+        SelectComboBoxItemByClick(box, label, Short);
+        ElementWaitHelper.WaitForSelectedComboBoxItem(box, label, Short);
+        return this;
+    }
+
+    /// <summary>Liest das aktuell ausgewählte Label der "Pruefmodus"-ComboBox.</summary>
+    /// <returns>Das Anzeige-Label des gewählten Prüfmodus (siehe <c>ScmTaskCompletionPruefmodusTexte</c>).</returns>
+    public string GetPruefmodus()
+    {
+        OpenAufgabenBeenden();
+        return WaitForElement(Window, cf => cf.ByName("Pruefmodus").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+    }
+
+    /// <summary>Wählt einen Eintrag der "Backmerge-Modus"-ComboBox (Expander "Prozessabläufe")
+    /// und wartet, bis er übernommen wurde.</summary>
+    /// <param name="label">Das Anzeige-Label (aus <c>ScmBackmergeModusTexte</c>).</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetBackmergeModus(string label)
+    {
+        OpenProzessablaeufe();
+        var box = WaitForElement(Window, cf => cf.ByName("Backmerge-Modus").And(cf.ByControlType(ControlType.ComboBox)), Short);
+        SelectComboBoxItemByClick(box, label, Short);
+        ElementWaitHelper.WaitForSelectedComboBoxItem(box, label, Short);
+        return this;
+    }
+
+    /// <summary>Liest das aktuell ausgewählte Label der "Backmerge-Modus"-ComboBox.</summary>
+    /// <returns>Das Anzeige-Label des gewählten Backmerge-Modus (siehe <c>ScmBackmergeModusTexte</c>).</returns>
+    public string GetBackmergeModus()
+    {
+        OpenProzessablaeufe();
+        return WaitForElement(Window, cf => cf.ByName("Backmerge-Modus").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+    }
+
+    /// <summary>Setzt die Checkbox "Draft-Pull-Requests vor dem Merge automatisch aktivieren".</summary>
+    /// <param name="enabled">Der gewünschte Zustand.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetBackmergeDraftAktivierungChecked(bool enabled)
+    {
+        OpenProzessablaeufe();
+        WaitForElement(Window, cf => cf.ByName("IsScmBackmergeDraftAktivierung"), Short).AsCheckBox().IsChecked = enabled;
+        return this;
+    }
+
+    /// <summary>Setzt die Checkbox "Bei blockiertem Merge Admin-Merge erlauben".</summary>
+    /// <param name="enabled">Der gewünschte Zustand.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetBackmergeAdminMergeChecked(bool enabled)
+    {
+        OpenProzessablaeufe();
+        WaitForElement(Window, cf => cf.ByName("IsScmBackmergeAdminMerge"), Short).AsCheckBox().IsChecked = enabled;
+        return this;
+    }
+
+    /// <summary>Liest, ob die Checkbox "Draft-Pull-Requests vor dem Merge automatisch aktivieren" gesetzt ist.</summary>
+    /// <returns><c>true</c>, wenn die Draft-Aktivierung gesetzt ist.</returns>
+    public bool IsBackmergeDraftAktivierungChecked()
+    {
+        OpenProzessablaeufe();
+        return WaitForElement(Window, cf => cf.ByName("IsScmBackmergeDraftAktivierung"), Short).AsCheckBox().IsChecked ?? false;
+    }
+
+    /// <summary>Liest, ob die Checkbox "Bei blockiertem Merge Admin-Merge erlauben" gesetzt ist.</summary>
+    /// <returns><c>true</c>, wenn der Admin-Merge gesetzt ist.</returns>
+    public bool IsBackmergeAdminMergeChecked()
+    {
+        OpenProzessablaeufe();
+        return WaitForElement(Window, cf => cf.ByName("IsScmBackmergeAdminMerge"), Short).AsCheckBox().IsChecked ?? false;
+    }
+
+    /// <summary>Liest, ob die Checkbox "Draft-Pull-Requests vor dem Merge automatisch aktivieren"
+    /// bedienbar ist (nur bei Backmerge-Modus ≠ „Deaktiviert").</summary>
+    /// <returns><c>true</c>, wenn die Checkbox aktiviert ist.</returns>
+    public bool IsBackmergeDraftAktivierungEnabled()
+    {
+        OpenProzessablaeufe();
+        return WaitForElement(Window, cf => cf.ByName("IsScmBackmergeDraftAktivierung"), Short).IsEnabled;
+    }
+
+    /// <summary>Liest, ob die Checkbox "Bei blockiertem Merge Admin-Merge erlauben" bedienbar
+    /// ist (nur bei Backmerge-Modus ≠ „Deaktiviert").</summary>
+    /// <returns><c>true</c>, wenn die Checkbox aktiviert ist.</returns>
+    public bool IsBackmergeAdminMergeEnabled()
+    {
+        OpenProzessablaeufe();
+        return WaitForElement(Window, cf => cf.ByName("IsScmBackmergeAdminMerge"), Short).IsEnabled;
     }
 
     /// <summary>

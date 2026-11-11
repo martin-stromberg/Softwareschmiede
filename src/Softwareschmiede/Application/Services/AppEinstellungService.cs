@@ -87,6 +87,15 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für den Backmerge-Aktivierungsmodus (<see cref="ScmBackmergeModus"/>-Wert als Zahl gespeichert).</summary>
     public const string ScmBackmergeModeKey = "scm.backmerge.mode";
 
+    /// <summary>Schlüssel für den Prüfmodus der SCM-Abschlussüberwachung (<see cref="ScmTaskCompletionPruefmodus"/>-Wert als Zahl gespeichert).</summary>
+    public const string ScmTaskCompletionPruefmodusKey = "scm.taskcompletion.scope";
+
+    /// <summary>Schlüssel für die automatische Aktivierung von Draft-Backmerge-PRs.</summary>
+    public const string ScmBackmergeDraftAktivierungKey = "scm.backmerge.draft_activation";
+
+    /// <summary>Schlüssel für die Admin-Merge-Fallback-Option des Backmerge-Dienstes.</summary>
+    public const string ScmBackmergeAdminMergeKey = "scm.backmerge.admin_merge";
+
     /// <summary>Schlüssel für den Kontomodus der SCM-Ereignisüberwachung (<see cref="ScmKontoModus"/>-Wert als Zahl gespeichert).</summary>
     public const string ScmKontoModusKey = "scm.monitoring.accountmode";
 
@@ -249,6 +258,37 @@ public sealed class AppEinstellungService
         => SetBoolSettingAsync(BackmergeProjektKey(projektId), aktiv, ct);
 
     /// <summary>
+    /// Ermittelt, ob Draft-Backmerge-Pull-Requests vor dem Merge automatisch aktiviert werden
+    /// (<see cref="ScmBackmergeDraftAktivierungKey"/>). Standard: <see langword="false"/>.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn Draft-Backmerge-PRs automatisch aktiviert werden.</returns>
+    public async Task<bool> GetScmBackmergeDraftAktivierungAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(ScmBackmergeDraftAktivierungKey, ct) ?? false;
+
+    /// <summary>Setzt die automatische Aktivierung von Draft-Backmerge-Pull-Requests (<see cref="ScmBackmergeDraftAktivierungKey"/>).</summary>
+    /// <param name="aktiv">Der zu speichernde Schalter.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public Task SetScmBackmergeDraftAktivierungAsync(bool aktiv, CancellationToken ct = default)
+        => SetBoolSettingAsync(ScmBackmergeDraftAktivierungKey, aktiv, ct);
+
+    /// <summary>
+    /// Ermittelt, ob der Backmerge-Dienst nach einem blockierten regulären Merge einen
+    /// Admin-Merge-Fallback (Umgehung des Branch-Schutzes) ausführen darf
+    /// (<see cref="ScmBackmergeAdminMergeKey"/>). Standard: <see langword="false"/>.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn der Admin-Merge-Fallback erlaubt ist.</returns>
+    public async Task<bool> GetScmBackmergeAdminMergeAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(ScmBackmergeAdminMergeKey, ct) ?? false;
+
+    /// <summary>Setzt die Admin-Merge-Fallback-Option des Backmerge-Dienstes (<see cref="ScmBackmergeAdminMergeKey"/>).</summary>
+    /// <param name="aktiv">Der zu speichernde Schalter.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public Task SetScmBackmergeAdminMergeAsync(bool aktiv, CancellationToken ct = default)
+        => SetBoolSettingAsync(ScmBackmergeAdminMergeKey, aktiv, ct);
+
+    /// <summary>
     /// Ermittelt, ob die SCM-Abschlussüberwachung ereignisgesteuerter Aufgaben aktiv ist. Der über
     /// <see cref="SetBoolSettingAsync"/> unter <see cref="ScmTaskCompletionEnabledKey"/> persistierte
     /// Laufzeit-Schalter (GUI-Einstellung) gilt ohne Neustart; ohne gespeicherten Eintrag ist die
@@ -271,6 +311,33 @@ public sealed class AppEinstellungService
     {
         var wert = await GetIntSettingAsync(ScmTaskCompletionWaitMinutesKey, ct);
         return wert is null ? ScmTaskCompletionDefaultWaitMinutes : Math.Clamp(wert.Value, 0, 43200);
+    }
+
+    /// <summary>
+    /// Liest den Prüfmodus der SCM-Abschlussüberwachung unter <see cref="ScmTaskCompletionPruefmodusKey"/>.
+    /// Fehlende oder ungültige gespeicherte Werte fallen auf
+    /// <see cref="ScmTaskCompletionPruefmodus.Ereignisgesteuert"/> zurück.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Der effektive Prüfmodus.</returns>
+    public async Task<ScmTaskCompletionPruefmodus> GetScmTaskCompletionPruefmodusAsync(CancellationToken ct = default)
+    {
+        var wert = await GetSettingAsync(ScmTaskCompletionPruefmodusKey, ct);
+        return int.TryParse(wert, out var modus) && Enum.IsDefined((ScmTaskCompletionPruefmodus)modus)
+            ? (ScmTaskCompletionPruefmodus)modus
+            : ScmTaskCompletionPruefmodus.Ereignisgesteuert;
+    }
+
+    /// <summary>Speichert den Prüfmodus der SCM-Abschlussüberwachung unter <see cref="ScmTaskCompletionPruefmodusKey"/>.</summary>
+    /// <param name="modus">Der zu speichernde Modus.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="modus"/> ist kein definierter <see cref="ScmTaskCompletionPruefmodus"/>-Wert.</exception>
+    public Task SetScmTaskCompletionPruefmodusAsync(ScmTaskCompletionPruefmodus modus, CancellationToken ct = default)
+    {
+        if (!Enum.IsDefined(modus))
+            throw new ArgumentOutOfRangeException(nameof(modus), modus, "Unbekannter Prüfmodus der SCM-Abschlussüberwachung.");
+
+        return SetIntSettingAsync(ScmTaskCompletionPruefmodusKey, (int)modus, ct);
     }
 
     /// <summary>

@@ -10,7 +10,7 @@ Enthält den dauerhaft angenommenen Ereignistext und Ursprung, Aufgabe, Status, 
 
 ### `ScmObservationCheckpoint`
 
-Speichert Wasserstand, Fehlerzahl, nächste Prüfzeit und Diagnose je Quelle. `SourceKey` kennt vier Namensräume: `repository/{provider}/{alias}` (Auflösung lokaler Repository-Adressen), `enumeration/{provider}/{host}/{repoId}` (repository-weite Referenzermittlung), `notifications/{provider}/{host}` (Notifications-Inbox des separaten Kontos; nur im Konto-Modus `SeparatesKonto`, trägt die `Inbox:`-Verwerfungsdiagnose für nicht registrierte Repositories) und `{provider}/{host}/{repoId}/{kind}/{number}/{contentKind}` (einzelne Textquellen).
+Speichert Wasserstand, Fehlerzahl, nächste Prüfzeit und Diagnose je Quelle. `SourceKey` kennt folgende Namensräume: `repository/{provider}/{alias}` (Auflösung lokaler Repository-Adressen), `enumeration/{provider}/{host}/{repoId}` (repository-weite Referenzermittlung der Ereignisüberwachung), `notifications/{provider}/{host}` (Notifications-Inbox des separaten Kontos; nur im Überwachungsmodus `SeparatesKonto`, trägt die `Inbox:`-Verwerfungsdiagnose für nicht registrierte Repositories), `{provider}/{host}/{repoId}/{kind}/{number}/{contentKind}` (einzelne Textquellen) sowie die Backmerge-Namensräume `backmerge-repository/{prefix}/{alias}` und `backmerge-enumeration/{provider}/{host}/{repoId}` des eigenständigen Backmerge-Prüfzyklus (`ScmBackmergeMonitoringService`) und `backmerge/{provider}/{host}/{repoId}/{nummer}` (Bewertungsstand je Pull-Request-Kandidat, `ScmBackmergeService`).
 
 ### `ScmContentSnapshot`
 

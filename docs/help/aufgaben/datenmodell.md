@@ -29,6 +29,8 @@
 | `VorschlagPrompt` | `string?` | Gespeicherter Rate-Limit-Prompt-Vorschlag |
 | `VorschlagAusfuehrenAbUtc` | `DateTimeOffset?` | Geplanter Ausführungszeitpunkt des Vorschlags |
 | `AlertReferenz` | `AlertReferenz?` | Optionale Herkunftsreferenz, wenn die Aufgabe aus einem SCM-Alert erstellt wurde |
+| `ScmAbschlussErkanntUtc` | `DateTimeOffset?` | UTC-Zeitpunkt, ab dem die Abschlussüberwachung die verknüpfte SCM-Referenz (Pull Request oder Issue) erstmals als geschlossen/gemergt beobachtet hat; persistierter Startpunkt der einstellbaren Abschluss-Wartezeit (neustartsicher), `null` solange die Referenz offen ist oder noch nicht geprüft wurde |
+| `ScmAbschlussReferenz` | `string?` | Anzeigetext der für den Abschluss beobachteten SCM-Referenz (z. B. „Pull Request #7" oder „Issue #3") — Diagnose-/Protokollwert zu `ScmAbschlussErkanntUtc` |
 | `PullRequests` | `ICollection<PullRequestReferenz>` | Persistierte Pull Requests, die aus der Aufgabe heraus erstellt wurden |
 
 `PausiertBisUtc` modelliert die Pause als zeitbasiertes Overlay — es gibt **kein** eigenes `AufgabeStatus.Pausiert`. Eine Aufgabe gilt genau dann als pausiert, wenn `PausiertBisUtc > UtcNow` gilt; abgelaufene Werte verbleiben wirkungslos in der Datenbank. Die Spalte wird als nullable Unix-Millisekunden-Wert (`long?`) über `NullableUnixMillisConverter` persistiert (Migration `20260916094502_AddAufgabePausiertBisUtc`).
