@@ -19,6 +19,7 @@ concurrency:
 jobs:
   create-review-issue:
     permissions:
+      contents: read
       issues: write
     uses: ./.github/workflows/create-review-issue.yml
     with:

@@ -53,6 +53,9 @@ jobs:
       REVIEW_BODY: ${{ inputs.body }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Check REVIEW_ISSUE_TOKEN secret
         env:
           REVIEW_ISSUE_TOKEN: ${{ secrets.REVIEW_ISSUE_TOKEN }}
