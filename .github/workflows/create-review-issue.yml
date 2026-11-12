@@ -1,0 +1,107 @@
+name: Create Review Issue (reusable)
+
+# Shared logic for the scheduled review workflows
+# (review-architecture-security.yml, review-nuget-packages.yml,
+# review-compliance.yml), which call this file via workflow_call with their
+# label, title, period and issue body. The free-standing @softwarewerkstatt
+# mention in the issue body notifies the bot account, whose notification inbox
+# is monitored by the application's SCM event monitoring (SeparatesKonto mode,
+# reason = mention). The issue must be authored by the repository owner, so
+# `gh issue create` runs under the REVIEW_ISSUE_TOKEN repository secret
+# (fine-grained PAT of the owner). A GITHUB_TOKEN issue would be authored by
+# github-actions[bot] and rejected by the owner validation - there is
+# intentionally no fallback. One-time secret setup is documented in
+# docs/CI_CD.md.
+
+"on":
+  workflow_call:
+    inputs:
+      label:
+        description: Type label used for duplicate detection (convention automated-*)
+        type: string
+        required: true
+      label-description:
+        description: Description used when the label is created via gh label create
+        type: string
+        required: true
+      title:
+        description: Issue title prefix; the period suffix is appended after an en dash
+        type: string
+        required: true
+      period:
+        description: Title suffix format - month (yyyy-MM), isoweek (yyyy-KWnn) or year (yyyy)
+        type: string
+        required: true
+      body:
+        description: Multi-line issue body; first line must be a free-standing @softwarewerkstatt
+        type: string
+        required: true
+    secrets:
+      REVIEW_ISSUE_TOKEN:
+        required: true
+
+jobs:
+  create-review-issue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      REVIEW_LABEL: ${{ inputs.label }}
+      REVIEW_LABEL_DESCRIPTION: ${{ inputs.label-description }}
+      REVIEW_TITLE_PREFIX: ${{ inputs.title }}
+      REVIEW_PERIOD: ${{ inputs.period }}
+      REVIEW_BODY: ${{ inputs.body }}
+
+    steps:
+      - name: Check REVIEW_ISSUE_TOKEN secret
+        env:
+          REVIEW_ISSUE_TOKEN: ${{ secrets.REVIEW_ISSUE_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:REVIEW_ISSUE_TOKEN)) {
+            Write-Error "Repository secret REVIEW_ISSUE_TOKEN is not set. Add a fine-grained PAT of the repository owner (repository access: this repository only, permission: Issues read and write) as an Actions secret named REVIEW_ISSUE_TOKEN - see docs/CI_CD.md. There is no fallback to GITHUB_TOKEN, because an issue authored by github-actions[bot] would be rejected by the SCM event validation."
+            exit 1
+          }
+        shell: pwsh
+
+      - name: Ensure review label exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh label create $env:REVIEW_LABEL --color "5319E7" --description $env:REVIEW_LABEL_DESCRIPTION --force
+        shell: pwsh
+
+      - name: Create review issue if none is open
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_ISSUE_TOKEN: ${{ secrets.REVIEW_ISSUE_TOKEN }}
+        run: |
+          switch ($env:REVIEW_PERIOD) {
+            'month' {
+              $suffix = (Get-Date).ToUniversalTime().ToString('yyyy-MM')
+            }
+            'isoweek' {
+              $now = (Get-Date).ToUniversalTime()
+              $isoYear = [System.Globalization.ISOWeek]::GetYear($now)
+              $isoWeek = [System.Globalization.ISOWeek]::GetWeekOfYear($now)
+              $suffix = "$isoYear-KW$($isoWeek.ToString('00'))"
+            }
+            'year' {
+              $suffix = (Get-Date).ToUniversalTime().ToString('yyyy')
+            }
+            default {
+              Write-Error "Unknown period '$env:REVIEW_PERIOD' (expected: month, isoweek, year)."
+              exit 1
+            }
+          }
+          $title = "$env:REVIEW_TITLE_PREFIX – $suffix"
+          $existingJson = gh issue list --state open --label $env:REVIEW_LABEL --json number
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $existing = $existingJson | ConvertFrom-Json
+          if ($existing.Count -eq 0) {
+            $env:GH_TOKEN = $env:REVIEW_ISSUE_TOKEN
+            $issueUrl = gh issue create --title $title --body $env:REVIEW_BODY --label $env:REVIEW_LABEL
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Write-Host "Created review issue: $issueUrl"
+          } else {
+            Write-Host "Skipped: an open review issue already exists (#$($existing[0].number))."
+          }
+        shell: pwsh

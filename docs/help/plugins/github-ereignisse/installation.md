@@ -27,6 +27,15 @@ Alternativ kann die Überwachung unter **Einstellungen → Automatisierung → A
 3. Wähle unter **Automatisierung → Aufgaben ausführen** den **Überwachungsmodus „Separates Konto“** und speichere. Ohne eingetragenes Token des separaten Kontos bricht das Speichern mit einer Fehlermeldung ab.
 4. Eine Aufgabe wird ausgelöst, wenn der Repository-Owner das separate Konto frei stehend als `@bot-name` in einer Beschreibung oder einem Kommentar erwähnt.
 
+### Automatisierte Review-Issues aus dem Repository
+
+Das Repository kann zeitgesteuerte Abläufe enthalten, die regelmäßig Prüfauftrags-Issues mit frei stehender Erwähnung des separaten Kontos anlegen (wiederkehrende Architektur-/Sicherheits-, NuGet- und Compliance-Reviews). Damit diese Issues Ereignisse auslösen, gelten betriebsseitig zusätzliche Voraussetzungen:
+
+- Das separate Konto muss — wie oben beschrieben — Collaborator mit Schreibrecht auf dem Repository sein; sonst stellt GitHub die Erwähnungs-Benachrichtigung gar nicht zu.
+- Im Repository muss ein Secret mit einem Zugriffstoken des Repository-Owners hinterlegt sein, damit die erzeugten Issues unter dessen Identität entstehen — die Owner-Prüfung der Ereignisüberwachung würde ein Issue eines Automatisierungs-Bot-Kontos sonst verwerfen.
+
+Einrichtung, Gültigkeitsdauer und Erneuerung dieses Secrets sowie das Troubleshooting der Review-Workflows sind in `docs/CI_CD.md` (Abschnitt „Geplante Review-Workflows") beschrieben.
+
 ## Hinweise
 
 - Die Ereignisüberwachung beginnt automatisch im Hintergrund; das Abfrageintervall beträgt standardmäßig 60 Sekunden.
