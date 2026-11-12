@@ -46,6 +46,7 @@ jobs:
     timeout-minutes: 10
 
     env:
+      GH_REPO: ${{ github.repository }}
       REVIEW_LABEL: ${{ inputs.label }}
       REVIEW_LABEL_DESCRIPTION: ${{ inputs.label-description }}
       REVIEW_TITLE_PREFIX: ${{ inputs.title }}
