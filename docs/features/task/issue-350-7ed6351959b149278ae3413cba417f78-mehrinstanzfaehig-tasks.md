@@ -1,0 +1,28 @@
+# Tasks: Mehrinstanzfähigkeit der SCM-Ereignisüberwachung (GitHub Issue #350)
+
+| # | Bereich | Aufgabe | Status | Testnachweis |
+|---|---------|---------|--------|--------------|
+| 1 | Datenmodell | `ScmEventObservation` um optionalen Positionsparameter `ViewerReactions` (`IReadOnlyList<string>? = null`) und berechnete Eigenschaft `ViewerHasReacted` erweitern (`src/Softwareschmiede.Plugin.Contracts/Domain/ValueObjects/ScmEvents.cs`) | Offen | — |
+| 2 | Plugin | `GitHubPlugin.TextFields` um `reactionGroups { content viewerHasReacted }` erweitern (`plugins/Softwareschmiede.Plugin.GitHub/GitHubPlugin.Events.cs`) | Offen | — |
+| 3 | Plugin | `GitHubPlugin.AddObservation`: `reactionGroups` als Pflicht-Array auswerten (`Permanent` bei Fehlen), `content` der Gruppen mit `viewerHasReacted == true` in `ViewerReactions` übernehmen | Offen | — |
+| 4 | Validierung | `ScmEventValidationService`: Konstante `BereitsBeantwortetRejection = "Bereits mit dem Konto reagiert"` anlegen | Offen | — |
+| 5 | Validierung | `GetRejection`: neue Regel nach der Trigger-Prüfung — `ContentKind is IssueComment or ReviewComment or PullRequestReview` und nicht-leere `ViewerReactions` → `BereitsBeantwortetRejection` | Offen | — |
+| 6 | Orchestrierung | `ScmEventOrchestrator.DispatchCoreAsync`: expliziter `BereitsBeantwortetRejection`-Zweig in der Revalidierung → `WaitAsync` mit dedizierter Meldung (kein Eintrag in die Toleranzliste) | Offen | — |
+| 7 | Tests | `GitHubEventSourceTests.Node(...)` um `reactionGroups` erweitern (immer emittieren, optionaler Reaktionsparameter) | Offen | — |
+| 8 | Tests | `ScmEventValidationServiceTests`-Helfer `Observe`/`ObserveSeparate` um optionalen `viewerReactions`-Parameter erweitern | Offen | — |
+| 9 | Tests | Neuer Test `ViewerReaction_RejectsCommentKinds`: Kommentar-Arten mit Kontoreaktion → `BereitsBeantwortetRejection` | Offen | — |
+| 10 | Tests | Neuer Test `SeparatesKonto_ViewerReaction_Rejects`: Mention-Kommentar mit Bot-Reaktion → `BereitsBeantwortetRejection` | Offen | — |
+| 11 | Tests | Neuer Test `ViewerReaction_CheckRunsAfterTrigger`: Reaktion ohne Trigger → weiterhin `"Kein Trigger"`/`KeineErwaehnungRejection` | Offen | — |
+| 12 | Tests | Neuer Test `ViewerReaction_DescriptionNotRejected`: `Description` mit Reaktionen bleibt vom neuen Ablehnungsgrund ausgenommen | Offen | — |
+| 13 | Tests | Neue Tests `ViewerReactions_MapFromReactionGroups` / `ViewerReactions_FalseOrEmpty_Ignored` / `MissingReactionGroups_ThrowsPermanent` / `ReactionGroups_RequestedInQuery` in `GitHubEventSourceTests` | Offen | — |
+| 14 | Tests | Neuer Test `ObservationJson_WithoutViewerReactions_Deserializes` in `ScmEventPersistenceTests` (Altbestand-Kompatibilität) | Offen | — |
+| 15 | Tests | Neuer Integrationstest `Monitor_ReactedComment_StoresDiagnosticWithoutInbox` (+ Wiederholpoll bleibt still) in `ScmEventMonitoringServiceTests_RepoWide` | Offen | — |
+| 16 | Tests | Neuer Integrationstest `Monitor_ReactedCommentOnUnassignedReference_CreatesNoTask` in `ScmEventMonitoringServiceTests_TaskAssignment`/`_RepoWide` | Offen | — |
+| 17 | Tests | Neuer Test `Dispatch_ReactedStoredObservation_Waits` in `ScmEventOrchestratorTests` (direkter `ScmIncomingEvent`-Insert mit `ViewerReactions` → `Wartend`, kein Prompt) | Offen | — |
+| 18 | E2E-Tests | `ScmE2EText.ViewerReactions` (`List<string>`, Default `[]`) in `ScmE2ETestConfiguration.cs` anlegen | Offen | — |
+| 19 | E2E-Tests | `ScmE2EApiClient.Node()`: `reactionGroups` aus `ScmE2EText.ViewerReactions` emittieren (sonst leeres Array) | Offen | — |
+| 20 | E2E-Tests | `ScmE2EFixture.AddText` um optionalen `viewerReactions`-Parameter erweitern | Offen | — |
+| 21 | E2E-Tests | Neue Phase in `ScmEvents_QueueReceptionDispatchAndReplies_UseRealPipeline` (vor `BotModeAsync`): reagierter Kommentar auf zugeordneter Referenz → kein Event + Snapshot-Diagnose; reagierter Kommentar auf unzugeordneter Referenz → keine Aufgabe; Positivkontrolle ohne Reaktion → Event | Offen | — |
+| 22 | E2E-Tests | Ergänzung in `BotModeAsync`: reagierter Mention-Kommentar + Notification → kein Inbox-Ereignis, Snapshot-Diagnose | Offen | — |
+| 23 | Dokumentation | `Docs/help/plugins/github-ereignisse/` (`business-rules.md`, `ablauf-technisch.md`): instanzübergreifende Duplikaterkennung, Rest-Zeitfenster und Voraussetzung „gleiches Ereignis-Konto" dokumentieren | Offen | — |
+| 24 | Verifikation | `dotnet build Softwareschmiede.slnx -c Debug`, beide Testprojekte je Lane (`Category!=OsInterface` + `Category=OsInterface`, mit `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1`), `dotnet format Softwareschmiede.slnx --verify-no-changes` | Offen | — |
