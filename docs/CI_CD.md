@@ -79,7 +79,7 @@ Alle drei Workflows lassen sich zusätzlich manuell über `workflow_dispatch` au
 
 Die Schritte laufen im Job `create-review-issue` des wiederverwendbaren Workflows `.github/workflows/create-review-issue.yml` (`ubuntu-latest`, `timeout-minutes: 10`, Shell `pwsh`); die Aufrufer liefern die Parameter über `with:`-Inputs:
 
-1. **Checkout:** Der wiederverwendbare Workflow checkt das Repository aus, damit `gh`-Aufrufe den Repository-Kontext aus dem Arbeitsverzeichnis auflösen können.
+1. **Kontext herstellen:** Der wiederverwendbare Workflow checkt das Repository aus und setzt `GH_REPO` auf `${{ github.repository }}`, damit `gh`-Aufrufe den Repository-Kontext zuverlässig auflösen können.
 2. **Guard-Schritt:** Das Repository-Secret `REVIEW_ISSUE_TOKEN` muss gesetzt sein — andernfalls schlägt der Lauf sofort sichtbar fehl (`exit 1` mit Anleitung). Es gibt bewusst keinen Fallback auf `GITHUB_TOKEN`, weil ein Issue des Autors `github-actions[bot]` von der Ereignisvalidierung verworfen würde und über die Duplikatprüfung künftige Zyklen blockierte.
 3. **Label sicherstellen:** Das Typlabel wird idempotent per `gh label create ... --force` unter `GITHUB_TOKEN` angelegt (Farbe `#5319E7`, Konvention `automated-*`).
 4. **Duplikatprüfung:** Existiert bereits ein offenes Issue mit dem Typlabel (`gh issue list --state open --label`), wird die Erzeugung übersprungen — erfolgreicher Lauf mit Log-Hinweis „Skipped: an open review issue already exists (#N)".
