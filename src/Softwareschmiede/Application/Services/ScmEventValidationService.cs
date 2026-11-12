@@ -14,6 +14,10 @@ public sealed class ScmEventValidationService
     /// stehende Erwähnung des separaten Kontos vorliegt.</summary>
     public const string KeineErwaehnungRejection = "Keine Erwähnung des separaten Kontos";
 
+    /// <summary>Ablehnungsgrund, wenn das aktive Ereignis-Konto auf den beobachteten Kommentar
+    /// bereits remote reagiert hat (instanzübergreifende Duplikaterkennung).</summary>
+    public const string BereitsReagiertRejection = "Bereits mit dem Konto reagiert";
+
     private const string QuoteChars = "'\"`´‚‘’„“”«»";
 
     /// <summary>Normalisiert ein konfiguriertes Trigger-Keyword: Leere oder nur aus Leerraum
@@ -36,6 +40,12 @@ public sealed class ScmEventValidationService
                 ? !HasFreeStandingTrigger(observation.Body, "@" + repository.ViewerLogin)
                 : !HasFreeStandingTrigger(observation.Body, NormalizeTriggerKeyword(triggerKeyword)))
             return separat ? KeineErwaehnungRejection : "Kein Trigger";
+        // Eine Kontoreaktion am Kommentar bedeutet: eine andere Instanz (oder dieser Kommentar
+        // zuvor) hat die Verarbeitung bereits quittiert — keine erneute Aufnahme. Beschränkt auf
+        // Kommentar-Arten, weil nur diese remote eine Empfangsreaktion tragen können.
+        if (observation.ContentKind is (ScmContentKind.IssueComment or ScmContentKind.ReviewComment
+                or ScmContentKind.PullRequestReview) && observation.ViewerHasReacted)
+            return BereitsReagiertRejection;
         if (!separat && !SameIdentity(repository.OwnerId, repository.Owner, repository.ViewerId, repository.ViewerLogin))
             return "Angemeldeter Benutzer ist nicht Repository-Owner";
         var edited = observation.LastEditedAt is not null;

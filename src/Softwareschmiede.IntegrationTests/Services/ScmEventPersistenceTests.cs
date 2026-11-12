@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -50,6 +52,22 @@ public sealed class ScmEventPersistenceTests
             }
         }
         finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    /// <summary>Ein Altbestand-Ereignis ohne die Reaktionseigenschaft deserialisiert zu
+    /// <see langword="null"/> und durchläuft die Eingangsprüfung exakt wie vor der Umstellung.</summary>
+    [Fact]
+    public void ObservationJson_WithoutViewerReactions_Deserializes()
+    {
+        var observation = Observe();
+        var node = JsonNode.Parse(JsonSerializer.Serialize(observation, ScmEventStore.JsonOptions))!.AsObject();
+        Assert.True(node.Remove("viewerReactions"));
+        var item = new ScmIncomingEvent { EventKey = observation.EventKey, ObservationJson = node.ToJsonString() };
+        var restored = ScmEventStore.Observation(item);
+        Assert.Equal(observation.EventKey, restored.EventKey);
+        Assert.Null(restored.ViewerReactions);
+        Assert.False(restored.ViewerHasReacted);
+        Assert.Null(ScmEventValidationService.GetRejection(restored));
     }
 
     /// <summary>Fehlende Identitäten bleiben auflösbar; fremde Bearbeitungen führen zu keinem Auftrag.</summary>

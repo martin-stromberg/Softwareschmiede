@@ -118,6 +118,31 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
             It.IsAny<ScmEventReference>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    /// <summary>Ein reagierter Trigger-Kommentar auf einer unzugeordneten Referenz löst keine
+    /// Aufgabenauflösung aus: Der Ablehnungsgrund verhindert die Trigger-Auswahl, die
+    /// Detailabfrage wird gar nicht erst angefragt.</summary>
+    [Fact]
+    public async Task Monitor_ReactedCommentOnUnassignedReference_CreatesNoTask()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await AddRepositoryAsync(fixture);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureObservations(fixture, viewerReactions: ["EYES"]);
+        ConfigureIssue(fixture, 9);
+
+        await Monitor(fixture).RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        Assert.Empty(await db.Aufgaben.ToListAsync());
+        Assert.Empty(await db.ScmIncomingEvents.ToListAsync());
+        Assert.All(await db.ScmContentSnapshots.ToListAsync(),
+            x => Assert.Equal(ScmEventStore.UnassignedDiagnostic, x.Diagnostic));
+        fixture.Git.As<IScmEventSource>().Verify(x => x.ReadIssueAsync(
+            It.IsAny<ScmEventReference>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     /// <summary>Eine remote verschwundene Referenz bleibt unzugeordnet, ohne dass eine Aufgabe entsteht.</summary>
     [Fact]
     public async Task Monitor_VanishedReference_StaysUnassigned()
@@ -429,22 +454,23 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
             .ReturnsAsync(references);
 
     private static void ConfigureObservations(ScmDispatchFixture fixture, bool descriptionQualified = false,
-        string body = "$Softwareschmiede test")
+        string body = "$Softwareschmiede test", IReadOnlyList<string>? viewerReactions = null)
     {
         var time = DateTimeOffset.UtcNow;
         fixture.Git.As<IScmEventSource>().Setup(x => x.ReadEventsAsync(It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()))
             .Returns((ScmEventReadRequest request, CancellationToken _) => Task.FromResult(new ScmEventBatch(request,
                 request.ContentKind switch
                 {
-                    ScmContentKind.IssueComment => [Observation(request, "C_" + request.Reference.Number, body, time)],
+                    ScmContentKind.IssueComment => [Observation(request, "C_" + request.Reference.Number, body, time, viewerReactions)],
                     ScmContentKind.Description when descriptionQualified => [Observation(request, "D_" + request.Reference.Number, "$Softwareschmiede Beschreibung", time)],
                     _ => Array.Empty<ScmEventObservation>()
                 })));
     }
 
-    private static ScmEventObservation Observation(ScmEventReadRequest request, string nodeId, string body, DateTimeOffset time)
+    private static ScmEventObservation Observation(ScmEventReadRequest request, string nodeId, string body,
+        DateTimeOffset time, IReadOnlyList<string>? viewerReactions = null)
         => new(request.Reference, request.ContentKind, nodeId, "42", time, time, null, "U_1", "owner", null, null,
-            body, "https://github.com/owner/repo/issues/" + request.Reference.Number, time);
+            body, "https://github.com/owner/repo/issues/" + request.Reference.Number, time, viewerReactions);
 
     private static void ConfigureIssue(ScmDispatchFixture fixture, int number)
         => fixture.Git.As<IScmEventSource>().Setup(x => x.ReadIssueAsync(

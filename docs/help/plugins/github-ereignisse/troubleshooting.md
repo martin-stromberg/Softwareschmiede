@@ -4,9 +4,9 @@
 
 ## Es erscheint kein Ereignis
 
-**Ursache:** Das Repository oder die Referenz ist nicht mit einer aktiven Aufgabe verknüpft, das konfigurierte Trigger-Keyword fehlt, Autor/Bearbeiter ist nicht der angemeldete Repository-Owner, oder die SCM-Ereignisüberwachung ist deaktiviert.
+**Ursache:** Das Repository oder die Referenz ist nicht mit einer aktiven Aufgabe verknüpft, das konfigurierte Trigger-Keyword fehlt, Autor/Bearbeiter ist nicht der angemeldete Repository-Owner, die SCM-Ereignisüberwachung ist deaktiviert — oder das eigene Konto hat auf den Kommentar bereits reagiert, etwa mit der von der Anwendung gesetzten 👀-Empfangsreaktion oder einer manuell vergebenen Reaktion. Ein solcher Kommentar gilt als bereits bearbeitet; auch ein nachträgliches Bearbeiten löst kein neues Ereignis aus.
 
-**Lösung:** Prüfe die Verknüpfung und den Text in GitHub. Ergänze das Trigger-Keyword (Standard `$Softwareschmiede`, siehe **Einstellungen → Automatisierung → Aufgaben ausführen**) und stelle sicher, dass der Owner die aktuelle Textfassung verfasst hat. Prüfe außerdem, ob die Überwachung in den Einstellungen aktiviert ist — bei deaktivierter Überwachung zeigt die Ereignisübersicht einen entsprechenden Hinweis und „Quellen erneut prüfen" liest keine neuen Ereignisse ein. Öffne **SCM-Ereignisse** und klicke **Aktualisieren**.
+**Lösung:** Prüfe die Verknüpfung und den Text in GitHub. Ergänze das Trigger-Keyword (Standard `$Softwareschmiede`, siehe **Einstellungen → Automatisierung → Aufgaben ausführen**) und stelle sicher, dass der Owner die aktuelle Textfassung verfasst hat. Prüfe außerdem, ob die Überwachung in den Einstellungen aktiviert ist — bei deaktivierter Überwachung zeigt die Ereignisübersicht einen entsprechenden Hinweis und „Quellen erneut prüfen" liest keine neuen Ereignisse ein. Prüfe schließlich, ob unter dem Kommentar bereits eine Reaktion deines Kontos steht — dann nur ein neuer Kommentar löst eine weitere Anfrage aus. Öffne **SCM-Ereignisse** und klicke **Aktualisieren**.
 
 ## Ein Eintrag bleibt wartend
 
@@ -57,6 +57,12 @@
 **Lösung:** Erwähne das separate Konto als Repository-Owner frei stehend als `@Kontoname` in einer Beschreibung oder einem Kommentar. Prüfe die **Integrationshinweise** in der SCM-Ereignisübersicht: Verworfene Benachrichtigungen zu nicht registrierten Repositories werden dort gezählt. Stelle außerdem sicher, dass das Bot-Konto als Collaborator mit Schreibrecht auf dem Repository eingeladen ist.
 
 > **Hinweis:** Im Modus „Separates Konto" wertet die Ereignisüberwachung ausschließlich Benachrichtigungen aus — weder die repository-weite Enumeration noch verknüpfte Referenzen vorhandener Aufgaben laufen in diesem Modus. Die Backmerge-Prüfung ist davon unberührt: Sie läuft in einem eigenen Zyklus immer unter dem Benutzerkonto.
+
+## Der Wartegrund nennt eine zweite Installation
+
+**Ursache:** Auf die gespeicherte Textfassung wurde bereits mit dem Ereignis-Konto reagiert — typischerweise, weil eine parallel betriebene zweite Installation (z. B. eine Vorabversion mit eigener Datenbank) denselben Kommentar bereits übernommen und quittiert hat. Der Eintrag wird bewusst nicht zugestellt, damit die Anfrage nicht zweimal bearbeitet wird.
+
+**Lösung:** Ist die zweite Installation beabsichtigt und verarbeitet die Anfrage, kann der Eintrag über **Abbrechen…** beendet werden — die Verarbeitung läuft in der anderen Installation weiter. **Erneut prüfen** und **Neu senden…** führen zum selben Ergebnis, solange die Reaktion des Kontos auf dem Kommentar besteht.
 
 ## Ein Pull-Request-Ereignis hat eine neue Aufgabe angelegt, obwohl dazu schon eine Aufgabe existiert
 
