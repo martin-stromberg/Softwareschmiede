@@ -58,6 +58,12 @@
 
 > **Hinweis:** Im Modus „Separates Konto" wertet die Ereignisüberwachung ausschließlich Benachrichtigungen aus — weder die repository-weite Enumeration noch verknüpfte Referenzen vorhandener Aufgaben laufen in diesem Modus. Die Backmerge-Prüfung ist davon unberührt: Sie läuft in einem eigenen Zyklus immer unter dem Benutzerkonto.
 
+## Ein vom Workflow erzeugtes Review-Issue löst kein Ereignis aus
+
+**Ursache:** Die geplanten Review-Workflows erzeugen zeitgesteuert Issues mit frei stehender `@softwarewerkstatt`-Erwähnung (siehe `docs/CI_CD.md`, Abschnitt „Geplante Review-Workflows"). Bleibt das Ereignis aus, kommt eine der folgenden Ursachen in Frage: Der Issue-Autor ist `github-actions[bot]` statt des Repository-Owners (das Issue wurde ohne das Secret `REVIEW_ISSUE_TOKEN` erzeugt, etwa manuell — die Owner-Prüfung verwirft die Erwähnung und das offene Issue blockiert über die Duplikatprüfung zudem künftige Zyklen), der Issue-Body wurde von einem Nicht-Owner bearbeitet (bei bearbeiteten Textfassungen zählt der Bearbeiter statt des Autors), `@softwarewerkstatt` ist nicht als Collaborator mit Schreibrecht eingeladen (GitHub stellt dann keine Mention-Benachrichtigung zu — das Issue existiert, erreicht die Inbox aber nie), oder das Repository ist an keinem Projekt erfasst und aktiviert.
+
+**Lösung:** Prüfe Autor und Bearbeitungsstand des Issues in GitHub sowie die **Integrationshinweise** in der SCM-Ereignisübersicht — verworfene Benachrichtigungen zu nicht registrierten Repositories werden dort gezählt. Bei einem Issue des Autors `github-actions[bot]`: Issue schließen oder löschen, das Secret `REVIEW_ISSUE_TOKEN` gemäß `docs/CI_CD.md` einrichten und den Workflow per `workflow_dispatch` erneut ausführen. Stelle außerdem sicher, dass `@softwarewerkstatt` Collaborator mit Schreibrecht auf dem Repository ist und das Repository an einem Projekt erfasst und aktiviert ist.
+
 ## Der Wartegrund nennt eine zweite Installation
 
 **Ursache:** Auf die gespeicherte Textfassung wurde bereits mit dem Ereignis-Konto reagiert — typischerweise, weil eine parallel betriebene zweite Installation (z. B. eine Vorabversion mit eigener Datenbank) denselben Kommentar bereits übernommen und quittiert hat. Der Eintrag wird bewusst nicht zugestellt, damit die Anfrage nicht zweimal bearbeitet wird.

@@ -1,0 +1,45 @@
+name: Weekly NuGet Package Review
+
+# Scheduled caller of .github/workflows/create-review-issue.yml — the shared
+# logic (REVIEW_ISSUE_TOKEN guard, label creation, duplicate check and issue
+# creation under the owner's token) lives there; this file only carries the
+# schedule and the parameters for the NuGet package review.
+# One-time secret setup is documented in docs/CI_CD.md.
+
+"on":
+  schedule:
+    # Weekly on Monday at 06:00 UTC, two hours after the security-scan workflow.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: review-nuget-packages
+  cancel-in-progress: false
+
+jobs:
+  create-review-issue:
+    permissions:
+      issues: write
+    uses: ./.github/workflows/create-review-issue.yml
+    with:
+      label: automated-review-nuget
+      label-description: Automated weekly NuGet package review issue
+      title: Wöchentliche NuGet-Paketprüfung
+      period: isoweek
+      body: |
+        @softwarewerkstatt
+
+        Bitte analysiere alle verwendeten NuGet-Pakete.
+
+        Prüfe:
+
+        - Verfügbare Updates
+        - Security-Updates
+        - Pakete mit bekannt gewordenen Schwachstellen
+        - Veraltete oder nicht mehr gepflegte Pakete
+        - Empfohlene Nachfolgepakete
+        - Mögliche Breaking Changes bei Updates
+
+        Erstelle konkrete Update-Empfehlungen inklusive Risikobewertung.
+    secrets:
+      REVIEW_ISSUE_TOKEN: ${{ secrets.REVIEW_ISSUE_TOKEN }}
