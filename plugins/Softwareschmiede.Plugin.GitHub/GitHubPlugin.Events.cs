@@ -10,7 +10,7 @@ public sealed partial class GitHubPlugin
 {
     private readonly IGitHubEventApiClient _eventApiClient;
     private readonly IGitHubEventApiClient _agentEventApiClient;
-    private const string TextFields = "id body createdAt updatedAt lastEditedAt url author { login ... on Node { id } } editor { login ... on Node { id } }";
+    private const string TextFields = "id body createdAt updatedAt lastEditedAt url author { login ... on Node { id } } editor { login ... on Node { id } } reactionGroups { content viewerHasReacted }";
 
     /// <summary>Sicherheitsabstand für den serverseitigen <c>since</c>-Filter. GitHub vergleicht Zeitpunkte
     /// aus der wiederholten Stunde der US-Zeitumstellung um eine Stunde verschoben (beobachtet am
@@ -244,6 +244,11 @@ public sealed partial class GitHubPlugin
         var authorId = String(author, "id");
         var authorLogin = String(author, "login");
         if (IsViewer(repo, authorId, authorLogin) && body.Contains("<!-- softwareschmiede:", StringComparison.OrdinalIgnoreCase)) return;
+        var reactionGroups = Object(node, "reactionGroups");
+        if (reactionGroups.ValueKind != JsonValueKind.Array) throw Permanent("Unvollständige GitHub-Antwort.");
+        var viewerReactions = reactionGroups.EnumerateArray()
+            .Where(group => Boolean(group, "viewerHasReacted"))
+            .Select(group => Required(group, "content")).ToArray();
         var referencePath = request.Reference.Kind == ScmReferenceKind.Issue ? "issues" : "pull";
         var fragment = request.ContentKind switch
         {
@@ -254,7 +259,8 @@ public sealed partial class GitHubPlugin
         };
         target.Add(new(request.Reference, request.ContentKind, Required(node, "id"), remoteId, created, updated, edited,
             authorId, authorLogin, String(editor, "id"), String(editor, "login"), body,
-            $"https://{repo.Host}/{repo.Owner}/{repo.Name}/{referencePath}/{request.Reference.Number}{fragment}", DateTimeOffset.UtcNow));
+            $"https://{repo.Host}/{repo.Owner}/{repo.Name}/{referencePath}/{request.Reference.Number}{fragment}", DateTimeOffset.UtcNow,
+            viewerReactions.Length > 0 ? viewerReactions : null));
     }
 
     private Task<List<JsonElement>> RestPagesAsync(IGitHubEventApiClient client, string host, string endpoint, CancellationToken ct)

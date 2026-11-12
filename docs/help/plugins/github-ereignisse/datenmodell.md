@@ -6,7 +6,7 @@
 
 ### `ScmIncomingEvent`
 
-Enthält den dauerhaft angenommenen Ereignistext und Ursprung, Aufgabe, Status, Wartegrund, Versuchs- und Laufkennung sowie Zustellzeiten und Wiederholungsinformationen.
+Enthält den dauerhaft angenommenen Ereignistext und Ursprung, Aufgabe, Status, Wartegrund, Versuchs- und Laufkennung sowie Zustellzeiten und Wiederholungsinformationen. Der im `ObservationJson` eingebettete Beobachtungspayload trägt optional `ViewerReactions` — die Inhalte der vom lesenden Ereignis-Konto gesetzten Reaktionen auf der Textfassung (GraphQL-`ReactionContent`-Werte); sie sind die Grundlage der instanzübergreifenden Duplikaterkennung. Ältere Datensätze ohne das Feld deserialisieren zu `null` und verhalten sich unverändert.
 
 ### `ScmObservationCheckpoint`
 
@@ -14,7 +14,7 @@ Speichert Wasserstand, Fehlerzahl, nächste Prüfzeit und Diagnose je Quelle. `S
 
 ### `ScmContentSnapshot`
 
-Speichert Inhaltshash und Revision einer beobachteten Textfassung sowie den Auflösungsstatus ihrer Identität.
+Speichert Inhaltshash und Revision einer beobachteten Textfassung sowie den Auflösungsstatus ihrer Identität und eine optionale Diagnose — etwa den Ablehnungsgrund „Bereits mit dem Konto reagiert" für eine verworfene Kommentarversion, auf die das Ereignis-Konto bereits reagiert hat.
 
 ### `ScmOutgoingAction`
 

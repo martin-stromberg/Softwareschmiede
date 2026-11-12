@@ -137,6 +137,11 @@ public sealed class ScmEventOrchestrator(
                 var revalidation = ScmEventValidationService.GetRejection(
                     observation with { Reference = observation.Reference with { Repository = currentRepository } },
                     await einstellungen.GetScmTriggerKeywordAsync(ct));
+                // Eine gespeicherte Beobachtung mit Kontoreaktion erreicht die Inbox produktiv
+                // nie (Eingangsablehnung); Altbestand oder Eingriffe werden sicherheitshalber
+                // nicht zugestellt, sondern zur Klärung vorgelegt.
+                if (revalidation == ScmEventValidationService.BereitsReagiertRejection)
+                { await WaitAsync(item, "Auf diese Textversion wurde bereits mit dem Ereignis-Konto reagiert; die Verarbeitung erfolgt vermutlich durch eine zweite Installation.", ct); return; }
                 if (revalidation is not null && revalidation != "Kein Trigger" && revalidation != ScmEventValidationService.KeineErwaehnungRejection)
                 { await WaitAsync(item, "Angemeldeter Benutzer ist nicht mehr der bestätigte Repository-Owner.", ct); return; }
                 if (task.Status == AufgabeStatus.Neu) await tasks.SetStatusAsync(task.Id, AufgabeStatus.Gestartet, ct);

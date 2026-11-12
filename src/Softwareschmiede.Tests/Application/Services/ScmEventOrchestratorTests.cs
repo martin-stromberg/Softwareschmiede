@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -31,6 +32,45 @@ public sealed class ScmEventOrchestratorTests
         Assert.Contains("owner/repo", item.Reason);
         Assert.Contains("Lese- und Schreibrechte", item.Reason);
         Assert.Contains("Erneut prüfen", item.Reason);
+        Assert.Empty(fixture.Sessions);
+        Assert.Empty(fixture.Prompts);
+    }
+
+    /// <summary>A stored observation carrying a viewer reaction (legacy data or manual inserts)
+    /// is never delivered: the dispatch revalidation parks it with a dedicated reason.</summary>
+    [Fact]
+    public async Task Dispatch_ReactedStoredObservation_Waits()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        Guid eventId;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var project = new Projekt { Id = Guid.NewGuid(), Name = "SCM" };
+            var repository = new GitRepository { Id = Guid.NewGuid(), ProjektId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginTyp = fixture.Repository.ProviderPrefix, RepositoryName = "repo" };
+            var task = new Aufgabe { Id = Guid.NewGuid(), Titel = "SCM task", ProjektId = project.Id, GitRepositoryId = repository.Id, Status = AufgabeStatus.Gestartet, KiPluginPrefix = ScmDispatchFixture.KiPrefix };
+            var time = DateTimeOffset.UtcNow;
+            var observation = new ScmEventObservation(new(fixture.Repository, ScmReferenceKind.Issue, 7), ScmContentKind.IssueComment,
+                Guid.NewGuid().ToString(), "42", time, time, null, "U_1", "owner", null, null,
+                "$Softwareschmiede test", "https://github.com/owner/repo/issues/7", time, ["EYES"]);
+            var incomingEvent = new ScmIncomingEvent
+            {
+                AufgabeId = task.Id,
+                EventKey = observation.EventKey,
+                ObservationJson = JsonSerializer.Serialize(observation, ScmEventStore.JsonOptions),
+                ReceivedUtc = time.ToUnixTimeMilliseconds()
+            };
+            db.AddRange(project, repository, task, incomingEvent);
+            await db.SaveChangesAsync();
+            eventId = incomingEvent.Id;
+        }
+        await fixture.DispatchAsync(eventId);
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("Wartend", item.Status);
+        Assert.Contains("bereits mit dem Ereignis-Konto reagiert", item.Reason);
+        Assert.Contains("zweite Installation", item.Reason);
+        Assert.Null(item.DeliveryAttemptId);
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Prompts);
     }

@@ -141,19 +141,62 @@ public sealed class ScmEventValidationServiceTests
         Assert.Null(ScmEventValidationService.GetRejection(Observe("$Softwareschmiede bitte", "42", null, false)));
     }
 
-    private static ScmEventObservation Observe(string body, string author, string? editor, bool edited)
+    /// <summary>Eine Reaktion des Ereignis-Kontos auf einem Kommentar gilt als bereits bearbeitet.</summary>
+    [Theory]
+    [InlineData(ScmContentKind.IssueComment)]
+    [InlineData(ScmContentKind.ReviewComment)]
+    [InlineData(ScmContentKind.PullRequestReview)]
+    public void ViewerReaction_RejectsCommentKinds(ScmContentKind kind)
+    {
+        var observation = Observe("$Softwareschmiede bitte", "42", null, false, ["EYES"], kind);
+        Assert.Equal(ScmEventValidationService.BereitsReagiertRejection, ScmEventValidationService.GetRejection(observation));
+    }
+
+    /// <summary>Im SeparatesKonto bindet die Reaktion an das Bot-Konto; auch eine manuell gesetzte
+    /// Reaktion (nicht nur die Empfangsreaktion) unterdrückt den Kommentar.</summary>
+    [Fact]
+    public void SeparatesKonto_ViewerReaction_Rejects()
+    {
+        var observation = ObserveSeparate("@scm-bot bitte", "42", null, false, ["THUMBS_UP"]);
+        Assert.Equal(ScmEventValidationService.BereitsReagiertRejection, ScmEventValidationService.GetRejection(observation));
+    }
+
+    /// <summary>Die Reaktionsprüfung läuft erst nach dem Trigger: ein reagierter Kommentar ohne
+    /// Trigger behält die präzisere Trigger-Ablehnung.</summary>
+    [Fact]
+    public void ViewerReaction_CheckRunsAfterTrigger()
+    {
+        Assert.Equal("Kein Trigger", ScmEventValidationService.GetRejection(Observe("Nur Text", "42", null, false, ["EYES"])));
+        Assert.Equal(ScmEventValidationService.KeineErwaehnungRejection,
+            ScmEventValidationService.GetRejection(ObserveSeparate("Nur Text", "42", null, false, ["EYES"])));
+    }
+
+    /// <summary>Beschreibungen bleiben vom Reaktionskriterium ausgenommen: Auf Referenztexte wird
+    /// keine Empfangsreaktion gesetzt, es gibt kein vergleichbares Remote-Merkmal.</summary>
+    [Fact]
+    public void ViewerReaction_DescriptionNotRejected()
+    {
+        var observation = Observe("$Softwareschmiede bitte", "42", null, false, ["EYES"], ScmContentKind.Description);
+        Assert.Null(ScmEventValidationService.GetRejection(observation));
+    }
+
+    private static ScmEventObservation Observe(string body, string author, string? editor, bool edited,
+        IReadOnlyList<string>? viewerReactions = null, ScmContentKind kind = ScmContentKind.IssueComment)
     {
         var date = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
         return new(new(new("test", "host", "repo42", "OWNER", "repo", "42", "42", "owner", true), ScmReferenceKind.Issue, 1),
-            ScmContentKind.IssueComment, "node", "1", date, date, edited ? date : null, author, "owner", editor, null, body, "https://host/OWNER/repo/issues/1", date);
+            kind, "node", "1", date, date, edited ? date : null, author, "owner", editor, null, body, "https://host/OWNER/repo/issues/1", date,
+            viewerReactions);
     }
 
-    private static ScmEventObservation ObserveSeparate(string body, string author, string? editor, bool edited)
+    private static ScmEventObservation ObserveSeparate(string body, string author, string? editor, bool edited,
+        IReadOnlyList<string>? viewerReactions = null, ScmContentKind kind = ScmContentKind.IssueComment)
     {
         var date = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
         var repository = new ScmEventRepository("test", "host", "repo42", "OWNER", "repo", "42", "bot-id", "scm-bot", true,
             Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto);
         return new(new(repository, ScmReferenceKind.Issue, 1),
-            ScmContentKind.IssueComment, "node", "1", date, date, edited ? date : null, author, "owner", editor, null, body, "https://host/OWNER/repo/issues/1", date);
+            kind, "node", "1", date, date, edited ? date : null, author, "owner", editor, null, body, "https://host/OWNER/repo/issues/1", date,
+            viewerReactions);
     }
 }

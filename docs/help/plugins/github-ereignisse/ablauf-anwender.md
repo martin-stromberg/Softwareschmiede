@@ -20,6 +20,8 @@ Schreibe das Trigger-Keyword (Standard `$Softwareschmiede`) in die Beschreibung,
 
 > **Hinweis:** Im Überwachungsmodus **„Separates Konto“** wird die Anfrage stattdessen ausgelöst, indem der Repository-Owner das separate Konto frei stehend als `@Kontoname` in der Beschreibung oder einem Kommentar erwähnt. Benachrichtigungen zu Repositories, die nicht an einem Projekt erfasst und aktiviert sind, werden verworfen — ihre Anzahl erscheint in den Integrationshinweisen der Ereignisübersicht.
 
+> **Hinweis:** Ein Kommentar, auf den dein Konto bereits reagiert hat — etwa mit der von der Anwendung gesetzten 👀-Reaktion oder einer manuell vergebenen Reaktion —, gilt als bereits bearbeitet. Auch ein späteres Bearbeiten dieses Kommentars löst keine neue Anfrage aus; schreibe stattdessen einen neuen Kommentar.
+
 ### 2. Eingang prüfen
 
 Öffne links **SCM-Ereignisse**. Die Liste zeigt Aufgabe, Repository, Ursprung, Art, Eingangszeit und Status. Mit **Aktualisieren** lässt sich die Anzeige neu laden. Wähle einen Eintrag, um den vollständigen Text, die Ursprungsadresse und einen möglichen Wartegrund zu sehen.

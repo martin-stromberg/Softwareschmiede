@@ -296,16 +296,13 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         output.WriteLine("E3-Ungewissheit: late valid completion of still-current attempt resolves without any resend.");
 
         fixture.AddText(20, 2001, "$Softwareschmiede Aufgabe anlegen");
-        var deadline = DateTime.UtcNow.AddSeconds(60);
         Aufgabe? created = null;
-        while (DateTime.UtcNow < deadline)
+        await fixture.WaitForDatabaseAsync(async db =>
         {
-            await using var db = fixture.OpenDatabase();
             created = await db.Aufgaben.Include(x => x.IssueReferenz)
                 .SingleOrDefaultAsync(x => x.IssueReferenz != null && x.IssueReferenz.IssueNummer == 20);
-            if (created is not null) break;
-            await Task.Delay(200);
-        }
+            return created is not null;
+        }, "Aufgabe für Issue 20 nicht angelegt");
         Assert.NotNull(created);
         Assert.Equal("SCM Referenz 20", created!.Titel);
         Assert.Contains("$Softwareschmiede Aufgabe anlegen", created.AnforderungsBeschreibung);
@@ -339,6 +336,39 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Equal("$Softwareschmiede Aufgabe anlegen",
             fixture.Prompts().Last().GetProperty("request").GetProperty("body").GetString());
         output.WriteLine("E8: auto-created task waits actionably without default CLI; queue selection starts clone/CLI and delivers exactly once.");
+
+        // Mehrinstanz-Schutz (Benutzerkonto): ein Kommentar, auf den das aktive Ereignis-Konto
+        // bereits remote reagiert hat — etwa die Empfangsreaktion einer zweiten Installation —
+        // erzeugt weder Ereignis noch Aufgabe; ein unberührter Kommentar läuft unverändert.
+        var task6 = fixture.TaskIds[6];
+        var events6Before = 0;
+        await using (var db = fixture.OpenDatabase())
+            events6Before = await db.ScmIncomingEvents.CountAsync(x => x.AufgabeId == task6);
+        var eyesBefore = fixture.Responses().Count(x => x.Content == "eyes");
+        var promptsBefore = fixture.Prompts().Count;
+        fixture.AddText(6, 602, "$Softwareschmiede Von anderer Instanz quittiert", viewerReactions: ["EYES"]);
+        fixture.AddText(22, 2201, "$Softwareschmiede Reagierte unzugeordnete Referenz", viewerReactions: ["EYES"]);
+        fixture.AddText(6, 603, "$Softwareschmiede Unberührter Folgekommentar");
+        await fixture.WaitEventAsync(6, "Verarbeitet", 603);
+        await fixture.WaitForDatabaseAsync(async db =>
+            await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_602")
+                    && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection)
+                && await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_2201")
+                    && x.Diagnostic == ScmEventStore.UnassignedDiagnostic),
+            "Snapshot-Diagnosen für Kommentare 602/2201 fehlen", TimeSpan.FromSeconds(90));
+        await using (var db = fixture.OpenDatabase())
+        {
+            Assert.True(await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_602")
+                && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection));
+            Assert.True(await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_2201")
+                && x.Diagnostic == ScmEventStore.UnassignedDiagnostic));
+            Assert.Equal(events6Before + 1, await db.ScmIncomingEvents.CountAsync(x => x.AufgabeId == task6));
+            Assert.False(await db.Aufgaben.Include(x => x.IssueReferenz)
+                .AnyAsync(x => x.IssueReferenz != null && x.IssueReferenz.IssueNummer == 22));
+        }
+        Assert.Equal(eyesBefore + 1, fixture.Responses().Count(x => x.Content == "eyes"));
+        Assert.Equal(promptsBefore + 1, fixture.Prompts().Count);
+        output.WriteLine("E9-Mehrinstanz: reagierte Kommentare erzeugen weder Ereignis noch Aufgabe (Snapshot-Diagnose), unberührter Kommentar läuft durch.");
 
         // Bot-Phase ans Ende gelegt: der prozessgebundene ScmE2ECredentialStore verliert
         // eingetragene Secrets bei einem Neustart — danach findet keiner mehr statt.
@@ -376,16 +406,13 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var eyesBefore = fixture.Responses().Count(x => x.Content == "eyes");
         fixture.AddText(18, 1801, "@scm-bot Aufgabe aus Benachrichtigung anlegen");
         fixture.AddNotification(18);
-        var deadline = DateTime.UtcNow.AddSeconds(60);
         Aufgabe? botTask = null;
-        while (DateTime.UtcNow < deadline)
+        await fixture.WaitForDatabaseAsync(async db =>
         {
-            await using var db = fixture.OpenDatabase();
             botTask = await db.Aufgaben.Include(x => x.IssueReferenz)
                 .SingleOrDefaultAsync(x => x.IssueReferenz != null && x.IssueReferenz.IssueNummer == 18);
-            if (botTask is not null) break;
-            await Task.Delay(200);
-        }
+            return botTask is not null;
+        }, "Aufgabe für Issue 18 nicht angelegt");
         Assert.NotNull(botTask);
         var waiting = await fixture.WaitEventForTaskAsync(botTask!.Id, "Wartend");
         Assert.Equal(ScmKontoModus.SeparatesKonto, ScmEventStore.Observation(waiting).Reference.Repository.Konto);
@@ -397,20 +424,37 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
             && x.Body.Contains("KI-Simulator:", StringComparison.Ordinal));
         output.WriteLine("Bot: mention-Benachrichtigung legte Aufgabe an, Dispatch und Antwort liefen unter scm-bot.");
 
+        // Mehrinstanz-Schutz im SeparatesKonto: ein Mention-Kommentar, auf den das Bot-Konto
+        // bereits reagiert hat (viewerHasReacted bindet an den Agent-Client), erzeugt kein
+        // zweites Ereignis auf derselben Aufgabe.
+        var botEventsBefore = 0;
+        await using (var db = fixture.OpenDatabase())
+            botEventsBefore = await db.ScmIncomingEvents.CountAsync(x => x.AufgabeId == botTask.Id);
+        fixture.AddText(18, 1802, "@scm-bot Bereits vom Bot quittiert", viewerReactions: ["EYES"]);
+        fixture.AddNotification(18);
+        await fixture.WaitForDatabaseAsync(async db =>
+            await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_1802")
+                && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection),
+            "Snapshot-Diagnose für Kommentar 1802 fehlt");
+        await using (var db = fixture.OpenDatabase())
+        {
+            Assert.True(await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_1802")
+                && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection));
+            Assert.Equal(botEventsBefore, await db.ScmIncomingEvents.CountAsync(x => x.AufgabeId == botTask.Id));
+        }
+        output.WriteLine("Bot: reagierter Mention-Kommentar erzeugt kein Inbox-Ereignis, Snapshot-Diagnose gesetzt.");
+
         // Fremd- und Nicht-mention-Benachrichtigungen: verworfen bzw. ignoriert, Diagnose
         // sichtbar in den Integrationshinweisen — ohne MonitoringNotice-Alarm.
         fixture.AddNotification(19, repositoryNodeId: "FREMD_REPO");
         fixture.AddNotification(21, reason: "assign");
         const string inboxKey = "notifications/softwareschmiede.github/github.com";
         string? diagnostic = null;
-        deadline = DateTime.UtcNow.AddSeconds(30);
-        while (DateTime.UtcNow < deadline)
+        await fixture.WaitForDatabaseAsync(async db =>
         {
-            await using var db = fixture.OpenDatabase();
             diagnostic = (await db.ScmObservationCheckpoints.FindAsync(inboxKey))?.Diagnostic;
-            if (diagnostic?.Contains("1 verworfen", StringComparison.Ordinal) == true) break;
-            await Task.Delay(200);
-        }
+            return diagnostic?.Contains("1 verworfen", StringComparison.Ordinal) == true;
+        }, "Inbox-Verwerfungsdiagnose fehlt", TimeSpan.FromSeconds(30));
         Assert.NotNull(diagnostic);
         Assert.StartsWith(ScmEventStore.InboxDiscardDiagnosticPrefix, diagnostic);
         Assert.Contains("1 verworfen", diagnostic);

@@ -71,6 +71,62 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
             x => x.Diagnostic == ScmEventStore.AmbiguousAssignmentDiagnostic);
     }
 
+    /// <summary>Ein Kommentar mit Kontoreaktion auf einer aufgabenverknüpften Referenz erzeugt kein
+    /// Inbox-Ereignis und keine Zustellung; die Ablehnung bleibt als Snapshot-Diagnose sichtbar,
+    /// während ein unberührter Kommentar denselben Zyklus regulär durchläuft.</summary>
+    [Fact]
+    public async Task Monitor_ReactedComment_StoresDiagnosticWithoutInbox()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await AddTaskWithIssueAsync(fixture, 7);
+        var taskId8 = await AddTaskWithIssueAsync(fixture, 8);
+        ConfigureEnumeration(fixture,
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 7),
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
+        ConfigureObservations(fixture, viewerReactedNumber: 7);
+
+        await Monitor(fixture).RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        Assert.Equal(taskId8, item.AufgabeId);
+        var reacted = Assert.Single(await db.ScmContentSnapshots.Where(x => x.ContentKey.EndsWith("C_7")).ToListAsync());
+        Assert.Equal(ScmEventValidationService.BereitsReagiertRejection, reacted.Diagnostic);
+        Assert.True(reacted.IdentityResolved);
+        Assert.Contains(await db.ScmObservationCheckpoints.ToListAsync(),
+            x => x.SourceKey.StartsWith("test-scm/github.com/R_1/Issue/7/IssueComment") && x.WatermarkUtc != null);
+        Assert.Empty(fixture.Sessions);
+        Assert.Empty(fixture.Prompts);
+        // Nur das unberührte Ereignis hinterlässt Hostaktionen (Empfangsreaktion + Wartehinweis).
+        Assert.Equal(2, fixture.Responses.Count);
+    }
+
+    /// <summary>Ein reagierter Kommentar bleibt auch im Folgezyklus ohne Ereignis: Die
+    /// Snapshot-Deduplikation überspringt die bekannte, abgelehnte Textversion.</summary>
+    [Fact]
+    public async Task Monitor_ReactedComment_NextPoll_StaysQuiet()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await AddTaskWithIssueAsync(fixture, 7);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 7));
+        ConfigureObservations(fixture, viewerReactedNumber: 7);
+        var monitor = Monitor(fixture);
+
+        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        Assert.Empty(await db.ScmIncomingEvents.ToListAsync());
+        var reacted = Assert.Single(await db.ScmContentSnapshots.Where(x => x.ContentKey.EndsWith("C_7")).ToListAsync());
+        Assert.Equal(ScmEventValidationService.BereitsReagiertRejection, reacted.Diagnostic);
+        Assert.Empty(fixture.Responses);
+        Assert.Empty(fixture.Prompts);
+    }
+
     /// <summary>Wiederholte Polls deduplizieren über Snapshot/EventKey und schreiben den Enumerations-Watermark fort.</summary>
     [Fact]
     public async Task Monitor_RepeatedPolls_ProduceNoDuplicates()
@@ -200,13 +256,14 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
                 It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(references);
 
-    private static void ConfigureObservations(ScmDispatchFixture fixture)
+    private static void ConfigureObservations(ScmDispatchFixture fixture, int? viewerReactedNumber = null)
     {
         var time = DateTimeOffset.UtcNow;
         fixture.Git.As<IScmEventSource>().Setup(x => x.ReadEventsAsync(It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()))
             .Returns((ScmEventReadRequest request, CancellationToken _) => Task.FromResult(new ScmEventBatch(request,
                 request.ContentKind == ScmContentKind.IssueComment ? [new ScmEventObservation(request.Reference, request.ContentKind,
                     "C_" + request.Reference.Number, "42", time, time, null, "U_1", "owner", null, null,
-                    "$Softwareschmiede test", "https://github.com/owner/repo/issues/" + request.Reference.Number, time)] : [])));
+                    "$Softwareschmiede test", "https://github.com/owner/repo/issues/" + request.Reference.Number, time,
+                    request.Reference.Number == viewerReactedNumber ? new[] { "EYES" } : null)] : [])));
     }
 }
