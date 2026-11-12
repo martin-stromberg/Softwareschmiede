@@ -12,6 +12,7 @@ Die Einstellungsseite ermöglicht die zentrale Konfiguration der Anwendung ohne 
 6. **Promptvorlagen** — Wiederkehrende CLI-Prompts zentral verwalten
 7. **Updates** — Update-Modus (Aus / Nur prüfen / Bei Programmstart prüfen und ausführen) und Update-Pfad (exklusiver Kanal: nur stabile bzw. nur Vorabversionen)
 8. **Diagnose** — Öffnet das Konsolentestfenster zur Wiedergabe exportierter CLI-Aufzeichnungen
+9. **Automatisierung** — Die drei zyklischen Automatisierungsfunktionen: automatisches Starten von Aufgaben aus SCM-Ereignissen, automatisches Beenden von Aufgaben sowie die Backmerge-Prüfung
 
 ## Funktionsweise
 
@@ -62,22 +63,36 @@ Für das Codex-Plugin gilt eine zusätzliche Schutzregel: Der Wert `Softwareschm
 
 Das Arbeitsverzeichnis bestimmt, wo die Softwareschmiede lokale Repository-Klons anlegt. Der Pfad wird als `AppEinstellung` in der SQLite-Datenbank gespeichert. Ist kein Verzeichnis konfiguriert oder ist der Pfad ungültig, greift ein Fallback auf das Temp-Verzeichnis. Der Fallback wird im Aufgabenprotokoll protokolliert.
 
-### SCM-Ereignisse
+### Automatisierung
 
-Im Abschnitt **SCM-Ereignisse** der Registerkarte „Allgemein" steuern die Checkbox **„SCM-Ereignisüberwachung aktivieren"**, das **Trigger-Keyword** und die **Prompt-Anhänge** die Ereignisüberwachung (Details: [GitHub-Ereignisüberwachung](../plugins/github-ereignisse/index.md)).
+Die Registerkarte **„Automatisierung"** (direkt nach „Allgemein") bündelt die drei zyklischen Automatisierungsfunktionen der SCM-Verarbeitung in drei auf-/zuklappbaren Panels. Jede Panel-Titelleiste zeigt zusätzlich zum Namen an, ob die Funktion gerade **aktiviert** oder **deaktiviert** ist — auch im zugeklappten Zustand. Alle Schalter wirken nach dem Speichern ohne Neustart; die drei Funktionen lassen sich unabhängig voneinander ein- und ausschalten.
 
-Die Auswahlbox **„Konto-Modus"** legt den Eingangskanal der Überwachung fest:
+**Panel „Aufgaben ausführen":** Die Checkbox **„Aufgaben automatisch starten"** schaltet die Ereignisüberwachung ein oder aus. Die Auswahlbox **„Überwachungsmodus"** legt den Eingangskanal fest:
 
 - **Benutzerkonto** — (Standard) die registrierten Projekt-Repositories werden repository-weit überwacht; Auslöser ist das Trigger-Keyword
-- **Separates Konto** — es wird ausschließlich die GitHub-Benachrichtigungen eines separaten Kontos überwacht; Auslöser ist eine frei stehende `@`-Erwähnung dieses Kontos. Dafür muss unter **Einstellungen → Plugins → GitHub → Authentifizierung** ein **„Personal Access Token des separaten Kontos"** hinterlegt sein — ohne ihn bricht das Speichern mit einer Fehlermeldung ab. Im separaten Modus entfällt die repository-weite Enumeration; Backmerge-Pull-Requests werden dann nicht automatisch entdeckt
+- **Separates Konto** — es wird ausschließlich die GitHub-Benachrichtigungen eines separaten Kontos überwacht; Auslöser ist eine frei stehende `@`-Erwähnung dieses Kontos. Dafür muss unter **Einstellungen → Plugins → GitHub → Authentifizierung** ein **„Personal Access Token des separaten Kontos"** hinterlegt sein — ohne ihn bricht das Speichern mit einer Fehlermeldung ab. Im separaten Modus entfällt die repository-weite Enumeration der Ereignisüberwachung
 
-Zusätzlich legt die Auswahlbox **„Backmerge-Pull-Requests"** fest, ob die Anwendung Backmerge-PRs (head = Hauptbranch des Repositories → base = konfigurierter Basis-Branch eines Projekts) automatisch per Admin-Merge bestätigt:
+Der **Überwachungsmodus** ist nur bei aktivierter Funktion bedienbar. Das **Trigger-Keyword** wird nur angezeigt, wenn die Funktion aktiv und der Modus „Benutzerkonto" gewählt ist; die fünf mehrzeiligen **Prompt-Anhänge** (Allgemein, Issue, Issue-Kommentar, Pull Request, Pull-Request-Kommentar inkl. Reviews) erscheinen nur bei aktivierter Funktion (Details: [GitHub-Ereignisüberwachung](../plugins/github-ereignisse/index.md)).
+
+**Panel „Aufgaben beenden":** Die Checkbox **„Aufgaben automatisch beenden"** schaltet die Abschlussüberwachung ein oder aus. Die Auswahlbox **„Prüfmodus"** bestimmt, welche Aufgaben beobachtet werden:
+
+- **Nur ereignisgesteuerte Aufgaben** — (Standard) nur Aufgaben mit mindestens einem zugeordneten SCM-Ereignis
+- **Alle Aufgaben** — zusätzlich auch manuell angelegte Aufgaben
+
+Beobachtet werden in jedem Fall nur Aufgaben mit SCM-Referenz: Eine Aufgabe ohne verknüpftes Issue **und** ohne verknüpften Pull Request wird nie automatisch beendet. Ist die Referenz geschlossen oder gemergt, läuft die unter **„Wartezeit für Beendigung"** eingestellte Zeit (in Minuten) ab, danach wird die Aufgabe samt laufender KI-Ausführung beendet. Prüfmodus und Wartezeit sind nur bei aktivierter Funktion bedienbar.
+
+**Panel „Prozessabläufe":** Die Auswahlbox **„Backmerge-Pull-Requests"** legt fest, ob die Anwendung Backmerge-PRs (head = Hauptbranch des Repositories → base = konfigurierter Basis-Branch eines Projekts) automatisch mergt:
 
 - **Deaktiviert** — (Standard) keine automatischen Merges
 - **Global aktiviert** — Backmerge-PRs werden in allen Projekten automatisch gemergt
 - **Projektbezogen aktivierbar** — zusätzlich muss die Option **„Backmerge-Pull-Requests automatisch mergen"** in der Projektdetailansicht (Basis-Branch-Kachel) eingeschaltet sein; sie wird dort nur angeboten, wenn dieser Modus gesetzt und ein Basis-Branch konfiguriert ist
 
-Voraussetzungen für einen Auto-Merge: ein vom Repository-Hauptbranch abweichender Basis-Branch am Projekt-Repository, ein Token mit Schreibrecht und ein vom Provider als mergebar gemeldeter, offener (nicht als Draft markierter) Pull Request. Die Auswahl wird erst nach einem Klick auf „Speichern" übernommen.
+Die Backmerge-Prüfung läuft in einem eigenen Zyklus: unabhängig vom Schalter „Aufgaben automatisch starten", unabhängig vom Überwachungsmodus und immer unter dem Benutzerkonto — sie funktioniert daher auch im Modus „Separates Konto". Zwei weitere Optionen (jeweils standardmäßig deaktiviert, nur bei aktivem Modus bedienbar) steuern die Merge-Ausführung:
+
+- **„Draft-Pull-Requests vor dem Merge automatisch aktivieren"** — ein als Entwurf erkannter Backmerge-PR wird automatisch als bereit für Review markiert; ohne die Option wartet der Merge, bis der Entwurf manuell aufgehoben wurde
+- **„Bei blockiertem Merge Admin-Merge erlauben"** — der Merge läuft zuerst regulär; scheitert er am Branch-Schutz (z. B. fehlende Statuschecks oder Reviews), wird er mit dieser Option einmalig als Admin-Merge wiederholt, der den Branch-Schutz umgeht
+
+Voraussetzungen für einen Auto-Merge: ein vom Repository-Hauptbranch abweichender Basis-Branch am Projekt-Repository, ein Token mit Schreibrecht (für den Admin-Merge ein Token mit Admin-Recht) und ein vom Provider als mergebar gemeldeter, offener Pull Request. Die Auswahl wird erst nach einem Klick auf „Speichern" übernommen.
 
 ### Updates
 

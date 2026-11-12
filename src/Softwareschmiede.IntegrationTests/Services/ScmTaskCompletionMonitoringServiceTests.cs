@@ -12,9 +12,10 @@ using Softwareschmiede.TestSupport;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>Abschlussüberwachung ereignisgesteuerter Aufgaben: im Abschluss gemeldete Pull Requests
+/// <summary>Abschlussüberwachung von Aufgaben mit SCM-Referenz: im Abschluss gemeldete Pull Requests
 /// werden verknüpft, geschlossene/gemergte Referenzen beenden die Aufgabe nach der einstellbaren
-/// Wartezeit — nur für Aufgaben mit SCM-Ereigniszuordnung.</summary>
+/// Wartezeit. Der Prüfmodus bestimmt, ob nur ereignisgesteuerte oder alle Aufgaben mit Referenz
+/// beobachtet werden; Aufgaben ohne gültige Issue-/Pull-Request-Referenz bleiben stets unberührt.</summary>
 public sealed class ScmTaskCompletionMonitoringServiceTests
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -155,11 +156,11 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         Assert.Equal(AufgabeStatus.Beendet, (await TaskAsync(fixture, taskId)).Status);
     }
 
-    /// <summary>Der Issue-Abschlusspfad reicht den aktiven Kontomodus in den Repository-Kontext
-    /// durch: Im SeparatesKonto läuft die Issue-Prüfung unter dem Agent-Konto (der PR-Pfad bleibt
-    /// bewusst Benutzer-Token, siehe Token-Grenze).</summary>
+    /// <summary>Der Issue-Abschlusspfad läuft stets unter dem Benutzerkonto: Auch bei konfiguriertem
+    /// SeparatesKonto der Ereignisüberwachung wird der Repository-Kontext der Abschlussprüfung mit
+    /// <see cref="ScmKontoModus.Benutzerkonto"/> aufgebaut.</summary>
     [Fact]
-    public async Task CompletionService_PassesActiveKonto_ToRepositoryContext()
+    public async Task CompletionService_IssueCheck_UsesBenutzerkontoContext()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -182,20 +183,20 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await monitor.RunOnceAsync();
 
         var context = Assert.Single(contexts);
-        Assert.Equal(ScmKontoModus.SeparatesKonto, context.Konto);
+        Assert.Equal(ScmKontoModus.Benutzerkonto, context.Konto);
         Assert.Equal("https://github.com/owner/repo", context.RepositoryId);
     }
 
-    /// <summary>Deaktivierte Abschlussüberwachung beobachtet nichts; Aufgaben ohne
-    /// SCM-Ereigniszuordnung (manuell angelegt) bleiben ebenfalls unberührt.</summary>
+    /// <summary>Deaktivierte Abschlussüberwachung beobachtet nichts: kein Provider-Aufruf,
+    /// kein Abschluss-Countdown. (Der Ereignisgesteuert-Fall manuell angelegter Aufgaben ist
+    /// in <see cref="Monitor_Ereignisgesteuert_SkipsManualTaskWithPullRequest"/> abgedeckt.)</summary>
     [Fact]
-    public async Task Monitor_DisabledAndManualTask_SkipsObservation()
+    public async Task Monitor_Disabled_SkipsObservation()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: 7);
-        await AddManualTaskWithPullRequestAsync(fixture);
         SetupPullRequestStatus(fixture, PullRequestStatus.Merged);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
@@ -208,23 +209,6 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
             It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Null((await TaskAsync(fixture, taskId)).ScmAbschlussErkanntUtc);
-
-        using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmTaskCompletionEnabledKey, true);
-
-        await monitor.RunOnceAsync();
-
-        // Nur die ereignisgesteuerte Aufgabe wurde beobachtet, nicht die manuell angelegte.
-        fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
-            "owner/repo", 7, It.IsAny<CancellationToken>()), Times.Once);
-        Assert.NotNull((await TaskAsync(fixture, taskId)).ScmAbschlussErkanntUtc);
-        using var verification = fixture.Services.CreateScope();
-        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var manual = await db.Aufgaben.Include(x => x.PullRequests)
-            .SingleAsync(x => x.PullRequests.Any(p => p.PullRequestNumber == 42));
-        Assert.Null(manual.ScmAbschlussErkanntUtc);
-        Assert.Equal(AufgabeStatus.Gestartet, manual.Status);
     }
 
     /// <summary>Ein offener Pull Request und ein noch nicht abgeschlossenes Ereignis verhindern
@@ -263,10 +247,160 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         Assert.False(fixture.Sessions[taskId].Object.Process.HasExited);
     }
 
-    private static void SetupPullRequestStatus(ScmDispatchFixture fixture, PullRequestStatus status)
-        => fixture.Git.Setup(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PullRequestStatusInfo(PullRequestProvider.GitHub, "owner/repo", 7, null,
-                "https://github.com/owner/repo/pull/7", "PR", "src", "main", "sha", null,
+    /// <summary>Im Prüfmodus „AlleAufgaben“ wird auch eine manuell angelegte Aufgabe ohne
+    /// SCM-Ereigniszuordnung beobachtet, sofern sie eine Pull-Request-Referenz trägt.</summary>
+    [Fact]
+    public async Task Monitor_AlleAufgabenMode_ObservesManualTaskWithPullRequest()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await AddManualTaskWithPullRequestAsync(fixture);
+        await SetPruefmodusAsync(fixture, ScmTaskCompletionPruefmodus.AlleAufgaben);
+        SetupPullRequestStatus(fixture, PullRequestStatus.Merged, number: 42);
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        await monitor.RunOnceAsync();
+
+        fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
+            "owner/repo", 42, It.IsAny<CancellationToken>()), Times.Once);
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var manual = await db.Aufgaben.Include(x => x.PullRequests)
+            .SingleAsync(x => x.PullRequests.Any(p => p.PullRequestNumber == 42));
+        Assert.NotNull(manual.ScmAbschlussErkanntUtc);
+        Assert.Equal("Pull Request #42", manual.ScmAbschlussReferenz);
+    }
+
+    /// <summary>Im Standard-Prüfmodus „Ereignisgesteuert“ wird dieselbe manuell angelegte Aufgabe
+    /// ohne SCM-Ereigniszuordnung nicht beobachtet.</summary>
+    [Fact]
+    public async Task Monitor_Ereignisgesteuert_SkipsManualTaskWithPullRequest()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await AddManualTaskWithPullRequestAsync(fixture);
+        SetupPullRequestStatus(fixture, PullRequestStatus.Merged, number: 42);
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        await monitor.RunOnceAsync();
+
+        fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
+            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var manual = await db.Aufgaben.Include(x => x.PullRequests)
+            .SingleAsync(x => x.PullRequests.Any(p => p.PullRequestNumber == 42));
+        Assert.Null(manual.ScmAbschlussErkanntUtc);
+    }
+
+    /// <summary>Im Prüfmodus „AlleAufgaben“ wird eine manuell angelegte Aufgabe auch über ihr
+    /// verknüpftes Issue beobachtet: ein geschlossenes Issue beendet sie nach der Wartezeit.</summary>
+    [Fact]
+    public async Task Monitor_PruefmodusAlleAufgaben_ManuellAngelegteAufgabeMitGeschlossenemIssue_WirdBeendet()
+    {
+        var time = new TestTimeProvider();
+        await using var fixture = new ScmDispatchFixture(time: time);
+        await fixture.InitializeAsync();
+        var taskId = await AddManualTaskWithIssueAsync(fixture, 7);
+        await SetPruefmodusAsync(fixture, ScmTaskCompletionPruefmodus.AlleAufgaben);
+        await SetWaitAsync(fixture, 5);
+        fixture.Git.As<IScmEventSource>().Setup(x => x.ReadIssueAsync(
+                It.Is<ScmEventReference>(r => r.Number == 7), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Issue(7, "Issue", null, [], null, null) { IstGeschlossen = true });
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        await monitor.RunOnceAsync();
+
+        var task = await TaskAsync(fixture, taskId);
+        Assert.Equal("Issue #7", task.ScmAbschlussReferenz);
+        Assert.Equal(AufgabeStatus.Gestartet, task.Status);
+
+        time.Advance(TimeSpan.FromMinutes(5));
+        await monitor.RunOnceAsync();
+
+        Assert.Equal(AufgabeStatus.Beendet, (await TaskAsync(fixture, taskId)).Status);
+    }
+
+    /// <summary>Im Standard-Prüfmodus „Ereignisgesteuert“ wird eine Aufgabe mit ungültiger
+    /// Issue-Referenz (keine Nummer) trotz SCM-Ereigniszuordnung nie beobachtet.</summary>
+    [Fact]
+    public async Task Monitor_Ereignisgesteuert_TaskWithInvalidIssueReference_IsNeverObserved()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: null);
+        await AddIssueReferenceAsync(fixture, taskId, null);
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        await monitor.RunOnceAsync();
+
+        // Referenz vorhanden, aber ohne gültige Issue-/PR-Nummer → kein Provider-Aufruf.
+        fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
+            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        fixture.Git.As<IScmEventSource>().Verify(x => x.ReadIssueAsync(
+            It.IsAny<ScmEventReference>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Null((await TaskAsync(fixture, taskId)).ScmAbschlussErkanntUtc);
+    }
+
+    /// <summary>Im Prüfmodus „AlleAufgaben“ gilt eine ungültige Issue-Referenz (keine Nummer)
+    /// ebenfalls nicht als beobachtbare Referenz — kein Provider-Aufruf.</summary>
+    [Fact]
+    public async Task Monitor_AlleAufgaben_TaskWithInvalidIssueReference_IsNeverObserved()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (taskId, _) = await fixture.AddAsync(configured: true);
+        await AddIssueReferenceAsync(fixture, taskId, null);
+        await SetPruefmodusAsync(fixture, ScmTaskCompletionPruefmodus.AlleAufgaben);
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        await monitor.RunOnceAsync();
+
+        fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
+            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        fixture.Git.As<IScmEventSource>().Verify(x => x.ReadIssueAsync(
+            It.IsAny<ScmEventReference>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Null((await TaskAsync(fixture, taskId)).ScmAbschlussErkanntUtc);
+    }
+
+    /// <summary>Eine Aufgabe ganz ohne SCM-Referenz (weder Issue noch Pull Request) wird in keinem
+    /// Prüfmodus beobachtet oder beendet — selbst wenn ihr ein SCM-Ereignis zugeordnet ist.</summary>
+    [Theory]
+    [InlineData(ScmTaskCompletionPruefmodus.Ereignisgesteuert)]
+    [InlineData(ScmTaskCompletionPruefmodus.AlleAufgaben)]
+    public async Task Monitor_AufgabeOhneIssueUndOhnePullRequest_WirdNiemalsBeendet(ScmTaskCompletionPruefmodus modus)
+    {
+        var time = new TestTimeProvider();
+        await using var fixture = new ScmDispatchFixture(time: time);
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: null);
+        await SetPruefmodusAsync(fixture, modus);
+        await SetWaitAsync(fixture, 0);
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        await monitor.RunOnceAsync();
+
+        // Keine Referenz → der Kandidatenfilter sortiert die Aufgabe vor jedem Provider-Aufruf aus.
+        fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
+            It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        fixture.Git.As<IScmEventSource>().Verify(x => x.ReadIssueAsync(
+            It.IsAny<ScmEventReference>(), It.IsAny<CancellationToken>()), Times.Never);
+        var task = await TaskAsync(fixture, taskId);
+        Assert.Null(task.ScmAbschlussErkanntUtc);
+        Assert.Equal(AufgabeStatus.Gestartet, task.Status);
+
+        time.Advance(TimeSpan.FromMinutes(30));
+        await monitor.RunOnceAsync();
+
+        Assert.Equal(AufgabeStatus.Gestartet, (await TaskAsync(fixture, taskId)).Status);
+    }
+
+    private static void SetupPullRequestStatus(ScmDispatchFixture fixture, PullRequestStatus status, int number = 7)
+        => fixture.Git.Setup(x => x.GetPullRequestStatusAsync("owner/repo", number, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequestStatusInfo(PullRequestProvider.GitHub, "owner/repo", number, null,
+                $"https://github.com/owner/repo/pull/{number}", "PR", "src", "main", "sha", null,
                 status, PullRequestMergeStatus.Unknown, DateTimeOffset.UtcNow));
 
     private static async Task ProcessEventWithReportAsync(ScmDispatchFixture fixture, Guid eventId, int? pullRequestNumber)
@@ -292,7 +426,14 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
             .SetIntSettingAsync(AppEinstellungService.ScmTaskCompletionWaitMinutesKey, minutes);
     }
 
-    private static async Task AddIssueReferenceAsync(ScmDispatchFixture fixture, Guid taskId, int number)
+    private static async Task SetPruefmodusAsync(ScmDispatchFixture fixture, ScmTaskCompletionPruefmodus modus)
+    {
+        using var scope = fixture.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
+            .SetScmTaskCompletionPruefmodusAsync(modus);
+    }
+
+    private static async Task AddIssueReferenceAsync(ScmDispatchFixture fixture, Guid taskId, int? number)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -300,11 +441,31 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await db.SaveChangesAsync();
     }
 
+    private static async Task<GitRepository> GetOrCreateRepositoryAsync(ScmDispatchFixture fixture, SoftwareschmiededDbContext db)
+    {
+        var repository = await db.GitRepositories.FirstOrDefaultAsync();
+        if (repository is not null)
+            return repository;
+        var project = new Projekt { Id = Guid.NewGuid(), Name = "SCM" };
+        repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = project.Id,
+            RepositoryUrl = "https://github.com/owner/repo",
+            PluginTyp = fixture.Repository.ProviderPrefix,
+            RepositoryName = "repo",
+            Aktiv = true
+        };
+        db.AddRange(project, repository);
+        await db.SaveChangesAsync();
+        return repository;
+    }
+
     private static async Task AddManualTaskWithPullRequestAsync(ScmDispatchFixture fixture)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var repository = await db.GitRepositories.FirstAsync();
+        var repository = await GetOrCreateRepositoryAsync(fixture, db);
         var task = new Aufgabe
         {
             Id = Guid.NewGuid(),
@@ -328,6 +489,25 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         };
         db.Aufgaben.Add(task);
         await db.SaveChangesAsync();
+    }
+
+    private static async Task<Guid> AddManualTaskWithIssueAsync(ScmDispatchFixture fixture, int issueNumber)
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var repository = await GetOrCreateRepositoryAsync(fixture, db);
+        var task = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Manuell angelegt",
+            ProjektId = repository.ProjektId,
+            GitRepositoryId = repository.Id,
+            Status = AufgabeStatus.Gestartet,
+            IssueReferenz = new IssueReferenz { Id = Guid.NewGuid(), IssueNummer = issueNumber, Titel = "Issue" }
+        };
+        db.Aufgaben.Add(task);
+        await db.SaveChangesAsync();
+        return task.Id;
     }
 
     private static async Task<Aufgabe> TaskAsync(ScmDispatchFixture fixture, Guid taskId)

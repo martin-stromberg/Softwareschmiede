@@ -89,6 +89,16 @@ public interface IGitPlugin : IPlugin
         CancellationToken ct = default)
         => Task.FromResult(PullRequestCompletionResult.Failed($"'{nameof(CompletePullRequestAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt."));
 
+    /// <summary>Markiert einen Entwurfs-Pull-Request als bereit für Review (z. B. <c>gh pr ready</c>).</summary>
+    /// <param name="repositoryId">Repository-Identifier (z.B. "owner/repo").</param>
+    /// <param name="pullRequestNumber">Pull-Request-Nummer.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task<PullRequestCompletionResult> MarkPullRequestReadyAsync(
+        string repositoryId,
+        int pullRequestNumber,
+        CancellationToken ct = default)
+        => Task.FromResult(PullRequestCompletionResult.Failed($"'{nameof(MarkPullRequestReadyAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt."));
+
     /// <summary>Führt einen Commit durch.</summary>
     /// <param name="localPath">Lokaler Pfad des geklonten Repositories.</param>
     /// <param name="message">Commit-Nachricht.</param>

@@ -19,6 +19,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     private readonly SoftwareschmiededDbContext _db = TestDbContextFactory.Create();
     private readonly AppEinstellungService _einstellungen;
     private readonly ScmBackmergeService _sut;
+    private readonly FakeTimeProvider _time = new(DateTimeOffset.UtcNow);
     private readonly Mock<IGitPlugin> _plugin = new();
     private readonly ScmEventRepository _remote = new("github", "github.com", "R_1", "owner", "repo", "U_1", "U_1", "viewer", true);
     private readonly Guid _projektId = Guid.NewGuid();
@@ -29,7 +30,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     {
         _einstellungen = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
         _sut = new ScmBackmergeService(_db, _einstellungen, new ScmEventChangeNotifier(),
-            new FakeTimeProvider(DateTimeOffset.UtcNow), Options.Create(new ScmEventOptions()),
+            _time, Options.Create(new ScmEventOptions()),
             NullLogger<ScmBackmergeService>.Instance);
         _lokal = new GitRepository
         {
@@ -48,13 +49,18 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     /// <inheritdoc/>
     public void Dispose() => _db.Dispose();
 
+    private static PullRequestStatusInfo StatusInfo(PullRequestStatus status = PullRequestStatus.Open,
+        PullRequestMergeStatus mergeStatus = PullRequestMergeStatus.Mergeable,
+        string source = "main", string target = "staging", bool isDraft = false)
+        => new(PullRequestProvider.GitHub, "owner/repo", 7, "PR_7",
+            "https://github.com/owner/repo/pull/7", "Backmerge", source, target, "sha", null,
+            status, mergeStatus, DateTimeOffset.UtcNow, isDraft);
+
     private void SetStatus(PullRequestStatus status = PullRequestStatus.Open,
         PullRequestMergeStatus mergeStatus = PullRequestMergeStatus.Mergeable,
-        string source = "main", string target = "staging")
+        string source = "main", string target = "staging", bool isDraft = false)
         => _plugin.Setup(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PullRequestStatusInfo(PullRequestProvider.GitHub, "owner/repo", 7, "PR_7",
-                "https://github.com/owner/repo/pull/7", "Backmerge", source, target, "sha", null,
-                status, mergeStatus, DateTimeOffset.UtcNow));
+            .ReturnsAsync(StatusInfo(status, mergeStatus, source, target, isDraft));
 
     private Task EvaluateAsync(params ScmEventReference[] referenzen)
         => _sut.EvaluateDiscoveredReferencesAsync(_plugin.Object, _remote, referenzen, [_lokal]);
@@ -67,10 +73,11 @@ public sealed class ScmBackmergeServiceTests : IDisposable
         _plugin.Verify(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    private void VerifyAdminMerge(Times times)
+    private void VerifyMerge(bool allowProtectedBranchBypass, Times times)
         => _plugin.Verify(x => x.CompletePullRequestAsync("owner/repo", 7,
             It.Is<PullRequestCompletionOptions>(o => o.Strategy == PullRequestCompletionStrategy.Merge
-                && o.MergeMethod == PullRequestMergeMethod.Merge && o.AllowProtectedBranchBypass),
+                && o.MergeMethod == PullRequestMergeMethod.Merge
+                && o.AllowProtectedBranchBypass == allowProtectedBranchBypass),
             It.IsAny<CancellationToken>()), times);
 
     /// <summary>Deaktivierter Modus: keine Statusabfrage und kein Merge.</summary>
@@ -81,7 +88,8 @@ public sealed class ScmBackmergeServiceTests : IDisposable
         VerifyKeinProviderAufruf();
     }
 
-    /// <summary>Global aktiviert: Backmerge-PR (main → staging) wird per Admin-Merge bestätigt.</summary>
+    /// <summary>Global aktiviert: Backmerge-PR (main → staging) wird zuerst regulär gemergt; der
+    /// Admin-Fallback wird ohne gesetzte Option nicht aufgerufen.</summary>
     [Fact]
     public async Task Evaluate_ModusGlobal_BackmergeWirdGemergt()
     {
@@ -93,11 +101,34 @@ public sealed class ScmBackmergeServiceTests : IDisposable
 
         await EvaluateAsync(Pr());
 
-        VerifyAdminMerge(Times.Once());
+        VerifyMerge(allowProtectedBranchBypass: false, Times.Once());
+        VerifyMerge(allowProtectedBranchBypass: true, Times.Never());
         var checkpoint = await _db.ScmObservationCheckpoints.FindAsync(ScmBackmergeService.CheckpointKey(_remote, 7));
         checkpoint.Should().NotBeNull();
         checkpoint!.NextAttemptUtc.Should().Be(long.MaxValue);
+        checkpoint.ErrorCode.Should().Be("Merged");
         checkpoint.Diagnostic.Should().Contain("automatisch gemergt");
+    }
+
+    /// <summary>Eine endgültige Entscheidung überschreibt den Zwischen-Fehlercode früherer
+    /// Versuche — ein veraltetes „WaitingForMergeable“ bleibt nicht stehen.</summary>
+    [Fact]
+    public async Task Evaluate_EntscheidungNachWarten_LoeschtZwischenErrorCode()
+    {
+        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+        SetStatus(mergeStatus: PullRequestMergeStatus.Blocked);
+        await EvaluateAsync(Pr());
+        var checkpoint = await _db.ScmObservationCheckpoints.FindAsync(ScmBackmergeService.CheckpointKey(_remote, 7));
+        checkpoint!.ErrorCode.Should().Be("WaitingForMergeable");
+
+        SetStatus(status: PullRequestStatus.Closed);
+        _time.Advance(TimeSpan.FromHours(1));
+        await EvaluateAsync(Pr());
+
+        checkpoint = await _db.ScmObservationCheckpoints.FindAsync(ScmBackmergeService.CheckpointKey(_remote, 7));
+        checkpoint!.ErrorCode.Should().Be("Decided");
+        checkpoint.NextAttemptUtc.Should().Be(long.MaxValue);
+        checkpoint.Diagnostic.Should().Contain("Kein offener Pull Request");
     }
 
     /// <summary>Projektbezogener Modus ohne Projekt-Flag: kein Merge.</summary>
@@ -121,7 +152,8 @@ public sealed class ScmBackmergeServiceTests : IDisposable
             .ReturnsAsync(PullRequestCompletionResult.Completed("merge-sha"));
 
         await EvaluateAsync(Pr());
-        VerifyAdminMerge(Times.Once());
+        VerifyMerge(allowProtectedBranchBypass: false, Times.Once());
+        VerifyMerge(allowProtectedBranchBypass: true, Times.Never());
     }
 
     /// <summary>Kein Backmerge-Muster (head ≠ Hauptbranch): kein Merge, endgültige Entscheidung.</summary>
@@ -270,5 +302,121 @@ public sealed class ScmBackmergeServiceTests : IDisposable
         await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
         await EvaluateAsync(new ScmEventReference(_remote, ScmReferenceKind.Issue, 7));
         VerifyKeinProviderAufruf();
+    }
+
+    /// <summary>Draft-Backmerge ohne aktivierte Draft-Aktivierung: bisheriges Warte-Verhalten,
+    /// weder Ready-Aufruf noch Merge.</summary>
+    [Fact]
+    public async Task Evaluate_DraftOhneAktivierung_WartetOhneReadyAufruf()
+    {
+        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+        SetStatus(mergeStatus: PullRequestMergeStatus.Blocked, isDraft: true);
+
+        await EvaluateAsync(Pr());
+
+        _plugin.Verify(x => x.MarkPullRequestReadyAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _plugin.Verify(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
+            It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()), Times.Never);
+        var checkpoint = await _db.ScmObservationCheckpoints.FindAsync(ScmBackmergeService.CheckpointKey(_remote, 7));
+        checkpoint!.ErrorCode.Should().Be("WaitingForMergeable");
+        checkpoint.Diagnostic.Should().Contain("Entwurf");
+        checkpoint.NextAttemptUtc.Should().BeGreaterThan(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            .And.BeLessThan(long.MaxValue);
+    }
+
+    /// <summary>Draft-Backmerge mit aktivierter Option: Ready-Aufruf, erneuter Status-Read und
+    /// regulärer Merge ohne Admin-Fallback.</summary>
+    [Fact]
+    public async Task Evaluate_DraftMitAktivierung_WirdBereitGemachtUndGemergt()
+    {
+        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+        await _einstellungen.SetScmBackmergeDraftAktivierungAsync(true);
+        var abfragen = 0;
+        _plugin.Setup(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => ++abfragen == 1
+                ? StatusInfo(mergeStatus: PullRequestMergeStatus.Blocked, isDraft: true)
+                : StatusInfo(mergeStatus: PullRequestMergeStatus.Mergeable, isDraft: false));
+        _plugin.Setup(x => x.MarkPullRequestReadyAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.Approved("bereit"));
+        _plugin.Setup(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
+                It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.Completed("merge-sha"));
+
+        await EvaluateAsync(Pr());
+
+        _plugin.Verify(x => x.MarkPullRequestReadyAsync("owner/repo", 7, It.IsAny<CancellationToken>()), Times.Once);
+        _plugin.Verify(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()), Times.Exactly(2));
+        VerifyMerge(allowProtectedBranchBypass: false, Times.Once());
+        VerifyMerge(allowProtectedBranchBypass: true, Times.Never());
+        var checkpoint = await _db.ScmObservationCheckpoints.FindAsync(ScmBackmergeService.CheckpointKey(_remote, 7));
+        checkpoint!.NextAttemptUtc.Should().Be(long.MaxValue);
+        checkpoint.Diagnostic.Should().Contain("automatisch gemergt");
+    }
+
+    /// <summary>Fehlschlagende Draft-Aktivierung: Temporary-Backoff ohne erneuten Status-Read und ohne Merge.</summary>
+    [Fact]
+    public async Task Evaluate_DraftAktivierungFehlgeschlagen_BackoffWiederholung()
+    {
+        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+        await _einstellungen.SetScmBackmergeDraftAktivierungAsync(true);
+        SetStatus(mergeStatus: PullRequestMergeStatus.Blocked, isDraft: true);
+        _plugin.Setup(x => x.MarkPullRequestReadyAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.Failed("kein Zugriff"));
+
+        await EvaluateAsync(Pr());
+
+        _plugin.Verify(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()), Times.Once);
+        _plugin.Verify(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
+            It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()), Times.Never);
+        var checkpoint = await _db.ScmObservationCheckpoints.FindAsync(ScmBackmergeService.CheckpointKey(_remote, 7));
+        checkpoint!.Failures.Should().Be(1);
+        checkpoint.ErrorCode.Should().Be("Temporary");
+        checkpoint.Diagnostic.Should().Contain("Draft-Aktivierung fehlgeschlagen").And.Contain("kein Zugriff");
+        checkpoint.NextAttemptUtc.Should().BeGreaterThan(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            .And.BeLessThan(long.MaxValue);
+    }
+
+    /// <summary>Blockierter regulärer Merge mit aktivierter Admin-Option: zweiter Versuch mit Admin-Rechten.</summary>
+    [Fact]
+    public async Task Evaluate_AdminMergeFallback_ZweiterVersuchMitAdminRechten()
+    {
+        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+        await _einstellungen.SetScmBackmergeAdminMergeAsync(true);
+        SetStatus();
+        _plugin.Setup(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
+                It.Is<PullRequestCompletionOptions>(o => !o.AllowProtectedBranchBypass), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.BlockedResult("protected branch"));
+        _plugin.Setup(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
+                It.Is<PullRequestCompletionOptions>(o => o.AllowProtectedBranchBypass), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.Completed("merge-sha"));
+
+        await EvaluateAsync(Pr());
+
+        VerifyMerge(allowProtectedBranchBypass: false, Times.Once());
+        VerifyMerge(allowProtectedBranchBypass: true, Times.Once());
+        var checkpoint = await _db.ScmObservationCheckpoints.FindAsync(ScmBackmergeService.CheckpointKey(_remote, 7));
+        checkpoint!.NextAttemptUtc.Should().Be(long.MaxValue);
+        checkpoint.Diagnostic.Should().Contain("automatisch gemergt");
+    }
+
+    /// <summary>Blockierter regulärer Merge ohne aktivierte Admin-Option: kein Fallback, Backoff-Retry.</summary>
+    [Fact]
+    public async Task Evaluate_AdminMergeOhneOption_NurRegulaererVersuch()
+    {
+        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+        SetStatus();
+        _plugin.Setup(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
+                It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.BlockedResult("protected branch"));
+
+        await EvaluateAsync(Pr());
+
+        VerifyMerge(allowProtectedBranchBypass: false, Times.Once());
+        VerifyMerge(allowProtectedBranchBypass: true, Times.Never());
+        var checkpoint = await _db.ScmObservationCheckpoints.FindAsync(ScmBackmergeService.CheckpointKey(_remote, 7));
+        checkpoint!.ErrorCode.Should().Be("Blocked");
+        checkpoint.Diagnostic.Should().Contain("protected branch");
+        checkpoint.NextAttemptUtc.Should().BeGreaterThan(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            .And.BeLessThan(long.MaxValue);
     }
 }

@@ -719,6 +719,9 @@ password {token}
     private static int GetInt32OrDefault(JsonElement element, string propertyName)
         => element.TryGetProperty(propertyName, out var property) && property.TryGetInt32(out var value) ? value : 0;
 
+    private static bool GetBoolOrDefault(JsonElement element, string propertyName)
+        => element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.True;
+
     private static int? GetNullableInt32(JsonElement? element, string propertyName)
         => element is { ValueKind: JsonValueKind.Object } value
            && value.TryGetProperty(propertyName, out var property)
@@ -1039,7 +1042,7 @@ password {token}
         {
             var (host, owner, name) = ParseEventRepository(normalizedRepositoryId);
             var data = await GraphAsync(_eventApiClient, host,
-                "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id number title url state headRefName baseRefName headRefOid mergeCommit{oid} mergeStateStatus}}}",
+                "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id number title url state headRefName baseRefName headRefOid mergeCommit{oid} mergeStateStatus isDraft}}}",
                 new Dictionary<string, object?> { ["owner"] = owner, ["name"] = name, ["number"] = pullRequestNumber }, false, ct);
             var pullRequest = Object(Object(data, "repository"), "pullRequest");
             if (pullRequest.ValueKind != JsonValueKind.Object)
@@ -1153,6 +1156,32 @@ password {token}
         return PullRequestCompletionResult.Completed(status.MergeCommitSha, result.StdOut.Trim());
     }
 
+    /// <inheritdoc/>
+    public override async Task<PullRequestCompletionResult> MarkPullRequestReadyAsync(
+        string repositoryId,
+        int pullRequestNumber,
+        CancellationToken ct = default)
+    {
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId);
+        if (string.IsNullOrWhiteSpace(normalizedRepositoryId))
+        {
+            return PullRequestCompletionResult.Failed("Repository-ID fehlt.");
+        }
+
+        var result = await _cliRunner.RunAsync("gh",
+            ["pr", "ready", pullRequestNumber.ToString(), "--repo", normalizedRepositoryId],
+            null, GetGhEnvironment(), ct);
+        if (!result.IsSuccess)
+        {
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr);
+            return IsAuthenticationFailure(result.StdErr) || IsBranchProtectionFailure(result.StdErr)
+                ? PullRequestCompletionResult.BlockedResult(sanitizedError)
+                : PullRequestCompletionResult.Failed(sanitizedError);
+        }
+
+        return PullRequestCompletionResult.Approved(result.StdOut.Trim());
+    }
+
     private async Task<IReadOnlyList<JsonElement>> RunWorkflowListAsync(string repositoryId, string? commitSha, CancellationToken ct)
     {
         var (host, owner, name) = ParseEventRepository(repositoryId);
@@ -1205,7 +1234,8 @@ password {token}
             mergeCommitSha,
             status,
             MapMergeStatus(mergeStateStatus, status),
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            GetBoolOrDefault(root, "isDraft"));
     }
 
     private static IReadOnlyList<PullRequestWorkflowRunInfo> ParseWorkflowRuns(

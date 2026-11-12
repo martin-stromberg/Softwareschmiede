@@ -353,7 +353,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         // Fehlerfall zuerst: Separates Konto ohne AgentToken wird mit sichtbarer
         // Fehlermeldung abgelehnt; DiscardChanges setzt Banner und Modus zurück.
         var settings = new SettingsView(window).ForceShow();
-        settings.SwitchTab("Allgemein");
+        settings.OpenAufgabenAusfuehren();
         settings.SetKontoModus("Separates Konto");
         var rejected = Assert.Throws<InvalidOperationException>(() => settings.SaveSettings());
         Assert.Contains("Personal Access Token", rejected.Message);
@@ -363,7 +363,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         settings.SwitchTab("Plugins");
         WaitForElement(window, cf => cf.ByName("Softwareschmiede.GitHub.Eintrag"), Long).ClickInForeground();
         settings.SetPluginSecretField("AgentToken", "fixture-agent-token");
-        settings.SwitchTab("Allgemein");
+        settings.OpenAufgabenAusfuehren();
         settings.SetKontoModus("Separates Konto");
         settings.SaveSettings();
         output.WriteLine("Bot: Separates Konto ohne Token abgelehnt; AgentToken per Tastatur eingetragen und gemeinsam gespeichert.");

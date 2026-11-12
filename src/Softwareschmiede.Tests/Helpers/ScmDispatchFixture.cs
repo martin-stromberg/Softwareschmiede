@@ -136,6 +136,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddSingleton<ScmEventChangeNotifier>();
         services.AddSingleton<ScmEventExchangeProtocol>();
         services.AddSingleton<ScmEventMonitoringService>();
+        services.AddSingleton<ScmBackmergeMonitoringService>();
         services.AddSingleton<ScmTaskCompletionMonitoringService>();
         services.AddScoped<PullRequestReferenzService>();
         services.AddScoped<TodoService>();

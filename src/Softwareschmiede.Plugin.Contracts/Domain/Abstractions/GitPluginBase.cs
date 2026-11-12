@@ -61,6 +61,13 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
         CancellationToken ct = default)
         => Task.FromResult(PullRequestCompletionResult.Failed($"'{nameof(CompletePullRequestAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt."));
 
+    /// <inheritdoc/>
+    public virtual Task<PullRequestCompletionResult> MarkPullRequestReadyAsync(
+        string repositoryId,
+        int pullRequestNumber,
+        CancellationToken ct = default)
+        => Task.FromResult(PullRequestCompletionResult.Failed($"'{nameof(MarkPullRequestReadyAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt."));
+
     public abstract Task<bool> CheckHealthAsync(CancellationToken ct = default);
     public abstract Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default);
     public abstract Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default);
