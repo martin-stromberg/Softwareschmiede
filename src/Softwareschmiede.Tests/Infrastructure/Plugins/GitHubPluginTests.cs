@@ -1599,6 +1599,152 @@ public sealed class GitHubPluginTests
         result.Should().BeEmpty();
     }
 
+    /// <summary>GetPullRequestStatusAsync fragt isDraft ab und mappt Draft-PRs korrekt.</summary>
+    [Fact]
+    public async Task GetPullRequestStatusAsync_ParsesIsDraft()
+    {
+        const string statusJson = """
+            {
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "id": "PR_kw",
+                            "number": 42,
+                            "title": "PR",
+                            "url": "https://github.com/owner/repo/pull/42",
+                            "state": "OPEN",
+                            "headRefName": "feature/pr",
+                            "baseRefName": "main",
+                            "headRefOid": "head",
+                            "mergeCommit": null,
+                            "mergeStateStatus": "DRAFT",
+                            "isDraft": true
+                        }
+                    }
+                }
+            }
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _api.AddJson("graphql", statusJson);
+
+        var result = await _sut.GetPullRequestStatusAsync("owner/repo", 42);
+
+        var request = _api.Requests.Should().ContainSingle().Which;
+        request.JsonBody.Should().Contain("isDraft");
+        result.IsDraft.Should().BeTrue();
+        result.MergeStatus.Should().Be(PullRequestMergeStatus.Blocked);
+    }
+
+    /// <summary>Fehlendes isDraft-Feld in der Antwort wird als Nicht-Entwurf gelesen.</summary>
+    [Fact]
+    public async Task GetPullRequestStatusAsync_MissingIsDraft_DefaultsFalse()
+    {
+        const string statusJson = """
+            {
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "id": "PR_kw",
+                            "number": 42,
+                            "title": "PR",
+                            "url": "https://github.com/owner/repo/pull/42",
+                            "state": "OPEN",
+                            "headRefName": "feature/pr",
+                            "baseRefName": "main",
+                            "headRefOid": "head",
+                            "mergeCommit": null,
+                            "mergeStateStatus": "CLEAN"
+                        }
+                    }
+                }
+            }
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _api.AddJson("graphql", statusJson);
+
+        var result = await _sut.GetPullRequestStatusAsync("owner/repo", 42);
+
+        result.IsDraft.Should().BeFalse();
+    }
+
+    /// <summary>MarkPullRequestReadyAsync führt „gh pr ready &lt;nummer&gt; --repo &lt;repo&gt;“ aus.</summary>
+    [Fact]
+    public async Task MarkPullRequestReadyAsync_RunsGhPrReady()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pr", "ready", "42", "--repo", "owner/repo")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "marked ready", string.Empty));
+
+        var result = await _sut.MarkPullRequestReadyAsync("owner/repo", 42);
+
+        result.Success.Should().BeTrue();
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "gh",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pr", "ready", "42", "--repo", "owner/repo")),
+            null,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Ein gh-Fehler bei der Draft-Aktivierung liefert ein nicht erfolgreiches Ergebnis statt einer Exception.</summary>
+    [Fact]
+    public async Task MarkPullRequestReadyAsync_CliFailure_ReturnsFailed()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pr", "ready", "42", "--repo", "owner/repo")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "not a draft"));
+
+        var result = await _sut.MarkPullRequestReadyAsync("owner/repo", 42);
+
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("not a draft");
+    }
+
+    /// <summary>Ein Berechtigungsfehler bei der Draft-Aktivierung wird als blockiert markiert.</summary>
+    [Fact]
+    public async Task MarkPullRequestReadyAsync_PermissionError_ReturnsBlocked()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pr", "ready", "42", "--repo", "owner/repo")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "Resource not accessible by integration (requires protected branch bypass)"));
+
+        var result = await _sut.MarkPullRequestReadyAsync("owner/repo", 42);
+
+        result.Success.Should().BeFalse();
+        result.Blocked.Should().BeTrue();
+    }
+
+    /// <summary>Ohne Repository-ID schlägt die Draft-Aktivierung direkt fehl.</summary>
+    [Fact]
+    public async Task MarkPullRequestReadyAsync_WithoutRepositoryId_ReturnsFailed()
+    {
+        var result = await _sut.MarkPullRequestReadyAsync(" ", 42);
+
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("Repository-ID fehlt");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "gh",
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private static bool SequenceEqual(IEnumerable<string> actual, params string[] expected)
         => actual.SequenceEqual(expected);
 }

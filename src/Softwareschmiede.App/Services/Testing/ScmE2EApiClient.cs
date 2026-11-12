@@ -161,7 +161,10 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
             lastEditedAt = text.EditedAt,
             url = $"https://github.com/scm-owner/scm-e2e/issues/{text.Number}",
             author = new { id = text.Author == "scm-owner" ? "OWNER" : "OTHER", login = text.Author },
-            editor = text.EditedAt is null ? null : new { id = text.Author == "scm-owner" ? "OWNER" : "OTHER", login = text.Author }
+            editor = text.EditedAt is null ? null : new { id = text.Author == "scm-owner" ? "OWNER" : "OTHER", login = text.Author },
+            // Immer emittieren: der produktive Parser wertet das Feld streng aus. Vom Host
+            // gepostete Antworten werden bewusst nicht zurückgespiegelt (deterministische Fixture).
+            reactionGroups = text.ViewerReactions.Select(reaction => (object)new { content = reaction, viewerHasReacted = true }).ToArray()
         };
 
     // Feldliste der PR-Status-Abfrage (ParsePullRequestStatus): offen und mergebar — die

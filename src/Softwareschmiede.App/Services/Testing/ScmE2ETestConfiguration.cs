@@ -77,6 +77,7 @@ internal sealed class ScmE2EText
     public string Author { get; set; } = "scm-owner";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow.AddMinutes(-1);
     public DateTimeOffset? EditedAt { get; set; }
+    public List<string> ViewerReactions { get; set; } = [];
     public string NodeId => $"SCM_{Kind}_{Id}";
 }
 

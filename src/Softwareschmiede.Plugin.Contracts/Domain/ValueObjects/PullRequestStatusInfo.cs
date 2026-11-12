@@ -16,4 +16,5 @@ public sealed record PullRequestStatusInfo(
     string? MergeCommitSha,
     PullRequestStatus Status,
     PullRequestMergeStatus MergeStatus,
-    DateTimeOffset CheckedAtUtc);
+    DateTimeOffset CheckedAtUtc,
+    bool IsDraft = false);

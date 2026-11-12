@@ -5,6 +5,9 @@ using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.TestSupport;
 
@@ -221,6 +224,33 @@ public sealed class ScmEventQueueViewModelTests
         Assert.Null(view.MonitoringNotice);
         Assert.Contains("verworfen", view.Diagnostics);
         Assert.Contains("notifications/", view.Diagnostics);
+    }
+
+    /// <summary>„Quellen erneut prüfen" stößt den eigenständigen Backmerge-Prüfzyklus auch bei
+    /// deaktivierter Ereignisüberwachung an; die Ereignisquellen selbst bleiben ungelesen.</summary>
+    [Fact]
+    public async Task RetrySourcesCommand_MonitoringDisabled_StillRunsBackmergeCycle()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.AddAsync(configured: true);
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+            await einstellungen.SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false);
+            await einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+        }
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+
+        await view.RetrySourcesCommand.ExecuteAsync();
+
+        // Der Backmerge-Prüfzyklus lief: Repository-Auflösung und repository-weite Enumeration.
+        fixture.Git.As<IScmEventSource>().Verify(x => x.EnumerateReferencesAsync(
+            It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Once);
+        // Die Ereignisüberwachung blieb dagegen abgeschaltet: kein Quellen-Read.
+        fixture.Git.As<IScmEventSource>().Verify(x => x.ReadEventsAsync(
+            It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains("deaktiviert", view.Message);
     }
 
     private static ScmEventQueueViewModel View(IServiceScopeFactory scopes, ScmDispatchFixture fixture)

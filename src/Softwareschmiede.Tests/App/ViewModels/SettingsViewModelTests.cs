@@ -684,6 +684,101 @@ public sealed class SettingsViewModelTests : IDisposable
             .Should().BeNull("ein ungültiges Keyword darf nicht persistiert werden");
     }
 
+    /// <summary>Ein leeres Trigger-Keyword blockiert das Speichern nicht, solange das Feld nicht
+    /// wirksam ist — bei deaktivierter Ereignisüberwachung ist der Bereich ausgeblendet.</summary>
+    [Fact]
+    public async Task SpeichernCommand_EmptyTriggerKeyword_MonitoringDisabled_Saves()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsScmMonitoringEnabled = false;
+        sut.ScmTriggerKeyword = "   ";
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        sut.ErfolgsMeldung.Should().NotBeNull();
+    }
+
+    /// <summary>Im SeparatesKonto-Modus ist das Trigger-Keyword-Feld ausgeblendet; ein leerer
+    /// Wert blockiert das Speichern daher nicht.</summary>
+    [Fact]
+    public async Task SpeichernCommand_EmptyTriggerKeyword_SeparatesKonto_Saves()
+    {
+        var plugin = CreateGitHubPluginMock().Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        _credentialStore.SetCredential("Softwareschmiede.GitHub.AgentToken", "bot-token");
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        sut.ScmTriggerKeyword = "   ";
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        (await _einstellungService.GetScmKontoModusAsync()).Should().Be(ScmKontoModus.SeparatesKonto);
+    }
+
+    /// <summary>Eine ungültige Wartezeit blockiert das Speichern nicht, solange die
+    /// Abschlussüberwachung deaktiviert ist — das Feld ist dann deaktiviert und nicht wirksam;
+    /// der gespeicherte Wert bleibt unberührt.</summary>
+    [Fact]
+    public async Task SpeichernCommand_InvalidWait_TaskCompletionDisabled_Saves()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsScmTaskCompletionEnabled = false;
+        sut.ScmTaskCompletionWaitMinutes = "keine Zahl";
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        sut.ErfolgsMeldung.Should().NotBeNull();
+        (await _einstellungService.GetScmTaskCompletionWaitMinutesAsync())
+            .Should().Be(AppEinstellungService.ScmTaskCompletionDefaultWaitMinutes,
+                "die nicht wirksame Wartezeit darf nicht überschrieben werden");
+    }
+
+    /// <summary>„Verwerfen“ stellt die gespeicherten Auswahlen wieder her und benachrichtigt dabei
+    /// auch die abgeleiteten Anzeige-Properties (Sichtbarkeit, Enabled-Zustand, Panel-Status) —
+    /// die UI bleibt nach dem Wiederherstellen konsistent.</summary>
+    [Fact]
+    public async Task VerwerfenCommand_NotifiesDependentAnzeigeProperties()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        // Probehalber vom gespeicherten Standard abweichende Werte setzen.
+        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Global);
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        sut.IsScmMonitoringEnabled = false;
+        sut.IsScmTaskCompletionEnabled = false;
+
+        var changes = new List<string?>();
+        sut.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        await ((AsyncRelayCommand)sut.VerwerfenCommand).ExecuteAsync();
+
+        sut.SelectedBackmergeModus?.Modus.Should().Be(ScmBackmergeModus.Deaktiviert);
+        sut.SelectedKontoModus?.Modus.Should().Be(ScmKontoModus.Benutzerkonto);
+        sut.IsProzessablaeufeFelderEnabled.Should().BeFalse();
+        sut.ProzessablaeufeStatusText.Should().Be("deaktiviert");
+        sut.IsTriggerKeywordSichtbar.Should().BeTrue();
+        changes.Should().Contain(nameof(sut.IsProzessablaeufeFelderEnabled));
+        changes.Should().Contain(nameof(sut.ProzessablaeufeStatusText));
+        changes.Should().Contain(nameof(sut.IsTriggerKeywordSichtbar));
+        changes.Should().Contain(nameof(sut.IsPromptAnhaengeSichtbar));
+        changes.Should().Contain(nameof(sut.IsUeberwachungsmodusEnabled));
+        changes.Should().Contain(nameof(sut.AufgabenAusfuehrenStatusText));
+        changes.Should().Contain(nameof(sut.IsTaskCompletionFelderEnabled));
+        changes.Should().Contain(nameof(sut.AufgabenBeendenStatusText));
+    }
+
     /// <summary>LadenCommand lädt den Backmerge-Modus; ohne gespeicherten Eintrag gilt „Deaktiviert“.</summary>
     [Fact]
     public async Task LadenCommand_LoadsBackmergeModusDefaults()
@@ -900,6 +995,155 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.FehlerMeldung.Should().BeNull();
         (await _einstellungService.GetScmKontoModusAsync()).Should().Be(ScmKontoModus.SeparatesKonto);
         _credentialStore.GetCredential("Softwareschmiede.GitHub.AgentToken").Should().Be("bot-token");
+    }
+
+    /// <summary>LadenCommand lädt den Prüfmodus der Abschlussüberwachung; ohne Eintrag gilt „Ereignisgesteuert“.</summary>
+    [Fact]
+    public async Task LadenCommand_LoadsPruefmodusDefaults()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedScmTaskCompletionPruefmodus.Should().Be(ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionPruefmodus.Ereignisgesteuert));
+        sut.ScmTaskCompletionPruefmodusOptionen.Should().HaveCount(2);
+    }
+
+    /// <summary>SpeichernCommand persistiert den Prüfmodus und lädt ihn beim Neuladen zurück.</summary>
+    [Fact]
+    public async Task SpeichernCommand_PersistsPruefmodus()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionPruefmodus.AlleAufgaben);
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        (await _einstellungService.GetScmTaskCompletionPruefmodusAsync()).Should().Be(ScmTaskCompletionPruefmodus.AlleAufgaben);
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.SelectedScmTaskCompletionPruefmodus.Should().Be(ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionPruefmodus.AlleAufgaben));
+    }
+
+    /// <summary>Eine fehlende Prüfmodus-Auswahl wird nicht gespeichert.</summary>
+    [Fact]
+    public async Task SpeichernCommand_RejectsMissingPruefmodus()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedScmTaskCompletionPruefmodus = null;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        (await _einstellungService.GetScmTaskCompletionPruefmodusAsync()).Should().Be(ScmTaskCompletionPruefmodus.Ereignisgesteuert);
+    }
+
+    /// <summary>LadenCommand lädt die Backmerge-Optionen; ohne Eintrag sind beide deaktiviert.</summary>
+    [Fact]
+    public async Task LadenCommand_LoadsBackmergeOptionenDefaults()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsScmBackmergeDraftAktivierung.Should().BeFalse();
+        sut.IsScmBackmergeAdminMerge.Should().BeFalse();
+    }
+
+    /// <summary>SpeichernCommand persistiert beide Backmerge-Optionen unabhängig voneinander und lädt sie zurück.</summary>
+    [Fact]
+    public async Task SpeichernCommand_PersistsBackmergeOptionen()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsScmBackmergeDraftAktivierung = true;
+        sut.IsScmBackmergeAdminMerge = true;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        (await _einstellungService.GetScmBackmergeDraftAktivierungAsync()).Should().BeTrue();
+        (await _einstellungService.GetScmBackmergeAdminMergeAsync()).Should().BeTrue();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.IsScmBackmergeDraftAktivierung.Should().BeTrue();
+        sut.IsScmBackmergeAdminMerge.Should().BeTrue();
+    }
+
+    /// <summary>Der Überwachungsmodus ist nur bedienbar, Trigger-Keyword und Prompt-Anhänge nur sichtbar,
+    /// solange die Ereignisüberwachung aktiviert ist.</summary>
+    [Fact]
+    public async Task AufgabenAusfuehren_AbleitungenFolgenDemSchalter()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsUeberwachungsmodusEnabled.Should().BeTrue();
+        sut.IsTriggerKeywordSichtbar.Should().BeTrue("Benutzerkonto ist der Standard-Modus");
+        sut.IsPromptAnhaengeSichtbar.Should().BeTrue();
+        sut.AufgabenAusfuehrenStatusText.Should().Be("aktiviert");
+
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        sut.IsTriggerKeywordSichtbar.Should().BeFalse("im SeparatesKonto gilt die Erwähnung statt des Keywords");
+        sut.IsPromptAnhaengeSichtbar.Should().BeTrue();
+
+        sut.IsScmMonitoringEnabled = false;
+        sut.IsUeberwachungsmodusEnabled.Should().BeFalse();
+        sut.IsTriggerKeywordSichtbar.Should().BeFalse();
+        sut.IsPromptAnhaengeSichtbar.Should().BeFalse();
+        sut.AufgabenAusfuehrenStatusText.Should().Be("deaktiviert");
+    }
+
+    /// <summary>Prüfmodus und Wartezeit folgen dem Abschlussüberwachungs-Schalter; der Status zeigt den Schaltzustand.</summary>
+    [Fact]
+    public async Task AufgabenBeenden_AbleitungenFolgenDemSchalter()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsTaskCompletionFelderEnabled.Should().BeTrue();
+        sut.AufgabenBeendenStatusText.Should().Be("aktiviert");
+
+        sut.IsScmTaskCompletionEnabled = false;
+        sut.IsTaskCompletionFelderEnabled.Should().BeFalse();
+        sut.AufgabenBeendenStatusText.Should().Be("deaktiviert");
+    }
+
+    /// <summary>Die Backmerge-Optionen sind nur bedienbar, solange der Backmerge-Modus nicht „Deaktiviert“ ist.</summary>
+    [Fact]
+    public async Task Prozessablaeufe_AbleitungenFolgenDemBackmergeModus()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsProzessablaeufeFelderEnabled.Should().BeFalse("Standard ist Deaktiviert");
+        sut.ProzessablaeufeStatusText.Should().Be("deaktiviert");
+
+        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Global);
+        sut.IsProzessablaeufeFelderEnabled.Should().BeTrue();
+        sut.ProzessablaeufeStatusText.Should().Be("aktiviert");
+
+        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Projektbezogen);
+        sut.IsProzessablaeufeFelderEnabled.Should().BeTrue();
+        sut.ProzessablaeufeStatusText.Should().Be("aktiviert");
     }
 }
 

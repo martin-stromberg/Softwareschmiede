@@ -11,13 +11,16 @@ using Softwareschmiede.Infrastructure.Data;
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>
-/// Abschlussüberwachung ereignisgesteuerter Aufgaben: Prüft zyklisch — im selben Intervall-Stil wie
-/// <see cref="ScmEventMonitoringService"/> — den Remote-Zustand der SCM-Referenzen von Aufgaben, denen
-/// mindestens ein Inbox-Ereignis zugeordnet wurde. Ist die verknüpfte Referenz geschlossen/gemergt
-/// (alle verknüpften Pull Requests; ohne Pull-Request-Verknüpfung das verknüpfte Issue), startet die
-/// persistierte Wartezeit (<see cref="Aufgabe.ScmAbschlussErkanntUtc"/>); nach deren Ablauf wird die
-/// laufende KI-Ausführung beendet und die Aufgabe auf den Endstatus <see cref="AufgabeStatus.Beendet"/>
-/// gesetzt. Manuelle Aufgaben ohne SCM-Ereigniszuordnung bleiben unberührt.
+/// Abschlussüberwachung von Aufgaben mit SCM-Referenz: Prüft zyklisch — im selben Intervall-Stil wie
+/// <see cref="ScmEventMonitoringService"/> — den Remote-Zustand der verknüpften SCM-Referenzen der
+/// durch den Prüfmodus (<see cref="ScmTaskCompletionPruefmodus"/>) bestimmten Aufgaben.
+/// Ereignisgesteuert werden nur Aufgaben mit mindestens einem Inbox-Ereignis beobachtet, im Modus
+/// „AlleAufgaben“ alle noch nicht beendeten Aufgaben; Voraussetzung ist stets eine SCM-Referenz
+/// (Issue oder Pull Request). Ist die verknüpfte Referenz geschlossen/gemergt (alle verknüpften
+/// Pull Requests; ohne Pull-Request-Verknüpfung das verknüpfte Issue), startet die persistierte
+/// Wartezeit (<see cref="Aufgabe.ScmAbschlussErkanntUtc"/>); nach deren Ablauf wird die laufende
+/// KI-Ausführung beendet und die Aufgabe auf den Endstatus <see cref="AufgabeStatus.Beendet"/>
+/// gesetzt. Aufgaben ohne jede SCM-Referenz bleiben unberührt.
 /// </summary>
 public sealed class ScmTaskCompletionMonitoringService(
     IServiceScopeFactory scopes, TimeProvider time, IOptions<ScmEventOptions> options,
@@ -31,7 +34,7 @@ public sealed class ScmTaskCompletionMonitoringService(
         await startup.WaitAsync(ct);
         using var scope = scopes.CreateScope();
         var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-        // Laufzeit-Schalter (Einstellungen → Allgemein → SCM-Ereignisse): Bei deaktivierter
+        // Laufzeit-Schalter (Einstellungen → Automatisierung → Aufgaben beenden): Bei deaktivierter
         // Abschlussüberwachung wird weder beobachtet noch automatisch abgeschlossen; ein bereits
         // gesetzter Erkennungszeitpunkt bleibt persistiert bestehen.
         if (!await einstellungen.GetScmTaskCompletionEnabledAsync(ct))
@@ -40,14 +43,24 @@ public sealed class ScmTaskCompletionMonitoringService(
             return;
         }
         var wait = TimeSpan.FromMinutes(await einstellungen.GetScmTaskCompletionWaitMinutesAsync(ct));
+        var pruefmodus = await einstellungen.GetScmTaskCompletionPruefmodusAsync(ct);
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         // Ereignisgesteuert = mindestens ein eingegangenes SCM-Ereignis; abgeschlossene Ereignisse
         // entscheiden die Referenzbeobachtung nicht vorzeitig — erst nach deren Abschluss.
-        var candidates = await db.Aufgaben
-            .Where(a => a.Status != AufgabeStatus.Beendet && a.Status != AufgabeStatus.Archiviert
-                && db.ScmIncomingEvents.Any(e => e.AufgabeId == a.Id))
-            .Select(a => a.Id)
-            .ToListAsync(ct);
+        // Kandidaten brauchen immer eine SCM-Referenz (Issue oder Pull Request); Aufgaben ohne
+        // Referenz werden nie beobachtet.
+        var candidates = pruefmodus == ScmTaskCompletionPruefmodus.AlleAufgaben
+            ? await db.Aufgaben
+                .Where(a => a.Status != AufgabeStatus.Beendet && a.Status != AufgabeStatus.Archiviert
+                    && (a.IssueReferenz != null || a.PullRequests.Any()))
+                .Select(a => a.Id)
+                .ToListAsync(ct)
+            : await db.Aufgaben
+                .Where(a => a.Status != AufgabeStatus.Beendet && a.Status != AufgabeStatus.Archiviert
+                    && db.ScmIncomingEvents.Any(e => e.AufgabeId == a.Id)
+                    && (a.IssueReferenz != null || a.PullRequests.Any()))
+                .Select(a => a.Id)
+                .ToListAsync(ct);
         foreach (var taskId in candidates)
         {
             try
@@ -184,13 +197,14 @@ public sealed class ScmTaskCompletionMonitoringService(
         }
         if (task.IssueReferenz?.IssueNummer is > 0 && task.GitRepository is not null)
         {
-            var plugin = plugins.FirstOrDefault(x => MatchesPlugin(x, task.GitRepository));
+            var plugin = plugins.FirstOrDefault(x => ScmPluginMatcher.MatchesPlugin(x, task.GitRepository));
             if (plugin is not IScmEventSource source)
                 return null;
+            // Die Issue-Prüfung läuft immer unter dem Benutzerkonto — unabhängig vom konfigurierten
+            // Überwachungsmodus der Ereignisüberwachung.
             var repository = await source.GetEventRepositoryAsync(
                 new ScmRepositoryContext(task.GitRepository.Id, plugin.PluginPrefix,
-                    task.GitRepository.RepositoryUrl,
-                    await services.GetRequiredService<AppEinstellungService>().GetScmKontoModusAsync(ct)), ct);
+                    task.GitRepository.RepositoryUrl, ScmKontoModus.Benutzerkonto), ct);
             var issue = await source.ReadIssueAsync(
                 new ScmEventReference(repository, ScmReferenceKind.Issue, task.IssueReferenz.IssueNummer.Value), ct);
             return issue?.IstGeschlossen == true
@@ -206,10 +220,6 @@ public sealed class ScmTaskCompletionMonitoringService(
     {
         var expected = PullRequestProviderDescriptor.GetPluginPrefix(provider);
         return plugins.FirstOrDefault(x => string.Equals(x.PluginPrefix, expected, StringComparison.OrdinalIgnoreCase))
-            ?? (task.GitRepository is null ? null : plugins.FirstOrDefault(x => MatchesPlugin(x, task.GitRepository)));
+            ?? (task.GitRepository is null ? null : plugins.FirstOrDefault(x => ScmPluginMatcher.MatchesPlugin(x, task.GitRepository)));
     }
-
-    private static bool MatchesPlugin(IGitPlugin plugin, GitRepository repository)
-        => string.Equals(plugin.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(plugin.PluginName, repository.PluginTyp, StringComparison.OrdinalIgnoreCase);
 }

@@ -9,7 +9,9 @@ using Softwareschmiede.Infrastructure.Data;
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>Erkennt neu enumerierte Backmerge-Pull-Requests (head = Repository-Hauptbranch,
-/// base = konfigurierter Projekt-Basisbranch) und bestätigt sie automatisiert per Admin-Merge.</summary>
+/// base = konfigurierter Projekt-Basisbranch) und mergt sie automatisiert. Der Merge läuft zuerst
+/// regulär; nur bei aktivierter Option wird ein blockierter Merge per Admin-Merge erneut versucht.
+/// Draft-Pull-Requests können optional vorab automatisch aktiviert werden.</summary>
 /// <remarks>
 /// Ein Backmerge aktualisiert lediglich den Arbeitsbranch und benötigt keine inhaltliche Prüfung.
 /// Jede Pull-Request-Referenz wird genau einmal bewertet; der Bewertungsstand liegt in einem eigenen
@@ -26,7 +28,7 @@ public sealed class ScmBackmergeService(
     ILogger<ScmBackmergeService> logger)
 {
     /// <summary>Bewertet die enumerierten Referenzen eines Repositories auf das Backmerge-Muster und
-    /// mergt zutreffende Pull Requests per Admin-Merge (<c>gh pr merge --admin --merge</c>).</summary>
+    /// mergt zutreffende Pull Requests (regulärer Merge; optionaler Admin-Fallback).</summary>
     /// <param name="plugin">Das zuständige SCM-Plugin (führt Statusabfrage und Merge aus).</param>
     /// <param name="repository">Das kanonisch aufgelöste Ereignis-Repository.</param>
     /// <param name="discovered">Die in diesem Lauf enumerierten Referenzen des Repositories.</param>
@@ -42,6 +44,8 @@ public sealed class ScmBackmergeService(
         var modus = await einstellungen.GetScmBackmergeModusAsync(ct);
         if (modus == ScmBackmergeModus.Deaktiviert)
             return;
+        var draftAktivierung = await einstellungen.GetScmBackmergeDraftAktivierungAsync(ct);
+        var adminMerge = await einstellungen.GetScmBackmergeAdminMergeAsync(ct);
         // Ohne Schreibrecht des Tokens ist kein Merge möglich.
         if (!repository.CanWrite)
             return;
@@ -54,13 +58,13 @@ public sealed class ScmBackmergeService(
             return;
 
         var repositoryId = $"{repository.Owner}/{repository.Name}";
-        var hauptbranches = new Dictionary<Guid, string?>();
+        var kontext = new BewertungsKontext(plugin, repositoryId, kandidaten, new Dictionary<Guid, string?>(),
+            time.GetUtcNow(), draftAktivierung, adminMerge);
         foreach (var reference in pullRequests)
         {
             var sourceKey = CheckpointKey(repository, reference.Number);
             var checkpoint = await db.ScmObservationCheckpoints.FindAsync([sourceKey], ct);
-            var now = time.GetUtcNow();
-            if (checkpoint?.NextAttemptUtc > now.ToUnixTimeMilliseconds())
+            if (checkpoint?.NextAttemptUtc > kontext.Now.ToUnixTimeMilliseconds())
                 continue;
             if (checkpoint is null)
             {
@@ -69,7 +73,7 @@ public sealed class ScmBackmergeService(
             }
             try
             {
-                await BewertePullRequestAsync(plugin, repositoryId, reference.Number, checkpoint, kandidaten, hauptbranches, now, ct);
+                await BewertePullRequestAsync(reference, checkpoint, kontext, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -77,57 +81,66 @@ public sealed class ScmBackmergeService(
             }
             catch (Exception ex)
             {
-                checkpoint.Failures++;
-                var failure = ex as ScmProviderException;
-                checkpoint.ErrorCode = failure?.FailureKind.ToString() ?? "Temporary";
-                checkpoint.Diagnostic = "Backmerge-Prüfung fehlgeschlagen: " + (failure?.Message ?? "Status des Pull Requests konnte nicht gelesen werden.");
-                checkpoint.NextAttemptUtc = failure?.FailureKind is ScmProviderFailureKind.Authentication
-                    or ScmProviderFailureKind.Permission or ScmProviderFailureKind.Permanent
-                    ? long.MaxValue
-                    : ScmEventStore.RetryAt(checkpoint.Failures, now.ToUnixTimeMilliseconds(), failure?.RetryAfterUtc);
+                ScmCheckpointSupport.ApplyFailure(checkpoint, ex,
+                    "Backmerge-Prüfung fehlgeschlagen: "
+                    + ((ex as ScmProviderException)?.Message ?? "Status des Pull Requests konnte nicht gelesen werden."),
+                    kontext.Now.ToUnixTimeMilliseconds());
             }
             await db.SaveChangesAsync(ct);
             notifier.Notify();
         }
     }
 
+    /// <summary>Bewertet eine Pull-Request-Referenz in vier Schritten: offenen Status prüfen,
+    /// Backmerge-Zuordnung zum Projekt-Repository finden, Mergebarkeit herstellen (optionale
+    /// Draft-Aktivierung) und den Merge ausführen (optionaler Admin-Fallback).</summary>
     private async Task BewertePullRequestAsync(
-        IGitPlugin plugin,
-        string repositoryId,
-        int nummer,
-        ScmObservationCheckpoint checkpoint,
-        IReadOnlyList<GitRepository> kandidaten,
-        Dictionary<Guid, string?> hauptbranches,
-        DateTimeOffset now,
-        CancellationToken ct)
+        ScmEventReference reference,
+        ScmObservationCheckpoint checkpoint, BewertungsKontext kontext, CancellationToken ct)
     {
-        var status = await plugin.GetPullRequestStatusAsync(repositoryId, nummer, ct);
+        var status = await kontext.Plugin.GetPullRequestStatusAsync(kontext.RepositoryId, reference.Number, ct);
         if (status.Status != PullRequestStatus.Open)
         {
             Entscheide(checkpoint, "Kein offener Pull Request; keine Backmerge-Aktion.");
             return;
         }
 
-        var hauptbranchUnbekannt = false;
-        GitRepository? treffer = null;
-        foreach (var kandidat in kandidaten)
+        var (treffer, hauptbranchUnbekannt) = await FindeBackmergeZuordnungAsync(status, kontext, ct);
+        if (treffer is null)
         {
-            if (!hauptbranches.TryGetValue(kandidat.Id, out var hauptbranch))
+            if (hauptbranchUnbekannt)
             {
-                try
-                {
-                    hauptbranch = await plugin.GetDefaultBranchAsync(kandidat.RepositoryUrl, ct);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Hauptbranch für Repository {RepositoryUrl} konnte nicht ermittelt werden.", kandidat.RepositoryUrl);
-                    hauptbranch = null;
-                }
-                hauptbranches[kandidat.Id] = hauptbranch;
+                checkpoint.Diagnostic = "Hauptbranch konnte nicht ermittelt werden; Backmerge-Prüfung wird wiederholt.";
+                checkpoint.NextAttemptUtc = NextRetryUtc(kontext.Now);
+            }
+            else
+            {
+                Entscheide(checkpoint, $"Kein Backmerge ({status.SourceBranch} → {status.TargetBranch}).");
+            }
+            return;
+        }
+
+        var mergebarerStatus = await StelleMergebarkeitHerAsync(reference, status, checkpoint, kontext, ct);
+        if (mergebarerStatus is null)
+            return;
+
+        await FuehreMergeAusAsync(reference, mergebarerStatus, checkpoint, kontext, ct);
+    }
+
+    /// <summary>Sucht unter den aktivierten Kandidaten das Projekt-Repository, auf dessen vom
+    /// Hauptbranch abweichenden Basisbranch das Pull-Request-Muster (Hauptbranch → Basisbranch)
+    /// zutrifft. Hauptbranches werden pro Repository einmalig ermittelt und im
+    /// <paramref name="kontext"/> zwischengespeichert.</summary>
+    private async Task<(GitRepository? Treffer, bool HauptbranchUnbekannt)> FindeBackmergeZuordnungAsync(
+        PullRequestStatusInfo status, BewertungsKontext kontext, CancellationToken ct)
+    {
+        var hauptbranchUnbekannt = false;
+        foreach (var kandidat in kontext.Kandidaten)
+        {
+            if (!kontext.Hauptbranches.TryGetValue(kandidat.Id, out var hauptbranch))
+            {
+                hauptbranch = await LadeHauptbranchAsync(kontext, kandidat, ct);
+                kontext.Hauptbranches[kandidat.Id] = hauptbranch;
             }
             if (hauptbranch is null)
             {
@@ -139,53 +152,107 @@ public sealed class ScmBackmergeService(
                 continue;
             if (string.Equals(status.SourceBranch, hauptbranch, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(status.TargetBranch, kandidat.DefaultSourceBranchName, StringComparison.OrdinalIgnoreCase))
-            {
-                treffer = kandidat;
-                break;
-            }
+                return (kandidat, hauptbranchUnbekannt);
         }
+        return (null, hauptbranchUnbekannt);
+    }
 
-        if (treffer is null)
+    /// <summary>Ermittelt den Hauptbranch eines Projekt-Repositories; ein Lesefehler gilt als
+    /// „unbekannt“ und verzögert die Prüfung statt sie zu beenden.</summary>
+    private async Task<string?> LadeHauptbranchAsync(BewertungsKontext kontext, GitRepository kandidat, CancellationToken ct)
+    {
+        try
         {
-            if (hauptbranchUnbekannt)
+            return await kontext.Plugin.GetDefaultBranchAsync(kandidat.RepositoryUrl, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Hauptbranch für Repository {RepositoryUrl} konnte nicht ermittelt werden.", kandidat.RepositoryUrl);
+            return null;
+        }
+    }
+
+    /// <summary>Hebt bei aktivierter Option den Entwurfsstatus auf und prüft die Mergebarkeit.
+    /// Gibt den mergefähigen Status zurück oder <see langword="null"/>, wenn der Checkpoint
+    /// bereits auf „warten“/„fehlgeschlagen“ fortgeschrieben wurde.</summary>
+    private async Task<PullRequestStatusInfo?> StelleMergebarkeitHerAsync(
+        ScmEventReference reference, PullRequestStatusInfo status,
+        ScmObservationCheckpoint checkpoint, BewertungsKontext kontext, CancellationToken ct)
+    {
+        if (status.IsDraft)
+        {
+            if (!kontext.DraftAktivierung)
             {
-                checkpoint.Diagnostic = "Hauptbranch konnte nicht ermittelt werden; Backmerge-Prüfung wird wiederholt.";
-                checkpoint.NextAttemptUtc = NextRetryUtc(now);
+                checkpoint.Diagnostic = $"Backmerge erkannt ({status.SourceBranch} → {status.TargetBranch}); wartet auf Mergebarkeit (Pull Request ist ein Entwurf).";
+                checkpoint.ErrorCode = "WaitingForMergeable";
+                checkpoint.NextAttemptUtc = NextRetryUtc(kontext.Now);
+                logger.LogInformation("Backmerge-PR #{Nummer} in {RepositoryId} erkannt, ist aber ein Entwurf; Draft-Aktivierung ist deaktiviert.",
+                    reference.Number, kontext.RepositoryId);
+                return null;
             }
-            else
+
+            var ready = await kontext.Plugin.MarkPullRequestReadyAsync(kontext.RepositoryId, reference.Number, ct);
+            if (!ready.Success)
             {
-                Entscheide(checkpoint, $"Kein Backmerge ({status.SourceBranch} → {status.TargetBranch}).");
+                checkpoint.Failures++;
+                checkpoint.ErrorCode = "Temporary";
+                checkpoint.Diagnostic = $"Draft-Aktivierung fehlgeschlagen: {ready.Message ?? "Unbekannter Fehler."}";
+                checkpoint.NextAttemptUtc = ScmEventStore.RetryAt(checkpoint.Failures, kontext.Now.ToUnixTimeMilliseconds());
+                logger.LogWarning("Draft-Aktivierung von Backmerge-PR #{Nummer} in {RepositoryId} fehlgeschlagen: {Message}",
+                    reference.Number, kontext.RepositoryId, ready.Message);
+                return null;
             }
-            return;
+
+            logger.LogInformation("Draft-Status von Backmerge-PR #{Nummer} in {RepositoryId} automatisch aufgehoben.", reference.Number, kontext.RepositoryId);
+            status = await kontext.Plugin.GetPullRequestStatusAsync(kontext.RepositoryId, reference.Number, ct);
         }
 
         if (status.MergeStatus != PullRequestMergeStatus.Mergeable)
         {
             checkpoint.Diagnostic = $"Backmerge erkannt ({status.SourceBranch} → {status.TargetBranch}); wartet auf Mergebarkeit (Status: {status.MergeStatus}).";
             checkpoint.ErrorCode = "WaitingForMergeable";
-            checkpoint.NextAttemptUtc = NextRetryUtc(now);
+            checkpoint.NextAttemptUtc = NextRetryUtc(kontext.Now);
             logger.LogInformation("Backmerge-PR #{Nummer} in {RepositoryId} erkannt, aber noch nicht mergebar ({MergeStatus}).",
-                nummer, repositoryId, status.MergeStatus);
-            return;
+                reference.Number, kontext.RepositoryId, status.MergeStatus);
+            return null;
         }
+        return status;
+    }
 
-        var result = await plugin.CompletePullRequestAsync(repositoryId, nummer,
+    /// <summary>Führt den Backmerge aus: zuerst regulär, bei aktivierter Option mit Admin-Merge-Fallback.</summary>
+    private async Task FuehreMergeAusAsync(
+        ScmEventReference reference, PullRequestStatusInfo status,
+        ScmObservationCheckpoint checkpoint, BewertungsKontext kontext, CancellationToken ct)
+    {
+        var result = await kontext.Plugin.CompletePullRequestAsync(kontext.RepositoryId, reference.Number,
             new PullRequestCompletionOptions(PullRequestCompletionStrategy.Merge, PullRequestMergeMethod.Merge,
-                AllowProtectedBranchBypass: true), ct);
+                AllowProtectedBranchBypass: false), ct);
+        if ((!result.Success || !result.PullRequestMerged) && kontext.AdminMerge)
+        {
+            logger.LogInformation("Regulärer Merge von Backmerge-PR #{Nummer} in {RepositoryId} gescheitert; versuche Admin-Merge.",
+                reference.Number, kontext.RepositoryId);
+            result = await kontext.Plugin.CompletePullRequestAsync(kontext.RepositoryId, reference.Number,
+                new PullRequestCompletionOptions(PullRequestCompletionStrategy.Merge, PullRequestMergeMethod.Merge,
+                    AllowProtectedBranchBypass: true), ct);
+        }
         if (result.Success && result.PullRequestMerged)
         {
             checkpoint.ErrorCode = "Merged";
             Entscheide(checkpoint, $"Backmerge ({status.SourceBranch} → {status.TargetBranch}) automatisch gemergt.");
-            logger.LogInformation("Backmerge-PR #{Nummer} in {RepositoryId} automatisch per Admin-Merge bestätigt.", nummer, repositoryId);
+            logger.LogInformation("Backmerge-PR #{Nummer} in {RepositoryId} automatisch gemergt.", reference.Number, kontext.RepositoryId);
             return;
         }
 
         checkpoint.Failures++;
         checkpoint.ErrorCode = result.Blocked ? "Blocked" : "Temporary";
         checkpoint.Diagnostic = $"Backmerge-Merge fehlgeschlagen: {result.Message ?? "Unbekannter Fehler."}";
-        checkpoint.NextAttemptUtc = ScmEventStore.RetryAt(checkpoint.Failures, now.ToUnixTimeMilliseconds());
+        checkpoint.NextAttemptUtc = ScmEventStore.RetryAt(checkpoint.Failures, kontext.Now.ToUnixTimeMilliseconds());
         logger.LogWarning("Backmerge-Merge von PR #{Nummer} in {RepositoryId} fehlgeschlagen: {Message}",
-            nummer, repositoryId, result.Message);
+            reference.Number, kontext.RepositoryId, result.Message);
     }
 
     /// <summary>Filtert die Kandidaten nach dem Aktivierungsmodus; im projektbezogenen Modus werden
@@ -201,10 +268,13 @@ public sealed class ScmBackmergeService(
             && bool.TryParse(wert, out var aktiv) && aktiv).ToList();
     }
 
-    /// <summary>Markiert den Checkpoint als endgültig bewertet (keine weiteren Versuche).</summary>
+    /// <summary>Markiert den Checkpoint als endgültig bewertet (keine weiteren Versuche). Ein
+    /// Zwischencode aus früheren Versuchen (Temporary/Blocked/WaitingForMergeable) wird
+    /// überschrieben; lediglich der vom Merge-Pfad gesetzte Code „Merged“ bleibt erhalten.</summary>
     private void Entscheide(ScmObservationCheckpoint checkpoint, string diagnostic)
     {
-        checkpoint.ErrorCode ??= "Decided";
+        if (checkpoint.ErrorCode is not "Merged")
+            checkpoint.ErrorCode = "Decided";
         checkpoint.Diagnostic = diagnostic;
         checkpoint.NextAttemptUtc = long.MaxValue;
     }
@@ -217,4 +287,16 @@ public sealed class ScmBackmergeService(
         => string.Join('/', new[] { "backmerge", repository.ProviderPrefix.ToLowerInvariant(),
             repository.Host.ToLowerInvariant(), repository.RepositoryId,
             number.ToString(System.Globalization.CultureInfo.InvariantCulture) }.Select(Uri.EscapeDataString));
+
+    /// <summary>Die über den Bewertungszyklus unveränderten Zyklusdaten (Plugin, Remote-Kennung,
+    /// Kandidaten, Hauptbranch-Cache, Zeitpunkt und Merge-Optionen), gebündelt für die Teilmethoden
+    /// der Pull-Request-Bewertung.</summary>
+    private sealed record BewertungsKontext(
+        IGitPlugin Plugin,
+        string RepositoryId,
+        IReadOnlyList<GitRepository> Kandidaten,
+        Dictionary<Guid, string?> Hauptbranches,
+        DateTimeOffset Now,
+        bool DraftAktivierung,
+        bool AdminMerge);
 }

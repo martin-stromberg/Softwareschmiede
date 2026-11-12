@@ -47,14 +47,21 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
         RetrySourcesCommand = Command(async ct =>
         {
             using var scope = _scopes.CreateScope();
-            if (!await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct))
-            {
-                Message = "Die SCM-Ereignisüberwachung ist deaktiviert. Aktivierung unter Einstellungen → Allgemein → SCM-Ereignisse.";
-                return;
-            }
+            var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct);
+            // Die Backoff-Rücksetzung gilt für Ereignis- wie Backmerge-Checkpoints gleichermaßen.
             await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmObservationCheckpoints
                 .ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)null), ct);
-            await scope.ServiceProvider.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(ct);
+            if (!monitoringEnabled)
+            {
+                Message = "Die SCM-Ereignisüberwachung ist deaktiviert. Aktivierung unter Einstellungen → Automatisierung → Aufgaben ausführen.";
+            }
+            else
+            {
+                await scope.ServiceProvider.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(ct);
+            }
+            // Der Backmerge-Prüfzyklus ist unabhängig vom Ereignisüberwachungs-Schalter;
+            // er prüft seinen eigenen Modus (Einstellungen → Automatisierung → Prozessabläufe).
+            await scope.ServiceProvider.GetRequiredService<ScmBackmergeMonitoringService>().RunOnceAsync(ct);
         });
         OpenEventCommand = Command(OpenAsync, () => SelectedEvent is { IsFinal: false, IsBlocked: false, AttemptId: null });
         RetryCommand = Command(ct => WithEventAsync((service, item) => service.RetryAsync(item.Id, ct), ct), () => SelectedEvent is { IsFinal: false });
@@ -192,7 +199,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
                 LoadError = null;
                 Diagnostics = diagnostic;
                 MonitoringNotice = !monitoringEnabled
-                    ? "Die SCM-Ereignisüberwachung ist deaktiviert; neue Anfragen werden nicht eingelesen oder automatisch zugestellt (Einstellungen → Allgemein → SCM-Ereignisse)."
+                    ? "Die SCM-Ereignisüberwachung ist deaktiviert; neue Anfragen werden nicht eingelesen oder automatisch zugestellt (Einstellungen → Automatisierung → Aufgaben ausführen)."
                     : alertErrors.Count == 0 ? null
                     : "Die GitHub-Überwachung ist für betroffene Quellen unterbrochen; neue Anfragen können fehlen. "
                       + alertErrors[0].Diagnostic

@@ -32,7 +32,7 @@ public sealed class ScmEventMonitoringService(
         await startup.WaitAsync(ct);
         using var scope = scopes.CreateScope();
         var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-        // Laufzeit-Schalter (Einstellungen → Allgemein → SCM-Ereignisse): Bei deaktivierter
+        // Laufzeit-Schalter (Einstellungen → Automatisierung → Aufgaben ausführen): Bei deaktivierter
         // Überwachung wird weder beobachtet/enumeriert noch automatisch zugestellt. Bereits in
         // der Inbox vorhandene Ereignisse und alle Checkpoints bleiben unverändert bestehen.
         if (!await einstellungen.GetScmMonitoringEnabledAsync(ct))
@@ -72,10 +72,10 @@ public sealed class ScmEventMonitoringService(
             var inboxMode = kontoModus == ScmKontoModus.SeparatesKonto && plugin is IScmNotificationSource;
             // Resolve the entire local reference set before assigning any incoming event.
             // Raw HTTPS/SSH addresses and plugin display names are not repository identities.
-            var aliasGroups = linked.Where(x => MatchesPlugin(plugin, x.Repository))
+            var aliasGroups = linked.Where(x => ScmPluginMatcher.MatchesPlugin(plugin, x.Repository))
                 .GroupBy(x => x.RepositoryId, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(x => x.Key, x => (Repository: x.First().Repository, Linked: x.ToList()), StringComparer.OrdinalIgnoreCase);
-            foreach (var repository in repositories.Where(x => MatchesPlugin(plugin, x)
+            foreach (var repository in repositories.Where(x => ScmPluginMatcher.MatchesPlugin(plugin, x)
                 && !string.IsNullOrWhiteSpace(x.RepositoryUrl)))
                 if (!aliasGroups.ContainsKey(repository.RepositoryUrl))
                     aliasGroups[repository.RepositoryUrl] = (repository, []);
@@ -115,11 +115,13 @@ public sealed class ScmEventMonitoringService(
                         complete = false;
                     // Repository-Auflösungen werden auch bei „Permanent“ (z. B. 404 nach entzogenem oder
                     // noch fehlendem Zugriff) per Backoff erneut versucht, statt dauerhaft gesperrt zu bleiben.
-                    await RecordFailureAsync(resolutionKey, ex, cycle, ct, isolated
+                    if (!isolated)
+                        cycle.HadFailure = true;
+                    await ScmCheckpointSupport.RecordFailureAsync(scopes, _time, resolutionKey, ex, ct, isolated
                             ? " Das Repository ist für das separate Konto nicht erreichbar (z. B. privates Repository ohne Zugriff oder fehlende Token-Berechtigung)."
                               + " Es wird ausgelassen; die übrigen Repositories werden weiter überwacht."
                             : " Bis zur vollständigen Repositoryzuordnung werden keine neuen Anfragen dieses Providers eingelesen.",
-                        blocksCycle: !isolated, retryPermanent: true);
+                        retryPermanent: true);
                 }
             }
             // An unresolved alias could name any of the resolved repositories. Do not guess an assignment.
@@ -142,12 +144,15 @@ public sealed class ScmEventMonitoringService(
                 var enumerated = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var repository in repositoriesForEnumeration)
                 {
-                    using var enumerationScope = scopes.CreateScope();
-                    await EnumerateRepositoryAsync(source, plugin, repository,
-                        enumerationScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>(), enumerated,
-                        enumerationScope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>(), resolved,
-                        localRepositories.TryGetValue(repository, out var lokale) ? lokale : [],
-                        enumerationScope.ServiceProvider.GetRequiredService<ScmBackmergeService>(), cycle, ct);
+                    if (!await ScmCheckpointSupport.EnumerateRepositoryAsync(
+                            scopes, _time, options.Value.PollInterval, source, repository,
+                            "enumeration", enumerated,
+                            (discovered, _) =>
+                            {
+                                resolved.AddRange(discovered.Select(x => ((Guid?)null, x)));
+                                return Task.CompletedTask;
+                            }, ct))
+                        cycle.HadFailure = true;
                 }
             }
             foreach (var group in resolved.GroupBy(x => (Provider: x.Reference.Repository.ProviderPrefix.ToLowerInvariant(),
@@ -192,7 +197,8 @@ public sealed class ScmEventMonitoringService(
                     catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                     catch (Exception ex)
                     {
-                        await RecordFailureAsync(sourceKey, ex, cycle, ct);
+                        cycle.HadFailure = true;
+                        await ScmCheckpointSupport.RecordFailureAsync(scopes, _time, sourceKey, ex, ct);
                     }
                 }
             }
@@ -238,61 +244,6 @@ public sealed class ScmEventMonitoringService(
                 using var dispatchScope = scopes.CreateScope();
                 await dispatchScope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(item.Id, ct: ct);
             }
-        }
-    }
-
-    private static bool MatchesPlugin(IGitPlugin plugin, GitRepository repository)
-        => string.Equals(plugin.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(plugin.PluginName, repository.PluginTyp, StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>Enumeriert ein kanonisch aufgelöstes Repository einmal pro Lauf und verwaltet dessen
-    /// eigenen Watermark-/Backoff-Checkpoint. Enumerationsfehler blockieren die Provider-Runde nicht.</summary>
-    private async Task EnumerateRepositoryAsync(IScmEventSource source, IGitPlugin plugin, ScmEventRepository repository,
-        SoftwareschmiededDbContext db, HashSet<string> enumerated, ScmEventChangeNotifier notifier,
-        List<(Guid? TaskId, ScmEventReference Reference)> resolved, IReadOnlyList<GitRepository> lokaleRepositories,
-        ScmBackmergeService backmerge, CycleState cycle, CancellationToken ct)
-    {
-        var enumerationKey = string.Join('/', new[] { "enumeration", repository.ProviderPrefix.ToLowerInvariant(),
-            repository.Host.ToLowerInvariant(), repository.RepositoryId }.Select(Uri.EscapeDataString));
-        if (!enumerated.Add(enumerationKey)) return;
-        var checkpoint = await db.ScmObservationCheckpoints.FindAsync([enumerationKey], ct);
-        var now = _time.GetUtcNow();
-        if (checkpoint?.NextAttemptUtc > now.ToUnixTimeMilliseconds()) return;
-        try
-        {
-            var sinceUtc = checkpoint?.WatermarkUtc is long watermark
-                ? DateTimeOffset.FromUnixTimeMilliseconds(watermark) - options.Value.PollInterval * 2
-                : (DateTimeOffset?)null;
-            var discovered = await source.EnumerateReferencesAsync(repository, sinceUtc, ct);
-            resolved.AddRange(discovered.Select(x => ((Guid?)null, x)));
-            // Backmerge-Bewertung ist unabhängig von der Ereignis-Aufnahme: Ein Fehler darf den
-            // erfolgreichen Enumerations-Checkpoint nicht zurücksetzen.
-            try
-            {
-                await backmerge.EvaluateDiscoveredReferencesAsync(plugin, repository, discovered, lokaleRepositories, ct);
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Backmerge-Bewertung für Repository {RepositoryId} fehlgeschlagen.", repository.RepositoryId);
-            }
-            if (checkpoint is null)
-            {
-                checkpoint = new ScmObservationCheckpoint { SourceKey = enumerationKey };
-                db.Add(checkpoint);
-            }
-            checkpoint.WatermarkUtc = now.ToUnixTimeMilliseconds();
-            checkpoint.Failures = 0;
-            checkpoint.NextAttemptUtc = null;
-            checkpoint.ErrorCode = null;
-            checkpoint.Diagnostic = null;
-            await db.SaveChangesAsync(ct);
-            notifier.Notify();
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception ex)
-        {
-            await RecordFailureAsync(enumerationKey, ex, cycle, ct);
         }
     }
 
@@ -342,7 +293,8 @@ public sealed class ScmEventMonitoringService(
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
-            await RecordFailureAsync(inboxKey, ex, cycle, ct);
+            cycle.HadFailure = true;
+            await ScmCheckpointSupport.RecordFailureAsync(scopes, _time, inboxKey, ex, ct);
         }
     }
 
@@ -352,37 +304,4 @@ public sealed class ScmEventMonitoringService(
     /// <returns><see langword="true"/>, wenn das Repository für das Konto nicht erreichbar ist.</returns>
     private static bool IsInaccessible(string? errorCode)
         => errorCode is nameof(ScmProviderFailureKind.Permanent) or nameof(ScmProviderFailureKind.Permission);
-
-    /// <summary>Speichert einen Quellenfehler samt Diagnose und nächstem Prüfzeitpunkt.</summary>
-    /// <param name="sourceKey">Der Checkpoint-Schlüssel der Quelle.</param>
-    /// <param name="error">Der aufgetretene Fehler.</param>
-    /// <param name="cycle">Der Zustand der laufenden Provider-Runde.</param>
-    /// <param name="ct">Abbruchtoken.</param>
-    /// <param name="diagnosticSuffix">Ergänzender Diagnosetext.</param>
-    /// <param name="blocksCycle">Ob der Fehler den Inbox-Watermark des Zyklus zurückhält.</param>
-    /// <param name="retryPermanent">Ob auch „Permanent“-Fehler per Backoff statt dauerhaft gesperrt werden.</param>
-    private async Task RecordFailureAsync(string sourceKey, Exception error, CycleState cycle, CancellationToken ct,
-        string diagnosticSuffix = "", bool blocksCycle = true, bool retryPermanent = false)
-    {
-        using var failureScope = scopes.CreateScope();
-        var failureDb = failureScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var checkpoint = await failureDb.ScmObservationCheckpoints.FindAsync([sourceKey], ct);
-        if (checkpoint is null)
-        {
-            checkpoint = new ScmObservationCheckpoint { SourceKey = sourceKey };
-            failureDb.Add(checkpoint);
-        }
-        checkpoint.Failures++;
-        var failure = error as ScmProviderException;
-        checkpoint.ErrorCode = failure?.FailureKind.ToString() ?? "Temporary";
-        checkpoint.Diagnostic = (failure?.Message ?? "Quelle konnte nicht vollständig gelesen werden.") + diagnosticSuffix;
-        var blockedForever = failure?.FailureKind is ScmProviderFailureKind.Authentication or ScmProviderFailureKind.Permission
-            || (failure?.FailureKind is ScmProviderFailureKind.Permanent && !retryPermanent);
-        checkpoint.NextAttemptUtc = blockedForever
-            ? long.MaxValue : ScmEventStore.RetryAt(checkpoint.Failures, _time.GetUtcNow().ToUnixTimeMilliseconds(), failure?.RetryAfterUtc);
-        if (blocksCycle)
-            cycle.HadFailure = true;
-        await failureDb.SaveChangesAsync(ct);
-        failureScope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>().Notify();
-    }
 }

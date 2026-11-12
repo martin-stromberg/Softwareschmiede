@@ -4,7 +4,7 @@
 
 ## Voraussetzungen
 
-- Das GitHub-SCM-Plugin ist aktiviert. Die GitHub CLI (`gh`) wird für die Überwachung und alle lesenden Zugriffe **nicht** benötigt — sie läuft über direkte HTTP-Aufrufe. `gh` muss nur vorhanden sein, wenn die seltenen Komfortaktionen Issue-Anlage, PR-Anlage oder PR-Abschluss (Merge/Review) aus der Anwendung heraus genutzt werden oder Agenten in ihrer Sitzung selbst `gh` aufrufen sollen.
+- Das GitHub-SCM-Plugin ist aktiviert. Die GitHub CLI (`gh`) wird für die Überwachung und alle lesenden Zugriffe **nicht** benötigt — sie läuft über direkte HTTP-Aufrufe. `gh` muss nur vorhanden sein, wenn die seltenen Komfortaktionen Issue-Anlage, PR-Anlage oder PR-Abschluss (Merge/Review) aus der Anwendung heraus genutzt werden, Backmerge-Pull-Requests automatisch gemergt oder als Entwurf markierte Backmerge-PRs aktiviert werden sollen oder Agenten in ihrer Sitzung selbst `gh` aufrufen sollen.
 - Ein gültiger **Personal Access Token** ist unter **Einstellungen → Plugins → GitHub → Authentifizierung** gespeichert.
 - Der Token muss auf die betroffenen Repositorys zugreifen können. Für Ereignisantworten benötigt er außerdem Schreibrechte für Issues und Pull Requests.
 - Aufgaben müssen mit einem GitHub-Repository und der passenden Issue- oder Pull-Request-Referenz verknüpft sein.
@@ -20,17 +20,18 @@
 
 ## Separates Konto (Bot-Konto)
 
-Alternativ kann die Überwachung unter **Einstellungen → Allgemein → SCM-Ereignisse → Konto-Modus** auf **„Separates Konto“** umgeschaltet werden. Dann wird nicht mehr repository-weit enumeriert, sondern ausschließlich die GitHub-Notifications-Inbox eines eigenen Bot-Kontos gelesen; aus `reason = mention`-Einträgen entstehen Ereignisse.
+Alternativ kann die Überwachung unter **Einstellungen → Automatisierung → Aufgaben ausführen → Überwachungsmodus** auf **„Separates Konto“** umgeschaltet werden. Dann wird nicht mehr repository-weit enumeriert, sondern ausschließlich die GitHub-Notifications-Inbox eines eigenen Bot-Kontos gelesen; aus `reason = mention`-Einträgen entstehen Ereignisse.
 
 1. Lege ein separates GitHub-Konto an und lade es als **Collaborator mit Schreibrecht** in die zu überwachenden Repositories ein.
 2. Erstelle für dieses Konto einen Personal Access Token mit den Scopes `notifications` und `repo` und trage ihn unter **Einstellungen → Plugins → GitHub → Authentifizierung** im Feld **„Personal Access Token des separaten Kontos“** ein.
-3. Wähle unter **Allgemein → SCM-Ereignisse** den **Konto-Modus „Separates Konto“** und speichere. Ohne eingetragenes Token des separaten Kontos bricht das Speichern mit einer Fehlermeldung ab.
+3. Wähle unter **Automatisierung → Aufgaben ausführen** den **Überwachungsmodus „Separates Konto“** und speichere. Ohne eingetragenes Token des separaten Kontos bricht das Speichern mit einer Fehlermeldung ab.
 4. Eine Aufgabe wird ausgelöst, wenn der Repository-Owner das separate Konto frei stehend als `@bot-name` in einer Beschreibung oder einem Kommentar erwähnt.
 
 ## Hinweise
 
 - Die Ereignisüberwachung beginnt automatisch im Hintergrund; das Abfrageintervall beträgt standardmäßig 60 Sekunden.
-- Unter **Einstellungen → Allgemein → SCM-Ereignisse** lässt sich die Überwachung abschalten („SCM-Ereignisüberwachung aktivieren") und das Trigger-Keyword anpassen. Beide Änderungen wirken ohne Neustart. Ein deaktivierter Schalter stoppt alle GitHub-Abfragen und die automatische Zustellung; bereits eingegangene Ereignisse bleiben bestehen.
+- Unter **Einstellungen → Automatisierung → Aufgaben ausführen** lässt sich die Überwachung abschalten („Aufgaben automatisch starten") und das Trigger-Keyword anpassen. Beide Änderungen wirken ohne Neustart. Ein deaktivierter Schalter stoppt alle GitHub-Abfragen der Ereignisüberwachung und die automatische Zustellung; bereits eingegangene Ereignisse bleiben bestehen.
+- Die übrigen Automatisierungsfunktionen werden in denselben Register-Panels gesteuert: die Abschlussüberwachung (Schalter „Aufgaben automatisch beenden", **Prüfmodus** „Nur ereignisgesteuerte Aufgaben"/„Alle Aufgaben" und **Wartezeit für Beendigung**) unter **Einstellungen → Automatisierung → Aufgaben beenden** sowie die Backmerge-Prüfung (Modus **„Backmerge-Pull-Requests"** plus die Optionen **„Draft-Pull-Requests vor dem Merge automatisch aktivieren"** und **„Bei blockiertem Merge Admin-Merge erlauben"**) unter **Einstellungen → Automatisierung → Prozessabläufe**. Die Backmerge-Prüfung läuft unabhängig von der Ereignisüberwachung und immer unter dem Benutzerkonto.
 - Weitere Optionen für Ereignisabfrage und Verarbeitungsfristen sind derzeit nicht in der Benutzeroberfläche konfigurierbar.
 - Standard-SCM-Plugins wie Bitbucket und Local Directory werden nicht automatisch ereignisfähig, nur weil sie in der Anwendung verfügbar sind. Derzeit implementiert ausschließlich GitHub diese Fähigkeit.
 - Bei Codex, Claude und Devin CLI genügt die Auswahl des Plugins nicht: Versionen außerhalb der unterstützten Bereiche (Codex `v0.114.x`, Claude Code `v2.1.x`, Devin CLI `v3000.x`), unbekannte Promptformate, nicht unterstützte Berechtigungen oder ein fehlender tatsächlicher Kanalzugriff lassen das Ereignis wartend. Eine erkannte, aber außerhalb des Bereichs liegende Version kann in der Ereignisübersicht ausdrücklich bestätigt werden. GitHub Copilot CLI unterstützt den Ereignis-Antwortkanal derzeit nicht. Der KI-Simulator dient nur der lokalen Entwicklung und wird für diesen Zweck im SCM-Modus gestartet.

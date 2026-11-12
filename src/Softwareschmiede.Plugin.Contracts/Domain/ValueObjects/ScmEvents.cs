@@ -30,10 +30,13 @@ public sealed record ScmEventBatch(ScmEventReadRequest Request, IReadOnlyList<Sc
 public sealed record ScmEventObservation(ScmEventReference Reference, ScmContentKind ContentKind,
     string RemoteNodeId, string? RemoteCommentId, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     DateTimeOffset? LastEditedAt, string? AuthorId, string? AuthorLogin, string? EditorId, string? EditorLogin,
-    string Body, string Url, DateTimeOffset ObservedAt)
+    string Body, string Url, DateTimeOffset ObservedAt, IReadOnlyList<string>? ViewerReactions = null)
 {
     /// <summary>SHA-256 über den exakten UTF-8-Text.</summary>
     public string BodyHash => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Body)));
+
+    /// <summary>Das lesende Ereignis-Konto hat auf diesen Text bereits remote reagiert.</summary>
+    public bool ViewerHasReacted => ViewerReactions is { Count: > 0 };
 
     /// <summary>Revision der beobachteten Textversion; Metadatenänderungen zählen nicht.</summary>
     public DateTimeOffset Revision => LastEditedAt ?? CreatedAt;

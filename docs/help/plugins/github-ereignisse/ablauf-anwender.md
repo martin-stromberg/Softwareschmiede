@@ -6,11 +6,11 @@
 
 - Das GitHub-Repository ist mit einer Aufgabe verknüpft; die Aufgabe enthält eine Issue- oder Pull-Request-Referenz.
 - In **Einstellungen → Plugins → GitHub → Authentifizierung** ist ein gültiger **Personal Access Token** gespeichert, der auf das Repository zugreifen darf.
-- Der Text enthält das Trigger-Keyword (Standard `$Softwareschmiede`, einstellbar unter **Einstellungen → Allgemein → SCM-Ereignisse**) und stammt vom Repository-Owner. Bei einer bearbeiteten Textfassung muss der Owner auch als Bearbeiter erkennbar sein. Im Konto-Modus **„Separates Konto“** gilt stattdessen: Der Repository-Owner erwähnt das separate Konto frei stehend als `@Kontoname`; das Trigger-Keyword ist dann nicht erforderlich. Voraussetzung ist ein unter **Einstellungen → Plugins → GitHub → Authentifizierung** hinterlegter Token des separaten Kontos.
-- Die SCM-Ereignisüberwachung ist aktiviert (Checkbox unter **Einstellungen → Allgemein → SCM-Ereignisse**, standardmäßig an). Ist sie deaktiviert, werden weder neue Ereignisse eingelesen noch bestehende automatisch zugestellt; die manuellen Aktionen in der Übersicht bleiben nutzbar.
+- Der Text enthält das Trigger-Keyword (Standard `$Softwareschmiede`, einstellbar unter **Einstellungen → Automatisierung → Aufgaben ausführen**) und stammt vom Repository-Owner. Bei einer bearbeiteten Textfassung muss der Owner auch als Bearbeiter erkennbar sein. Im Überwachungsmodus **„Separates Konto“** gilt stattdessen: Der Repository-Owner erwähnt das separate Konto frei stehend als `@Kontoname`; das Trigger-Keyword ist dann nicht erforderlich. Voraussetzung ist ein unter **Einstellungen → Plugins → GitHub → Authentifizierung** hinterlegter Token des separaten Kontos.
+- Die SCM-Ereignisüberwachung ist aktiviert (Checkbox „Aufgaben automatisch starten" unter **Einstellungen → Automatisierung → Aufgaben ausführen**, standardmäßig an). Ist sie deaktiviert, werden weder neue Ereignisse eingelesen noch bestehende automatisch zugestellt; die manuellen Aktionen in der Übersicht bleiben nutzbar.
 - Für die automatische CLI-Verarbeitung werden derzeit Codex CLI, Claude CLI oder Devin CLI nur in einer unterstützten Version (Codex `v0.114.x`, Claude Code `v2.1.x`, Devin CLI `v3000.x`) und mit einem tatsächlich geprüften Schreibzugriff verwendet. Eine erkannte Version außerhalb des Bereichs lässt sich beim wartenden Ereignis ausdrücklich bestätigen; andere ausgewählte KI-Plugins können in der Ereignisverarbeitung wartend bleiben.
 - Die CLI darf erlaubte Issue-/PR-Aktionen (Kommentar, Review, Merge inkl. Admin-Merge, Commit/Push, Schließen u. a.) selbst über `gh`/git ausführen: Die Sitzung erhält beim Start dieselbe GitHub-Anmeldung wie die Anwendung (Token aus **Einstellungen → Plugins → GitHub → Authentifizierung** als Prozessumgebung). Der Aktionsumfang bleibt durch die Token-/Repository-Berechtigungen begrenzt; `gh` muss auf dem Rechner erreichbar sein.
-- Optional kannst du unter **Einstellungen → Allgemein → SCM-Ereignisse** Prompt-Anhänge pflegen: Texte, die der Anwendung bei der Zustellung je Ereignisart angehängt werden (Allgemein gilt immer, dazu kommt der Anhang für Issue, Issue-Kommentar, Pull Request oder Pull-Request-Kommentar inklusive Reviews). So erhält die CLI z. B. Hinweise auf verfügbare Skills oder Bearbeitungsregeln, ohne dass sie in jedem GitHub-Kommentar stehen müssen. Leere Felder hängen nichts an; Trigger-Keyword und gespeicherter Ereignistext bleiben unverändert.
+- Optional kannst du unter **Einstellungen → Automatisierung → Aufgaben ausführen** Prompt-Anhänge pflegen: Texte, die der Anwendung bei der Zustellung je Ereignisart angehängt werden (Allgemein gilt immer, dazu kommt der Anhang für Issue, Issue-Kommentar, Pull Request oder Pull-Request-Kommentar inklusive Reviews). So erhält die CLI z. B. Hinweise auf verfügbare Skills oder Bearbeitungsregeln, ohne dass sie in jedem GitHub-Kommentar stehen müssen. Leere Felder hängen nichts an; Trigger-Keyword und gespeicherter Ereignistext bleiben unverändert.
 
 ## Schritt-für-Schritt-Anleitung
 
@@ -18,7 +18,9 @@
 
 Schreibe das Trigger-Keyword (Standard `$Softwareschmiede`) in die Beschreibung, einen Kommentar oder Review-Text des verknüpften Issues oder Pull Requests. Ergänze die konkrete Bitte im selben Text.
 
-> **Hinweis:** Im Konto-Modus **„Separates Konto“** wird die Anfrage stattdessen ausgelöst, indem der Repository-Owner das separate Konto frei stehend als `@Kontoname` in der Beschreibung oder einem Kommentar erwähnt. Benachrichtigungen zu Repositories, die nicht an einem Projekt erfasst und aktiviert sind, werden verworfen — ihre Anzahl erscheint in den Integrationshinweisen der Ereignisübersicht.
+> **Hinweis:** Im Überwachungsmodus **„Separates Konto“** wird die Anfrage stattdessen ausgelöst, indem der Repository-Owner das separate Konto frei stehend als `@Kontoname` in der Beschreibung oder einem Kommentar erwähnt. Benachrichtigungen zu Repositories, die nicht an einem Projekt erfasst und aktiviert sind, werden verworfen — ihre Anzahl erscheint in den Integrationshinweisen der Ereignisübersicht.
+
+> **Hinweis:** Ein Kommentar, auf den dein Konto bereits reagiert hat — etwa mit der von der Anwendung gesetzten 👀-Reaktion oder einer manuell vergebenen Reaktion —, gilt als bereits bearbeitet. Auch ein späteres Bearbeiten dieses Kommentars löst keine neue Anfrage aus; schreibe stattdessen einen neuen Kommentar.
 
 ### 2. Eingang prüfen
 
@@ -38,7 +40,7 @@ Ist ein Eintrag nicht mehr relevant (z. B. Anfrage hinfällig oder anderweitig e
 
 ## Ergebnis
 
-Die Liste zeigt den Verarbeitungsstatus. Bei erfolgreicher Bestätigung erhalten Kommentare und veröffentlichte Pull-Request-Reviews auf GitHub 👀; für Beschreibungen wird keine Reaktion gesetzt. Wartende Einträge zeigen den Grund, soweit er bekannt ist. Die Anwendung beendet die Aufgabe nicht automatisch; sie bleibt nach der Verarbeitung in ihrem bisherigen Aufgabenstatus.
+Die Liste zeigt den Verarbeitungsstatus. Bei erfolgreicher Bestätigung erhalten Kommentare und veröffentlichte Pull-Request-Reviews auf GitHub 👀; für Beschreibungen wird keine Reaktion gesetzt. Wartende Einträge zeigen den Grund, soweit er bekannt ist. Die Ereignisverarbeitung selbst beendet die Aufgabe nicht; unabhängig davon kann die optionale **Abschlussüberwachung** (Einstellungen → Automatisierung → Aufgaben beenden) die Aufgabe später automatisch beenden, sobald ihre verknüpfte SCM-Referenz geschlossen oder gemergt ist.
 
 ## Barrierefreiheit
 

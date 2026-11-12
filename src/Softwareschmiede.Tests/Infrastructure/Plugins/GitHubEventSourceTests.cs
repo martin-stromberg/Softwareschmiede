@@ -167,6 +167,79 @@ public sealed class GitHubEventSourceTests
         Assert.Equal("C_2", Assert.Single(batch.Observations).RemoteNodeId);
     }
 
+    /// <summary>Reaktionsgruppen mit <c>viewerHasReacted</c> landen als ViewerReactions auf der Beobachtung.</summary>
+    [Fact]
+    public async Task ViewerReactions_MapFromReactionGroups()
+    {
+        var api = new FakeApi();
+        api.Add("comments?", new[] { new { id = 1, node_id = "C_1" } });
+        api.AddGraph(new
+        {
+            node = Node("C_1", "$Softwareschmiede", reactionGroups: new object[]
+        {
+            new { content = "EYES", viewerHasReacted = true },
+            new { content = "THUMBS_UP", viewerHasReacted = false }
+        })
+        });
+        var observation = Assert.Single((await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment))).Observations);
+        Assert.Equal(["EYES"], observation.ViewerReactions);
+        Assert.True(observation.ViewerHasReacted);
+        api.AssertComplete();
+    }
+
+    /// <summary>Leere oder ausschließlich fremde Reaktionen lassen die Beobachtung unverändert verarbeitbar.</summary>
+    [Fact]
+    public async Task ViewerReactions_FalseOrEmpty_Ignored()
+    {
+        var api = new FakeApi();
+        api.Add("comments?", new[] { new { id = 1, node_id = "C_1" }, new { id = 2, node_id = "C_2" } });
+        api.AddGraph(new { node = Node("C_1", "$Softwareschmiede") });
+        api.AddGraph(new
+        {
+            node = Node("C_2", "$Softwareschmiede", reactionGroups: new object[]
+        {
+            new { content = "EYES", viewerHasReacted = false },
+            new { content = "THUMBS_UP", viewerHasReacted = false }
+        })
+        });
+        var batch = await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment));
+        Assert.Equal(2, batch.Observations.Count);
+        Assert.All(batch.Observations, x =>
+        {
+            Assert.Null(x.ViewerReactions);
+            Assert.False(x.ViewerHasReacted);
+        });
+        api.AssertComplete();
+    }
+
+    /// <summary>Eine strukturell unvollständige Antwort ohne Reaktionsfeld ist ein typisierter
+    /// Providerfehler statt eines still deaktivierten Mehrinstanz-Schutzes.</summary>
+    [Fact]
+    public async Task MissingReactionGroups_ThrowsPermanent()
+    {
+        var api = new FakeApi();
+        api.Add("comments?", new[] { new { id = 1, node_id = "C_1" } });
+        var incomplete = Node("C_1", "$Softwareschmiede");
+        incomplete.Remove("reactionGroups");
+        api.AddGraph(new { node = incomplete });
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment)));
+        Assert.Equal(ScmProviderFailureKind.Permanent, error.FailureKind);
+    }
+
+    /// <summary>Der Lesepfad fordert die Reaktionsdaten des lesenden Kontos in derselben Abfrage an.</summary>
+    [Fact]
+    public async Task ReactionGroups_RequestedInQuery()
+    {
+        var api = new FakeApi();
+        api.Add("comments?", new[] { new { id = 1, node_id = "C_1" } });
+        api.AddGraph(new { node = Node("C_1", "$Softwareschmiede") });
+        await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment));
+        var graph = Assert.Single(api.Requests, x => x.Method == "POST");
+        Assert.Contains("reactionGroups", graph.JsonBody);
+        Assert.Contains("viewerHasReacted", graph.JsonBody);
+        api.AssertComplete();
+    }
+
     /// <summary>Provider, Host, Repository, Typ und Nummer sind Bestandteil des Identitätsschlüssels.</summary>
     [Fact]
     public async Task EventKey_SeparatesEveryOriginDimension()
@@ -547,7 +620,8 @@ public sealed class GitHubEventSourceTests
         api.Add("repos/owner/repo", new { node_id = "R_1", name = "repo", owner = new { node_id = "U_1", login = "owner" }, permissions = new { push = true } });
     }
     private static Dictionary<string, object?> Node(string id, string body, DateTimeOffset? edited = null,
-        string? editorId = "U_1", string? editorLogin = "owner", DateTimeOffset? updated = null) => new()
+        string? editorId = "U_1", string? editorLogin = "owner", DateTimeOffset? updated = null,
+        object? reactionGroups = null) => new()
         {
             ["id"] = id,
             ["body"] = body,
@@ -556,7 +630,8 @@ public sealed class GitHubEventSourceTests
             ["lastEditedAt"] = edited,
             ["author"] = new { id = "U_1", login = "owner" },
             ["editor"] = edited is not null && editorId is not null ? new { id = editorId, login = editorLogin } : null,
-            ["url"] = "https://evil.example/ignored"
+            ["url"] = "https://evil.example/ignored",
+            ["reactionGroups"] = reactionGroups ?? Array.Empty<object>()
         };
     private static Dictionary<string, object?> Review(string id, string state, DateTimeOffset? submitted)
     {

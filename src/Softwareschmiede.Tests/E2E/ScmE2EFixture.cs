@@ -96,9 +96,9 @@ internal sealed class ScmE2EFixture
         ["SOFTWARESCHMIEDE_TEST_DB_PATH"] = DatabasePath
     };
 
-    public void AddText(int number, long id, string body, string kind = "IssueComment")
+    public void AddText(int number, long id, string body, string kind = "IssueComment", IEnumerable<string>? viewerReactions = null)
     {
-        Scenario.Texts.Add(new ScmE2EText { Number = number, Id = id, Body = body, Kind = kind, PullRequest = number is 7 or 9 });
+        Scenario.Texts.Add(new ScmE2EText { Number = number, Id = id, Body = body, Kind = kind, PullRequest = number is 7 or 9, ViewerReactions = viewerReactions?.ToList() ?? [] });
         SaveScenario();
     }
 
@@ -183,6 +183,23 @@ internal sealed class ScmE2EFixture
             await Task.Delay(100);
         }
         throw new TimeoutException($"SCM-Fixture: kein Aufruf von '{endpointFragment}'. Fixture: {Configuration.TestRoot}");
+    }
+
+    /// <summary>Wiederholt eine Datenbankprüfung, bis die Bedingung erfüllt ist; bei Ablauf
+    /// TimeoutException mit Beschreibung und Fixture-Pfad.</summary>
+    public async Task WaitForDatabaseAsync(
+        Func<SoftwareschmiededDbContext, Task<bool>> condition,
+        string description,
+        TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(60));
+        while (DateTime.UtcNow < deadline)
+        {
+            await using var db = OpenDatabase();
+            if (await condition(db)) return;
+            await Task.Delay(200);
+        }
+        throw new TimeoutException($"SCM-Fixture: {description}. Fixture: {Configuration.TestRoot}");
     }
 
     public IReadOnlyList<ScmE2ERemoteResponse> Responses() => ReadLines(Configuration.ResponsesPath).Select(x => JsonSerializer.Deserialize<ScmE2ERemoteResponse>(x)!).ToArray();
