@@ -321,6 +321,8 @@ Die Repository-Automation ist branchbasiert aufgebaut:
 - **`release.yml`** erstellt auf `main`-Pushes oder `v*.*.*`-Tags GitHub-Releases.
 - **`sync-staging-with-main.yml`** erstellt nach einem Release einen automatischen Backmerge-PR von `main` nach `staging`.
 - **`security-scan.yml`** führt zusätzlich einen geplanten Dependency-Sicherheitscheck aus.
+- **`review-architecture-security.yml`**, **`review-nuget-packages.yml`** und **`review-compliance.yml`** legen zeitgesteuert Issues mit `@softwarewerkstatt`-Erwähnung an — monatlich am 1. Tag des Monats (Architektur- und Sicherheitsreview), wöchentlich montags (NuGet-Paketprüfung) und jährlich am 1. Januar (Compliance- und Copyright-Review). Eine labelbasierte Duplikatprüfung verhindert parallele offene Issues desselben Prüftyps; die Issues entstehen unter der Owner-Identität via `REVIEW_ISSUE_TOKEN`, damit die SCM-Ereignisüberwachung die Erwähnung annimmt.
+- **`create-review-issue.yml`** enthält die gemeinsame Logik der drei Review-Workflows (`workflow_call`): Secret-Guard, Label-Erzeugung, Duplikatprüfung und Issue-Erzeugung.
 
 Die Release-Pipeline nutzt `semantic-release` aus `package.json` sowie die GitHub CLI für Release-Erstellung und Asset-Upload.
 
