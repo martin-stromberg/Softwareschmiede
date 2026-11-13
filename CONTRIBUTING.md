@@ -106,7 +106,7 @@ Weitere Details zu Installation und Konfiguration siehe [`README.md`](README.md)
 ## Test-Anforderungen
 
 - Testprojekt: `src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj`.
-- Kategorien: Unit-/Integration-/BUnit-Tests laufen ohne Einschränkung im CI. Tests der Kategorie
+- Kategorien: Unit-/Integration-Tests laufen ohne Einschränkung im CI. Tests der Kategorie
   `Category=E2E` (FlaUI/WPF) und `Category=ConPTY` sind vom CI ausgeschlossen, da GitHub-hosted
   Runner keine verlässliche interaktive Desktop-/Konsolen-Session bieten.
 - **Lokaler E2E-Lauf ist vor jedem PR mit UI-relevanten Änderungen Pflicht:**
