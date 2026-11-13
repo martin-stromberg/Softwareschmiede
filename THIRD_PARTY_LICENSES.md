@@ -80,7 +80,6 @@ Die folgenden Pakete werden ausschließlich in `Softwareschmiede.Tests`,
 | Xunit.SkippableFact | 1.5.23 | MS-PL | Bedingtes Überspringen von Tests (z. B. ConPTY im CI) |
 | Microsoft.NET.Test.Sdk | 18.7.0 | MIT | Test-SDK |
 | Moq | 4.* | BSD-3-Clause | Mocking-Framework |
-| bunit | 2.7.2 | MIT | Blazor-Komponenten-Tests |
 | coverlet.collector | 10.0.1 | MIT | Code-Coverage-Collector |
 | FluentAssertions | 8.10.0 | Kommerzielle Lizenz (Xceed) | Ab Version 8 kein OSI-Standardlizenztext mehr, sondern eine kommerzielle Lizenz von Xceed Software Inc.: kostenlos für Open-Source-Projekte und nicht-kommerzielle Nutzung, kostenpflichtig für kommerzielle Nutzung. Da Softwareschmiede als Open-Source-Projekt veröffentlicht wird und das Paket nur im Testprojekt verwendet wird (nicht Teil des Publish-Outputs), ergibt sich hieraus keine Einschränkung für Nutzer der Anwendung. |
 | Microsoft.EntityFrameworkCore.InMemory | 10.0.9 | MIT | In-Memory-Datenbank für Tests |
