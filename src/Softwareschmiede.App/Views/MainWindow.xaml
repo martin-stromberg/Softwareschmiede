@@ -173,6 +173,61 @@
                             Background="{DynamicResource BorderBrush}"
                             Margin="4,0,4,8" />
 
+                    <!-- Sektion: Auto-Shutdown bei Abschluss aller laufenden Automatisierungen -->
+                    <StackPanel Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{Binding LaufendeAutomatisierungenAnzahl, StringFormat={}{0} laufende Automatisierung(en)}"
+                                   AutomationProperties.AutomationId="AutoShutdownLaufendeAnzahl"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   Margin="8,0,8,4" />
+                        <CheckBox IsChecked="{Binding AutoShutdownAktiviert}"
+                                  Content="Nach Leerlauf PC herunterfahren"
+                                  ToolTip="Fährt den Computer herunter, sobald keine Aufgabe mehr läuft und die Wartezeit abgelaufen ist. Andere Programme werden ebenfalls beendet."
+                                  AutomationProperties.AutomationId="AutoShutdownAktivieren"
+                                  AutomationProperties.Name="Auto-Shutdown"
+                                  FontSize="11"
+                                  Margin="8,0,8,2"
+                                  Visibility="{Binding AutoShutdownUiSichtbar, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="8,0,8,2"
+                                    ToolTip="So lange wird nach dem Ende der letzten laufenden Aufgabe noch gewartet, bevor der Computer herunterfährt."
+                                    Visibility="{Binding AutoShutdownOptionenSichtbar, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="Wartezeit (Minuten):"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <TextBox Text="{Binding AutoShutdownToleranzMinuten, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.AutomationId="AutoShutdownToleranzMinuten"
+                                     AutomationProperties.Name="Auto-Shutdown-Wartezeit in Minuten"
+                                     FontSize="11"
+                                     Width="48"
+                                     Margin="4,0,0,0"
+                                     Padding="2,1" />
+                        </StackPanel>
+                        <CheckBox IsChecked="{Binding AutoShutdownErzwingen}"
+                                  Content="Herunterfahren erzwingen"
+                                  ToolTip="Erzwingt das Herunterfahren auch dann, wenn andere Programme das Beenden verweigern — nicht gespeicherte Daten gehen dabei verloren."
+                                  AutomationProperties.AutomationId="AutoShutdownErzwingen"
+                                  AutomationProperties.Name="Herunterfahren erzwingen"
+                                  FontSize="11"
+                                  Margin="8,0,8,2"
+                                  Visibility="{Binding AutoShutdownOptionenSichtbar, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <TextBlock Text="{Binding AutoShutdownCountdownText}"
+                                   AutomationProperties.AutomationId="AutoShutdownCountdown"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   Margin="8,0,8,2"
+                                   Visibility="{Binding AutoShutdownCountdownAktiv, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <TextBlock Text="{Binding AutoShutdownToleranzFehler}"
+                                   AutomationProperties.AutomationId="AutoShutdownToleranzFehler"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource ErrorBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="8,0,8,2"
+                                   Visibility="{Binding AutoShutdownToleranzFehler, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                    </StackPanel>
+
                     <TextBlock Text="{Binding CurrentVersion}"
                                AutomationProperties.AutomationId="AppVersionText"
                                FontSize="11"

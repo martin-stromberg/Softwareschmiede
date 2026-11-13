@@ -147,10 +147,20 @@ Position und Größe des Hauptfensters werden automatisch gespeichert, wenn die 
 
 ### Automatisches Herunterfahren
 
-Der `AutoShutdownOrchestrator` lauscht auf `IRunningAutomationStatusSource.RunningCountChanged`. Wenn die Anzahl aktiver CLI-Prozesse auf 0 sinkt und die Einstellung aktiv ist, wird `ISystemShutdownService.Shutdown` aufgerufen.
+In der Fußzeile der Seitenleiste zeigt ein eigener Block dauerhaft die Anzahl laufender Automatisierungen an („N laufende Automatisierung(en)"). Als laufend gelten dabei nur Aufgaben, deren KI-Ausführung tatsächlich arbeitet — eine Aufgabe im Zustand „Wartet", „Pausiert" oder „Bereit" zählt nicht mit. Ist die Seitenleiste eingeklappt, wird der gesamte Block ausgeblendet.
+
+Sobald mindestens eine Automatisierung läuft, erscheint der Schalter **„Nach Leerlauf PC herunterfahren"**. Ist er aktiviert, werden zwei weitere Optionen eingeblendet:
+
+- **„Wartezeit (Minuten):"** — wie lange nach dem Ende der letzten laufenden Aufgabe noch gewartet wird, bevor der Computer herunterfährt (ganze Zahl von 0 bis 1440, Standard 5; `0` löst sofort aus)
+- **„Herunterfahren erzwingen"** — erzwingt das Herunterfahren auch dann, wenn andere Programme das Beenden verweigern; nicht gespeicherte Daten gehen dabei verloren
+
+Wartezeit und Erzwingen werden dauerhaft gespeichert und beim nächsten Programmstart vorausgewählt. Die Aktivierung des Schalters gilt dagegen nur für die laufende Sitzung und muss nach jedem Programmstart erneut gesetzt werden.
+
+Sinkt die Anzahl laufender Automatisierungen bei aktiviertem Schalter auf 0, startet in der Fußzeile ein sichtbarer Countdown („Herunterfahren in …", z. B. „5 Min. 0 Sek." oder „1 Std. 30 Min."). Beginnt währenddessen wieder eine Automatisierung, wird der Countdown abgebrochen und die Anzeige entfernt; ändert sich lediglich ein Status, ohne dass etwas Neues läuft, läuft der Countdown unverändert weiter. Wird die Wartezeit während eines laufenden Countdowns geändert, gilt der neue Wert sofort. Bei einer ungültigen Eingabe erscheint der Hinweis „Wartezeit muss eine ganze Zahl zwischen 0 und 1440 Minuten sein." — der bisherige Wert bleibt dann wirksam. Läuft der Countdown ab, fährt der Computer herunter; ein weiterer Abbruch-Dialog erscheint nicht — die Wartezeit ist die vorgesehene Abbruchmöglichkeit. Der Countdown lässt sich jederzeit durch Deaktivieren des Schalters stoppen.
 
 ## Einschränkungen
 
 - Plugin-Einstellungen werden im Windows Credential Store gespeichert — nicht plattformübergreifend portierbar.
 - Arbeitsverzeichnis-Änderungen wirken sich erst auf neue Aufgaben aus; laufende Aufgaben behalten ihren Klonpfad.
 - Dark Mode wirkt nicht auf eingebettete CLI-Fenster (native Prozesse behalten ihr eigenes Erscheinungsbild).
+- Automatisches Herunterfahren: Die Aktivierung gilt nur pro Sitzung und wird beim nächsten Programmstart nicht wiederhergestellt (nur Wartezeit und Erzwingen sind vorausgewählt). Aufgaben im Zustand „Wartet" verhindern den Shutdown nicht — noch auf Eingabe wartende Sitzungen werden beim Herunterfahren mit beendet. Die Option „Herunterfahren erzwingen" wirkt nur unter Windows; unter Linux und macOS wird regulär heruntergefahren.

@@ -173,3 +173,51 @@
 - `SettingsViewModel.Arbeitsverzeichnis` — Property mit bidirektionaler Bindung (Zeile 33-37)
 - `ArbeitsverzeichnisSettingsService.SaveArbeitsverzeichnisAsync()` — Persistierung (aufgerufen in Zeile 224)
 - `ArbeitsverzeichnisSettingsService.GetArbeitsverzeichnisAsync()` — Laden mit Fallback-Logik
+
+## Automatisches Herunterfahren — Zählung „laufend"
+
+**Beschreibung:** Der Auto-Shutdown zählt nicht rohe Prozess-Handles, sondern denselben fachlichen Zustand wie die Statusanzeige auf den Aufgabenkacheln — nur so stimmen Anzeige und Countdown-Auslöser überein.
+
+**Bedingungen:**
+- Gezählt wird ausschließlich der klassifizierte Zustand `KiAusfuehrungsZustand.Laeuft` über die gemeinsame `KiAusfuehrungsStatusKlassifikation`
+- `Wartet` (z. B. auf Eingabe wartende Session), `Pausiert`, `PromptInWartestellung` und `Bereit` zählen nicht als laufend
+- Eine pausierte Aufgabe mit physikalisch noch laufendem CLI-Prozess zählt nicht (Pause überlagert Laeuft); ein physisch wartender Prozess im Zustand „Wartet" verhindert den Shutdown nicht
+
+**Verhalten:**
+- Der Countdown startet erst, wenn die fachliche Anzahl auf 0 fällt — nicht beim Wegfall des letzten Prozess-Handles
+- Wartende oder pausierte Sessions werden beim OS-Shutdown mit beendet (bei „Herunterfahren erzwingen" zwangsweise)
+
+**Umsetzung:** `LaufendeAutomatisierungenZaehlung.ZaehleAsync` — wendet `KiAusfuehrungsStatusKlassifikation.Klassifiziere` auf die Kandidatenmenge von `IAktiveAufgabenService.GetAktiveAufgabenAsync` an (gleiche Semantik wie `MainWindowViewModel.LaufendeAutomatisierungenAnzahl` auf der Seitenleisten-Liste).
+
+## Automatisches Herunterfahren — Countdown-Semantik
+
+**Beschreibung:** Jedes Statuswechsel-Ereignis bricht nicht blind den Countdown ab, sondern löst eine koaleszierte Neuauswertung aus. Das verhindert, dass periodische Heartbeat-Ereignisse einen armierten Countdown unendlich verlängern, ohne den Schutz vor einem Shutdown auf veraltetem Zustand aufzugeben.
+
+**Bedingungen:**
+- Trigger: `RunningCountChanged`, `LaufdatenChanged`, 5-s-Sicherheitstick, `SetEnabled`/`SetOptionen`
+- Der Auto-Shutdown muss aktiviert sein (`SetEnabled(true)`)
+
+**Verhalten:**
+- Neuauswertung ergibt Anzahl > 0 → Countdown disarmiert; bei Rückkehr auf 0 wird ein neuer, voller Countdown armiert
+- Neuauswertung ergibt weiterhin Anzahl 0 → ein bereits armiertes Countdown läuft mit dem bestehenden Endzeitpunkt weiter (kein Zurücksetzen)
+- Deaktivieren (`SetEnabled(false)`) disarmiert den Countdown sofort
+- Änderung der Wartezeit bei laufendem Countdown armiert ihn ab sofort mit dem neuen Wert neu
+- Der Shutdown wird pro Null-Phase höchstens einmal ausgelöst (`_shutdownAusgeloest`); vor der Auslösung erfolgt ein Final-Recheck der Anzahl
+- Kein Abbruch-Dialog nach Auslösung — die Wartezeit ist die vorgesehene Abbruchmöglichkeit; endet die App vor Ablauf, wird kein Shutdown ausgelöst
+
+**Umsetzung:** `AutoShutdownOrchestrator.EvaluiereAsync`/`OnCountdownAbgelaufenAsync` (koaleszierte Auswertung mit `SemaphoreSlim` + Erneut-Flag; `TimeProvider`-Timer).
+
+## Automatisches Herunterfahren — Persistenz und Erzwingen
+
+**Beschreibung:** Wartezeit und Erzwingen sind dauerhafte Anwendereinstellungen; die Aktivierung ist bewusst ein Sitzungsschalter.
+
+**Bedingungen:**
+- Schlüssel `autoshutdown.toleranz.minuten` (int, Standard `5`, Clamp 0–1440) und `autoshutdown.force` (bool, Standard `false`)
+- Die Aktivierungs-Checkbox wird nicht persistiert — Sicherheitsaspekt: kein „vergessenes" Arming nach Neustart
+
+**Verhalten:**
+- Beim Start werden Wartezeit und Erzwingen einmalig geladen und vorausgewählt; ein zwischenzeitlich vom Anwender geänderter Wert wird nicht überschrieben
+- Ungültige Wartezeit-Eingaben werden in der UI abgelehnt (Fehlertext, letzter gültiger Wert bleibt wirksam)
+- „Herunterfahren erzwingen" wirkt nur unter Windows (`/f`-Flag); Linux/macOS haben kein Äquivalent und fahren regulär herunter
+
+**Umsetzung:** `AppEinstellungService` (`AutoShutdownErzwingenKey`, `AutoShutdownToleranzMinutenKey`, `AutoShutdownDefaultToleranzMinuten`, `AutoShutdownMaxToleranzMinuten`), `AutoShutdownEinstellungenService` (Singleton → Scope), `SystemShutdownService.ResolveShutdownCommand`.

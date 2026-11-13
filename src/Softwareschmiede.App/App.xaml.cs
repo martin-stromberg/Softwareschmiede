@@ -113,6 +113,10 @@ public sealed partial class App : System.Windows.Application
 
         _host.Services.GetRequiredService<ScmEventStartupGate>().Ready();
 
+        // Auto-Shutdown-Orchestrator frühzeitig aktivieren, damit die Event-Abonnements
+        // (RunningCountChanged, LaufdatenChanged) bereits vor dem ersten UI-Schalter stehen.
+        _host.Services.GetRequiredService<IAutoShutdownOrchestrator>();
+
         _host.Services.GetService<UpdateE2ETestKontext>()
             ?.Protokoll.Schreibe(UpdateE2EEreignisse.DatabaseInitializationCompleted);
 
@@ -273,10 +277,15 @@ public sealed partial class App : System.Windows.Application
             services.AddSingleton<IProzessStarter>(sp => new AufzeichnenderProzessStarter(
                 sp.GetRequiredService<ILogger<AufzeichnenderProzessStarter>>(),
                 AufzeichnenderProzessStarter.ResolveLogDateiPfad(dbPath)));
+            // Testmodus: kein echter OS-Shutdown — Anforderungen landen in der Logdatei neben der Test-DB.
+            services.AddSingleton<ISystemShutdownService>(sp => new AufzeichnenderSystemShutdownService(
+                sp.GetRequiredService<ILogger<AufzeichnenderSystemShutdownService>>(),
+                AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(dbPath)));
         }
         else
         {
             services.AddSingleton<IProzessStarter, SystemProzessStarter>();
+            services.AddSingleton<ISystemShutdownService, SystemShutdownService>();
         }
 
         // Terminal-Session-Erzeugung: die Backend-Wahl (PTY/Pipe, E2E-Modus, Diagnose) liegt vollständig
@@ -305,6 +314,17 @@ public sealed partial class App : System.Windows.Application
             sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<DarkModeService>();
         services.AddSingleton<AufgabenListenModusService>();
+
+        // Auto-Shutdown bei Abschluss: Zähler und Orchestrator sind Singletons (greifen für
+        // scoped Dienste selbst über IServiceScopeFactory zu); der Einstellungen-Service
+        // persistiert nur die Nebenwerte (Erzwingen, Toleranz) — die Aktivierung bleibt Session-Zustand.
+        services.AddSingleton<LaufendeAutomatisierungenZaehlung>();
+        services.AddSingleton<ILaufendeAutomatisierungenZaehlung>(sp =>
+            sp.GetRequiredService<LaufendeAutomatisierungenZaehlung>());
+        services.AddSingleton<AutoShutdownOrchestrator>();
+        services.AddSingleton<IAutoShutdownOrchestrator>(sp =>
+            sp.GetRequiredService<AutoShutdownOrchestrator>());
+        services.AddSingleton<AutoShutdownEinstellungenService>();
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<ICliRawExportService, CliRawExportService>();
         services.AddSingleton<CliReplayAufzeichnungStore>();
@@ -328,7 +348,10 @@ public sealed partial class App : System.Windows.Application
             VersionProvider: sp.GetService<IApplicationVersionProvider>(),
             LaufdatenChangedNotifier: sp.GetService<AufgabeLaufdatenChangedNotifier>(),
             UpdateDienste: sp.GetService<MainWindowUpdateDienste>(),
-            AufgabenListenModusService: sp.GetService<AufgabenListenModusService>()));
+            AufgabenListenModusService: sp.GetService<AufgabenListenModusService>(),
+            AutoShutdownOrchestrator: sp.GetService<IAutoShutdownOrchestrator>(),
+            AutoShutdownEinstellungenService: sp.GetService<AutoShutdownEinstellungenService>(),
+            TimeProvider: sp.GetService<TimeProvider>()));
 
         // Plugin Infrastructure
         services.AddSingleton<PluginManager>();
