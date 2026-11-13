@@ -13,7 +13,8 @@ namespace Softwareschmiede.Tests.Infrastructure.Plugins;
 public sealed class GitHubNotificationSourceTests
 {
     private static GitHubPlugin Plugin(FakeGitHubEventApi api, Mock<ICredentialStore>? store = null, FakeGitHubEventApi? agent = null)
-        => new(Mock.Of<ICliRunner>(), (store ?? new Mock<ICredentialStore>()).Object, NullLogger<GitHubPlugin>.Instance, api, agent);
+        => new(Mock.Of<ICliRunner>(), (store ?? new Mock<ICredentialStore>()).Object, NullLogger<GitHubPlugin>.Instance, api, agent,
+            netrcPath: GitHubPluginTests.CreateMissingNetrcPath());
 
     private static Mock<ICredentialStore> StoreWithAgentToken()
     {

@@ -604,9 +604,11 @@ public sealed class GitHubEventSourceTests
         routed.AssertComplete();
     }
 
-    private static GitHubPlugin Plugin(FakeApi api) => new(Mock.Of<ICliRunner>(), Mock.Of<ICredentialStore>(), NullLogger<GitHubPlugin>.Instance, api);
+    private static GitHubPlugin Plugin(FakeApi api) => new(Mock.Of<ICliRunner>(), Mock.Of<ICredentialStore>(), NullLogger<GitHubPlugin>.Instance, api,
+        null, netrcPath: GitHubPluginTests.CreateMissingNetrcPath());
     private static GitHubPlugin Plugin(FakeApi api, ICredentialStore store, FakeApi agent)
-        => new(Mock.Of<ICliRunner>(), store, NullLogger<GitHubPlugin>.Instance, api, agent);
+        => new(Mock.Of<ICliRunner>(), store, NullLogger<GitHubPlugin>.Instance, api, agent,
+            netrcPath: GitHubPluginTests.CreateMissingNetrcPath());
     private static ICredentialStore StoreWithAgentToken()
     {
         var store = new Mock<ICredentialStore>();

@@ -11,6 +11,23 @@ namespace Softwareschmiede.Tests.Infrastructure.Plugins;
 public sealed class PluginManagerTests : IDisposable
 {
     private readonly string _tempDirectory = Path.Combine(Path.GetTempPath(), $"plugin-manager-{Guid.NewGuid():N}");
+    private readonly string? _previousNetrcPathOverride;
+
+    /// <summary>PluginManagerTests.</summary>
+    public PluginManagerTests()
+    {
+        // Die Plugin-Discovery instanziiert GitHubPlugin über ActivatorUtilities — der
+        // netrcPath-Konstruktorparameter ist dabei nicht erreichbar. Der dokumentierte
+        // Umgebungsvariablen-Override lenkt die _netrc-Legacy-Bereinigung deshalb auf einen
+        // nicht existierenden Pfad unterhalb des Temp-Verzeichnisses, statt die echte
+        // %USERPROFILE%\_netrc des ausführenden Benutzers anzufassen.
+        // Die Isolation läuft über eine process-weite Umgebungsvariable und ist deshalb bewusst
+        // auf CollectionBehavior(DisableTestParallelization = true) in AssemblyInfo.cs angewiesen;
+        // bei künftiger Test-Parallelisierung müsste die Isolation anders gelöst werden.
+        _previousNetrcPathOverride = Environment.GetEnvironmentVariable(GitHubPlugin.NetrcPathEnvironmentVariable);
+        Environment.SetEnvironmentVariable(GitHubPlugin.NetrcPathEnvironmentVariable,
+            Path.Combine(_tempDirectory, "_netrc"));
+    }
 
     /// <summary><summary>GetSourceCodeManagementPlugins_ShouldReturnEmpty_WhenPluginDirectoryMissing.</summary>.</summary>
     [Fact]
@@ -191,6 +208,7 @@ public sealed class PluginManagerTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
+        Environment.SetEnvironmentVariable(GitHubPlugin.NetrcPathEnvironmentVariable, _previousNetrcPathOverride);
         if (Directory.Exists(_tempDirectory))
         {
             Directory.Delete(_tempDirectory, recursive: true);
