@@ -42,5 +42,10 @@ jobs:
         - Mögliche Breaking Changes bei Updates
 
         Erstelle konkrete Update-Empfehlungen inklusive Risikobewertung.
+
+        Setze die unbedenklichen Empfehlungen (niedriges bis mittleres Risiko)
+        direkt in einem Pull Request gegen staging um. Risikoreiche oder
+        aufgeschobene Empfehlungen dokumentiere im PR-Body bzw. als eigenes
+        Folge-Issue.
     secrets:
       REVIEW_ISSUE_TOKEN: ${{ secrets.REVIEW_ISSUE_TOKEN }}
