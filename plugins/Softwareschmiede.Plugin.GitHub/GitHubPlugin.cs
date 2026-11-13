@@ -1042,7 +1042,7 @@ password {token}
         {
             var (host, owner, name) = ParseEventRepository(normalizedRepositoryId);
             var data = await GraphAsync(_eventApiClient, host,
-                "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id number title url state headRefName baseRefName headRefOid mergeCommit{oid} mergeStateStatus isDraft}}}",
+                "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id number title url state headRefName baseRefName headRefOid mergeCommit{oid} mergeStateStatus isDraft reviewDecision commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}",
                 new Dictionary<string, object?> { ["owner"] = owner, ["name"] = name, ["number"] = pullRequestNumber }, false, ct);
             var pullRequest = Object(Object(data, "repository"), "pullRequest");
             if (pullRequest.ValueKind != JsonValueKind.Object)
@@ -1206,6 +1206,11 @@ password {token}
         var root = doc.RootElement;
         var state = GetStringOrNull(root, "state");
         var mergeStateStatus = GetStringOrNull(root, "mergeStateStatus");
+        var reviewDecision = root.TryGetProperty("reviewDecision", out var reviewDecisionElement)
+            ? MapReviewDecision(reviewDecisionElement.ValueKind == JsonValueKind.String
+                ? reviewDecisionElement.GetString() : null)
+            : PullRequestReviewDecision.Unknown;
+        var checksState = LiesCheckRollupState(root) ?? PullRequestChecksState.Unknown;
         var mergeCommitSha = root.TryGetProperty("mergeCommit", out var mergeCommit)
                              && mergeCommit.ValueKind == JsonValueKind.Object
             ? GetStringOrNull(mergeCommit, "oid")
@@ -1235,7 +1240,28 @@ password {token}
             status,
             MapMergeStatus(mergeStateStatus, status),
             DateTimeOffset.UtcNow,
-            GetBoolOrDefault(root, "isDraft"));
+            GetBoolOrDefault(root, "isDraft"),
+            reviewDecision,
+            checksState);
+    }
+
+    /// <summary>Liest den Rollup-Zustand der Statuschecks des Head-Commits aus. Fehlt das
+    /// commits-Feld ganz, gilt der Zustand als unbekannt (<see langword="null"/>); ein
+    /// fehlender Rollup bedeutet „keine Checks vorhanden“.</summary>
+    private static PullRequestChecksState? LiesCheckRollupState(JsonElement root)
+    {
+        if (!root.TryGetProperty("commits", out var commits)
+            || commits.ValueKind != JsonValueKind.Object
+            || !commits.TryGetProperty("nodes", out var nodes)
+            || nodes.ValueKind != JsonValueKind.Array)
+            return null;
+        if (nodes.GetArrayLength() == 0
+            || !nodes[0].TryGetProperty("commit", out var commit)
+            || commit.ValueKind != JsonValueKind.Object
+            || !commit.TryGetProperty("statusCheckRollup", out var rollup)
+            || rollup.ValueKind != JsonValueKind.Object)
+            return PullRequestChecksState.None;
+        return MapChecksState(GetStringOrNull(rollup, "state"));
     }
 
     private static IReadOnlyList<PullRequestWorkflowRunInfo> ParseWorkflowRuns(
@@ -1309,6 +1335,25 @@ password {token}
             _ => PullRequestMergeStatus.Unknown
         };
     }
+
+    private static PullRequestReviewDecision MapReviewDecision(string? reviewDecision)
+        => reviewDecision?.ToUpperInvariant() switch
+        {
+            "REVIEW_REQUIRED" => PullRequestReviewDecision.ReviewRequired,
+            "CHANGES_REQUESTED" => PullRequestReviewDecision.ChangesRequested,
+            "APPROVED" => PullRequestReviewDecision.Approved,
+            null => PullRequestReviewDecision.None,
+            _ => PullRequestReviewDecision.Unknown
+        };
+
+    private static PullRequestChecksState MapChecksState(string? rollupState)
+        => rollupState?.ToUpperInvariant() switch
+        {
+            "SUCCESS" => PullRequestChecksState.Success,
+            "PENDING" or "EXPECTED" => PullRequestChecksState.Pending,
+            "FAILURE" or "ERROR" => PullRequestChecksState.Failure,
+            _ => PullRequestChecksState.Unknown
+        };
 
     private static WorkflowRunStatus MapWorkflowRunStatus(string? status)
         => status?.ToLowerInvariant() switch

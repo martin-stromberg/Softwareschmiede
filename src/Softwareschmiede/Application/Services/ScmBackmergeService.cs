@@ -213,12 +213,43 @@ public sealed class ScmBackmergeService(
 
         if (status.MergeStatus != PullRequestMergeStatus.Mergeable)
         {
-            checkpoint.Diagnostic = $"Backmerge erkannt ({status.SourceBranch} → {status.TargetBranch}); wartet auf Mergebarkeit (Status: {status.MergeStatus}).";
-            checkpoint.ErrorCode = "WaitingForMergeable";
-            checkpoint.NextAttemptUtc = NextRetryUtc(kontext.Now);
-            logger.LogInformation("Backmerge-PR #{Nummer} in {RepositoryId} erkannt, aber noch nicht mergebar ({MergeStatus}).",
-                reference.Number, kontext.RepositoryId, status.MergeStatus);
-            return null;
+            var nurReviewBlockiert = status.MergeStatus == PullRequestMergeStatus.Blocked
+                && status.ReviewDecision == PullRequestReviewDecision.ReviewRequired
+                && status.ChecksState is PullRequestChecksState.Success or PullRequestChecksState.None;
+            if (nurReviewBlockiert && checkpoint.ErrorCode != "ReviewApprovalSent")
+            {
+                // Die Review-Pflicht ist die einzige Blockade: zuerst über den Plugin-Vertrag
+                // genehmigen — dafür genügt Schreibrecht. Nur wenn die Genehmigung die Pflicht
+                // nicht erfüllt (z. B. fremder Reviewer gefordert), bleibt der Admin-Fallback.
+                var approve = await kontext.Plugin.CompletePullRequestAsync(kontext.RepositoryId, reference.Number,
+                    new PullRequestCompletionOptions(PullRequestCompletionStrategy.ApprovalOnly), ct);
+                if (approve.Success)
+                {
+                    checkpoint.ErrorCode = "ReviewApprovalSent";
+                    logger.LogInformation("Backmerge-PR #{Nummer} in {RepositoryId} automatisch genehmigt.",
+                        reference.Number, kontext.RepositoryId);
+                    status = await kontext.Plugin.GetPullRequestStatusAsync(kontext.RepositoryId, reference.Number, ct);
+                }
+                else
+                {
+                    logger.LogInformation("Automatische Genehmigung von Backmerge-PR #{Nummer} in {RepositoryId} nicht möglich: {Message}",
+                        reference.Number, kontext.RepositoryId, approve.Message);
+                }
+            }
+
+            if (status.MergeStatus != PullRequestMergeStatus.Mergeable
+                && !(nurReviewBlockiert && kontext.AdminMerge))
+            {
+                checkpoint.Diagnostic = nurReviewBlockiert
+                    ? $"Backmerge erkannt ({status.SourceBranch} → {status.TargetBranch}); wartet auf Mergebarkeit (Review erforderlich)."
+                    : $"Backmerge erkannt ({status.SourceBranch} → {status.TargetBranch}); wartet auf Mergebarkeit (Status: {status.MergeStatus}).";
+                if (checkpoint.ErrorCode != "ReviewApprovalSent")
+                    checkpoint.ErrorCode = "WaitingForMergeable";
+                checkpoint.NextAttemptUtc = NextRetryUtc(kontext.Now);
+                logger.LogInformation("Backmerge-PR #{Nummer} in {RepositoryId} erkannt, aber noch nicht mergebar ({MergeStatus}).",
+                    reference.Number, kontext.RepositoryId, status.MergeStatus);
+                return null;
+            }
         }
         return status;
     }

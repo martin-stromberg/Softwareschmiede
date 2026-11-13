@@ -17,4 +17,6 @@ public sealed record PullRequestStatusInfo(
     PullRequestStatus Status,
     PullRequestMergeStatus MergeStatus,
     DateTimeOffset CheckedAtUtc,
-    bool IsDraft = false);
+    bool IsDraft = false,
+    PullRequestReviewDecision ReviewDecision = PullRequestReviewDecision.Unknown,
+    PullRequestChecksState ChecksState = PullRequestChecksState.Unknown);
