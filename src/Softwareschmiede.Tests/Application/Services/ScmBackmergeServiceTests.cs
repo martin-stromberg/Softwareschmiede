@@ -51,16 +51,20 @@ public sealed class ScmBackmergeServiceTests : IDisposable
 
     private static PullRequestStatusInfo StatusInfo(PullRequestStatus status = PullRequestStatus.Open,
         PullRequestMergeStatus mergeStatus = PullRequestMergeStatus.Mergeable,
-        string source = "main", string target = "staging", bool isDraft = false)
+        string source = "main", string target = "staging", bool isDraft = false,
+        PullRequestReviewDecision review = PullRequestReviewDecision.Unknown,
+        PullRequestChecksState checks = PullRequestChecksState.Unknown)
         => new(PullRequestProvider.GitHub, "owner/repo", 7, "PR_7",
             "https://github.com/owner/repo/pull/7", "Backmerge", source, target, "sha", null,
-            status, mergeStatus, DateTimeOffset.UtcNow, isDraft);
+            status, mergeStatus, DateTimeOffset.UtcNow, isDraft, review, checks);
 
     private void SetStatus(PullRequestStatus status = PullRequestStatus.Open,
         PullRequestMergeStatus mergeStatus = PullRequestMergeStatus.Mergeable,
-        string source = "main", string target = "staging", bool isDraft = false)
+        string source = "main", string target = "staging", bool isDraft = false,
+        PullRequestReviewDecision review = PullRequestReviewDecision.Unknown,
+        PullRequestChecksState checks = PullRequestChecksState.Unknown)
         => _plugin.Setup(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(StatusInfo(status, mergeStatus, source, target, isDraft));
+            .ReturnsAsync(StatusInfo(status, mergeStatus, source, target, isDraft, review, checks));
 
     private Task EvaluateAsync(params ScmEventReference[] referenzen)
         => _sut.EvaluateDiscoveredReferencesAsync(_plugin.Object, _remote, referenzen, [_lokal]);
@@ -374,6 +378,108 @@ public sealed class ScmBackmergeServiceTests : IDisposable
         checkpoint.Diagnostic.Should().Contain("Draft-Aktivierung fehlgeschlagen").And.Contain("kein Zugriff");
         checkpoint.NextAttemptUtc.Should().BeGreaterThan(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
             .And.BeLessThan(long.MaxValue);
+    }
+
+    /// <summary>Blockade nur durch Review-Pflicht bei grünen Checks: Der Dienst genehmigt den
+    /// Backmerge-PR selbst (ApprovalOnly genügt Schreibrecht) und mergt danach regulär.</summary>
+    [Fact]
+    public async Task Evaluate_NurReviewBlockiert_GenehmigtUndMergedRegulaer()
+    {
+        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+        var abfragen = 0;
+        _plugin.Setup(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => ++abfragen == 1
+                ? StatusInfo(mergeStatus: PullRequestMergeStatus.Blocked,
+                    review: PullRequestReviewDecision.ReviewRequired, checks: PullRequestChecksState.Success)
+                : StatusInfo(mergeStatus: PullRequestMergeStatus.Mergeable,
+                    review: PullRequestReviewDecision.Approved, checks: PullRequestChecksState.Success));
+        _plugin.Setup(x => x.CompletePullRequestAsync("owner/repo", 7,
+                It.Is<PullRequestCompletionOptions>(o => o.Strategy == PullRequestCompletionStrategy.ApprovalOnly),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.Approved("genehmigt"));
+        _plugin.Setup(x => x.CompletePullRequestAsync("owner/repo", 7,
+                It.Is<PullRequestCompletionOptions>(o => o.Strategy == PullRequestCompletionStrategy.Merge),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.Completed("merge-sha"));
+
+        await EvaluateAsync(Pr());
+
+        _plugin.Verify(x => x.CompletePullRequestAsync("owner/repo", 7,
+            It.Is<PullRequestCompletionOptions>(o => o.Strategy == PullRequestCompletionStrategy.ApprovalOnly),
+            It.IsAny<CancellationToken>()), Times.Once);
+        VerifyMerge(allowProtectedBranchBypass: false, Times.Once());
+        var checkpoint = await _db.ScmObservationCheckpoints.FindAsync(ScmBackmergeService.CheckpointKey(_remote, 7));
+        checkpoint!.ErrorCode.Should().Be("Merged");
+    }
+
+    /// <summary>Review-Blockade mit wirkungsloser Genehmigung: Bei aktiviertem Admin-Merge wird der
+    /// reguläre Merge versucht und der Admin-Fallback ausgeführt.</summary>
+    [Fact]
+    public async Task Evaluate_NurReviewBlockiertMitAdminMerge_BypassFallback()
+    {
+        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+        await _einstellungen.SetScmBackmergeAdminMergeAsync(true);
+        SetStatus(mergeStatus: PullRequestMergeStatus.Blocked,
+            review: PullRequestReviewDecision.ReviewRequired, checks: PullRequestChecksState.Success);
+        _plugin.Setup(x => x.CompletePullRequestAsync("owner/repo", 7,
+                It.Is<PullRequestCompletionOptions>(o => o.Strategy == PullRequestCompletionStrategy.ApprovalOnly),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.Approved("genehmigt"));
+        _plugin.Setup(x => x.CompletePullRequestAsync("owner/repo", 7,
+                It.Is<PullRequestCompletionOptions>(o => o.Strategy == PullRequestCompletionStrategy.Merge
+                    && !o.AllowProtectedBranchBypass), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.BlockedResult("review erforderlich"));
+        _plugin.Setup(x => x.CompletePullRequestAsync("owner/repo", 7,
+                It.Is<PullRequestCompletionOptions>(o => o.Strategy == PullRequestCompletionStrategy.Merge
+                    && o.AllowProtectedBranchBypass), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.Completed("merge-sha"));
+
+        await EvaluateAsync(Pr());
+
+        VerifyMerge(allowProtectedBranchBypass: false, Times.Once());
+        VerifyMerge(allowProtectedBranchBypass: true, Times.Once());
+        var checkpoint = await _db.ScmObservationCheckpoints.FindAsync(ScmBackmergeService.CheckpointKey(_remote, 7));
+        checkpoint!.ErrorCode.Should().Be("Merged");
+    }
+
+    /// <summary>Review-Blockade bei laufenden Checks: weder Genehmigung noch Merge, nur Warten.</summary>
+    [Fact]
+    public async Task Evaluate_ReviewBlockiertChecksPending_WartetOhneGenehmigung()
+    {
+        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+        SetStatus(mergeStatus: PullRequestMergeStatus.Blocked,
+            review: PullRequestReviewDecision.ReviewRequired, checks: PullRequestChecksState.Pending);
+
+        await EvaluateAsync(Pr());
+
+        _plugin.Verify(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
+            It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()), Times.Never);
+        var checkpoint = await _db.ScmObservationCheckpoints.FindAsync(ScmBackmergeService.CheckpointKey(_remote, 7));
+        checkpoint!.ErrorCode.Should().Be("WaitingForMergeable");
+        checkpoint.NextAttemptUtc.Should().BeGreaterThan(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            .And.BeLessThan(long.MaxValue);
+    }
+
+    /// <summary>Eine bereits gesendete Genehmigung wird im nächsten Zyklus nicht wiederholt —
+    /// stattdessen wartet der Dienst oder greift auf den Admin-Merge zurück.</summary>
+    [Fact]
+    public async Task Evaluate_GenehmigungGesendet_KeineErneuteGenehmigung()
+    {
+        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+        SetStatus(mergeStatus: PullRequestMergeStatus.Blocked,
+            review: PullRequestReviewDecision.ReviewRequired, checks: PullRequestChecksState.Success);
+        _plugin.Setup(x => x.CompletePullRequestAsync("owner/repo", 7,
+                It.Is<PullRequestCompletionOptions>(o => o.Strategy == PullRequestCompletionStrategy.ApprovalOnly),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.Approved("genehmigt"));
+
+        await EvaluateAsync(Pr());
+        _time.Advance(TimeSpan.FromHours(1));
+        await EvaluateAsync(Pr());
+
+        _plugin.Verify(x => x.CompletePullRequestAsync("owner/repo", 7,
+            It.Is<PullRequestCompletionOptions>(o => o.Strategy == PullRequestCompletionStrategy.ApprovalOnly),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>Blockierter regulärer Merge mit aktivierter Admin-Option: zweiter Versuch mit Admin-Rechten.</summary>
