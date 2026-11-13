@@ -186,3 +186,69 @@ Falls `SetValue()` wirft eine Exception:
 - `FehlerMeldung` wird mit der Exception-Message gesetzt
 - Die Methode kehrt zurück, weitere Einstellungen werden nicht gespeichert
 - Der Anwender wird über das Fehler-Banner informiert
+
+## Automatisches Herunterfahren (Auto-Shutdown)
+
+### Übersicht
+
+Der `AutoShutdownOrchestrator` (Application-Layer, Singleton) überwacht die Anzahl fachlich laufender Automatisierungen und armiert bei aktiviertem Schalter einen Countdown über die konfigurierte Wartezeit. Läuft der Countdown ab, wird der OS-Shutdown über `ISystemShutdownService` angefordert. Die UI-Seite liegt in `MainWindowAutoShutdownFlow` (Seitenleisten-Fußzeile des `MainWindow`); Persistenz läuft über `AutoShutdownEinstellungenService` → `AppEinstellungService` (Key-Value-Tabelle `AppEinstellungen`, keine Migration).
+
+### Ablauf
+
+#### 1. Fachliche Lauf-Zählung
+
+1. `LaufendeAutomatisierungenZaehlung.ZaehleAsync` öffnet einen DI-Scope (`IServiceScopeFactory`) und lädt Kandidaten über `IAktiveAufgabenService.GetAktiveAufgabenAsync`.
+2. Pro Aufgabe wird ein `KiAusfuehrungsStatusDaten` aus `Aufgabe.Status`, `AusfuehrungsStatus`, `AktiveRunId`, `LastHeartbeatUtc`, `LaufStatus`, `PausiertBisUtc`, `IRunningAutomationStatusSource.GetLiveLaufStatus(id)` und `PromptZeitVersandService.GetScheduledPromptStatus(id)` befüllt.
+3. `KiAusfuehrungsStatusKlassifikation.Klassifiziere` (aus der App in den Application-Layer verschoben, `public`) liefert den `KiAusfuehrungsZustand`; gezählt wird ausschließlich `Laeuft`.
+4. `MainWindowViewModel` wendet dieselbe Klassifikation (über den `internal` Adapter in `AppConverters.cs`) auf die gemappte `AktiveAufgabenListe` an und setzt `LaufendeAutomatisierungenAnzahl` — identisches Ergebnis ohne zweite DB-Abfrage.
+
+Beteiligte Komponenten:
+- `LaufendeAutomatisierungenZaehlung` / `ILaufendeAutomatisierungenZaehlung` — Zählservice
+- `KiAusfuehrungsStatusKlassifikation`, `KiAusfuehrungsStatusDaten`, `KiAusfuehrungsZustand` — geteilte Klassifikation
+- `IAktiveAufgabenService`, `IRunningAutomationStatusSource`, `PromptZeitVersandService` — Datenquellen
+
+#### 2. Aktivierung und Optionen (UI → Orchestrator)
+
+1. Checkbox „Nach Leerlauf PC herunterfahren" → `MainWindowAutoShutdownFlow.AutoShutdownAktiviert` → `IAutoShutdownOrchestrator.SetEnabled(bool)`; bei `true` wird sofort eine Auswertung angestoßen und der 5-s-Sicherheitstick armiert, bei `false` wird ein laufender Countdown disarmiert.
+2. Textbox „Wartezeit (Minuten):" → `AutoShutdownToleranzMinuten`-Setter validiert (`int.TryParse`, 0–`AppEinstellungService.AutoShutdownMaxToleranzMinuten` = 1440); gültig → `AutoShutdownEinstellungenService.SpeichereToleranzMinutenAsync` + `SetOptionen(toleranz, erzwingen)`, ungültig → `AutoShutdownToleranzFehler` sichtbar, nichts wird angewendet.
+3. Checkbox „Herunterfahren erzwingen" → `SpeichereErzwingenAsync` + `SetOptionen`.
+4. `SetOptionen` speichert beide Werte im Orchestrator; bei laufendem Countdown und geänderter Toleranz wird `CountdownEndeUtc = now + neueToleranz` neu armiert. `Erzwingen` wird erst beim Auslösen ausgewertet.
+
+#### 3. Countdown-Lebenszyklus (Orchestrator)
+
+1. Trigger-Quellen: `IRunningAutomationStatusSource.RunningCountChanged`, `AufgabeLaufdatenChangedNotifier.LaufdatenChanged`, periodischer 5-s-Sicherheitstick (`TimeProvider`-Timer, nur solange aktiviert) sowie `SetEnabled`/`SetOptionen`. Alle Trigger laufen in die koaleszierte `EvaluiereAsync` (`SemaphoreSlim` + Erneut-Flag — parallele Trigger während einer laufenden Auswertung erzeugen höchstens einen Nachlauf).
+2. `EvaluiereEinmalAsync`: `count = await _zaehlung.ZaehleAsync()`; unter `_syncLock`:
+   - `count > 0` → `_shutdownAusgeloest = false`, laufender Countdown wird disarmiert, `ZustandGeaendert` gefeuert.
+   - `enabled && count == 0 && !_shutdownAusgeloest && CountdownEndeUtc == null` → `CountdownEndeUtc = TimeProvider.GetUtcNow() + toleranz`, Countdown-`ITimer` auf die Restlaufzeit armiert.
+   - sonst → keine Änderung; ein armiertes Countdown läuft bei unveränderter Anzahl mit dem bestehenden Endzeitpunkt weiter (verhindert Verhungern durch periodische Heartbeat-`LaufdatenChanged`-Ereignisse).
+3. Countdown-Timer-Callback → `OnCountdownAbgelaufenAsync`: Final-Recheck (`enabled` und `ZaehleAsync() == 0`) → `_shutdownAusgeloest = true`, `ZustandGeaendert`, Warn-Log, `ISystemShutdownService.RequestShutdownAsync(erzwingen)`. Negativer Recheck → erneute `EvaluiereAsync`. Der Shutdown wird pro Null-Phase höchstens einmal ausgelöst.
+4. `Dispose`: Abmeldung beider Events, Entsorgung beider `ITimer`.
+
+Beteiligte Komponenten:
+- `AutoShutdownOrchestrator` / `IAutoShutdownOrchestrator` — `SetEnabled`, `SetOptionen`, `CountdownEndeUtc`, `IstAktiviert`, Event `ZustandGeaendert`
+- `TimeProvider` — DI-registriert; `CreateTimer` für Countdown (One-Shot) und Sicherheitstick (5 s); mit `FakeTimeProvider` deterministisch testbar
+- `ISystemShutdownService` — OS-Shutdown-Auslösung
+
+#### 4. Countdown-Anzeige (UI)
+
+1. `AutoShutdownUiSichtbar` (`MainWindowViewModel`) = `LaufendeAutomatisierungenAnzahl > 0 || AutoShutdownAktiviert || AutoShutdownCountdownAktiv` — der Block bleibt im Countdown sichtbar, damit deaktiviert werden kann; der gesamte Block ist zusätzlich an `IsNavigationExpanded` gebunden (eingeklappte Navigation blendet ihn aus).
+2. Orchestrator-Event `ZustandGeaendert` → `MainWindowAutoShutdownFlow.CountdownAnzeigeAktualisieren` liest `CountdownEndeUtc` per Dispatcher: gesetzt → `AutoShutdownCountdownText` („Herunterfahren in X Min. Y Sek." / „X Std. Y Min." / „Y Sek.") und 1-s-`DispatcherTimer` für die Restzeit-Ticks; `null` → Timer gestoppt, Text geleert.
+3. Beim Start lädt `EinstellungenLadenAsync` einmalig die persistierten Nebenwerte (kein Write-Back, kein Enabled) und reicht sie per `SetOptionen` an den Orchestrator; ein zwischenzeitlich vom Anwender geänderter Wert wird nicht überschrieben.
+
+#### 5. OS-Shutdown-Auslösung
+
+1. `SystemShutdownService.RequestShutdownAsync(erzwingen, ct)` ruft `ResolveShutdownCommand(erzwingen)` (`internal`, für Argument-Mapping-Tests).
+2. Windows: `shutdown /s /f /t 0` bei `erzwingen == true`, sonst `shutdown /s /t 0`. Linux/macOS: bestehende Kommandos unverändert — das Force-Flag hat dort kein Äquivalent.
+3. Prozessstart (`UseShellExecute = false`, `CreateNoWindow = true`) + `WaitForExitAsync`; `ExitCode != 0` → `InvalidOperationException` (vom Orchestrator geloggt, Auslöse-Flag zurückgesetzt, Neuauswertung).
+
+#### 6. Testmodus-Aufzeichnung
+
+1. `App.xaml.cs` `ConfigureServices`: Ist `SOFTWARESCHMIEDE_TEST_DB_PATH` gesetzt (wie beim `IProzessStarter`-Testmodus), wird `ISystemShutdownService` → `AufzeichnenderSystemShutdownService` registriert, sonst `SystemShutdownService`.
+2. `AufzeichnenderSystemShutdownService.RequestShutdownAsync` hängt eine Zeile (`erzwingen|utc|pid`) an `system-shutdowns.log` im Verzeichnis der Testdatenbank an — kein Prozessstart, kein OS-Kontakt. Damit kann kein E2E-/Unit-Test ein echtes Herunterfahren auslösen.
+
+### Fehlerbehandlung
+
+- **Zählfehler in `EvaluiereEinmalAsync`:** Warn-Log, Zustand bleibt unverändert; der nächste Trigger wertet erneut aus.
+- **Zählfehler im Final-Recheck:** `CountdownEndeUtc` wird zurückgesetzt und neu ausgewertet — der Orchestrator bleibt nicht mit totem One-Shot-Timer hängen.
+- **Fehler beim `RequestShutdownAsync`:** Error-Log, `_shutdownAusgeloest` wird zurückgesetzt und neu ausgewertet — bei einem transienten Fehler kann die nächste Auswertung erneut armieren.
+- **Ungültige Wartezeit-Eingabe:** `AutoShutdownToleranzFehler` sichtbar; weder persistiert noch an den Orchestrator weitergereicht (letzter gültiger Wert bleibt wirksam). `SetOptionen` normalisiert negative Werte defensiv auf 0; `GetAutoShutdownToleranzMinutenAsync` clampt gespeicherte Werte auf 0–1440.

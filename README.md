@@ -31,6 +31,7 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 - **Zeitgesteuerte Prompts** mit persistenter Wartestellung — Pläne überleben Ansichtswechsel, CLI-Stopp und App-Neustart und werden zum Zielzeitpunkt bzw. beim nächsten CLI-Start zugestellt
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases mit konfigurierbarem Update-Modus und wählbarem Update-Pfad (ausschließlich stabile Versionen oder ausschließlich Release-Kandidaten)
 - **CLI-Aufzeichnung mit Konsolentestfenster** zur Diagnose des Terminal-Renderpfads — byte-exakter Mitschnitt, `.clireplay`-Export, zeitgesteuerte Wiedergabe in der aufgezeichneten Terminal-Geometrie und Einzelschritt-Modus (vor/zurück)
+- **Automatisches Herunterfahren** nach Abschluss aller laufenden Automatisierungen — mit einstellbarer Wartezeit-Countdown, optionalem „Herunterfahren erzwingen" und persistierten Nebenwerten
 
 ## Terminalintegration
 
@@ -193,6 +194,18 @@ Aufgaben lassen sich zeitgebunden pausieren. Zusätzlich erkennt die Anwendung S
 - `CliUpdateSafetyService.CheckAsync` wertet Aufgaben, deren KI-Plugin ein zukünftiges Session-Limit gespeichert hat, nicht als Update-Risiko — die sonst übliche Heartbeat-Toleranz entfällt für sie komplett.
 
 Abgedeckt wird das Feature u. a. durch `KiPluginLimitServiceTests`, `AufgabeServiceTests_Pause`, `AufgabePausierenDialogViewModelTests`, `CliUpdateSafetyServiceTests` sowie die E2E-Tests `E2E_AufgabePausieren` und `E2E_SessionLimitPause`.
+
+## Automatisches Herunterfahren (Auto-Shutdown)
+
+Die Fußzeile der Navigations-Seitenleiste zeigt mit „`{n}` laufende Automatisierung(en)" die Anzahl der aktuell laufenden Automatisierungen an — gezählt wird ausschließlich der Klassifikations-Zustand `Läuft` (`KiAusfuehrungsStatusKlassifikation`); wartende, pausierte oder bereite Aufgaben zählen nicht. Bei eingeklappter Navigation wird der komplette Block wie die übrigen Fußzeilentexte ausgeblendet.
+
+- **Aktivierung:** Sobald mindestens eine Automatisierung läuft (oder die Funktion bereits aktiviert ist bzw. ein Countdown läuft), erscheint die Checkbox **„Nach Leerlauf PC herunterfahren"**. Der Aktivierungszustand ist bewusst ein reiner Session-Schalter und wird nicht persistiert — nach einem App-Neustart ist die Funktion wieder ausgeschaltet.
+- **Optionen:** Bei aktivierter Checkbox werden das Eingabefeld **„Wartezeit (Minuten)"** (ganzzahlig 0–1440, ungültige Eingaben werden mit einem Fehlertext quittiert und nicht übernommen) und die Checkbox **„Herunterfahren erzwingen"** eingeblendet. Beide Werte werden in der `AppEinstellung`-Tabelle persistiert (`autoshutdown.toleranz.minuten`, Standard 5; `autoshutdown.force`, Standard aus) und beim nächsten Programmstart vorausgewählt. Eine geänderte Wartezeit wirkt sofort — ein laufender Countdown wird mit dem neuen Wert ab jetzt neu armiert.
+- **Countdown:** Sobald die fachliche Anzahl laufender Automatisierungen auf 0 sinkt, armiert der `AutoShutdownOrchestrator` einen Countdown über die Wartezeit; die Fußzeile zeigt die Restzeit („Herunterfahren in X Min. Y Sek." bzw. „X Std. Y Min.", sekündlich aktualisiert). Jeder Statuswechsel — Prozess-Start/-Ende (`RunningCountChanged`), Laufdaten-Wechsel (`LaufdatenChanged`) oder der 5-Sekunden-Sicherheitstick — löst eine koaleszierte Neuauswertung aus: Beginnt wieder eine Automatisierung, wird der Countdown disarmiert; bleibt die Anzahl 0, läuft er mit dem bestehenden Endzeitpunkt weiter (kein Verhungern durch periodische Heartbeat-Ereignisse). Pro Null-Phase wird der Shutdown höchstens einmal ausgelöst, vorher erfolgt ein finaler Recheck der Anzahl.
+- **Auslösung:** Nach Countdown-Ende ruft der Orchestrator `ISystemShutdownService.RequestShutdownAsync(erzwingen)` — unter Windows `shutdown /s /f /t 0` (erzwungen) bzw. `shutdown /s /t 0`; unter Linux/macOS unverändert `shutdown -h now` (das Force-Flag wirkt nur unter Windows). Das Deaktivieren der Checkbox während des Countdowns bricht diesen ab; es gibt keinen zusätzlichen Abbruchdialog unmittelbar vor dem Shutdown.
+- **Testschutz:** Ist `SOFTWARESCHMIEDE_TEST_DB_PATH` gesetzt (jeder E2E-Start), registriert die App den `AufzeichnenderSystemShutdownService`, der Shutdown-Aufforderungen zeilenweise in `system-shutdowns.log` im Testdatenbank-Verzeichnis protokolliert — Tests lösen damit niemals ein echtes Herunterfahren aus.
+
+Die Implementierung liegt in `AutoShutdownOrchestrator`/`IAutoShutdownOrchestrator`, `LaufendeAutomatisierungenZaehlung`, `KiAusfuehrungsStatusKlassifikation`, `SystemShutdownService`/`AufzeichnenderSystemShutdownService`, `AutoShutdownEinstellungenService`, `MainWindowAutoShutdownFlow`, `AppEinstellungService` und `MainWindow.xaml`. Abgedeckt wird das Feature u. a. durch `AutoShutdownOrchestratorTests`, `LaufendeAutomatisierungenZaehlungTests`, `AppEinstellungServiceTests_AutoShutdown`, `MainWindowViewModelAutoShutdownTests`, `AufzeichnenderSystemShutdownServiceTests` und den E2E-Test `General_AutoShutdown_E2E`.
 
 ## Voraussetzungen
 

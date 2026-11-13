@@ -109,6 +109,61 @@ public abstract class WpfTestBase : IDisposable
         => AufzeichnenderProzessStarter.ResolveLogDateiPfad(_testDbPath);
 
     /// <summary>
+    /// Löscht die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderSystemShutdownService"/>, falls sie existiert.
+    /// Verhindert, dass Einträge aus vorherigen Testläufen die Substring-Prüfungen von
+    /// <see cref="WaitForSystemShutdownEintragAsync"/> verfälschen.
+    /// </summary>
+    private void DeleteSystemShutdownLog()
+    {
+        var pfad = ResolveSystemShutdownLogPfad();
+        if (File.Exists(pfad))
+            File.Delete(pfad);
+    }
+
+    /// <summary>Löst den Pfad der System-Shutdown-Logdatei für die Testdatenbank dieser Instanz auf.</summary>
+    /// <returns>Der Pfad zur System-Shutdown-Logdatei.</returns>
+    protected string ResolveSystemShutdownLogPfad()
+        => AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(_testDbPath);
+
+    /// <summary>
+    /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderSystemShutdownService"/> einen
+    /// Eintrag enthält, der <paramref name="substring"/> enthält. Voraussetzung: die App läuft im Testmodus
+    /// (<see cref="LaunchApp"/> wurde aufgerufen), sodass <c>ISystemShutdownService</c> auf
+    /// <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderSystemShutdownService"/> zeigt.
+    /// </summary>
+    /// <param name="substring">Der erwartete Teilstring innerhalb eines Logeintrags (z. B. <c>erzwingen=True</c>).</param>
+    /// <param name="timeout">Maximale Wartezeit. Standard: <see cref="Short"/>.</param>
+    /// <exception cref="TimeoutException">Wird geworfen, wenn kein passender Eintrag innerhalb von <paramref name="timeout"/> erscheint.</exception>
+    protected async Task WaitForSystemShutdownEintragAsync(string substring, TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? Short;
+        var pfad = ResolveSystemShutdownLogPfad();
+        var deadline = DateTime.UtcNow + effectiveTimeout;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (File.Exists(pfad))
+            {
+                try
+                {
+                    var inhalt = await File.ReadAllTextAsync(pfad);
+                    if (inhalt.Contains(substring, StringComparison.Ordinal))
+                        return;
+                }
+                catch (IOException)
+                {
+                    // Die Logdatei wird gerade parallel von der App beschrieben — nächster Poll versucht erneut.
+                }
+            }
+
+            await Task.Delay(200);
+        }
+
+        throw new TimeoutException(
+            $"Die System-Shutdown-Logdatei enthielt nicht innerhalb von {effectiveTimeout.TotalSeconds}s einen Eintrag mit '{substring}'.");
+    }
+
+    /// <summary>
     /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/> einen
     /// Eintrag enthält, der <paramref name="substring"/> enthält. Voraussetzung: die App läuft im Testmodus
     /// (<see cref="LaunchApp"/> wurde aufgerufen), sodass <c>IProzessStarter</c> auf
@@ -198,6 +253,7 @@ public abstract class WpfTestBase : IDisposable
         }
 
         DeleteProzessStartLog();
+        DeleteSystemShutdownLog();
         _letzteLaunchUmgebungsVariablen = umgebungsVariablen;
 
         var appPath = ResolveAppExePath();

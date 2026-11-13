@@ -102,6 +102,18 @@ public sealed class AppEinstellungService
     /// <summary>Schlüsselpräfix für die projektbezogene Backmerge-Freigabe; der vollständige Schlüssel ist <c>plugins.backmerge.project.{projektId}</c>.</summary>
     public const string BackmergeProjektKeyPrefix = "plugins.backmerge.project.";
 
+    /// <summary>Schlüssel für den Schalter "Herunterfahren erzwingen" des automatischen OS-Shutdowns.</summary>
+    public const string AutoShutdownErzwingenKey = "autoshutdown.force";
+
+    /// <summary>Schlüssel für die Toleranzzeit (Minuten) des Auto-Shutdown-Countdowns.</summary>
+    public const string AutoShutdownToleranzMinutenKey = "autoshutdown.toleranz.minuten";
+
+    /// <summary>Standardwert der Auto-Shutdown-Toleranzzeit in Minuten.</summary>
+    public const int AutoShutdownDefaultToleranzMinuten = 5;
+
+    /// <summary>Maximalwert der Auto-Shutdown-Toleranzzeit in Minuten.</summary>
+    public const int AutoShutdownMaxToleranzMinuten = 1440;
+
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AppEinstellungService> _logger;
 
@@ -526,6 +538,41 @@ public sealed class AppEinstellungService
         await _db.SaveChangesAsync(ct);
         _logger.LogDebug("Update-Einstellungen gespeichert.");
     }
+
+    /// <summary>
+    /// Ermittelt, ob das Herunterfahren beim Auto-Shutdown erzwungen werden soll
+    /// (<see cref="AutoShutdownErzwingenKey"/>). Standard: <see langword="false"/>.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn der Shutdown erzwungen werden soll.</returns>
+    public async Task<bool> GetAutoShutdownErzwingenAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(AutoShutdownErzwingenKey, ct) ?? false;
+
+    /// <summary>Setzt den Schalter "Herunterfahren erzwingen" des Auto-Shutdowns (<see cref="AutoShutdownErzwingenKey"/>).</summary>
+    /// <param name="erzwingen">Der zu speichernde Schalter.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public Task SetAutoShutdownErzwingenAsync(bool erzwingen, CancellationToken ct = default)
+        => SetBoolSettingAsync(AutoShutdownErzwingenKey, erzwingen, ct);
+
+    /// <summary>
+    /// Liest die Toleranzzeit in Minuten des Auto-Shutdown-Countdowns
+    /// (<see cref="AutoShutdownToleranzMinutenKey"/>). Fehlende oder ungültige Werte fallen auf
+    /// <see cref="AutoShutdownDefaultToleranzMinuten"/> zurück; gespeicherte Werte werden auf
+    /// 0 bis <see cref="AutoShutdownMaxToleranzMinuten"/> begrenzt.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Die wirksame Toleranzzeit in Minuten.</returns>
+    public async Task<int> GetAutoShutdownToleranzMinutenAsync(CancellationToken ct = default)
+    {
+        var wert = await GetIntSettingAsync(AutoShutdownToleranzMinutenKey, ct);
+        return wert is null ? AutoShutdownDefaultToleranzMinuten : Math.Clamp(wert.Value, 0, AutoShutdownMaxToleranzMinuten);
+    }
+
+    /// <summary>Speichert die Toleranzzeit (Minuten) des Auto-Shutdown-Countdowns (<see cref="AutoShutdownToleranzMinutenKey"/>).</summary>
+    /// <param name="toleranzMinuten">Die zu speichernde Toleranzzeit in Minuten.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public Task SetAutoShutdownToleranzMinutenAsync(int toleranzMinuten, CancellationToken ct = default)
+        => SetIntSettingAsync(AutoShutdownToleranzMinutenKey, toleranzMinuten, ct);
 }
 
 /// <summary>Fenstergeometrie-Einstellungen (Position und Größe des Hauptfensters).</summary>

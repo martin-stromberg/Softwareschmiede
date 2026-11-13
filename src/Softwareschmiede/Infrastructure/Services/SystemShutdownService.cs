@@ -11,12 +11,13 @@ namespace Softwareschmiede.Infrastructure.Services;
 public sealed class SystemShutdownService(ILogger<SystemShutdownService> logger) : ISystemShutdownService
 {
     /// <inheritdoc />
-    public async Task RequestShutdownAsync(CancellationToken cancellationToken = default)
+    public async Task RequestShutdownAsync(bool erzwingen, CancellationToken cancellationToken = default)
     {
-        var (fileName, arguments) = ResolveShutdownCommand();
+        var (fileName, arguments) = ResolveShutdownCommand(erzwingen);
 
         logger.LogWarning(
-            "OS-Shutdown wird angefordert über Kommando: {FileName} {Arguments}",
+            "OS-Shutdown wird angefordert (Erzwingen={Erzwingen}) über Kommando: {FileName} {Arguments}",
+            erzwingen,
             fileName,
             arguments);
 
@@ -38,11 +39,15 @@ public sealed class SystemShutdownService(ILogger<SystemShutdownService> logger)
         }
     }
 
-    private static (string FileName, string Arguments) ResolveShutdownCommand()
+    /// <summary>
+    /// Löst das plattformspezifische Shutdown-Kommando auf. Das Force-Flag wirkt ausschließlich
+    /// unter Windows (<c>/f</c>); unter Linux/macOS bleiben die Kommandos unverändert.
+    /// </summary>
+    internal static (string FileName, string Arguments) ResolveShutdownCommand(bool erzwingen)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            return ("shutdown", "/s /f /t 0");
+            return ("shutdown", erzwingen ? "/s /f /t 0" : "/s /t 0");
         }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))

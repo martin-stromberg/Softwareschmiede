@@ -36,6 +36,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly AufgabenListenModusBindung _modusBindung;
     private readonly Action<Action> _dispatcherInvoke;
     private readonly DispatcherTimer _aktualisierungsTimer;
+    private readonly MainWindowAutoShutdownFlow _autoShutdownFlow;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
 
     private ViewModelBase? _currentView;
@@ -46,6 +47,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly ScmEventChangeNotifier? _scmNotifier;
     private int _scmWaitingCount;
     private ScmEventQueueViewModel? _scmQueue;
+    private int _laufendeAutomatisierungenAnzahl;
 
     /// <summary>Gibt den Fenstertitel zurück.</summary>
     public string Title
@@ -113,6 +115,69 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob aktuell das Dashboard angezeigt wird.</summary>
     public bool IsDashboardVisible => CurrentView is DashboardViewModel;
 
+    /// <summary>
+    /// Anzahl der fachlich laufenden Automatisierungen in der Seitenleiste — nur der
+    /// klassifizierte Zustand <see cref="KiAusfuehrungsZustand.Laeuft"/> zählt.
+    /// </summary>
+    public int LaufendeAutomatisierungenAnzahl
+    {
+        get => _laufendeAutomatisierungenAnzahl;
+        private set
+        {
+            if (SetProperty(ref _laufendeAutomatisierungenAnzahl, value))
+            {
+                OnPropertyChanged(nameof(AutoShutdownUiSichtbar));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Schalter „Nach Leerlauf PC herunterfahren" (nur Session-Aktivierung, wird nicht persistiert).
+    /// </summary>
+    public bool AutoShutdownAktiviert
+    {
+        get => _autoShutdownFlow.AutoShutdownAktiviert;
+        set => _autoShutdownFlow.AutoShutdownAktiviert = value;
+    }
+
+    /// <summary>Schalter „Herunterfahren erzwingen" (persistiert).</summary>
+    public bool AutoShutdownErzwingen
+    {
+        get => _autoShutdownFlow.AutoShutdownErzwingen;
+        set => _autoShutdownFlow.AutoShutdownErzwingen = value;
+    }
+
+    /// <summary>
+    /// Toleranzzeit des Auto-Shutdown-Countdowns in Minuten als Texteingabe (persistiert,
+    /// gültig: ganzzahlig 0–<see cref="AppEinstellungService.AutoShutdownMaxToleranzMinuten"/>).
+    /// </summary>
+    public string AutoShutdownToleranzMinuten
+    {
+        get => _autoShutdownFlow.AutoShutdownToleranzMinuten;
+        set => _autoShutdownFlow.AutoShutdownToleranzMinuten = value;
+    }
+
+    /// <summary>Validierungsfehler der Toleranz-Eingabe; <c>null</c> bei gültigem Wert.</summary>
+    public string? AutoShutdownToleranzFehler => _autoShutdownFlow.AutoShutdownToleranzFehler;
+
+    /// <summary>Angezeigter Countdown-Text („Herunterfahren in 5 Min. 0 Sek."); <c>null</c>, wenn kein Countdown armiert ist.</summary>
+    public string? AutoShutdownCountdownText => _autoShutdownFlow.AutoShutdownCountdownText;
+
+    /// <summary>
+    /// Sichtbarkeit des Auto-Shutdown-Blocks in der Seitenleisten-Fußzeile:
+    /// bei fachlich laufenden Automatisierungen, aktiviertem Schalter oder armiertem Countdown.
+    /// </summary>
+    public bool AutoShutdownUiSichtbar =>
+        _laufendeAutomatisierungenAnzahl > 0
+        || _autoShutdownFlow.AutoShutdownAktiviert
+        || _autoShutdownFlow.AutoShutdownCountdownAktiv;
+
+    /// <summary>Sichtbarkeit der Auto-Shutdown-Optionen (Toleranz, Erzwingen) — nur bei aktiviertem Schalter.</summary>
+    public bool AutoShutdownOptionenSichtbar => _autoShutdownFlow.AutoShutdownOptionenSichtbar;
+
+    /// <summary>Ob aktuell ein Auto-Shutdown-Countdown armiert ist.</summary>
+    public bool AutoShutdownCountdownAktiv => _autoShutdownFlow.AutoShutdownCountdownAktiv;
+
     /// <summary>Navigiert zum Dashboard.</summary>
     public ICommand NavigateToDashboardCommand { get; }
 
@@ -167,6 +232,23 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _pluginManager = serviceProvider.GetService<IPluginManager>();
         _scmNotifier = serviceProvider.GetService<ScmEventChangeNotifier>();
         _dispatcherInvoke = DispatcherInvokeFactory.Create(optionaleDienste?.DispatcherInvoke);
+        _autoShutdownFlow = new MainWindowAutoShutdownFlow(
+            optionaleDienste?.AutoShutdownOrchestrator,
+            optionaleDienste?.AutoShutdownEinstellungenService,
+            optionaleDienste?.TimeProvider ?? TimeProvider.System,
+            logger,
+            _dispatcherInvoke);
+        _autoShutdownFlow.PropertyChanged += (_, e) =>
+        {
+            OnPropertyChanged(e.PropertyName);
+            // Die Blocksichtbarkeit hängt zusätzlich an Aktivierung und Countdown —
+            // VM-seitig kommt die fachliche Lauf-Anzahl als dritter Faktor dazu.
+            if (e.PropertyName is nameof(MainWindowAutoShutdownFlow.AutoShutdownAktiviert)
+                or nameof(MainWindowAutoShutdownFlow.AutoShutdownCountdownAktiv))
+            {
+                OnPropertyChanged(nameof(AutoShutdownUiSichtbar));
+            }
+        };
         _modusBindung = AufgabenListenModusBindung.FuerMenue(
             optionaleDienste?.AufgabenListenModusService, logger, _dispatcherInvoke);
         _modusBindung.WertGeaendert += () => OnPropertyChanged(nameof(AufgabenListenModus));
@@ -203,6 +285,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         VersionLadenImHintergrund();
         GespeichertenAufgabenListenModusLadenAsync()
             .SafeFireAndForget(_logger, "Aufgabenlisten-Modus laden");
+        AutoShutdownEinstellungenLadenAsync()
+            .SafeFireAndForget(_logger, "Auto-Shutdown-Einstellungen laden");
         OnScmChanged();
     }
 
@@ -215,6 +299,17 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
     public Task GespeichertenAufgabenListenModusLadenAsync(CancellationToken ct = default)
         => _modusBindung.GespeichertenWertLadenAsync(ct);
+
+    /// <summary>
+    /// Lädt die persistierten Auto-Shutdown-Nebenwerte (Erzwingen, Toleranz) einmalig und
+    /// schiebt sie ohne Write-Back in den Orchestrator — die Aktivierung selbst bleibt
+    /// absichtlich ausgeschaltet (Session-Schalter). Wird im Konstruktor per
+    /// <c>SafeFireAndForget</c> gestartet und ist für Tests direkt awaitbar. Ein
+    /// zwischenzeitlich vom Anwender geänderter Wert wird nicht überschrieben.
+    /// </summary>
+    /// <param name="ct">Token zum Abbrechen der Operation.</param>
+    public Task AutoShutdownEinstellungenLadenAsync(CancellationToken ct = default)
+        => _autoShutdownFlow.EinstellungenLadenAsync(ct);
 
     private DashboardViewModel? _dashboardViewModel;
 
@@ -330,6 +425,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             var aufgaben = await _aufgabeService.GetAktiveAufgabenAsync(ct);
             var offeneTodoCounts = await _todoService.GetOpenTodoCountsAsync(aufgaben.Select(a => a.Id), ct);
             AktiveAufgabenListe.ReplaceAll(aufgaben.Select(a => MapAktiveAufgabePanelItem(a, offeneTodoCounts)));
+            LaufendeAutomatisierungenAnzahl = AktiveAufgabenListe.Count(item =>
+                Softwareschmiede.App.Converters.KiAusfuehrungsStatusAdapter.Klassifiziere(item, out _)
+                    == KiAusfuehrungsZustand.Laeuft);
         }
         catch (OperationCanceledException)
         {
@@ -487,6 +585,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         _aktualisierungsTimer.Stop();
         _aktualisierungsTimer.Tick -= OnAktualisierungsTimerTick;
+        _autoShutdownFlow.Dispose();
         _runningStatusSource.RunningCountChanged -= OnRunningCountChanged;
         if (_scmNotifier is not null) _scmNotifier.Changed -= OnScmChanged;
         _scmQueue?.Dispose();
