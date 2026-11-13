@@ -32,6 +32,14 @@ Jedes Plugin deklariert Einstellungsgruppen (`PluginSettingGroup`) mit typisiert
 
 Das Standard-SCM-Plugin und das Standard-KI-Plugin werden in den App-Einstellungen hinterlegt und per `PluginDefaultSettingsService` verwaltet.
 
+### Zugangsdaten und Sicherheit (GitHub)
+
+Der GitHub-Token bleibt ausschließlich verschlüsselt im Windows Credential Store gespeichert. Für Git-Operationen wie Klonen, Push, Pull und das Abrufen von Branches wird er nur innerhalb des laufenden Prozesses als Authentifizierungs-Header an GitHub übergeben — er landet weder in Repository-URLs noch in Befehlszeilen oder Dateien.
+
+Frühere Versionen hatten den Token zusätzlich im Klartext in der Datei `_netrc` (Windows) bzw. `.netrc` im Benutzerprofil hinterlegt. Beim Programmstart entfernt das GitHub-Plugin diese älteren GitHub-Einträge (`github.com` und `api.github.com`) automatisch aus einer vorhandenen Datei — Einträge anderer Anbieter (z. B. Bitbucket oder selbst gehostete Server) bleiben unverändert erhalten. Bestand die Datei nur aus den GitHub-Einträgen, wird sie gelöscht; eine nicht vorhandene Datei wird nicht angelegt. Für den Anwender ist keine Aktion nötig — die Migration läuft transparent beim Programmstart.
+
+> **Hinweis:** Auch manuell gepflegte Einträge für `github.com` in dieser Datei werden entfernt, da sie von den früher automatisch angelegten nicht unterscheidbar sind. Werden sie für andere Werkzeuge erneut angelegt, entfernt der nächste Programmstart sie wieder — andere Werkzeuge sollten daher einen eigenen Anmeldemechanismus (z. B. den Git Credential Manager) verwenden.
+
 ## Beispiele
 
 - Für GitHub-Repositories wird `GitHubPlugin` als SCM gewählt; der GitHub-Token wird unter `Softwareschmiede.GitHub.Token` gespeichert.

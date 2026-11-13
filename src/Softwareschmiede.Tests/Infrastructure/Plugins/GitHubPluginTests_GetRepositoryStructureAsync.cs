@@ -31,7 +31,9 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
             _cliRunnerMock.Object,
             _credentialStoreMock.Object,
             new Mock<ILogger<GitHubPlugin>>().Object,
-            _api);
+            _api,
+            null,
+            GitHubPluginTests.CreateMissingNetrcPath());
     }
 
     private void SetupDefaultBranch(string branch = "main")

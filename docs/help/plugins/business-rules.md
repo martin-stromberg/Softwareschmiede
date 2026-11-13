@@ -144,3 +144,36 @@
 - Keine Neustart-Aktion nötig
 
 **Umsetzung:** Default-Verhalten durch fehlende DB-Einträge
+
+## GitHub-Credential-Verwaltung
+
+### Regel: Kein persistierter GitHub-Token
+
+**Beschreibung:** Der GitHub-Personal-Access-Token wird ausschließlich im Windows Credential Store (`Softwareschmiede.GitHub.Token`) gehalten und für git-Aufrufe nur in der Prozessumgebung des Kindprozesses übergeben — niemals in Dateien, Remote-URLs oder Kommandozeilenargumenten. Das Verhalten ist sicherheitsrelevant und nicht per Einstellung abschaltbar.
+
+**Bedingungen:**
+- Beliebige Host-git-Operation des `GitHubPlugin` gegen github.com (`clone`, `push`, `pull`, `ls-remote`, `fetch`/`checkout` im PR-Checkout)
+
+**Verhalten:**
+- `GetGitEnvironment` setzt bei vorhandenem Token `GIT_CONFIG_*`-`http.extraheader` (`AUTHORIZATION: basic <base64("x-access-token:"+token)>`) zusätzlich zu `GH_TOKEN`; es gibt keinen `NETRC`-Verweis mehr.
+- `_netrc`/`.netrc` wird vom Plugin weder gelesen noch beschrieben — Ausnahme ist die einmalige Legacy-Bereinigung (nächste Regel).
+- Ohne Token enthält die Umgebung nur `GIT_TERMINAL_PROMPT=0` und `GIT_SSH_COMMAND`; HTTPS-Klone ohne Token scheitern früh mit einer verständlichen Meldung (unverändert).
+
+**Umsetzung:** `GitHubPlugin.AddGitHubHttpAuthHeader` + `GetGitEnvironment` — dasselbe `extraheader`-Muster, das `GetAgentEnvironmentAsync` bereits für Agent-Prozesse nutzt; die Env-Variante vermeidet im Unterschied zu CLI-Args (`-c http.extraheader=…`, BitBucket-Muster) den Token in der Prozess-Kommandozeile.
+
+### Regel: Einmalige `_netrc`-Bereinigung bei Plugin-Start
+
+**Beschreibung:** Beim Instanziieren des `GitHubPlugin` (Plugin-Discovery beim Anwendungsstart) werden die von Altversionen geschriebenen Stanzas `machine github.com` und `machine api.github.com` einmalig aus einer existierenden `_netrc` im Benutzerprofil entfernt — eine Migration für Bestandsinstallationen.
+
+**Bedingungen:**
+- `GitHubPlugin` wird instanziiert (pro Instanziierung einmal, idempotent)
+
+**Verhalten:**
+- `_netrc` existiert nicht → keine Aktion, die Datei wird nie angelegt.
+- Nur exakte `machine github.com`-/`machine api.github.com`-Stanzas (case-insensitiv, getrimmt, inkl. Inline-Tokens) werden entfernt — die `machine`-Zeile plus alle Folgezeilen bis zur nächsten `machine`-/`default`-Zeile.
+- Fremd-Einträge (z. B. `machine bitbucket.org`, Self-Hosted-Hosts) bleiben unverändert; ohne Treffer wird die Datei nicht zurückgeschrieben.
+- Bestand die Datei ausschließlich aus den entfernten GitHub-Stanzas (Rest leer/whitespace-only) → die Datei wird gelöscht.
+- Manuell gepflegte GitHub-Stanzas werden ebenfalls entfernt — sie sind von plugin-geschriebenen nicht unterscheidbar und der Pfad ist für das Plugin obsolet.
+- Jeder Fehler (gesperrte/unlesbare Datei, Rechte) → `LogWarning`; Plugin-Instanziierung und spätere git-Operationen laufen normal weiter.
+
+**Umsetzung:** `GitHubPlugin.RemoveLegacyNetrcEntries` / `RemoveNetrcStanzas` — Read-Modify-Write unter exklusivem Dateizugriff (`FileShare.None`), damit ein gleichzeitiger Fremd-Zugriff (z. B. `BitBucketPlugin.UpdateNetrcEntry`) nicht mit einer veralteten Version interleavet, sondern mit `IOException` fehlschlägt. Verbleibende Einschränkung: kein prozessübergreifender Lock — ein Fremd-Writer kann die Datei vor dem Öffnen oder zwischen Handle-Close und `File.Delete` erneut verändern.

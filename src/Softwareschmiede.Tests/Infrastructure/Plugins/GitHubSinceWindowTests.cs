@@ -28,7 +28,8 @@ public sealed class GitHubSinceWindowTests
         agent.AddJson("notifications", "[]");
         var store = new Mock<ICredentialStore>();
         store.Setup(c => c.GetCredential("Softwareschmiede.GitHub.AgentToken")).Returns("bot-token");
-        var plugin = new GitHubPlugin(Mock.Of<ICliRunner>(), store.Object, NullLogger<GitHubPlugin>.Instance, new FakeGitHubEventApi(), agent);
+        var plugin = new GitHubPlugin(Mock.Of<ICliRunner>(), store.Object, NullLogger<GitHubPlugin>.Instance, new FakeGitHubEventApi(), agent,
+            GitHubPluginTests.CreateMissingNetrcPath());
 
         await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", Since);
 
@@ -42,7 +43,8 @@ public sealed class GitHubSinceWindowTests
     {
         var api = new FakeGitHubEventApi();
         api.Add("comments?", Array.Empty<object>());
-        var plugin = new GitHubPlugin(Mock.Of<ICliRunner>(), Mock.Of<ICredentialStore>(), NullLogger<GitHubPlugin>.Instance, api);
+        var plugin = new GitHubPlugin(Mock.Of<ICliRunner>(), Mock.Of<ICredentialStore>(), NullLogger<GitHubPlugin>.Instance, api,
+            null, GitHubPluginTests.CreateMissingNetrcPath());
 
         await plugin.ReadEventsAsync(new ScmEventReadRequest(new ScmEventReference(Repository, ScmReferenceKind.Issue, 27),
             ScmContentKind.IssueComment, Since, Since.AddMinutes(2)));

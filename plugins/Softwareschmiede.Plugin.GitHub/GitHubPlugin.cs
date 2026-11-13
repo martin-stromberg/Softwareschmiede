@@ -23,9 +23,20 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     private const string RepositoryUrlKey = "RepositoryUrl";
     private const string RepositoryNameKey = "RepositoryName";
     private static readonly Regex EmbeddedTokenPattern = new(@"oauth2:[^@\s]+@", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly string[] LegacyNetrcHosts = ["github.com", "api.github.com"];
+
+    /// <summary>
+    /// Name der optionalen Umgebungsvariable, mit der der Pfad der <c>_netrc</c>/<c>.netrc</c>-Datei
+    /// für die einmalige Legacy-Bereinigung übersteuert werden kann (Testseam für Kontexte, in denen
+    /// der <c>netrcPath</c>-Konstruktorparameter nicht erreichbar ist — z. B. die Plugin-Discovery über
+    /// <c>ActivatorUtilities</c>). Leere Werte werden ignoriert; der explizite Konstruktorparameter
+    /// hat Vorrang, danach greift diese Variable, zuletzt das Benutzerprofil.
+    /// </summary>
+    internal const string NetrcPathEnvironmentVariable = "SOFTWARESCHMIEDE_NETRC_PATH";
     private readonly ICliRunner _cliRunner;
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<GitHubPlugin> _logger;
+    private readonly string? _netrcPath;
 
     /// <inheritdoc/>
     public override string PluginName => "GitHub";
@@ -123,15 +134,21 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     }
 
     /// <summary>Erstellt den Provider mit austauschbaren Ereignis-API-Transporten beider Konten.</summary>
+    /// <param name="netrcPath">Optionaler Pfad-Override der <c>_netrc</c>/<c>.netrc</c>-Datei für die
+    /// einmalige Legacy-Bereinigung (Testseam); <see langword="null"/> ist der Produktiv-Default und
+    /// löst den Pfad über <see cref="NetrcPathEnvironmentVariable"/> bzw. das Benutzerprofil auf.</param>
     public GitHubPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<GitHubPlugin> logger,
-        IGitHubEventApiClient? eventApiClient, IGitHubEventApiClient? agentEventApiClient)
+        IGitHubEventApiClient? eventApiClient, IGitHubEventApiClient? agentEventApiClient, string? netrcPath = null)
         : base(cliRunner)
     {
         _cliRunner = cliRunner;
         _credentialStore = credentialStore;
         _logger = logger;
+        _netrcPath = netrcPath;
         _eventApiClient = eventApiClient ?? new GitHubHttpApiClient(() => _credentialStore.GetCredential(GitHubTokenCredentialKey));
         _agentEventApiClient = agentEventApiClient ?? new GitHubHttpApiClient(() => _credentialStore.GetCredential(GitHubAgentTokenCredentialKey));
+
+        RemoveLegacyNetrcEntries();
     }
 
     private IDictionary<string, string> GetGhEnvironment()
@@ -167,14 +184,23 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
         if (!string.IsNullOrEmpty(token))
         {
             environment["GH_TOKEN"] = token;
-            // HTTPS-git-Auth für github.com ohne eingebettetes Token in der Remote-URL:
-            // derselbe Basic-Authorization-Header, den GitHub-Actions-Checkouts verwenden.
-            var credentials = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("x-access-token:" + token));
-            environment["GIT_CONFIG_COUNT"] = "1";
-            environment["GIT_CONFIG_KEY_0"] = "http.https://github.com/.extraheader";
-            environment["GIT_CONFIG_VALUE_0"] = "AUTHORIZATION: basic " + credentials;
+            AddGitHubHttpAuthHeader(environment, token);
         }
         return Task.FromResult<IReadOnlyDictionary<string, string?>>(environment);
+    }
+
+    /// <summary>
+    /// Setzt die HTTPS-git-Authentifizierung für github.com als <c>http.extraheader</c> über die
+    /// <c>GIT_CONFIG_*</c>-Prozessumgebung — dasselbe Basic-Authorization-Schema, das
+    /// GitHub-Actions-Checkouts verwenden. Der Token bleibt rein prozessbasiert und wird
+    /// niemals in URLs, CLI-Argumenten oder Dateien persistiert.
+    /// </summary>
+    private static void AddGitHubHttpAuthHeader(IDictionary<string, string?> environment, string token)
+    {
+        var credentials = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("x-access-token:" + token));
+        environment["GIT_CONFIG_COUNT"] = "1";
+        environment["GIT_CONFIG_KEY_0"] = "http.https://github.com/.extraheader";
+        environment["GIT_CONFIG_VALUE_0"] = "AUTHORIZATION: basic " + credentials;
     }
 
     private IDictionary<string, string> GetGitEnvironment(string? token = null)
@@ -193,13 +219,181 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             // Programm-Token für git-Authentifizierung bereitstellen, ohne ihn in URLs einzubetten
             env["GH_TOKEN"] = token;
 
-            // .netrc bleibt als optionaler Fallback erhalten (For curl, das git unter Windows/HTTPS nutzt)
-            env["NETRC"] = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
+            // HTTPS-Auth gegen github.com rein prozessbasiert über http.extraheader —
+            // es wird kein Token mehr nach _netrc/.netrc persistiert.
+            // Expliziter Cast: env trägt nur nicht-leere Werte, der Helfer arbeitet auf
+            // dem nullability-toleranten IDictionary<string, string?>.
+            AddGitHubHttpAuthHeader((IDictionary<string, string?>)env, token);
         }
 
         return env;
+    }
+
+    /// <summary>
+    /// Ermittelt den Pfad der <c>_netrc</c>/<c>.netrc</c>-Datei: expliziter
+    /// <c>netrcPath</c>-Konstruktorparameter, sonst die Umgebungsvariable
+    /// <see cref="NetrcPathEnvironmentVariable"/> (leere Werte werden ignoriert), sonst das
+    /// Benutzerprofil. Die Umgebungsvariable ist die Testseam für Instanziierungen, bei denen der
+    /// Konstruktorparameter nicht erreichbar ist (Plugin-Discovery via <c>ActivatorUtilities</c>).
+    /// </summary>
+    private string ResolveNetrcPath()
+    {
+        if (_netrcPath is not null)
+        {
+            return _netrcPath;
+        }
+
+        var environmentOverride = Environment.GetEnvironmentVariable(NetrcPathEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(environmentOverride))
+        {
+            return environmentOverride;
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
+    }
+
+    /// <summary>
+    /// Entfernt einmalig pro Plugin-Instanziierung die von Altversionen geschriebenen
+    /// <c>machine github.com</c>/<c>machine api.github.com</c>-Stanzas aus einer existierenden
+    /// <c>_netrc</c>. Nur Fremd-Host-Einträge (z. B. des BitBucket-Plugins oder manuell
+    /// gepflegte Stanzas anderer Hosts) bleiben unverändert — manuell gepflegte
+    /// GitHub-Stanzas werden ebenfalls entfernt, da sie von plugin-geschriebenen nicht
+    /// unterscheidbar sind. Fehler werden nur geloggt und brechen den Ablauf nie ab.
+    /// </summary>
+    /// <remarks>
+    /// Der Read-Modify-Write läuft unter exklusivem Dateizugriff (<see cref="FileShare.None"/>):
+    /// Ein gleichzeitiger Fremd-Lese-/Schreibzugriff (z. B. <c>BitBucketPlugin.UpdateNetrcEntry</c>,
+    /// das die Datei bei jedem BitBucket-git-Aufruf ebenfalls nicht-atomar verändert) kann
+    /// innerhalb dieses Fensters nicht mehr interleaven — er schlägt mit einer
+    /// <see cref="IOException"/> fehl, statt eine veraltete Version zurückzuschreiben.
+    /// Verbleibende Einschränkung: Der Exklusivzugriff gilt nur für das eigene
+    /// Read-Modify-Write-Fenster; ein Fremd-Writer kann die Datei vor dem Öffnen oder
+    /// zwischen dem Schließen des Handles und dem <see cref="File.Delete(string)"/> erneut
+    /// verändern — vollständige Atomizität bzw. ein prozessübergreifender Lock besteht nicht.
+    /// </remarks>
+    private void RemoveLegacyNetrcEntries()
+    {
+        try
+        {
+            var netrcPath = ResolveNetrcPath();
+            if (!File.Exists(netrcPath) && !Directory.Exists(netrcPath))
+            {
+                return;
+            }
+
+            // Erst nur lesend prüfen: Eine _netrc ohne GitHub-Stanzas bleibt auch dann
+            // warnfrei unverändert, wenn sie schreibgeschützt ist.
+            var cleanupRequired = false;
+            using (var previewStream = new FileStream(netrcPath, FileMode.Open, FileAccess.Read, FileShare.None))
+            using (var reader = new StreamReader(previewStream))
+            {
+                cleanupRequired = RemoveNetrcStanzas(reader.ReadToEnd(), LegacyNetrcHosts) is not null;
+            }
+
+            if (!cleanupRequired)
+            {
+                return;
+            }
+
+            var deleteFile = false;
+            using (var stream = new FileStream(netrcPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            {
+                string content;
+                System.Text.Encoding encoding;
+                using (var reader = new StreamReader(stream, detectEncodingFromByteOrderMarks: true, leaveOpen: true))
+                {
+                    content = reader.ReadToEnd();
+                    encoding = reader.CurrentEncoding;
+                }
+
+                var remaining = RemoveNetrcStanzas(content, LegacyNetrcHosts);
+                if (remaining is null)
+                {
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(remaining))
+                {
+                    // Löschen erst nach dem Schließen: das eigene Handle ist ohne
+                    // FileShare.Delete geöffnet, File.Delete würde an der eigenen Sperre scheitern.
+                    deleteFile = true;
+                }
+                else
+                {
+                    stream.SetLength(0);
+                    stream.Position = 0;
+                    using (var writer = new StreamWriter(stream, encoding, bufferSize: 1024, leaveOpen: true))
+                    {
+                        writer.Write(remaining);
+                    }
+                }
+            }
+
+            if (deleteFile)
+            {
+                File.Delete(netrcPath);
+                _logger.LogInformation("_netrc nach Entfernen der GitHub-Legacy-Einträge gelöscht: {Path}", netrcPath);
+            }
+            else
+            {
+                _logger.LogInformation("GitHub-Legacy-Einträge aus _netrc entfernt: {Path}", netrcPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "_netrc konnte nicht von GitHub-Legacy-Einträgen bereinigt werden");
+        }
+    }
+
+    /// <summary>
+    /// Entfernt aus <paramref name="content"/> alle Stanzas, deren <c>machine</c>-Zeile auf einen der
+    /// übergebenen Hosts trifft — jeweils die komplette <c>machine</c>-Zeile plus alle Folgezeilen
+    /// bis zur nächsten <c>machine</c>- oder <c>default</c>-Zeile. Die Erkennung tokenisiert jede
+    /// Zeile (beliebige Whitespace-Trenner, case-insensitiv): <c>machine\tgithub.com</c>,
+    /// Mehrfach-Leerzeichen und Inline-Tokens wie <c>machine github.com login … password …</c>
+    /// werden erkannt und die ganze Zeile entfernt; <c>default</c> beendet eine laufende Stanza
+    /// als Blockgrenze. Liefert <see langword="null"/>, wenn kein Eintrag betroffen war, sonst
+    /// den bereinigten Inhalt mit unverändertem Rest (inklusive finaler Zeilenschaltung).
+    /// </summary>
+    private static string? RemoveNetrcStanzas(string content, IReadOnlyCollection<string> hosts)
+    {
+        var lines = content.Split('\n');
+        var result = new List<string>(lines.Length);
+        var removed = false;
+        var skipping = false;
+
+        foreach (var line in lines)
+        {
+            var tokens = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length > 0
+                && tokens[0].Equals("machine", StringComparison.OrdinalIgnoreCase))
+            {
+                skipping = tokens.Length > 1
+                    && hosts.Any(host => tokens[1].Equals(host, StringComparison.OrdinalIgnoreCase));
+                removed |= skipping;
+            }
+            else if (tokens.Length > 0
+                && tokens[0].Equals("default", StringComparison.OrdinalIgnoreCase))
+            {
+                skipping = false;
+            }
+
+            if (!skipping)
+            {
+                result.Add(line);
+            }
+        }
+
+        // Die finale Zeilenschaltung des Restinhalts erhalten: endete die Datei innerhalb
+        // einer entfernten Stanza, ging das abschließende leere Split-Element verloren.
+        if (removed && skipping && content.EndsWith('\n'))
+        {
+            result.Add(string.Empty);
+        }
+
+        return removed ? string.Join('\n', result) : null;
     }
 
     private static bool IsHttpsRepositoryUrl(string repositoryUrl)
@@ -331,31 +525,8 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             _logger.LogWarning("Git user.email Konfiguration fehlgeschlagen: {Error}", userEmailResult.StdErr);
         }
 
-        // Create .netrc file for backup credential storage
-        var netrcPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
-
-        var netrcContent = $@"machine github.com
-login oauth2
-password {token}
-machine api.github.com
-login oauth2
-password {token}
-";
-
-        try
-        {
-            File.WriteAllText(netrcPath, netrcContent);
-            _logger.LogInformation("Git .netrc credentials file erstellt/aktualisiert: {Path}", netrcPath);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Git .netrc file konnte nicht erstellt werden");
-        }
-
         // Remote-URL bleibt unauthentifiziert – der Token wird ausschließlich über GH_TOKEN
-        // (GetGitEnvironment()) bzw. .netrc bereitgestellt, niemals in der URL eingebettet.
+        // (GetGitEnvironment()) bzw. http.extraheader bereitgestellt, niemals in der URL eingebettet.
         if (repositoryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
             var setUrlResult = await _cliRunner.RunAsync(
@@ -876,7 +1047,7 @@ password {token}
         }
 
         // Clone mit unauthentifizierter URL – der Token wird ausschließlich über GH_TOKEN
-        // (GetGitEnvironment()) bereitgestellt, niemals in der URL eingebettet.
+        // bzw. http.extraheader (GetGitEnvironment()) bereitgestellt, niemals in der URL eingebettet.
         var result = await _cliRunner.RunAsync(
             "git",
             ["clone", repositoryUrl, targetPath],
@@ -1473,7 +1644,7 @@ password {token}
             "git",
             ["ls-remote", "--symref", repositoryUrl, "HEAD"],
             null,
-            GetGhEnvironment(),
+            GetGitEnvironment(),
             ct);
 
         if (result.IsSuccess)
@@ -1493,6 +1664,18 @@ password {token}
         _logger.LogWarning("Standard-Branch konnte nicht ermittelt werden, Fallback auf 'main'.");
         return "main";
     }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Übergibt dem <c>git fetch</c>/<c>checkout</c> des PR-Checkouts die git-Umgebung aus
+    /// <see cref="GetGitEnvironment"/> — nötig seit dem Wegfall der <c>_netrc</c>-Persistenz,
+    /// damit der Checkout auch gegen private Repositories authentifiziert läuft.
+    /// </remarks>
+    public override Task CheckoutPullRequestSourceAsync(
+        string localPath,
+        PullRequestCheckoutSpec checkoutSpec,
+        CancellationToken ct = default)
+        => CheckoutPullRequestSourceCoreAsync(localPath, checkoutSpec, GetGitEnvironment(), ct);
 
     /// <inheritdoc/>
     /// <remarks>

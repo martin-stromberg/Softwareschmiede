@@ -27,8 +27,15 @@ public sealed class GitHubPluginTests
             _cliRunnerMock.Object,
             _credentialStoreMock.Object,
             new Mock<ILogger<GitHubPlugin>>().Object,
-            _api);
+            _api,
+            null,
+            CreateMissingNetrcPath());
     }
+
+    /// <summary>Liefert einen garantiert nicht existierenden netrc-Pfad, damit die
+    /// Konstruktor-Bereinigung im Test nicht die echte %USERPROFILE%\_netrc anfasst.</summary>
+    internal static string CreateMissingNetrcPath()
+        => Path.Combine(Path.GetTempPath(), $"sws-test-{Guid.NewGuid():N}", "_netrc");
 
     /// <summary>GetIssuesAsync parsed die REST-Antwort (inkl. html_url und PR-Filter) korrekt.</summary>
     [Fact]
@@ -506,7 +513,8 @@ public sealed class GitHubPluginTests
             "git",
             It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Contains("https://github.com/test/repo") && a.Contains("/target/path")),
             null,
-            It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token"),
+            It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token"
+                && HasGitHubExtraHeader(env, "token") && !env.ContainsKey("NETRC")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1000,7 +1008,8 @@ public sealed class GitHubPluginTests
             "git",
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "push", "--set-upstream", "origin", "feature/a")),
             "/repo",
-            It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GIT_TERMINAL_PROMPT") && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token123"),
+            It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GIT_TERMINAL_PROMPT") && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token123"
+                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1152,7 +1161,8 @@ public sealed class GitHubPluginTests
             "git",
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
             "/repo",
-            It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token"),
+            It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token"
+                && HasGitHubExtraHeader(env, "token") && !env.ContainsKey("NETRC")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1743,6 +1753,111 @@ public sealed class GitHubPluginTests
             It.IsAny<string?>(),
             It.IsAny<IDictionary<string, string>?>(),
             It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Ohne gespeicherten Token enthält die git-Umgebung nur Prompt-/SSH-Einstellungen —
+    /// weder GH_TOKEN noch GIT_CONFIG_* noch einen NETRC-Verweis (SSH-Klon, kein HTTPS-Fail-Fast).</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_OhneToken_NurTerminalPromptUndSshInEnv()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.CloneRepositoryAsync("git@github.com:owner/repo.git", "/target/path");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("clone")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null
+                && env["GIT_TERMINAL_PROMPT"] == "0"
+                && env.ContainsKey("GIT_SSH_COMMAND")
+                && !env.ContainsKey("GH_TOKEN")
+                && !env.Keys.Any(k => k.StartsWith("GIT_CONFIG_", StringComparison.Ordinal))
+                && !env.ContainsKey("NETRC")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>GetDefaultBranchAsync nutzt die git-Umgebung mit http.extraheader-Auth,
+    /// damit ls-remote --symref gegen private Repositories authentifiziert bleibt.</summary>
+    [Fact]
+    public async Task GetDefaultBranchAsync_Env_EnthaeltGitAuth()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("--symref")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "ref: refs/heads/main\tHEAD", string.Empty));
+
+        var result = await _sut.GetDefaultBranchAsync("https://github.com/owner/repo.git");
+
+        result.Should().Be("main");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "ls-remote", "--symref", "https://github.com/owner/repo.git", "HEAD")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token123"
+                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Der PR-Checkout übergibt die git-Umgebung mit http.extraheader-Auth an
+    /// git fetch/checkout — seit dem Wegfall der _netrc-Persistenz nötig für private Repositories.</summary>
+    [Fact]
+    public async Task CheckoutPullRequestSourceAsync_UebergibtGitEnvironment()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        var spec = new PullRequestCheckoutSpec(
+            TargetRepositoryId: "owner/repo",
+            TargetRepositoryUrl: "https://github.com/owner/repo.git",
+            SourceRepositoryId: "owner/repo",
+            SourceRepositoryUrl: null,
+            SourceBranch: "feature/pr",
+            SourceRef: null,
+            HeadSha: null);
+
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "fetch", "--no-tags", "origin", "refs/heads/feature/pr")),
+            "/repo",
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token123"
+                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC")),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "checkout", "-B", "feature/pr", "FETCH_HEAD")),
+            "/repo",
+            It.Is<IDictionary<string, string>?>(env => env != null && HasGitHubExtraHeader(env, "token123")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Prüft die drei GIT_CONFIG_*-Einträge des github.com-http.extraheader gegen den erwarteten Token.</summary>
+    private static bool HasGitHubExtraHeader(IDictionary<string, string> env, string token)
+    {
+        var expected = "AUTHORIZATION: basic " + Convert.ToBase64String(
+            System.Text.Encoding.UTF8.GetBytes("x-access-token:" + token));
+        return env.TryGetValue("GIT_CONFIG_COUNT", out var count) && count == "1"
+            && env.TryGetValue("GIT_CONFIG_KEY_0", out var key) && key == "http.https://github.com/.extraheader"
+            && env.TryGetValue("GIT_CONFIG_VALUE_0", out var value) && value == expected;
     }
 
     private static bool SequenceEqual(IEnumerable<string> actual, params string[] expected)
