@@ -187,6 +187,29 @@ Die Platzhalter werden erst beim Versand aus der Aufgabendetailansicht ersetzt.
 1. Klicken Sie auf die Schaltfläche **Verwerfen** in der Symbolleiste
 2. Alle nicht gespeicherten Änderungen werden zurückgesetzt und die zuletzt gespeicherten Werte werden wiederhergestellt
 
+## Automatisches Herunterfahren (Seitenleiste)
+
+Der Auto-Shutdown wird nicht über die Einstellungsseite, sondern direkt in der Fußzeile der Seitenleiste gesteuert. Voraussetzung: Die Seitenleiste ist ausgeklappt — bei eingeklappter Navigation ist der Block ausgeblendet.
+
+### Herunterfahren nach Leerlauf aktivieren
+
+1. Starten Sie mindestens eine Aufgabe mit KI-Ausführung — in der Fußzeile erscheint die Anzeige „N laufende Automatisierung(en)" und darunter der Schalter **„Nach Leerlauf PC herunterfahren"**
+2. Aktivieren Sie den Schalter — es werden zwei weitere Optionen eingeblendet:
+   - **„Wartezeit (Minuten):"** — Verzögerung nach dem Ende der letzten laufenden Aufgabe (Standard: 5)
+   - **„Herunterfahren erzwingen"** — Computer fährt auch herunter, wenn andere Programme das Beenden verweigern
+3. Sobald keine Automatisierung mehr läuft, zeigt die Fußzeile den Countdown „Herunterfahren in …" an
+4. Nach Ablauf fährt der Computer herunter
+
+> **Hinweis:** Beginnt während des Countdowns wieder eine Aufgabe, stoppt der Countdown automatisch. Sie können ihn jederzeit durch Deaktivieren des Schalters abbrechen. Die Aktivierung gilt nur bis zum nächsten Programmstart — Wartezeit und „Herunterfahren erzwingen" bleiben dagegen gespeichert. Aufgaben im Zustand „Wartet" zählen nicht als laufend und verhindern das Herunterfahren nicht.
+
+### Ungültige Wartezeit
+
+**Symptom:** Unter dem Wartezeit-Feld erscheint der rote Hinweis „Wartezeit muss eine ganze Zahl zwischen 0 und 1440 Minuten sein."
+
+**Lösung:**
+1. Geben Sie eine ganze Zahl zwischen 0 und 1440 ein (0 = sofort herunterfahren)
+2. Solange der Hinweis angezeigt wird, gilt der zuletzt gültige Wert weiter
+
 ## Fehlerbehebung
 
 ### Validierungsfehler beim Speichern

@@ -72,6 +72,118 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Der in der Fußzeile der Navigations-Seitenleiste angezeigte Versionstext ("AppVersionText").</returns>
     public string GetVersionText() => WaitForElement(Window, cf => cf.ByAutomationId("AppVersionText"), Short).Name;
 
+    /// <summary>Liest den Anzahl-Text des Auto-Shutdown-Blocks ("AutoShutdownLaufendeAnzahl").</summary>
+    /// <returns>Der Anzeigetext oder <c>null</c>, wenn das Element nicht sichtbar ist.</returns>
+    public string? GetAutoShutdownLaufendeAnzahlText()
+        => LiesElementText("AutoShutdownLaufendeAnzahl");
+
+    /// <summary>Wartet, bis der Anzahl-Text des Auto-Shutdown-Blocks <paramref name="teilText"/> enthält.</summary>
+    /// <param name="teilText">Der erwartete Teiltext (z. B. "1 laufende").</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Der vollständige Anzeigetext.</returns>
+    /// <exception cref="TimeoutException">Der Text erschien nicht rechtzeitig.</exception>
+    public string WaitForAutoShutdownLaufendeAnzahlText(string teilText, TimeSpan timeout)
+        => WarteAufElementText("AutoShutdownLaufendeAnzahl", teilText, timeout);
+
+    /// <summary>Gibt an, ob die Aktivierungs-Checkbox des Auto-Shutdowns sichtbar ist.</summary>
+    /// <returns><c>true</c>, wenn die Checkbox vorhanden und nicht ausgeblendet ist.</returns>
+    public bool IsAutoShutdownAktivierenVisible()
+        => IstElementSichtbar("AutoShutdownAktivieren");
+
+    /// <summary>Wartet, bis die Aktivierungs-Checkbox des Auto-Shutdowns nicht mehr sichtbar ist.</summary>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Die Checkbox blieb sichtbar.</exception>
+    public MenuView WaitForAutoShutdownAktivierenVerschwunden(TimeSpan timeout)
+        => WarteAufElementUnsichtbar("AutoShutdownAktivieren", timeout);
+
+    /// <summary>Liest den gesetzten Zustand der Aktivierungs-Checkbox (<c>null</c> bei nicht gefundener Checkbox).</summary>
+    /// <returns>Der Checked-Zustand oder <c>null</c>.</returns>
+    public bool? GetAutoShutdownAktiviertChecked()
+        => GetCheckBoxChecked("AutoShutdownAktivieren");
+
+    /// <summary>Setzt die Aktivierungs-Checkbox auf den gewünschten Zustand (Togglen nur bei Abweichung).</summary>
+    /// <param name="aktiviert">Der Zielzustand.</param>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Die Checkbox wurde nicht rechtzeitig sichtbar.</exception>
+    public MenuView SetzeAutoShutdownAktiviert(bool aktiviert)
+        => SetzeCheckBoxZustand(
+            "AutoShutdownAktivieren",
+            aktiviert,
+            "Die Auto-Shutdown-Aktivierungs-Checkbox wurde nicht rechtzeitig sichtbar.");
+
+    /// <summary>Gibt an, ob das Toleranz-Textfeld sichtbar ist (Optionen nur bei aktiviertem Schalter).</summary>
+    /// <returns><c>true</c>, wenn das Feld vorhanden und nicht ausgeblendet ist.</returns>
+    public bool IsAutoShutdownToleranzVisible()
+        => IstElementSichtbar("AutoShutdownToleranzMinuten");
+
+    /// <summary>
+    /// Wartet, bis das Toleranz-Textfeld sichtbar ist. Das Options-Panel blendet sich über
+    /// <c>AutoShutdownOptionenSichtbar</c> frühestens im selben Render-Pass wie die
+    /// Aktivierungs-Checkbox ein — nach <see cref="SetzeAutoShutdownAktiviert"/> kann ein
+    /// direkter Read das Feld daher noch nicht sehen.
+    /// </summary>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Das Toleranz-Feld wurde nicht rechtzeitig sichtbar.</exception>
+    public MenuView WaitForAutoShutdownToleranzSichtbar(TimeSpan timeout)
+    {
+        WaitForElement(Window, cf => cf.ByAutomationId("AutoShutdownToleranzMinuten"), timeout);
+        return this;
+    }
+
+    /// <summary>Setzt den Toleranzwert (Minuten) im Auto-Shutdown-Optionsfeld.</summary>
+    /// <param name="minuten">Der einzugebende Wert als Text.</param>
+    /// <returns>Diese Instanz.</returns>
+    public MenuView SetzeAutoShutdownToleranz(string minuten)
+    {
+        var feld = WaitForElement(Window, cf => cf.ByAutomationId("AutoShutdownToleranzMinuten"), Medium).AsTextBox();
+        feld.Focus();
+        feld.Text = minuten;
+        return this;
+    }
+
+    /// <summary>Liest den aktuellen Text des Toleranz-Feldes.</summary>
+    /// <returns>Der Feldtext oder <c>null</c>, wenn das Feld nicht gefunden wurde.</returns>
+    public string? GetAutoShutdownToleranzText()
+        => Window.FindFirstDescendant(cf => cf.ByAutomationId("AutoShutdownToleranzMinuten"))
+            ?.AsTextBox().Text;
+
+    /// <summary>Liest den gesetzten Zustand der Erzwingen-Checkbox (<c>null</c> bei nicht gefundener Checkbox).</summary>
+    /// <returns>Der Checked-Zustand oder <c>null</c>.</returns>
+    public bool? GetAutoShutdownErzwingenChecked()
+        => GetCheckBoxChecked("AutoShutdownErzwingen");
+
+    /// <summary>Setzt die Erzwingen-Checkbox auf den gewünschten Zustand (Togglen nur bei Abweichung).</summary>
+    /// <param name="erzwingen">Der Zielzustand.</param>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Die Checkbox wurde nicht rechtzeitig sichtbar.</exception>
+    public MenuView SetzeAutoShutdownErzwingen(bool erzwingen)
+        => SetzeCheckBoxZustand(
+            "AutoShutdownErzwingen",
+            erzwingen,
+            "Die Auto-Shutdown-Erzwingen-Checkbox wurde nicht rechtzeitig sichtbar.");
+
+    /// <summary>Liest den Countdown-Text des Auto-Shutdown-Blocks ("AutoShutdownCountdown").</summary>
+    /// <returns>Der Anzeigetext oder <c>null</c>, wenn kein Countdown sichtbar ist.</returns>
+    public string? GetAutoShutdownCountdownText()
+        => LiesElementText("AutoShutdownCountdown");
+
+    /// <summary>Wartet, bis der Countdown-Text sichtbar ist und <paramref name="teilText"/> enthält.</summary>
+    /// <param name="teilText">Der erwartete Teiltext (z. B. "Herunterfahren in").</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Der vollständige Anzeigetext.</returns>
+    /// <exception cref="TimeoutException">Der Countdown-Text erschien nicht rechtzeitig.</exception>
+    public string WaitForAutoShutdownCountdownText(string teilText, TimeSpan timeout)
+        => WarteAufElementText("AutoShutdownCountdown", teilText, timeout);
+
+    /// <summary>Wartet, bis kein Countdown-Text mehr sichtbar ist.</summary>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Der Countdown-Text blieb sichtbar.</exception>
+    public MenuView WaitForAutoShutdownCountdownVerschwunden(TimeSpan timeout)
+        => WarteAufElementVerschwunden("AutoShutdownCountdown", timeout);
+
     /// <summary>
     /// Klickt den "Programmupdate prüfen"-Button der Seitenleiste. Der Button ist erst nach dem
     /// Laden der Update-Einstellungen aktiviert - der Klick wartet daher begrenzt auf die
@@ -551,5 +663,158 @@ public sealed class MenuView : BaseWindowView
         }
 
         return null;
+    }
+
+    /// <summary>Liest den UIA-Namen (Anzeigetext) eines Elements; <c>null</c>, wenn es fehlt oder ausgeblendet ist.</summary>
+    private string? LiesElementText(string automationId)
+    {
+        var element = Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
+        return element is null || element.IsOffscreen ? null : element.Name;
+    }
+
+    /// <summary>Gibt an, ob ein Element vorhanden und nicht ausgeblendet ist.</summary>
+    private bool IstElementSichtbar(string automationId)
+    {
+        var element = Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
+        return element is not null && !element.IsOffscreen;
+    }
+
+    /// <summary>Liest den Checked-Zustand einer Checkbox; <c>null</c>, wenn sie nicht gefunden wurde.</summary>
+    private bool? GetCheckBoxChecked(string automationId)
+        => Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId))?.AsCheckBox().IsChecked;
+
+    /// <summary>
+    /// Setzt eine Checkbox auf den gewünschten Zustand: wartet auf Sichtbarkeit, klickt bei
+    /// Abweichung (ggf. wiederholt) und kehrt erst zurück, wenn <c>IsChecked</c> den Zielzustand
+    /// meldet — ein wirkungslos bleibender UIA-Klick wird so erkannt statt erst an späteren,
+    /// nicht zusammenhängenden Asserts aufzuschlagen. Sonderfall <paramref name="ziel"/>
+    /// <c>false</c>: Sichtbarkeitsregeln können die Checkbox synchron mit dem Ausschalten aus
+    /// dem UIA-Baum kollabieren lassen (z. B. <c>AutoShutdownUiSichtbar</c> bei Anzahl 0 +
+    /// Deaktivierung). War sie zuvor sichtbar und verschwindet nun, ist das Ausschalten damit
+    /// bereits bewiesen — der Helper wartet nicht vergeblich auf einen lesbaren Zustand.
+    /// </summary>
+    /// <exception cref="TimeoutException">Die Checkbox wurde nicht rechtzeitig sichtbar oder erreichte den Zielzustand nicht.</exception>
+    private MenuView SetzeCheckBoxZustand(string automationId, bool ziel, string fehlertext)
+    {
+        var deadline = DateTime.UtcNow + Medium;
+        var naechsterKlick = DateTime.UtcNow;
+        var gefunden = false;
+        bool? zuletztIsChecked = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
+            if (element is null || element.IsOffscreen)
+            {
+                // Verschwinden NACH dem ersten Sichtbarwerden beweist bei ziel == false
+                // den ausgeschalteten Zustand (siehe Methoden-Dokumentation).
+                if (!ziel && gefunden)
+                {
+                    return this;
+                }
+            }
+            else
+            {
+                gefunden = true;
+                var checkbox = element.AsCheckBox();
+                try
+                {
+                    zuletztIsChecked = checkbox.IsChecked;
+                }
+                catch (FlaUI.Core.Exceptions.FlaUIException)
+                {
+                    // Das Element kollabierte zwischen Fund und Zustandsabfrage - der
+                    // nächste Schleifendurchlauf bewertet den Baum erneut (siehe oben).
+                }
+                catch (System.Runtime.InteropServices.COMException)
+                {
+                    // UIA-Provider des kollabierenden Elements transient nicht erreichbar.
+                }
+
+                if (zuletztIsChecked == ziel)
+                {
+                    return this;
+                }
+
+                // Erneuter Klick erst nach Abstand: UIA kann den Zustand kurz verzögert
+                // melden; ein Sofort-Doppelklick würde den Zielzustand wieder zurückdrehen.
+                if (DateTime.UtcNow >= naechsterKlick)
+                {
+                    try
+                    {
+                        checkbox.Click();
+                        naechsterKlick = DateTime.UtcNow + TimeSpan.FromSeconds(1);
+                    }
+                    catch (FlaUI.Core.Exceptions.FlaUIException)
+                    {
+                        // Kollabierendes Element ohne klickbaren Punkt - der nächste
+                        // Schleifendurchlauf bewertet den Baum erneut.
+                    }
+                    catch (System.Runtime.InteropServices.COMException)
+                    {
+                        // UIA-Provider transient nicht erreichbar - erneut versuchen.
+                    }
+                }
+            }
+
+            Thread.Sleep(200);
+        }
+
+        var diagnose = gefunden
+            ? $" Zuletzt gesehen: IsChecked={zuletztIsChecked?.ToString() ?? "null"}, Ziel={ziel}."
+            : string.Empty;
+        throw new TimeoutException(fehlertext + diagnose);
+    }
+
+    /// <summary>Wartet, bis der Anzeigetext eines Elements <paramref name="teilText"/> enthält.</summary>
+    /// <exception cref="TimeoutException">Der Text erschien nicht rechtzeitig.</exception>
+    private string WarteAufElementText(string automationId, string teilText, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        string? zuletzt = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            zuletzt = LiesElementText(automationId);
+            if (zuletzt is not null && zuletzt.Contains(teilText, StringComparison.Ordinal))
+                return zuletzt;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException(
+            $"{automationId} enthielt nicht innerhalb von {timeout.TotalSeconds}s '{teilText}'. Zuletzt gesehen: '{zuletzt}'.");
+    }
+
+    /// <summary>Wartet, bis ein Element keinen sichtbaren Anzeigetext mehr liefert.</summary>
+    /// <exception cref="TimeoutException">Der Text blieb sichtbar.</exception>
+    private MenuView WarteAufElementVerschwunden(string automationId, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (LiesElementText(automationId) is null)
+                return this;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException(
+            $"{automationId} blieb länger als {timeout.TotalSeconds}s sichtbar. Zuletzt gesehen: '{LiesElementText(automationId)}'.");
+    }
+
+    /// <summary>Wartet, bis ein Element nicht mehr vorhanden oder ausgeblendet ist.</summary>
+    /// <exception cref="TimeoutException">Das Element blieb sichtbar.</exception>
+    private MenuView WarteAufElementUnsichtbar(string automationId, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (!IstElementSichtbar(automationId))
+                return this;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException(
+            $"{automationId} blieb länger als {timeout.TotalSeconds}s sichtbar.");
     }
 }

@@ -112,30 +112,15 @@ public sealed class GreaterThanZeroToVisibilityConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>Fachliche Zustandsklassifikation der KI-Ausführung (gemeinsame Basis der Status-Converter).</summary>
-internal enum KiAusfuehrungsZustand
-{
-    /// <summary>Aufgabe ist pausiert (PausiertBisUtc in der Zukunft).</summary>
-    Pausiert,
-
-    /// <summary>Ein zeitgesteuerter Prompt steht in der Warteschlange.</summary>
-    PromptInWartestellung,
-
-    /// <summary>CLI-Ausführung läuft (aktiver Run ohne WartetAufEingabe-Substatus).</summary>
-    Laeuft,
-
-    /// <summary>Ausführung wartet (Substatus WartetAufEingabe oder Aufgabenstatus Wartend).</summary>
-    Wartet,
-
-    /// <summary>Keine aktive Ausführung erkennbar.</summary>
-    Bereit
-}
-
 /// <summary>
-/// Gemeinsame Statusklassifikation für <see cref="KiAusfuehrungsStatusConverter"/> (Volltext) und
-/// <see cref="KiAusfuehrungsStatusSymbolConverter"/> (nur Glyph), damit beide Darstellungen nicht divergieren.
+/// App-seitiger Adapter der gemeinsamen Statusklassifikation
+/// (<see cref="Softwareschmiede.Application.Services.KiAusfuehrungsStatusKlassifikation"/>) für
+/// <see cref="KiAusfuehrungsStatusConverter"/> (Volltext) und
+/// <see cref="KiAusfuehrungsStatusSymbolConverter"/> (nur Glyph): mappt die Eingabetypen
+/// <see cref="Aufgabe"/> und <see cref="AktiveAufgabePanelItem"/> auf
+/// <see cref="KiAusfuehrungsStatusDaten"/> und delegiert die eigentliche Regellogik.
 /// </summary>
-internal static class KiAusfuehrungsStatusKlassifikation
+internal static class KiAusfuehrungsStatusAdapter
 {
     /// <summary>
     /// Klassifiziert <paramref name="value"/> (<see cref="Aufgabe"/> oder <see cref="AktiveAufgabePanelItem"/>)
@@ -149,8 +134,8 @@ internal static class KiAusfuehrungsStatusKlassifikation
 
         var status = value switch
         {
-            Aufgabe aufgabe => new StatusDaten(aufgabe.Status, aufgabe.AusfuehrungsStatus, aufgabe.AktiveRunId, aufgabe.LastHeartbeatUtc, aufgabe.LaufStatus, null, false, aufgabe.PausiertBisUtc),
-            AktiveAufgabePanelItem item => new StatusDaten(item.Status, item.AusfuehrungsStatus, item.AktiveRunId, item.LastHeartbeatUtc, item.LaufStatus, item.LiveLaufStatus, item.HasScheduledPrompt, item.PausiertBisUtc),
+            Aufgabe aufgabe => KiAusfuehrungsStatusDaten.VonAufgabe(aufgabe, liveLaufStatus: null, hasScheduledPrompt: false),
+            AktiveAufgabePanelItem item => new KiAusfuehrungsStatusDaten(item.Status, item.AusfuehrungsStatus, item.AktiveRunId, item.LastHeartbeatUtc, item.LaufStatus, item.LiveLaufStatus, item.HasScheduledPrompt, item.PausiertBisUtc),
             _ => null
         };
 
@@ -159,62 +144,9 @@ internal static class KiAusfuehrungsStatusKlassifikation
             return null;
         }
 
-        // Der Pausiert-Zweig steht bewusst vor allen übrigen Anzeigen: Eine aktive Pause überlagert
-        // den Laufzeitstatus (die Kachel zeigt den Countdown statt "Läuft"/"Prompt in Wartestellung").
-        if (status.PausiertBisUtc is { } pausiertBis && pausiertBis > DateTimeOffset.UtcNow)
-        {
-            pausiertRestzeit = pausiertBis - DateTimeOffset.UtcNow;
-            return KiAusfuehrungsZustand.Pausiert;
-        }
-
-        if (status.HasScheduledPrompt)
-        {
-            return KiAusfuehrungsZustand.PromptInWartestellung;
-        }
-
-        // Live-Zweig (nur-aufwärts): Läuft nachweislich ein gehandelter Prozess, schlägt der
-        // Live-Substatus vor der Auswertung der persistierten Laufdaten immer auf Laeuft/Wartet
-        // durch — niemals auf Bereit (Issue 342: Fußzeile und Kachel speisen sich aus getrennten
-        // Quellen, die ohne diesen Zweig divergieren können).
-        if (status.LiveLaufStatus is { } liveLaufStatus)
-        {
-            return liveLaufStatus == AufgabeLaufStatus.WartetAufEingabe
-                ? KiAusfuehrungsZustand.Wartet
-                : KiAusfuehrungsZustand.Laeuft;
-        }
-
-        if (status.AusfuehrungsStatus != AufgabeAusfuehrungsStatus.Aktiv)
-        {
-            return KiAusfuehrungsZustand.Bereit;
-        }
-
-        if (AufgabeLaufAktivitaet.IstAktiv(status.AktiveRunId, status.LastHeartbeatUtc, DateTimeOffset.UtcNow))
-        {
-            // LaufStatus bildet den Laufzeit-Substatus der CLI ab (siehe PseudoConsoleSession.RuntimeStatus,
-            // persistiert über CliProcessManager/AufgabeService.AktivenLaufSicherstellenAsync). Ohne diesen
-            // Substatus (null, z. B. beim klassischen Start ohne ConPTY) bleibt es beim Zustand "Läuft".
-            return status.LaufStatus == AufgabeLaufStatus.WartetAufEingabe
-                ? KiAusfuehrungsZustand.Wartet
-                : KiAusfuehrungsZustand.Laeuft;
-        }
-
-        if (status.Status == AufgabeStatus.Wartend)
-        {
-            return KiAusfuehrungsZustand.Wartet;
-        }
-
-        return KiAusfuehrungsZustand.Bereit;
+        return Softwareschmiede.Application.Services.KiAusfuehrungsStatusKlassifikation
+            .Klassifiziere(status, out pausiertRestzeit);
     }
-
-    private sealed record StatusDaten(
-        AufgabeStatus Status,
-        AufgabeAusfuehrungsStatus AusfuehrungsStatus,
-        string? AktiveRunId,
-        DateTimeOffset? LastHeartbeatUtc,
-        AufgabeLaufStatus? LaufStatus,
-        AufgabeLaufStatus? LiveLaufStatus,
-        bool HasScheduledPrompt,
-        DateTimeOffset? PausiertBisUtc);
 }
 
 /// <summary>Konvertiert eine Aufgabe oder ein Aufgabenpanel-Item in einen KI-Ausführungsstatus-String.</summary>
@@ -224,7 +156,7 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        var zustand = KiAusfuehrungsStatusKlassifikation.Klassifiziere(value, out var pausiertRestzeit);
+        var zustand = KiAusfuehrungsStatusAdapter.Klassifiziere(value, out var pausiertRestzeit);
         return zustand switch
         {
             null => string.Empty,
@@ -256,7 +188,7 @@ public sealed class KiAusfuehrungsStatusSymbolConverter : IValueConverter
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        var zustand = KiAusfuehrungsStatusKlassifikation.Klassifiziere(value, out _);
+        var zustand = KiAusfuehrungsStatusAdapter.Klassifiziere(value, out _);
         return zustand switch
         {
             null => string.Empty,

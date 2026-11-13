@@ -43,6 +43,11 @@ public partial class End2EndTest : WpfTestBase
     public Task General_Konsolenwiedergabe_E2E()
         => MitFrischerAppAsync(KonsolenTestfenster_OeffnetLaedtAufzeichnungUndSpieltAb_E2E);
 
+    /// <summary>Prüft den Auto-Shutdown-Fluss (Issue 6) in einem eigenen App-Lifecycle plus Neustart.</summary>
+    [SkippableFact]
+    public Task General_AutoShutdown_E2E()
+        => MitFrischerAppAsync(AutoShutdown_CountdownAbbruchAufzeichnungUndPersistenz_E2E);
+
     /// <summary>Prüft View- und Dialognavigation in einem eigenen App-Lifecycle.</summary>
     [SkippableFact]
     public Task General_ViewNavigation_E2E()
