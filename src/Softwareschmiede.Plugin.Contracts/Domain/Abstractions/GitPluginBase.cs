@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -7,6 +8,9 @@ namespace Softwareschmiede.Domain.Abstractions;
 /// <summary>Gemeinsame Basis für Git-Plugins. Öffentlich zugänglich für externe Plugin-Assemblies.</summary>
 public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider, IIssueTemplateProvider, IScmAlertProvider
 {
+    /// <summary>Erkennt SCP-SSH-URLs der Form <c>git@host:pfad</c> (verankert, ohne Query/Fragment).</summary>
+    protected static readonly Regex ScpSshUrlPattern = new(@"\Agit@(?<host>[A-Za-z0-9.-]+):(?<path>[^?#\\]+)\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private readonly ICliRunner _cliRunner;
 
     protected GitPluginBase(ICliRunner cliRunner)
@@ -240,6 +244,74 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
             throw new InvalidOperationException($"Pfad '{localPath}' ist kein Git-Repository.");
         }
     }
+
+    /// <summary>
+    /// Wandelt eine Repository-URL in die HTTPS-Form um, da plugin-geführter git-Transport
+    /// ausschließlich über HTTPS läuft. Akzeptiert werden <c>https://</c>-URLs (unverändert),
+    /// SCP-URLs (<c>git@host:pfad</c> → <c>https://host/pfad</c>) und <c>ssh://</c>-URLs mit
+    /// User <c>git</c>/leer und Default-Port bzw. Port 22 (<c>ssh://[git@]host[:22]/pfad</c>
+    /// → <c>https://host/pfad</c>). Als Host sind DNS-Namen sowie IPv4-/IPv6-Literale erlaubt
+    /// (z. B. Self-Hosted-Server ohne DNS-Namen). Pfad und <c>.git</c>-Suffix bleiben erhalten;
+    /// nicht URL-taugliche Pfadzeichen (z. B. Leerzeichen, Nicht-ASCII) werden escaped. Es gibt
+    /// keinen <c>owner/repo</c>-Zwang. Umschließender Whitespace wird vor der Prüfung entfernt.
+    /// Alle anderen Schemata und Eingaben liefern <see langword="null"/>.
+    /// </summary>
+    protected static string? ToHttpsRepositoryUrl(string repositoryUrl)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryUrl))
+        {
+            return null;
+        }
+
+        repositoryUrl = repositoryUrl.Trim();
+
+        var scp = ScpSshUrlPattern.Match(repositoryUrl);
+        if (scp.Success)
+        {
+            if (!Uri.TryCreate("https://" + scp.Groups["host"].Value, UriKind.Absolute, out var scpHost)
+                || !IsConvertibleHostNameType(scpHost.HostNameType))
+            {
+                return null;
+            }
+
+            // Über Uri aufbauen statt String-Verkettung, damit der Pfad wie im ssh://-Zweig
+            // (AbsolutePath) escaped wird; nicht darstellbare Eingaben liefern null.
+            // Im SCP-Pfad ist "%" ein literales Zeichen (kein Encoding wie in einer URI),
+            // daher vor der Uri-Erzeugung prozent-sicher machen, damit z. B. "a%20b" nicht
+            // als Escape für ein Leerzeichen reinterpretiert wird.
+            var scpPath = scp.Groups["path"].Value.Replace("%", "%25");
+            return Uri.TryCreate($"https://{scpHost.IdnHost}/{scpPath}", UriKind.Absolute, out var scpUri)
+                ? scpUri.AbsoluteUri
+                : null;
+        }
+
+        if (!Uri.TryCreate(repositoryUrl, UriKind.Absolute, out var uri))
+        {
+            return null;
+        }
+
+        if (uri.Scheme == Uri.UriSchemeHttps)
+        {
+            return repositoryUrl;
+        }
+
+        if (uri.Scheme != "ssh"
+            || !(uri.IsDefaultPort || uri.Port == 22)
+            || !(string.IsNullOrEmpty(uri.UserInfo) || uri.UserInfo == "git")
+            || !IsConvertibleHostNameType(uri.HostNameType)
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment))
+        {
+            return null;
+        }
+
+        // IdnHost liefert IPv6-Literale ohne Klammern; uri.Host enthält sie bereits.
+        var host = uri.HostNameType == UriHostNameType.IPv6 ? uri.Host : uri.IdnHost;
+        return $"https://{host}{uri.AbsolutePath}";
+    }
+
+    private static bool IsConvertibleHostNameType(UriHostNameType hostNameType)
+        => hostNameType is UriHostNameType.Dns or UriHostNameType.IPv4 or UriHostNameType.IPv6;
 
     /// <summary>Führt einen Git-Befehl aus.</summary>
     protected Task<CliResult> RunGitAsync(

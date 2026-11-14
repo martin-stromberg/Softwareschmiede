@@ -157,7 +157,7 @@
 **Verhalten:**
 - `GetGitEnvironment` setzt bei vorhandenem Token `GIT_CONFIG_*`-`http.extraheader` (`AUTHORIZATION: basic <base64("x-access-token:"+token)>`) zusätzlich zu `GH_TOKEN`; es gibt keinen `NETRC`-Verweis mehr.
 - `_netrc`/`.netrc` wird vom Plugin weder gelesen noch beschrieben — Ausnahme ist die einmalige Legacy-Bereinigung (nächste Regel).
-- Ohne Token enthält die Umgebung nur `GIT_TERMINAL_PROMPT=0` und `GIT_SSH_COMMAND`; HTTPS-Klone ohne Token scheitern früh mit einer verständlichen Meldung (unverändert).
+- Ohne Token enthält die Umgebung nur `GIT_TERMINAL_PROMPT=0`; HTTPS-Klone ohne Token scheitern früh mit einer verständlichen Meldung (unverändert).
 
 **Umsetzung:** `GitHubPlugin.AddGitHubHttpAuthHeader` + `GetGitEnvironment` — dasselbe `extraheader`-Muster, das `GetAgentEnvironmentAsync` bereits für Agent-Prozesse nutzt; die Env-Variante vermeidet im Unterschied zu CLI-Args (`-c http.extraheader=…`, BitBucket-Muster) den Token in der Prozess-Kommandozeile.
 
@@ -177,3 +177,63 @@
 - Jeder Fehler (gesperrte/unlesbare Datei, Rechte) → `LogWarning`; Plugin-Instanziierung und spätere git-Operationen laufen normal weiter.
 
 **Umsetzung:** `GitHubPlugin.RemoveLegacyNetrcEntries` / `RemoveNetrcStanzas` — Read-Modify-Write unter exklusivem Dateizugriff (`FileShare.None`), damit ein gleichzeitiger Fremd-Zugriff (z. B. `BitBucketPlugin.UpdateNetrcEntry`) nicht mit einer veralteten Version interleavet, sondern mit `IOException` fehlschlägt. Verbleibende Einschränkung: kein prozessübergreifender Lock — ein Fremd-Writer kann die Datei vor dem Öffnen oder zwischen Handle-Close und `File.Delete` erneut verändern.
+
+## git-Transport (GitHub und Bitbucket)
+
+### Regel: Plugin-geführter git-Transport läuft ausschließlich über HTTPS
+
+**Beschreibung:** Weder das `GitHubPlugin` noch das `BitbucketPlugin` verwenden SSH als git-Transport — die früher gesetzte Prozessumgebungsvariable `GIT_SSH_COMMAND` mit ausgehebelter Host-Key-Prüfung und das vom GitHub-Plugin in betreute Arbeitskopien geschriebene `core.sshCommand` sind vollständig entfernt. Sicherheitsrelevant, nicht konfigurierbar und ohne Opt-out; die Authentifizierung läuft unverändert über die jeweiligen HTTPS-Mechanismen (GitHub: `GIT_CONFIG_*`-`http.extraheader`/`GH_TOKEN`; Bitbucket: eingebettete Credentials bzw. `_netrc`/`http.extraheader`-Args).
+
+**Bedingungen:**
+- Beliebige plugin-geführte git-Transportoperation: `clone`, `push`, `pull`, `ls-remote` (Branch-Abfragen, Standard-Branch) sowie `fetch`/`checkout` des PR-Quell-Checkouts
+
+**Verhalten:**
+- `GetGitEnvironment` beider Plugins enthält kein `GIT_SSH_COMMAND` mehr; `GIT_TERMINAL_PROMPT=0` bleibt — ohne Credentials schlägt die Auth nicht-interaktiv fehl statt zu blockieren.
+- Neue Klone des GitHub-Plugins erhalten kein `core.sshCommand` in `.git/config`; der Schreibblock in `ConfigureGitCredentialsAsync` entfällt.
+- SSH-gestützte Umgehung von TLS-/Host-Key-Prüfungen existiert nicht mehr — MITM-Angriffsfläche entfällt.
+
+**Umsetzung:** `GitHubPlugin.GetGitEnvironment`, `BitbucketPlugin.GetGitEnvironment`, `GitHubPlugin.ConfigureGitCredentialsAsync` (entfernte Blöcke)
+
+### Regel: SSH-Repository-URLs werden deterministisch in HTTPS umgewandelt
+
+**Beschreibung:** In SSH-Form hinterlegte Repository-URLs bleiben gültige Verknüpfungsdaten und werden am Verwendungspunkt transparent konvertiert — Bestandsverknüpfungen und -arbeitskopien funktionieren ohne Migration weiter. Nicht umwandelbare URLs werden beim Klon mit verständlicher Fehlermeldung abgelehnt.
+
+**Bedingungen:**
+- `GitRepository.RepositoryUrl` bzw. die den Remote-Methoden übergebene URL liegt in SSH- oder anderem Nicht-HTTPS-Format vor
+
+**Verhalten:**
+- `git@host:pfad` (SCP-Form) → `https://host/pfad`; `ssh://[git@]host[:22]/pfad` → `https://host/pfad` — nur User `git`/leer, nur Default-Port oder 22, kein Query/Fragment. DNS-, IPv4- und IPv6-Hosts sind zulässig; `.git`-Suffix und beliebig tiefe Pfade bleiben erhalten, nicht URL-taugliche Zeichen werden escaped.
+- Bereits HTTPS-URLs bleiben unverändert; es gibt keinen `owner/repo`-Zwang.
+- `CloneRepositoryAsync` (beide Plugins): `ToHttpsRepositoryUrl` liefert `null` (`http://`, `git://`, `ssh://` mit Fremd-Port/-User, Pfade) → harte `InvalidOperationException` „Es werden nur HTTPS-Repository-URLs verwendet; SSH-URLs werden automatisch konvertiert." — vor jedem CLI-Aufruf.
+- `GetRemoteBranchesAsync`/`GetDefaultBranchAsync` (beide Plugins): nicht konvertierbare URLs bleiben stehen und laufen in den bestehenden Soft-Fail-Pfad (leere Branch-Liste bzw. `main`-Fallback) — die Branch-Vorschlags-UI bleibt tolerant.
+- PR-Checkout: die `SourceRepositoryUrl` der `PullRequestCheckoutSpec` (Fork-Fall) wird per `with`-Ausdruck konvertiert — nicht konvertierbare Fork-URLs bleiben stehen und scheitern im normalen git-Fehlerpfad.
+- Self-Hosted-Bitbucket-Server mit SSH auf Nicht-Standard-Port (typisch `ssh://git@host:7999/…`) werden bewusst nicht auf einen geratenen HTTPS-Port umgeschrieben — sauberer Fehler statt nichtdeterministischer Konvertierung.
+
+**Umsetzung:** `GitPluginBase<TPlugin>.ToHttpsRepositoryUrl` + `ScpSshUrlPattern` — eine gemeinsame `protected static`-Methode für beide Plugin-Assemblies mit identischen Akzeptanzregeln.
+
+### Regel: Betreute Arbeitskopien werden bei der nächsten Operation hygienisch bereinigt
+
+**Beschreibung:** Von Altversionen hinterlassene SSH-Remote-URLs und (nur GitHub) das unsichere `core.sshCommand` werden beim nächsten plugin-geführten Push, Pull oder PR-Checkout auf der jeweiligen Arbeitskopie entfernt bzw. normalisiert — eine Migration ohne eigenen Nutzertrigger. Der Anwender muss bestehende Arbeitskopien nicht neu klonen.
+
+**Bedingungen:**
+- `PushBranchAsync`, `PullAsync` oder `CheckoutPullRequestSourceAsync` läuft auf einer betreuten Arbeitskopie
+
+**Verhalten:**
+- SSH-`remote.origin.url` → `git remote set-url origin <https-url>` (nur bei Differenz): GitHub wendet `ToHttpsRepositoryUrl` nach dem bestehenden Legacy-Token-Stripping an; Bitbucket bettet bei vorhandenen Credentials `user:appPassword` wie beim Frisch-Klon ein (`BuildAuthenticatedCloneUrl`), sonst bleibt die URL nackt — `_netrc` authentifiziert hostbezogen.
+- `core.sshCommand` (nur GitHub): `git config --unset` ausschließlich wenn der gelesene Wert exakt der plugin-geschriebenen Signatur `ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null` entspricht (getrimmter Ordinal-Vergleich) — ein anwenderseitig gesetztes eigenes `core.sshCommand`, auch mit `StrictHostKeyChecking=no` neben weiteren eigenen Flags, bleibt unangetastet. Das Bitbucket-Plugin hat den Eintrag nie geschrieben → keine Bereinigung.
+- Alle Bereinigungsschritte sind best-effort: Lesefehler, nicht-git-Pfade und Schreibfehler erzeugen nur `LogWarning` und brechen die umgebende git-Operation nie ab.
+
+**Umsetzung:** `GitHubPlugin.NormalizeRemoteUrlAsync` + `RemoveInsecureSshCommandAsync` (`LegacyInsecureSshCommand`-Konstante), `BitbucketPlugin.NormalizeRemoteUrlAsync`; Auslöser jeweils am Anfang von `PushBranchAsync`, `PullAsync` und `CheckoutPullRequestSourceAsync`.
+
+### Regel: GitHub-Enterprise-Hosts authentifizieren nicht über HTTPS-git
+
+**Beschreibung:** Der `http.extraheader`-Key des GitHub-Plugins ist fest auf `http.https://github.com/.extraheader` verdrahtet. git-Operationen gegen GitHub-Enterprise-Hosts (≠ `github.com`) authentifizieren daher nicht und schlagen nicht-interaktiv fehl — bewusste Fail-closed-Entscheidung statt unsicherem Weiterbetrieb über SSH.
+
+**Bedingungen:**
+- Plugin-geführte git-Operation gegen einen GitHub-Enterprise-Host
+
+**Verhalten:**
+- Ohne Host-gebundenen Auth-Header schlägt die HTTPS-Authentifizierung nicht-interaktiv fehl (`GIT_TERMINAL_PROMPT=0`).
+- Ein generischer `http.extraheader` ist bewusst keine Option — er würde den Token an jeden kontaktierten Host senden (Leak-Vektor über Fork-`clone_url`/`SourceRepositoryUrl` aus PR-Metadaten). Ein hostgebundener Key ist als Folge-Issue vorgesehen.
+
+**Umsetzung:** `GitHubPlugin.AddGitHubHttpAuthHeader` — der Key bleibt `http.https://github.com/.extraheader`.

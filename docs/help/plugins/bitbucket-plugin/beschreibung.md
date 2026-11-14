@@ -119,7 +119,7 @@ Ports werden in der BitBucket-URL unterstützt.
 
 4. **URL-Format**: Die Self-Hosted-URL muss die Basis-URL ohne Pfad sein (z.B. `https://bitbucket.example.com`, nicht `https://bitbucket.example.com/bitbucket`).
 
-5. **Git-Clone-URLs**: Das Plugin konstruiert Clone-URLs aus der konfigurierten Basis-URL. Falls Git SSH-Keys statt HTTP-Auth verwendet werden, muss der SSH-Agent entsprechend konfiguriert sein.
+5. **Git-Clone-URLs**: Das Plugin konstruiert Clone-URLs aus der konfigurierten Basis-URL und verwendet ausschließlich HTTPS für den Git-Transport — SSH-Keys oder ein SSH-Agent sind nicht erforderlich. SSH-Repository-URLs (`git@host:pfad`, `ssh://git@host/pfad`) werden automatisch in ihre HTTPS-Form umgewandelt; `ssh://`-URLs mit einem abweichenden Port (z. B. Port 7999 bei Self-Hosted) können nicht eindeutig konvertiert werden und werden beim Klon mit einer verständlichen Meldung abgelehnt.
 
 ## Vergleich mit GitHub-Plugin
 

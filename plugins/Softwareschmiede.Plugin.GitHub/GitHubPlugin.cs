@@ -26,6 +26,14 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     private static readonly string[] LegacyNetrcHosts = ["github.com", "api.github.com"];
 
     /// <summary>
+    /// Exakter Wert, den Altversionen des Plugins als unsicheres <c>core.sshCommand</c> in betreute
+    /// Arbeitskopien geschrieben haben. Nur dieser Wert wird bei der Bestandsbereinigung entfernt —
+    /// ein vom Anwender bewusst gesetztes eigenes <c>core.sshCommand</c> (auch mit teilweise
+    /// identischen Optionen plus eigenen Flags) bleibt unangetastet.
+    /// </summary>
+    private const string LegacyInsecureSshCommand = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
+
+    /// <summary>
     /// Name der optionalen Umgebungsvariable, mit der der Pfad der <c>_netrc</c>/<c>.netrc</c>-Datei
     /// für die einmalige Legacy-Bereinigung übersteuert werden kann (Testseam für Kontexte, in denen
     /// der <c>netrcPath</c>-Konstruktorparameter nicht erreichbar ist — z. B. die Plugin-Discovery über
@@ -210,9 +218,6 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
 
         // Disable terminal prompts completely
         env["GIT_TERMINAL_PROMPT"] = "0";
-
-        // Disable SSH host key checking to prevent /dev/tty access
-        env["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
 
         if (!string.IsNullOrEmpty(token))
         {
@@ -447,45 +452,105 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
 
     private async Task NormalizeRemoteUrlAsync(string localPath, CancellationToken ct = default)
     {
-        // Get current remote URL
-        var getUrlResult = await _cliRunner.RunAsync(
-            "git",
-            ["config", "remote.origin.url"],
-            localPath,
-            null,
-            ct);
-
-        if (!getUrlResult.IsSuccess)
+        try
         {
-            _logger.LogWarning("Konnte remote.origin.url nicht abrufen: {Error}", getUrlResult.StdErr);
-            return;
+            // Get current remote URL
+            var getUrlResult = await _cliRunner.RunAsync(
+                "git",
+                ["config", "remote.origin.url"],
+                localPath,
+                null,
+                ct);
+
+            if (getUrlResult?.IsSuccess != true)
+            {
+                _logger.LogWarning("Konnte remote.origin.url nicht abrufen: {Error}", getUrlResult?.StdErr);
+                return;
+            }
+
+            var currentUrl = getUrlResult.StdOut.Trim();
+
+            // Legacy-Repositories können noch einen eingebetteten Token aus früheren Klones enthalten.
+            // Diese werden entfernt, damit keine Klartext-Tokens in der Remote-URL verbleiben.
+            var normalizedUrl = EmbeddedTokenPattern.Replace(currentUrl, string.Empty);
+
+            // SSH-Remote-URLs aus Altversionen werden auf HTTPS normalisiert — der
+            // plugin-geführte git-Transport läuft ausschließlich über HTTPS.
+            normalizedUrl = ToHttpsRepositoryUrl(normalizedUrl) ?? normalizedUrl;
+
+            if (string.Equals(normalizedUrl, currentUrl, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var setUrlResult = await _cliRunner.RunAsync(
+                "git",
+                ["remote", "set-url", "origin", normalizedUrl],
+                localPath,
+                null,
+                ct);
+
+            if (setUrlResult?.IsSuccess != true)
+            {
+                _logger.LogWarning("Konnte remote.origin.url nicht normalisieren: {Error}", setUrlResult?.StdErr);
+            }
+            else
+            {
+                _logger.LogInformation("Remote origin URL normalisiert (HTTPS, ohne eingebettetes Token).");
+            }
         }
-
-        var currentUrl = getUrlResult.StdOut.Trim();
-
-        // Legacy-Repositories können noch einen eingebetteten Token aus früheren Klones enthalten.
-        // Diese werden entfernt, damit keine Klartext-Tokens in der Remote-URL verbleiben.
-        if (!EmbeddedTokenPattern.IsMatch(currentUrl))
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
         {
-            return;
+            _logger.LogWarning(ex, "remote.origin.url konnte nicht normalisiert werden.");
         }
+    }
 
-        var normalizedUrl = EmbeddedTokenPattern.Replace(currentUrl, string.Empty);
-
-        var setUrlResult = await _cliRunner.RunAsync(
-            "git",
-            ["remote", "set-url", "origin", normalizedUrl],
-            localPath,
-            null,
-            ct);
-
-        if (!setUrlResult.IsSuccess)
+    /// <summary>
+    /// Entfernt das von Altversionen des Plugins in betreute Arbeitskopien geschriebene,
+    /// unsichere <c>core.sshCommand</c> per <c>git config --unset</c>. Wertbasiert: nur der
+    /// exakt plugin-geschriebene Wert (<see cref="LegacyInsecureSshCommand"/>) wird entfernt —
+    /// ein vom Anwender bewusst gesetztes eigenes <c>core.sshCommand</c>, auch wenn es die
+    /// Option <c>StrictHostKeyChecking=no</c> neben weiteren eigenen Flags enthält, bleibt
+    /// unverändert. Fehler werden nur geloggt und brechen die umgebende git-Operation nie ab.
+    /// </summary>
+    private async Task RemoveInsecureSshCommandAsync(string localPath, CancellationToken ct = default)
+    {
+        try
         {
-            _logger.LogWarning("Konnte remote.origin.url nicht normalisieren: {Error}", setUrlResult.StdErr);
+            var getResult = await _cliRunner.RunAsync(
+                "git",
+                ["config", "--get", "core.sshCommand"],
+                localPath,
+                null,
+                ct);
+
+            if (getResult?.IsSuccess != true
+                || !string.Equals(getResult.StdOut.Trim(), LegacyInsecureSshCommand, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var unsetResult = await _cliRunner.RunAsync(
+                "git",
+                ["config", "--unset", "core.sshCommand"],
+                localPath,
+                null,
+                ct);
+
+            if (unsetResult?.IsSuccess == true)
+            {
+                _logger.LogInformation("Unsicheren core.sshCommand-Eintrag aus der Arbeitskopie entfernt.");
+            }
+            else
+            {
+                _logger.LogWarning("core.sshCommand konnte nicht entfernt werden: {Error}", unsetResult?.StdErr);
+            }
         }
-        else
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
         {
-            _logger.LogInformation("Remote origin URL von eingebettetem Token bereinigt.");
+            _logger.LogWarning(ex, "core.sshCommand konnte nicht geprüft oder entfernt werden.");
         }
     }
 
@@ -544,19 +609,6 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             {
                 _logger.LogInformation("Git remote origin URL aktualisiert (ohne eingebettetes Token).");
             }
-        }
-
-        // Disable strict host key checking for git operations
-        var strictHostKeyResult = await _cliRunner.RunAsync(
-            "git",
-            ["config", "core.sshCommand", "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"],
-            localPath,
-            gitEnvironment,
-            ct);
-
-        if (!strictHostKeyResult.IsSuccess)
-        {
-            _logger.LogWarning("Git core.sshCommand Konfiguration fehlgeschlagen: {Error}", strictHostKeyResult.StdErr);
         }
     }
 
@@ -1038,6 +1090,12 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     {
         _logger.LogInformation("Klone Repository {Url} nach {TargetPath}.", repositoryUrl, targetPath);
 
+        // Nur HTTPS-Transport: SSH-URLs werden in ihre HTTPS-Form umgewandelt,
+        // andere Schemata werden vor jedem CLI-Aufruf abgelehnt.
+        repositoryUrl = ToHttpsRepositoryUrl(repositoryUrl)
+            ?? throw new InvalidOperationException(
+                "git clone abgebrochen: Es werden nur HTTPS-Repository-URLs verwendet; SSH-URLs werden automatisch konvertiert.");
+
         var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
 
         if (IsHttpsRepositoryUrl(repositoryUrl) && string.IsNullOrWhiteSpace(token))
@@ -1076,8 +1134,10 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     {
         _logger.LogInformation("Pushe Branch {BranchName} in {LocalPath}.", branchName, localPath);
 
-        // Remote-URL von einem ggf. eingebetteten Legacy-Token bereinigen, bevor gepusht wird
+        // Bestands-Arbeitskopien hygienisch bereinigen: Remote-URL auf HTTPS normalisieren
+        // und das von Altversionen geschriebene unsichere core.sshCommand entfernen.
         await NormalizeRemoteUrlAsync(localPath, ct);
+        await RemoveInsecureSshCommandAsync(localPath, ct);
 
         var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
 
@@ -1100,8 +1160,10 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     {
         _logger.LogInformation("Führe git pull in {LocalPath} durch.", localPath);
 
-        // Remote-URL von einem ggf. eingebetteten Legacy-Token bereinigen, bevor gepullt wird
+        // Bestands-Arbeitskopien hygienisch bereinigen: Remote-URL auf HTTPS normalisieren
+        // und das von Altversionen geschriebene unsichere core.sshCommand entfernen.
         await NormalizeRemoteUrlAsync(localPath, ct);
+        await RemoveInsecureSshCommandAsync(localPath, ct);
 
         var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
 
@@ -1584,9 +1646,11 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     {
         _logger.LogInformation("Rufe Remote-Branches für {RepositoryUrl} ab.", repositoryUrl);
 
+        var remoteUrl = ToHttpsRepositoryUrl(repositoryUrl) ?? repositoryUrl;
+
         var result = await _cliRunner.RunAsync(
             "git",
-            ["ls-remote", "--heads", repositoryUrl],
+            ["ls-remote", "--heads", remoteUrl],
             null,
             GetGitEnvironment(),
             ct);
@@ -1640,9 +1704,11 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     {
         _logger.LogInformation("Ermittle Standard-Branch für {RepositoryUrl}.", repositoryUrl);
 
+        var remoteUrl = ToHttpsRepositoryUrl(repositoryUrl) ?? repositoryUrl;
+
         var result = await _cliRunner.RunAsync(
             "git",
-            ["ls-remote", "--symref", repositoryUrl, "HEAD"],
+            ["ls-remote", "--symref", remoteUrl, "HEAD"],
             null,
             GetGitEnvironment(),
             ct);
@@ -1669,13 +1735,32 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     /// <remarks>
     /// Übergibt dem <c>git fetch</c>/<c>checkout</c> des PR-Checkouts die git-Umgebung aus
     /// <see cref="GetGitEnvironment"/> — nötig seit dem Wegfall der <c>_netrc</c>-Persistenz,
-    /// damit der Checkout auch gegen private Repositories authentifiziert läuft.
+    /// damit der Checkout auch gegen private Repositories authentifiziert läuft. Zuvor wird die
+    /// betreute Arbeitskopie hygienisch bereinigt (SSH-<c>remote.origin.url</c> → HTTPS,
+    /// plugin-geschriebenes unsicheres <c>core.sshCommand</c> → entfernt) und eine SSH-
+    /// <c>SourceRepositoryUrl</c> (Fork-Fall) in ihre HTTPS-Form umgewandelt.
     /// </remarks>
-    public override Task CheckoutPullRequestSourceAsync(
+    public override async Task CheckoutPullRequestSourceAsync(
         string localPath,
         PullRequestCheckoutSpec checkoutSpec,
         CancellationToken ct = default)
-        => CheckoutPullRequestSourceCoreAsync(localPath, checkoutSpec, GetGitEnvironment(), ct);
+    {
+        ArgumentNullException.ThrowIfNull(checkoutSpec);
+
+        await NormalizeRemoteUrlAsync(localPath, ct);
+        await RemoveInsecureSshCommandAsync(localPath, ct);
+
+        if (!string.IsNullOrWhiteSpace(checkoutSpec.SourceRepositoryUrl))
+        {
+            checkoutSpec = checkoutSpec with
+            {
+                SourceRepositoryUrl = ToHttpsRepositoryUrl(checkoutSpec.SourceRepositoryUrl)
+                    ?? checkoutSpec.SourceRepositoryUrl
+            };
+        }
+
+        await CheckoutPullRequestSourceCoreAsync(localPath, checkoutSpec, GetGitEnvironment(), ct);
+    }
 
     /// <inheritdoc/>
     /// <remarks>
