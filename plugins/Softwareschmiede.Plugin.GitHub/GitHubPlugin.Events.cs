@@ -398,7 +398,7 @@ public sealed partial class GitHubPlugin
     {
         var host = "github.com";
         var path = value;
-        var scp = Regex.Match(value, @"\Agit@(?<host>[A-Za-z0-9.-]+):(?<path>[^?#\\]+)\z", RegexOptions.CultureInvariant);
+        var scp = ScpSshUrlPattern.Match(value);
         if (scp.Success)
         {
             if (!Uri.TryCreate("https://" + scp.Groups["host"].Value, UriKind.Absolute, out var sshHost)

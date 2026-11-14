@@ -23,9 +23,19 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     private const string RepositoryUrlKey = "RepositoryUrl";
     private const string RepositoryNameKey = "RepositoryName";
 
+    /// <summary>
+    /// Name der optionalen Umgebungsvariable, mit der der Pfad der <c>_netrc</c>/<c>.netrc</c>-Datei
+    /// für die Credential-Pflege übersteuert werden kann (Testseam für Kontexte, in denen
+    /// der <c>netrcPath</c>-Konstruktorparameter nicht erreichbar ist). Leere Werte werden
+    /// ignoriert; der explizite Konstruktorparameter hat Vorrang, danach greift diese Variable,
+    /// zuletzt das Benutzerprofil.
+    /// </summary>
+    internal const string NetrcPathEnvironmentVariable = "SOFTWARESCHMIEDE_NETRC_PATH";
+
     private readonly ICliRunner _cliRunner;
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<BitbucketPlugin> _logger;
+    private readonly string? _netrcPath;
 
     /// <inheritdoc/>
     public override string PluginName => "Bitbucket";
@@ -39,13 +49,26 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override string PluginSymbol => "🪣";
 
-    /// <inheritdoc cref="BitbucketPlugin"/>
+    /// <summary>Erstellt eine neue Instanz des <see cref="BitbucketPlugin"/>.</summary>
     public BitbucketPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<BitbucketPlugin> logger)
+        : this(cliRunner, credentialStore, logger, null)
+    {
+    }
+
+    /// <summary>Erstellt eine neue Instanz des <see cref="BitbucketPlugin"/>.</summary>
+    /// <param name="cliRunner">Runner für die Ausführung externer CLI-Aufrufe.</param>
+    /// <param name="credentialStore">Zugriff auf die hinterlegten Bitbucket-Credentials.</param>
+    /// <param name="logger">Logger für Diagnoseausgaben.</param>
+    /// <param name="netrcPath">Optionaler Pfad-Override der <c>_netrc</c>/<c>.netrc</c>-Datei für die
+    /// Credential-Pflege (Testseam); <see langword="null"/> ist der Produktiv-Default und löst den
+    /// Pfad über <see cref="NetrcPathEnvironmentVariable"/> bzw. das Benutzerprofil auf.</param>
+    public BitbucketPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<BitbucketPlugin> logger, string? netrcPath)
         : base(cliRunner)
     {
         _cliRunner = cliRunner;
         _credentialStore = credentialStore;
         _logger = logger;
+        _netrcPath = netrcPath;
     }
 
     /// <inheritdoc/>
@@ -168,15 +191,12 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
         var env = new Dictionary<string, string>
         {
-            ["GIT_TERMINAL_PROMPT"] = "0",
-            ["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+            ["GIT_TERMINAL_PROMPT"] = "0"
         };
 
         if (!string.IsNullOrEmpty(user) && !string.IsNullOrEmpty(appPassword))
         {
-            var netrcPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
+            var netrcPath = ResolveNetrcPath();
 
             string host;
             var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
@@ -196,6 +216,90 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         }
 
         return env;
+    }
+
+    /// <summary>
+    /// Ermittelt den Pfad der <c>_netrc</c>/<c>.netrc</c>-Datei: expliziter
+    /// <c>netrcPath</c>-Konstruktorparameter, sonst die Umgebungsvariable
+    /// <see cref="NetrcPathEnvironmentVariable"/> (leere Werte werden ignoriert), sonst das
+    /// Benutzerprofil.
+    /// </summary>
+    private string ResolveNetrcPath()
+    {
+        if (_netrcPath is not null)
+        {
+            return _netrcPath;
+        }
+
+        var environmentOverride = Environment.GetEnvironmentVariable(NetrcPathEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(environmentOverride))
+        {
+            return environmentOverride;
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
+    }
+
+    /// <summary>
+    /// Normalisiert eine noch im SSH-Format vorliegende <c>remote.origin.url</c> einer betreuten
+    /// Arbeitskopie auf die HTTPS-Form — der plugin-geführte git-Transport läuft ausschließlich
+    /// über HTTPS. Bei vorhandenen Credentials werden diese wie bei einem frischen Klon in die
+    /// Ziel-URL eingebettet (<see cref="BuildAuthenticatedCloneUrl"/>), sonst bleibt die URL nackt.
+    /// HTTPS- und nicht konvertierbare Remote-URLs bleiben unverändert; Fehler werden nur geloggt.
+    /// </summary>
+    private async Task NormalizeRemoteUrlAsync(string localPath, CancellationToken ct = default)
+    {
+        try
+        {
+            var getUrlResult = await _cliRunner.RunAsync(
+                "git",
+                ["config", "remote.origin.url"],
+                localPath,
+                null,
+                ct);
+
+            if (getUrlResult?.IsSuccess != true)
+            {
+                return;
+            }
+
+            var currentUrl = getUrlResult.StdOut.Trim();
+            var httpsUrl = ToHttpsRepositoryUrl(currentUrl);
+
+            if (httpsUrl is null || string.Equals(httpsUrl, currentUrl, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var user = _credentialStore.GetCredential(BitbucketUserKey);
+            var appPassword = _credentialStore.GetCredential(BitbucketAppPasswordKey);
+            var targetUrl = !string.IsNullOrEmpty(user) && !string.IsNullOrEmpty(appPassword)
+                ? BuildAuthenticatedCloneUrl(httpsUrl, user, appPassword)
+                : httpsUrl;
+
+            var setUrlResult = await _cliRunner.RunAsync(
+                "git",
+                ["remote", "set-url", "origin", targetUrl],
+                localPath,
+                null,
+                ct);
+
+            if (setUrlResult?.IsSuccess == true)
+            {
+                _logger.LogInformation("Remote origin URL auf HTTPS normalisiert.");
+            }
+            else
+            {
+                _logger.LogWarning("Konnte remote.origin.url nicht normalisieren: {Error}", setUrlResult?.StdErr);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "remote.origin.url konnte nicht normalisiert werden.");
+        }
     }
 
     private string[] GetGitHttpAuthArgs()
@@ -289,6 +393,12 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(appPassword))
             throw new InvalidOperationException("Bitbucket-Authentifizierung fehlt.");
 
+        // Nur HTTPS-Transport: SSH-URLs werden in ihre HTTPS-Form umgewandelt,
+        // andere Schemata werden vor jedem CLI-Aufruf abgelehnt.
+        repositoryUrl = ToHttpsRepositoryUrl(repositoryUrl)
+            ?? throw new InvalidOperationException(
+                "git clone abgebrochen: Es werden nur HTTPS-Repository-URLs verwendet; SSH-URLs werden automatisch konvertiert.");
+
         var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
 
         // Browser-URL in Git-SCM-Clone-URL umwandeln, dann Credentials einbetten.
@@ -312,6 +422,9 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override async Task PullAsync(string localPath, CancellationToken ct = default)
     {
+        // Bestands-Arbeitskopien hygienisch bereinigen: SSH-Remote-URL auf HTTPS normalisieren.
+        await NormalizeRemoteUrlAsync(localPath, ct);
+
         var result = await _cliRunner.RunAsync(
             "git",
             [.. GetGitHttpAuthArgs(), "pull"],
@@ -326,6 +439,9 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override async Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default)
     {
+        // Bestands-Arbeitskopien hygienisch bereinigen: SSH-Remote-URL auf HTTPS normalisieren.
+        await NormalizeRemoteUrlAsync(localPath, ct);
+
         var result = await _cliRunner.RunAsync(
             "git",
             [.. GetGitHttpAuthArgs(), "push", "--set-upstream", "origin", branchName],
@@ -933,9 +1049,11 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override async Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default)
     {
+        var remoteUrl = ToHttpsRepositoryUrl(repositoryUrl) ?? repositoryUrl;
+
         var result = await _cliRunner.RunAsync(
             "git",
-            ["ls-remote", "--heads", repositoryUrl],
+            ["ls-remote", "--heads", remoteUrl],
             null,
             GetGitEnvironment(),
             ct);
@@ -1044,9 +1162,11 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override async Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default)
     {
+        var remoteUrl = ToHttpsRepositoryUrl(repositoryUrl) ?? repositoryUrl;
+
         var result = await _cliRunner.RunAsync(
             "git",
-            ["ls-remote", "--symref", repositoryUrl, "HEAD"],
+            ["ls-remote", "--symref", remoteUrl, "HEAD"],
             null,
             GetGitEnvironment(),
             ct);
@@ -1059,6 +1179,35 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         }
 
         return "main";
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Übergibt dem <c>git fetch</c>/<c>checkout</c> des PR-Checkouts die git-Umgebung aus
+    /// <see cref="GetGitEnvironment"/> — <c>GIT_TERMINAL_PROMPT=0</c> verhindert Prompt-Blockaden
+    /// und die <c>_netrc</c>-Pflege authentifiziert Same-Host-Fetches. Zuvor wird eine noch im
+    /// SSH-Format vorliegende <c>remote.origin.url</c> auf HTTPS normalisiert und eine SSH-
+    /// <c>SourceRepositoryUrl</c> (Fork-Fall) in ihre HTTPS-Form umgewandelt.
+    /// </remarks>
+    public override async Task CheckoutPullRequestSourceAsync(
+        string localPath,
+        PullRequestCheckoutSpec checkoutSpec,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(checkoutSpec);
+
+        await NormalizeRemoteUrlAsync(localPath, ct);
+
+        if (!string.IsNullOrWhiteSpace(checkoutSpec.SourceRepositoryUrl))
+        {
+            checkoutSpec = checkoutSpec with
+            {
+                SourceRepositoryUrl = ToHttpsRepositoryUrl(checkoutSpec.SourceRepositoryUrl)
+                    ?? checkoutSpec.SourceRepositoryUrl
+            };
+        }
+
+        await CheckoutPullRequestSourceCoreAsync(localPath, checkoutSpec, GetGitEnvironment(), ct);
     }
 
     /// <inheritdoc/>
@@ -1085,6 +1234,10 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         CancellationToken ct = default,
         string? branchName = null)
     {
+        // SSH-Repository-URLs vorab in die HTTPS-Form umwandeln, damit das URI-basierte
+        // TryExtractRepositoryId auch SCP-/ssh://-URLs auflösen kann.
+        repositoryUrl = ToHttpsRepositoryUrl(repositoryUrl) ?? repositoryUrl;
+
         var repositoryId = TryExtractRepositoryId(repositoryUrl);
         if (repositoryId is null)
         {

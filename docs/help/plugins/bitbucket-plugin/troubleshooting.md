@@ -128,7 +128,7 @@ Textfeld, oder Unterverzeichnisse werden nicht zur Auswahl angeboten.
 **Ursachen:**
 - Git ist nicht installiert
 - netrc-Konfiguration ist falsch (Windows: `_netrc`, Linux/Mac: `.netrc`)
-- SSH-Keys sind nicht konfiguriert (bei SSH-URLs)
+- Die Repository-URL liegt in einem Schema vor, das nicht in eine HTTPS-Adresse umgewandelt werden kann (z. B. `ssh://` mit einem abweichenden Port oder `http://`/`git://`) — der Klon bricht dann mit der Meldung „Es werden nur HTTPS-Repository-URLs verwendet; SSH-URLs werden automatisch konvertiert." ab
 - Netzwerk-Firewall blockiert Git-Operationen
 
 **Lösung:**
@@ -151,11 +151,12 @@ Textfeld, oder Unterverzeichnisse werden nicht zur Auswahl angeboten.
      password {app_password}
      ```
    - Falls die Datei fehlt oder falsch ist, führe einen Health-Check durch — das Plugin aktualisiert die netrc-Datei automatisch
-3. Falls SSH-URLs verwendet werden:
-   - Stelle sicher, dass der SSH-Agent läuft und SSH-Keys konfiguriert sind
-   - Öffne ein Terminal und prüfe: `ssh -T git@bitbucket.org` (Cloud) oder `ssh -T git@bitbucket.company.com` (Self-Hosted)
+3. Falls die Fehlermeldung „Es werden nur HTTPS-Repository-URLs verwendet" erscheint:
+   - Das Plugin führt Git-Operationen ausschließlich über HTTPS aus; SSH-Keys oder ein SSH-Agent sind nicht erforderlich
+   - SSH-Repository-URLs im Format `git@host:pfad` oder `ssh://git@host/pfad` (Standard-Port) werden automatisch in HTTPS umgewandelt — hier liegt die Ursache meist anderswo (Zugangsdaten, Erreichbarkeit)
+   - Prüfe, ob die Repository-URL einen SSH-Port abseits von 22 verwendet (z. B. `ssh://git@bitbucket.company.com:7999/…`): Passe die hinterlegte Repository-URL auf die HTTPS-Form deiner BitBucket-Installation an (z. B. `https://bitbucket.company.com/scm/{PROJECT}/{repo}.git`)
 4. Netzwerk-Firewall:
-   - Prüfe, dass Port 443 (HTTPS) oder 22 (SSH) offen ist
+   - Prüfe, dass Port 443 (HTTPS) offen ist
    - Falls hinter Proxy: Konfiguriere Git mit Proxy-Einstellungen
 
 ## Jira-Integration zeigt keine Issues

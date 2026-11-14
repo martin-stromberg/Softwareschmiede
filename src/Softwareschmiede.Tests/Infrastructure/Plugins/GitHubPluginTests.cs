@@ -514,7 +514,7 @@ public sealed class GitHubPluginTests
             It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Contains("https://github.com/test/repo") && a.Contains("/target/path")),
             null,
             It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token"
-                && HasGitHubExtraHeader(env, "token") && !env.ContainsKey("NETRC")),
+                && HasGitHubExtraHeader(env, "token") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -977,6 +977,13 @@ public sealed class GitHubPluginTests
             .ReturnsAsync(new CliResult(0, "https://oauth2:token123@github.com/owner/repo.git", string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
                 It.Is<IEnumerable<string>>(a => a.Contains("set-url") && a.Contains("origin")),
                 "/repo",
                 null,
@@ -1009,7 +1016,7 @@ public sealed class GitHubPluginTests
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "push", "--set-upstream", "origin", "feature/a")),
             "/repo",
             It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GIT_TERMINAL_PROMPT") && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token123"
-                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC")),
+                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1025,6 +1032,13 @@ public sealed class GitHubPluginTests
                 null,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(a => a.Contains("push")),
@@ -1057,6 +1071,13 @@ public sealed class GitHubPluginTests
             .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
                 It.Is<IEnumerable<string>>(a => a.Contains("push")),
                 "/repo",
                 It.IsAny<IDictionary<string, string>?>(),
@@ -1087,6 +1108,13 @@ public sealed class GitHubPluginTests
             .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
                 It.Is<IEnumerable<string>>(a => a.Contains("push")),
                 "/repo",
                 It.IsAny<IDictionary<string, string>?>(),
@@ -1110,6 +1138,13 @@ public sealed class GitHubPluginTests
                 null,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "https://oauth2:abc@github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(a => a.Contains("set-url")),
@@ -1149,6 +1184,13 @@ public sealed class GitHubPluginTests
             .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
                 It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
                 "/repo",
                 It.IsAny<IDictionary<string, string>?>(),
@@ -1162,7 +1204,7 @@ public sealed class GitHubPluginTests
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
             "/repo",
             It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token"
-                && HasGitHubExtraHeader(env, "token") && !env.ContainsKey("NETRC")),
+                && HasGitHubExtraHeader(env, "token") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1178,6 +1220,13 @@ public sealed class GitHubPluginTests
                 null,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
@@ -1208,6 +1257,13 @@ public sealed class GitHubPluginTests
                 null,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
@@ -1419,6 +1475,7 @@ public sealed class GitHubPluginTests
         var expected = "AUTHORIZATION: basic " + Convert.ToBase64String(
             System.Text.Encoding.UTF8.GetBytes("x-access-token:agent-token"));
         environment["GIT_CONFIG_VALUE_0"].Should().Be(expected);
+        environment.Should().NotContainKey("GIT_SSH_COMMAND");
     }
 
     /// <summary>Ohne gespeicherten Token bleibt nur das deaktivierte Credential-Prompt —
@@ -1433,6 +1490,7 @@ public sealed class GitHubPluginTests
         environment.Should().ContainKey("GIT_TERMINAL_PROMPT").WhoseValue.Should().Be("0");
         environment.Should().NotContainKey("GH_TOKEN");
         environment.Should().NotContainKey("GIT_CONFIG_VALUE_0");
+        environment.Should().NotContainKey("GIT_SSH_COMMAND");
     }
 
     /// <summary>Im SeparatesKonto liefert GetAgentEnvironmentAsync das AgentToken statt des Benutzer-Tokens.</summary>
@@ -1448,6 +1506,7 @@ public sealed class GitHubPluginTests
         var expected = "AUTHORIZATION: basic " + Convert.ToBase64String(
             System.Text.Encoding.UTF8.GetBytes("x-access-token:bot-token"));
         environment["GIT_CONFIG_VALUE_0"].Should().Be(expected);
+        environment.Should().NotContainKey("GIT_SSH_COMMAND");
     }
 
     /// <summary>GetSettingGroups enthält das optionale AgentToken-Secret in der Authentifizierung.</summary>
@@ -1755,33 +1814,23 @@ public sealed class GitHubPluginTests
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary>Ohne gespeicherten Token enthält die git-Umgebung nur Prompt-/SSH-Einstellungen —
-    /// weder GH_TOKEN noch GIT_CONFIG_* noch einen NETRC-Verweis (SSH-Klon, kein HTTPS-Fail-Fast).</summary>
+    /// <summary>Ohne gespeicherten Token schlägt der Klon einer SSH-URL — nach der automatischen
+    /// HTTPS-Konvertierung — mit dem bestehenden Token-Fail-Fast fehl, bevor git gestartet wird.</summary>
     [Fact]
-    public async Task CloneRepositoryAsync_OhneToken_NurTerminalPromptUndSshInEnv()
+    public async Task CloneRepositoryAsync_SshUrlOhneToken_WirftInvalidOperationException()
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
-        _cliRunnerMock.Setup(c => c.RunAsync(
-                "git",
-                It.IsAny<IEnumerable<string>>(),
-                It.IsAny<string?>(),
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.CloneRepositoryAsync("git@github.com:owner/repo.git", "/target/path");
+        var act = () => _sut.CloneRepositoryAsync("git@github.com:owner/repo.git", "/target/path");
 
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*GitHub-Token fehlt*");
         _cliRunnerMock.Verify(c => c.RunAsync(
-            "git",
-            It.Is<IEnumerable<string>>(a => a.Contains("clone")),
-            null,
-            It.Is<IDictionary<string, string>?>(env => env != null
-                && env["GIT_TERMINAL_PROMPT"] == "0"
-                && env.ContainsKey("GIT_SSH_COMMAND")
-                && !env.ContainsKey("GH_TOKEN")
-                && !env.Keys.Any(k => k.StartsWith("GIT_CONFIG_", StringComparison.Ordinal))
-                && !env.ContainsKey("NETRC")),
-            It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<string>(),
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>GetDefaultBranchAsync nutzt die git-Umgebung mit http.extraheader-Auth,
@@ -1806,7 +1855,7 @@ public sealed class GitHubPluginTests
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "ls-remote", "--symref", "https://github.com/owner/repo.git", "HEAD")),
             null,
             It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token123"
-                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC")),
+                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1823,6 +1872,20 @@ public sealed class GitHubPluginTests
                 It.IsAny<IDictionary<string, string>?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
 
         var spec = new PullRequestCheckoutSpec(
             TargetRepositoryId: "owner/repo",
@@ -1835,18 +1898,737 @@ public sealed class GitHubPluginTests
 
         await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
 
+        // Vorab-Hygiene der betreuten Arbeitskopie: Remote-URL lesen und
+        // plugin-geschriebenes core.sshCommand prüfen.
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "fetch", "--no-tags", "origin", "refs/heads/feature/pr")),
             "/repo",
             It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token123"
-                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC")),
+                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "checkout", "-B", "feature/pr", "FETCH_HEAD")),
             "/repo",
-            It.Is<IDictionary<string, string>?>(env => env != null && HasGitHubExtraHeader(env, "token123")),
+            It.Is<IDictionary<string, string>?>(env => env != null && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Eine SCP-SSH-Repository-URL (git@host:…) wird beim Klon in die HTTPS-Form
+    /// umgewandelt; die Umgebung trägt GH_TOKEN + extraheader und kein GIT_SSH_COMMAND.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_SshUrl_WirdZuHttpsGeklont()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.CloneRepositoryAsync("git@github.com:owner/repo.git", "/target/path");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Contains("https://github.com/owner/repo.git") && a.Contains("/target/path")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token"
+                && HasGitHubExtraHeader(env, "token") && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Any(x => x.Contains("git@", StringComparison.Ordinal) || x.Contains("ssh://", StringComparison.Ordinal))),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Eine ssh://-Repository-URL wird beim Klon in die HTTPS-Form umgewandelt.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_SshSchemeUrl_WirdZuHttpsGeklont()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.CloneRepositoryAsync("ssh://git@github.com/owner/repo.git", "/target/path");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Contains("https://github.com/owner/repo.git") && a.Contains("/target/path")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Nicht konvertierbare Repository-URLs (anderes Schema, SSH mit Fremd-Port) werden
+    /// vor jedem CLI-Aufruf mit verständlicher Meldung abgelehnt.</summary>
+    [Theory]
+    [InlineData("http://github.com/owner/repo")]
+    [InlineData("git://github.com/owner/repo")]
+    [InlineData("ssh://git@github.com:2222/owner/repo.git")]
+    public async Task CloneRepositoryAsync_NichtHttpsSchema_WirdAbgelehnt(string repositoryUrl)
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+
+        var act = () => _sut.CloneRepositoryAsync(repositoryUrl, "/target/path");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*nur HTTPS-Repository-URLs*");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Nach einem erfolgreichen Klon wird kein core.sshCommand in die Arbeitskopie
+    /// geschrieben; user.name, user.email und die Remote-URL werden weiterhin konfiguriert.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_KonfiguriertKeinSshCommand()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.CloneRepositoryAsync("https://github.com/owner/repo.git", "/target/path");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Any(x => x.Contains("core.sshCommand", StringComparison.Ordinal))),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "user.name", "Softwareschmiede Bot")),
+            "/target/path",
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "user.email", "bot@softwareschmiede.local")),
+            "/target/path",
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("remote") && a.Contains("set-url") && a.Contains("origin") && a.Contains("https://github.com/owner/repo.git")),
+            "/target/path",
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Eine noch im SCP-SSH-Format vorliegende remote.origin.url wird vor dem Push
+    /// auf die HTTPS-Form umgeschrieben.</summary>
+    [Fact]
+    public async Task PushBranchAsync_SshRemoteUrl_WirdZuHttpsNormalisiert()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        var calls = new List<string>();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "git@github.com:owner/repo.git", string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://github.com/owner/repo.git");
+        var pushIndex = calls.FindIndex(c => c == "push --set-upstream origin feature/a");
+        setUrlIndex.Should().BeGreaterThanOrEqualTo(0);
+        pushIndex.Should().BeGreaterThan(setUrlIndex);
+    }
+
+    /// <summary>Eine noch im SCP-SSH-Format vorliegende remote.origin.url wird vor dem Pull
+    /// auf die HTTPS-Form umgeschrieben.</summary>
+    [Fact]
+    public async Task PullAsync_SshRemoteUrl_WirdZuHttpsNormalisiert()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        var calls = new List<string>();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "git@github.com:owner/repo.git", string.Empty));
+
+        await _sut.PullAsync("/repo");
+
+        var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://github.com/owner/repo.git");
+        var pullIndex = calls.FindIndex(c => c == "pull");
+        setUrlIndex.Should().BeGreaterThanOrEqualTo(0);
+        pullIndex.Should().BeGreaterThan(setUrlIndex);
+    }
+
+    /// <summary>Ein von einer Altversion geschriebenes core.sshCommand mit StrictHostKeyChecking=no
+    /// wird vor dem Push per git config --unset entfernt — das Unset muss vor dem Remote-Aufruf liegen,
+    /// damit die unsichere Option während des Push nicht mehr aktiv ist.</summary>
+    [Fact]
+    public async Task PushBranchAsync_LegacySshCommand_WirdEntfernt()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        var calls = new List<string>();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--unset", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        var unsetIndex = calls.FindIndex(c => c == "config --unset core.sshCommand");
+        var pushIndex = calls.FindIndex(c => c == "push --set-upstream origin feature/a");
+        unsetIndex.Should().BeGreaterThanOrEqualTo(0);
+        pushIndex.Should().BeGreaterThan(unsetIndex);
+    }
+
+    /// <summary>Dasselbe gilt für den Pull: das unsichere core.sshCommand wird per --unset entfernt,
+    /// bevor git pull gegen origin läuft.</summary>
+    [Fact]
+    public async Task PullAsync_LegacySshCommand_WirdEntfernt()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        var calls = new List<string>();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null", string.Empty));
+
+        await _sut.PullAsync("/repo");
+
+        var unsetIndex = calls.FindIndex(c => c == "config --unset core.sshCommand");
+        var pullIndex = calls.FindIndex(c => c == "pull");
+        unsetIndex.Should().BeGreaterThanOrEqualTo(0);
+        pullIndex.Should().BeGreaterThan(unsetIndex);
+    }
+
+    /// <summary>Ein vom Anwender gesetztes eigenes core.sshCommand, das zwar die Option
+    /// StrictHostKeyChecking=no enthält, aber nicht exakt der Plugin-Signatur entspricht
+    /// (hier: zusätzliches -i-Flag), bleibt unverändert erhalten — nur der nachweisbar
+    /// plugin-geschriebene Wert wird entfernt.</summary>
+    [Fact]
+    public async Task PushBranchAsync_EigenesSshCommandMitOption_BleibtErhalten()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "ssh -o StrictHostKeyChecking=no -i /key", string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("--unset")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Never);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("push")),
+            "/repo",
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Ein fremd gesetztes core.sshCommand ohne die Plugin-Signatur
+    /// (StrictHostKeyChecking=no) bleibt unverändert erhalten.</summary>
+    [Fact]
+    public async Task PushBranchAsync_FremdesSshCommand_BleibtErhalten()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "ssh -i /key", string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("--unset")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Never);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("push")),
+            "/repo",
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Ist kein core.sshCommand gesetzt (git config --get schlägt fehl), wird kein
+    /// --unset ausgeführt und der Pull läuft normal weiter.</summary>
+    [Fact]
+    public async Task PullAsync_OhneSshCommand_KeinUnset()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PullAsync("/repo");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("--unset")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Never);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
+            "/repo",
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Schlägt das Lesen von core.sshCommand fehl (z. B. kein git-Repository),
+    /// wird nur gewarnt — der Pull läuft in seinen normalen Pfad weiter.</summary>
+    [Fact]
+    public async Task PullAsync_SshCommandReadFehler_NurWarnung()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(128, string.Empty, "fatal: not in a git directory"));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(128, string.Empty, "fatal: not in a git directory"));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PullAsync("/repo");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("--unset")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Never);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
+            "/repo",
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Eine SSH-SourceRepositoryUrl eines Fork-PRs wird vor dem Fetch in die
+    /// HTTPS-Form umgewandelt.</summary>
+    [Fact]
+    public async Task CheckoutPullRequestSourceAsync_SshForkUrl_WirdZuHttpsGefetcht()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
+
+        var spec = new PullRequestCheckoutSpec(
+            TargetRepositoryId: "owner/repo",
+            TargetRepositoryUrl: "https://github.com/owner/repo.git",
+            SourceRepositoryId: "fork/repo",
+            SourceRepositoryUrl: "git@github.com:fork/repo.git",
+            SourceBranch: "feature/pr",
+            SourceRef: null,
+            HeadSha: null);
+
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "fetch", "--no-tags", "https://github.com/fork/repo.git", "refs/heads/feature/pr")),
+            "/repo",
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>GetRemoteBranchesAsync fragt SCP-SSH-Repository-URLs über die konvertierte
+    /// HTTPS-Remote-URL ab.</summary>
+    [Fact]
+    public async Task GetRemoteBranchesAsync_SshUrl_NutztHttpsRemote()
+    {
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("ls-remote")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "hash1\trefs/heads/main", string.Empty));
+
+        var result = await _sut.GetRemoteBranchesAsync("git@github.com:owner/repo.git");
+
+        result.Should().Equal("main");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "ls-remote", "--heads", "https://github.com/owner/repo.git")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>GetDefaultBranchAsync fragt SCP-SSH-Repository-URLs über die konvertierte
+    /// HTTPS-Remote-URL ab.</summary>
+    [Fact]
+    public async Task GetDefaultBranchAsync_SshUrl_NutztHttpsRemote()
+    {
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("ls-remote")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "ref: refs/heads/main\tHEAD", string.Empty));
+
+        var result = await _sut.GetDefaultBranchAsync("ssh://git@github.com/owner/repo.git");
+
+        result.Should().Be("main");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "ls-remote", "--symref", "https://github.com/owner/repo.git", "HEAD")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Beim Same-Repo-PR-Checkout (Fetch gegen origin) wird eine noch im SCP-SSH-Format
+    /// vorliegende remote.origin.url vor dem Fetch auf HTTPS normalisiert.</summary>
+    [Fact]
+    public async Task CheckoutPullRequestSourceAsync_SshOriginUrl_WirdVorFetchNormalisiert()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        var calls = new List<string>();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "git@github.com:owner/repo.git", string.Empty));
+
+        var spec = new PullRequestCheckoutSpec(
+            TargetRepositoryId: "owner/repo",
+            TargetRepositoryUrl: "https://github.com/owner/repo.git",
+            SourceRepositoryId: "owner/repo",
+            SourceRepositoryUrl: null,
+            SourceBranch: "feature/pr",
+            SourceRef: null,
+            HeadSha: null);
+
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+
+        var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://github.com/owner/repo.git");
+        var fetchIndex = calls.FindIndex(c => c == "fetch --no-tags origin refs/heads/feature/pr");
+        setUrlIndex.Should().BeGreaterThanOrEqualTo(0);
+        fetchIndex.Should().BeGreaterThan(setUrlIndex);
+    }
+
+    /// <summary>Beim PR-Checkout wird ein von einer Altversion geschriebenes unsicheres
+    /// core.sshCommand vor dem Fetch per git config --unset entfernt.</summary>
+    [Fact]
+    public async Task CheckoutPullRequestSourceAsync_LegacySshCommand_WirdEntfernt()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        var calls = new List<string>();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null", string.Empty));
+
+        var spec = new PullRequestCheckoutSpec(
+            TargetRepositoryId: "owner/repo",
+            TargetRepositoryUrl: "https://github.com/owner/repo.git",
+            SourceRepositoryId: "owner/repo",
+            SourceRepositoryUrl: null,
+            SourceBranch: "feature/pr",
+            SourceRef: null,
+            HeadSha: null);
+
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+
+        var unsetIndex = calls.FindIndex(c => c == "config --unset core.sshCommand");
+        var fetchIndex = calls.FindIndex(c => c == "fetch --no-tags origin refs/heads/feature/pr");
+        unsetIndex.Should().BeGreaterThanOrEqualTo(0);
+        fetchIndex.Should().BeGreaterThan(unsetIndex);
+    }
+
+    /// <summary>Eine null-CheckoutSpec wird mit ArgumentNullException abgelehnt, bevor irgendein
+    /// git-Aufruf auf der Arbeitskopie stattfindet.</summary>
+    [Fact]
+    public async Task CheckoutPullRequestSourceAsync_NullSpec_WirftArgumentNullException()
+    {
+        var act = () => _sut.CheckoutPullRequestSourceAsync("/repo", null!);
+
+        await act.Should().ThrowAsync<ArgumentNullException>();
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Eine remote.origin.url, die sich nicht in die HTTPS-Form umwandeln lässt
+    /// (hier: ssh:// mit Fremd-Port), bleibt unverändert — kein set-url, der Push läuft weiter.</summary>
+    [Theory]
+    [InlineData("ssh://git@github.com:2222/owner/repo.git")]
+    [InlineData("ssh://user:pass@github.com/owner/repo.git")]
+    public async Task PushBranchAsync_NichtKonvertierbareRemoteUrl_KeinSetUrl(string remoteUrl)
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, remoteUrl, string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("set-url")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Never);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "push", "--set-upstream", "origin", "feature/a")),
+            "/repo",
+            It.IsAny<IDictionary<string, string>?>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
