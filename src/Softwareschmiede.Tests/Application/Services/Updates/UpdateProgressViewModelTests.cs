@@ -21,6 +21,19 @@ public sealed class UpdateProgressViewModelTests
         sut.Message.Should().Be("Lädt");
     }
 
+    /// <summary>Die Verifikationsphase wird mit eigenem Phasentext und indeterminatem Fortschritt angezeigt.</summary>
+    [Fact]
+    public void Apply_ShouldShowVerifikation_WhenPhaseIsVerifizieren()
+    {
+        var sut = new UpdateProgressViewModel();
+
+        sut.Apply(new UpdatePreparationProgress(UpdatePreparationPhase.Verifizieren, null, "Update-Paket wird verifiziert."));
+
+        sut.PhaseText.Should().Be("Verifikation");
+        sut.IsIndeterminate.Should().BeTrue();
+        sut.Message.Should().Be("Update-Paket wird verifiziert.");
+    }
+
     /// <summary>Fehler erlauben das Schließen des Dialogs.</summary>
     [Fact]
     public void SetError_ShouldEnableClose()

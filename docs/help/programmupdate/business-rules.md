@@ -54,12 +54,32 @@ Regeln:
 
 ## Download-Fallback auf die API-Asset-URL
 
-- `UpdateInfo` trägt neben der primären `DownloadUrl` (`browser_download_url`) eine optionale `FallbackDownloadUrl` — die GitHub-API-Asset-URL der Form `https://api.github.com/repos/{owner}/{repo}/releases/assets/{id}`.
-- Herkunft: `GitHubReleaseClient.CreateFallbackDownloadUrl` bevorzugt das servergelieferte Asset-Feld `url` (`GitHubAsset.Url`), sofern es `IsAllowedAssetApiUrl` besteht — absolut, HTTPS, Host `api.github.com` (OrdinalIgnoreCase). Das Host-Pinning verhindert, dass eine servergelieferte URL den Download auf einen Fremdhost lenkt. Fehlt `url` oder ist sie ungültig, wird die Fallback-URL aus `GitHubAsset.Id > 0` aufgebaut; ohne beides bleibt `FallbackDownloadUrl` `null` und das Asset bleibt fallbacklos nutzbar.
+- `UpdateInfo` trägt je Download-Quelle eine `UpdateDownloadRoute` — `PaketDownload` für das `release.zip`-Asset und `ManifestDownload` für das `update.json`-Manifest. Jede Route besteht aus der primären `browser_download_url` (`Primary`) und einer optionalen GitHub-API-Asset-URL (`Fallback`) der Form `https://api.github.com/repos/{owner}/{repo}/releases/assets/{id}`.
+- Herkunft: `GitHubReleaseClient.CreateFallbackDownloadUrl` bevorzugt das servergelieferte Asset-Feld `url` (`GitHubAsset.Url`), sofern es `IsAllowedAssetApiUrl` besteht — absolut, HTTPS, Host `api.github.com` (OrdinalIgnoreCase). Das Host-Pinning verhindert, dass eine servergelieferte URL den Download auf einen Fremdhost lenkt. Fehlt `url` oder ist sie ungültig, wird die Fallback-URL aus `GitHubAsset.Id > 0` aufgebaut; ohne beides bleibt `Fallback` `null` und die Route bleibt fallbacklos nutzbar.
 - Auslöser: ausschließlich ein empfangener HTTP-Status ≥ 500 (5xx) auf der primären Antwort — vor Stream-Beginn. Transportfehler ohne HTTP-Antwort, `429`, Timeout und ein Abriss mitten im Download lösen **keinen** Fallback aus.
 - Umfang: genau ein Zweitversuch, ohne Verzögerung und ohne weitere Wiederholungen. Der Fallback-Request trägt `Accept: application/octet-stream` (sonst liefert die API JSON-Metadaten statt des Binärstroms) und `User-Agent: Softwareschmiede/1.0` (die GitHub-API lehnt Requests ohne User-Agent mit 403 ab); der primäre Request bleibt headerlos.
-- Scheitert auch der Fallback oder liegt keine `FallbackDownloadUrl` vor, gilt der bisherige Fehlerpfad: `EnsureSuccessStatusCode` → `HttpRequestException` → „Update konnte nicht vorbereitet werden."
-- Der Mechanismus ist intern: kein UI-Hinweis, keine Konfiguration, kein Opt-out — sichtbar nur als `LogWarning` (mit Statuscode und beiden URLs) im Anwendungsprotokoll. Der Fallback gilt ausschließlich für `UpdatePackageService.DownloadAsync` — der einzige Abruf einer `browser_download_url`.
+- Scheitert auch der Fallback oder liegt kein `Fallback` vor, gilt der bisherige Fehlerpfad: `EnsureSuccessStatusCode` → `HttpRequestException` → „Update konnte nicht vorbereitet werden."
+- Der Mechanismus ist intern: kein UI-Hinweis, keine Konfiguration, kein Opt-out — sichtbar nur als `LogWarning` (mit Statuscode und beiden URLs) im Anwendungsprotokoll. Die gemeinsame Hilfsmethode `UpdatePackageService.SendWithFallbackAsync` wendet ihn gleichermaßen auf den Paket-Download (`DownloadAsync`) und den Manifest-Abruf (`DownloadManifestAsync`) an — die einzigen beiden `browser_download_url`-Zugriffe.
+
+## Paket-Verifikation (SHA-256 gegen `update.json`)
+
+**Beschreibung:** Vor dem Entpacken wird die Integrität des heruntergeladenen `release.zip` gegen das Update-Manifest `update.json` geprüft. Das Manifest ist ein reguläres Release-Asset (Schema: `version`, `publishedAt`, `assets[]` mit `assetName`, `assetUrl`, `sha256`, `sizeBytes`), das der Release-Workflow seit Einführung des Paket-Schritts zu jedem Release hochlädt. Die Verifikation schützt vor einem manipulierten oder korrupten Paket-Download (z. B. CDN-/Proxy-Eingriff, nachträglich ausgetauschtem Asset); sie ist ein verbindlicher Sicherheitsschritt — kein Opt-out, keine Konfiguration.
+
+**Bedingungen:**
+
+- Greift in **jedem** Vorbereitungslauf (`UpdatePackageService.PreparePackageAsync`) — Startautomatik und manueller Start gleichermaßen; Zeitpunkt: nach erfolgreichem ZIP-Download, vor `ZipFile.ExtractToDirectory`.
+- `UpdateInfo.ManifestDownload` muss gesetzt sein; `GitHubReleaseClient` befüllt die Route aus dem `update.json`-Asset (`UpdateOptions.ManifestAssetName`) desselben Releases. Ein Release ohne Manifest-Asset bleibt Update-Angebot — das Filtern erfolgt bewusst nicht im Release-Client, sondern ausschließlich hier.
+- Verbindlich ist ausschließlich `sha256` (64-stelliger Hexwert, Vergleich `OrdinalIgnoreCase`); `sizeBytes` und die Manifest-`version` werden nicht geprüft.
+
+**Verhalten:**
+
+- Hash stimmt überein → die Vorbereitung läuft unverändert weiter (Entpacken, Validierung, Skripterzeugung).
+- `ManifestDownload == null`, Manifest-HTTP-Fehler (inkl. einmaligem 5xx-Fallback), ungültiges JSON, fehlender `release.zip`-Eintrag oder leerer/formal ungültiger `sha256` → `InvalidDataException` bzw. `HttpRequestException` → das Paket gilt als nicht verifizierbar und wird verworfen — es gibt keinen stillen Fallback auf „ungeprüft installieren", da ein solcher die Schutzwirkung durch einfaches Weglassen des Assets unterlaufen würde.
+- Hash-Mismatch → `InvalidDataException` (beide Hashwerte werden per `LogWarning` protokolliert) → Abbruch vor dem ersten Schreibzugriff des Entpackens.
+- Jeder Fehlschlag läuft über den bestehenden Catch-all von `PreparePackageAsync` (Aufräumen von `*.download`, `release.zip`, Extraktionsverzeichnis) zu `MainWindowUpdateFlow` → `SetError` + `UpdateHinweis` „Update konnte nicht vorbereitet werden." — kein Skript, kein Prozessstart, kein `Shutdown()`.
+- Konsequenz: Ein Release ohne `update.json`-Asset (nur Altbestand vor Einführung des Manifest-Schritts) ist faktisch nicht mehr installierbar.
+
+**Umsetzung:** `UpdatePackageService.DownloadManifestAsync` (Abruf über `SendWithFallbackAsync`), `UpdatePackageService.GetExpectedSha256` (DTOs `UpdateManifest`/`UpdateManifestAsset`, `System.Text.Json`), `UpdatePackageService.VerifyPackageHashAsync` (`SHA256.HashDataAsync` + `Convert.ToHexString`). Sichtbar als Phase `UpdatePreparationPhase.Verifizieren` (Anzeige „Verifikation" im Fortschrittsdialog). Das Manifest selbst ist nicht signiert und wird über denselben TLS-/GitHub-Kanal bezogen wie Release-Liste und ZIP — ein vollständig kompromittiertes GitHub-Release bleibt bewusstes Restrisiko; eine Authenticode-Signaturprüfung der entpackten Dateien ist nicht Teil dieser Verifikation.
 
 ## Aktualitäts- und Concurrency-Regeln
 

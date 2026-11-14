@@ -1,5 +1,8 @@
 using System.IO.Compression;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Application.Services.Updates;
@@ -70,6 +73,11 @@ public sealed class UpdatePackageService : IUpdatePackageService
             if (new FileInfo(zipPath).Length == 0)
                 throw new InvalidDataException("Das heruntergeladene Update-Paket ist leer.");
 
+            progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.Verifizieren, null, "Update-Paket wird verifiziert."));
+            var manifestJson = await DownloadManifestAsync(update, ct);
+            var expectedSha256 = GetExpectedSha256(manifestJson);
+            await VerifyPackageHashAsync(zipPath, expectedSha256, ct);
+
             progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.Entpacken, null, "Update wird entpackt."));
             ZipFile.ExtractToDirectory(zipPath, extractedDirectory, overwriteFiles: true);
             ValidateExtractedPackage(extractedDirectory);
@@ -95,20 +103,7 @@ public sealed class UpdatePackageService : IUpdatePackageService
         IProgress<UpdatePreparationProgress>? progress,
         CancellationToken ct)
     {
-        var response = await SendDownloadRequestAsync(update.DownloadUrl, useApiHeaders: false, ct);
-        if (!response.IsSuccessStatusCode
-            && (int)response.StatusCode >= 500
-            && update.FallbackDownloadUrl is not null)
-        {
-            _logger.LogWarning(
-                "Update-Download über {DownloadUrl} lieferte HTTP {StatusCode}; versuche einmalig die API-Asset-URL {FallbackDownloadUrl}.",
-                update.DownloadUrl,
-                (int)response.StatusCode,
-                update.FallbackDownloadUrl);
-            response.Dispose();
-            response = await SendDownloadRequestAsync(update.FallbackDownloadUrl, useApiHeaders: true, ct);
-        }
-
+        var response = await SendWithFallbackAsync(update.PaketDownload, "Update-Download", ct);
         using (response)
         {
             response.EnsureSuccessStatusCode();
@@ -130,6 +125,76 @@ public sealed class UpdatePackageService : IUpdatePackageService
                     progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.Download, percent, "Update wird heruntergeladen."));
                 }
             }
+        }
+    }
+
+    private async Task<string> DownloadManifestAsync(UpdateInfo update, CancellationToken ct)
+    {
+        if (update.ManifestDownload is null)
+            throw new InvalidDataException("Das Update-Manifest ist nicht verfügbar; das Paket kann nicht verifiziert werden.");
+
+        var response = await SendWithFallbackAsync(update.ManifestDownload, "Update-Manifest-Abruf", ct);
+        using (response)
+        {
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStringAsync(ct);
+        }
+    }
+
+    private async Task<HttpResponseMessage> SendWithFallbackAsync(UpdateDownloadRoute route, string beschreibung, CancellationToken ct)
+    {
+        var response = await SendDownloadRequestAsync(route.Primary, useApiHeaders: false, ct);
+        if (!response.IsSuccessStatusCode
+            && (int)response.StatusCode >= 500
+            && route.Fallback is not null)
+        {
+            _logger.LogWarning(
+                "{Beschreibung} über {DownloadUrl} lieferte HTTP {StatusCode}; versuche einmalig die API-Asset-URL {FallbackDownloadUrl}.",
+                beschreibung,
+                route.Primary,
+                (int)response.StatusCode,
+                route.Fallback);
+            response.Dispose();
+            response = await SendDownloadRequestAsync(route.Fallback, useApiHeaders: true, ct);
+        }
+
+        return response;
+    }
+
+    private string GetExpectedSha256(string manifestJson)
+    {
+        UpdateManifest? manifest;
+        try
+        {
+            manifest = JsonSerializer.Deserialize<UpdateManifest>(manifestJson);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException("Das Update-Manifest ist kein gültiges JSON.", ex);
+        }
+
+        var asset = manifest?.Assets?.FirstOrDefault(a =>
+            string.Equals(a.AssetName, _options.AssetName, StringComparison.OrdinalIgnoreCase));
+        if (asset is null)
+            throw new InvalidDataException($"Das Update-Manifest enthält keinen Eintrag für {_options.AssetName}.");
+
+        if (asset.Sha256 is not { Length: 64 } sha256 || !sha256.All(Uri.IsHexDigit))
+            throw new InvalidDataException($"Das Update-Manifest enthält keinen verwertbaren SHA-256-Wert für {_options.AssetName}.");
+
+        return sha256;
+    }
+
+    private async Task VerifyPackageHashAsync(string zipPath, string expectedSha256, CancellationToken ct)
+    {
+        await using var stream = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var actualSha256 = Convert.ToHexString(await SHA256.HashDataAsync(stream, ct));
+        if (!string.Equals(actualSha256, expectedSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "SHA-256 des Update-Pakets stimmt nicht mit dem Manifest überein (erwartet {ExpectedSha256}, berechnet {ActualSha256}).",
+                expectedSha256,
+                actualSha256);
+            throw new InvalidDataException("Der SHA-256 des heruntergeladenen Update-Pakets stimmt nicht mit dem Update-Manifest überein.");
         }
     }
 
@@ -212,5 +277,20 @@ public sealed class UpdatePackageService : IUpdatePackageService
         EnsureInsideDirectory(path, updateRoot, "Update-Verzeichnisses", allowRoot: false);
         if (Directory.Exists(path))
             Directory.Delete(path, recursive: true);
+    }
+
+    private sealed class UpdateManifest
+    {
+        [JsonPropertyName("assets")]
+        public List<UpdateManifestAsset>? Assets { get; set; }
+    }
+
+    private sealed class UpdateManifestAsset
+    {
+        [JsonPropertyName("assetName")]
+        public string? AssetName { get; set; }
+
+        [JsonPropertyName("sha256")]
+        public string? Sha256 { get; set; }
     }
 }

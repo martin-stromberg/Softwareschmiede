@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Infrastructure.Services.Updates;
+using Softwareschmiede.Tests.E2E;
 using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services.Updates;
@@ -15,14 +16,17 @@ public sealed class UpdatePackageServiceTests
 {
     private static readonly Uri PrimaryDownloadUrl = new("https://example.invalid/release.zip");
     private static readonly Uri FallbackAssetApiUrl = new("https://api.github.com/repos/martin-stromberg/Softwareschmiede/releases/assets/91001");
+    private static readonly Uri ManifestDownloadUrl = new("https://example.invalid/update.json");
+    private static readonly Uri ManifestFallbackAssetApiUrl = new("https://api.github.com/repos/martin-stromberg/Softwareschmiede/releases/assets/91011");
 
-    /// <summary>Ein gültiges Release-ZIP wird heruntergeladen, entpackt und validiert.</summary>
+    /// <summary>Ein gültiges Release-ZIP wird heruntergeladen, verifiziert, entpackt und validiert.</summary>
     [Fact]
     public async Task PreparePackageAsync_ShouldDownloadExtractAndCreateScript_WhenZipIsValid()
     {
         using var temp = new TempDirectory();
         var zipBytes = CreateZip(includeExe: true, includeVersion: true);
-        var sut = CreateSut(temp.Path, zipBytes);
+        var handler = CreateRoutingHandler(zipBytes);
+        var sut = CreateSut(temp.Path, handler);
         var progressItems = new List<UpdatePreparationProgress>();
 
         var result = await sut.PreparePackageAsync(CreateUpdateInfo(), new Progress<UpdatePreparationProgress>(progressItems.Add));
@@ -30,10 +34,122 @@ public sealed class UpdatePackageServiceTests
         File.Exists(result.ZipPath).Should().BeTrue();
         File.Exists(Path.Combine(result.ExtractedDirectory, "Softwareschmiede.exe")).Should().BeTrue();
         File.Exists(Path.Combine(result.ExtractedDirectory, "version.json")).Should().BeTrue();
+        File.Exists(result.ScriptPath).Should().BeTrue();
         progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Download);
+        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Verifizieren);
         progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Entpacken);
         progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.UpdateVorbereiten);
+        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, ManifestDownloadUrl.AbsoluteUri);
     }
+
+    /// <summary>Ein Paket, dessen SHA-256 nicht zum Manifest passt, wird vor dem Entpacken verworfen und aufgeräumt.</summary>
+    [Fact]
+    public async Task PreparePackageAsync_ShouldThrowInvalidDataAndClean_WhenHashMismatches()
+    {
+        using var temp = new TempDirectory();
+        var zipBytes = CreateZip(includeExe: true, includeVersion: true);
+        var handler = CreateRoutingHandler(zipBytes, manifestJson: UpdateE2EFixture.ErzeugeManifestJson("1.2.3", PrimaryDownloadUrl.AbsoluteUri, zipBytes, sha256Override: new string('0', 64)));
+        var sut = CreateSut(temp.Path, handler);
+
+        var act = () => sut.PreparePackageAsync(CreateUpdateInfo(), null);
+
+        await act.Should().ThrowAsync<InvalidDataException>();
+        File.Exists(Path.Combine(temp.Path, "updates", "download", "release.zip")).Should().BeFalse();
+        File.Exists(Path.Combine(temp.Path, "updates", "download", "release.zip.download")).Should().BeFalse();
+        Directory.Exists(Path.Combine(temp.Path, "updates", "extracted", "1.2.3")).Should().BeFalse();
+    }
+
+    /// <summary>Ein Update ohne Manifest-Referenz wird vor dem Entpacken verworfen.</summary>
+    [Fact]
+    public async Task PreparePackageAsync_ShouldThrow_WhenManifestUrlIsMissing()
+    {
+        using var temp = new TempDirectory();
+        var handler = CreateRoutingHandler(CreateZip(includeExe: true, includeVersion: true));
+        var sut = CreateSut(temp.Path, handler);
+
+        var act = () => sut.PreparePackageAsync(CreateUpdateInfo() with { ManifestDownload = null }, null);
+
+        await act.Should().ThrowAsync<InvalidDataException>();
+        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri);
+        Directory.Exists(Path.Combine(temp.Path, "updates", "extracted", "1.2.3")).Should().BeFalse();
+    }
+
+    /// <summary>Ein fehlschlagender Manifest-Abruf ohne Fallback scheitert mit dem HTTP-Fehler und räumt auf.</summary>
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task PreparePackageAsync_ShouldThrow_WhenManifestDownloadFails(HttpStatusCode statusCode)
+    {
+        using var temp = new TempDirectory();
+        var zipBytes = CreateZip(includeExe: true, includeVersion: true);
+        var handler = CreateRoutingHandler(zipBytes);
+        RegistriereFehler(handler, ManifestDownloadUrl, statusCode);
+        var sut = CreateSut(temp.Path, handler);
+
+        var act = () => sut.PreparePackageAsync(CreateUpdateInfo(), null);
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+        File.Exists(Path.Combine(temp.Path, "updates", "download", "release.zip")).Should().BeFalse();
+        Directory.Exists(Path.Combine(temp.Path, "updates", "extracted", "1.2.3")).Should().BeFalse();
+    }
+
+    /// <summary>Ein 5xx der primären Manifest-URL löst genau einen Fallback-Request mit octet-stream-Accept auf die API-Asset-URL aus; die Verifikation läuft danach regulär.</summary>
+    [Fact]
+    public async Task PreparePackageAsync_ShouldUseManifestFallback_WhenManifestReturns5xx()
+    {
+        using var temp = new TempDirectory();
+        var zipBytes = CreateZip(includeExe: true, includeVersion: true);
+        var handler = CreateRoutingHandler(zipBytes);
+        RegistriereFehler(handler, ManifestDownloadUrl, HttpStatusCode.InternalServerError);
+        handler.AddHandler(ManifestFallbackAssetApiUrl.AbsoluteUri,
+            _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(UpdateE2EFixture.ErzeugeManifestJson("1.2.3", PrimaryDownloadUrl.AbsoluteUri, zipBytes))
+            }));
+        var sut = CreateSut(temp.Path, handler);
+
+        var result = await sut.PreparePackageAsync(
+            CreateUpdateInfo(manifestFallbackDownloadUrl: ManifestFallbackAssetApiUrl), null);
+
+        File.Exists(Path.Combine(result.ExtractedDirectory, "Softwareschmiede.exe")).Should().BeTrue();
+        handler.RequestedUrls.Should().Equal(
+            PrimaryDownloadUrl.AbsoluteUri,
+            ManifestDownloadUrl.AbsoluteUri,
+            ManifestFallbackAssetApiUrl.AbsoluteUri);
+        handler.RequestedAcceptHeaders.Should().HaveCount(3);
+        handler.RequestedAcceptHeaders[2].Should().Contain("application/octet-stream");
+    }
+
+    /// <summary>Unbrauchbare Manifeste (kein JSON, ohne verwertbaren release.zip-Eintrag oder ungültigen Hash) werden vor dem Entpacken verworfen.</summary>
+    [Theory]
+    [MemberData(nameof(UnusableManifests))]
+    public async Task PreparePackageAsync_ShouldThrowInvalidData_WhenManifestIsUnusable(string manifestJson)
+    {
+        using var temp = new TempDirectory();
+        var zipBytes = CreateZip(includeExe: true, includeVersion: true);
+        var handler = CreateRoutingHandler(zipBytes, manifestJson: manifestJson);
+        var sut = CreateSut(temp.Path, handler);
+
+        var act = () => sut.PreparePackageAsync(CreateUpdateInfo(), null);
+
+        await act.Should().ThrowAsync<InvalidDataException>();
+        File.Exists(Path.Combine(temp.Path, "updates", "download", "release.zip")).Should().BeFalse();
+        Directory.Exists(Path.Combine(temp.Path, "updates", "extracted", "1.2.3")).Should().BeFalse();
+    }
+
+    /// <summary>Unbrauchbare Manifest-Varianten: kein JSON, ohne assets, ohne release.zip-Eintrag, leerer oder nicht-64-Hex-sha256.</summary>
+    public static TheoryData<string> UnusableManifests()
+        => new()
+        {
+            "definitiv kein gueltiges json {{{",
+            """{"version":"1.2.3"}""",
+            """{"assets":null}""",
+            """{"assets":[]}""",
+            """{"assets":[{"assetName":"other.zip","sha256":"0000000000000000000000000000000000000000000000000000000000000000"}]}""",
+            """{"assets":[{"assetName":"release.zip","sha256":""}]}""",
+            """{"assets":[{"assetName":"release.zip","sha256":"abc"}]}""",
+            """{"assets":[{"assetName":"release.zip","sha256":"zzzz000000000000000000000000000000000000000000000000000000000000"}]}"""
+        };
 
     /// <summary>Ein Prerelease-Paket wird unter seinem vollständigen SemVer-Pfad (inkl. Suffix) entpackt.</summary>
     [Fact]
@@ -114,7 +230,7 @@ public sealed class UpdatePackageServiceTests
     {
         using var temp = new TempDirectory();
         var zipBytes = CreateZip(includeExe: true, includeVersion: true);
-        var handler = new RoutingHttpHandler();
+        var handler = CreateRoutingHandler(zipBytes);
         RegistriereFehler(handler, PrimaryDownloadUrl, HttpStatusCode.InternalServerError);
         handler.AddHandler(FallbackAssetApiUrl.AbsoluteUri,
             _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
@@ -128,8 +244,8 @@ public sealed class UpdatePackageServiceTests
         File.Exists(result.ZipPath).Should().BeTrue();
         File.Exists(Path.Combine(result.ExtractedDirectory, "Softwareschmiede.exe")).Should().BeTrue();
         File.Exists(result.ScriptPath).Should().BeTrue();
-        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, FallbackAssetApiUrl.AbsoluteUri);
-        handler.RequestedAcceptHeaders.Should().HaveCount(2);
+        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, FallbackAssetApiUrl.AbsoluteUri, ManifestDownloadUrl.AbsoluteUri);
+        handler.RequestedAcceptHeaders.Should().HaveCount(3);
         handler.RequestedAcceptHeaders[1].Should().Contain("application/octet-stream");
     }
 
@@ -207,7 +323,26 @@ public sealed class UpdatePackageServiceTests
         byte[] zipBytes,
         HttpStatusCode statusCode = HttpStatusCode.OK,
         UpdateOptions? options = null)
-        => CreateSut(baseDirectory, new BytesHttpHandler(zipBytes, statusCode), options);
+        => CreateSut(baseDirectory, CreateRoutingHandler(zipBytes, statusCode), options);
+
+    private static RoutingHttpHandler CreateRoutingHandler(
+        byte[] zipBytes,
+        HttpStatusCode statusCode = HttpStatusCode.OK,
+        string? manifestJson = null)
+    {
+        var handler = new RoutingHttpHandler();
+        handler.AddHandler(PrimaryDownloadUrl.AbsoluteUri,
+            _ => Task.FromResult(new HttpResponseMessage(statusCode)
+            {
+                Content = new ByteArrayContent(zipBytes)
+            }));
+        handler.AddHandler(ManifestDownloadUrl.AbsoluteUri,
+            _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(manifestJson ?? UpdateE2EFixture.ErzeugeManifestJson("1.2.3", PrimaryDownloadUrl.AbsoluteUri, zipBytes))
+            }));
+        return handler;
+    }
 
     private static UpdatePackageService CreateSut(
         string baseDirectory,
@@ -226,8 +361,14 @@ public sealed class UpdatePackageServiceTests
     private static void RegistriereFehler(RoutingHttpHandler handler, Uri url, HttpStatusCode statusCode)
         => handler.AddHandler(url.AbsoluteUri, _ => Task.FromResult(new HttpResponseMessage(statusCode)));
 
-    private static UpdateInfo CreateUpdateInfo(string version = "1.2.3", bool isPrerelease = false, Uri? fallbackDownloadUrl = null)
-        => new(version, $"v{version}", "release.zip", PrimaryDownloadUrl, DateTimeOffset.UtcNow, IsPrerelease: isPrerelease, fallbackDownloadUrl);
+    private static UpdateInfo CreateUpdateInfo(
+        string version = "1.2.3",
+        bool isPrerelease = false,
+        Uri? fallbackDownloadUrl = null,
+        Uri? manifestFallbackDownloadUrl = null)
+        => new(version, $"v{version}", "release.zip",
+            new UpdateDownloadRoute(PrimaryDownloadUrl, fallbackDownloadUrl), DateTimeOffset.UtcNow,
+            IsPrerelease: isPrerelease, new UpdateDownloadRoute(ManifestDownloadUrl, manifestFallbackDownloadUrl));
 
     private static byte[] CreateZip(bool includeExe, bool includeVersion, string version = "1.2.3")
     {
@@ -262,25 +403,5 @@ public sealed class UpdatePackageServiceTests
         }
 
         public Task StartScriptAsync(UpdatePreparationResult preparation, CancellationToken ct = default) => Task.CompletedTask;
-    }
-
-    private sealed class BytesHttpHandler : HttpMessageHandler
-    {
-        private readonly byte[] _bytes;
-        private readonly HttpStatusCode _statusCode;
-
-        public BytesHttpHandler(byte[] bytes, HttpStatusCode statusCode)
-        {
-            _bytes = bytes;
-            _statusCode = statusCode;
-        }
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            return Task.FromResult(new HttpResponseMessage(_statusCode)
-            {
-                Content = new ByteArrayContent(_bytes)
-            });
-        }
     }
 }

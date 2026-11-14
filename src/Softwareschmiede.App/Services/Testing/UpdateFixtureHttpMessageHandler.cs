@@ -29,15 +29,16 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var url = request.RequestUri?.AbsoluteUri ?? string.Empty;
-        var art = Klassifiziere(url);
-        _kontext.Protokoll.Schreibe(
-            UpdateE2EEreignisse.HttpRequest,
-            new { url, method = request.Method.Method, art });
 
         var szenario = _kontext.LeseSzenario()
             ?? throw new HttpRequestException($"Update-E2E-Szenariodatei ist nicht lesbar: {_kontext.Konfiguration.SzenarioDateiPfad}");
 
         var antwort = szenario.FindeAntwort(url);
+        var art = antwort?.Art ?? Klassifiziere(url);
+        _kontext.Protokoll.Schreibe(
+            UpdateE2EEreignisse.HttpRequest,
+            new { url, method = request.Method.Method, art });
+
         if (antwort is null)
         {
             _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.UnknownHttpRequest, new { url });
@@ -127,6 +128,8 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
             return "release";
         if (url.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             return "asset";
+        if (url.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            return "manifest";
         return "sonstige";
     }
 
