@@ -24,7 +24,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
 {
     private static readonly UpdateInfo ReleaseCandidateUpdate = new(
         "1.2.3-rc.1", "v1.2.3-rc.1", "release.zip",
-        new Uri("https://example.invalid/release.zip"), null, IsPrerelease: true);
+        new UpdateDownloadRoute(new Uri("https://example.invalid/release.zip")), null, IsPrerelease: true);
 
     /// <summary>Der Konstruktor darf keine Update-Prüfung starten; beide Update-Commands bleiben gesperrt.</summary>
     [Fact]

@@ -11,22 +11,27 @@ public sealed record InstalledVersionInfo(
     string? Commit,
     DateTimeOffset? CreatedAtUtc);
 
+/// <summary>Download-Route eines Release-Assets: primäre Browser-URL plus optionale GitHub-API-Asset-URL für den einmaligen Fallback bei 5xx der primären URL.</summary>
+/// <param name="Primary">Direkte Download-URL des Release-Assets.</param>
+/// <param name="Fallback">Optionale GitHub-API-Asset-URL für den einmaligen Download-Fallback bei 5xx der primären <paramref name="Primary"/>.</param>
+public sealed record UpdateDownloadRoute(Uri Primary, Uri? Fallback = null);
+
 /// <summary>Informationen zu einem verfügbaren GitHub-Release-Update.</summary>
 /// <param name="Version">Semantische Release-Version ohne führendes <c>v</c>, inklusive Prerelease-Suffix und Build-Metadaten.</param>
 /// <param name="TagName">GitHub-Release-Tag.</param>
 /// <param name="AssetName">Name des Release-Assets.</param>
-/// <param name="DownloadUrl">Direkte Download-URL des Release-Assets.</param>
+/// <param name="PaketDownload">Download-Route des Release-Assets.</param>
 /// <param name="PublishedAt">Optionaler Veröffentlichungszeitpunkt.</param>
 /// <param name="IsPrerelease">Gibt an, ob das Release als Prerelease klassifiziert ist (GitHub-Flag <c>prerelease</c> oder SemVer-Prerelease-Suffix).</param>
-/// <param name="FallbackDownloadUrl">Optionale GitHub-API-Asset-URL für den einmaligen Download-Fallback bei 5xx der primären <paramref name="DownloadUrl"/>.</param>
+/// <param name="ManifestDownload">Optionale Download-Route des Update-Manifests (<c>update.json</c>) für die SHA-256-Verifikation vor dem Entpacken.</param>
 public sealed record UpdateInfo(
     string Version,
     string TagName,
     string AssetName,
-    Uri DownloadUrl,
+    UpdateDownloadRoute PaketDownload,
     DateTimeOffset? PublishedAt,
     bool IsPrerelease,
-    Uri? FallbackDownloadUrl = null);
+    UpdateDownloadRoute? ManifestDownload = null);
 
 /// <summary>Persistierter Modus der Update-Prüfung mit festen Speicherwerten.</summary>
 public enum UpdateMode
@@ -128,6 +133,9 @@ public enum UpdatePreparationPhase
 {
     /// <summary>Das Release-Asset wird heruntergeladen.</summary>
     Download,
+
+    /// <summary>Das heruntergeladene Update-Paket wird gegen das Update-Manifest verifiziert.</summary>
+    Verifizieren,
 
     /// <summary>Das Release-ZIP wird entpackt.</summary>
     Entpacken,

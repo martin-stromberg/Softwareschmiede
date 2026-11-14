@@ -624,8 +624,9 @@ public partial class End2EndTest
     /// neu gestartet. (a) Riskante CLI-Fixture: echter Ja/Nein-Dialog mit Nein - keine
     /// Vorbereitung/Asset/Start/Shutdown. (b) Ja bestätigt, echter blockierter
     /// Downloadfortschritt, Abbrechen - Abbruchzustand ohne Start/Shutdown. (c) Asset-HTTP-
-    /// Fehler (automatisch) und defektes ZIP (manuell): sichtbarer Vorbereitungsfehler ohne
-    /// Start/Shutdown. (c3) Primärer Asset-Abruf liefert 5xx: einmaliger Fallback auf die
+    /// Fehler (automatisch), defektes ZIP und manipuliertes Paket mit Hash-Mismatch
+    /// (manuell): sichtbarer Vorbereitungsfehler ohne Start/Shutdown. (c4) Primärer
+    /// Asset-Abruf liefert 5xx: einmaliger Fallback auf die
     /// GitHub-API-Asset-URL - die Installation läuft vollständig durch. (d) Gültige
     /// Vorbereitung mit Launcherfehler: genau ein Versuch, kein
     /// erfolgreicher Start, kein Shutdown, sichtbarer Fehler. Anschließend alle T-09-
@@ -664,12 +665,16 @@ public partial class End2EndTest
             // (c2) Defektes ZIP beim manuellen Startversuch in derselben Session.
             await DefektesZipPhaseAsync(fixture, menu);
 
+            // (c3) Gültiges ZIP mit fremdem Manifest-Hash beim manuellen Startversuch:
+            // die Verifikation bricht vor dem Entpacken kontrolliert ab.
+            await ManipuliertesPaketPhaseAsync(fixture, menu);
+
             // (d) Gültige Vorbereitung, Launcherfehler: ein Versuch, kein erfolgreicher Start,
             // kein Shutdown.
             (mainWindow, menu) = await LauncherFehlerPhaseAsync(fixture);
             fixture.AktualisiereSzenario(s => s.ProzessStart = new UpdateE2EProzessStart { Ergebnis = "Erfolg" });
 
-            // (c3) Primärer Asset-Abruf 5xx, einmaliger Fallback auf die API-Asset-URL:
+            // (c4) Primärer Asset-Abruf 5xx, einmaliger Fallback auf die API-Asset-URL:
             // die Installation läuft vollständig durch.
             (mainWindow, menu) = await AssetFallbackErfolgPhaseAsync(fixture);
 
@@ -815,7 +820,9 @@ public partial class End2EndTest
 
     /// <summary>
     /// E-06 (c2): Defektes ZIP beim manuellen Startversuch in derselben Session -
-    /// sichtbarer Vorbereitungsfehler ohne Start/Shutdown.
+    /// sichtbarer Vorbereitungsfehler ohne Start/Shutdown. Das Manifest trägt den Hash der
+    /// servierten defekten Datei, damit weiterhin der ZIP-Parse-Fehler (nicht der
+    /// Hash-Mismatch) den Abbruch auslöst.
     /// </summary>
     private async Task DefektesZipPhaseAsync(UpdateE2EFixture fixture, MenuView menu)
     {
@@ -826,6 +833,8 @@ public partial class End2EndTest
             var antwort = s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl);
             antwort.Status = 200;
             antwort.BodyDatei = Path.GetRelativePath(fixture.Testwurzel, defektesPaket);
+            s.Antworten.Single(a => a.Url == fixture.StableManifestDownloadUrl).Inhalt =
+                UpdateE2EFixture.ErzeugeManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, defektesPaket);
         });
         var basis = ProtokollBasis(fixture);
         menu.ClickUpdateStarten();
@@ -835,6 +844,42 @@ public partial class End2EndTest
         Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.PreparationFailed));
         Assert.Contains("konnte nicht vorbereitet", fortschritt.WaitForErrorState(Medium));
         Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateStartAttempt));
+        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.ShutdownRequested));
+        fortschritt.Close();
+        await PruefeSettingsBedienbarAsync(fixture, menu);
+    }
+
+    /// <summary>
+    /// E-06 (c3): Manipuliertes Paket beim manuellen Startversuch in derselben Session - eine
+    /// gültige ZIP mit anderem Inhalt als vom Manifest verzeichnet scheitert an der
+    /// SHA-256-Verifikation vor dem Entpacken: sichtbarer Vorbereitungsfehler ohne
+    /// Entpacken, Start oder Shutdown.
+    /// </summary>
+    private async Task ManipuliertesPaketPhaseAsync(UpdateE2EFixture fixture, MenuView menu)
+    {
+        var manipuliertesPaket = Path.Combine(fixture.PaketVerzeichnis, "manipuliert.zip");
+        UpdateE2EFixture.ErstellePaketZip(manipuliertesPaket, UpdateE2EFixture.StableVersion, "manipulierter-marker");
+        fixture.AktualisiereSzenario(s =>
+        {
+            var antwort = s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl);
+            antwort.Status = 200;
+            antwort.BodyDatei = Path.GetRelativePath(fixture.Testwurzel, manipuliertesPaket);
+            s.Antworten.Single(a => a.Url == fixture.StableManifestDownloadUrl).Inhalt =
+                UpdateE2EFixture.ErzeugeManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, fixture.StableZipPfad);
+        });
+        var basis = ProtokollBasis(fixture);
+        menu.ClickUpdateStarten();
+        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.UpdateAttemptCompleted, Long,
+            filter: e => DatenText(e, "versuch") == "starten");
+        var fortschritt = new UpdateProgressDialogView(menu.Window);
+        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.HttpRequest,
+            e => DatenText(e, "art") == "manifest" && DatenText(e, "url") == fixture.StableManifestDownloadUrl));
+        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.PreparationFailed));
+        Assert.Contains("konnte nicht vorbereitet", fortschritt.WaitForErrorState(Medium));
+        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.PreparationPhase,
+            e => DatenText(e, "phase") == "Entpacken"));
+        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateStartAttempt));
+        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateProcessStartRecorded));
         Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.ShutdownRequested));
         fortschritt.Close();
         await PruefeSettingsBedienbarAsync(fixture, menu);
@@ -874,7 +919,7 @@ public partial class End2EndTest
     }
 
     /// <summary>
-    /// E-06 (c3): Primärer Asset-Abruf liefert 5xx - der einmalige Fallback auf die
+    /// E-06 (c4): Primärer Asset-Abruf liefert 5xx - der einmalige Fallback auf die
     /// GitHub-API-Asset-URL rettet den Download; die Installation läuft vollständig durch.
     /// Genau ein Request je Download-Route; der vollständige Installationsnachweis läuft
     /// über <c>AssertiereInstallationsNachweis</c> mit beiden erwarteten Asset-URLs.
@@ -1465,7 +1510,9 @@ public partial class End2EndTest
                 prerelease: true,
                 DateTimeOffset.UtcNow,
                 UpdateE2EFixture.ErstelleAssetJson(
-                    UpdateE2EFixture.RcAssetApiUrl, UpdateE2EFixture.RcAssetId, fixture.RcDownloadUrl)),
+                    UpdateE2EFixture.RcAssetApiUrl, UpdateE2EFixture.RcAssetId, fixture.RcDownloadUrl),
+                UpdateE2EFixture.ErstelleManifestAssetJson(
+                    UpdateE2EFixture.RcManifestAssetApiUrl, UpdateE2EFixture.RcManifestAssetId, fixture.RcManifestDownloadUrl)),
             UpdateE2EFixture.ErstelleReleaseJson(
                 "9.9.9",
                 prerelease: false,

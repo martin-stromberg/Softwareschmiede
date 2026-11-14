@@ -12,8 +12,8 @@ public sealed class UpdateServiceTests_Options
     [Fact]
     public async Task CheckForUpdateAsync_PropagatesCurrentOptions()
     {
-        var stable = new UpdateInfo("1.2.1", "v1.2.1", "release.zip", new Uri("https://example.invalid/stable.zip"), null, IsPrerelease: false);
-        var prerelease = new UpdateInfo("1.3.0-rc.1", "v1.3.0-rc.1", "release.zip", new Uri("https://example.invalid/rc.zip"), null, IsPrerelease: true);
+        var stable = new UpdateInfo("1.2.1", "v1.2.1", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/stable.zip")), null, IsPrerelease: false);
+        var prerelease = new UpdateInfo("1.3.0-rc.1", "v1.3.0-rc.1", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/rc.zip")), null, IsPrerelease: true);
         var versionProvider = new Mock<IApplicationVersionProvider>();
         versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new InstalledVersionInfo("1.2.0", "v1.2.0-rc.1", null, null));
@@ -44,8 +44,8 @@ public sealed class UpdateServiceTests_Options
     public async Task CheckForUpdateAsync_RejectsChannelMismatch(bool isPrereleaseResult, string updatePfad)
     {
         var gefundenes = isPrereleaseResult
-            ? new UpdateInfo("1.3.0-rc.1", "v1.3.0-rc.1", "release.zip", new Uri("https://example.invalid/rc.zip"), null, IsPrerelease: true)
-            : new UpdateInfo("1.3.0", "v1.3.0", "release.zip", new Uri("https://example.invalid/stable.zip"), null, IsPrerelease: false);
+            ? new UpdateInfo("1.3.0-rc.1", "v1.3.0-rc.1", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/rc.zip")), null, IsPrerelease: true)
+            : new UpdateInfo("1.3.0", "v1.3.0", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/stable.zip")), null, IsPrerelease: false);
         var versionProvider = new Mock<IApplicationVersionProvider>();
         versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new InstalledVersionInfo("1.2.0", "v1.2.0", null, null));

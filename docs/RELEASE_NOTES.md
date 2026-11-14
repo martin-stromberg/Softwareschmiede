@@ -6,6 +6,7 @@
 
 ## What's New
 
+- Security: downloaded update packages are now verified against the SHA-256 hash published in the update manifest (`update.json`) before being installed — a tampered or corrupted download is discarded instead of applied. The update progress dialog shows a new "Verification" phase.
 - Security: the GitHub and Bitbucket plugins now use HTTPS-only git transport — the insecure SSH configuration with disabled host key verification (a man-in-the-middle attack vector) has been removed. Existing managed working copies are migrated automatically: on the next push, pull, or PR checkout the remote URL is switched to HTTPS and the plugin-written `core.sshCommand` entry is unset.
 
 ## Wichtige Hinweise vor dem Update
@@ -14,4 +15,5 @@
 
 ## Neuerungen
 
+- Sicherheit: Heruntergeladene Update-Pakete werden vor der Installation jetzt gegen den im Update-Manifest (`update.json`) veröffentlichten SHA-256-Hash geprüft — ein manipulierter oder beschädigter Download wird verworfen statt installiert. Der Update-Fortschrittsdialog zeigt dafür eine neue Phase „Verifikation".
 - Sicherheit: Die GitHub- und Bitbucket-Plugins nutzen jetzt ausschließlich HTTPS als Git-Transport — die unsichere SSH-Konfiguration mit deaktivierter Host-Key-Prüfung (ein Man-in-the-Middle-Angriffsvektor) wurde entfernt. Bestehende verwaltete Arbeitskopien werden automatisch migriert: Beim nächsten Push, Pull oder PR-Checkout wird die Remote-URL auf HTTPS umgestellt und der vom Plugin geschriebene `core.sshCommand`-Eintrag entfernt.

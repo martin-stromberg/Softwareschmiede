@@ -133,15 +133,25 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
             return null;
         }
 
+        var manifestAsset = release.Assets.FirstOrDefault(a =>
+            string.Equals(a.Name, _options.ManifestAssetName, StringComparison.OrdinalIgnoreCase)
+            && IsAbsoluteHttpsUrl(a.BrowserDownloadUrl));
+        if (manifestAsset is null)
+        {
+            _logger.LogWarning("GitHub-Release {TagName} enthält kein nutzbares Manifest-Asset {ManifestAssetName}; das Paket lässt sich nicht verifizieren.", release.TagName, _options.ManifestAssetName);
+        }
+
         version = parsed;
         return new UpdateInfo(
             UpdateVersionComparer.Normalize(release.TagName),
             release.TagName,
             asset.Name,
-            new Uri(asset.BrowserDownloadUrl, UriKind.Absolute),
+            new UpdateDownloadRoute(new Uri(asset.BrowserDownloadUrl, UriKind.Absolute), CreateFallbackDownloadUrl(asset)),
             release.PublishedAt,
             isPrerelease,
-            CreateFallbackDownloadUrl(asset));
+            manifestAsset is null
+                ? null
+                : new UpdateDownloadRoute(new Uri(manifestAsset.BrowserDownloadUrl, UriKind.Absolute), CreateFallbackDownloadUrl(manifestAsset)));
     }
 
     private Uri? CreateFallbackDownloadUrl(GitHubAsset asset)

@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -51,6 +52,18 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <summary>GitHub-API-Asset-URL (Fallback-Download-Route) des RC-Pakets.</summary>
     public static readonly string RcAssetApiUrl = AssetApiUrl(RcAssetId);
 
+    /// <summary>Feste simulierte Asset-ID des Stable-Manifests in der Release-Liste.</summary>
+    public const long StableManifestAssetId = 91011;
+
+    /// <summary>Feste simulierte Asset-ID des RC-Manifests in der Release-Liste.</summary>
+    public const long RcManifestAssetId = 91012;
+
+    /// <summary>GitHub-API-Asset-URL (Fallback-Download-Route) des Stable-Manifests.</summary>
+    public static readonly string StableManifestAssetApiUrl = AssetApiUrl(StableManifestAssetId);
+
+    /// <summary>GitHub-API-Asset-URL (Fallback-Download-Route) des RC-Manifests.</summary>
+    public static readonly string RcManifestAssetApiUrl = AssetApiUrl(RcManifestAssetId);
+
     private static readonly JsonSerializerOptions JsonOptionen = new() { WriteIndented = true };
 
     private readonly UpdateE2ESzenario _szenario = new();
@@ -79,6 +92,8 @@ public sealed class UpdateE2EFixture : IDisposable
         // Deutlich unterscheidbare, eindeutige Download-URLs; niemals echte Release-Quellen.
         StableDownloadUrl = $"https://e2e.invalid/{SzenarioId}/release-{StableVersion}.zip";
         RcDownloadUrl = $"https://e2e.invalid/{SzenarioId}/release-{RcVersion}.zip";
+        StableManifestDownloadUrl = $"https://e2e.invalid/{SzenarioId}/update-{StableVersion}.json";
+        RcManifestDownloadUrl = $"https://e2e.invalid/{SzenarioId}/update-{RcVersion}.json";
         StableZipPfad = Path.Combine(PaketVerzeichnis, $"release-{StableVersion}.zip");
         RcZipPfad = Path.Combine(PaketVerzeichnis, $"release-{RcVersion}.zip");
 
@@ -122,6 +137,12 @@ public sealed class UpdateE2EFixture : IDisposable
 
     /// <summary>Download-URL des RC-Pakets.</summary>
     public string RcDownloadUrl { get; }
+
+    /// <summary>Download-URL des Stable-Manifests (<c>update.json</c>).</summary>
+    public string StableManifestDownloadUrl { get; }
+
+    /// <summary>Download-URL des RC-Manifests (<c>update.json</c>).</summary>
+    public string RcManifestDownloadUrl { get; }
 
     /// <summary>Pfad der Stable-ZIP-Datei.</summary>
     public string StableZipPfad { get; }
@@ -168,6 +189,23 @@ public sealed class UpdateE2EFixture : IDisposable
                 Url = url,
                 Status = 200,
                 BodyDatei = RelativZurWurzel(zipPfad)
+            });
+        }
+
+        foreach (var (manifestUrl, version, downloadUrl, zipPfad) in new[]
+        {
+            (StableManifestDownloadUrl, StableVersion, StableDownloadUrl, StableZipPfad),
+            (RcManifestDownloadUrl, RcVersion, RcDownloadUrl, RcZipPfad),
+            (StableManifestAssetApiUrl, StableVersion, StableDownloadUrl, StableZipPfad),
+            (RcManifestAssetApiUrl, RcVersion, RcDownloadUrl, RcZipPfad)
+        })
+        {
+            _szenario.Antworten.Add(new UpdateE2EAntwort
+            {
+                Url = manifestUrl,
+                Status = 200,
+                Inhalt = ErzeugeManifestJson(version, downloadUrl, zipPfad),
+                Art = "manifest"
             });
         }
     }
@@ -370,30 +408,83 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <param name="apiUrl">Die GitHub-API-Asset-URL (<c>url</c>-Feld).</param>
     /// <param name="assetId">Die Asset-ID.</param>
     /// <param name="downloadUrl">Die Browser-Download-URL.</param>
+    /// <param name="assetName">Der Asset-Name; Standard ist <see cref="UpdateOptions.AssetName"/>.</param>
     /// <returns>Das anonyme Asset-Objekt.</returns>
-    public static object ErstelleAssetJson(string apiUrl, long assetId, string downloadUrl)
+    public static object ErstelleAssetJson(string apiUrl, long assetId, string downloadUrl, string? assetName = null)
         => new
         {
-            name = StandardOptionen.AssetName,
+            name = assetName ?? StandardOptionen.AssetName,
             url = apiUrl,
             id = assetId,
             browser_download_url = downloadUrl
         };
+
+    /// <summary>Erzeugt das JSON-Objekt des Manifest-Assets (<c>update.json</c>) für die simulierte Release-Liste.</summary>
+    /// <param name="apiUrl">Die GitHub-API-Asset-URL (<c>url</c>-Feld).</param>
+    /// <param name="assetId">Die Asset-ID.</param>
+    /// <param name="downloadUrl">Die Browser-Download-URL.</param>
+    /// <returns>Das anonyme Asset-Objekt.</returns>
+    public static object ErstelleManifestAssetJson(string apiUrl, long assetId, string downloadUrl)
+        => ErstelleAssetJson(apiUrl, assetId, downloadUrl, StandardOptionen.ManifestAssetName);
+
+    /// <summary>
+    /// Erzeugt das Update-Manifest (<c>update.json</c>) im Workflow-Schema mit dem tatsächlichen
+    /// SHA-256 und der Größe der Paket-ZIP unter <paramref name="zipPfad"/>.
+    /// </summary>
+    /// <param name="version">Die Release-Version.</param>
+    /// <param name="downloadUrl">Die Browser-Download-URL des Paket-Assets (<c>assetUrl</c>-Feld).</param>
+    /// <param name="zipPfad">Pfad der zu verifizierenden Paket-ZIP.</param>
+    /// <returns>Das Manifest als JSON-Text.</returns>
+    public static string ErzeugeManifestJson(string version, string downloadUrl, string zipPfad)
+        => ErzeugeManifestJson(version, downloadUrl, File.ReadAllBytes(zipPfad));
+
+    /// <summary>
+    /// Erzeugt das Update-Manifest (<c>update.json</c>) im Workflow-Schema mit dem tatsächlichen
+    /// SHA-256 und der Größe der Paket-Bytes in <paramref name="zipBytes"/>.
+    /// </summary>
+    /// <param name="version">Die Release-Version.</param>
+    /// <param name="downloadUrl">Die Browser-Download-URL des Paket-Assets (<c>assetUrl</c>-Feld).</param>
+    /// <param name="zipBytes">Bytes der zu verifizierenden Paket-ZIP.</param>
+    /// <param name="sha256Override">Optionaler abweichender SHA-256-Wert (für Mismatch-Szenarien).</param>
+    /// <returns>Das Manifest als JSON-Text.</returns>
+    public static string ErzeugeManifestJson(string version, string downloadUrl, byte[] zipBytes, string? sha256Override = null)
+    {
+        var sha256 = sha256Override ?? Convert.ToHexString(SHA256.HashData(zipBytes)).ToLowerInvariant();
+        return JsonSerializer.Serialize(new
+        {
+            version,
+            releaseNotes = $"Softwareschmiede release v{version}",
+            publishedAt = DateTimeOffset.UtcNow.ToString("O"),
+            assets = new[]
+            {
+                new
+                {
+                    platform = "windows",
+                    runtimeIdentifier = "win-x64",
+                    assetName = StandardOptionen.AssetName,
+                    assetUrl = downloadUrl,
+                    sha256,
+                    sizeBytes = (long)zipBytes.Length
+                }
+            }
+        });
+    }
 
     /// <summary>Erzeugt das JSON-Objekt eines Releases für die simulierte Release-Liste.</summary>
     /// <param name="version">Die Release-Version (Tag wird als <c>v{version}</c> gesetzt).</param>
     /// <param name="prerelease">Ob das Release als Vorabversion markiert ist.</param>
     /// <param name="publishedAt">Der Veröffentlichungszeitpunkt (<c>published_at</c>-Feld).</param>
     /// <param name="assetJson">Das Asset-Objekt des Releases (aus <see cref="ErstelleAssetJson"/>).</param>
+    /// <param name="manifestAssetJson">Optionales Manifest-Asset-Objekt des Releases (aus <see cref="ErstelleManifestAssetJson"/>).</param>
     /// <returns>Das anonyme Release-Objekt.</returns>
-    public static object ErstelleReleaseJson(string version, bool prerelease, DateTimeOffset publishedAt, object assetJson)
+    public static object ErstelleReleaseJson(string version, bool prerelease, DateTimeOffset publishedAt, object assetJson, object? manifestAssetJson = null)
         => new
         {
             tag_name = $"v{version}",
             prerelease,
             draft = false,
             published_at = publishedAt,
-            assets = new[] { assetJson }
+            assets = manifestAssetJson is null ? new[] { assetJson } : new[] { assetJson, manifestAssetJson }
         };
 
     /// <summary>
@@ -492,7 +583,8 @@ public sealed class UpdateE2EFixture : IDisposable
                 StableVersion,
                 prerelease: false,
                 DateTimeOffset.UtcNow.AddDays(-7),
-                ErstelleAssetJson(StableAssetApiUrl, StableAssetId, StableDownloadUrl))
+                ErstelleAssetJson(StableAssetApiUrl, StableAssetId, StableDownloadUrl),
+                ErstelleManifestAssetJson(StableManifestAssetApiUrl, StableManifestAssetId, StableManifestDownloadUrl))
         };
 
         if (mitRcRelease)
@@ -501,7 +593,8 @@ public sealed class UpdateE2EFixture : IDisposable
                 RcVersion,
                 prerelease: true,
                 DateTimeOffset.UtcNow,
-                ErstelleAssetJson(RcAssetApiUrl, RcAssetId, RcDownloadUrl)));
+                ErstelleAssetJson(RcAssetApiUrl, RcAssetId, RcDownloadUrl),
+                ErstelleManifestAssetJson(RcManifestAssetApiUrl, RcManifestAssetId, RcManifestDownloadUrl)));
         }
 
         return JsonSerializer.Serialize(releases);
