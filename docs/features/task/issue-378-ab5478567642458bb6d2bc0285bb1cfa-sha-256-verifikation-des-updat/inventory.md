@@ -1,0 +1,25 @@
+# Bestandsaufnahme: SHA-256-Verifikation des Update-Pakets nachrüsten
+
+Analyse des Programmupdate-Bereichs (Release-Abruf, Paket-Download/-Vorbereitung, Fortschrittsdialog, Update-E2E-Fixture) bezogen auf die Anforderung aus `requirement.md` (Issue #378): das vom Release-Workflow bereits erzeugte Manifest `update.json` soll vor dem Entpacken der `release.zip` zur SHA-256-Verifikation herangezogen werden.
+
+## Zusammenfassung
+
+- **Manifest-Erzeugung existiert bereits vollständig:** `.github/actions/build-and-package/action.yml` (Schritt „Create update manifest", Zeilen 98–141) schreibt `update.json` im Rezepte-Format (`version`, `releaseNotes`, `publishedAt`, `assets[]` mit `platform`, `runtimeIdentifier`, `assetName`, `assetUrl`, `sha256` kleingeschrieben, `sizeBytes`); `release.yml` (Zeilen 169, 180) und `staging-ci.yml` (Zeile 325) laden `release.zip` + `update.json` als Release-Assets hoch. Der Workflow muss nicht geändert werden.
+- **Keine Integritätsprüfung vorhanden:** `UpdatePackageService.PreparePackageAsync` (src/Softwareschmiede/Infrastructure/Services/Updates/UpdatePackageService.cs:44–90) validiert nur Leerheit der ZIP und nach dem Entpacken das Vorhandensein von `Softwareschmiede.exe` + `version.json` im Paket-Root (`ValidateExtractedPackage`, Zeilen 148–157). Kein SHA-256-, kein `update.json`-Bezug im gesamten Update-Code (Suche nach `sha256`/`update.json` in `src/` bestätigt das; `System.Security.Cryptography` wird im Update-Pfad nicht verwendet).
+- **`UpdateInfo` trägt keine Manifest-Referenz:** Der Record (src/Softwareschmiede/Application/Services/Updates/UpdateModels.cs:22–29) kennt `DownloadUrl` und optional `FallbackDownloadUrl`, keine Manifest-URL. `GitHubReleaseClient.TryCreateCandidate` (GitHubReleaseClient.cs:111–145) wählt aktuell nur das `_options.AssetName`-Asset (`release.zip`) aus; ein `update.json`-Asset in der Release-Antwort wird ignoriert.
+- **URL-Pinning-Hilfen sind vorhanden und wiederverwendbar:** `IsAbsoluteHttpsUrl`, `IsAllowedAssetApiUrl` (Host-Pinning `api.github.com`), `CreateFallbackDownloadUrl` und `RepositoryApiUrl` in `GitHubReleaseClient.cs`.
+- **Fehler- und Aufräumpfad ist generisch:** Der Catch-all in `PreparePackageAsync` (Zeilen 83–89) räumt `*.download`, `release.zip` und das Extraktionsverzeichnis bei jeder Exception auf; Fehler laufen über `MainWindowUpdateFlow.InstalliereUpdateAsync` (MainWindowUpdateFlow.cs:334–339) in `SetError` + `UpdateHinweis` „Update konnte nicht vorbereitet werden." Eine `InvalidDataException` aus einer neuen Verifikation würde denselben Pfad ohne Änderung nutzen.
+- **`UpdatePreparationPhase` hat nur drei Werte** (`Download`, `Entpacken`, `UpdateVorbereiten`; UpdateModels.cs:127–137); `UpdateProgressViewModel.Apply` (UpdateProgressViewModel.cs:87–93) bildet sie auf die Anzeigetexte ab. Eine eigene Verifikationsphase wäre eine additive Erweiterung.
+- **`UpdateOptions` hat keinen Manifest-Eintrag:** Es existieren `AssetName` (`"release.zip"`), `RepositoryOwner`/`RepositoryName`, `UpdateDirectoryName`, `CheckTimeout`, `ExecutableName` (UpdateOptions.cs). `UpdateOptions` wird als feste Instanz registriert (`Options.Create(new UpdateOptions())`, App.xaml.cs:209) — keine externe Konfiguration.
+- **Update-E2E-Fixture kennt kein `update.json`:** `UpdateE2EFixture.ErstelleAssetJson` erzeugt pro Release genau ein Asset (`release.zip`); `SetzeStandardAntworten` registriert nur Release-Listen- und ZIP-URLs. `UpdateFixtureHttpMessageHandler` bildet exakte URLs ab und wirft bei unbekannten URLs `HttpRequestException` („Unbekannte Update-E2E-Anfrage") — ein neuer Manifest-Abruf würde in den E2E-Tests ohne Fixture-Erweiterung fehlschlagen.
+- **Geteilter `HttpClient`:** In Produktion und im Update-E2E-Modus teilen sich `GitHubReleaseClient` und `UpdatePackageService` denselben `HttpClient`-Singleton (App.xaml.cs:335–338 bzw. 417/423–428) — der Manifest-Abruf des Paketdienstes würde in E2E automatisch über den Fixture-Handler laufen.
+
+Test-Ausgangszustand: Build erfolgreich (0 Warnungen/Fehler); Regulär-Lane `Category!=OsInterface` bestanden für beide Testprojekte (2424 + 280 Tests, 0 Fehlgeschlagen, 3 plattformbedingt Übersprungen); das update-relevante E2E-Subset `End2EndTest.General_Update*` (OsInterface-Lane, 2 konsolidierte Fakten) bestand ebenfalls. Nachweis und Details: [Tests](inventory/tests.md).
+
+## Details
+
+- [Datenmodell](inventory/models.md) — `UpdateInfo`, `UpdateOptions`, `update.json`-Manifestschema, DTOs des Release-Clients, E2E-Szenariomodell
+- [Logik](inventory/logic.md) — `UpdatePackageService`, `GitHubReleaseClient`, `UpdateService`, `MainWindowUpdateFlow`, `UpdateProgressViewModel`, E2E-Adapter, Release-Workflow
+- [Enums](inventory/enums.md) — `UpdatePreparationPhase`, `UpdateMode`, `UpdateKanal`, `UpdateCheckStatus`
+- [Interfaces](inventory/interfaces.md) — `IUpdatePackageService`, `IUpdateReleaseClient`, `IUpdateService` u. a.
+- [Tests](inventory/tests.md) — Test-Ausgangszustand mit Lauf-Nachweisen sowie bestehende Testklassen und Hilfsmethoden des Update-Bereichs
