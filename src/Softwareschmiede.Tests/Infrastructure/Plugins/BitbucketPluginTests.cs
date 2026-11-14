@@ -12,6 +12,7 @@ public sealed class BitbucketPluginTests
 {
     private readonly Mock<ICliRunner> _cliRunnerMock;
     private readonly Mock<ICredentialStore> _credentialStoreMock;
+    private readonly string _netrcPath;
     private readonly BitbucketPlugin _sut;
 
     /// <summary>Initialisiert Testinstanz mit Mocks.</summary>
@@ -19,10 +20,12 @@ public sealed class BitbucketPluginTests
     {
         _cliRunnerMock = new Mock<ICliRunner>();
         _credentialStoreMock = new Mock<ICredentialStore>();
+        _netrcPath = Path.Combine(Path.GetTempPath(), $"sws-bb-netrc-{Guid.NewGuid():N}");
         _sut = new BitbucketPlugin(
             _cliRunnerMock.Object,
             _credentialStoreMock.Object,
-            new Mock<ILogger<BitbucketPlugin>>().Object);
+            new Mock<ILogger<BitbucketPlugin>>().Object,
+            _netrcPath);
     }
 
     /// <summary>GetSettingGroups gibt exakt 3 Gruppen zurück.</summary>
@@ -662,4 +665,595 @@ public sealed class BitbucketPluginTests
 
         branch.Should().Be("main");
     }
+
+    /// <summary>Eine SCP-SSH-Repository-URL (git@host:…) wird beim Klon in die HTTPS-Form
+    /// umgewandelt und mit den konfigurierten Credentials authentifiziert; die Umgebung
+    /// enthält kein GIT_SSH_COMMAND.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_SshUrl_WirdZuHttpsGeklont()
+    {
+        SetupCredentials();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.CloneRepositoryAsync("git@bitbucket.org:ws/repo.git", "/target/path");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Contains("https://user:appPassword@bitbucket.org/ws/repo.git") && a.Contains("/target/path")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GIT_TERMINAL_PROMPT"] == "0" && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Eine ssh://-Repository-URL wird beim Klon in die HTTPS-Form umgewandelt.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_SshSchemeUrl_WirdZuHttpsGeklont()
+    {
+        SetupCredentials();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.CloneRepositoryAsync("ssh://git@bitbucket.org/ws/repo.git", "/target/path");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Contains("https://user:appPassword@bitbucket.org/ws/repo.git") && a.Contains("/target/path")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Im SelfHosted-Modus wird eine SCP-SSH-URL zunächst zu HTTPS konvertiert und dann
+    /// über ResolveGitCloneUrl in die SCM-Clone-URL überführt.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_SelfHostedSshUrl_WirdZuScmHttpsUrlGeklont()
+    {
+        SetupCredentials();
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode")).Returns("SelfHosted");
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.SelfHostedUrl")).Returns("https://bitbucket.example.com");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.CloneRepositoryAsync("git@bitbucket.example.com:projects/KEY/repos/slug", "/target/path");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Contains("https://user:appPassword@bitbucket.example.com/scm/KEY/slug.git") && a.Contains("/target/path")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Nicht konvertierbare Repository-URLs werden vor jedem CLI-Aufruf abgelehnt.</summary>
+    [Theory]
+    [InlineData("http://bitbucket.org/ws/repo")]
+    [InlineData("git://bitbucket.org/ws/repo")]
+    public async Task CloneRepositoryAsync_NichtHttpsSchema_WirdAbgelehnt(string repositoryUrl)
+    {
+        SetupCredentials();
+
+        var act = () => _sut.CloneRepositoryAsync(repositoryUrl, "/target/path");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*nur HTTPS-Repository-URLs*");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Bitbucket-Server-SSH-URLs mit Nicht-Standard-Port werden nicht geraten,
+    /// sondern vor jedem CLI-Aufruf abgelehnt.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_SshUrlMitFremdPort_WirdAbgelehnt()
+    {
+        SetupCredentials();
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode")).Returns("SelfHosted");
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.SelfHostedUrl")).Returns("https://bitbucket.example.com");
+
+        var act = () => _sut.CloneRepositoryAsync("ssh://git@bitbucket.example.com:7999/scm/KEY/slug.git", "/target/path");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*nur HTTPS-Repository-URLs*");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Ohne Username/AppPassword greift der bestehende Credential-Fail-Fast
+    /// vor jedem CLI-Aufruf.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_OhneCredentials_WirftInvalidOperationException()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
+
+        var act = () => _sut.CloneRepositoryAsync("git@bitbucket.org:ws/repo.git", "/target/path");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Bitbucket-Authentifizierung fehlt*");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Eine noch im SCP-SSH-Format vorliegende remote.origin.url wird vor dem Push
+    /// auf die HTTPS-Form mit eingebetteten Credentials umgeschrieben.</summary>
+    [Fact]
+    public async Task PushBranchAsync_SshRemoteUrl_WirdZuHttpsNormalisiert()
+    {
+        SetupCredentials();
+        var calls = new List<string>();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "git@bitbucket.org:ws/repo.git", string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://user:appPassword@bitbucket.org/ws/repo.git");
+        var pushIndex = calls.FindIndex(c => c == "push --set-upstream origin feature/a");
+        setUrlIndex.Should().BeGreaterThanOrEqualTo(0);
+        pushIndex.Should().BeGreaterThan(setUrlIndex);
+    }
+
+    /// <summary>Eine noch im SCP-SSH-Format vorliegende remote.origin.url wird vor dem Pull
+    /// auf die HTTPS-Form mit eingebetteten Credentials umgeschrieben.</summary>
+    [Fact]
+    public async Task PullAsync_SshRemoteUrl_WirdZuHttpsNormalisiert()
+    {
+        SetupCredentials();
+        var calls = new List<string>();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "git@bitbucket.org:ws/repo.git", string.Empty));
+
+        await _sut.PullAsync("/repo");
+
+        var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://user:appPassword@bitbucket.org/ws/repo.git");
+        var pullIndex = calls.FindIndex(c => c == "pull");
+        setUrlIndex.Should().BeGreaterThanOrEqualTo(0);
+        pullIndex.Should().BeGreaterThan(setUrlIndex);
+    }
+
+    /// <summary>Eine bereits HTTPS-förmige remote.origin.url (inkl. eingebetteter Credentials)
+    /// bleibt unverändert — kein set-url, der Push läuft normal.</summary>
+    [Fact]
+    public async Task PushBranchAsync_HttpsRemoteUrl_KeinSetUrl()
+    {
+        SetupCredentials();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://user:appPassword@bitbucket.org/ws/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("push")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("set-url")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Never);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("push")),
+            "/repo",
+            It.Is<IDictionary<string, string>?>(env => env != null && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Schlägt das Lesen der remote.origin.url fehl, läuft der Pull in seinem
+    /// normalen Pfad weiter (Fehlertoleranz der Normalisierung).</summary>
+    [Fact]
+    public async Task PullAsync_RemoteUrlReadFehler_LaeuftWeiter()
+    {
+        SetupCredentials();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(128, string.Empty, "fatal: not in a git directory"));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("pull")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PullAsync("/repo");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("set-url")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Never);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("pull")),
+            "/repo",
+            It.Is<IDictionary<string, string>?>(env => env != null && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>GetRemoteBranchesAsync fragt SCP-SSH-Repository-URLs über die konvertierte
+    /// HTTPS-Remote-URL ab.</summary>
+    [Fact]
+    public async Task GetRemoteBranchesAsync_SshUrl_NutztHttpsRemote()
+    {
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("ls-remote")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "hash1\trefs/heads/main", string.Empty));
+
+        var result = (await _sut.GetRemoteBranchesAsync("git@bitbucket.org:ws/repo.git")).ToList();
+
+        result.Should().Equal("main");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "ls-remote", "--heads", "https://bitbucket.org/ws/repo.git")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>GetDefaultBranchAsync fragt SCP-SSH-Repository-URLs über die konvertierte
+    /// HTTPS-Remote-URL ab.</summary>
+    [Fact]
+    public async Task GetDefaultBranchAsync_SshUrl_NutztHttpsRemote()
+    {
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("ls-remote")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "ref: refs/heads/main\tHEAD", string.Empty));
+
+        var result = await _sut.GetDefaultBranchAsync("ssh://git@bitbucket.org/ws/repo.git");
+
+        result.Should().Be("main");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "ls-remote", "--symref", "https://bitbucket.org/ws/repo.git", "HEAD")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Eine SSH-SourceRepositoryUrl eines Fork-PRs wird vor dem Fetch in die
+    /// HTTPS-Form umgewandelt.</summary>
+    [Fact]
+    public async Task CheckoutPullRequestSourceAsync_SshForkUrl_WirdZuHttpsGefetcht()
+    {
+        SetupCredentials();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://user:appPassword@bitbucket.org/ws/repo.git", string.Empty));
+
+        var spec = new PullRequestCheckoutSpec(
+            TargetRepositoryId: "ws/repo",
+            TargetRepositoryUrl: "https://bitbucket.org/ws/repo.git",
+            SourceRepositoryId: "fork/repo",
+            SourceRepositoryUrl: "git@bitbucket.org:fork/repo.git",
+            SourceBranch: "feature/pr",
+            SourceRef: null,
+            HeadSha: null);
+
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "fetch", "--no-tags", "https://bitbucket.org/fork/repo.git", "refs/heads/feature/pr")),
+            "/repo",
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Der PR-Checkout übergibt erstmals die git-Umgebung (GIT_TERMINAL_PROMPT=0,
+    /// kein GIT_SSH_COMMAND) an git fetch/checkout und normalisiert vorab die remote.origin.url.</summary>
+    [Fact]
+    public async Task CheckoutPullRequestSourceAsync_UebergibtGitEnvironment()
+    {
+        SetupCredentials();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://user:appPassword@bitbucket.org/ws/repo.git", string.Empty));
+
+        var spec = new PullRequestCheckoutSpec(
+            TargetRepositoryId: "ws/repo",
+            TargetRepositoryUrl: "https://bitbucket.org/ws/repo.git",
+            SourceRepositoryId: "ws/repo",
+            SourceRepositoryUrl: null,
+            SourceBranch: "feature/pr",
+            SourceRef: null,
+            HeadSha: null);
+
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "fetch", "--no-tags", "origin", "refs/heads/feature/pr")),
+            "/repo",
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GIT_TERMINAL_PROMPT"] == "0" && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "checkout", "-B", "feature/pr", "FETCH_HEAD")),
+            "/repo",
+            It.Is<IDictionary<string, string>?>(env => env != null && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Beim Same-Repo-PR-Checkout (Fetch gegen origin) wird eine noch im SCP-SSH-Format
+    /// vorliegende remote.origin.url vor dem Fetch auf HTTPS mit Credentials normalisiert.</summary>
+    [Fact]
+    public async Task CheckoutPullRequestSourceAsync_SshOriginUrl_WirdVorFetchNormalisiert()
+    {
+        SetupCredentials();
+        var calls = new List<string>();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
+            .ReturnsAsync(new CliResult(0, "git@bitbucket.org:ws/repo.git", string.Empty));
+
+        var spec = new PullRequestCheckoutSpec(
+            TargetRepositoryId: "ws/repo",
+            TargetRepositoryUrl: "https://bitbucket.org/ws/repo.git",
+            SourceRepositoryId: "ws/repo",
+            SourceRepositoryUrl: null,
+            SourceBranch: "feature/pr",
+            SourceRef: null,
+            HeadSha: null);
+
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+
+        var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://user:appPassword@bitbucket.org/ws/repo.git");
+        var fetchIndex = calls.FindIndex(c => c == "fetch --no-tags origin refs/heads/feature/pr");
+        setUrlIndex.Should().BeGreaterThanOrEqualTo(0);
+        fetchIndex.Should().BeGreaterThan(setUrlIndex);
+    }
+
+    /// <summary>Eine null-CheckoutSpec wird mit ArgumentNullException abgelehnt, bevor irgendein
+    /// git-Aufruf auf der Arbeitskopie stattfindet.</summary>
+    [Fact]
+    public async Task CheckoutPullRequestSourceAsync_NullSpec_WirftArgumentNullException()
+    {
+        var act = () => _sut.CheckoutPullRequestSourceAsync("/repo", null!);
+
+        await act.Should().ThrowAsync<ArgumentNullException>();
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Ohne Credentials wird eine SSH-remote.origin.url auf die nackte HTTPS-Form
+    /// umgeschrieben — die _netrc-Pflege übernimmt die Authentifizierung zur Laufzeit.</summary>
+    [Fact]
+    public async Task PushBranchAsync_SshRemoteUrlOhneCredentials_WirdZuNacktemHttpsNormalisiert()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "git@bitbucket.org:ws/repo.git", string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "remote", "set-url", "origin", "https://bitbucket.org/ws/repo.git")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Eine remote.origin.url, die sich nicht in die HTTPS-Form umwandeln lässt
+    /// (Fremd-Port oder Fremd-Userinfo), bleibt unverändert — kein set-url, der Push läuft weiter.</summary>
+    [Theory]
+    [InlineData("ssh://git@bitbucket.example.com:7999/scm/KEY/slug.git")]
+    [InlineData("ssh://user:pass@bitbucket.org/ws/repo.git")]
+    public async Task PushBranchAsync_NichtKonvertierbareRemoteUrl_KeinSetUrl(string remoteUrl)
+    {
+        SetupCredentials();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, remoteUrl, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("push")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("set-url")),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Never);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("push")),
+            "/repo",
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Die _netrc-Pflege schreibt in den per Konstruktorparameter übergebenen
+    /// netrcPath — die echte Benutzer-_netrc bleibt unangetastet.</summary>
+    [Fact]
+    public async Task NetrcPfad_AusKonstruktorParameter_WirdGenutzt()
+    {
+        SetupCredentials();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://user:appPassword@bitbucket.org/ws/repo.git", string.Empty));
+        var realNetrcPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
+        var realNetrcBefore = File.Exists(realNetrcPath) ? File.ReadAllText(realNetrcPath) : null;
+
+        await _sut.PullAsync("/repo");
+
+        File.Exists(_netrcPath).Should().BeTrue();
+        var content = File.ReadAllText(_netrcPath);
+        content.Should().Contain("machine bitbucket.org");
+        content.Should().Contain("login user");
+        content.Should().Contain("password appPassword");
+        var realNetrcAfter = File.Exists(realNetrcPath) ? File.ReadAllText(realNetrcPath) : null;
+        realNetrcAfter.Should().Be(realNetrcBefore);
+    }
+
+    private void SetupCredentials()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username")).Returns("user");
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword")).Returns("appPassword");
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode")).Returns("Cloud");
+    }
+
+    private static bool SequenceEqual(IEnumerable<string> actual, params string[] expected)
+        => actual.SequenceEqual(expected);
 }

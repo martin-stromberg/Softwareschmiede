@@ -26,7 +26,8 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
         _sut = new BitbucketPlugin(
             _cliRunnerMock.Object,
             _credentialStoreMock.Object,
-            new Mock<ILogger<BitbucketPlugin>>().Object);
+            new Mock<ILogger<BitbucketPlugin>>().Object,
+            Path.Combine(Path.GetTempPath(), $"sws-bb-netrc-{Guid.NewGuid():N}"));
 
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode")).Returns("Cloud");
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("test");
@@ -316,5 +317,38 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
         var result = await _sut.GetRepositoryStructureLoadResultAsync("https://bitbucket.example.com/projects/PROJ/repos/repo/browse", maxDepth: 2);
 
         result.Status.Should().Be(RepositoryStructureLoadStatus.Failed);
+    }
+
+    /// <summary>Eine SCP-SSH-Repository-URL (git@bitbucket.org:ws/repo) wird vorab in die
+    /// HTTPS-Form umgewandelt, sodass die Repository-ID aufgelöst und die Source-API
+    /// aufgerufen wird statt mit „Repository-ID konnte nicht ermittelt werden" zu scheitern.</summary>
+    [Fact]
+    public async Task GetRepositoryStructureLoadResultAsync_SshUrl_LoestRepositoryIdAuf()
+    {
+        SetupDefaultBranch();
+        const string sourceJson = """{ "values": [] }""";
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "curl",
+                It.Is<IEnumerable<string>>(args => args.Any(a => a.Contains("/2.0/repositories/ws/repo/src/", StringComparison.Ordinal))),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, sourceJson, string.Empty));
+
+        var result = await _sut.GetRepositoryStructureLoadResultAsync("git@bitbucket.org:ws/repo", maxDepth: 2);
+
+        result.Status.Should().Be(RepositoryStructureLoadStatus.Success);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("ls-remote") && a.Contains("https://bitbucket.org/ws/repo")),
+            null,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "curl",
+            It.Is<IEnumerable<string>>(args => args.Any(a => a.Contains("/2.0/repositories/ws/repo/src/", StringComparison.Ordinal))),
+            null,
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 }

@@ -268,6 +268,52 @@ public sealed class GitPluginBaseTests
             .WithMessage("*MergeToSourceAsync*");
     }
 
+    /// <summary>HTTPS-URLs bleiben unverändert; SCP- und ssh://-URLs werden deterministisch
+    /// in die HTTPS-Form desselben Hosts umgewandelt — inkl. IP-Literal-Hosts und explizitem
+    /// Port 22. Umschließender Whitespace wird vorher entfernt. Nicht-URL-taugliche Pfadzeichen
+    /// (Leerzeichen, Nicht-ASCII) werden in beiden SSH-Formen identisch escaped.</summary>
+    [Theory]
+    [InlineData("https://github.com/owner/repo.git", "https://github.com/owner/repo.git")]
+    [InlineData("  https://github.com/owner/repo.git  ", "https://github.com/owner/repo.git")]
+    [InlineData("git@github.com:owner/repo.git", "https://github.com/owner/repo.git")]
+    [InlineData(" git@github.com:owner/repo.git ", "https://github.com/owner/repo.git")]
+    [InlineData("git@gitlab.example.com:group/sub/repo.git", "https://gitlab.example.com/group/sub/repo.git")]
+    [InlineData("git@192.168.1.5:team/repo.git", "https://192.168.1.5/team/repo.git")]
+    [InlineData("git@github.com:mein repo/x.git", "https://github.com/mein%20repo/x.git")]
+    [InlineData("git@github.com:owner/münchen.git", "https://github.com/owner/m%C3%BCnchen.git")]
+    [InlineData("git@github.com:owner/a%20b.git", "https://github.com/owner/a%2520b.git")]
+    [InlineData("git@github.com:owner/a%b.git", "https://github.com/owner/a%25b.git")]
+    [InlineData("ssh://git@github.com/owner/repo.git", "https://github.com/owner/repo.git")]
+    [InlineData("ssh://git@github.com:22/owner/repo.git", "https://github.com/owner/repo.git")]
+    [InlineData("ssh://github.com/owner/repo.git", "https://github.com/owner/repo.git")]
+    [InlineData("ssh://git@1.2.3.4/team/repo.git", "https://1.2.3.4/team/repo.git")]
+    [InlineData("ssh://git@[fd00::1]/team/repo.git", "https://[fd00::1]/team/repo.git")]
+    [InlineData("ssh://git@github.com/mein repo/x.git", "https://github.com/mein%20repo/x.git")]
+    [InlineData("ssh://git@github.com/owner/münchen.git", "https://github.com/owner/m%C3%BCnchen.git")]
+    public void ToHttpsRepositoryUrl_ShouldConvertToHttps_WhenUrlIsConvertible(string input, string expected)
+    {
+        TestGitPlugin.ToHttps(input).Should().Be(expected);
+    }
+
+    /// <summary>Fremde Schemata, ssh:// mit Fremd-Port oder Fremd-Userinfo, Query-/Fragment-Anteile
+    /// und nicht-URL-Eingaben werden mit null abgelehnt statt geraten.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("owner/repo")]
+    [InlineData("http://github.com/owner/repo.git")]
+    [InlineData("git://github.com/owner/repo.git")]
+    [InlineData("ssh://git@github.com:7999/owner/repo.git")]
+    [InlineData("ssh://user@github.com/owner/repo.git")]
+    [InlineData("ssh://user:pass@github.com/owner/repo.git")]
+    [InlineData("ssh://git@github.com/owner/repo.git?x=1")]
+    [InlineData("ssh://git@github.com/owner/repo.git#frag")]
+    public void ToHttpsRepositoryUrl_ShouldReturnNull_WhenUrlIsNotConvertible(string? input)
+    {
+        TestGitPlugin.ToHttps(input).Should().BeNull();
+    }
+
     private sealed class TestGitPlugin(ICliRunner cliRunner) : GitPluginBase<TestGitPlugin>(cliRunner)
     {
         public override string PluginName => "Test";
@@ -291,5 +337,7 @@ public sealed class GitPluginBaseTests
         public override Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default) => Task.FromResult("main");
         /// <summary>EnsureRepoAsync.</summary>
         public Task EnsureRepoAsync(string localPath, CancellationToken ct = default) => EnsureGitRepositoryAsync(localPath, ct);
+        /// <summary>Testzugang zum protected static SSH→HTTPS-Konverter der Basisklasse.</summary>
+        public static string? ToHttps(string? url) => ToHttpsRepositoryUrl(url!);
     }
 }

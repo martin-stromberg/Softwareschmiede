@@ -21,7 +21,7 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 
 - **Projekt- und Aufgabenverwaltung** mit lokalem Aufgabenstatus, Protokollierung und To-Do-Listen
 - **Kompakte Aufgabenliste** in Seitenleiste und Dashboard mit dreizeiligen Symbol-Kacheln, vollflächig klickbar, umschaltbar zwischen den Anzeigemodi Datum, Repository und KI (pro Ansicht persistiert)
-- **Plugin-basierte SCM-Integration** für GitHub, BitBucket und lokale Arbeitsverzeichnisse
+- **Plugin-basierte SCM-Integration** für GitHub, BitBucket und lokale Arbeitsverzeichnisse — plugin-geführte git-Operationen laufen ausschließlich über HTTPS; als SSH-URL hinterlegte Repository-Verknüpfungen (`git@…`, `ssh://…`) werden transparent in HTTPS-URLs umgewandelt
 - **Plugin-basierte KI-Ausführung** über eingebettete interaktive CLI-Terminal-Sitzungen (ConPTY mit diagnostiziertem Pipe-Fallback)
 - **IDE-Integration** mit Visual Studio für `.sln`/`.slnx` und Visual Studio Code als Fallback
 - **Dateiexplorer und Diff-Ansicht** direkt in der Aufgabendetailansicht

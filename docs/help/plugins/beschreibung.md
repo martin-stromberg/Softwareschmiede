@@ -32,9 +32,11 @@ Jedes Plugin deklariert Einstellungsgruppen (`PluginSettingGroup`) mit typisiert
 
 Das Standard-SCM-Plugin und das Standard-KI-Plugin werden in den App-Einstellungen hinterlegt und per `PluginDefaultSettingsService` verwaltet.
 
-### Zugangsdaten und Sicherheit (GitHub)
+### Zugangsdaten und Sicherheit
 
 Der GitHub-Token bleibt ausschließlich verschlüsselt im Windows Credential Store gespeichert. Für Git-Operationen wie Klonen, Push, Pull und das Abrufen von Branches wird er nur innerhalb des laufenden Prozesses als Authentifizierungs-Header an GitHub übergeben — er landet weder in Repository-URLs noch in Befehlszeilen oder Dateien.
+
+Alle Git-Operationen der SCM-Plugins (GitHub und Bitbucket) laufen ausschließlich über die gesicherte HTTPS-Verbindung; das in früheren Versionen abgeschaltete Sicherheitsmerkmal zur Überprüfung der Serveridentität bei SSH-Verbindungen wird nicht mehr umgangen. Repository-Adressen im SSH-Format (z. B. `git@github.com:owner/repo`) dürfen weiterhin bei der Verknüpfung angegeben werden — sie werden bei der Verwendung automatisch in die HTTPS-Form umgewandelt, ebenso die in bereits geklonten Arbeitskopien hinterlegte Verbindungsadresse beim nächsten Push, Pull oder Pull-Request-Bezug. Für den Anwender ist keine Aktion nötig; lediglich Adressen, die sich nicht eindeutig in eine HTTPS-Adresse überführen lassen (etwa SSH-Verbindungen auf einem abweichenden Port), werden beim Klon mit einer verständlichen Meldung abgelehnt.
 
 Frühere Versionen hatten den Token zusätzlich im Klartext in der Datei `_netrc` (Windows) bzw. `.netrc` im Benutzerprofil hinterlegt. Beim Programmstart entfernt das GitHub-Plugin diese älteren GitHub-Einträge (`github.com` und `api.github.com`) automatisch aus einer vorhandenen Datei — Einträge anderer Anbieter (z. B. Bitbucket oder selbst gehostete Server) bleiben unverändert erhalten. Bestand die Datei nur aus den GitHub-Einträgen, wird sie gelöscht; eine nicht vorhandene Datei wird nicht angelegt. Für den Anwender ist keine Aktion nötig — die Migration läuft transparent beim Programmstart.
 
