@@ -106,6 +106,42 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
             && z.Contains("\"art\":\"asset\"", StringComparison.Ordinal));
     }
 
+    /// <summary>Eine <c>*.json</c>-Download-URL (Update-Manifest) wird als <c>manifest</c>-Abruf protokolliert.</summary>
+    [Fact]
+    public async Task SendAsync_KlassifiziertManifestUrlAlsManifest()
+    {
+        var manifestUrl = "https://e2e.invalid/szenario/update-1.3.0.json";
+        SchreibeSzenario(new UpdateE2ESzenario
+        {
+            Antworten = [new UpdateE2EAntwort { Url = manifestUrl, Inhalt = "{}" }],
+        });
+
+        using var antwort = await _client.GetAsync(manifestUrl);
+
+        Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
+        var zeilen = File.ReadAllLines(_kontext.Konfiguration.ProtokollDateiPfad);
+        Assert.Contains(zeilen, z => z.Contains($"\"event\":\"{UpdateE2EEreignisse.HttpRequest}\"", StringComparison.Ordinal)
+            && z.Contains("\"art\":\"manifest\"", StringComparison.Ordinal));
+    }
+
+    /// <summary>Ein explizites <c>art</c> der Antwort überschreibt die URL-Klassifizierung (Manifest-API-Fallback-URL).</summary>
+    [Fact]
+    public async Task SendAsync_AntwortArt_UeberschreibtUrlKlassifizierung()
+    {
+        var manifestApiUrl = "https://api.github.com/repos/o/r/releases/assets/91011";
+        SchreibeSzenario(new UpdateE2ESzenario
+        {
+            Antworten = [new UpdateE2EAntwort { Url = manifestApiUrl, Inhalt = "{}", Art = "manifest" }],
+        });
+
+        using var antwort = await _client.GetAsync(manifestApiUrl);
+
+        Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
+        var zeilen = File.ReadAllLines(_kontext.Konfiguration.ProtokollDateiPfad);
+        Assert.Contains(zeilen, z => z.Contains($"\"event\":\"{UpdateE2EEreignisse.HttpRequest}\"", StringComparison.Ordinal)
+            && z.Contains("\"art\":\"manifest\"", StringComparison.Ordinal));
+    }
+
     /// <summary>Eine per <c>fault</c> markierte Antwort wirft den kontrollierten Transportfehler.</summary>
     [Fact]
     public async Task SendAsync_Transportfehler_WirftKontrollierteAusnahme()

@@ -12,7 +12,7 @@ public sealed class UpdateServiceTests
     [Fact]
     public async Task CheckForUpdateAsync_ShouldReturnAvailable_WhenRemoteVersionIsNewer()
     {
-        var update = new UpdateInfo("1.2.4", "v1.2.4", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
+        var update = new UpdateInfo("1.2.4", "v1.2.4", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/release.zip")), null, IsPrerelease: false);
         var versionProvider = new Mock<IApplicationVersionProvider>();
         versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));
@@ -93,8 +93,8 @@ public sealed class UpdateServiceTests
     {
         var istRcKanal = updatePfad == UpdatePfadKanalResolver.VorabversionenPfad;
         var update = istRcKanal
-            ? new UpdateInfo("1.3.0-rc.1", "v1.3.0-rc.1", "release.zip", new Uri("https://example.invalid/rc.zip"), null, IsPrerelease: true)
-            : new UpdateInfo("1.3.0", "v1.3.0", "release.zip", new Uri("https://example.invalid/stable.zip"), null, IsPrerelease: false);
+            ? new UpdateInfo("1.3.0-rc.1", "v1.3.0-rc.1", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/rc.zip")), null, IsPrerelease: true)
+            : new UpdateInfo("1.3.0", "v1.3.0", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/stable.zip")), null, IsPrerelease: false);
         var versionProvider = new Mock<IApplicationVersionProvider>();
         versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new InstalledVersionInfo("1.2.0", installierterTag, null, null));

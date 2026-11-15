@@ -78,17 +78,17 @@ flowchart LR
 | `CliUpdateSafetyService` (`ICliUpdateSafetyService`) | Bewertet aktive Aufgaben via `AufgabeLaufAktivitaet.IstAktiv`; liefert `CliUpdateSafetyResult`. |
 | `UpdateVersionComparer` | Statische Fassade: `TryParse`, `Normalize`, `IsNewer` auf Basis von `SemanticUpdateVersion`. |
 | `SemanticUpdateVersion` | SemVer-2.0-Value-Object: `Major`/`Minor`/`Patch`, `PrereleaseIdentifiers`, `BuildMetadata`, `IsPrerelease`, `IComparable`/`IEquatable`. |
-| `UpdateModels.cs` | `UpdateMode`, `UpdateKanal`, `UpdateSettings`, `UpdateCheckOptions`, `UpdateInfo`, `UpdateReleaseLookupResult`, `UpdateCheckResult`/`UpdateCheckStatus`, `UpdatePreparationProgress`/`Phase`, `UpdatePreparationResult`, `CliUpdateSafetyResult`, `InstalledVersionInfo`. |
+| `UpdateModels.cs` | `UpdateMode`, `UpdateKanal`, `UpdateSettings`, `UpdateCheckOptions`, `UpdateDownloadRoute` (primäre Download-URL + optionaler API-Fallback, je Route), `UpdateInfo`, `UpdateReleaseLookupResult`, `UpdateCheckResult`/`UpdateCheckStatus`, `UpdatePreparationProgress`/`Phase` (inkl. `Verifizieren`), `UpdatePreparationResult`, `CliUpdateSafetyResult`, `InstalledVersionInfo`. |
 | `UpdatePfadKanalResolver` | Statische Pfad→Kanal-Abbildung: Konstanten `ProduktivversionenPfad`/`VorabversionenPfad`, `ErmittleKanal`, `NormalisierePfad` (Produktiv-Fallback), `IstGueltigerPfad` und `ErmittleKanalFuerTagName` („-rc"-Infix → `ReleaseCandidate`, gleiche Regel wie `DatenbankPfadResolver`). |
-| `UpdateOptions` | Konfiguration: `RepositoryOwner`, `RepositoryName`, `AssetName` (`release.zip`), `UpdateDirectoryName` (`updates`), `CheckTimeout` (15 s), `ExecutableName` (`Softwareschmiede.exe`). |
+| `UpdateOptions` | Konfiguration: `RepositoryOwner`, `RepositoryName`, `AssetName` (`release.zip`), `ManifestAssetName` (`update.json`), `UpdateDirectoryName` (`updates`), `CheckTimeout` (15 s), `ExecutableName` (`Softwareschmiede.exe`). |
 | `AppEinstellungService` | `GetUpdateSettingsAsync`/`SetUpdateSettingsAsync` (Schlüssel `updates.mode`, `updates.pfad`; Abfragetag `UpdateSettings.Read`). |
 
 ### Infrastruktur (`Softwareschmiede/Infrastructure/Services/Updates`)
 
 | Komponente | Rolle |
 |------------|-------|
-| `GitHubReleaseClient` (`IUpdateReleaseClient`) | Paginierte Release-Suche über die GitHub-REST-API, exklusiver Kandidatenfilter je `UpdateCheckOptions.Kanal` (Draft/Tag/Asset/Kanalzugehörigkeit), SemVer-Maximum, `UpdateReleaseLookupResult`. Leitet pro Kandidat zusätzlich `UpdateInfo.FallbackDownloadUrl` aus den Asset-Feldern `url`/`id` ab (`CreateFallbackDownloadUrl`, Host auf `api.github.com` gepinnt via `IsAllowedAssetApiUrl`). |
-| `UpdatePackageService` (`IUpdatePackageService`) | Download (`*.download` → `release.zip`; einmaliger Fallback auf `UpdateInfo.FallbackDownloadUrl` bei HTTP-Status ≥ 500, via `SendDownloadRequestAsync` mit API-Headern), Entpacken nach `updates/extracted/{Version}`, Paketvalidierung (Executable + `version.json`), Schreibrechte-Probe (`RequiresElevation`), Pfadsicherung gegen Verzeichnisaustritt (`EnsureInsideBase`). |
+| `GitHubReleaseClient` (`IUpdateReleaseClient`) | Paginierte Release-Suche über die GitHub-REST-API, exklusiver Kandidatenfilter je `UpdateCheckOptions.Kanal` (Draft/Tag/Asset/Kanalzugehörigkeit), SemVer-Maximum, `UpdateReleaseLookupResult`. Befüllt pro Kandidat `UpdateInfo.PaketDownload` und — bei vorhandenem `update.json`-Asset — `UpdateInfo.ManifestDownload` als `UpdateDownloadRoute`; die optionalen `Fallback`-URLs leitet `CreateFallbackDownloadUrl` aus den Asset-Feldern `url`/`id` ab (Host auf `api.github.com` gepinnt via `IsAllowedAssetApiUrl`). Ein fehlendes Manifest-Asset disqualifiziert den Kandidaten nicht. |
+| `UpdatePackageService` (`IUpdatePackageService`) | Download (`*.download` → `release.zip`), SHA-256-Verifikation des Pakets gegen `update.json` (Phase `Verifizieren`: `DownloadManifestAsync` + `GetExpectedSha256` + `VerifyPackageHashAsync` — harter Abbruch bei fehlendem/ungültigem Manifest oder Hash-Mismatch), Entpacken nach `updates/extracted/{Version}`, Paketvalidierung (Executable + `version.json`), Schreibrechte-Probe (`RequiresElevation`), Pfadsicherung gegen Verzeichnisaustritt (`EnsureInsideBase`). Paket- und Manifest-Abruf teilen `SendWithFallbackAsync` (einmaliger Fallback auf `route.Fallback` bei HTTP-Status ≥ 500, via `SendDownloadRequestAsync` mit API-Headern). |
 | `UpdateScriptService` (`IUpdateScriptService`) | Schreibt `updates/update.ps1` (wartet auf App-Exit, kopiert Dateien, startet App neu, Logdatei) und startet es via `IUpdateProcessLauncher`. |
 | `UpdateProcessLauncher` (`IUpdateProcessLauncher`) | `ProcessStartInfo`-Kapselung; `Verb = "runas"` bei `RequiresElevation`. |
 
@@ -117,7 +117,7 @@ Der Altbestand `updates.includePrereleases` verfällt still — er wird nicht me
 
 Für E2E-Tests existiert eine kontrollierte Update-Umgebung unter `Softwareschmiede.App/Services/Testing/`, die sich nur bei gesetzter Szenario-Konfiguration aktiviert (`UpdateE2ETestConfiguration.LadeAusUmgebung`):
 
-- `UpdateFixtureHttpMessageHandler` — ersetzt den HTTP-Transport (Release-JSON-Seiten, ZIP-Streams, Fehler, Freigaben). `Klassifiziere` ordnet Requests auf `.../releases/assets/...`-URLs der Request-Art „asset" zu (API-Fallback-Downloads zählen damit als Asset-Requests).
+- `UpdateFixtureHttpMessageHandler` — ersetzt den HTTP-Transport (Release-JSON-Seiten, Manifest- und ZIP-Downloads, Fehler, Freigaben). `Klassifiziere` ordnet Requests auf `.../releases/assets/...`-URLs der Request-Art „asset" zu (API-Fallback-Downloads zählen damit als Asset-Requests) und `*.json`-URLs der Art „manifest"; die `UpdateE2EFixture` serviert `update.json`-Antworten mit dem tatsächlichen SHA-256 der erzeugten Paket-ZIPs.
 - `RecordingUpdateProcessLauncher` / `RecordingApplicationShutdownService` — protokollieren Skriptstart/Shutdown ohne echte Prozess-/Systemgrenzen.
 - `FixtureCliUpdateSafetyService` — kontrollierte riskante Aufgaben für echte Bestätigungsdialoge.
 - `UpdateSettingsReadFailureInterceptor` — EF-Core-`DbCommandInterceptor`, der nur die getaggte `UpdateSettings.Read`-Abfrage gezielt fehlschlagen lässt.

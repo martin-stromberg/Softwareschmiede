@@ -49,7 +49,7 @@ Laufen beim Start eines Updates noch CLI-Aufgaben, die nicht auf eine Eingabe wa
 
 Während der Vorbereitung wird ein modaler Dialog mit dem Titel **„Update vorbereiten"** über dem Hauptfenster angezeigt. Er enthält:
 
-- **Phase-Anzeige** — die gerade ausgeführte Phase: „Download", „Entpacken" oder „Update-Vorbereitung".
+- **Phase-Anzeige** — die gerade ausgeführte Phase: „Download", „Verifikation", „Entpacken" oder „Update-Vorbereitung".
 - **Fortschrittsbalken** — prozentualer Fortschritt beim Download (0–100 %) bzw. eine unbestimmte Fortschrittsanzeige in den übrigen Phasen.
 - **Meldungstext** — eine aussagekräftige Meldung zum aktuellen Zustand (z. B. „Update wird heruntergeladen.").
 - **Abbrechen-Schaltfläche** — unterbricht die laufende Vorbereitung. Sie ist deaktiviert, sobald die Vorbereitung abgeschlossen ist oder ein Fehlerzustand angezeigt wird.
@@ -64,9 +64,10 @@ Der Update-Vorgang läuft in mehreren Phasen ab:
 1. **Prüfung** — die installierte Version wird mit der neuesten passenden Version auf dem Update-Server verglichen. Je nach gewähltem Update-Pfad werden ausschließlich stabile Versionen („Produktivversionen") oder ausschließlich Vorabversionen („Vorabversionen") als Kandidaten berücksichtigt.
 2. **Sicherheitsprüfung** — vor der Installation wird geprüft, ob laufende CLI-Aufgaben das Update blockieren würden.
 3. **Download** — das Update-Paket wird heruntergeladen (Fortschritt in Prozent). Antwortet der Download-Server mit einem vorübergehenden Serverfehler (HTTP 5xx), versucht die Anwendung automatisch und einmalig einen alternativen Download-Pfad — ohne sichtbaren Hinweis oder Nutzereingriff.
-4. **Entpacken** — das Paket wird in ein Arbeitsverzeichnis entpackt und auf Vollständigkeit geprüft.
-5. **Update-Vorbereitung** — das Update-Skript wird erzeugt.
-6. **Installation** — das Skript wird gestartet, die Anwendung beendet sich, das Skript tauscht die Programmdateien aus und startet die Anwendung neu.
+4. **Verifikation** — das heruntergeladene Paket wird auf Unversehrtheit geprüft: Die Anwendung vergleicht seine Prüfsumme mit der vom Update-Server bereitgestellten Soll-Prüfsumme. Stimmt sie nicht überein oder fehlt sie, wird das Update sicherheitshalber verworfen — ein beschädigtes oder verändertes Paket wird niemals installiert.
+5. **Entpacken** — das verifizierte Paket wird in ein Arbeitsverzeichnis entpackt und auf Vollständigkeit geprüft.
+6. **Update-Vorbereitung** — das Update-Skript wird erzeugt.
+7. **Installation** — das Skript wird gestartet, die Anwendung beendet sich, das Skript tauscht die Programmdateien aus und startet die Anwendung neu.
 
 ## Einschränkungen
 

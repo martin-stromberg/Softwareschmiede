@@ -24,7 +24,7 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
     /// <summary>Standard-Updateangebot der Tests (stabile Version 1.2.3).</summary>
     protected static readonly UpdateInfo NeuesUpdate = new(
         "1.2.3", "v1.2.3", "release.zip",
-        new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
+        new UpdateDownloadRoute(new Uri("https://example.invalid/release.zip")), null, IsPrerelease: false);
 
     /// <summary>Standard-Vorbereitungsergebnis der Tests.</summary>
     protected static readonly UpdatePreparationResult FertigeVorbereitung = new(

@@ -36,7 +36,7 @@
 3. Laufen noch CLI-Aufgaben, die nicht auf eine Eingabe warten, erscheint die Sicherheitsabfrage **„Update starten?"**. Sie listet die betroffenen Aufgaben und fragt, ob das Update trotzdem vorbereitet und die Anwendung beendet werden soll:
    - **Bestätigen** — der Update-Vorgang startet.
    - **Ablehnen** — der Vorgang endet, die Anwendung läuft weiter.
-4. Der Fortschrittsdialog **„Update vorbereiten"** zeigt die Phasen **Download**, **Entpacken** und **Update-Vorbereitung** mit Fortschrittsbalken und Meldungstext an.
+4. Der Fortschrittsdialog **„Update vorbereiten"** zeigt die Phasen **Download**, **Verifikation**, **Entpacken** und **Update-Vorbereitung** mit Fortschrittsbalken und Meldungstext an. In der Phase „Verifikation" prüft die Anwendung die Unversehrtheit des heruntergeladenen Pakets anhand seiner Prüfsumme.
 5. Nach erfolgreicher Vorbereitung erscheint „Update wird gestartet. Die Anwendung wird beendet." Die Anwendung schließt sich, das Update-Skript tauscht die Programmdateien aus und startet die Anwendung anschließend neu.
 
 ## Update abbrechen
