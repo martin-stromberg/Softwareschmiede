@@ -80,10 +80,10 @@ Alle drei Workflows lassen sich zusätzlich manuell über `workflow_dispatch` au
 Die Schritte laufen im Job `create-review-issue` des wiederverwendbaren Workflows `.github/workflows/create-review-issue.yml` (`ubuntu-latest`, `timeout-minutes: 10`, Shell `pwsh`); die Aufrufer liefern die Parameter über `with:`-Inputs:
 
 1. **Kontext herstellen:** Der wiederverwendbare Workflow checkt das Repository aus und setzt `GH_REPO` auf `${{ github.repository }}`, damit `gh`-Aufrufe den Repository-Kontext zuverlässig auflösen können.
-2. **Guard-Schritt:** Das Repository-Secret `REVIEW_ISSUE_TOKEN` muss gesetzt sein — andernfalls schlägt der Lauf sofort sichtbar fehl (`exit 1` mit Anleitung). Es gibt bewusst keinen Fallback auf `GITHUB_TOKEN`, weil ein Issue des Autors `github-actions[bot]` von der Ereignisvalidierung verworfen würde und über die Duplikatprüfung künftige Zyklen blockierte.
+2. **Guard-Schritt:** Das Repository-Secret `REVIEW_ISSUE_TOKEN` muss gesetzt sein — andernfalls schlägt der Lauf sofort sichtbar fehl (`exit 1` mit Anleitung). Es gibt keinen Fallback auf `GITHUB_TOKEN`; das Token bestimmt die Autor-Identität des erzeugten Issues (Repository-Owner). Die Ereignisvalidierung akzeptiert inzwischen auch das `github-actions`-Konto — das Secret ist damit keine Validierungsvoraussetzung mehr, bleibt aber verbindlicher Bestandteil des Workflows.
 3. **Label sicherstellen:** Das Typlabel wird idempotent per `gh label create ... --force` unter `GITHUB_TOKEN` angelegt (Farbe `#5319E7`, Konvention `automated-*`).
 4. **Duplikatprüfung:** Existiert bereits ein offenes Issue mit dem Typlabel (`gh issue list --state open --label`), wird die Erzeugung übersprungen — erfolgreicher Lauf mit Log-Hinweis „Skipped: an open review issue already exists (#N)".
-5. **Issue erzeugen:** `gh issue create` läuft unter `REVIEW_ISSUE_TOKEN`, damit der Repository-Owner als Autor erscheint — Voraussetzung für die Owner-Prüfung der `SeparatesKonto`-Ereignisvalidierung. Der Issue-Body beginnt mit der frei stehenden Zeile `@softwarewerkstatt`, gefolgt vom festen Prüfauftrag; der Lauf protokolliert die Issue-URL.
+5. **Issue erzeugen:** `gh issue create` läuft unter `REVIEW_ISSUE_TOKEN`, damit der Repository-Owner als Autor erscheint (die `SeparatesKonto`-Ereignisvalidierung akzeptiert neben dem Owner inzwischen auch das vertrauenswürdige `github-actions`-Konto). Der Issue-Body beginnt mit der frei stehenden Zeile `@softwarewerkstatt`, gefolgt vom festen Prüfauftrag; der Lauf protokolliert die Issue-URL.
 
 Eine `concurrency`-Gruppe je Workflow mit `cancel-in-progress: false` serialisiert Cron- gegen manuelle Läufe, sodass die Sequenz Duplikatprüfung → Erzeugung nicht halbiert werden kann.
 
@@ -105,7 +105,7 @@ Eine `concurrency`-Gruppe je Workflow mit `cancel-in-progress: false` serialisie
 | Name | Herkunft | Zweck |
 |------|----------|-------|
 | `GITHUB_TOKEN` | Automatisch von GitHub Actions bereitgestellt | Wird fuer die Semantic-Release-Dry-Run-Analyse sowie fuer die Erstellung des GitHub-Release inkl. Tag und Asset-Upload verwendet. Erfordert `contents: write`, aber keine Schreibfreigabe auf den geschuetzten `main`-Branch. |
-| `REVIEW_ISSUE_TOKEN` | Manuell hinterlegtes Repository-Secret: feingranulierter PAT des Owners `martin-stromberg` (Repository-Zugriff nur auf dieses Repository, Permission **Issues: Read and write**) | Autor-Identität der von den Review-Workflows erzeugten Issues — die `SeparatesKonto`-Ereignisvalidierung akzeptiert Erwähnungen nur vom Repository-Owner; ein unter `GITHUB_TOKEN` erzeugtes Issue (Autor `github-actions[bot]`) würde verworfen. |
+| `REVIEW_ISSUE_TOKEN` | Manuell hinterlegtes Repository-Secret: feingranulierter PAT des Owners `martin-stromberg` (Repository-Zugriff nur auf dieses Repository, Permission **Issues: Read and write**) | Autor-Identität der von den Review-Workflows erzeugten Issues — sie erscheinen unter dem Repository-Owner. Die `SeparatesKonto`-Ereignisvalidierung akzeptiert inzwischen auch `github-actions[bot]`; das Secret bleibt gleichwohl Pflicht, weil der Workflow-Guard ohne es abbricht. |
 
 Abgesehen von `REVIEW_ISSUE_TOKEN` für die geplanten Review-Workflows (einmalige Betriebshandlung, siehe Abschnitt „Geplante Review-Workflows") sind keine weiteren, manuell zu hinterlegenden Secrets erforderlich.
 

@@ -6,12 +6,12 @@ name: Create Review Issue (reusable)
 # label, title, period and issue body. The free-standing @softwarewerkstatt
 # mention in the issue body notifies the bot account, whose notification inbox
 # is monitored by the application's SCM event monitoring (SeparatesKonto mode,
-# reason = mention). The issue must be authored by the repository owner, so
-# `gh issue create` runs under the REVIEW_ISSUE_TOKEN repository secret
-# (fine-grained PAT of the owner). A GITHUB_TOKEN issue would be authored by
-# github-actions[bot] and rejected by the owner validation - there is
-# intentionally no fallback. One-time secret setup is documented in
-# docs/CI_CD.md.
+# reason = mention). `gh issue create` runs under the REVIEW_ISSUE_TOKEN
+# repository secret (fine-grained PAT of the owner), so the issue keeps the
+# repository owner as its author. Issues authored by github-actions[bot] are
+# accepted by the SCM event validation since #394; the PAT is retained
+# intentionally to keep review issues owner-authored. One-time secret setup
+# is documented in docs/CI_CD.md.
 
 "on":
   workflow_call:
@@ -62,7 +62,7 @@ jobs:
           REVIEW_ISSUE_TOKEN: ${{ secrets.REVIEW_ISSUE_TOKEN }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:REVIEW_ISSUE_TOKEN)) {
-            Write-Error "Repository secret REVIEW_ISSUE_TOKEN is not set. Add a fine-grained PAT of the repository owner (repository access: this repository only, permission: Issues read and write) as an Actions secret named REVIEW_ISSUE_TOKEN - see docs/CI_CD.md. There is no fallback to GITHUB_TOKEN, because an issue authored by github-actions[bot] would be rejected by the SCM event validation."
+            Write-Error "Repository secret REVIEW_ISSUE_TOKEN is not set. Add a fine-grained PAT of the repository owner (repository access: this repository only, permission: Issues read and write) as an Actions secret named REVIEW_ISSUE_TOKEN - see docs/CI_CD.md. The PAT intentionally keeps the created issue authored by the repository owner."
             exit 1
           }
         shell: pwsh
