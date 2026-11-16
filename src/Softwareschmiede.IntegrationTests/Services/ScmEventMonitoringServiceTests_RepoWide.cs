@@ -25,7 +25,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -58,7 +58,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
             new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 42));
         ConfigureObservations(fixture);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -86,7 +86,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
             new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         ConfigureObservations(fixture, viewerReactedNumber: 7);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -113,7 +113,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
         await AddTaskWithIssueAsync(fixture, 7);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 7));
         ConfigureObservations(fixture, viewerReactedNumber: 7);
-        var monitor = Monitor(fixture);
+        var monitor = fixture.Monitor;
 
         await monitor.RunOnceAsync();
         await monitor.RunOnceAsync();
@@ -136,7 +136,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
         var taskId = await AddTaskWithIssueAsync(fixture, 7);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 7));
         ConfigureObservations(fixture);
-        var monitor = Monitor(fixture);
+        var monitor = fixture.Monitor;
 
         await monitor.RunOnceAsync();
         await monitor.RunOnceAsync();
@@ -159,7 +159,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
         await AddRepositoryAsync(fixture, "https://github.com/owner/inactive", aktiv: false);
         await AddRepositoryAsync(fixture, "https://example.org/other/repo", pluginTyp: "Other.Plugin");
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         fixture.Git.As<IScmEventSource>().Verify(x => x.EnumerateReferencesAsync(
             It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -182,7 +182,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
         fixture.Git.As<IScmEventSource>().Setup(x => x.EnumerateReferencesAsync(
                 It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ScmProviderException(ScmProviderFailureKind.Temporary, "Verbindung unterbrochen."));
-        var monitor = Monitor(fixture);
+        var monitor = fixture.Monitor;
 
         await monitor.RunOnceAsync();
 
@@ -202,8 +202,54 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
             It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    private static ScmEventMonitoringService Monitor(ScmDispatchFixture fixture)
-        => fixture.Services.GetRequiredService<ScmEventMonitoringService>();
+    /// <summary>Eine Beobachtung des vertrauenswürdigen github-actions-Kontos mit frei stehendem
+    /// Keyword löst auf einer unzugeordneten Referenz Aufgabenanlage und Inbox-Ereignis aus.</summary>
+    [Fact]
+    public async Task Monitor_GitHubActionsAuthoredTrigger_CreatesTask()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await AddRepositoryAsync(fixture);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureObservations(fixture, authorId: "U_gha", authorLogin: "github-actions[bot]");
+        fixture.ConfigureIssue(9);
+
+        await fixture.Monitor.RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var task = Assert.Single(await db.Aufgaben.Include(x => x.IssueReferenz).ToListAsync());
+        Assert.Equal(9, task.IssueReferenz!.IssueNummer);
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        Assert.Equal(task.Id, item.AufgabeId);
+        Assert.Equal("github-actions[bot]", ScmEventStore.Observation(item).AuthorLogin);
+        Assert.DoesNotContain(await db.ScmContentSnapshots.ToListAsync(),
+            x => x.Diagnostic == "Textversion stammt nicht vom Repository-Owner");
+    }
+
+    /// <summary>Ein Fremd-Bot-Login steht nicht auf der Vertrauensliste: Der Kommentar mit gültigem
+    /// Trigger wird mit der Owner-Diagnose verworfen, ohne Ereignis und ohne neue Aufgabe.</summary>
+    [Fact]
+    public async Task Monitor_ForeignBotAuthoredTrigger_StillRejected()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await AddTaskWithIssueAsync(fixture, 7);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 7));
+        ConfigureObservations(fixture, authorId: "U_dep", authorLogin: "dependabot[bot]");
+
+        await fixture.Monitor.RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        Assert.Empty(await db.ScmIncomingEvents.ToListAsync());
+        Assert.Single(await db.Aufgaben.ToListAsync());
+        var snapshot = Assert.Single(await db.ScmContentSnapshots.Where(x => x.ContentKey.EndsWith("C_7")).ToListAsync());
+        Assert.Equal("Textversion stammt nicht vom Repository-Owner", snapshot.Diagnostic);
+        Assert.True(snapshot.IdentityResolved);
+        Assert.Empty(fixture.Prompts);
+        Assert.Empty(fixture.Sessions);
+    }
 
     private static async Task<Guid> AddRepositoryAsync(ScmDispatchFixture fixture,
         string url = "https://github.com/owner/repo", bool aktiv = true, string? pluginTyp = null)
@@ -256,13 +302,14 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
                 It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(references);
 
-    private static void ConfigureObservations(ScmDispatchFixture fixture, int? viewerReactedNumber = null)
+    private static void ConfigureObservations(ScmDispatchFixture fixture, int? viewerReactedNumber = null,
+        string? authorId = "U_1", string? authorLogin = "owner")
     {
         var time = DateTimeOffset.UtcNow;
         fixture.Git.As<IScmEventSource>().Setup(x => x.ReadEventsAsync(It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()))
             .Returns((ScmEventReadRequest request, CancellationToken _) => Task.FromResult(new ScmEventBatch(request,
                 request.ContentKind == ScmContentKind.IssueComment ? [new ScmEventObservation(request.Reference, request.ContentKind,
-                    "C_" + request.Reference.Number, "42", time, time, null, "U_1", "owner", null, null,
+                    "C_" + request.Reference.Number, "42", time, time, null, authorId, authorLogin, null, null,
                     "$Softwareschmiede test", "https://github.com/owner/repo/issues/" + request.Reference.Number, time,
                     request.Reference.Number == viewerReactedNumber ? new[] { "EYES" } : null)] : [])));
     }

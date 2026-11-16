@@ -12,6 +12,9 @@ public sealed class UpdateOptions
     /// <summary>Name des erwarteten Release-Assets.</summary>
     public string AssetName { get; init; } = "release.zip";
 
+    /// <summary>Name des erwarteten Manifest-Assets für die Paket-Verifikation.</summary>
+    public string ManifestAssetName { get; init; } = "update.json";
+
     /// <summary>Name des Update-Arbeitsverzeichnisses relativ zum Programmverzeichnis.</summary>
     public string UpdateDirectoryName { get; init; } = "updates";
 

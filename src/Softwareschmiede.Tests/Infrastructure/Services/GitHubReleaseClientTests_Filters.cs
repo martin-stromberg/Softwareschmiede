@@ -226,7 +226,7 @@ public sealed class GitHubReleaseClientTests_Filters
         result.Release!.Version.Should().Be("1.3.0-rc.1");
         result.Release.TagName.Should().Be("v1.3.0-rc.1");
         result.Release.IsPrerelease.Should().BeTrue();
-        result.Release.DownloadUrl.Should().Be("https://example.invalid/release-1.3.0-rc.1.zip");
+        result.Release.PaketDownload.Primary.Should().Be("https://example.invalid/release-1.3.0-rc.1.zip");
     }
 
     private static GitHubReleaseClient CreateSut(HttpClient httpClient)

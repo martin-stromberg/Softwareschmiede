@@ -80,6 +80,10 @@ public sealed class UpdateE2EAntwort
     /// <summary>Bei <c>true</c> wird statt einer Antwort ein absichtlicher Transportfehler geworfen.</summary>
     [JsonPropertyName("fault")]
     public bool Fehler { get; set; }
+
+    /// <summary>Überschreibt die URL-basierte Klassifizierung der Anfrage im Protokoll.</summary>
+    [JsonPropertyName("art")]
+    public string? Art { get; set; }
 }
 
 /// <summary>

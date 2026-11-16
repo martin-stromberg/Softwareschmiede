@@ -45,6 +45,10 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal readonly List<ScmResponseRequest> Responses = [];
     internal readonly List<ScmNotification> Notifications = [];
     internal readonly ScmEventRepository Repository = new("test-scm", "github.com", "R_1", "owner", "repo", "U_1", "U_1", "owner", true);
+    /// <summary>Repository-Darstellung des dedizierten Bot-Kontos, wie die Quelle sie im Modus
+    /// <see cref="ScmKontoModus.SeparatesKonto"/> nach der Auflösung liefert.</summary>
+    internal static readonly ScmEventRepository BotRepository = new("test-scm", "github.com", "R_1",
+        "owner", "repo", "U_1", "BOT", "scm-bot", true, ScmKontoModus.SeparatesKonto);
     internal ServiceProvider Services { get; }
     internal Func<Task>? CloneGate { get; set; }
     internal string Prompt { get; set; }
@@ -167,7 +171,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
 
     internal async Task<(Guid TaskId, Guid EventId)> AddAsync(AufgabeStatus status = AufgabeStatus.Neu, bool configured = false, bool cloned = true,
         ScmReferenceKind referenceKind = ScmReferenceKind.Issue, ScmContentKind contentKind = ScmContentKind.IssueComment, string body = "$Softwareschmiede test",
-        ScmEventRepository? eventRepository = null)
+        ScmEventRepository? eventRepository = null, string? authorId = "U_1", string? authorLogin = "owner")
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -182,13 +186,47 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
             ? "https://github.com/owner/repo/pull/7"
             : "https://github.com/owner/repo/issues/7";
         var observation = new ScmEventObservation(new(eventRepository ?? Repository, referenceKind, 7), contentKind, Guid.NewGuid().ToString(), "42",
-            time, time, null, "U_1", "owner", null, null, body, url, time);
+            time, time, null, authorId, authorLogin, null, null, body, url, time);
         await scope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(task.Id, task.Id.ToString(), new(new(observation.Reference, observation.ContentKind, null, time), [observation]));
         return (task.Id, await db.ScmIncomingEvents.Where(x => x.AufgabeId == task.Id).Select(x => x.Id).SingleAsync());
     }
 
     /// <summary>Registriert eine Inbox-Notification, die die gemockte <see cref="IScmNotificationSource"/> liefert.</summary>
     internal void AddNotification(ScmNotification notification) => Notifications.Add(notification);
+
+    /// <summary>Lässt <see cref="IScmEventSource.ReadIssueAsync"/> ein Standard-Issue liefern; mit
+    /// <paramref name="number"/> nur für Issue-Referenzen dieser Nummer, sonst für jede Referenz.</summary>
+    internal void ConfigureIssue(int? number = null)
+        => Git.As<IScmEventSource>().Setup(x => x.ReadIssueAsync(
+                It.Is<ScmEventReference>(r => r.Kind == ScmReferenceKind.Issue
+                    && (!number.HasValue || r.Number == number.Value)),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ScmEventReference reference, CancellationToken _) => new Issue(reference.Number,
+                "Issue Titel " + reference.Number, "Beschreibungstext", Array.Empty<string>(), null,
+                "https://github.com/owner/repo/issues/" + reference.Number));
+
+    /// <summary>Lässt <see cref="IScmEventSource.ReadEventsAsync"/> für Issue-Kommentare eine
+    /// Mention-Observation mit Bot-Ansprache liefern; der Autor ist über
+    /// <paramref name="authorId"/>/<paramref name="authorLogin"/> steuerbar.</summary>
+    internal void ConfigureMentionObservations(string? authorId = "U_1", string? authorLogin = "owner")
+    {
+        var time = DateTimeOffset.UtcNow;
+        Git.As<IScmEventSource>().Setup(x => x.ReadEventsAsync(It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()))
+            .Returns((ScmEventReadRequest request, CancellationToken _) => Task.FromResult(new ScmEventBatch(request,
+                request.ContentKind == ScmContentKind.IssueComment ? [new ScmEventObservation(request.Reference, request.ContentKind,
+                    "C_" + request.Reference.Number, "42", time, time, null, authorId, authorLogin, null, null,
+                    "@scm-bot bitte übernehmen", "https://github.com/owner/repo/issues/" + request.Reference.Number, time)] : [])));
+    }
+
+    /// <summary>Der Monitoring-Dienst aus dem Service-Provider der Fixture.</summary>
+    internal ScmEventMonitoringService Monitor => Services.GetRequiredService<ScmEventMonitoringService>();
+
+    /// <summary>Setzt den Konto-Modus über den <see cref="AppEinstellungService"/>.</summary>
+    internal async Task SetKontoModusAsync(ScmKontoModus modus)
+    {
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().SetScmKontoModusAsync(modus);
+    }
 
     internal async Task DispatchAsync(Guid id)
     {

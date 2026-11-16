@@ -14,7 +14,8 @@ public partial class End2EndTest
 
     /// <summary>
     /// Fixture-Smoke 1 (Plan: <c>Fixture_UsesIsolatedRealUpdatePipeline</c>): Echte JSON- und
-    /// ZIP-Pipeline über den Fixture-HttpMessageHandler, isolierte Testpfade, Stable-/RC-Auswahl,
+    /// ZIP-Pipeline über den Fixture-HttpMessageHandler inklusive Manifest-Abruf und
+    /// SHA-256-Verifikation, isolierte Testpfade, Stable-/RC-Auswahl,
     /// kontrollierte Launcher-/Shutdown-Grenze, DB-erhaltender Neustart und der Nachweis, dass
     /// unbekannte Requests ohne Netzwerkfallback scheitern.
     /// </summary>
@@ -47,9 +48,15 @@ public partial class End2EndTest
                 && DatenText(e, "version") == UpdateE2EFixture.StableVersion
                 && DatenBool(e, "isPrerelease") == false);
 
-            // Echte ZIP-Pipeline: Download/Entpacken/Skripterzeugung liefen real (Phasen protokolliert).
-            Assert.True(protokoll.Count(e => e.Ereignis == UpdateE2EEreignisse.PreparationPhase) >= 3,
-                "Mindestens drei Vorbereitungsphasen (Download, Entpacken, UpdateVorbereiten) erwartet.");
+            // Echte ZIP-Pipeline: Download/Verifizieren/Entpacken/Skripterzeugung liefen real
+            // (Phasen protokolliert); der Manifest-Abruf lief über den Fixture-Handler.
+            Assert.True(protokoll.Count(e => e.Ereignis == UpdateE2EEreignisse.PreparationPhase) >= 4,
+                "Mindestens vier Vorbereitungsphasen (Download, Verifizieren, Entpacken, UpdateVorbereiten) erwartet.");
+            Assert.Contains(protokoll, e => e.Ereignis == UpdateE2EEreignisse.PreparationPhase
+                && DatenText(e, "phase") == "Verifizieren");
+            Assert.Contains(protokoll, e => e.Ereignis == UpdateE2EEreignisse.HttpRequest
+                && DatenText(e, "art") == "manifest"
+                && DatenText(e, "url") == fixture.StableManifestDownloadUrl);
             var vorbereitung = Assert.Single(protokoll, e => e.Ereignis == UpdateE2EEreignisse.PreparationCompleted);
             var scriptPfad = DatenText(vorbereitung, "scriptPath");
             Assert.NotNull(scriptPfad);

@@ -180,23 +180,73 @@ public sealed class ScmEventValidationServiceTests
         Assert.Null(ScmEventValidationService.GetRejection(observation));
     }
 
+    /// <summary>Ein Autor aus der Vertrauensliste legitimiert die Textversion auch ohne
+    /// Owner-Identität; der Login-Vergleich ist case-insensitive.</summary>
+    [Theory]
+    [InlineData("github-actions[bot]")]
+    [InlineData("app/github-actions")]
+    [InlineData("GITHUB-ACTIONS[BOT]")]
+    public void GitHubActionsAuthor_IsAccepted(string authorLogin)
+    {
+        var observation = Observe("$Softwareschmiede bitte", "bot-id", null, false, authorLogin: authorLogin);
+        Assert.Null(ScmEventValidationService.GetRejection(observation));
+    }
+
+    /// <summary>Die Vertrauenslisten-Akzeptanz gilt im SeparatesKonto an derselben Stelle wie
+    /// die Owner-Prüfung: Autor github-actions mit frei stehender Erwähnung wird angenommen.</summary>
+    [Fact]
+    public void SeparatesKonto_GitHubActionsAuthor_IsAccepted()
+    {
+        var observation = ObserveSeparate("@scm-bot bitte", "bot-id", null, false, authorLogin: "github-actions[bot]");
+        Assert.Null(ScmEventValidationService.GetRejection(observation));
+    }
+
+    /// <summary>Auch als Bearbeiter gilt github-actions als vertrauenswürdiger Akteur —
+    /// unabhängig davon, wer den ursprünglichen Autor stellt, in beiden Kontomodi.</summary>
+    [Theory]
+    [InlineData("42")]
+    [InlineData("7")]
+    public void GitHubActionsEditor_IsAccepted(string author)
+    {
+        Assert.Null(ScmEventValidationService.GetRejection(
+            Observe("$Softwareschmiede bitte", author, "bot-id", true, editorLogin: "github-actions[bot]")));
+        Assert.Null(ScmEventValidationService.GetRejection(
+            ObserveSeparate("@scm-bot bitte", author, "bot-id", true, editorLogin: "github-actions[bot]")));
+    }
+
+    /// <summary>Fremde Bot- und Benutzer-Logins stehen nicht auf der Vertrauensliste und
+    /// bleiben in beiden Kontomodi abgelehnt.</summary>
+    [Theory]
+    [InlineData("dependabot[bot]")]
+    [InlineData("renovate[bot]")]
+    [InlineData("fremder-benutzer")]
+    public void ForeignBotLogins_StayRejected(string authorLogin)
+    {
+        Assert.Equal("Textversion stammt nicht vom Repository-Owner", ScmEventValidationService.GetRejection(
+            Observe("$Softwareschmiede bitte", "bot-id", null, false, authorLogin: authorLogin)));
+        Assert.Equal("Textversion stammt nicht vom Repository-Owner", ScmEventValidationService.GetRejection(
+            ObserveSeparate("@scm-bot bitte", "bot-id", null, false, authorLogin: authorLogin)));
+    }
+
     private static ScmEventObservation Observe(string body, string author, string? editor, bool edited,
-        IReadOnlyList<string>? viewerReactions = null, ScmContentKind kind = ScmContentKind.IssueComment)
+        IReadOnlyList<string>? viewerReactions = null, ScmContentKind kind = ScmContentKind.IssueComment,
+        string? authorLogin = "owner", string? editorLogin = null)
     {
         var date = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
         return new(new(new("test", "host", "repo42", "OWNER", "repo", "42", "42", "owner", true), ScmReferenceKind.Issue, 1),
-            kind, "node", "1", date, date, edited ? date : null, author, "owner", editor, null, body, "https://host/OWNER/repo/issues/1", date,
+            kind, "node", "1", date, date, edited ? date : null, author, authorLogin, editor, editorLogin, body, "https://host/OWNER/repo/issues/1", date,
             viewerReactions);
     }
 
     private static ScmEventObservation ObserveSeparate(string body, string author, string? editor, bool edited,
-        IReadOnlyList<string>? viewerReactions = null, ScmContentKind kind = ScmContentKind.IssueComment)
+        IReadOnlyList<string>? viewerReactions = null, ScmContentKind kind = ScmContentKind.IssueComment,
+        string? authorLogin = "owner", string? editorLogin = null)
     {
         var date = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
         var repository = new ScmEventRepository("test", "host", "repo42", "OWNER", "repo", "42", "bot-id", "scm-bot", true,
             Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto);
         return new(new(repository, ScmReferenceKind.Issue, 1),
-            kind, "node", "1", date, date, edited ? date : null, author, "owner", editor, null, body, "https://host/OWNER/repo/issues/1", date,
+            kind, "node", "1", date, date, edited ? date : null, author, authorLogin, editor, editorLogin, body, "https://host/OWNER/repo/issues/1", date,
             viewerReactions);
     }
 }

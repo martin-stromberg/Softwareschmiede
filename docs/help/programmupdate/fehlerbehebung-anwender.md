@@ -67,9 +67,11 @@ Der Vorgang wurde abgebrochen — durch den **Abbrechen**-Button im Fortschritts
 
 ## Hinweis/Dialog „Update konnte nicht vorbereitet werden."
 
-Das Herunterladen, Entpacken oder die Vorbereitung des Update-Pakets ist fehlgeschlagen.
+Das Herunterladen, die Verifikation, das Entpacken oder die Vorbereitung des Update-Pakets ist fehlgeschlagen.
 
 > **Hinweis:** Bei einem vorübergehenden Serverfehler (HTTP 5xx) versucht die Anwendung automatisch einmalig einen alternativen Download-Pfad — dieser interne Mechanismus ist nicht sichtbar und benötigt kein Zutun. Erscheint die Fehlermeldung dennoch, sind beide Pfade gescheitert oder es lag eine andere Fehlerart vor (z. B. Verbindungsabbruch, Zeitüberschreitung).
+
+> **Hinweis:** Bricht der Vorgang in der Phase „Verifikation" ab, konnte die Unversehrtheit des heruntergeladenen Pakets nicht bestätigt werden — die Soll-Prüfsumme war nicht abrufbar oder stimmte nicht mit dem Paket überein. Das Update wird dann absichtlich verworfen, statt ein möglicherweise beschädigtes oder verändertes Paket zu installieren. Es wurde nichts verändert; wiederholen Sie den Vorgang später. Tritt der Fehler wiederholt auf, wenden Sie sich an den Support.
 
 1. Prüfen Sie die Internetverbindung und den freien Speicherplatz im Programmverzeichnis.
 2. Prüfen Sie, ob ein Virenscanner oder fehlende Schreibrechte den Dateizugriff blockieren.

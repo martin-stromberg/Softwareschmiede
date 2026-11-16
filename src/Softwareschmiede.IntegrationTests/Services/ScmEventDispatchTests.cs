@@ -131,6 +131,23 @@ public sealed class ScmEventDispatchTests
         Assert.Equal(101, fixture.Responses.Count(x => x.Kind == Domain.ValueObjects.ScmResponseKind.Reaction));
     }
 
+    /// <summary>A stored github-actions observation passes dispatch revalidation via the trust
+    /// list and is delivered like an owner-authored event.</summary>
+    [Fact]
+    public async Task Dispatch_GitHubActionsAuthoredObservation_Delivers()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (_, eventId) = await fixture.AddAsync(configured: true, authorId: "U_gha", authorLogin: "github-actions[bot]");
+
+        await fixture.DispatchAsync(eventId);
+
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("Zugestellt", item.Status);
+        Assert.NotNull(item.DeliveryAttemptId);
+        Assert.Single(fixture.Prompts);
+    }
+
     /// <summary>The second start waits before clone preparation and reuses the first run and its files.</summary>
     [Fact]
     public async Task ConcurrentDispatchAndManualStart_PreserveWorkspaceAndStartOneProcess()

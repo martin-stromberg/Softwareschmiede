@@ -15,9 +15,6 @@ namespace Softwareschmiede.IntegrationTests.Services;
 /// repository-weite Enumeration; Verwerfungen werden sichtbar ohne Fehlalarm.</summary>
 public sealed class ScmEventMonitoringServiceTests_Notifications
 {
-    private static readonly ScmEventRepository BotRepository = new("test-scm", "github.com", "R_1",
-        "owner", "repo", "U_1", "BOT", "scm-bot", true, ScmKontoModus.SeparatesKonto);
-
     /// <summary>Eine mention-Notification erzeugt Referenz → Read → Resolver-Aufgabe → Inbox-Ereignis;
     /// die repository-weite Enumeration läuft nicht.</summary>
     [Fact]
@@ -26,16 +23,14 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await SetKontoModusAsync(fixture, ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
         ConfigureBotResolution(fixture);
-        ConfigureMentionObservations(fixture);
-        fixture.Git.As<IScmEventSource>().Setup(x => x.ReadIssueAsync(It.IsAny<ScmEventReference>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ScmEventReference reference, CancellationToken _) =>
-                new Issue(reference.Number, "Titel", "Body", [], null, "https://github.com/owner/repo/issues/" + reference.Number));
+        fixture.ConfigureMentionObservations();
+        fixture.ConfigureIssue();
         fixture.AddNotification(new ScmNotification("T_1", "R_1", "github.com", "owner", "repo",
             ScmReferenceKind.Issue, 7, "mention", DateTimeOffset.UtcNow));
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -53,6 +48,37 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         Assert.Contains("1 verarbeitet, 0 verworfen", checkpoint.Diagnostic);
     }
 
+    /// <summary>Referenzfall SeparatesKonto: Eine mention-Notification auf ein vom Workflow
+    /// (github-actions) verfasstes Issue führt über die Vertrauensliste zu Aufgabenanlage
+    /// und regulärer Zustellung — nicht zur Owner-Ablehnungsdiagnose.</summary>
+    [Fact]
+    public async Task Monitor_GitHubActionsAuthoredMention_CreatesTaskAndDispatches()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await AddRepositoryAsync(fixture);
+        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        ConfigureBotResolution(fixture);
+        fixture.ConfigureMentionObservations(authorId: "U_gha", authorLogin: "github-actions[bot]");
+        fixture.ConfigureIssue();
+        using (var settingsScope = fixture.Services.CreateScope())
+            await settingsScope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
+                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix);
+        fixture.AddNotification(new ScmNotification("T_1", "R_1", "github.com", "owner", "repo",
+            ScmReferenceKind.Issue, 7, "mention", DateTimeOffset.UtcNow));
+
+        await fixture.Monitor.RunOnceAsync();
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var task = Assert.Single(await db.Aufgaben.ToListAsync());
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        Assert.Equal(task.Id, item.AufgabeId);
+        Assert.Equal("github-actions[bot]", ScmEventStore.Observation(item).AuthorLogin);
+        Assert.Equal("Zugestellt", item.Status);
+        Assert.Single(fixture.Prompts);
+    }
+
     /// <summary>Eine Notification eines nicht registrierten Repositorys wird verworfen; die
     /// Verwerfungsdiagnose trägt das Inbox-Präfix und legt keinen Backoff an.</summary>
     [Fact]
@@ -61,12 +87,12 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await SetKontoModusAsync(fixture, ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
         ConfigureBotResolution(fixture);
         fixture.AddNotification(new ScmNotification("T_9", "R_FOREIGN", "github.com", "other", "other-repo",
             ScmReferenceKind.Issue, 5, "mention", DateTimeOffset.UtcNow));
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -86,15 +112,15 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await SetKontoModusAsync(fixture, ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
         ConfigureBotResolution(fixture);
-        ConfigureMentionObservations(fixture);
+        fixture.ConfigureMentionObservations();
         fixture.AddNotification(new ScmNotification("T_1", "R_1", "github.com", "owner", "repo",
             ScmReferenceKind.Issue, 7, "review_requested", DateTimeOffset.UtcNow));
         fixture.AddNotification(new ScmNotification("T_2", "R_1", "github.com", "owner", "repo",
             ScmReferenceKind.Issue, 8, "subscribed", DateTimeOffset.UtcNow));
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -111,13 +137,13 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await SetKontoModusAsync(fixture, ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
         ConfigureBotResolution(fixture);
-        ConfigureMentionObservations(fixture);
+        fixture.ConfigureMentionObservations();
         fixture.Git.As<IScmNotificationSource>().Setup(x => x.EnumerateNotificationsAsync(
                 It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ScmProviderException(ScmProviderFailureKind.Temporary, "Verbindung unterbrochen."));
-        var monitor = Monitor(fixture);
+        var monitor = fixture.Monitor;
 
         await monitor.RunOnceAsync();
 
@@ -164,7 +190,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await SetKontoModusAsync(fixture, ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
         ConfigureBotResolution(fixture);
         using (var scope = fixture.Services.CreateScope())
         {
@@ -173,7 +199,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
             await db.SaveChangesAsync();
         }
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var verify = fixture.Services.CreateScope();
         var db2 = verify.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -191,7 +217,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, "https://ghe-a.example.com/owner/repo-a", "repo-a");
         await AddRepositoryAsync(fixture, "https://ghe-b.example.com/owner/repo-b", "repo-b");
-        await SetKontoModusAsync(fixture, ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
         var repositoryA = new ScmEventRepository("test-scm", "ghe-a.example.com", "R_SAME",
             "owner", "repo-a", "U_1", "BOT", "scm-bot", true, ScmKontoModus.SeparatesKonto);
         var repositoryB = new ScmEventRepository("test-scm", "ghe-b.example.com", "R_B",
@@ -208,7 +234,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
                         ScmReferenceKind.Issue, 9, "mention", DateTimeOffset.UtcNow) }
                     : Array.Empty<ScmNotification>()));
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -228,15 +254,15 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await SetKontoModusAsync(fixture, ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
         ConfigureBotResolution(fixture);
-        var monitor = Monitor(fixture);
+        var monitor = fixture.Monitor;
 
         await monitor.RunOnceAsync();
         fixture.Git.As<IScmNotificationSource>().Verify(x => x.EnumerateNotificationsAsync(
             It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Once);
 
-        await SetKontoModusAsync(fixture, ScmKontoModus.Benutzerkonto);
+        await fixture.SetKontoModusAsync(ScmKontoModus.Benutzerkonto);
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
             .Returns((ScmRepositoryContext context, CancellationToken _) =>
@@ -250,30 +276,11 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
             It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    private static ScmEventMonitoringService Monitor(ScmDispatchFixture fixture)
-        => fixture.Services.GetRequiredService<ScmEventMonitoringService>();
-
-    private static async Task SetKontoModusAsync(ScmDispatchFixture fixture, ScmKontoModus modus)
-    {
-        using var scope = fixture.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().SetScmKontoModusAsync(modus);
-    }
-
     private static void ConfigureBotResolution(ScmDispatchFixture fixture)
         => fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
             .Returns((ScmRepositoryContext context, CancellationToken _) =>
-                Task.FromResult(BotRepository with { Konto = context.Konto }));
-
-    private static void ConfigureMentionObservations(ScmDispatchFixture fixture)
-    {
-        var time = DateTimeOffset.UtcNow;
-        fixture.Git.As<IScmEventSource>().Setup(x => x.ReadEventsAsync(It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()))
-            .Returns((ScmEventReadRequest request, CancellationToken _) => Task.FromResult(new ScmEventBatch(request,
-                request.ContentKind == ScmContentKind.IssueComment ? [new ScmEventObservation(request.Reference, request.ContentKind,
-                    "C_" + request.Reference.Number, "42", time, time, null, "U_1", "owner", null, null,
-                    "@scm-bot bitte übernehmen", "https://github.com/owner/repo/issues/" + request.Reference.Number, time)] : [])));
-    }
+                Task.FromResult(ScmDispatchFixture.BotRepository with { Konto = context.Konto }));
 
     private static async Task AddRepositoryAsync(ScmDispatchFixture fixture,
         string repositoryUrl = "https://github.com/owner/repo", string repositoryName = "repo")

@@ -55,6 +55,20 @@ public sealed class GitHubEventSourceTests
         api.AssertComplete();
     }
 
+    /// <summary>Ein Bot-/App-Autorknoten kommt mit seiner Identität unverändert in der
+    /// Beobachtung an — die Login-Prüfung der Validierung arbeitet auf genau diesem Wert.</summary>
+    [Fact]
+    public async Task BotAuthor_LoginFlowsIntoObservation()
+    {
+        var api = new FakeApi();
+        api.Add("comments?", new[] { new { id = 1, node_id = "C_1" } });
+        api.AddGraph(new { node = Node("C_1", "$Softwareschmiede bitte", authorId: "U_gha", authorLogin: "github-actions[bot]") });
+        var observation = Assert.Single((await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment))).Observations);
+        Assert.Equal("U_gha", observation.AuthorId);
+        Assert.Equal("github-actions[bot]", observation.AuthorLogin);
+        api.AssertComplete();
+    }
+
     /// <summary>Ein Fehler auf Folgeseite liefert niemals einen erfolgreich checkpointbaren Teilbatch.</summary>
     [Fact]
     public async Task FailedSecondPage_ThrowsWithoutGraphOrPartialBatch()
@@ -623,14 +637,14 @@ public sealed class GitHubEventSourceTests
     }
     private static Dictionary<string, object?> Node(string id, string body, DateTimeOffset? edited = null,
         string? editorId = "U_1", string? editorLogin = "owner", DateTimeOffset? updated = null,
-        object? reactionGroups = null) => new()
+        object? reactionGroups = null, string? authorId = "U_1", string? authorLogin = "owner") => new()
         {
             ["id"] = id,
             ["body"] = body,
             ["createdAt"] = Created,
             ["updatedAt"] = updated ?? edited ?? Created,
             ["lastEditedAt"] = edited,
-            ["author"] = new { id = "U_1", login = "owner" },
+            ["author"] = new { id = authorId, login = authorLogin },
             ["editor"] = edited is not null && editorId is not null ? new { id = editorId, login = editorLogin } : null,
             ["url"] = "https://evil.example/ignored",
             ["reactionGroups"] = reactionGroups ?? Array.Empty<object>()

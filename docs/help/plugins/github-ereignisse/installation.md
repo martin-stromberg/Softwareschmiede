@@ -32,7 +32,7 @@ Alternativ kann die Überwachung unter **Einstellungen → Automatisierung → A
 Das Repository kann zeitgesteuerte Abläufe enthalten, die regelmäßig Prüfauftrags-Issues mit frei stehender Erwähnung des separaten Kontos anlegen (wiederkehrende Architektur-/Sicherheits-, NuGet- und Compliance-Reviews). Damit diese Issues Ereignisse auslösen, gelten betriebsseitig zusätzliche Voraussetzungen:
 
 - Das separate Konto muss — wie oben beschrieben — Collaborator mit Schreibrecht auf dem Repository sein; sonst stellt GitHub die Erwähnungs-Benachrichtigung gar nicht zu.
-- Im Repository muss ein Secret mit einem Zugriffstoken des Repository-Owners hinterlegt sein, damit die erzeugten Issues unter dessen Identität entstehen — die Owner-Prüfung der Ereignisüberwachung würde ein Issue eines Automatisierungs-Bot-Kontos sonst verwerfen.
+- Im Repository muss ein Secret mit einem Zugriffstoken des Repository-Owners hinterlegt sein — ohne dieses Secret bricht der geplante Lauf bereits in seinem Guard-Schritt mit einer Fehlermeldung ab. Das Token sorgt dafür, dass die erzeugten Issues unter der Owner-Identität erscheinen; die Ereignisüberwachung selbst würde auch ein Issue des GitHub-Actions-Kontos (`github-actions[bot]`) annehmen — das Konto gilt als vertrauenswürdige Automatisierungs-Identität.
 
 Einrichtung, Gültigkeitsdauer und Erneuerung dieses Secrets sowie das Troubleshooting der Review-Workflows sind in `docs/CI_CD.md` (Abschnitt „Geplante Review-Workflows") beschrieben.
 

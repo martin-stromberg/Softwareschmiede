@@ -20,13 +20,19 @@ public sealed class ScmEventValidationService
 
     private const string QuoteChars = "'\"`´‚‘’„“”«»";
 
+    /// <summary>Vertrauenswürdige Automatisierungs-Logins, deren Textversionen dem Repository
+    /// selbst zugerechnet werden (beide Schreibweisen des GitHub-Kontos github-actions).</summary>
+    private static readonly IReadOnlyList<string> TrustedAutomationLogins = ["github-actions[bot]", "app/github-actions"];
+
     /// <summary>Normalisiert ein konfiguriertes Trigger-Keyword: Leere oder nur aus Leerraum
     /// bestehende Werte fallen auf <see cref="DefaultTriggerKeyword"/> zurück, sonst wird der
     /// getrimmte Wert verwendet.</summary>
     public static string NormalizeTriggerKeyword(string? triggerKeyword)
         => string.IsNullOrWhiteSpace(triggerKeyword) ? DefaultTriggerKeyword : triggerKeyword.Trim();
 
-    /// <summary>Prüft die vertrauenswürdige Provideridentität der beobachteten Textversion.</summary>
+    /// <summary>Prüft die vertrauenswürdige Provideridentität der beobachteten Textversion.
+    /// Als Akteur gilt neben dem Repository-Owner auch ein Eintrag aus
+    /// <see cref="TrustedAutomationLogins"/> (z. B. das GitHub-Konto github-actions).</summary>
     /// <param name="observation">Die beobachtete Textversion.</param>
     /// <param name="triggerKeyword">Das zu prüfende Trigger-Keyword; leere Werte fallen auf
     /// <see cref="DefaultTriggerKeyword"/> zurück.</param>
@@ -53,7 +59,8 @@ public sealed class ScmEventValidationService
         var actorLogin = edited ? observation.EditorLogin : observation.AuthorLogin;
         if (string.IsNullOrWhiteSpace(actorId) && string.IsNullOrWhiteSpace(actorLogin))
             return "Bearbeiter nicht bestimmbar";
-        if (!SameIdentity(actorId, actorLogin, repository.OwnerId, repository.Owner))
+        if (!SameIdentity(actorId, actorLogin, repository.OwnerId, repository.Owner)
+                && !IsTrustedAutomationLogin(actorLogin))
             return "Textversion stammt nicht vom Repository-Owner";
         if (observation.Body.Contains("<!-- softwareschmiede:", StringComparison.Ordinal))
             return "Eigene Antwort";
@@ -80,4 +87,10 @@ public sealed class ScmEventValidationService
             ? string.Equals(leftId, rightId, StringComparison.Ordinal)
             : !string.IsNullOrWhiteSpace(leftLogin) && !string.IsNullOrWhiteSpace(rightLogin)
               && string.Equals(leftLogin, rightLogin, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Der Login gehört einem vertrauenswürdigen Automatisierungskonto
+    /// (<see cref="TrustedAutomationLogins"/>, case-insensitive).</summary>
+    private static bool IsTrustedAutomationLogin(string? login)
+        => !string.IsNullOrWhiteSpace(login)
+            && TrustedAutomationLogins.Contains(login, StringComparer.OrdinalIgnoreCase);
 }
