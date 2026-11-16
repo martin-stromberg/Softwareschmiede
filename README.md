@@ -234,7 +234,7 @@ dotnet build src/Softwareschmiede.App/Softwareschmiede.App.csproj -c Debug
 dotnet run --project src/Softwareschmiede.App/Softwareschmiede.App.csproj
 ```
 
-Beim Build kopiert `CopyPluginsToOutput` die Plugin-DLLs nach `bin/<Configuration>/plugins/`.
+Beim Build kopiert `CopyPluginsToOutput` die Plugin-DLLs nach `bin/<Configuration>/plugins/`. Zur Laufzeit lädt der `PluginManager` nur whitelisted First-Party-Plugin-Assemblies — fremde DLLs im `plugins`-Verzeichnis werden nicht ausgeführt und als Warnung protokolliert.
 
 ## Typischer Ablauf
 

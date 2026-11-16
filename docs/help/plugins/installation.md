@@ -15,7 +15,9 @@
 
 ## Plugin-Verzeichnis
 
-Jedes Plugin muss im "plugin"-Verzeichnis der Anwendung abgelegt sein. Der `PluginManager` sucht sowohl nach DLLsdirekt im Verzeichnis als auch in den Unterordnern der ersten Ebene.
+Jedes Plugin muss im "plugins"-Verzeichnis der Anwendung abgelegt sein. Der `PluginManager` betrachtet als Ladekandidaten DLLs direkt im Verzeichnis sowie je Unterordner der ersten Ebene nur die zum Ordnernamen passende DLL (`<Ordner>\<Ordner>.dll`); übrige DLLs dort sind Abhängigkeiten des Plugins.
+
+Zusätzlich gilt eine fest kodierte Whitelist: Nur die mit der Anwendung ausgelieferten Plugin-Assemblies (Dateiname und echter Assembly-Name müssen übereinstimmen) werden geladen. Fremde DLLs im Plugin-Verzeichnis werden nicht ausgeführt und erzeugen einen Warn-Eintrag im Anwendungsprotokoll.
 
 Mit dem Kompilieren des Anwendungsprojekts werden die im Projekt enthaltenenen Plugins in das Buildverzeichnis kopiert, so dass sie auch ind er ENtwicklungsumgebung autmatisch verfügbar sind.
 
