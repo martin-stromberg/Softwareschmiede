@@ -19,9 +19,6 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
     private const string AccessibleUrl = "https://github.com/owner/repo";
     private const string InaccessibleUrl = "https://github.com/owner/private-repo";
 
-    private static readonly ScmEventRepository BotRepository = new("test-scm", "github.com", "R_1",
-        "owner", "repo", "U_1", "BOT", "scm-bot", true, ScmKontoModus.SeparatesKonto);
-
     /// <summary>Im separaten Konto blockiert ein 404 bei der Auflösung eines Repositorys nicht die
     /// Inbox: Die Erwähnung in einem erreichbaren Repository wird trotzdem eingelesen, und das
     /// betroffene Repository wird mit verständlicher Diagnose ausgelassen.</summary>
@@ -32,16 +29,14 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, AccessibleUrl, "repo");
         await AddRepositoryAsync(fixture, InaccessibleUrl, "private-repo");
-        await SetKontoModusAsync(fixture, ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
         ConfigureResolutionWithInaccessibleRepository(fixture);
-        ConfigureMentionObservations(fixture);
-        fixture.Git.As<IScmEventSource>().Setup(x => x.ReadIssueAsync(It.IsAny<ScmEventReference>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ScmEventReference reference, CancellationToken _) =>
-                new Issue(reference.Number, "Titel", "Body", [], null, "https://github.com/owner/repo/issues/" + reference.Number));
+        fixture.ConfigureMentionObservations();
+        fixture.ConfigureIssue();
         fixture.AddNotification(new ScmNotification("T_1", "R_1", "github.com", "owner", "repo",
             ScmReferenceKind.Issue, 27, "mention", DateTimeOffset.UtcNow));
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -64,11 +59,11 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, AccessibleUrl, "repo");
         await AddRepositoryAsync(fixture, InaccessibleUrl, "private-repo");
-        await SetKontoModusAsync(fixture, ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
         ConfigureResolutionWithInaccessibleRepository(fixture);
         var before = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -79,15 +74,6 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
             $"NextAttemptUtc liegt zu weit in der Zukunft: {failure.NextAttemptUtc - before} ms.");
     }
 
-    private static ScmEventMonitoringService Monitor(ScmDispatchFixture fixture)
-        => fixture.Services.GetRequiredService<ScmEventMonitoringService>();
-
-    private static async Task SetKontoModusAsync(ScmDispatchFixture fixture, ScmKontoModus modus)
-    {
-        using var scope = fixture.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().SetScmKontoModusAsync(modus);
-    }
-
     private static void ConfigureResolutionWithInaccessibleRepository(ScmDispatchFixture fixture)
         => fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
@@ -95,17 +81,7 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
                 context.RepositoryId.Contains("private-repo", StringComparison.OrdinalIgnoreCase)
                     ? Task.FromException<ScmEventRepository>(new ScmProviderException(ScmProviderFailureKind.Permanent,
                         "GitHub-Anfrage fehlgeschlagen (HTTP 404, github.com/repos/owner/private-repo)."))
-                    : Task.FromResult(BotRepository with { Konto = context.Konto }));
-
-    private static void ConfigureMentionObservations(ScmDispatchFixture fixture)
-    {
-        var time = DateTimeOffset.UtcNow;
-        fixture.Git.As<IScmEventSource>().Setup(x => x.ReadEventsAsync(It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()))
-            .Returns((ScmEventReadRequest request, CancellationToken _) => Task.FromResult(new ScmEventBatch(request,
-                request.ContentKind == ScmContentKind.IssueComment ? [new ScmEventObservation(request.Reference, request.ContentKind,
-                    "C_" + request.Reference.Number, "42", time, time, null, "U_1", "owner", null, null,
-                    "@scm-bot bitte übernehmen", "https://github.com/owner/repo/issues/" + request.Reference.Number, time)] : [])));
-    }
+                    : Task.FromResult(ScmDispatchFixture.BotRepository with { Konto = context.Konto }));
 
     private static async Task AddRepositoryAsync(ScmDispatchFixture fixture, string repositoryUrl, string repositoryName)
     {

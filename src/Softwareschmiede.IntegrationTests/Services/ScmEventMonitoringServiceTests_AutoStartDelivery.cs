@@ -25,12 +25,12 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         var repositoryId = await AddRepositoryAsync(fixture);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
-        ConfigureIssue(fixture, 9);
+        fixture.ConfigureIssue(9);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
                 .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -63,12 +63,12 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         var repositoryId = await AddRepositoryAsync(fixture);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
-        ConfigureIssue(fixture, 9);
+        fixture.ConfigureIssue(9);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
                 .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator");
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -101,8 +101,8 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         await AddRepositoryAsync(fixture);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
-        ConfigureIssue(fixture, 9);
-        var monitor = Monitor(fixture);
+        fixture.ConfigureIssue(9);
+        var monitor = fixture.Monitor;
 
         await monitor.RunOnceAsync();
 
@@ -161,8 +161,8 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         await AddRepositoryAsync(fixture);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
-        ConfigureIssue(fixture, 9);
-        await Monitor(fixture).RunOnceAsync();
+        fixture.ConfigureIssue(9);
+        await fixture.Monitor.RunOnceAsync();
         Guid eventId;
         using (var scope = fixture.Services.CreateScope())
         {
@@ -209,7 +209,7 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -224,9 +224,6 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Prompts);
     }
-
-    private static ScmEventMonitoringService Monitor(ScmDispatchFixture fixture)
-        => fixture.Services.GetRequiredService<ScmEventMonitoringService>();
 
     private static async Task<Guid> AddRepositoryAsync(ScmDispatchFixture fixture)
     {
@@ -297,10 +294,4 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
                     : Array.Empty<ScmEventObservation>())));
     }
 
-    private static void ConfigureIssue(ScmDispatchFixture fixture, int number)
-        => fixture.Git.As<IScmEventSource>().Setup(x => x.ReadIssueAsync(
-                It.Is<ScmEventReference>(r => r.Kind == ScmReferenceKind.Issue && r.Number == number), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ScmEventReference reference, CancellationToken _) => new Issue(reference.Number,
-                "Issue Titel " + reference.Number, "Beschreibungstext", Array.Empty<string>(), null,
-                "https://github.com/owner/repo/issues/" + reference.Number));
 }

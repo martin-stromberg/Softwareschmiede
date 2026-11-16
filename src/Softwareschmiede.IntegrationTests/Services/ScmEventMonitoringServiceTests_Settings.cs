@@ -24,7 +24,7 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync(configured: true);
-        var monitor = Monitor(fixture);
+        var monitor = fixture.Monitor;
 
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
@@ -115,7 +115,7 @@ public sealed class ScmEventMonitoringServiceTests_Settings
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
                 .SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "!Bearbeite");
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -144,9 +144,6 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
         Assert.Single(fixture.Prompts);
     }
-
-    private static ScmEventMonitoringService Monitor(ScmDispatchFixture fixture)
-        => fixture.Services.GetRequiredService<ScmEventMonitoringService>();
 
     private static async Task<Guid> AddTaskWithIssueAsync(ScmDispatchFixture fixture, int number)
     {

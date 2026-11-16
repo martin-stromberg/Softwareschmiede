@@ -24,10 +24,10 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         var repositoryId = await AddRepositoryAsync(fixture);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
-        ConfigureIssue(fixture, 9);
+        fixture.ConfigureIssue(9);
         var projectId = (await RepositoriesAsync(fixture))[0].ProjektId;
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -55,7 +55,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -81,8 +81,8 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         // Beschreibung und Kommentar sind beide qualifiziert.
         ConfigureObservations(fixture, descriptionQualified: true);
-        ConfigureIssue(fixture, 9);
-        var monitor = Monitor(fixture);
+        fixture.ConfigureIssue(9);
+        var monitor = fixture.Monitor;
 
         await monitor.RunOnceAsync();
         await monitor.RunOnceAsync();
@@ -106,7 +106,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture, body: "Kommentar ohne Trigger");
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -129,9 +129,9 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await AddRepositoryAsync(fixture);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture, viewerReactions: ["EYES"]);
-        ConfigureIssue(fixture, 9);
+        fixture.ConfigureIssue(9);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -153,7 +153,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -176,7 +176,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
                 It.IsAny<ScmEventReference>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ScmProviderException(ScmProviderFailureKind.Temporary, "Verbindung unterbrochen."));
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -196,8 +196,8 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await AddRepositoryAsync(fixture);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
-        ConfigureIssue(fixture, 9);
-        var monitor = Monitor(fixture);
+        fixture.ConfigureIssue(9);
+        var monitor = fixture.Monitor;
         await monitor.RunOnceAsync();
 
         var taskId = (await TasksAsync(fixture)).Single();
@@ -223,7 +223,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -249,7 +249,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -272,7 +272,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5, body: "PR Beschreibung\n\nCloses #9");
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -295,7 +295,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -322,7 +322,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5, body: "PR Beschreibung\n\nCloses #9");
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -347,7 +347,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5, sourceRepositoryId: "fork/repo");
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -374,7 +374,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5);
 
-        await Monitor(fixture).RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync();
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -386,9 +386,6 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Prompts);
     }
-
-    private static ScmEventMonitoringService Monitor(ScmDispatchFixture fixture)
-        => fixture.Services.GetRequiredService<ScmEventMonitoringService>();
 
     private static async Task<List<Guid>> TasksAsync(ScmDispatchFixture fixture)
     {
@@ -471,13 +468,6 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         DateTimeOffset time, IReadOnlyList<string>? viewerReactions = null)
         => new(request.Reference, request.ContentKind, nodeId, "42", time, time, null, "U_1", "owner", null, null,
             body, "https://github.com/owner/repo/issues/" + request.Reference.Number, time, viewerReactions);
-
-    private static void ConfigureIssue(ScmDispatchFixture fixture, int number)
-        => fixture.Git.As<IScmEventSource>().Setup(x => x.ReadIssueAsync(
-                It.Is<ScmEventReference>(r => r.Kind == ScmReferenceKind.Issue && r.Number == number), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ScmEventReference reference, CancellationToken _) => new Issue(reference.Number,
-                "Issue Titel " + reference.Number, "Beschreibungstext", Array.Empty<string>(), null,
-                "https://github.com/owner/repo/issues/" + reference.Number));
 
     private static void ConfigurePullRequest(ScmDispatchFixture fixture, int number,
         string branchName = "feature/branch", string body = "PR Beschreibung", string sourceRepositoryId = "owner/repo")
