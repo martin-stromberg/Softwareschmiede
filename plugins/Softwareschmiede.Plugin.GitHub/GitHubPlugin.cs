@@ -174,13 +174,14 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     /// <remarks>
     /// Stellt dem Agenten dieselbe gh-/git-Anmeldung zur Verfügung, die der Host für seine
     /// eigenen Aufrufe nutzt (<see cref="GetGhEnvironment"/>): <c>GH_TOKEN</c> für die
-    /// <c>gh</c>-CLI, ein <c>http.extraheader</c>-Eintrag für HTTPS-git-Operationen gegen
-    /// github.com (z. B. Push nach lokal behobenem Konflikt) sowie
-    /// <c>GIT_TERMINAL_PROMPT=0</c>, damit git bei fehlenden Credentials sauber fehlschlägt
-    /// statt interaktiv zu blockieren. Die Werte werden ausschließlich als Prozessumgebung
-    /// des CLI-Kindprozesses gesetzt — niemals in Prompts, Logs oder Persistenz.
+    /// <c>gh</c>-CLI, ein an den Host der Repository-URL gebundener
+    /// <c>http.extraheader</c>-Eintrag für HTTPS-git-Operationen (z. B. Push nach lokal
+    /// behobenem Konflikt) sowie <c>GIT_TERMINAL_PROMPT=0</c>, damit git bei fehlenden
+    /// Credentials sauber fehlschlägt statt interaktiv zu blockieren. Die Werte werden
+    /// ausschließlich als Prozessumgebung des CLI-Kindprozesses gesetzt — niemals in
+    /// Prompts, Logs oder Persistenz.
     /// </remarks>
-    public Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(ScmKontoModus konto, CancellationToken ct = default)
+    public Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(ScmKontoModus konto, string? repositoryUrl, CancellationToken ct = default)
     {
         var environment = new Dictionary<string, string?>
         {
@@ -192,26 +193,68 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
         if (!string.IsNullOrEmpty(token))
         {
             environment["GH_TOKEN"] = token;
-            AddGitHubHttpAuthHeader(environment, token);
+            AddGitHubHttpAuthHeader(environment, token, repositoryUrl);
         }
         return Task.FromResult<IReadOnlyDictionary<string, string?>>(environment);
     }
 
     /// <summary>
-    /// Setzt die HTTPS-git-Authentifizierung für github.com als <c>http.extraheader</c> über die
+    /// Setzt die HTTPS-git-Authentifizierung als <c>http.extraheader</c> über die
     /// <c>GIT_CONFIG_*</c>-Prozessumgebung — dasselbe Basic-Authorization-Schema, das
-    /// GitHub-Actions-Checkouts verwenden. Der Token bleibt rein prozessbasiert und wird
-    /// niemals in URLs, CLI-Argumenten oder Dateien persistiert.
+    /// GitHub-Actions-Checkouts verwenden. Der Key ist an den Host der Ziel-URL gebunden
+    /// (<c>http.https://&lt;host&gt;[:port]/.extraheader</c>); lässt sich daraus kein
+    /// HTTPS-Host bestimmen, wird kein Eintrag erzeugt (fail-closed). Der Token bleibt
+    /// rein prozessbasiert und wird niemals in URLs, CLI-Argumenten oder Dateien persistiert.
     /// </summary>
-    private static void AddGitHubHttpAuthHeader(IDictionary<string, string?> environment, string token)
+    private static void AddGitHubHttpAuthHeader(IDictionary<string, string?> environment, string token, string? targetUrl)
     {
+        var extraHeaderKey = TryBuildHttpExtraHeaderKey(targetUrl);
+        if (extraHeaderKey is null)
+        {
+            return;
+        }
+
         var credentials = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("x-access-token:" + token));
         environment["GIT_CONFIG_COUNT"] = "1";
-        environment["GIT_CONFIG_KEY_0"] = "http.https://github.com/.extraheader";
+        environment["GIT_CONFIG_KEY_0"] = extraHeaderKey;
         environment["GIT_CONFIG_VALUE_0"] = "AUTHORIZATION: basic " + credentials;
     }
 
-    private IDictionary<string, string> GetGitEnvironment(string? token = null)
+    /// <summary>
+    /// Bildet aus einer Repository-/Remote-URL den hostgebundenen <c>http.extraheader</c>-Key
+    /// (<c>http.https://&lt;host&gt;[:port]/.extraheader</c>): Die Eingabe wird zuerst über
+    /// <see cref="GitPluginBase{TPlugin}.ToHttpsRepositoryUrl"/> normalisiert, sodass auch
+    /// SSH-/SCP-gespeicherte URLs an den HTTPS-Host der Arbeitskopie binden. Nur absolute
+    /// HTTPS-URIs mit nicht-leerem Host liefern einen Key; der Host wird als
+    /// <see cref="Uri.IdnHost"/> (IDN → Punycode) übernommen, IPv6-Literale behalten über
+    /// <see cref="Uri.Host"/> ihre Klammern, ein Nicht-Default-Port wird angehängt. Alle
+    /// anderen Eingaben liefern <see langword="null"/> (fail-closed — es entsteht kein
+    /// hostloser Key).
+    /// </summary>
+    private static string? TryBuildHttpExtraHeaderKey(string? url)
+    {
+        if (url is null)
+        {
+            return null;
+        }
+
+        // SSH-/SCP-Form vorab in die HTTPS-Form bringen, damit der Key auch bei einer
+        // SSH-gespeicherten Repository-URL an den HTTPS-Host der Arbeitskopie bindet.
+        url = ToHttpsRepositoryUrl(url) ?? url;
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrEmpty(uri.Host))
+        {
+            return null;
+        }
+
+        var host = uri.HostNameType == UriHostNameType.IPv6 ? uri.Host : uri.IdnHost;
+        var port = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+        return $"http.https://{host}{port}/.extraheader";
+    }
+
+    private IDictionary<string, string> GetGitEnvironment(string? token = null, string? targetUrl = null)
     {
         token ??= _credentialStore.GetCredential(GitHubTokenCredentialKey);
         var env = new Dictionary<string, string>();
@@ -224,11 +267,11 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             // Programm-Token für git-Authentifizierung bereitstellen, ohne ihn in URLs einzubetten
             env["GH_TOKEN"] = token;
 
-            // HTTPS-Auth gegen github.com rein prozessbasiert über http.extraheader —
+            // HTTPS-Auth rein prozessbasiert über hostgebundenen http.extraheader —
             // es wird kein Token mehr nach _netrc/.netrc persistiert.
             // Expliziter Cast: env trägt nur nicht-leere Werte, der Helfer arbeitet auf
             // dem nullability-toleranten IDictionary<string, string?>.
-            AddGitHubHttpAuthHeader((IDictionary<string, string?>)env, token);
+            AddGitHubHttpAuthHeader((IDictionary<string, string?>)env, token, targetUrl);
         }
 
         return env;
@@ -450,7 +493,19 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
                    && normalizedError.Contains("base sha", StringComparison.Ordinal));
     }
 
-    private async Task NormalizeRemoteUrlAsync(string localPath, CancellationToken ct = default)
+    /// <summary>
+    /// Liest <c>remote.origin.url</c> der Arbeitskopie, entfernt eingebettete Legacy-Tokens
+    /// und bringt SSH-/SCP-Formen via <see cref="GitPluginBase{TPlugin}.ToHttpsRepositoryUrl"/>
+    /// auf HTTPS; bei Abweichung zur bisherigen URL wird sie per <c>git remote set-url</c>
+    /// zurückgeschrieben.
+    /// </summary>
+    /// <returns>
+    /// Die effektive/kontaktierte origin-URL: die normalisierte URL bzw. — bei Fehlschlag
+    /// von <c>set-url</c> — die tokenbereinigte URL (host-äquivalent, nur nicht in der
+    /// Arbeitskopie persistiert); <see langword="null"/>, wenn sie nicht bestimmt werden
+    /// konnte (Abruf fehlgeschlagen oder Ausnahme).
+    /// </returns>
+    private async Task<string?> NormalizeRemoteUrlAsync(string localPath, CancellationToken ct = default)
     {
         try
         {
@@ -465,22 +520,22 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             if (getUrlResult?.IsSuccess != true)
             {
                 _logger.LogWarning("Konnte remote.origin.url nicht abrufen: {Error}", getUrlResult?.StdErr);
-                return;
+                return null;
             }
 
             var currentUrl = getUrlResult.StdOut.Trim();
 
             // Legacy-Repositories können noch einen eingebetteten Token aus früheren Klones enthalten.
             // Diese werden entfernt, damit keine Klartext-Tokens in der Remote-URL verbleiben.
-            var normalizedUrl = EmbeddedTokenPattern.Replace(currentUrl, string.Empty);
+            var strippedUrl = EmbeddedTokenPattern.Replace(currentUrl, string.Empty);
 
             // SSH-Remote-URLs aus Altversionen werden auf HTTPS normalisiert — der
             // plugin-geführte git-Transport läuft ausschließlich über HTTPS.
-            normalizedUrl = ToHttpsRepositoryUrl(normalizedUrl) ?? normalizedUrl;
+            var normalizedUrl = ToHttpsRepositoryUrl(strippedUrl) ?? strippedUrl;
 
             if (string.Equals(normalizedUrl, currentUrl, StringComparison.Ordinal))
             {
-                return;
+                return normalizedUrl;
             }
 
             var setUrlResult = await _cliRunner.RunAsync(
@@ -493,16 +548,19 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             if (setUrlResult?.IsSuccess != true)
             {
                 _logger.LogWarning("Konnte remote.origin.url nicht normalisieren: {Error}", setUrlResult?.StdErr);
+                // Host-äquivalente Ersatz-URL: Der extraheader-Key bindet an denselben Host,
+                // auch wenn die bereinigte/normalisierte URL nicht persistiert werden konnte.
+                return strippedUrl;
             }
-            else
-            {
-                _logger.LogInformation("Remote origin URL normalisiert (HTTPS, ohne eingebettetes Token).");
-            }
+
+            _logger.LogInformation("Remote origin URL normalisiert (HTTPS, ohne eingebettetes Token).");
+            return normalizedUrl;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "remote.origin.url konnte nicht normalisiert werden.");
+            return null;
         }
     }
 
@@ -563,7 +621,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             return;
         }
 
-        var gitEnvironment = GetGitEnvironment(token);
+        var gitEnvironment = GetGitEnvironment(token, repositoryUrl);
 
         // Configure user name and email for commits
         var userNameResult = await _cliRunner.RunAsync(
@@ -1110,7 +1168,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             "git",
             ["clone", repositoryUrl, targetPath],
             null,
-            GetGitEnvironment(token),
+            GetGitEnvironment(token, repositoryUrl),
             ct);
 
         if (!result.IsSuccess)
@@ -1136,7 +1194,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
 
         // Bestands-Arbeitskopien hygienisch bereinigen: Remote-URL auf HTTPS normalisieren
         // und das von Altversionen geschriebene unsichere core.sshCommand entfernen.
-        await NormalizeRemoteUrlAsync(localPath, ct);
+        var remoteUrl = await NormalizeRemoteUrlAsync(localPath, ct);
         await RemoveInsecureSshCommandAsync(localPath, ct);
 
         var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
@@ -1145,7 +1203,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             "git",
             ["push", "--set-upstream", "origin", branchName],
             localPath,
-            GetGitEnvironment(token),
+            GetGitEnvironment(token, remoteUrl),
             ct);
 
         if (!result.IsSuccess)
@@ -1162,7 +1220,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
 
         // Bestands-Arbeitskopien hygienisch bereinigen: Remote-URL auf HTTPS normalisieren
         // und das von Altversionen geschriebene unsichere core.sshCommand entfernen.
-        await NormalizeRemoteUrlAsync(localPath, ct);
+        var remoteUrl = await NormalizeRemoteUrlAsync(localPath, ct);
         await RemoveInsecureSshCommandAsync(localPath, ct);
 
         var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
@@ -1171,7 +1229,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             "git",
             ["pull"],
             localPath,
-            GetGitEnvironment(token),
+            GetGitEnvironment(token, remoteUrl),
             ct);
 
         if (!result.IsSuccess)
@@ -1652,7 +1710,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             "git",
             ["ls-remote", "--heads", remoteUrl],
             null,
-            GetGitEnvironment(),
+            GetGitEnvironment(targetUrl: remoteUrl),
             ct);
 
         if (!result.IsSuccess)
@@ -1710,7 +1768,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             "git",
             ["ls-remote", "--symref", remoteUrl, "HEAD"],
             null,
-            GetGitEnvironment(),
+            GetGitEnvironment(targetUrl: remoteUrl),
             ct);
 
         if (result.IsSuccess)
@@ -1738,7 +1796,10 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     /// damit der Checkout auch gegen private Repositories authentifiziert läuft. Zuvor wird die
     /// betreute Arbeitskopie hygienisch bereinigt (SSH-<c>remote.origin.url</c> → HTTPS,
     /// plugin-geschriebenes unsicheres <c>core.sshCommand</c> → entfernt) und eine SSH-
-    /// <c>SourceRepositoryUrl</c> (Fork-Fall) in ihre HTTPS-Form umgewandelt.
+    /// <c>SourceRepositoryUrl</c> (Fork-Fall) in ihre HTTPS-Form umgewandelt. Der
+    /// <c>http.extraheader</c>-Key bindet sich an den Host der tatsächlich kontaktierten
+    /// Remote: Same-Repository → Host der <c>remote.origin.url</c>, Fork → Host der
+    /// normalisierten <c>SourceRepositoryUrl</c>.
     /// </remarks>
     public override async Task CheckoutPullRequestSourceAsync(
         string localPath,
@@ -1747,7 +1808,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     {
         ArgumentNullException.ThrowIfNull(checkoutSpec);
 
-        await NormalizeRemoteUrlAsync(localPath, ct);
+        var originUrl = await NormalizeRemoteUrlAsync(localPath, ct);
         await RemoveInsecureSshCommandAsync(localPath, ct);
 
         if (!string.IsNullOrWhiteSpace(checkoutSpec.SourceRepositoryUrl))
@@ -1759,7 +1820,10 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             };
         }
 
-        await CheckoutPullRequestSourceCoreAsync(localPath, checkoutSpec, GetGitEnvironment(), ct);
+        var fetchRemote = ResolvePullRequestFetchRemote(checkoutSpec);
+        var kontaktierteUrl = fetchRemote == "origin" ? originUrl : fetchRemote;
+
+        await CheckoutPullRequestSourceCoreAsync(localPath, checkoutSpec, GetGitEnvironment(targetUrl: kontaktierteUrl), ct);
     }
 
     /// <inheritdoc/>
