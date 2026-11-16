@@ -10,8 +10,10 @@ Plugins werden beim Anwendungsstart durch den `PluginManager` registriert und pe
 
 Beim Anwendungsstart registriert `App.xaml.cs` alle Plugin-Instanzen im DI-Container und übergibt sie dem `PluginManager`. Parallel wird der neue `PluginActivationService` registriert.
 
+Die Discovery des `PluginManager` ist gehärtet: Ladekandidaten sind DLLs direkt unter `plugins/` sowie je Plugin-Unterordner nur die ordnungsgleiche Entry-DLL (`<Ordner>\<Ordner>.dll`). Jeder Kandidat wird gegen eine fest kodierte Whitelist bekannter First-Party-Assembly-Namen geprüft — zuerst der Dateiname, dann der echte Assembly-Name aus den Metadaten (ohne die Assembly zu laden), damit sich eine fremde DLL nicht per Umbenennung als bekanntes Plugin tarnen kann. Abgelehnte DLLs erzeugen einen Warn-Log-Eintrag und werden nicht geladen.
+
 Beteiligte Komponenten:
-- `PluginManager` (Singleton) — Hält alle Plugins, liefert Defaults
+- `PluginManager` (Singleton) — Hält alle Plugins, liefert Defaults; führt Whitelist-Prüfung der Ladekandidaten durch
 - `PluginActivationService` (scoped) — Verwaltet Aktivierungsstatus
 - `IPluginManager.GetDefaultSourceCodeManagementPlugin()` — Gibt das Standard-SCM-Plugin zurück
 - `IPluginManager.GetDefaultDevelopmentAutomationPlugin()` — Gibt das Standard-KI-Plugin zurück

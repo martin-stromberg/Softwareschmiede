@@ -12,6 +12,25 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// <summary>Lädt Plugins dynamisch aus dem Unterordner <c>plugins</c>.</summary>
 public sealed class PluginManager : IPluginManager
 {
+    /// <summary>
+    /// Whitelist der mitgelieferten First-Party-Plugin-Assemblies. Nur DLLs, deren Dateiname
+    /// <em>und</em> echter Assembly-Name (Metadaten) hierauf passen, werden geladen — eine in
+    /// <c>plugins</c> abgelegte fremde DLL läuft sonst mit vollen App-Rechten. Die Liste ist
+    /// bewusst hartkodiert: Eine Konfigurationsdatei im nutzerschreibbaren Installationsverzeichnis
+    /// ließe sich genauso fälschen wie die DLL selbst.
+    /// </summary>
+    private static readonly HashSet<string> AllowedPluginAssemblyNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Softwareschmiede.Plugin.BitBucket",
+        "Softwareschmiede.Plugin.ClaudeCli",
+        "Softwareschmiede.Plugin.Codex",
+        "Softwareschmiede.Plugin.Devin",
+        "Softwareschmiede.Plugin.GitHub",
+        "Softwareschmiede.Plugin.GitHubCopilot",
+        "Softwareschmiede.Plugin.KiSimulator",
+        "Softwareschmiede.Plugin.LocalDirectory",
+    };
+
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<PluginManager> _logger;
     private readonly string _pluginDirectory;
@@ -138,15 +157,19 @@ public sealed class PluginManager : IPluginManager
         }
 
         var testMode = _applyTestModeFilter && IsTestMode();
-        foreach (var dllPath in Directory.GetFiles(_pluginDirectory, "*.dll", SearchOption.TopDirectoryOnly)
-            .Concat(Directory.GetDirectories(_pluginDirectory, "*", SearchOption.TopDirectoryOnly)
-                .SelectMany(folder => Directory.GetFiles(folder, "*.dll", SearchOption.TopDirectoryOnly))))
+        foreach (var dllPath in EnumeratePluginCandidates())
         {
             if (testMode && !IsAllowedInTestMode(Path.GetFileName(dllPath)))
             {
                 _logger.LogInformation("Test-Modus: Plugin übersprungen: {DllPath}", dllPath);
                 continue;
             }
+
+            if (!IsAllowedPlugin(dllPath))
+            {
+                continue;
+            }
+
             LoadPluginsFromDll(dllPath);
         }
 
@@ -155,6 +178,68 @@ public sealed class PluginManager : IPluginManager
             _gitPlugins.Count,
             _kiPlugins.Count,
             _idePlugins.Count);
+    }
+
+    /// <summary>
+    /// Liefert die Ladekandidaten: direkt in <c>plugins</c> liegende DLLs (Legacy-Layout) sowie je
+    /// Plugin-Unterordner nur die zum Ordnernamen passende DLL (<c>&lt;Ordner&gt;\&lt;Ordner&gt;.dll</c>).
+    /// Übrige DLLs in den Unterordnern sind Dependencies des jeweiligen Plugins und keine Kandidaten.
+    /// </summary>
+    private IEnumerable<string> EnumeratePluginCandidates()
+    {
+        foreach (var dllPath in Directory.GetFiles(_pluginDirectory, "*.dll", SearchOption.TopDirectoryOnly))
+        {
+            yield return dllPath;
+        }
+
+        foreach (var folder in Directory.GetDirectories(_pluginDirectory, "*", SearchOption.TopDirectoryOnly))
+        {
+            var entryDll = Path.Combine(folder, Path.GetFileName(folder) + ".dll");
+            if (File.Exists(entryDll))
+            {
+                yield return entryDll;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Prüft eine Ladekandidaten-DLL gegen <see cref="AllowedPluginAssemblyNames"/> — zuerst den
+    /// Dateinamen, dann den echten Assembly-Namen aus den Metadaten (ohne die Assembly zu laden),
+    /// damit eine fremde DLL sich nicht per Umbenennung als bekanntes Plugin maskieren kann.
+    /// Abgelehnte DLLs erzeugen einen Warn-Log-Eintrag.
+    /// </summary>
+    private bool IsAllowedPlugin(string dllPath)
+    {
+        var fileName = Path.GetFileNameWithoutExtension(dllPath);
+        if (!AllowedPluginAssemblyNames.Contains(fileName))
+        {
+            _logger.LogWarning(
+                "Plugin-DLL steht nicht auf der Whitelist bekannter Plugin-Assemblies und wird nicht geladen: {DllPath}",
+                dllPath);
+            return false;
+        }
+
+        string? assemblyName;
+        try
+        {
+            assemblyName = AssemblyLoadContext.GetAssemblyName(Path.GetFullPath(dllPath)).Name;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Metadaten der Plugin-DLL konnten nicht gelesen werden, DLL wird nicht geladen: {DllPath}", dllPath);
+            return false;
+        }
+
+        if (!string.Equals(assemblyName, fileName, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "Assembly-Name {AssemblyName} stimmt nicht mit dem whitelisted Dateinamen überein, DLL wird nicht geladen: {DllPath}",
+                assemblyName,
+                dllPath);
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>

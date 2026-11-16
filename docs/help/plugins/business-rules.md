@@ -239,3 +239,21 @@
 - Bekannte Einschränkung: `GH_TOKEN`/`gh`-CLI adressiert ohne gesetztes `GH_HOST` weiterhin `github.com` — `gh`-Aufrufe gegen GitHub-Enterprise-Hosts sind nicht Teil dieser Anbindung.
 
 **Umsetzung:** `GitHubPlugin.TryBuildHttpExtraHeaderKey` (Key-Bildung aus der Ziel-URL, `null` = fail-closed) + `AddGitHubHttpAuthHeader(environment, token, targetUrl)`; die Ziel-URL reichen `GetGitEnvironment(token, targetUrl)` und `GetAgentEnvironmentAsync(konto, repositoryUrl, ct)` durch; `GitPluginBase.ResolvePullRequestFetchRemote` bestimmt das Fetch-Ziel des PR-Checkouts (`origin` vs. `SourceRepositoryUrl`).
+
+## Sicherheit der Plugin-Discovery
+
+### Regel: Nur whitelisted Plugin-Assemblies werden geladen
+
+**Beschreibung:** Der `PluginManager` lädt ausschließlich Assemblies, deren Dateiname und echter Assembly-Name (Metadaten) auf einer fest kodierten Whitelist der mitgelieferten First-Party-Plugins stehen. Eine fremde, im `plugins`-Verzeichnis abgelegte DLL wird nicht geladen — sie könnte sonst mit vollen App-Rechten inkl. Credential-Store-Zugriff ausgeführt werden.
+
+**Bedingungen:**
+- Plugin-Discovery beim Anwendungsstart (`plugins/` und Plugin-Unterordner der ersten Ebene)
+
+**Verhalten:**
+- Ladekandidaten: `*.dll` direkt unter `plugins/` sowie je Unterordner nur `<Ordner>\<Ordner>.dll`; Dependency-DLLs in den Unterordnern sind keine Kandidaten.
+- Dateiname nicht auf der Whitelist → `LogWarning` + übersprungen.
+- Dateiname auf der Whitelist, aber echter Assembly-Name abweichend (Maskerade per Umbenennung) → `LogWarning` + übersprungen.
+- Der im Test-Modus greifende Namensfilter bleibt als zusätzliche Einschränkung bestehen.
+- Grenze: Eine präparierte *Dependency*-DLL neben einem legitimen Plugin wird durch die Whitelist nicht abgedeckt — dafür wäre Strong-Name-Signierung erforderlich (derzeit nicht eingerichtet).
+
+**Umsetzung:** `PluginManager.AllowedPluginAssemblyNames`, `PluginManager.EnumeratePluginCandidates()`, `PluginManager.IsAllowedPlugin()` (`AssemblyLoadContext.GetAssemblyName` für die Metadatenprüfung).
