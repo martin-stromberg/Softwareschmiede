@@ -198,11 +198,7 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
         ArgumentException.ThrowIfNullOrWhiteSpace(checkoutSpec.SourceRepositoryId);
         ArgumentException.ThrowIfNullOrWhiteSpace(checkoutSpec.SourceBranch);
 
-        var sameRepository = string.Equals(
-            checkoutSpec.TargetRepositoryId,
-            checkoutSpec.SourceRepositoryId,
-            StringComparison.OrdinalIgnoreCase);
-        var remote = sameRepository ? "origin" : checkoutSpec.SourceRepositoryUrl;
+        var remote = ResolvePullRequestFetchRemote(checkoutSpec);
         if (string.IsNullOrWhiteSpace(remote))
             throw new InvalidOperationException("Fuer einen Fork-Pull-Request fehlt die Clone-URL des Quell-Repositories.");
 
@@ -224,6 +220,22 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
                 throw new InvalidOperationException("Der ausgecheckte Pull-Request-Stand stimmt nicht mit dem erwarteten Head-SHA ueberein.");
         }
     }
+
+    /// <summary>
+    /// Bestimmt das Fetch-Ziel für den PR-Checkout: bei einem Pull Request aus demselben
+    /// Repository (<see cref="PullRequestCheckoutSpec.TargetRepositoryId"/> und
+    /// <see cref="PullRequestCheckoutSpec.SourceRepositoryId"/> OrdinalIgnoreCase identisch)
+    /// das <c>origin</c>-Remote, bei einem Fork die
+    /// <see cref="PullRequestCheckoutSpec.SourceRepositoryUrl"/>.
+    /// </summary>
+    /// <returns><c>"origin"</c> oder die Clone-URL des Quell-Repositories (ggf. leer).</returns>
+    protected static string? ResolvePullRequestFetchRemote(PullRequestCheckoutSpec checkoutSpec)
+        => string.Equals(
+            checkoutSpec.TargetRepositoryId,
+            checkoutSpec.SourceRepositoryId,
+            StringComparison.OrdinalIgnoreCase)
+            ? "origin"
+            : checkoutSpec.SourceRepositoryUrl;
 
     /// <summary>Führt <c>git add .</c> aus.</summary>
     protected async Task AddAllAsync(string localPath, CancellationToken ct = default)

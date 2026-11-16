@@ -188,7 +188,8 @@ public sealed class EntwicklungsprozessService
                 ct);
 
             await _options.KiAusfuehrungsService.StartTerminalSessionAsync(
-                aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, optionalParameters, ct, repository.StartKonfiguration, gitPlugin);
+                aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, optionalParameters, ct, repository.StartKonfiguration, gitPlugin,
+                repositoryUrl: repository.RepositoryUrl);
         }
         catch (OperationCanceledException)
         {
@@ -301,7 +302,8 @@ public sealed class EntwicklungsprozessService
             optionalParameters,
             ct,
             repository.StartKonfiguration,
-            gitPlugin);
+            gitPlugin,
+            repositoryUrl: repository.RepositoryUrl);
     }
 
     /// <summary>Führt einen manuellen Commit durch.</summary>

@@ -18,6 +18,9 @@ public interface IScmAgentAccess
     /// Eine leere Liste bedeutet: keine Anbindung verfügbar; der reguläre CLI-Start
     /// darf dadurch nicht blockiert werden.</summary>
     /// <param name="konto">Der aktive Kontomodus; wählt das bereitzustellende Credential.</param>
+    /// <param name="repositoryUrl">URL des Repositories der Arbeitskopie; Quelle des Zielhosts
+    /// für die hostgebundene git-Authentifizierung (<c>http.extraheader</c>-Key).
+    /// <see langword="null"/> ist zulässig — die Anbindung erfolgt dann ohne hostgebundenen Key.</param>
     /// <param name="ct">Abbruch-Token.</param>
-    Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(ScmKontoModus konto, CancellationToken ct = default);
+    Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(ScmKontoModus konto, string? repositoryUrl, CancellationToken ct = default);
 }

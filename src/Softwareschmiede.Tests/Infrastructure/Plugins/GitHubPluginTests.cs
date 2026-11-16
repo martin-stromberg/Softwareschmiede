@@ -514,7 +514,7 @@ public sealed class GitHubPluginTests
             It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Contains("https://github.com/test/repo") && a.Contains("/target/path")),
             null,
             It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token"
-                && HasGitHubExtraHeader(env, "token") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
+                && HasGitHubExtraHeader(env, "token", "http.https://github.com/.extraheader") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1016,7 +1016,7 @@ public sealed class GitHubPluginTests
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "push", "--set-upstream", "origin", "feature/a")),
             "/repo",
             It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GIT_TERMINAL_PROMPT") && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token123"
-                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
+                && HasGitHubExtraHeader(env, "token123", "http.https://github.com/.extraheader") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1204,7 +1204,7 @@ public sealed class GitHubPluginTests
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
             "/repo",
             It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token"
-                && HasGitHubExtraHeader(env, "token") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
+                && HasGitHubExtraHeader(env, "token", "http.https://github.com/.extraheader") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1460,13 +1460,13 @@ public sealed class GitHubPluginTests
     }
 
     /// <summary>GetAgentEnvironmentAsync stellt dem Agenten dieselbe gh-/git-Anmeldung wie dem
-    /// Host bereit: GH_TOKEN, github.com-scoped extraheader und deaktiviertes Credential-Prompt.</summary>
+    /// Host bereit: GH_TOKEN, an den Repository-Host gebundener extraheader und deaktiviertes Credential-Prompt.</summary>
     [Fact]
     public async Task GetAgentEnvironmentAsync_WithToken_ProvidesGhAndGitAuth()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://github.com/owner/repo");
 
         environment["GH_TOKEN"].Should().Be("agent-token");
         environment["GIT_TERMINAL_PROMPT"].Should().Be("0");
@@ -1478,6 +1478,83 @@ public sealed class GitHubPluginTests
         environment.Should().NotContainKey("GIT_SSH_COMMAND");
     }
 
+    /// <summary>Ein GHE-Host in der Repository-URL bindet den extraheader-Key an diesen Host.</summary>
+    [Fact]
+    public async Task GetAgentEnvironmentAsync_GheHost_BindetExtraHeaderAnGheHost()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
+
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://ghe.example.com/owner/repo.git");
+
+        environment["GH_TOKEN"].Should().Be("agent-token");
+        environment["GIT_CONFIG_COUNT"].Should().Be("1");
+        environment["GIT_CONFIG_KEY_0"].Should().Be("http.https://ghe.example.com/.extraheader");
+    }
+
+    /// <summary>Ein Nicht-Default-Port der Repository-URL wird in den extraheader-Key aufgenommen;
+    /// der Default-Port 443 nicht.</summary>
+    [Theory]
+    [InlineData("https://ghe.example.com:8443/owner/repo.git", "http.https://ghe.example.com:8443/.extraheader")]
+    [InlineData("https://ghe.example.com:443/owner/repo.git", "http.https://ghe.example.com/.extraheader")]
+    public async Task GetAgentEnvironmentAsync_NonDefaultPort_NimmtPortInKeyAuf(string repositoryUrl, string expectedKey)
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
+
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl);
+
+        environment["GIT_CONFIG_COUNT"].Should().Be("1");
+        environment["GIT_CONFIG_KEY_0"].Should().Be(expectedKey);
+    }
+
+    /// <summary>Userinfo/Credentials in der Repository-URL dürfen nicht in den extraheader-Key
+    /// einfließen — der Key enthält ausschließlich den Host.</summary>
+    [Fact]
+    public async Task GetAgentEnvironmentAsync_UserinfoInUrl_KeyEnthaeltNurHost()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
+
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://oauth2:geheim@ghe.example.com/o/r.git");
+
+        environment["GIT_CONFIG_COUNT"].Should().Be("1");
+        environment["GIT_CONFIG_KEY_0"].Should().Be("http.https://ghe.example.com/.extraheader");
+        environment["GIT_CONFIG_KEY_0"].Should().NotContain("oauth2").And.NotContain("geheim");
+    }
+
+    /// <summary>Eine SSH-/SCP-gespeicherte Repository-URL bindet den extraheader-Key nach der
+    /// HTTPS-Normalisierung an denselben Host wie die HTTPS-Form.</summary>
+    [Theory]
+    [InlineData("git@ghe.example.com:o/r.git")]
+    [InlineData("ssh://git@ghe.example.com/o/r.git")]
+    public async Task GetAgentEnvironmentAsync_SshForm_BindetKeyAnHttpsHost(string repositoryUrl)
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
+
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl);
+
+        environment["GIT_CONFIG_COUNT"].Should().Be("1");
+        environment["GIT_CONFIG_KEY_0"].Should().Be("http.https://ghe.example.com/.extraheader");
+    }
+
+    /// <summary>Lässt sich aus der Repository-URL kein HTTPS-Host bestimmen, entsteht fail-closed
+    /// kein extraheader-Eintrag — GH_TOKEN und GIT_TERMINAL_PROMPT bleiben erhalten.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("keine-url")]
+    [InlineData("ssh://git@host:2222/x")]
+    public async Task GetAgentEnvironmentAsync_OhneBestimmbarenHost_KeinExtraHeader(string? repositoryUrl)
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
+
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl);
+
+        environment["GIT_TERMINAL_PROMPT"].Should().Be("0");
+        environment["GH_TOKEN"].Should().Be("agent-token");
+        environment.Should().NotContainKey("GIT_CONFIG_COUNT");
+        environment.Should().NotContainKey("GIT_CONFIG_KEY_0");
+        environment.Should().NotContainKey("GIT_CONFIG_VALUE_0");
+    }
+
     /// <summary>Ohne gespeicherten Token bleibt nur das deaktivierte Credential-Prompt —
     /// ein fehlender Token blockiert den CLI-Start nicht.</summary>
     [Fact]
@@ -1485,7 +1562,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://github.com/owner/repo");
 
         environment.Should().ContainKey("GIT_TERMINAL_PROMPT").WhoseValue.Should().Be("0");
         environment.Should().NotContainKey("GH_TOKEN");
@@ -1500,7 +1577,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("user-token");
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.AgentToken")).Returns("bot-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto, "https://github.com/owner/repo");
 
         environment["GH_TOKEN"].Should().Be("bot-token");
         var expected = "AUTHORIZATION: basic " + Convert.ToBase64String(
@@ -1855,7 +1932,7 @@ public sealed class GitHubPluginTests
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "ls-remote", "--symref", "https://github.com/owner/repo.git", "HEAD")),
             null,
             It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token123"
-                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
+                && HasGitHubExtraHeader(env, "token123", "http.https://github.com/.extraheader") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1917,13 +1994,13 @@ public sealed class GitHubPluginTests
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "fetch", "--no-tags", "origin", "refs/heads/feature/pr")),
             "/repo",
             It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token123"
-                && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
+                && HasGitHubExtraHeader(env, "token123", "http.https://github.com/.extraheader") && !env.ContainsKey("NETRC") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "checkout", "-B", "feature/pr", "FETCH_HEAD")),
             "/repo",
-            It.Is<IDictionary<string, string>?>(env => env != null && HasGitHubExtraHeader(env, "token123") && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.Is<IDictionary<string, string>?>(env => env != null && HasGitHubExtraHeader(env, "token123", "http.https://github.com/.extraheader") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1948,7 +2025,7 @@ public sealed class GitHubPluginTests
             It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Contains("https://github.com/owner/repo.git") && a.Contains("/target/path")),
             null,
             It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token"
-                && HasGitHubExtraHeader(env, "token") && !env.ContainsKey("GIT_SSH_COMMAND")),
+                && HasGitHubExtraHeader(env, "token", "http.https://github.com/.extraheader") && !env.ContainsKey("GIT_SSH_COMMAND")),
             It.IsAny<CancellationToken>()), Times.Once);
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2594,7 +2671,8 @@ public sealed class GitHubPluginTests
     }
 
     /// <summary>Eine remote.origin.url, die sich nicht in die HTTPS-Form umwandeln lässt
-    /// (hier: ssh:// mit Fremd-Port), bleibt unverändert — kein set-url, der Push läuft weiter.</summary>
+    /// (hier: ssh:// mit Fremd-Port), bleibt unverändert — kein set-url, der Push läuft
+    /// fail-closed ohne extraheader-Eintrag weiter.</summary>
     [Theory]
     [InlineData("ssh://git@github.com:2222/owner/repo.git")]
     [InlineData("ssh://user:pass@github.com/owner/repo.git")]
@@ -2628,17 +2706,257 @@ public sealed class GitHubPluginTests
             "git",
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "push", "--set-upstream", "origin", "feature/a")),
             "/repo",
-            It.IsAny<IDictionary<string, string>?>(),
+            It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN")
+                && !env.ContainsKey("GIT_CONFIG_COUNT") && !env.ContainsKey("GIT_CONFIG_KEY_0") && !env.ContainsKey("GIT_CONFIG_VALUE_0")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    /// <summary>Prüft die drei GIT_CONFIG_*-Einträge des github.com-http.extraheader gegen den erwarteten Token.</summary>
-    private static bool HasGitHubExtraHeader(IDictionary<string, string> env, string token)
+    /// <summary>Ein Klon gegen eine GitHub-Enterprise-URL bindet den extraheader-Key an den
+    /// GHE-Host statt an github.com.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_GheUrl_BindetExtraHeaderAnGheHost()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.CloneRepositoryAsync("https://ghe.example.com/owner/repo.git", "/target/path");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Contains("https://ghe.example.com/owner/repo.git")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token"
+                && HasGitHubExtraHeader(env, "token", "http.https://ghe.example.com/.extraheader") && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Eine GHE-remote.origin.url bindet den extraheader-Key des Push an den
+    /// Origin-Host statt an github.com.</summary>
+    [Fact]
+    public async Task PushBranchAsync_GheRemote_BindetExtraHeaderAnOriginHost()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://ghe.example.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("push")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "push", "--set-upstream", "origin", "feature/a")),
+            "/repo",
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token123"
+                && HasGitHubExtraHeader(env, "token123", "http.https://ghe.example.com/.extraheader") && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Ist remote.origin.url nicht lesbar, läuft der Push fail-closed ohne
+    /// extraheader-Eintrag weiter — die Operation bricht nicht ab.</summary>
+    [Fact]
+    public async Task PushBranchAsync_RemoteUrlNichtLesbar_KeinExtraHeader()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(128, string.Empty, "fatal: not in a git directory"));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("push")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "push", "--set-upstream", "origin", "feature/a")),
+            "/repo",
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token123"
+                && env["GIT_TERMINAL_PROMPT"] == "0"
+                && !env.ContainsKey("GIT_CONFIG_COUNT") && !env.ContainsKey("GIT_CONFIG_KEY_0") && !env.ContainsKey("GIT_CONFIG_VALUE_0")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Eine GHE-remote.origin.url bindet den extraheader-Key des Pull an den
+    /// Origin-Host statt an github.com.</summary>
+    [Fact]
+    public async Task PullAsync_GheRemote_BindetExtraHeaderAnOriginHost()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://ghe.example.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PullAsync("/repo");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
+            "/repo",
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token123"
+                && HasGitHubExtraHeader(env, "token123", "http.https://ghe.example.com/.extraheader") && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Im Fork-Fall bindet der extraheader-Key an den Host der kontaktierten
+    /// SourceRepositoryUrl, nicht an den Origin-Host.</summary>
+    [Fact]
+    public async Task CheckoutPullRequestSourceAsync_Fork_BindetExtraHeaderAnSourceHost()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://ghe.example.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
+
+        var spec = new PullRequestCheckoutSpec(
+            TargetRepositoryId: "owner/repo",
+            TargetRepositoryUrl: "https://ghe.example.com/owner/repo.git",
+            SourceRepositoryId: "fork/repo",
+            SourceRepositoryUrl: "https://ghe-fork.example.com/fork/repo.git",
+            SourceBranch: "feature/pr",
+            SourceRef: null,
+            HeadSha: null);
+
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "fetch", "--no-tags", "https://ghe-fork.example.com/fork/repo.git", "refs/heads/feature/pr")),
+            "/repo",
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token123"
+                && HasGitHubExtraHeader(env, "token123", "http.https://ghe-fork.example.com/.extraheader") && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Im Same-Repository-Fall bindet der extraheader-Key an den Origin-Host der
+    /// Arbeitskopie — hier eine GHE-remote.origin.url.</summary>
+    [Fact]
+    public async Task CheckoutPullRequestSourceAsync_SameRepo_BindetExtraHeaderAnOriginHost()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://ghe.example.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "--get", "core.sshCommand")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, string.Empty));
+
+        var spec = new PullRequestCheckoutSpec(
+            TargetRepositoryId: "owner/repo",
+            TargetRepositoryUrl: "https://ghe.example.com/owner/repo.git",
+            SourceRepositoryId: "owner/repo",
+            SourceRepositoryUrl: null,
+            SourceBranch: "feature/pr",
+            SourceRef: null,
+            HeadSha: null);
+
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "fetch", "--no-tags", "origin", "refs/heads/feature/pr")),
+            "/repo",
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == "token123"
+                && HasGitHubExtraHeader(env, "token123", "http.https://ghe.example.com/.extraheader") && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Prüft die drei GIT_CONFIG_*-Einträge des http.extraheader gegen den erwarteten Token und Key.</summary>
+    private static bool HasGitHubExtraHeader(IDictionary<string, string> env, string token, string expectedKey)
     {
         var expected = "AUTHORIZATION: basic " + Convert.ToBase64String(
             System.Text.Encoding.UTF8.GetBytes("x-access-token:" + token));
         return env.TryGetValue("GIT_CONFIG_COUNT", out var count) && count == "1"
-            && env.TryGetValue("GIT_CONFIG_KEY_0", out var key) && key == "http.https://github.com/.extraheader"
+            && env.TryGetValue("GIT_CONFIG_KEY_0", out var key) && key == expectedKey
             && env.TryGetValue("GIT_CONFIG_VALUE_0", out var value) && value == expected;
     }
 

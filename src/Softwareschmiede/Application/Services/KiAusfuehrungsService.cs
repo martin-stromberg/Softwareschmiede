@@ -266,6 +266,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// Optionales Git-Plugin, das zum Klonen des Repositories verwendet wurde (für die Auflösung des
     /// tatsächlichen Repository-Pfads, z. B. bei <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus).
     /// </param>
+    /// <param name="repositoryUrl">Optionale Repository-URL der Arbeitskopie; Quelle des Zielhosts
+    /// für die hostgebundene SCM-Anbindung des Agenten (<see cref="IScmAgentAccess"/>).</param>
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public Task<CliProcessHandle> StartTerminalSessionAsync(
         Guid aufgabeId,
@@ -274,12 +276,14 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         string? optionalParameters = null,
         CancellationToken ct = default,
         RepositoryStartKonfiguration? startConfig = null,
-        IGitPlugin? gitPlugin = null)
+        IGitPlugin? gitPlugin = null,
+        string? repositoryUrl = null)
         => ScmTaskCoordinator.Shared.RunAsync(aufgabeId,
-            () => StartTerminalSessionCoreAsync(aufgabeId, kiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin), ct);
+            () => StartTerminalSessionCoreAsync(aufgabeId, kiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin, repositoryUrl), ct);
 
     private async Task<CliProcessHandle> StartTerminalSessionCoreAsync(Guid aufgabeId, IKiPlugin kiPlugin, string localRepoPath,
-        string? optionalParameters, CancellationToken ct, RepositoryStartKonfiguration? startConfig, IGitPlugin? gitPlugin)
+        string? optionalParameters, CancellationToken ct, RepositoryStartKonfiguration? startConfig, IGitPlugin? gitPlugin,
+        string? repositoryUrl)
     {
         await _startLock.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -301,7 +305,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             var effectiveWorkdir = await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(localRepoPath, startConfig, gitPlugin, ct).ConfigureAwait(false);
 
             var spec = await kiPlugin.GetTerminalStartSpecAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
-            spec = await WithScmAgentEnvironmentAsync(spec, gitPlugin, ct).ConfigureAwait(false);
+            spec = await WithScmAgentEnvironmentAsync(spec, gitPlugin, repositoryUrl, ct).ConfigureAwait(false);
             try { ScmCliWorkspaceTrust.EnsureTrusted(kiPlugin.PluginPrefix, spec); }
             catch (Exception ex)
             {
@@ -429,7 +433,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// <see cref="ScmCliAccessEvaluator"/>-Fingerprints. Eine fehlende oder fehlschlagende
     /// Anbindung blockiert den regulären CLI-Start nicht.</summary>
     private async Task<TerminalSessionStartSpec> WithScmAgentEnvironmentAsync(
-        TerminalSessionStartSpec spec, IGitPlugin? gitPlugin, CancellationToken ct)
+        TerminalSessionStartSpec spec, IGitPlugin? gitPlugin, string? repositoryUrl, CancellationToken ct)
     {
         if (gitPlugin is not IScmAgentAccess agentAccess)
         {
@@ -441,7 +445,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         {
             using var scope = _scopeFactory.CreateScope();
             var konto = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmKontoModusAsync(ct).ConfigureAwait(false);
-            agentEnvironment = await agentAccess.GetAgentEnvironmentAsync(konto, ct).ConfigureAwait(false);
+            agentEnvironment = await agentAccess.GetAgentEnvironmentAsync(konto, repositoryUrl, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
