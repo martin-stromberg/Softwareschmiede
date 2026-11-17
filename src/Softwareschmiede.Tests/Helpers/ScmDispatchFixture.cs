@@ -39,6 +39,9 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal readonly string Root;
     internal readonly Mock<IGitPlugin> Git = new();
     internal readonly Mock<IKiPlugin> Ki = new();
+    /// <summary>Optionales zweites KI-Plugin (z. B. für Fallback-Tests mit deaktiviertem Prefix).</summary>
+    internal readonly Mock<IKiPlugin>? Ki2;
+    internal readonly ScmKiProfile? Ki2Profile;
     internal readonly Dictionary<Guid, Mock<ITerminalSession>> Sessions = new();
     internal readonly List<TerminalSessionStartSpec> StartSpecs = [];
     internal readonly List<string> Prompts = [];
@@ -55,9 +58,10 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     private readonly List<Process> _processes = [];
     private readonly bool _ownsRoot;
 
-    internal ScmDispatchFixture(string? root = null, TimeProvider? time = null, ScmKiProfile? ki = null)
+    internal ScmDispatchFixture(string? root = null, TimeProvider? time = null, ScmKiProfile? ki = null, ScmKiProfile? ki2 = null)
     {
         KiProfile = ki ?? ScmKiProfile.Simulator;
+        Ki2Profile = ki2;
         Prompt = KiProfile.Prompt;
         Root = root ?? Path.Combine(Path.GetTempPath(), "scm-dispatch-" + Guid.NewGuid().ToString("N"));
         _ownsRoot = root is null;
@@ -99,10 +103,27 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 WorkingDirectory = directory,
                 EnvironmentVariables = KiProfile.EnvironmentVariables
             }));
+        var kiPlugins = new List<IKiPlugin> { Ki.Object };
+        if (ki2 is not null)
+        {
+            Ki2 = new Mock<IKiPlugin>();
+            Ki2.SetupGet(x => x.PluginPrefix).Returns(ki2.Prefix);
+            Ki2.SetupGet(x => x.PluginName).Returns(ki2.Prefix);
+            Ki2.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            Ki2.Setup(x => x.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .Returns((string directory, string? _, CancellationToken _) => Task.FromResult(new TerminalSessionStartSpec
+                {
+                    FileName = "fixture",
+                    Arguments = ki2.Arguments,
+                    WorkingDirectory = directory,
+                    EnvironmentVariables = ki2.EnvironmentVariables
+                }));
+            kiPlugins.Add(Ki2.Object);
+        }
         var plugins = new Mock<IPluginManager>();
         plugins.Setup(x => x.GetSourceCodeManagementPlugins()).Returns([Git.Object]);
         plugins.Setup(x => x.GetDefaultSourceCodeManagementPlugin()).Returns(Git.Object);
-        plugins.Setup(x => x.GetDevelopmentAutomationPlugins()).Returns([Ki.Object]);
+        plugins.Setup(x => x.GetDevelopmentAutomationPlugins()).Returns(kiPlugins);
         var directories = new Mock<IArbeitsverzeichnisResolver>();
         directories.Setup(x => x.ResolveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Root, false, "test", Root));
         var factory = new Mock<ITerminalSessionFactory>();
