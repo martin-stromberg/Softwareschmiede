@@ -114,6 +114,11 @@ public sealed class Aufgabe
     /// oder „Issue #3") — Diagnose-/Protokollwert zu <see cref="ScmAbschlussErkanntUtc"/>.</summary>
     public string? ScmAbschlussReferenz { get; set; }
 
+    /// <summary>Zweck-Markierung der Aufgabe; <see langword="null"/> kennzeichnet eine reguläre
+    /// Arbeitsaufgabe. Als Zweck markierte Aufgaben (z. B. <c>"IssueAufbereitung"</c>) werden von der
+    /// kanonischen SCM-Ereignisauflösung ausdrücklich ausgeschlossen.</summary>
+    public string? Zweck { get; set; }
+
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
     public Projekt Projekt { get; set; } = null!;
 

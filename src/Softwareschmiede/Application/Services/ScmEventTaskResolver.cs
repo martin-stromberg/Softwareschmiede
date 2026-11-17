@@ -62,6 +62,7 @@ public sealed class ScmEventTaskResolver(
         var repositoryIds = repositories.Select(x => (Guid?)x.Id).ToArray();
         var taskIds = await db.Aufgaben.AsNoTracking()
             .Where(a => repositoryIds.Contains(a.GitRepositoryId)
+                && a.Zweck == null
                 && a.IssueReferenz != null && a.IssueReferenz.IssueNummer == reference.Number)
             .Select(a => a.Id).Distinct().ToListAsync(ct);
         if (taskIds.Count > 1) return ScmTaskResolution.Ambiguous;
@@ -131,6 +132,7 @@ public sealed class ScmEventTaskResolver(
             && string.Equals(pullRequest.SourceRepositoryId, repositoryId, StringComparison.OrdinalIgnoreCase);
         var candidates = await db.Aufgaben.AsNoTracking()
             .Where(a => repositoryIds.Contains(a.GitRepositoryId)
+                && a.Zweck == null
                 && a.Status != AufgabeStatus.Beendet && a.Status != AufgabeStatus.Archiviert
                 && ((branchMatchPossible && a.BranchName != null)
                     || (a.IssueReferenz != null && a.IssueReferenz.IssueNummer != null

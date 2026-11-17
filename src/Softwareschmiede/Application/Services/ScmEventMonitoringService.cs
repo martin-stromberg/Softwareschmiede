@@ -43,9 +43,12 @@ public sealed class ScmEventMonitoringService(
         var triggerKeyword = await einstellungen.GetScmTriggerKeywordAsync(ct);
         var delayKeyword = await einstellungen.GetScmDelayKeywordAsync(ct);
         var kontoModus = await einstellungen.GetScmKontoModusAsync(ct);
+        var issueAufbereitungAktiv = await einstellungen.GetScmIssueAufbereitungEnabledAsync(ct);
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        // Zweck-markierte Aufgaben (z. B. Issue-Aufbereitung) sind keine verknüpften Quellen:
+        // Sie dürfen weder Ereignisse auf ihre Issue-Nummer ziehen noch PR-Kontext liefern.
         var tasks = await db.Aufgaben.AsNoTracking().Include(x => x.GitRepository).Include(x => x.IssueReferenz)
-            .Include(x => x.PullRequests).Where(x => x.GitRepository != null && x.GitRepository.Aktiv).ToListAsync(ct);
+            .Include(x => x.PullRequests).Where(x => x.GitRepository != null && x.GitRepository.Aktiv && x.Zweck == null).ToListAsync(ct);
         var repositories = await db.GitRepositories.AsNoTracking().Where(x => x.Aktiv).ToListAsync(ct);
         var plugins = scope.ServiceProvider.GetRequiredService<IPluginManager>().GetSourceCodeManagementPlugins();
         var pendingInboxCommits = new List<(string Key, DateTimeOffset Now, string Diagnostic)>();
@@ -191,6 +194,16 @@ public sealed class ScmEventMonitoringService(
                                 .ResolveAsync(reference, source, trigger, candidates, ct);
                             aufgabeId = resolution.AufgabeId;
                             unassigned = resolution.Kind == ScmTaskResolutionKind.Unassigned;
+                        }
+                        // „Issue erstellt"-Erkennung läuft vor der Inbox-Aufnahme, solange für den
+                        // ContentKey noch kein Snapshot existiert (Erstbeobachtung). Nur der
+                        // repository-weite Enumerationskanal (kein Inbox-Modus) meldet neue Issues.
+                        if (!inboxMode && issueAufbereitungAktiv && reference.Kind == ScmReferenceKind.Issue
+                            && kind == ScmContentKind.Description && batch.Observations.Count > 0
+                            && localRepositories.TryGetValue(reference.Repository, out var aufbereitungRepositories))
+                        {
+                            await batchScope.ServiceProvider.GetRequiredService<ScmIssueAufbereitungsService>()
+                                .ErkennenUndEinreihenAsync(source, reference, batch, aufbereitungRepositories, ct);
                         }
                         await batchScope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(
                             aufgabeId, sourceKey, batch, unassigned, triggerKeyword, delayKeyword, ct);

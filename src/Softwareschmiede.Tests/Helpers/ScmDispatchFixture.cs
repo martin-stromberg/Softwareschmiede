@@ -182,6 +182,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddScoped<ScmEventOrchestrator>();
         services.AddScoped<ScmEventExecutionLimitService>();
         services.AddScoped<ScmEventTaskResolver>();
+        services.AddScoped<ScmIssueAufbereitungsService>();
         services.AddScoped<ScmBackmergeService>();
         services.AddScoped(sp => new EntwicklungsprozessService(sp.GetRequiredService<AufgabeService>(), sp.GetRequiredService<ProtokollService>(),
             Git.Object, sp.GetRequiredService<PluginSelectionService>(), directories.Object,

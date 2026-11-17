@@ -229,6 +229,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ScmEventOrchestrator>();
         services.AddScoped<ScmEventExecutionLimitService>();
         services.AddScoped<ScmEventTaskResolver>();
+        services.AddScoped<ScmIssueAufbereitungsService>();
         services.AddScoped<ScmBackmergeService>();
         services.AddSingleton<ScmEventMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmEventMonitoringService>());

@@ -270,12 +270,23 @@ public sealed class AufgabeService : IAktiveAufgabenService
     /// <summary>Erstellt eine neue Aufgabe aus einer Issue-Ereignisreferenz. Der kanonische
     /// <paramref name="sourceKey"/> verhindert Anlageduplikate; bei paralleler Anlage wird die
     /// bestehende Aufgabe zurückgegeben.</summary>
+    /// <param name="projektId">ID des Projekts, dem die Aufgabe zugeordnet wird.</param>
+    /// <param name="issue">Die Issue-Anlagedaten der Quelle.</param>
+    /// <param name="gitRepositoryId">ID des lokalen Git-Repositorys.</param>
+    /// <param name="sourceKey">Der deduplizierende Quellenschlüssel der Aufgabenreferenz.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <param name="zweck">Optionale Zweck-Markierung der Aufgabe (siehe <see cref="Aufgabe.Zweck"/>);
+    /// <see langword="null"/> legt eine reguläre Arbeitsaufgabe an.</param>
+    /// <param name="kiPluginPrefix">Optionaler Plugin-Prefix für die funktionale Plugin-Zuordnung
+    /// (siehe <see cref="Aufgabe.KiPluginPrefix"/>).</param>
     public async Task<Aufgabe> CreateFromIssueEventAsync(
         Guid projektId,
         Issue issue,
         Guid gitRepositoryId,
         string sourceKey,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? zweck = null,
+        string? kiPluginPrefix = null)
     {
         ArgumentNullException.ThrowIfNull(issue);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceKey);
@@ -302,7 +313,9 @@ public sealed class AufgabeService : IAktiveAufgabenService
             AnforderungsBeschreibung = issue.Body,
             Status = AufgabeStatus.Neu,
             AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            ErstellungsDatum = DateTimeOffset.UtcNow,
+            Zweck = zweck,
+            KiPluginPrefix = kiPluginPrefix
         };
 
         var issueReferenz = CreateIssueReferenz(aufgabe.Id, issue);

@@ -112,6 +112,7 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(x => x.Sequence).ValueGeneratedOnAdd();
             e.HasIndex(x => x.Id).IsUnique();
             e.HasIndex(x => x.EventKey).IsUnique();
+            e.Property(x => x.Zweck).HasMaxLength(100);
             e.HasIndex(x => new { x.AufgabeId, x.Sequence });
             e.HasIndex(x => new { x.Status, x.NextAttemptUtc });
         });
@@ -147,6 +148,8 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.HasKey(r => r.Id);
             e.Property(r => r.DefaultSourceBranchName)
                 .HasMaxLength(255);
+            e.Property(r => r.IssueAufbereitungAktiv)
+                .HasDefaultValue(false);
             e.HasOne(r => r.StartKonfiguration)
                 .WithOne(c => c.GitRepository)
                 .HasForeignKey<RepositoryStartKonfiguration>(c => c.GitRepositoryId)
@@ -198,6 +201,8 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(a => a.PausiertBisUtc).HasConversion(NullableUnixMillisConverter);
             e.Property(a => a.BasisBranchName)
                 .HasMaxLength(255);
+            e.Property(a => a.Zweck)
+                .HasMaxLength(100);
             e.Property(a => a.RecoveryVersion)
                 .HasDefaultValue(0)
                 .IsConcurrencyToken();

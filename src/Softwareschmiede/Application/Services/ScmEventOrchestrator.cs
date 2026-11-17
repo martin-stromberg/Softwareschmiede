@@ -128,6 +128,14 @@ public sealed class ScmEventOrchestrator(
             var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, ct);
             // Ein Abbruch ist endgültig: keine Hostaktionen, kein Abgleich und keine Zustellung mehr.
             if (item.Status == "Abgebrochen") return;
+            // Interner Aufbereitungsauftrag: bleibt bis zum eigenen Ausführungspfad geparkt;
+            // der generische Zustellpfad würde den rohen Issue-Body als Prompt zustellen.
+            if (item.Zweck == ScmIssueAufbereitungsService.Zweck)
+            {
+                item.NextAttemptUtc = long.MaxValue;
+                await WaitAsync(item, "Die Ausführung der Issue-Aufbereitung ist noch nicht verfügbar.", ct);
+                return;
+            }
             var observation = ScmEventStore.Observation(item);
             var plugin = plugins.GetSourceCodeManagementPlugins().FirstOrDefault(x => x.PluginPrefix == observation.Reference.Repository.ProviderPrefix);
             if (plugin is not IScmEventSource source || plugin is not IScmEventResponder responder)
