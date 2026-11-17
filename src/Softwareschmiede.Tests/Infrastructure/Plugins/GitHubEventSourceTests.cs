@@ -831,6 +831,136 @@ public sealed class GitHubEventSourceTests
         Assert.Equal("repos/owner/repo/pulls", api.Requests.Last().Endpoint);
     }
 
+    /// <summary>Die Beschreibungsaktualisierung ersetzt den Issue-Body vollständig per PATCH;
+    /// der Aktions-Marker bleibt als Reconcile-Anker im Text, der Titel wird nicht gesendet.</summary>
+    [Fact]
+    public async Task IssueBodyUpdate_Execute_PatchesDescriptionWithMarker()
+    {
+        var request = new ScmResponseRequest(Issue, "event-1-issuebody", ScmResponseKind.IssueBodyUpdate, "Verbesserte Beschreibung.");
+        var api = new FakeApi();
+        Identity(api);
+        api.Add("issues/7", new { id = 77, body = "alte Beschreibung", html_url = "https://github.com/owner/repo/issues/7" });
+        api.Add("issues/7", new { id = 77, body = "Verbesserte Beschreibung.\n\n" + request.Marker, html_url = "https://github.com/owner/repo/issues/7" });
+
+        var result = await Plugin(api).ExecuteResponseAsync(request);
+
+        Assert.Equal("77", result.RemoteId);
+        Assert.False(result.AlreadyExisted);
+        Assert.Equal("https://github.com/owner/repo/issues/7", result.Url);
+        var patched = api.Requests.Last();
+        Assert.Equal("PATCH", patched.Method);
+        Assert.Equal("repos/owner/repo/issues/7", patched.Endpoint);
+        using var body = JsonDocument.Parse(patched.JsonBody!);
+        var remote = body.RootElement.GetProperty("body").GetString()!;
+        Assert.StartsWith("Verbesserte Beschreibung.", remote);
+        Assert.EndsWith(request.Marker, remote);
+        Assert.False(body.RootElement.TryGetProperty("title", out _));
+        api.AssertComplete();
+    }
+
+    /// <summary>Eine bereits angewendete Beschreibungsänderung wird am Marker erkannt und
+    /// nicht erneut geschrieben — Reconcile verhindert den zweiten PATCH.</summary>
+    [Fact]
+    public async Task IssueBodyUpdate_AlreadyApplied_ReconcilesWithoutWrite()
+    {
+        var request = new ScmResponseRequest(Issue, "event-1-issuebody", ScmResponseKind.IssueBodyUpdate, "Verbesserte Beschreibung.");
+        var api = new FakeApi();
+        Identity(api);
+        api.Add("issues/7", new { id = 77, body = "Verbesserte Beschreibung.\n\n" + request.Marker, html_url = "https://github.com/owner/repo/issues/7" });
+
+        var result = await Plugin(api).ExecuteResponseAsync(request);
+
+        Assert.True(result.AlreadyExisted);
+        Assert.Equal("77", result.RemoteId);
+        Assert.Equal("https://github.com/owner/repo/issues/7", result.Url);
+        Assert.All(api.Requests, x => Assert.Equal("GET", x.Method));
+        api.AssertComplete();
+    }
+
+    /// <summary>Der eigenständige Reconcile-Pfad liest ausschließlich das Issue-Objekt und
+    /// meldet einen Marker-Treffer als bereits vorhanden — ohne Abgleich kein Schreibschutz.</summary>
+    [Fact]
+    public async Task IssueBodyUpdate_Reconcile_FindsMarkerOnIssue()
+    {
+        var request = new ScmResponseRequest(Issue, "event-1-issuebody", ScmResponseKind.IssueBodyUpdate, "Verbesserte Beschreibung.");
+        var api = new FakeApi();
+        api.Add("issues/7", new { id = 77, body = "Verbesserte Beschreibung.\n\n" + request.Marker, html_url = "https://github.com/owner/repo/issues/7" });
+
+        var result = await Plugin(api).ReconcileResponseAsync(request);
+
+        Assert.NotNull(result);
+        Assert.True(result!.AlreadyExisted);
+        Assert.Equal("77", result.RemoteId);
+        Assert.Single(api.Requests);
+        api.AssertComplete();
+    }
+
+    /// <summary>Die Beschreibungsaktualisierung ist auf Issue-Referenzen mit neuem Text
+    /// beschränkt — ungültige Anfragen scheitern typisiert vor jedem Transportaufruf.</summary>
+    [Theory]
+    [InlineData(true, "Neue Beschreibung.")]
+    [InlineData(false, "")]
+    [InlineData(false, "   ")]
+    public async Task IssueBodyUpdate_RequiresIssueReferenceAndBody(bool pullRequest, string body)
+    {
+        var request = new ScmResponseRequest(pullRequest ? PullRequest : Issue, "action-1", ScmResponseKind.IssueBodyUpdate, body);
+
+        var api = new FakeApi();
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+
+        Assert.Equal(ScmProviderFailureKind.Permanent, error.FailureKind);
+        Assert.Empty(api.Requests);
+    }
+
+    /// <summary>Schreibfehler der Beschreibungsaktualisierung folgen derselben Status-Matrix
+    /// wie alle Mutationen: Sperrfehler sind nie ungewiss, Serverfehler schon.</summary>
+    [Theory]
+    [InlineData(401, ScmProviderFailureKind.Authentication, false)]
+    [InlineData(403, ScmProviderFailureKind.Permission, false)]
+    [InlineData(429, ScmProviderFailureKind.RateLimit, false)]
+    [InlineData(500, ScmProviderFailureKind.Temporary, true)]
+    [InlineData(404, ScmProviderFailureKind.Permanent, false)]
+    public async Task IssueBodyUpdate_Failures_TypedProviderErrors(int status, ScmProviderFailureKind kind, bool uncertain)
+    {
+        var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.IssueBodyUpdate, "Neue Beschreibung.");
+        var api = new FakeApi();
+        Identity(api);
+        api.Add("issues/7", new { id = 77, body = "alte Beschreibung" });
+        api.AddStatus("issues/7", status, status == 429 ? new() { ["Retry-After"] = "30" } : null);
+
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+
+        Assert.Equal(kind, error.FailureKind);
+        Assert.Equal(uncertain, error.OutcomeUncertain);
+        if (status == 429) Assert.NotNull(error.RetryAfterUtc);
+    }
+
+    /// <summary>Die Beschreibungsaktualisierung folgt dem Konto der gespeicherten Referenz —
+    /// inklusive Identitätsprüfung, Abgleichs-Read und eigentlichem PATCH.</summary>
+    [Theory]
+    [InlineData(ScmKontoModus.Benutzerkonto)]
+    [InlineData(ScmKontoModus.SeparatesKonto)]
+    public async Task IssueBodyUpdate_RoutesByReferenceKonto(ScmKontoModus konto)
+    {
+        var user = new FakeApi();
+        var agent = new FakeApi();
+        var routed = konto == ScmKontoModus.SeparatesKonto ? agent : user;
+        var idle = konto == ScmKontoModus.SeparatesKonto ? user : agent;
+        var request = new ScmResponseRequest(Issue with { Repository = Repository with { Konto = konto } },
+            "action-1", ScmResponseKind.IssueBodyUpdate, "Neue Beschreibung.");
+        Identity(routed);
+        routed.Add("issues/7", new { id = 77, body = "alte Beschreibung" });
+        routed.Add("issues/7", new { id = 77, body = "Neue Beschreibung." });
+        var plugin = Plugin(user, StoreWithAgentToken(), agent);
+
+        var result = await plugin.ExecuteResponseAsync(request);
+
+        Assert.Equal("77", result.RemoteId);
+        Assert.Empty(idle.Requests);
+        Assert.Contains(routed.Requests, x => x.Method == "PATCH");
+        routed.AssertComplete();
+    }
+
     /// <summary>Repository-weite Erkennung listet offene Issues und Pull Requests über alle Seiten.</summary>
     [Fact]
     public async Task Enumeration_ReturnsOpenReferencesAcrossPages()

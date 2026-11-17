@@ -335,7 +335,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             : "Das Ereignis ist bereits abgeschlossen und konnte nicht abgebrochen werden.";
     }
 
-    private static string ActionLabel(string purpose) => purpose == "receipt" ? "Empfangsbestätigung" : purpose == "waiting" ? "Wartehinweis" : purpose == "attachments" ? "Screenshot-Nachweis" : "KI-Antwort";
+    private static string ActionLabel(string purpose) => purpose == "receipt" ? "Empfangsbestätigung" : purpose == "waiting" ? "Wartehinweis" : purpose == "attachments" ? "Screenshot-Nachweis" : purpose == "issuebody" ? "Issue-Beschreibung" : "KI-Antwort";
     /// <summary>Benennt das betroffene Ereignis knapp, damit es in der Liste gefunden wird.</summary>
     private static string ActionReference(ScmIncomingEvent item)
     {
