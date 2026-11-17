@@ -4,8 +4,8 @@ Branch: `task/issue-410-c69c8e7f6eb14c4cbe407bdbdc9e1cd6-ausfuehrungsbegrenzung`
 
 | # | Titel | Abhängigkeiten | Branch | Status |
 |---|-------|----------------|--------|--------|
-| 1 | Plugin-Fallback für SCM-Ereignisausführungen (#411) | Keine | `task/issue-410-c69c8e7f6eb14c4cbe407bdbdc9e1cd6-ausfuehrungsbegrenzung-schritt-1-plugin-fallback` | In Arbeit |
-| 2 | Ausführungsbegrenzung: Limits + Startprüfung + Priorisierung (#410 T1) | 1 | `task/issue-410-c69c8e7f6eb14c4cbe407bdbdc9e1cd6-ausfuehrungsbegrenzung-schritt-2-ausfuehrungslimits` | Offen |
+| 1 | Plugin-Fallback für SCM-Ereignisausführungen (#411) | Keine | `task/issue-410-c69c8e7f6eb14c4cbe407bdbdc9e1cd6-ausfuehrungsbegrenzung-schritt-1-plugin-fallback` | Fertig |
+| 2 | Ausführungsbegrenzung: Limits + Startprüfung + Priorisierung (#410 T1) | 1 | `task/issue-410-c69c8e7f6eb14c4cbe407bdbdc9e1cd6-ausfuehrungsbegrenzung-schritt-2-ausfuehrungslimits` | In Arbeit |
 | 3 | Ereignisgesteuerte Startprüfung bei Beendet/Pausiert (#410 T2) | 2 | `task/issue-410-c69c8e7f6eb14c4cbe407bdbdc9e1cd6-ausfuehrungsbegrenzung-schritt-3-startpruefung` | Offen |
 | 4 | SCM-Schnittstelle: Issue-Beschreibung aktualisieren (#412 Grundlage) | Keine | `task/issue-410-c69c8e7f6eb14c4cbe407bdbdc9e1cd6-ausfuehrungsbegrenzung-schritt-4-issue-body-update` | Offen |
 | 5 | „Issue erstellt"-Erkennung + Aufbereitungsauftrag (#412 T1) | 1 | `task/issue-410-c69c8e7f6eb14c4cbe407bdbdc9e1cd6-ausfuehrungsbegrenzung-schritt-5-issue-erkennung` | Offen |
