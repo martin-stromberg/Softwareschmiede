@@ -15,7 +15,7 @@ namespace Softwareschmiede.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.15");
 
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.AlertReferenz", b =>
                 {
@@ -187,6 +187,10 @@ namespace Softwareschmiede.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("VorschlagPrompt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Zweck")
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -529,6 +533,11 @@ namespace Softwareschmiede.Migrations
                     b.Property<string>("DefaultSourceBranchName")
                         .HasMaxLength(255)
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IssueAufbereitungAktiv")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("PluginTyp")
                         .IsRequired()
@@ -1031,6 +1040,10 @@ namespace Softwareschmiede.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Zweck")
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Sequence");

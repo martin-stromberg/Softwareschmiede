@@ -399,7 +399,8 @@ public sealed record ScmEventQueueItem(Guid Id, Guid TaskId, string TaskTitle, s
         return new(item.Id, item.AufgabeId, task?.Titel ?? "Entfernte Aufgabe",
             $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}",
             $"{(observation.Reference.Kind == Domain.ValueObjects.ScmReferenceKind.Issue ? "Issue" : "Pull Request")} #{observation.Reference.Number}",
-            observation.ContentKind switch { Domain.ValueObjects.ScmContentKind.Description => "Beschreibung", Domain.ValueObjects.ScmContentKind.ReviewComment => "Review-Kommentar", Domain.ValueObjects.ScmContentKind.PullRequestReview => "Review", _ => "Kommentar" },
+            item.Zweck == ScmIssueAufbereitungsService.Zweck ? "Issue-Aufbereitung"
+                : observation.ContentKind switch { Domain.ValueObjects.ScmContentKind.Description => "Beschreibung", Domain.ValueObjects.ScmContentKind.ReviewComment => "Review-Kommentar", Domain.ValueObjects.ScmContentKind.PullRequestReview => "Review", _ => "Kommentar" },
             DateTimeOffset.FromUnixTimeMilliseconds(item.ReceivedUtc).ToLocalTime().ToString("g"), item.Status,
             item.Status switch { "ZustellungVorbereitet" => "Zustellung vorbereitet", "InBearbeitung" => "In Bearbeitung", "ZustellungUngewiss" => "Zustellung ungewiss", "VerarbeitungUngeklärt" => "Verarbeitung ungeklärt", _ => item.Status },
             observation.Body, observation.Url, reason, item.CliRunId, item.DeliveryAttemptId, blocked, hasOpenActions);
