@@ -94,17 +94,25 @@ public sealed class ScmEventOrchestrator(
             // Hostaktionen werden unabhängig vom Zustellstatus nachgeholt, ohne einen zweiten Prompt.
             if (observation.ContentKind != ScmContentKind.Description)
             {
-                var receipt = await outbox.EnsureAsync(item, "receipt", new(observation.Reference,
+                var receipt = await EnsureHostActionAsync(item, "receipt", new(observation.Reference,
                     ScmEventStore.ActionId(item.Id, "receipt").ToString("D"), ScmResponseKind.Reaction,
                     Reaction: "eyes", ContentKind: observation.ContentKind, RemoteCommentId: observation.RemoteCommentId, RemoteNodeId: observation.RemoteNodeId), ct);
+                if (receipt is null) return;
                 await outbox.ExecuteAsync(receipt, responder, ct);
             }
-            foreach (var action in await db.ScmOutgoingActions.Where(x => x.EventId == item.Id && x.Purpose == "waiting" && x.Status != "Succeeded").ToListAsync(ct))
+            foreach (var action in await db.ScmOutgoingActions.Where(x => x.EventId == item.Id
+                && (x.Purpose == "waiting" || x.Purpose == "attachments") && x.Status != "Succeeded").ToListAsync(ct))
                 await outbox.ExecuteAsync(action, responder, ct);
             if (item.Status == "Verarbeitet") return;
             if (item.DeliveryAttemptId is not null)
             {
                 try { await ReconcileAttemptAsync(item, observation, responder, ct); }
+                catch (ScmActionIdCollisionException ex)
+                {
+                    item.Status = "VerarbeitungUngeklärt";
+                    item.Reason = ex.Message;
+                    await db.SaveChangesAsync(ct);
+                }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
                 {
                     item.Status = "VerarbeitungUngeklärt";
@@ -432,6 +440,40 @@ public sealed class ScmEventOrchestrator(
                 {
                     item.Status = "Verarbeitet";
                     item.Reason = null;
+                    // Nachweis-Bilder des Versuchs werden als eigener, versuchsübergreifender
+                    // Outbox-Schritt (AttemptId bleibt null) eingesammelt und hochgeladen —
+                    // sie verändern die geprüfte Abschlussmenge nie.
+                    if (await IsCancelledAsync(item.Id, ct)) return;
+                    var collected = await exchange.CollectAttachmentsAsync(attempt, complete, ct);
+                    // Auch wenn alle deklarierten/abgelegten Dateien übersprungen wurden, erhält
+                    // der Versuch eine transparente Kommentaraktion mit den Übersprungen-Hinweisen:
+                    // ohne sie bliebe eine versuchte, vollständig verworfene Lieferung auf GitHub
+                    // und in der Queue unsichtbar. Nur wenn weder Dateien noch Gründe vorliegen
+                    // (leere Ablage ohne Deklaration) wird keine Aktion erzeugt.
+                    if (collected.Attachments.Count > 0 || collected.Skipped.Count > 0)
+                    {
+                        // Die Übersprungen-Liste ist mengenmäßig unbegrenzt und wird wie der
+                        // Protokolleintrag gekappt, damit der Kommentar das Remote-Limit nie sprengt.
+                        const int maximumSkippedLines = 8;
+                        var skippedNote = collected.Skipped.Count == 0 ? string.Empty
+                            : "\n\n" + string.Join("\n", collected.Skipped.Take(maximumSkippedLines).Select(x => $"*Übersprungen: {x}*"))
+                                + (collected.Skipped.Count > maximumSkippedLines
+                                    ? $"\n*… und {collected.Skipped.Count - maximumSkippedLines} weitere übersprungene Dateien.*"
+                                    : string.Empty);
+                        var response = new ScmResponseRequest(observation.Reference,
+                            ScmEventStore.ActionId(item.Id, "attachments").ToString("D"), ScmResponseKind.Comment,
+                            Body: (collected.Attachments.Count > 0
+                                ? "Screenshot-Nachweise des abgeschlossenen Laufs."
+                                : "Die Screenshot-Nachweise des abgeschlossenen Laufs konnten nicht hochgeladen werden.") + skippedNote,
+                            Attachments: collected.Attachments.Select(x => new ScmResponseAttachment(x.FullPath, x.Name, x.ContentType, x.Caption)).ToArray());
+                        var outgoing = await EnsureHostActionAsync(item, "attachments", response, ct);
+                        if (outgoing is null) return;
+                        await outbox.ExecuteAsync(outgoing, responder, ct);
+                    }
+                    if (collected.Skipped.Count > 0)
+                        await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.GitAktion,
+                            "Screenshot-Nachweise übersprungen: " + string.Join("; ", collected.Skipped.Take(8))
+                                + (collected.Skipped.Count > 8 ? "; …" : string.Empty), ct: ct);
                 }
             }
             // Ein im Abschluss gemeldeter, vom Agenten selbst angelegter Pull Request wird unabhängig
@@ -500,10 +542,29 @@ public sealed class ScmEventOrchestrator(
     private async Task WaitWithCommentAsync(ScmIncomingEvent item, ScmEventObservation observation, IScmEventResponder responder, string reason, CancellationToken ct)
     {
         await WaitAsync(item, reason, ct);
-        var action = await outbox.EnsureAsync(item, "waiting", new(observation.Reference,
+        var action = await EnsureHostActionAsync(item, "waiting", new(observation.Reference,
             ScmEventStore.ActionId(item.Id, "waiting").ToString("D"), ScmResponseKind.Comment,
             Body: $"Die Anfrage wurde empfangen und wartet auf die Verarbeitung in der Anwendung.\n<!-- softwareschmiede:event:{item.Id:D}:waiting -->"), ct);
-        await outbox.ExecuteAsync(action, responder, ct);
+        if (action is not null) await outbox.ExecuteAsync(action, responder, ct);
+    }
+
+    /// <summary>Legt eine host-generierte Outbox-Aktion an. Die deterministischen IDs sind dem
+    /// Agenten errechenbar; hat er die ID mit einer eigenen Aktion vorweggenommen, wird diese
+    /// nicht still als Nachweis wiederverwendet — das Ereignis endet sichtbar als unklar.</summary>
+    private async Task<ScmOutgoingAction?> EnsureHostActionAsync(ScmIncomingEvent item, string purpose,
+        ScmResponseRequest request, CancellationToken ct)
+    {
+        try
+        {
+            return await outbox.EnsureAsync(item, purpose, request, ct);
+        }
+        catch (ScmActionIdCollisionException ex)
+        {
+            item.Status = "VerarbeitungUngeklärt";
+            item.Reason = ex.Message;
+            await db.SaveChangesAsync(ct);
+            return null;
+        }
     }
 
     private async Task RenewLeaseAsync(Guid taskId, string owner, CancellationTokenSource cancellation)

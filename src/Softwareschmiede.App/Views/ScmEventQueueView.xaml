@@ -126,6 +126,7 @@
         </Grid>
         <StackPanel Grid.Row="5" Margin="0,8,0,0">
             <TextBlock Text="SCM-Ereignisse werden geladen…" Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventLoading"/>
+            <TextBlock Text="Aktion wird ausgeführt…" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventBusy"/>
             <StackPanel Visibility="{Binding LoadError, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
                 <TextBlock Text="{Binding LoadError}" TextWrapping="Wrap" AutomationProperties.AutomationId="ScmEventLoadError"/>
                 <Button Content="Erneut laden" Command="{Binding RefreshCommand}" HorizontalAlignment="Left" Padding="10,4" AutomationProperties.AutomationId="ScmEventReload"/>

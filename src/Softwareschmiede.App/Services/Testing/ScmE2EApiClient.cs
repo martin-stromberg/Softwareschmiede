@@ -9,7 +9,7 @@ namespace Softwareschmiede.App.Services.Testing;
 internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
     string viewerLogin = "scm-owner", string viewerNodeId = "OWNER") : IGitHubEventApiClient
 {
-    // Both fixture account clients append to the same calls.jsonl.
+    // Both fixture account clients append to the same scm-calls.jsonl.
     private static readonly object Sync = new();
     private const string Repository = "repos/scm-owner/scm-e2e";
 
@@ -20,6 +20,27 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
         {
             File.AppendAllText(configuration.CallsPath, JsonSerializer.Serialize(request) + "\n");
             return Task.FromResult(Respond(request));
+        }
+    }
+
+    // The E2E suite never creates screenshots; the stub stays dormant but keeps an
+    // unexpected upload call diagnosable in scm-calls.jsonl like every remote call.
+    public Task<GitHubEventApiResponse> UploadAsync(GitHubAssetUploadRequest request, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        lock (Sync)
+        {
+            File.AppendAllText(configuration.CallsPath, JsonSerializer.Serialize(new
+            {
+                upload = "user-attachments/assets",
+                request.Host,
+                request.RepositoryId,
+                request.Name,
+                request.ContentType,
+                bytes = request.Data.Length
+            }) + "\n");
+            return Task.FromResult(new GitHubEventApiResponse(200,
+                "{\"url\":\"https://github.com/user-attachments/assets/e2e-fixture\"}"));
         }
     }
 
@@ -44,7 +65,7 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
                 updated_at = notification.UpdatedAt
             }).ToArray());
         if (path == Repository && request.Method == "GET")
-            return Json(new { node_id = "REPO", name = "scm-e2e", owner = new { node_id = "OWNER", login = "scm-owner" }, permissions = new { push = scenario.CanWrite } });
+            return Json(new { node_id = "REPO", id = 424242, name = "scm-e2e", owner = new { node_id = "OWNER", login = "scm-owner" }, permissions = new { push = scenario.CanWrite } });
         var responses = ReadResponses();
         if (path == "graphql" && request.Method == "POST")
         {

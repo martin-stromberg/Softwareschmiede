@@ -18,7 +18,7 @@ Speichert Inhaltshash und Revision einer beobachteten Textfassung sowie den Aufl
 
 ### `ScmOutgoingAction`
 
-Verfolgt Empfangsreaktionen, Wartehinweise und angeforderte Antworten einschließlich Aktionstyp, Remote-ID, Versuchszahl und Fehlerstatus.
+Verfolgt Empfangsreaktionen, Wartehinweise und angeforderte Antworten einschließlich Aktionstyp, Remote-ID, Versuchszahl und Fehlerstatus. Neben `receipt` und `waiting` deckt der hostseitige Zweck `attachments` die Screenshot-Nachweise ab: Die Aktion trägt eine deterministische Aktions-ID und veröffentlicht die vom Agenten im `attachmentsPath`-Verzeichnis des Antwortkanals abgelegten Nachweis-Bilder als Kommentar-Anhänge; sie entsteht nur, wenn beim Abschluss mindestens eine Datei gesammelt oder verworfen wurde.
 
 ### `ScmTaskLease`
 

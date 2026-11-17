@@ -92,3 +92,9 @@
 3. Bei einem am Branch-Schutz scheiternden Merge: Die Option **„Bei blockiertem Merge Admin-Merge erlauben"** unter **Einstellungen → Automatisierung → Prozessabläufe** einschalten — dann wird der gescheiterte reguläre Merge einmalig als Admin-Merge wiederholt (Voraussetzung: Token mit Admin-Recht).
 4. Prüfe, dass der Modus **„Backmerge-Pull-Requests"** nicht auf „Deaktiviert" steht, ein vom Hauptbranch abweichender Basis-Branch konfiguriert ist und — im Modus „Projektbezogen aktivierbar" — die Freigabe in der Projektdetailansicht eingeschaltet ist.
 5. Mit **Quellen erneut prüfen** in der SCM-Ereignisübersicht lässt sich der Prüfzyklus sofort erneut anstoßen; dabei wird auch der Fehler-Backoff zurückgesetzt.
+
+## Die Integrationshinweise melden einen offenen Screenshot-Nachweis
+
+**Ursache:** Nach dem Abschluss eines Laufs sollten vom Agenten im `attachmentsPath`-Verzeichnis des Antwortkanals abgelegte Nachweis-Bilder als GitHub-Kommentar veröffentlicht werden; der Upload oder das Posten des Kommentars ist fehlgeschlagen oder steht noch aus. Der Hinweis „Screenshot-Nachweis (`<owner/repo>` Issue/Pull Request #N): `<Fehler>`" in den **Integrationshinweisen** der Ereignisübersicht nennt den Grund.
+
+**Lösung:** Öffne das zugehörige Ereignis über den Filter **Verarbeitet** oder **Alle** und wähle **Erneut prüfen** — das setzt den Warte-Backoff zurück und führt die Aktion erneut aus. Ein bereits angekommener Nachweis-Kommentar wird über einen unsichtbaren Marker erkannt und nicht doppelt erzeugt. Meldet der Hinweis einen ungewissen Ausgang, prüfe zuerst auf GitHub, ob der Kommentar bereits angekommen ist — in diesem Fall sendet die Anwendung bewusst nicht automatisch erneut. Enthält ein veröffentlichter Kommentar ausschließlich Übersprungen-Zeilen, nennt er für jede Datei den Verwerfungsgrund — etwa ungültiges Format, zu große Datei oder „Upload wird für diesen Host nicht unterstützt" auf Hosts außerhalb `github.com`.

@@ -14,7 +14,7 @@ public enum ScmContentKind { Description, IssueComment, ReviewComment, PullReque
 /// <summary>Vom Provider geladene Repository- und Authentifizierungsdaten, ohne Credentials.</summary>
 public sealed record ScmEventRepository(string ProviderPrefix, string Host, string RepositoryId,
     string Owner, string Name, string? OwnerId, string ViewerId, string ViewerLogin, bool CanWrite,
-    ScmKontoModus Konto = ScmKontoModus.Benutzerkonto);
+    ScmKontoModus Konto = ScmKontoModus.Benutzerkonto, string? NumericRepositoryId = null);
 
 /// <summary>Validierter Ursprung einer Beobachtung oder Antwort.</summary>
 public sealed record ScmEventReference(ScmEventRepository Repository, ScmReferenceKind Kind, int Number);
@@ -54,11 +54,14 @@ public sealed record ScmEventObservation(ScmEventReference Reference, ScmContent
 /// <summary>Vom Antwortkanal erlaubte Remoteaktion.</summary>
 public enum ScmResponseKind { Comment, Reaction, PullRequest }
 
+/// <summary>Vom Host validierte lokale Nachweis-Datei, die das Plugin zum Attachment-Speicher hochlädt.</summary>
+public sealed record ScmResponseAttachment(string Path, string Name, string ContentType, string? Caption);
+
 /// <summary>Antwort mit ausschließlich vom Host vorgegebenem Ursprung und deterministischer Aktions-ID.</summary>
 public sealed record ScmResponseRequest(ScmEventReference Reference, string ActionId, ScmResponseKind Kind,
     string? Body = null, string? Reaction = null, ScmContentKind? ContentKind = null,
     string? RemoteCommentId = null, string? RemoteNodeId = null, string? Title = null,
-    string? HeadBranch = null, string? BaseBranch = null)
+    string? HeadBranch = null, string? BaseBranch = null, IReadOnlyList<ScmResponseAttachment>? Attachments = null)
 {
     /// <summary>Wiedererkennungsmarker ohne ausführbaren Trigger.</summary>
     public string Marker => $"<!-- softwareschmiede:action:{ActionId} -->";

@@ -26,7 +26,7 @@ Der CLI-Kanaladapter erkennt Codex CLI `v0.114.x`, Claude Code `v2.1.x` und Devi
 
 ## Datenfluss
 
-GitHub-Texte werden mit Repository- und Versionsmetadaten gelesen, gegen lokale Referenzen abgeglichen und dauerhaft in die Inbox geschrieben. Nach Trigger- und Identitätsprüfung leitet der Orchestrator den vollständigen Ursprungstext an eine CLI mit nachgewiesenem Antwortkanal weiter. Empfangsreaktion, Wartehinweis und KI-Antwort werden als getrennte Remoteaktionen protokolliert. Kommentare und veröffentlichte PR-Reviews erhalten die 👀-Reaktion; für PR-Reviews wird sie über GraphQL auf dem Review-Node gesetzt. Ein fehlgeschlagener Empfangsreaktionsversuch erhält keinen alternativen Kommentar als Ersatz, kann aber unabhängig von der Reaktion einen Warte-Kommentar nach sich ziehen.
+GitHub-Texte werden mit Repository- und Versionsmetadaten gelesen, gegen lokale Referenzen abgeglichen und dauerhaft in die Inbox geschrieben. Nach Trigger- und Identitätsprüfung leitet der Orchestrator den vollständigen Ursprungstext an eine CLI mit nachgewiesenem Antwortkanal weiter. Empfangsreaktion, Wartehinweis und KI-Antwort werden als getrennte Remoteaktionen protokolliert. Kommentare und veröffentlichte PR-Reviews erhalten die 👀-Reaktion; für PR-Reviews wird sie über GraphQL auf dem Review-Node gesetzt. Ein fehlgeschlagener Empfangsreaktionsversuch erhält keinen alternativen Kommentar als Ersatz, kann aber unabhängig von der Reaktion einen Warte-Kommentar nach sich ziehen. Nach dem Abschluss eines Laufs veröffentlicht eine dauerhafte Outbox-Aktion des Zwecks `attachments` zudem die vom Agenten im `attachmentsPath`-Verzeichnis des Antwortkanals abgelegten Nachweis-Bilder hostseitig als Kommentar-Anhänge.
 
 ## Zuverlässigkeit
 

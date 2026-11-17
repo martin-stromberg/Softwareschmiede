@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -59,7 +61,7 @@ public sealed class ScmEventQueueViewModelTests
         await fixture.InitializeAsync();
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
         view.SelectedEvent = new(Guid.NewGuid(), Guid.NewGuid(), "task", "owner/repo", "Issue #1", "Kommentar", "now", status,
-            status, "body", "origin", null, null, attempt ? Guid.NewGuid() : null, false);
+            status, "body", "origin", null, null, attempt ? Guid.NewGuid() : null, false, false);
         Assert.Equal(enabled, view.OpenEventCommand.CanExecute(null));
         Assert.True(view.NavigateToTaskCommand.CanExecute(null));
         Assert.Equal(attempt, view.CheckStatusCommand.CanExecute(null));
@@ -79,10 +81,181 @@ public sealed class ScmEventQueueViewModelTests
         await fixture.InitializeAsync();
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
         view.SelectedEvent = new(Guid.NewGuid(), Guid.NewGuid(), "task", "owner/repo", "Issue #1", "Kommentar", "now", status,
-            status, "body", "origin", null, null, null, false);
+            status, "body", "origin", null, null, null, false, false);
         Assert.Equal(enabled, view.CancelCommand.CanExecute(null));
         Assert.Equal(enabled, view.RetryCommand.CanExecute(null));
         Assert.Equal(enabled, view.OpenEventCommand.CanExecute(null));
+    }
+
+    /// <summary>„Erneut prüfen" bleibt an einem „Verarbeitet"-Ereignis nur verfügbar, solange
+    /// eine Outbox-Aktion (z. B. Screenshot-Nachweis) unvollendet ist; „Abgebrochen" bleibt
+    /// auch mit offener Aktion gesperrt, alle anderen Endzustände ohnehin.</summary>
+    [Theory]
+    [InlineData("Verarbeitet", true, true)]
+    [InlineData("Verarbeitet", false, false)]
+    [InlineData("Abgebrochen", true, false)]
+    [InlineData("Abgebrochen", false, false)]
+    [InlineData("Wartend", false, true)]
+    [InlineData("VerarbeitungUngeklärt", true, true)]
+    public async Task RetryCommand_ProcessedEvent_RequiresOpenOutboxAction(string status, bool openActions, bool enabled)
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+        view.SelectedEvent = new(Guid.NewGuid(), Guid.NewGuid(), "task", "owner/repo", "Issue #1", "Kommentar", "now", status,
+            status, "body", "origin", null, null, null, false, openActions);
+        Assert.Equal(enabled, view.RetryCommand.CanExecute(null));
+    }
+
+    /// <summary>Eine permanent gescheiterte attachments-Aktion an einem „Verarbeitet"-Ereignis
+    /// ist aus der Queue bewusst erneut auslösbar: Die Projektion meldet die offene Aktion und
+    /// der Klick führt sie tatsächlich erneut aus.</summary>
+    [Fact]
+    public async Task ProcessedEvent_WithFailedAttachmentsAction_OffersWorkingRetry()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var attempts = 0;
+        fixture.Git.As<IScmEventResponder>().Setup(x => x.ExecuteResponseAsync(
+            It.Is<ScmResponseRequest>(r => r.Attachments != null && r.Attachments.Count > 0), It.IsAny<CancellationToken>()))
+            .Returns((ScmResponseRequest request, CancellationToken _) =>
+            {
+                if (++attempts == 1) throw new ScmProviderException(ScmProviderFailureKind.Permanent, "Upload wird nicht unterstützt.");
+                fixture.Responses.Add(request);
+                return Task.FromResult(new ScmResponseResult("remote", null, false));
+            });
+        var (_, eventId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(eventId);
+        var delivered = await fixture.EventAsync(eventId);
+        var runId = Guid.Parse(delivered.CliRunId!);
+        var directory = delivered.ExchangePath!;
+        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"),
+            [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3]);
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
+            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId)));
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
+            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], false, Report: "fertig.")));
+        await fixture.DispatchAsync(eventId);
+        await fixture.DispatchAsync(eventId);
+
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+        view.SelectedFilter = "Verarbeitet";
+        await view.RefreshAsync();
+        var item = Assert.Single(view.Events);
+        Assert.True(item.HasOpenActions);
+        Assert.Equal(1, attempts);
+        view.SelectedEvent = item;
+        Assert.True(view.RetryCommand.CanExecute(null));
+
+        await view.RetryCommand.ExecuteAsync();
+
+        Assert.Equal(2, attempts);
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments")).Status);
+    }
+
+    /// <summary>Eine gesperrte Outbox-Aktion benennt in den Integrationshinweisen das betroffene
+    /// Ereignis und den heilsamen Weg über das ereignisbezogene „Erneut prüfen" — nicht die
+    /// wirkungslose Quellen-Schaltfläche.</summary>
+    [Fact]
+    public async Task FailedOutgoingAction_DiagnosticNamesEventAndEventRetry()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (_, eventId) = await fixture.AddAsync();
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            db.ScmOutgoingActions.Add(new ScmOutgoingAction
+            {
+                Id = Guid.NewGuid(),
+                EventId = eventId,
+                Purpose = "attachments",
+                Status = "Failed",
+                Error = "Upload fehlgeschlagen.",
+                ErrorCode = "Permanent",
+                NextAttemptUtc = long.MaxValue,
+                RequestJson = "{}"
+            });
+            await db.SaveChangesAsync();
+        }
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+        await view.RefreshAsync();
+        Assert.Contains("Screenshot-Nachweis", view.Diagnostics);
+        Assert.Contains("owner/repo Issue #7", view.Diagnostics);
+        Assert.Contains("Erneut prüfen", view.Diagnostics);
+    }
+
+    /// <summary>Der Hard-Stop-Hinweis passt zum Ereignisstatus: An „Verarbeitet" sagt er den
+    /// Filterweg („Verarbeitet" oder „Alle" → „Erneut prüfen"), an „Abgebrochen" verweist er
+    /// nicht auf eine deaktivierte Schaltfläche, an offenen Stati bleibt die direkte Anweisung.</summary>
+    [Theory]
+    [InlineData("Verarbeitet", "Filter „Verarbeitet“", "Erneut prüfen")]
+    [InlineData("Abgebrochen", "keine Wiederholung verfügbar", null)]
+    [InlineData("Wartend", "beim Ereignis „Erneut prüfen“ wählen", "Erneut prüfen")]
+    public async Task FailedOutgoingAction_DiagnosticMatchesEventStatus(string status, string hint, string? retry)
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (_, eventId) = await fixture.AddAsync();
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            (await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId)).Status = status;
+            db.ScmOutgoingActions.Add(new ScmOutgoingAction
+            {
+                Id = Guid.NewGuid(),
+                EventId = eventId,
+                Purpose = "attachments",
+                Status = "Failed",
+                Error = "Upload fehlgeschlagen.",
+                ErrorCode = "Permanent",
+                NextAttemptUtc = long.MaxValue,
+                RequestJson = "{}"
+            });
+            await db.SaveChangesAsync();
+        }
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+        await view.RefreshAsync();
+        Assert.Contains(hint, view.Diagnostics);
+        if (retry is null) Assert.DoesNotContain("Erneut prüfen", view.Diagnostics);
+        else Assert.Contains(retry, view.Diagnostics);
+    }
+
+    /// <summary>Eine ungewisse Folgeaktion am Wiederholungsende darf nicht als einfach
+    /// retrybar verkauft werden: Sie wird nur noch remote abgeglichen; die Diagnose weist
+    /// deshalb auf die manuelle GitHub-Prüfung statt auf einen automatischen Neuversand.</summary>
+    [Fact]
+    public async Task UncertainOutgoingAction_DiagnosticAdvisesManualGitHubCheck()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (_, eventId) = await fixture.AddAsync();
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            (await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId)).Status = "Verarbeitet";
+            db.ScmOutgoingActions.Add(new ScmOutgoingAction
+            {
+                Id = Guid.NewGuid(),
+                EventId = eventId,
+                Purpose = "attachments",
+                Status = "Uncertain",
+                Error = "Ausgang ungewiss; Remoteergebnis noch nicht wiedergefunden.",
+                ErrorCode = "Permanent",
+                NextAttemptUtc = long.MaxValue,
+                RequestJson = "{}"
+            });
+            await db.SaveChangesAsync();
+        }
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+        await view.RefreshAsync();
+        Assert.Contains("Ausgang ungewiss", view.Diagnostics);
+        Assert.Contains("GitHub", view.Diagnostics);
+        Assert.Contains("kein automatischer Neuversand", view.Diagnostics);
+        Assert.DoesNotContain("Erneut prüfen", view.Diagnostics);
     }
 
     /// <summary>A cancelled event keeps its attempt identity but disables check, retry, open and cancel.</summary>
@@ -93,7 +266,7 @@ public sealed class ScmEventQueueViewModelTests
         await fixture.InitializeAsync();
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
         view.SelectedEvent = new(Guid.NewGuid(), Guid.NewGuid(), "task", "owner/repo", "Issue #1", "Kommentar", "now", "Abgebrochen",
-            "Abgebrochen", "body", "origin", "Vom Anwender abgebrochen.", Guid.NewGuid().ToString("D"), Guid.NewGuid(), false);
+            "Abgebrochen", "body", "origin", "Vom Anwender abgebrochen.", Guid.NewGuid().ToString("D"), Guid.NewGuid(), false, false);
         Assert.False(view.CancelCommand.CanExecute(null));
         Assert.False(view.CheckStatusCommand.CanExecute(null));
         Assert.False(view.RetryCommand.CanExecute(null));

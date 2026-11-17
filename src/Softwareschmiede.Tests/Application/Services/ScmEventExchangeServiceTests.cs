@@ -278,6 +278,183 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         document.RootElement.GetProperty("completeSchema").GetString()!.Should().Contain("pullRequestNumber");
     }
 
+    /// <summary>Jeder Versuchskanal erhält ein privates screenshots/-Verzeichnis neben
+    /// actions/ und results/; die Root-Ausschlussregel deckt es mit ab.</summary>
+    [Fact]
+    public async Task Prepare_CreatesPrivateScreenshotsDirectory()
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        attempt.AttachmentsPath.Should().Be(Path.Combine(attempt.DirectoryPath, "screenshots"));
+        Directory.Exists(attempt.AttachmentsPath).Should().BeTrue();
+        Git("check-ignore", "--", Path.Combine(attempt.AttachmentsPath, "probe.png")).Should().NotBeEmpty();
+    }
+
+    /// <summary>Der Prompt nennt das Konventionsverzeichnis attachmentsPath, dokumentiert das
+    /// attachments-Feld samt seinen Grenzen im completeSchema und untersagt den Selbst-Upload.</summary>
+    [Fact]
+    public async Task Prompt_DocumentsAttachmentsPathAndCompleteAttachments()
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        using var document = JsonDocument.Parse(attempt.Prompt);
+        document.RootElement.GetProperty("attachmentsPath").GetString().Should().Be(attempt.AttachmentsPath);
+        var instruction = document.RootElement.GetProperty("instruction").GetString()!;
+        instruction.Should().Contain("attachmentsPath");
+        instruction.Should().Contain("nicht selbst hochladen");
+        instruction.Should().Contain("1000");
+        instruction.Should().Contain("16 Dateien");
+        instruction.Should().Contain("alle passenden Dateien");
+        instruction.Should().NotContain("gezielte Auswahl");
+        var completeSchema = document.RootElement.GetProperty("completeSchema").GetString()!;
+        completeSchema.Should().Contain("attachments?:[{path,caption?}]");
+        completeSchema.Should().Contain("32").And.Contain("1024").And.Contain("1000");
+    }
+
+    /// <summary>Das optionale attachments-Feld wird gelesen; inhaltlich ungültige Einträge sind
+    /// Datenwerte, die den Abschluss nie kippen — sie werden erst beim Einsammeln übersprungen.</summary>
+    [Theory]
+    [InlineData("screenshots/nachweis.png", "Vorher")]
+    [InlineData("", null)]
+    [InlineData("   ", null)]
+    public async Task Complete_Attachments_AreParsedWithoutRejectingTheCompletion(string? path, string? caption)
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var request = attempt.Request;
+        var data = new Dictionary<string, object?>
+        {
+            ["protocolVersion"] = 1,
+            ["eventId"] = request.EventId,
+            ["attemptId"] = request.AttemptId,
+            ["cliRunId"] = request.CliRunId,
+            ["actionIds"] = Array.Empty<Guid>(),
+            ["noRemoteAction"] = true,
+            ["reason"] = "Nichts geändert.",
+            ["attachments"] = new[] { new Dictionary<string, object?> { ["path"] = path, ["caption"] = caption } }
+        };
+        await Write(Path.Combine(attempt.DirectoryPath, "complete.json"), data);
+        await _protocol.ReadAsync(attempt);
+        var result = await _protocol.ReadAsync(attempt);
+        result.Diagnostic.Should().BeNull();
+        var attachment = Assert.Single(result.Complete!.Attachments!);
+        attachment.Path.Should().Be(path);
+        attachment.Caption.Should().Be(caption);
+    }
+
+    /// <summary>Zu viele Einträge oder eine zu lange Unterschrift verwerfen nicht den Abschluss:
+    /// Die Deklarationen werden gelesen und erst beim Einsammeln einzeln begründet übersprungen.</summary>
+    [Theory]
+    [InlineData(33, null)]
+    [InlineData(1, 1001)]
+    public async Task Complete_Attachments_OversizedDeclarations_ParseAndSkipAtCollection(int entries, int? captionChars)
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var request = attempt.Request;
+        var attachments = Enumerable.Range(0, entries)
+            .Select(_ => (object)new { path = "screenshots/nachweis.png", caption = captionChars is { } c ? new string('x', c) : null })
+            .ToArray();
+        var data = new Dictionary<string, object?>
+        {
+            ["protocolVersion"] = 1,
+            ["eventId"] = request.EventId,
+            ["attemptId"] = request.AttemptId,
+            ["cliRunId"] = request.CliRunId,
+            ["actionIds"] = Array.Empty<Guid>(),
+            ["noRemoteAction"] = true,
+            ["reason"] = "Nichts geändert.",
+            ["attachments"] = attachments
+        };
+        await Write(Path.Combine(attempt.DirectoryPath, "complete.json"), data);
+        await _protocol.ReadAsync(attempt);
+        var result = await _protocol.ReadAsync(attempt);
+        result.Diagnostic.Should().BeNull();
+        result.Complete.Should().NotBeNull();
+        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete);
+        collected.Attachments.Should().BeEmpty();
+        if (entries > ScmEventExchangeProtocol.MaximumAttachmentEntries)
+            collected.Skipped.Should().Contain(x => x.Contains("Eintragslimit"));
+        else
+            collected.Skipped.Should().ContainSingle(x => x.Contains("Längenlimit"));
+    }
+
+    /// <summary>Ein null-Element im attachments-Array ist wie jede andere ungültige Deklaration
+    /// ein Datenwert — es kippt den Abschluss nicht und wird beim Einsammeln übersprungen.</summary>
+    [Fact]
+    public async Task Complete_Attachments_NullElement_ParsesAndIsSkippedAtCollection()
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var request = attempt.Request;
+        var data = new Dictionary<string, object?>
+        {
+            ["protocolVersion"] = 1,
+            ["eventId"] = request.EventId,
+            ["attemptId"] = request.AttemptId,
+            ["cliRunId"] = request.CliRunId,
+            ["actionIds"] = Array.Empty<Guid>(),
+            ["noRemoteAction"] = true,
+            ["reason"] = "Nichts geändert.",
+            ["attachments"] = new object?[] { null }
+        };
+        await Write(Path.Combine(attempt.DirectoryPath, "complete.json"), data);
+        await _protocol.ReadAsync(attempt);
+        var result = await _protocol.ReadAsync(attempt);
+        result.Diagnostic.Should().BeNull();
+        Assert.Single(result.Complete!.Attachments!).Should().BeNull();
+        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete);
+        collected.Attachments.Should().BeEmpty();
+        collected.Skipped.Should().ContainSingle(x => x.Contains("ohne verwertbaren Pfad"));
+    }
+
+    /// <summary>Ein strukturell falsches attachments-Feld (Skalar oder Objekt statt Array)
+    /// erzeugt kein JsonException-Diagnostic: Die Deklaration wird als nicht verwertbar
+    /// gelesen und beim Einsammeln begründet übersprungen — der Abschluss bleibt gültig.</summary>
+    [Theory]
+    [InlineData("\"a.png\"")]
+    [InlineData("42")]
+    [InlineData("{\"path\":\"screenshots/a.png\"}")]
+    public async Task Complete_Attachments_StructurallyWrongField_ParsesAndIsSkippedAtCollection(string attachmentsJson)
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var request = attempt.Request;
+        await File.WriteAllTextAsync(Path.Combine(attempt.DirectoryPath, "complete.json"),
+            "{\"protocolVersion\":1,\"eventId\":\"" + request.EventId + "\",\"attemptId\":\"" + request.AttemptId
+            + "\",\"cliRunId\":\"" + request.CliRunId + "\",\"actionIds\":[],\"noRemoteAction\":true,"
+            + "\"reason\":\"Nichts geändert.\",\"attachments\":" + attachmentsJson + "}");
+        await _protocol.ReadAsync(attempt);
+        var result = await _protocol.ReadAsync(attempt);
+        result.Diagnostic.Should().BeNull();
+        result.Complete.Should().NotBeNull();
+        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete);
+        collected.Attachments.Should().BeEmpty();
+        collected.Skipped.Should().ContainSingle(x => x.Contains("ohne verwertbaren Pfad"));
+    }
+
+    /// <summary>Gemischte ungültige und gültige Einträge bleiben parsebar: Skalare, typfremde
+    /// Felder und Objekte ohne Pfad werden einzeln übersprungen; ein gültiger Eintrag mit
+    /// Zusatzfeldern wird normal verwertet — das strikte Fremdfeld-Verbot gilt nur außerhalb
+    /// von attachments.</summary>
+    [Fact]
+    public async Task Complete_Attachments_MixedInvalidEntries_ParseAndSkipIndividually()
+    {
+        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var request = attempt.Request;
+        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, "echt.png"),
+            [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        await File.WriteAllTextAsync(Path.Combine(attempt.DirectoryPath, "complete.json"),
+            "{\"protocolVersion\":1,\"eventId\":\"" + request.EventId + "\",\"attemptId\":\"" + request.AttemptId
+            + "\",\"cliRunId\":\"" + request.CliRunId + "\",\"actionIds\":[],\"noRemoteAction\":true,"
+            + "\"reason\":\"Nichts geändert.\",\"attachments\":[\"screenshots/echt.png\",7,"
+            + "{\"path\":123,\"caption\":\"c\"},{\"path\":\"screenshots/echt.png\",\"extra\":true,\"caption\":\"Vorher\"},"
+            + "{\"caption\":\"kein pfad\"}]}");
+        await _protocol.ReadAsync(attempt);
+        var result = await _protocol.ReadAsync(attempt);
+        result.Diagnostic.Should().BeNull();
+        result.Complete!.Attachments.Should().HaveCount(5);
+        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete);
+        var attachment = collected.Attachments.Should().ContainSingle().Subject;
+        attachment.Name.Should().Be("echt.png");
+        attachment.Caption.Should().Be("Vorher");
+        collected.Skipped.Should().HaveCount(4).And.OnlyContain(x => x.Contains("ohne verwertbaren Pfad"));
+    }
+
     /// <summary>Der Prompt weist den Agenten an, erlaubte Issue-/PR-Aktionen selbst über die
     /// SCM-Anbindung auszuführen, und dokumentiert das report-Feld; Repo- und Ursprungskontext
     /// bleiben Daten im request.</summary>
