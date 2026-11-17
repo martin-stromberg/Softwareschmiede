@@ -157,6 +157,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddSingleton<IOptions<ScmEventOptions>>(Options.Create(new ScmEventOptions()));
         services.AddSingleton<KiAusfuehrungsService>();
         services.AddSingleton<ICliExecutionLimitSource>(sp => sp.GetRequiredService<KiAusfuehrungsService>());
+        services.AddSingleton<IRunningAutomationStatusSource>(sp => sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<PromptZeitVersandService>();
         services.AddSingleton<ScmEventStartupGate>();
         services.AddSingleton<ScmEventChangeNotifier>();
@@ -164,6 +165,9 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddSingleton<ScmEventMonitoringService>();
         services.AddSingleton<ScmBackmergeMonitoringService>();
         services.AddSingleton<ScmTaskCompletionMonitoringService>();
+        services.AddSingleton<ScmStartPruefungsAusloeser>();
+        services.AddSingleton<ScmStartPruefungsService>();
+        services.AddSingleton<AufgabeLaufdatenChangedNotifier>();
         services.AddScoped<PullRequestReferenzService>();
         services.AddScoped<TodoService>();
         services.AddScoped<AufgabeService>();
@@ -172,6 +176,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddScoped<PluginDefaultSettingsService>();
         services.AddScoped<PluginActivationService>();
         services.AddScoped<PluginSelectionService>();
+        services.AddScoped<KiPluginLimitService>();
         services.AddScoped<ScmEventStore>();
         services.AddScoped<ScmEventOutbox>();
         services.AddScoped<ScmEventOrchestrator>();
@@ -243,6 +248,12 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
 
     /// <summary>Der Monitoring-Dienst aus dem Service-Provider der Fixture.</summary>
     internal ScmEventMonitoringService Monitor => Services.GetRequiredService<ScmEventMonitoringService>();
+
+    /// <summary>Der Auslöser der ereignisgesteuerten Startprüfung aus dem Service-Provider der Fixture.</summary>
+    internal ScmStartPruefungsAusloeser Ausloeser => Services.GetRequiredService<ScmStartPruefungsAusloeser>();
+
+    /// <summary>Der ereignisgesteuerte Startprüfungs-Dienst aus dem Service-Provider der Fixture.</summary>
+    internal ScmStartPruefungsService StartPruefung => Services.GetRequiredService<ScmStartPruefungsService>();
 
     /// <summary>Setzt den Konto-Modus über den <see cref="AppEinstellungService"/>.</summary>
     internal async Task SetKontoModusAsync(ScmKontoModus modus)

@@ -23,18 +23,27 @@ public sealed class KiPluginLimitService
     private readonly AppEinstellungService _appEinstellungService;
     private readonly AufgabeLaufdatenChangedNotifier _laufdatenChangedNotifier;
     private readonly ILogger<KiPluginLimitService> _logger;
+    private readonly ScmStartPruefungsAusloeser? _startPruefungsAusloeser;
 
     /// <inheritdoc cref="KiPluginLimitService"/>
+    /// <param name="db">Datenbankkontext.</param>
+    /// <param name="appEinstellungService">Dienst für Anwendungseinstellungen.</param>
+    /// <param name="laufdatenChangedNotifier">Benachrichtigt über geänderte Laufdaten.</param>
+    /// <param name="logger">Logger.</param>
+    /// <param name="startPruefungsAusloeser">Optionaler Auslöser der SCM-Startprüfung;
+    /// wird benachrichtigt, wenn das Session-Limit Aufgaben pausiert.</param>
     public KiPluginLimitService(
         SoftwareschmiededDbContext db,
         AppEinstellungService appEinstellungService,
         AufgabeLaufdatenChangedNotifier laufdatenChangedNotifier,
-        ILogger<KiPluginLimitService> logger)
+        ILogger<KiPluginLimitService> logger,
+        ScmStartPruefungsAusloeser? startPruefungsAusloeser = null)
     {
         _db = db;
         _appEinstellungService = appEinstellungService;
         _laufdatenChangedNotifier = laufdatenChangedNotifier;
         _logger = logger;
+        _startPruefungsAusloeser = startPruefungsAusloeser;
     }
 
     /// <summary>
@@ -128,6 +137,10 @@ public sealed class KiPluginLimitService
         {
             _laufdatenChangedNotifier.NotifyLaufdatenChanged(aufgabe.Id);
         }
+
+        // Pausen-Setzpfad der SCM-Startprüfung: Die Prüfung bewertet Priorisierung/Freigabe
+        // sofort neu statt erst beim nächsten Poll.
+        _startPruefungsAusloeser?.StartpruefungAnfordern();
     }
 
     /// <summary>

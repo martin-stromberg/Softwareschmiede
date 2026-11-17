@@ -35,16 +35,25 @@ public sealed class AufgabeService : IAktiveAufgabenService
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AufgabeService> _logger;
     private readonly TodoService _todoService;
+    private readonly ScmStartPruefungsAusloeser? _startPruefungsAusloeser;
 
     /// <inheritdoc cref="AufgabeService"/>
+    /// <param name="db">Datenbankkontext.</param>
+    /// <param name="logger">Logger.</param>
+    /// <param name="todoService">Dienst für Aufgaben-To-dos.</param>
+    /// <param name="startPruefungsAusloeser">Optionaler Auslöser der SCM-Startprüfung;
+    /// wird bei Pausenänderungen benachrichtigt. <see langword="null"/> in manuell
+    /// aufgebauten Diensten (z. B. Tests) — dann entfällt die Benachrichtigung.</param>
     public AufgabeService(
         SoftwareschmiededDbContext db,
         ILogger<AufgabeService> logger,
-        TodoService todoService)
+        TodoService todoService,
+        ScmStartPruefungsAusloeser? startPruefungsAusloeser = null)
     {
         _db = db;
         _logger = logger;
         _todoService = todoService;
+        _startPruefungsAusloeser = startPruefungsAusloeser;
     }
 
     /// <summary>Gibt alle aktiven (nicht archivierten) Aufgaben eines Projekts zurück.</summary>
@@ -889,6 +898,11 @@ public sealed class AufgabeService : IAktiveAufgabenService
         });
 
         await _db.SaveChangesAsync(ct);
+
+        // Pausen-Setzpfad der SCM-Startprüfung: Setzen wie Aufheben verändern die
+        // Startbarkeit — die Prüfung bewertet Priorisierung/Freigabe sofort neu statt
+        // erst beim nächsten Poll.
+        _startPruefungsAusloeser?.StartpruefungAnfordern();
     }
 
     /// <summary>Schließt eine Aufgabe ab: Status → Beendet, AbschlussDatum setzen, Branch- und Klonpfad-Felder leeren.</summary>

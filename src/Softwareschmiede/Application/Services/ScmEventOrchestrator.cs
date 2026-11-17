@@ -19,6 +19,50 @@ public sealed class ScmEventOrchestrator(
     AppEinstellungService einstellungen, PullRequestReferenzService pullRequestReferenzen,
     ProtokollService protokoll, ScmEventExecutionLimitService executionLimits)
 {
+    /// <summary>
+    /// Startprüfung: Dispatcht alle fälligen, nicht abgeschlossenen Ereignisse in der priorisierten
+    /// Reihenfolge aus <see cref="ScmDispatchPrioritaet"/> (Fortsetzungsereignisse → fällige
+    /// Verzögerungen zeitaufsteigend → Eingangsreihenfolge). Wird vom Poll-Zyklus des
+    /// <see cref="ScmEventMonitoringService"/> und vom ereignisgesteuerten
+    /// <see cref="ScmStartPruefungsService"/> gleichermaßen aufgerufen und ist beliebig oft
+    /// wiederholbar: Fälligkeit, Sperren und die atomare Platzvergabe entscheidet
+    /// <see cref="DispatchAsync"/> je Ereignis erneut unter der Aufgabensperre.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    public async Task DispatchDueEventsAsync(CancellationToken ct = default)
+    {
+        var nowMilliseconds = time.GetUtcNow().ToUnixTimeMilliseconds();
+        var upperSequence = await db.ScmIncomingEvents.MaxAsync(x => (long?)x.Sequence, ct) ?? 0;
+        long afterSequence = 0;
+        while (afterSequence < upperSequence)
+        {
+            // Abgebrochene Ereignisse sind endgültig: auch noch ausstehende Hostaktionen werden nicht mehr gesendet.
+            var batch = await db.ScmIncomingEvents.AsNoTracking().Where(x => x.Sequence > afterSequence && x.Sequence <= upperSequence).Where(x =>
+                x.Status != "Abgebrochen" &&
+                ((x.Status != "Verarbeitet" && (x.NextAttemptUtc == null || x.NextAttemptUtc <= nowMilliseconds)) ||
+                db.ScmOutgoingActions.Any(action => action.EventId == x.Id && action.Status != "Succeeded"
+                    && (action.NextAttemptUtc == null || action.NextAttemptUtc <= nowMilliseconds))))
+                .OrderBy(x => x.Sequence).Take(100)
+                .Select(x => new ScmDispatchPrioritaet.EreignisAuswahl(x.Id, x.AufgabeId, x.Sequence, x.Status, x.NextAttemptUtc))
+                .ToListAsync(ct);
+            if (batch.Count == 0) break;
+            afterSequence = batch[^1].Sequence;
+            // Priorisierter Zugriff auf die begrenzten Ausführungsplätze: Fortsetzungen vor
+            // fälligen Verzögerungen (zeitaufsteigend) vor der Eingangsreihenfolge.
+            var batchAufgabeIds = batch.Select(x => x.AufgabeId).Distinct().ToList();
+            var aufgabenZustaende = await db.Aufgaben.AsNoTracking()
+                .Where(x => batchAufgabeIds.Contains(x.Id))
+                .Select(x => new { x.Id, x.Status, x.AusfuehrungsStatus, x.PausiertBisUtc })
+                .ToDictionaryAsync(x => x.Id,
+                    x => new ScmDispatchPrioritaet.AufgabenZustand(x.Status, x.AusfuehrungsStatus, x.PausiertBisUtc), ct);
+            foreach (var item in ScmDispatchPrioritaet.OrderForDispatch(batch, aufgabenZustaende))
+            {
+                using var dispatchScope = scopes.CreateScope();
+                await dispatchScope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(item.Id, ct: ct);
+            }
+        }
+    }
+
     /// <summary>Versucht Zustellung oder rekonstruiert ausschließlich den schon begonnenen Versuch.</summary>
     public async Task DispatchAsync(Guid eventId, string? explicitPluginPrefix = null, CancellationToken ct = default)
     {

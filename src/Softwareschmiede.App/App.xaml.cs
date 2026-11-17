@@ -308,6 +308,10 @@ public sealed partial class App : System.Windows.Application
         services.AddHostedService(sp => sp.GetRequiredService<PullRequestMonitoringService>());
         services.AddSingleton<ScmTaskCompletionMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmTaskCompletionMonitoringService>());
+        // Ereignisgesteuerter Auslöser der SCM-Startprüfung (freiwerdende Plätze, Pausen).
+        services.AddSingleton<ScmStartPruefungsAusloeser>();
+        services.AddSingleton<ScmStartPruefungsService>();
+        services.AddHostedService(sp => sp.GetRequiredService<ScmStartPruefungsService>());
         services.AddSingleton<CliProcessManager>();
         services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
         services.AddSingleton<IBenachrichtigungsBannerService, WpfBannerService>();
