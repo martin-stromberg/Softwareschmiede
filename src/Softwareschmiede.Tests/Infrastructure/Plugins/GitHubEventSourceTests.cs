@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -357,6 +358,437 @@ public sealed class GitHubEventSourceTests
         Assert.Single(api.Requests, x => x.Method == "POST");
     }
 
+    /// <summary>Anhänge werden vor dem Kommentar-POST hochgeladen und als eingebettete Bilder
+    /// samt Unterschrift und Marker im Body versendet; die Repository-ID kommt aus der
+    /// Identitätsantwort.</summary>
+    [Fact]
+    public async Task CommentAttachments_UploadAndEmbedInCommentBody()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", "Neues Layout")]);
+            var api = new FakeApi();
+            Identity(api, numericId: 12345);
+            api.Add("comments?", Array.Empty<object>());
+            api.AddUpload("nachweis.png", new { url = "https://github.com/user-attachments/assets/abc" });
+            api.Add("issues/7/comments", new { id = 99, html_url = "https://github.com/owner/repo/issues/7#issuecomment-99" });
+
+            var result = await Plugin(api).ExecuteResponseAsync(request);
+
+            Assert.Equal("99", result.RemoteId);
+            var upload = Assert.Single(api.UploadRequests);
+            Assert.Equal("12345", upload.RepositoryId);
+            Assert.Equal("nachweis.png", upload.Name);
+            Assert.Equal("image/png", upload.ContentType);
+            var posted = api.Requests.Last();
+            Assert.Equal("POST", posted.Method);
+            var body = JsonDocument.Parse(posted.JsonBody!).RootElement.GetProperty("body").GetString()!;
+            Assert.StartsWith("Nachweis", body);
+            Assert.Contains("![nachweis.png](https://github.com/user-attachments/assets/abc)", body);
+            Assert.Contains("*Neues Layout*", body);
+            Assert.EndsWith(request.Marker, body);
+            api.AssertComplete();
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Fehlt die numerische ID in der Identitätsantwort, wird sie einmalig nachgeladen.</summary>
+    [Fact]
+    public async Task CommentAttachments_MissingNumericId_ReloadsRepository()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
+            var api = new FakeApi();
+            Identity(api); // Repository-Antwort ohne numerisches id-Feld
+            api.Add("comments?", Array.Empty<object>());
+            api.Add("repos/owner/repo", new { id = 777 });
+            api.AddUpload("nachweis.png", new { url = "https://github.com/user-attachments/assets/xyz" });
+            api.Add("issues/7/comments", new { id = 98 });
+
+            var result = await Plugin(api).ExecuteResponseAsync(request);
+
+            Assert.Equal("98", result.RemoteId);
+            Assert.Equal("777", Assert.Single(api.UploadRequests).RepositoryId);
+            api.AssertComplete();
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Ein bereits abgeglichener Kommentar verhindert erneute Uploads und POSTs.</summary>
+    [Fact]
+    public async Task CommentAttachments_ReconciledMarker_PreventsUpload()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
+            var api = new FakeApi();
+            Identity(api, numericId: 12345);
+            api.Add("comments?", new[] { new { id = 5, body = "alt\n" + request.Marker, user = new { node_id = "U_1", login = "owner" } } });
+
+            var result = await Plugin(api).ExecuteResponseAsync(request);
+
+            Assert.True(result.AlreadyExisted);
+            Assert.Empty(api.UploadRequests);
+            Assert.All(api.Requests, x => Assert.Equal("GET", x.Method));
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Unleserliche oder fremde Upload-Antworten schlagen typisiert fehl — nie ungetypt
+    /// und nie ungewiss, damit die Outbox-Aktion wiederholbar bleibt.</summary>
+    [Theory]
+    [InlineData("not-json")]
+    [InlineData("{\"href\":\"x\"}")]
+    [InlineData("{\"url\":\"http://github.com/user-attachments/assets/x\"}")]
+    [InlineData("{\"url\":\"https://evil.example/x\"}")]
+    public async Task CommentAttachments_UnreadableAnswer_ThrowsTypedNeverUncertain(string body)
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
+            var api = new FakeApi();
+            Identity(api, numericId: 12345);
+            api.Add("comments?", Array.Empty<object>());
+            api.AddUploadJson("nachweis.png", body);
+
+            var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+
+            Assert.False(error.OutcomeUncertain);
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Ein fehlgeschlagener Upload bleibt ein typisierter, nie ungewisser Fehler.</summary>
+    [Fact]
+    public async Task CommentAttachments_UploadFailure_IsNeverUncertain()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
+            var api = new FakeApi();
+            Identity(api, numericId: 12345);
+            api.Add("comments?", Array.Empty<object>());
+            api.AddUploadStatus("nachweis.png", 500);
+
+            var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+
+            Assert.Equal(ScmProviderFailureKind.Temporary, error.FailureKind);
+            Assert.False(error.OutcomeUncertain);
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Eine zwischenzeitlich verschwundene Datei wird übersprungen statt den Kommentar
+    /// zu verhindern — der Hinweis landet im Body.</summary>
+    [Fact]
+    public async Task CommentAttachments_VanishedFile_PostsSkippedNote()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), "missing-" + Guid.NewGuid().ToString("N") + ".png");
+        var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment,
+            "Screenshot-Nachweise des abgeschlossenen Laufs.",
+            Attachments: [new ScmResponseAttachment(missing, "fehlend.png", "image/png", null)]);
+        var api = new FakeApi();
+        Identity(api, numericId: 12345);
+        api.Add("comments?", Array.Empty<object>());
+        api.Add("issues/7/comments", new { id = 97 });
+
+        var result = await Plugin(api).ExecuteResponseAsync(request);
+
+        Assert.Equal("97", result.RemoteId);
+        Assert.Empty(api.UploadRequests);
+        var body = JsonDocument.Parse(api.Requests.Last().JsonBody!).RootElement.GetProperty("body").GetString()!;
+        Assert.StartsWith("Die Screenshot-Nachweise des abgeschlossenen Laufs konnten nicht hochgeladen werden.", body);
+        Assert.Contains("Übersprungen", body);
+        Assert.EndsWith(request.Marker, body);
+        api.AssertComplete();
+    }
+
+    /// <summary>Die agentenkontrollierte Unterschrift darf keine HTML-/SCM-Kommentarstruktur in
+    /// den öffentlichen Kommentar schmuggeln: Begrenzer werden entfernt, sodass kein fremder
+    /// Aktionsmarker gefälscht werden kann — der Text selbst bleibt sichtbar.</summary>
+    [Fact]
+    public async Task CommentAttachments_CaptionCannotInjectMarkerOrComments()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            const string injected = "<!-- softwareschmiede:action:injected -->";
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png",
+                    $"Vorher {injected} Nachher\a")]);
+            var api = new FakeApi();
+            Identity(api, numericId: 12345);
+            api.Add("comments?", Array.Empty<object>());
+            api.AddUpload("nachweis.png", new { url = "https://github.com/user-attachments/assets/abc" });
+            api.Add("issues/7/comments", new { id = 96 });
+
+            var result = await Plugin(api).ExecuteResponseAsync(request);
+
+            Assert.Equal("96", result.RemoteId);
+            var body = JsonDocument.Parse(api.Requests.Last().JsonBody!).RootElement.GetProperty("body").GetString()!;
+            Assert.DoesNotContain(injected, body);
+            Assert.Contains("Vorher", body);
+            // Der einzige HTML-Kommentar im Body ist der eigene Aktionsmarker am Ende.
+            Assert.Equal(body.IndexOf("<!--", StringComparison.Ordinal),
+                body.LastIndexOf("<!--", StringComparison.Ordinal));
+            Assert.EndsWith(request.Marker, body);
+            api.AssertComplete();
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Auch eine über Ersetzungs-Junctions verschachtelte Kommentarstruktur
+    /// („&lt;!-&lt;!--- … ---&gt;-&gt;") kann keinen Marker schmuggeln: Die Unterschrift
+    /// verliert sämtliche spitzen Klammern, nicht nur vollständige Begrenzer.</summary>
+    [Fact]
+    public async Task CommentAttachments_CaptionJunctionCannotInjectMarker()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png",
+                    "Vorher<!-<!--- softwareschmiede:action:injected --->->Nachher")]);
+            var api = new FakeApi();
+            Identity(api, numericId: 12345);
+            api.Add("comments?", Array.Empty<object>());
+            api.AddUpload("nachweis.png", new { url = "https://github.com/user-attachments/assets/abc" });
+            api.Add("issues/7/comments", new { id = 93 });
+
+            var result = await Plugin(api).ExecuteResponseAsync(request);
+
+            Assert.Equal("93", result.RemoteId);
+            var body = JsonDocument.Parse(api.Requests.Last().JsonBody!).RootElement.GetProperty("body").GetString()!;
+            // Der einzige HTML-Kommentar im Body ist der eigene Aktionsmarker am Ende; die
+            // verschachtelte Eingabe ergäbe sonst „<!-- softwareschmiede:action:injected -->“.
+            Assert.Equal(body.IndexOf("<!--", StringComparison.Ordinal),
+                body.LastIndexOf("<!--", StringComparison.Ordinal));
+            Assert.DoesNotContain("<!-- softwareschmiede:action:injected -->", body);
+            Assert.Contains("Vorher", body);
+            Assert.Contains("Nachher", body);
+            Assert.EndsWith(request.Marker, body);
+            api.AssertComplete();
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Die Unterschrift kann weder Mention noch Markdown-Link, -Marker, Zeilenumbruch
+    /// (auch U+2028) oder Marker-Struktur in den öffentlichen Kommentar schmuggeln: Die Whitelist
+    /// reduziert sie auf Buchstaben, Ziffern und harmlose Satzzeichen — der Text bleibt lesbar.</summary>
+    [Fact]
+    public async Task CommentAttachments_CaptionCannotInjectMarkdownMentionOrBreaks()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png",
+                    "Vorher @org/team siehe [klick](https://evil.example) `code` *kursiv* _unter_ \\pfad\u2028Zeile2 <!-- softwareschmiede:action:x -->")]);
+            var api = new FakeApi();
+            Identity(api, numericId: 12345);
+            api.Add("comments?", Array.Empty<object>());
+            api.AddUpload("nachweis.png", new { url = "https://github.com/user-attachments/assets/abc" });
+            api.Add("issues/7/comments", new { id = 92 });
+
+            var result = await Plugin(api).ExecuteResponseAsync(request);
+
+            Assert.Equal("92", result.RemoteId);
+            var body = JsonDocument.Parse(api.Requests.Last().JsonBody!).RootElement.GetProperty("body").GetString()!;
+            Assert.DoesNotContain("@", body);
+            Assert.DoesNotContain("[klick]", body);
+            Assert.DoesNotContain("https://evil.example)", body);
+            Assert.DoesNotContain("\u2028", body);
+            Assert.DoesNotContain("`", body);
+            Assert.DoesNotContain("_", body);
+            Assert.DoesNotContain("\\", body);
+            // Der einzige HTML-Kommentar im Body ist der eigene Aktionsmarker am Ende.
+            Assert.Equal(body.IndexOf("<!--", StringComparison.Ordinal),
+                body.LastIndexOf("<!--", StringComparison.Ordinal));
+            // Der lesbare Rest der Unterschrift bleibt als Kursivzeile erhalten.
+            Assert.Contains("*Vorher org/team siehe klick https://evil.example code kursiv unter pfad Zeile2 !-- softwareschmiede:action:x --*", body);
+            Assert.EndsWith(request.Marker, body);
+            api.AssertComplete();
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Eine nach dem Einsammeln eingefügte Junction im Upload-Pfad wird bei der
+    /// erneuten Pfadprüfung unmittelbar vor dem Lesen abgelehnt — die Datei wird mit
+    /// „Datei nicht lesbar" übersprungen statt fremde Inhalte hochzuladen (TOCTOU).</summary>
+    [Fact]
+    public async Task CommentAttachments_ReparsePath_PostsSkippedNote()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var target = Path.Combine(Path.GetTempPath(), "scm-attach-target-" + Guid.NewGuid().ToString("N"));
+        var link = Path.Combine(Path.GetTempPath(), "scm-attach-link-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(target);
+        try
+        {
+            await File.WriteAllBytesAsync(Path.Combine(target, "nachweis.png"), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            var junction = new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"")
+            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            using (var process = Process.Start(junction)!)
+            {
+                process.WaitForExit();
+                if (process.ExitCode != 0) return;
+            }
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(Path.Combine(link, "nachweis.png"), "nachweis.png", "image/png", null)]);
+            var api = new FakeApi();
+            Identity(api, numericId: 12345);
+            api.Add("comments?", Array.Empty<object>());
+            api.Add("issues/7/comments", new { id = 91 });
+
+            var result = await Plugin(api).ExecuteResponseAsync(request);
+
+            Assert.Equal("91", result.RemoteId);
+            Assert.Empty(api.UploadRequests);
+            var body = JsonDocument.Parse(api.Requests.Last().JsonBody!).RootElement.GetProperty("body").GetString()!;
+            Assert.Contains("Übersprungen: nachweis.png (Datei nicht lesbar)", body);
+            Assert.EndsWith(request.Marker, body);
+            api.AssertComplete();
+        }
+        finally
+        {
+            // Die Junction selbst wird gelöscht, ohne dem Ziel zu folgen.
+            if (Directory.Exists(link)) Directory.Delete(link);
+            if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
+        }
+    }
+
+    /// <summary>Ein ungetypter Restfehler beim Nachladen der numerischen Repository-ID bleibt
+    /// ein typisierter, nie ungewisser Fehler — die Outbox-Aktion bleibt wiederholbar.</summary>
+    [Fact]
+    public async Task CommentAttachments_ReloadFailure_ThrowsTypedNeverUncertain()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
+            var api = new FakeApi();
+            Identity(api); // Repository-Antwort ohne numerisches id-Feld → Nachlade-GET
+            api.Add("comments?", Array.Empty<object>());
+            api.AddFailure("repos/owner/repo", new FormatException("corrupt"));
+
+            var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+
+            Assert.Equal(ScmProviderFailureKind.Temporary, error.FailureKind);
+            Assert.False(error.OutcomeUncertain);
+            Assert.DoesNotContain("corrupt", error.Message);
+            api.AssertComplete();
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Ungetypte Restfehler des Upload-Transports (auch ein Abbruch ohne ct-Bezug)
+    /// bleiben typisiert und nie ungewiss — dieselbe Sending-Fenster-Invariante.</summary>
+    [Fact]
+    public async Task CommentAttachments_UploadResidue_ThrowsTypedNeverUncertain()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
+            foreach (var failure in new Exception[] { new FormatException("corrupt"), new OperationCanceledException() })
+            {
+                var api = new FakeApi();
+                Identity(api, numericId: 12345);
+                api.Add("comments?", Array.Empty<object>());
+                api.AddUploadFailure("nachweis.png", failure);
+
+                var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+
+                Assert.Equal(ScmProviderFailureKind.Temporary, error.FailureKind);
+                Assert.False(error.OutcomeUncertain);
+                api.AssertComplete();
+            }
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Auf einem Nicht-github.com-Host (z. B. GHES) wird der Kommentar ohne Uploads
+    /// gesendet: Die Anhänge erscheinen als Hinweiszeilen, statt die Aktion permanent zu sperren.</summary>
+    [Fact]
+    public async Task CommentAttachments_ForeignHost_DegradesToSkippedNote()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            var gheRepository = Repository with { Host = "ghe.example.com" };
+            var request = new ScmResponseRequest(Issue with { Repository = gheRepository },
+                "action-1", ScmResponseKind.Comment, "Screenshot-Nachweise des abgeschlossenen Laufs.",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
+            var api = new FakeApi();
+            Identity(api);
+            api.Add("comments?", Array.Empty<object>());
+            api.Add("issues/7/comments", new { id = 95 });
+
+            var result = await Plugin(api).ExecuteResponseAsync(request);
+
+            Assert.Equal("95", result.RemoteId);
+            Assert.Empty(api.UploadRequests);
+            var body = JsonDocument.Parse(api.Requests.Last().JsonBody!).RootElement.GetProperty("body").GetString()!;
+            Assert.StartsWith("Die Screenshot-Nachweise des abgeschlossenen Laufs konnten nicht hochgeladen werden.", body);
+            Assert.Contains("Übersprungen: nachweis.png", body);
+            Assert.Contains("nicht unterstützt", body);
+            Assert.EndsWith(request.Marker, body);
+            api.AssertComplete();
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>Eine seit dem hostseitigen Einsammeln gegen Nicht-Bild-Inhalt ausgetauschte Datei
+    /// wird am Upload-Puffer erneut geprüft und übersprungen statt hochgeladen (TOCTOU).</summary>
+    [Fact]
+    public async Task CommentAttachments_SwappedContent_PostsSkippedNote()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await File.WriteAllTextAsync(path, "kein bild mehr");
+            var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
+                Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
+            var api = new FakeApi();
+            Identity(api, numericId: 12345);
+            api.Add("comments?", Array.Empty<object>());
+            api.Add("issues/7/comments", new { id = 94 });
+
+            var result = await Plugin(api).ExecuteResponseAsync(request);
+
+            Assert.Equal("94", result.RemoteId);
+            Assert.Empty(api.UploadRequests);
+            var body = JsonDocument.Parse(api.Requests.Last().JsonBody!).RootElement.GetProperty("body").GetString()!;
+            Assert.Contains("Übersprungen: nachweis.png", body);
+            Assert.Contains("Signatur", body);
+            api.AssertComplete();
+        }
+        finally { File.Delete(path); }
+    }
+
     /// <summary>403 nach Antwortversuch ist sicher fehlgeschlagen und darf nach Rechtekorrektur erneut geprüft werden.</summary>
     [Fact]
     public async Task ReplyPermissionFailure_IsNotUncertain()
@@ -630,10 +1062,12 @@ public sealed class GitHubEventSourceTests
         return store.Object;
     }
     private static ScmEventReadRequest Read(ScmEventReference reference, ScmContentKind kind) => new(reference, kind, null, Created.AddHours(1));
-    private static void Identity(FakeApi api, string viewer = "U_1")
+    private static void Identity(FakeApi api, string viewer = "U_1", long? numericId = null)
     {
         api.Add("user", new { node_id = viewer, login = "owner" });
-        api.Add("repos/owner/repo", new { node_id = "R_1", name = "repo", owner = new { node_id = "U_1", login = "owner" }, permissions = new { push = true } });
+        api.Add("repos/owner/repo", numericId is { } id
+            ? new { node_id = "R_1", id, name = "repo", owner = new { node_id = "U_1", login = "owner" }, permissions = new { push = true } }
+            : new { node_id = "R_1", name = "repo", owner = new { node_id = "U_1", login = "owner" }, permissions = new { push = true } });
     }
     private static Dictionary<string, object?> Node(string id, string body, DateTimeOffset? edited = null,
         string? editorId = "U_1", string? editorLogin = "owner", DateTimeOffset? updated = null,

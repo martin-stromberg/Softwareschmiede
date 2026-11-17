@@ -30,6 +30,9 @@ public sealed class GitHubHttpApiClient : IGitHubEventApiClient
         _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(100) };
     }
 
+    /// <summary>Größenlimit je hochgeladener Nachweis-Datei (10 MiB).</summary>
+    internal const int MaxUploadBytes = 10 * 1024 * 1024;
+
     /// <inheritdoc />
     public async Task<GitHubEventApiResponse> SendAsync(GitHubEventApiRequest request, CancellationToken ct = default)
     {
@@ -57,6 +60,49 @@ public sealed class GitHubHttpApiClient : IGitHubEventApiClient
         {
             throw new ScmProviderException(ScmProviderFailureKind.Temporary,
                 "GitHub-Transport nicht erreichbar.", outcomeUncertain: request.Method != "GET" && request.Endpoint != "graphql");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<GitHubEventApiResponse> UploadAsync(GitHubAssetUploadRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            if (!ValidateHost(request.Host).Equals("github.com", StringComparison.OrdinalIgnoreCase))
+                throw new ScmProviderException(ScmProviderFailureKind.Permanent, "Attachment-Upload wird für diesen Host nicht unterstützt.");
+            if (request.Data is not { Length: > 0 } || request.Data.Length > MaxUploadBytes)
+                throw new ScmProviderException(ScmProviderFailureKind.Permanent, "Attachment überschreitet das Größenlimit.");
+            var uri = new Uri("https://uploads.github.com/user-attachments/assets?name=" + Uri.EscapeDataString(request.Name)
+                + "&content_type=" + Uri.EscapeDataString(request.ContentType)
+                + "&repository_id=" + Uri.EscapeDataString(request.RepositoryId), UriKind.Absolute);
+            using var message = new HttpRequestMessage(HttpMethod.Post, uri);
+            message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            message.Headers.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
+            message.Headers.UserAgent.ParseAdd("Softwareschmiede");
+            if (_tokenProvider() is { Length: > 0 } token)
+                message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            message.Content = new ByteArrayContent(request.Data);
+            message.Content.Headers.ContentType = new MediaTypeHeaderValue(request.ContentType);
+
+            using var response = await _httpClient.SendAsync(message, ct);
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var header in response.Headers.Concat(response.Content.Headers))
+                headers[header.Key] = string.Join(",", header.Value);
+            return new((int)response.StatusCode, await response.Content.ReadAsStringAsync(ct), headers);
+        }
+        catch (ScmProviderException) { throw; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        // Der Upload-Schritt kennt bewusst keinen ungewissen Ausgang: Die Outbox würde ihn
+        // sonst nur noch abgleichen, ohne dass je ein Kommentar abgeglichen werden könnte.
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
+        {
+            throw new ScmProviderException(ScmProviderFailureKind.Temporary, "GitHub-Transport nicht erreichbar.");
+        }
+        catch (Exception)
+        {
+            // Fehler beim Request-/Body-Aufbau dürfen nie ungetypt durchschlagen — die Outbox
+            // markiert ungetypte Ausnahmen im Status „Sending" sonst als reconcile-only „Uncertain".
+            throw new ScmProviderException(ScmProviderFailureKind.Temporary, "Attachment-Upload konnte nicht vorbereitet werden.");
         }
     }
 

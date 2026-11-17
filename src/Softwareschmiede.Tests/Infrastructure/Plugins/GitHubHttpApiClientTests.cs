@@ -202,6 +202,107 @@ public sealed class GitHubHttpApiClientTests
         error.ToString().Should().NotContain(token);
     }
 
+    /// <summary>Der Attachment-Upload geht binär an uploads.github.com: escaped Query-Parameter,
+    /// Bearer-Header und deklarierter Content-Type; der Token bleibt aus der URL.</summary>
+    [Fact]
+    public async Task UploadAsync_PostsBinaryBodyToUploadsHost()
+    {
+        HttpRequestMessage? captured = null;
+        byte[]? capturedBody = null;
+        var client = Client(async request =>
+        {
+            captured = request;
+            capturedBody = await request.Content!.ReadAsByteArrayAsync();
+            return Response(HttpStatusCode.OK, "{\"url\":\"https://github.com/user-attachments/assets/abc\"}");
+        });
+        var data = new byte[] { 1, 2, 3 };
+        var result = await client.UploadAsync(new("github.com", "12345", "nachweis 1.png", "image/png", data));
+        result.StatusCode.Should().Be(200);
+        captured!.RequestUri!.AbsoluteUri.Should().Be(
+            "https://uploads.github.com/user-attachments/assets?name=nachweis%201.png&content_type=image%2Fpng&repository_id=12345");
+        captured.Method.Should().Be(HttpMethod.Post);
+        captured.Headers.Authorization!.Scheme.Should().Be("Bearer");
+        captured.Headers.Authorization.Parameter.Should().Be("fake-token");
+        captured.Content!.Headers.ContentType!.MediaType.Should().Be("image/png");
+        capturedBody.Should().Equal(data);
+        captured.RequestUri!.ToString().Should().NotContain("fake-token");
+    }
+
+    /// <summary>Nur github.com wird auf uploads.github.com abgebildet; fremde Hosts scheitern
+    /// als permanenter Fehler, bevor der Token an einen fremden Origin gehen könnte.</summary>
+    [Fact]
+    public async Task UploadAsync_ForeignHost_ThrowsPermanentBeforeRequest()
+    {
+        var called = false;
+        var client = Client(_ =>
+        {
+            called = true;
+            return Task.FromResult(Response(HttpStatusCode.OK, "{}"));
+        });
+        var error = await Assert.ThrowsAsync<ScmProviderException>(
+            () => client.UploadAsync(new("ghe.example.com", "1", "a.png", "image/png", [1])));
+        error.FailureKind.Should().Be(ScmProviderFailureKind.Permanent);
+        called.Should().BeFalse();
+    }
+
+    /// <summary>Leere oder über das Limit hinausgehende Datenmengen werden vor dem Versand abgelehnt.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(GitHubHttpApiClient.MaxUploadBytes + 1)]
+    public async Task UploadAsync_InvalidDataSize_ThrowsPermanent(int size)
+    {
+        var called = false;
+        var client = Client(_ =>
+        {
+            called = true;
+            return Task.FromResult(Response(HttpStatusCode.OK, "{}"));
+        });
+        var error = await Assert.ThrowsAsync<ScmProviderException>(
+            () => client.UploadAsync(new("github.com", "1", "a.png", "image/png", new byte[size])));
+        error.FailureKind.Should().Be(ScmProviderFailureKind.Permanent);
+        called.Should().BeFalse();
+    }
+
+    /// <summary>Transport- und Timeout-Fehler des Uploads sind bewusst wiederholbar —
+    /// niemals ungewiss, damit die Outbox-Aktion nicht reconcile-only verharrt.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task UploadAsync_TransportFailure_IsTemporaryAndNeverUncertain(bool timeout)
+    {
+        var client = Client(_ => timeout
+            ? throw new TaskCanceledException("timeout")
+            : throw new HttpRequestException("refused secret-token"));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(
+            () => client.UploadAsync(new("github.com", "1", "a.png", "image/png", [1])));
+        error.FailureKind.Should().Be(ScmProviderFailureKind.Temporary);
+        error.OutcomeUncertain.Should().BeFalse();
+        error.Message.Should().NotContain("secret-token");
+    }
+
+    /// <summary>Aufbaufehler (z. B. ungültiger Content-Type) werden zu typisierten Providerfehlern
+    /// statt ungetypt durchzuschlagen.</summary>
+    [Fact]
+    public async Task UploadAsync_RequestBuildFailure_ThrowsTypedProviderError()
+    {
+        var client = Client(_ => Task.FromResult(Response(HttpStatusCode.OK, "{}")));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(
+            () => client.UploadAsync(new("github.com", "1", "a.png", "not a\nmime", [1])));
+        error.FailureKind.Should().Be(ScmProviderFailureKind.Temporary);
+        error.OutcomeUncertain.Should().BeFalse();
+    }
+
+    /// <summary>Aufrufer-Cancellation wird durchgereicht statt als Transportfehler gemappt.</summary>
+    [Fact]
+    public async Task UploadAsync_CallerCancellation_Propagates()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var client = Client(_ => throw new OperationCanceledException(cts.Token));
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => client.UploadAsync(new("github.com", "1", "a.png", "image/png", [1]), cts.Token));
+    }
+
     private static GitHubHttpApiClient Client(Func<HttpRequestMessage, Task<HttpResponseMessage>> respond, Func<string?>? token = null)
         => new(token ?? (() => "fake-token"), new DelegateHandler((request, _) => respond(request)));
 
