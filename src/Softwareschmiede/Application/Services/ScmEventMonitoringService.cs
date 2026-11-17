@@ -226,36 +226,11 @@ public sealed class ScmEventMonitoringService(
                 }
             pendingInboxCommits.Clear();
         }
-        var nowMilliseconds = _time.GetUtcNow().ToUnixTimeMilliseconds();
-        var upperSequence = await db.ScmIncomingEvents.MaxAsync(x => (long?)x.Sequence, ct) ?? 0;
-        long afterSequence = 0;
-        while (afterSequence < upperSequence)
-        {
-            // Abgebrochene Ereignisse sind endgültig: auch noch ausstehende Hostaktionen werden nicht mehr gesendet.
-            var batch = await db.ScmIncomingEvents.AsNoTracking().Where(x => x.Sequence > afterSequence && x.Sequence <= upperSequence).Where(x =>
-                x.Status != "Abgebrochen" &&
-                ((x.Status != "Verarbeitet" && (x.NextAttemptUtc == null || x.NextAttemptUtc <= nowMilliseconds)) ||
-                db.ScmOutgoingActions.Any(action => action.EventId == x.Id && action.Status != "Succeeded"
-                    && (action.NextAttemptUtc == null || action.NextAttemptUtc <= nowMilliseconds))))
-                .OrderBy(x => x.Sequence).Take(100)
-                .Select(x => new ScmDispatchPrioritaet.EreignisAuswahl(x.Id, x.AufgabeId, x.Sequence, x.Status, x.NextAttemptUtc))
-                .ToListAsync(ct);
-            if (batch.Count == 0) break;
-            afterSequence = batch[^1].Sequence;
-            // Priorisierter Zugriff auf die begrenzten Ausführungsplätze: Fortsetzungen vor
-            // fälligen Verzögerungen (zeitaufsteigend) vor der Eingangsreihenfolge.
-            var batchAufgabeIds = batch.Select(x => x.AufgabeId).Distinct().ToList();
-            var aufgabenZustaende = await db.Aufgaben.AsNoTracking()
-                .Where(x => batchAufgabeIds.Contains(x.Id))
-                .Select(x => new { x.Id, x.Status, x.AusfuehrungsStatus, x.PausiertBisUtc })
-                .ToDictionaryAsync(x => x.Id,
-                    x => new ScmDispatchPrioritaet.AufgabenZustand(x.Status, x.AusfuehrungsStatus, x.PausiertBisUtc), ct);
-            foreach (var item in ScmDispatchPrioritaet.OrderForDispatch(batch, aufgabenZustaende))
-            {
-                using var dispatchScope = scopes.CreateScope();
-                await dispatchScope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(item.Id, ct: ct);
-            }
-        }
+        // Die Startprüfung liegt im Orchestrator: Der Poll-Zyklus und der ereignisgesteuerte
+        // Auslöser (ScmStartPruefungsService bei freiwerdenden Plätzen oder gesetzten Pausen)
+        // führen exakt dieselbe priorisierte Auswahl fälliger Ereignisse aus; der Poll bleibt
+        // als langsamere Sicherheitsnetz-Wiederholung bestehen.
+        await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchDueEventsAsync(ct);
     }
 
     /// <summary>Liest die Notifications-Inbox eines Hosts und leitet Referenzen auf registrierte
