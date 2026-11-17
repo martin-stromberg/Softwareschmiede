@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
@@ -252,6 +253,76 @@ public sealed class ScmEventDispatchTests_Limits
         Assert.Equal("Wartend", second.Status);
         Assert.Contains("globale Limit", second.Reason);
         Assert.Single(fixture.Sessions);
+    }
+
+    /// <summary>Atomare Zulassung: Ein Dispatch, der den Platz reserviert hat, aber noch mitten
+    /// im Startfenster steht (Health-Check, noch kein Prozess-Handle registriert), belegt den
+    /// Platz bereits — ein gleichzeitig einlaufender Dispatch einer anderen Aufgabe wartet mit
+    /// Limit-Grund statt das Limit transient zu überschreiten.</summary>
+    [Fact]
+    public async Task Dispatch_ConcurrentStartDuringHealthCheck_GlobalLimitOne_ExactlyOneStarts()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+        var (_, firstId) = await fixture.AddAsync(configured: true);
+        var (_, secondId) = await fixture.AddAsync(configured: true);
+
+        // Der Health-Check öffnet das reale Startfenster zwischen Zulassung und Handle-
+        // Registrierung kontrolliert: Der erste Dispatch hält die Platzreservierung,
+        // während der zweite die Zulassungskontrolle vollständig passiert.
+        var healthCheckEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHealthCheck = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()))
+            .Returns(async (CancellationToken _) =>
+            {
+                healthCheckEntered.TrySetResult();
+                await releaseHealthCheck.Task;
+                return true;
+            });
+
+        var first = Task.Run(() => fixture.DispatchAsync(firstId));
+        await healthCheckEntered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+        // Zweiter Dispatch während des offenen Startfensters: kein Prozess-Handle aktiv.
+        await fixture.DispatchAsync(secondId);
+
+        var second = await fixture.EventAsync(secondId);
+        Assert.Equal("Wartend", second.Status);
+        Assert.Contains("globale Limit", second.Reason);
+        Assert.Empty(fixture.Sessions);
+
+        releaseHealthCheck.SetResult();
+        await first.WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.Single(fixture.Sessions);
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(firstId)).Status);
+        Assert.Equal("Wartend", (await fixture.EventAsync(secondId)).Status);
+    }
+
+    /// <summary>Ein fehlschlagender Start gibt die Reservierung wieder frei: Der nächste
+    /// Dispatch darf den Platz sofort neu belegen statt dauerhaft zu warten.</summary>
+    [Fact]
+    public async Task Dispatch_StartFails_ReservationReleasedForNextDispatch()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+        var (_, firstId) = await fixture.AddAsync(configured: true);
+        var (_, secondId) = await fixture.AddAsync(configured: true);
+
+        fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        await fixture.DispatchAsync(firstId);
+        var first = await fixture.EventAsync(firstId);
+        Assert.Equal("Wartend", first.Status);
+        Assert.Contains("nicht startbereit", first.Reason);
+        Assert.Empty(fixture.Sessions);
+
+        fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        await fixture.DispatchAsync(secondId);
+
+        Assert.Single(fixture.Sessions);
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(secondId)).Status);
     }
 
     /// <summary>Host-Zustellaktionen (Empfangsquittung/Wartekommentar) laufen unbegrenzt:

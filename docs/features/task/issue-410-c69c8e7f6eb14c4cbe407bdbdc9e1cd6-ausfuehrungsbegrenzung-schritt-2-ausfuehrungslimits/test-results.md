@@ -69,6 +69,37 @@ dotnet format Softwareschmiede.slnx --verify-no-changes
 - `src/Softwareschmiede.Tests/E2E/E2E_AusfuehrungsLimits.cs` — 1 konsolidiertes FlaUI-Szenario.
 - Angepasst: `SettingsViewModelTests.KiPluginSelectedCommand_LaeadtSettingsGroups_FuerAusgewaehltesPlugin` (zweite Gruppe „Ausführungsbegrenzung").
 
+## Nachtrag: Abnahme-Korrektur (atomare Zulassung)
+
+Die fachliche Abnahme (`docs/projects/task/issue-410-…/acceptance-schritt-2.md`)
+meldete genau eine Abweichung: Die Zulassungskontrolle war nicht atomar —
+zwischen Limit-Prüfung und Prozess-Handle-Registrierung konnten nebenläufige
+Dispatches verschiedener Aufgaben das Limit transient überschreiten.
+
+**Korrektur (Ansatz b, Slot-Reservierung):**
+`ScmEventExecutionLimitService.PruefeUndReserviereStartPlatzAsync` verbindet
+Check+Claim unter einer prozessweiten Sperre zu einer atomaren Operation;
+der reservierte Platz zählt ab sofort für jeden weitere Zulassungsversuch.
+`DispatchCoreAsync` hält die Reservierung über Plugin-Auflösung, Health-Check
+und Prozessstart; danach übernimmt die echte Laufzählung (Handle registriert).
+Fehlschlag → Freigabe; hängender Start → Verfall nach 5 min
+(`ReservierungsLebensdauer`).
+
+**Erneute Läufe (selber Branch, nach Build 0/0):**
+
+- Reguläre Lane `…Softwareschmiede.Tests --filter "Category!=OsInterface"`:
+  **2644 erfolgreich, 0 Fehler, 3 übersprungen, 2647 gesamt** (3 m 12 s) —
+  Delta +5 neue Unit-Tests (`PruefeUndReserviereStartPlatzAsync_*`).
+- Integrationstests: **324 erfolgreich, 0 Fehler, 324 gesamt** (42 s) —
+  Delta +2 neue Fälle in `ScmEventDispatchTests_Limits`:
+  - `Dispatch_ConcurrentStartDuringHealthCheck_GlobalLimitOne_ExactlyOneStarts`
+    (deterministische Race: erster Dispatch im Health-Check-Fenster parkend,
+    zweiter Dispatch wartet mit Limit-Grund statt zu starten),
+  - `Dispatch_StartFails_ReservationReleasedForNextDispatch`
+    (Reservierungs-Freigabe bei Startfehlschlag).
+- `dotnet format Softwareschmiede.slnx --verify-no-changes`: sauber.
+- `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` wie gehabt gesetzt.
+
 ## Fehlerhistorie während der Umsetzung
 
 1. `LadenAsync_GlobalesLimitGespeichert_FeldGefuellt` — Mock-Setup unvollständig

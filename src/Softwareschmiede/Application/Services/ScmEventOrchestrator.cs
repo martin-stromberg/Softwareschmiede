@@ -182,23 +182,30 @@ public sealed class ScmEventOrchestrator(
                     if (string.IsNullOrWhiteSpace(prefix))
                     { await WaitWithCommentAsync(item, observation, responder, "Keine Standard-CLI konfiguriert. Ereignis öffnen und CLI auswählen.", ct); return; }
                     // Zulassungskontrolle unmittelbar vor dem CLI-Start: Erreichtes globales oder
-                    // Plugin-Limit lässt das Ereignis ohne neue Ausführung ehrlich warten.
-                    var limitWartegrund = await executionLimits.GetStartBlockReasonAsync(prefix, ct);
-                    if (limitWartegrund is not null)
+                    // Plugin-Limit lässt das Ereignis ohne neue Ausführung ehrlich warten. Prüfung
+                    // und Platzbelegung sind eine atomare Operation; die Reservierung deckt das
+                    // gesamte Startfenster (Plugin-Auflösung, Health-Check, Prozessstart) ab und
+                    // wird nach der Handle-Registrierung von der echten Laufzählung abgelöst —
+                    // so kann kein nebenläufiger Dispatch zwischen Prüfung und Start rutschen.
+                    var zulassung = await executionLimits.PruefeUndReserviereStartPlatzAsync(prefix, ct);
+                    if (zulassung.Wartegrund is not null)
                     {
-                        if (!string.Equals(item.Reason, limitWartegrund, StringComparison.Ordinal))
-                            await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.SystemMeldung, limitWartegrund, ct: ct);
-                        await WaitAsync(item, limitWartegrund, ct);
+                        if (!string.Equals(item.Reason, zulassung.Wartegrund, StringComparison.Ordinal))
+                            await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.SystemMeldung, zulassung.Wartegrund, ct: ct);
+                        await WaitAsync(item, zulassung.Wartegrund, ct);
                         return;
                     }
-                    var kiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);
-                    if (!await kiPlugin.CheckHealthAsync(ct)) throw new InvalidOperationException("Die ausgewählte CLI ist nicht startbereit.");
-                    var parameters = prefix.Contains("KiSimulator", StringComparison.OrdinalIgnoreCase) ? "--scm-exchange" : null;
-                    if (string.IsNullOrWhiteSpace(task.LokalerKlonPfad))
-                        await development.ProzessStartenUndCliStartenAsync(task.Id, task.GitRepository!.RepositoryUrl,
-                            task.BasisBranchName, prefix, ct, strictPluginSelection: true, optionalParameters: parameters);
-                    else
-                        await development.CliNeustartenAsync(task.Id, prefix, parameters, ct, strictPluginSelection: true);
+                    using (zulassung.Reservierung)
+                    {
+                        var kiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);
+                        if (!await kiPlugin.CheckHealthAsync(ct)) throw new InvalidOperationException("Die ausgewählte CLI ist nicht startbereit.");
+                        var parameters = prefix.Contains("KiSimulator", StringComparison.OrdinalIgnoreCase) ? "--scm-exchange" : null;
+                        if (string.IsNullOrWhiteSpace(task.LokalerKlonPfad))
+                            await development.ProzessStartenUndCliStartenAsync(task.Id, task.GitRepository!.RepositoryUrl,
+                                task.BasisBranchName, prefix, ct, strictPluginSelection: true, optionalParameters: parameters);
+                        else
+                            await development.CliNeustartenAsync(task.Id, prefix, parameters, ct, strictPluginSelection: true);
+                    }
                     adapter = cli.GetScmPromptSession(task.Id);
                 }
                 if (adapter is null || !adapter.IsAlive)

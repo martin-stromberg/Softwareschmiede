@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -23,11 +24,12 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     /// <summary>ScmEventExecutionLimitServiceTests.</summary>
     public ScmEventExecutionLimitServiceTests()
     {
+        ScmEventExecutionLimitService.ReservierungenZuruecksetzen();
         _db = TestDbContextFactory.Create();
         _einstellungen = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
         _cli = new Mock<ICliExecutionLimitSource>();
         _cli.Setup(x => x.GetLaufendeAufgabenIds()).Returns([]);
-        _sut = new ScmEventExecutionLimitService(_db, _einstellungen, _cli.Object);
+        _sut = new ScmEventExecutionLimitService(_db, _einstellungen, _cli.Object, TimeProvider.System);
 
         _db.Projekte.Add(new Projekt
         {
@@ -40,7 +42,11 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     }
 
     /// <summary>Dispose.</summary>
-    public void Dispose() => _db.Dispose();
+    public void Dispose()
+    {
+        ScmEventExecutionLimitService.ReservierungenZuruecksetzen();
+        _db.Dispose();
+    }
 
     private async Task<Guid> LaufendeAufgabeAsync(string titel, string? kiPluginPrefix,
         Mock<IScmPromptSessionAdapter>? session = null)
@@ -221,5 +227,108 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
 
         belegung.FuerPlugin(PrefixA.ToLowerInvariant()).Should().Be(1);
         belegung.FuerPlugin("").Should().Be(0);
+    }
+
+    /// <summary>Bei unbegrenzter Konfiguration ist die Zulassung frei und belegt keinen Platz.</summary>
+    [Fact]
+    public async Task PruefeUndReserviereStartPlatzAsync_OhneGrenzen_FreiOhneReservierung()
+    {
+        var zulassung = await _sut.PruefeUndReserviereStartPlatzAsync(PrefixA);
+
+        zulassung.Wartegrund.Should().BeNull();
+        zulassung.Reservierung.Should().BeNull();
+    }
+
+    /// <summary>Eine gehaltene Reservierung belegt den Platz: Der nächste Start wartet,
+    /// die Freigabe gibt den Platz wieder frei — ohne dass je ein Prozess lief.</summary>
+    [Fact]
+    public async Task PruefeUndReserviereStartPlatzAsync_Reservierung_BelegtGlobalenPlatz()
+    {
+        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+
+        var erste = await _sut.PruefeUndReserviereStartPlatzAsync(PrefixA);
+        erste.Wartegrund.Should().BeNull();
+        erste.Reservierung.Should().NotBeNull();
+
+        // Die Reservierung zählt sofort als belegter Platz — auch für die reine Prüfung.
+        (await _sut.PruefeUndReserviereStartPlatzAsync(PrefixB)).Wartegrund.Should().Contain("globale Limit");
+        (await _sut.GetStartBlockReasonAsync(PrefixB)).Should().Contain("globale Limit");
+
+        erste.Reservierung!.Dispose();
+
+        var dritte = await _sut.PruefeUndReserviereStartPlatzAsync(PrefixB);
+        dritte.Wartegrund.Should().BeNull();
+        dritte.Reservierung!.Dispose();
+    }
+
+    /// <summary>Plugin-Reservierungen belegen nur das eigene Plugin-Limit.</summary>
+    [Fact]
+    public async Task PruefeUndReserviereStartPlatzAsync_Reservierung_BelegtNurEigenesPluginLimit()
+    {
+        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1");
+
+        var reservierung = (await _sut.PruefeUndReserviereStartPlatzAsync(PrefixA)).Reservierung;
+        reservierung.Should().NotBeNull();
+
+        (await _sut.PruefeUndReserviereStartPlatzAsync(PrefixA)).Wartegrund.Should().Contain($"'{PrefixA}'");
+        (await _sut.PruefeUndReserviereStartPlatzAsync(PrefixB)).Wartegrund.Should().BeNull();
+
+        reservierung!.Dispose();
+        (await _sut.PruefeUndReserviereStartPlatzAsync(PrefixA)).Reservierung!.Dispose();
+    }
+
+    /// <summary>Atomarität der Zulassung: Viele gleichzeitige Versuche auf getrennten
+    /// Service-Instanzen (eigene DbContexts wie in eigenen DI-Scopes) erhalten bei
+    /// globalem Limit 1 genau eine Reservierung; alle übrigen warten mit Limit-Grund.</summary>
+    [Fact]
+    public async Task PruefeUndReserviereStartPlatzAsync_ParalleleVersuche_NurEineReservierung()
+    {
+        const int versuche = 8;
+        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+        var dienste = Enumerable.Range(0, versuche).Select(_ =>
+        {
+            var db = TestDbContextFactory.Create();
+            var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+            einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1").GetAwaiter().GetResult();
+            return (Dienst: new ScmEventExecutionLimitService(db, einstellungen, _cli.Object, TimeProvider.System), Db: db);
+        }).ToList();
+        try
+        {
+            var zulassungen = await Task.WhenAll(dienste.Select(x =>
+                Task.Run(() => x.Dienst.PruefeUndReserviereStartPlatzAsync(PrefixA))));
+
+            zulassungen.Count(x => x.Reservierung is not null).Should().Be(1);
+            zulassungen.Where(x => x.Reservierung is null).Should().OnlyContain(x => x.Wartegrund != null && x.Wartegrund.Contains("globale Limit"));
+
+            // Der vergebene Platz wird nach Freigabe wieder nutzbar.
+            zulassungen.Single(x => x.Reservierung is not null).Reservierung!.Dispose();
+            var frei = await _sut.PruefeUndReserviereStartPlatzAsync(PrefixA);
+            frei.Reservierung.Should().NotBeNull();
+            frei.Reservierung!.Dispose();
+        }
+        finally
+        {
+            foreach (var x in dienste) x.Db.Dispose();
+        }
+    }
+
+    /// <summary>Bleibt der Start hängen, verfällt die Reservierung nach ihrer Lebensdauer
+    /// und der Platz wird ohne Freigabe wieder nutzbar.</summary>
+    [Fact]
+    public async Task PruefeUndReserviereStartPlatzAsync_Reservierung_VerfaelltNachLebensdauer()
+    {
+        var zeit = new FakeTimeProvider();
+        var sut = new ScmEventExecutionLimitService(_db, _einstellungen, _cli.Object, zeit);
+        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+
+        var hängende = await sut.PruefeUndReserviereStartPlatzAsync(PrefixA);
+        hängende.Reservierung.Should().NotBeNull();
+        (await sut.PruefeUndReserviereStartPlatzAsync(PrefixB)).Wartegrund.Should().NotBeNull();
+
+        zeit.Advance(ScmEventExecutionLimitService.ReservierungsLebensdauer + TimeSpan.FromSeconds(1));
+
+        var frei = await sut.PruefeUndReserviereStartPlatzAsync(PrefixB);
+        frei.Wartegrund.Should().BeNull();
+        frei.Reservierung!.Dispose();
     }
 }

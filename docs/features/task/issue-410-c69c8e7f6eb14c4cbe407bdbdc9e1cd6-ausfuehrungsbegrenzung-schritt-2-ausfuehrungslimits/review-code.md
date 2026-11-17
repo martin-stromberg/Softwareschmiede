@@ -91,3 +91,34 @@ Statuskonvention, Fluent-Teststil).
 - `E2E_AusfuehrungsLimits.cs` enthält im `finally` einen verschachtelten
   `try/catch` mit stillem Fallback auf direkte DB-Bereinigung — bewusstes
   Cleanup-Hardening für Folgeszenarien, dokumentiert im Kommentar; kein Befund.
+
+## Nachtrag: Abnahme-Korrektur (atomare Zulassungskontrolle)
+
+Die Abnahme (`acceptance-schritt-2.md`) beanstandete die nicht-atomare
+Zulassung (check-then-act zwischen `GetStartBlockReasonAsync` und der
+Handle-Registrierung im späteren Prozessstart). Umgesetzt wurde Ansatz (b),
+Slot-Reservierung, statt einer globalen Start-Serialisierung (a): Eine
+prozessweite Sperre um Prüfung→Start hätte alle Dispatch-Starts auch dann
+sequentialisiert, wenn das Limit noch Parallelität zulässt; die Reservierung
+lässt zulässige Parallelstarts unverändert zu und bremst nicht-zählende
+Pfade (Hostaktionen/Reconcile laufen vor der Prüfung) gar nicht.
+
+- `PruefeUndReserviereStartPlatzAsync` liest die Grenzen, wartet auf
+  `ZulassungsGate` (prozessweites `SemaphoreSlim`, da der Service scoped ist)
+  und wertet Belegung + offene Reservierungen unter derselben Sperre aus —
+  Check+Claim ist damit atomar. Die Handle-Belegung wird erst innerhalb der
+  Sperre gelesen, sodass die Momentaufnahme nicht veralten kann.
+- `ReservierungenSync` (schlichter `lock`) schützt die Reservierungs-Map
+  separat: `Dispose` der Reservierung ist non-blocking — bewusste Entscheidung,
+  damit UI-Dispatch-Pfade auf dem Dispatcher-Kontext nie synchron auf das
+  `ZulassungsGate` warten (Deadlock-Vermeidung).
+- Reservierungen verfallen nach `ReservierungsLebensdauer` (5 min) und werden
+  bei der nächsten Zulassungsprüfung verdrängt — ein hängender Start gibt den
+  Platz selbsttätig frei.
+- Bekannte, bewusst akzeptierte Restreichweite: Starts, die die
+  Zulassungskontrolle gar nicht passieren (manueller CLI-Start im
+  Aufgabenfenster, zeitgesteuerte Prompts), unterliegen dem Limit weiterhin
+  nicht — die Invariante gilt zwischen allen Dispatch-Pfaden, die die
+  Zulassung anfordern.
+- `GetStartBlockReasonAsync` bleibt als reine, nicht reservierende Prüfung
+  erhalten und rechnet Reservierungen jetzt ebenfalls ein.
