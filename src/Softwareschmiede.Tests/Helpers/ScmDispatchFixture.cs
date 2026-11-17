@@ -77,7 +77,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
             .Returns((ScmResponseRequest request, CancellationToken _) => { Responses.Add(request); return Task.FromResult(new ScmResponseResult("remote", null, false)); });
         // As<> muss vor dem ersten Git.Object-Zugriff erfolgen; Tests können die leere
         // Standard-Anbindung mit eigenem Setup überschreiben.
-        Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmKontoModus>(), It.IsAny<CancellationToken>()))
+        Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmKontoModus>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, string?>());
         Git.As<IScmNotificationSource>().Setup(x => x.EnumerateNotificationsAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .Returns((string _, DateTimeOffset? _, CancellationToken _) => Task.FromResult<IReadOnlyList<ScmNotification>>(Notifications.ToArray()));

@@ -152,10 +152,10 @@
 **Beschreibung:** Der GitHub-Personal-Access-Token wird ausschließlich im Windows Credential Store (`Softwareschmiede.GitHub.Token`) gehalten und für git-Aufrufe nur in der Prozessumgebung des Kindprozesses übergeben — niemals in Dateien, Remote-URLs oder Kommandozeilenargumenten. Das Verhalten ist sicherheitsrelevant und nicht per Einstellung abschaltbar.
 
 **Bedingungen:**
-- Beliebige Host-git-Operation des `GitHubPlugin` gegen github.com (`clone`, `push`, `pull`, `ls-remote`, `fetch`/`checkout` im PR-Checkout)
+- Beliebige Host-git-Operation des `GitHubPlugin` (`clone`, `push`, `pull`, `ls-remote`, `fetch`/`checkout` im PR-Checkout) — gegen `github.com` wie gegen GitHub-Enterprise-Hosts
 
 **Verhalten:**
-- `GetGitEnvironment` setzt bei vorhandenem Token `GIT_CONFIG_*`-`http.extraheader` (`AUTHORIZATION: basic <base64("x-access-token:"+token)>`) zusätzlich zu `GH_TOKEN`; es gibt keinen `NETRC`-Verweis mehr.
+- `GetGitEnvironment` setzt bei vorhandenem Token `GIT_CONFIG_*`-`http.extraheader` (`AUTHORIZATION: basic <base64("x-access-token:"+token)>`) zusätzlich zu `GH_TOKEN`; der Key bindet an den Host der jeweils kontaktierten Remote-URL (Details siehe Regel „Host-Bindung des `http.extraheader`-Keys" weiter unten). Es gibt keinen `NETRC`-Verweis mehr.
 - `_netrc`/`.netrc` wird vom Plugin weder gelesen noch beschrieben — Ausnahme ist die einmalige Legacy-Bereinigung (nächste Regel).
 - Ohne Token enthält die Umgebung nur `GIT_TERMINAL_PROMPT=0`; HTTPS-Klone ohne Token scheitern früh mit einer verständlichen Meldung (unverändert).
 
@@ -225,15 +225,35 @@
 
 **Umsetzung:** `GitHubPlugin.NormalizeRemoteUrlAsync` + `RemoveInsecureSshCommandAsync` (`LegacyInsecureSshCommand`-Konstante), `BitbucketPlugin.NormalizeRemoteUrlAsync`; Auslöser jeweils am Anfang von `PushBranchAsync`, `PullAsync` und `CheckoutPullRequestSourceAsync`.
 
-### Regel: GitHub-Enterprise-Hosts authentifizieren nicht über HTTPS-git
+### Regel: Host-Bindung des `http.extraheader`-Keys
 
-**Beschreibung:** Der `http.extraheader`-Key des GitHub-Plugins ist fest auf `http.https://github.com/.extraheader` verdrahtet. git-Operationen gegen GitHub-Enterprise-Hosts (≠ `github.com`) authentifizieren daher nicht und schlagen nicht-interaktiv fehl — bewusste Fail-closed-Entscheidung statt unsicherem Weiterbetrieb über SSH.
+**Beschreibung:** Der `http.extraheader`-Key des GitHub-Plugins wird pro git-Operation an den Host der tatsächlich kontaktierten Remote-URL gebunden (`http.https://<host>[:port]/.extraheader`) statt fest auf `github.com` verdrahtet zu sein. Damit authentifizieren HTTPS-git-Operationen gegen `github.com` wie gegen GitHub-Enterprise-Hosts. Ein generischer, hostloser `http.extraheader` wird bewusst nicht erzeugt — er würde den Token an jeden kontaktierten Host senden (Leak-Vektor über Fork-`clone_url`/`SourceRepositoryUrl` aus PR-Metadaten).
 
 **Bedingungen:**
-- Plugin-geführte git-Operation gegen einen GitHub-Enterprise-Host
+- Beliebige plugin-geführte git-Operation des `GitHubPlugin` bzw. die Prozessumgebung einer Agenten-Terminal-Session (`IScmAgentAccess.GetAgentEnvironmentAsync`) mit vorhandenem Token
 
 **Verhalten:**
-- Ohne Host-gebundenen Auth-Header schlägt die HTTPS-Authentifizierung nicht-interaktiv fehl (`GIT_TERMINAL_PROMPT=0`).
-- Ein generischer `http.extraheader` ist bewusst keine Option — er würde den Token an jeden kontaktierten Host senden (Leak-Vektor über Fork-`clone_url`/`SourceRepositoryUrl` aus PR-Metadaten). Ein hostgebundener Key ist als Folge-Issue vorgesehen.
+- Der Zielhost wird je Operation aus der kontaktierten URL bestimmt: `clone`/`ls-remote`/Credential-Konfiguration aus der (per `ToHttpsRepositoryUrl` normalisierten) übergebenen Repository-URL; `push`/`pull` und der Same-Repository-Fall des PR-Checkouts aus der `remote.origin.url`-Rückgabe von `NormalizeRemoteUrlAsync`; der Fork-Fall des PR-Checkouts aus der normalisierten `SourceRepositoryUrl`; Agenten-Sessions aus `repository.RepositoryUrl`, die über `EntwicklungsprozessService` → `KiAusfuehrungsService` → `IScmAgentAccess.GetAgentEnvironmentAsync(konto, repositoryUrl, ct)` durchgereicht wird.
+- SSH-/SCP-Formen der Ziel-URL werden vor der Key-Bildung über `ToHttpsRepositoryUrl` normalisiert; Userinfo/Credentials gelangen nie in den Key. Der Host steht als `IdnHost` (IDN → Punycode) im Key, IPv6-Literale behalten ihre Klammern, ein Nicht-Default-Port wird angehängt.
+- Lässt sich kein Zielhost bestimmen (URL fehlt, ist unparsebar oder nicht-HTTPS, `remote.origin.url` nicht lesbar), entsteht kein `GIT_CONFIG_*`-Block — die Operation läuft fail-closed mit `GIT_TERMINAL_PROMPT=0` weiter; es gibt keinen Fallback auf `github.com` oder einen hostlosen Key.
+- Bekannte Einschränkung: `GH_TOKEN`/`gh`-CLI adressiert ohne gesetztes `GH_HOST` weiterhin `github.com` — `gh`-Aufrufe gegen GitHub-Enterprise-Hosts sind nicht Teil dieser Anbindung.
 
-**Umsetzung:** `GitHubPlugin.AddGitHubHttpAuthHeader` — der Key bleibt `http.https://github.com/.extraheader`.
+**Umsetzung:** `GitHubPlugin.TryBuildHttpExtraHeaderKey` (Key-Bildung aus der Ziel-URL, `null` = fail-closed) + `AddGitHubHttpAuthHeader(environment, token, targetUrl)`; die Ziel-URL reichen `GetGitEnvironment(token, targetUrl)` und `GetAgentEnvironmentAsync(konto, repositoryUrl, ct)` durch; `GitPluginBase.ResolvePullRequestFetchRemote` bestimmt das Fetch-Ziel des PR-Checkouts (`origin` vs. `SourceRepositoryUrl`).
+
+## Sicherheit der Plugin-Discovery
+
+### Regel: Nur whitelisted Plugin-Assemblies werden geladen
+
+**Beschreibung:** Der `PluginManager` lädt ausschließlich Assemblies, deren Dateiname und echter Assembly-Name (Metadaten) auf einer fest kodierten Whitelist der mitgelieferten First-Party-Plugins stehen. Eine fremde, im `plugins`-Verzeichnis abgelegte DLL wird nicht geladen — sie könnte sonst mit vollen App-Rechten inkl. Credential-Store-Zugriff ausgeführt werden.
+
+**Bedingungen:**
+- Plugin-Discovery beim Anwendungsstart (`plugins/` und Plugin-Unterordner der ersten Ebene)
+
+**Verhalten:**
+- Ladekandidaten: `*.dll` direkt unter `plugins/` sowie je Unterordner nur `<Ordner>\<Ordner>.dll`; Dependency-DLLs in den Unterordnern sind keine Kandidaten.
+- Dateiname nicht auf der Whitelist → `LogWarning` + übersprungen.
+- Dateiname auf der Whitelist, aber echter Assembly-Name abweichend (Maskerade per Umbenennung) → `LogWarning` + übersprungen.
+- Der im Test-Modus greifende Namensfilter bleibt als zusätzliche Einschränkung bestehen.
+- Grenze: Eine präparierte *Dependency*-DLL neben einem legitimen Plugin wird durch die Whitelist nicht abgedeckt — dafür wäre Strong-Name-Signierung erforderlich (derzeit nicht eingerichtet).
+
+**Umsetzung:** `PluginManager.AllowedPluginAssemblyNames`, `PluginManager.EnumeratePluginCandidates()`, `PluginManager.IsAllowedPlugin()` (`AssemblyLoadContext.GetAssemblyName` für die Metadatenprüfung).

@@ -418,6 +418,16 @@ public sealed class SettingsView : BaseWindowView
         return IsBereichSichtbar("ScmTriggerKeyword");
     }
 
+    /// <summary>Prüft, ob der Verzögerungs-Keyword-Bereich sichtbar ist (bei aktivierter
+    /// Ereignisüberwachung in beiden Kontomodi). Geprüft wird über das enthaltene
+    /// "ScmDelayKeyword"-Textfeld, da der Bereichs-StackPanel kein UIA-Element besitzt.</summary>
+    /// <returns><c>true</c>, wenn der Bereich sichtbar ist.</returns>
+    public bool IsDelayKeywordBereichVisible()
+    {
+        OpenAufgabenAusfuehren();
+        return IsBereichSichtbar("ScmDelayKeyword");
+    }
+
     /// <summary>Prüft, ob der Prompt-Anhänge-Bereich sichtbar ist (nur bei aktivierter
     /// Ereignisüberwachung). Geprüft wird über das enthaltene "ScmPromptAppendixGeneral"-Textfeld,
     /// da der Bereichs-StackPanel kein UIA-Element besitzt.</summary>

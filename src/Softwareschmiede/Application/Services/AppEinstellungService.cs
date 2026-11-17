@@ -45,6 +45,9 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für das konfigurierbare SCM-Trigger-Keyword.</summary>
     public const string ScmTriggerKeywordKey = "scm.trigger.keyword";
 
+    /// <summary>Schlüssel für das konfigurierbare SCM-Verzögerungs-Keyword.</summary>
+    public const string ScmDelayKeywordKey = "scm.delay.keyword";
+
     /// <summary>Schlüssel für den SCM-Prompt-Anhang, der bei jeder Ereignisart angehängt wird.</summary>
     public const string ScmPromptAppendGeneralKey = "scm.prompt.append.general";
 
@@ -362,6 +365,17 @@ public sealed class AppEinstellungService
     /// <returns>Das effektive Trigger-Keyword.</returns>
     public async Task<string> GetScmTriggerKeywordAsync(CancellationToken ct = default)
         => ScmEventValidationService.NormalizeTriggerKeyword(await GetSettingAsync(ScmTriggerKeywordKey, ct));
+
+    /// <summary>
+    /// Liest das konfigurierte SCM-Verzögerungs-Keyword unter <see cref="ScmDelayKeywordKey"/>.
+    /// Fehlende oder ungültige (leere bzw. nur aus Leerraum bestehende) Werte fallen auf
+    /// <see cref="ScmDelayDirective.DefaultDelayKeyword"/> zurück; gespeicherte Werte
+    /// werden getrimmt zurückgegeben.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Das effektive Verzögerungs-Keyword.</returns>
+    public async Task<string> GetScmDelayKeywordAsync(CancellationToken ct = default)
+        => ScmDelayDirective.NormalizeDelayKeyword(await GetSettingAsync(ScmDelayKeywordKey, ct));
 
     /// <summary>
     /// Liest alle fünf SCM-Prompt-Anhänge (<see cref="ScmPromptAppendGeneralKey"/>,

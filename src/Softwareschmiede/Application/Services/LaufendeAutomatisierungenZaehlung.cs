@@ -1,15 +1,19 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>
 /// Singleton-Zähler der fachlich laufenden Automatisierungen: wendet die gemeinsame
 /// <see cref="KiAusfuehrungsStatusKlassifikation"/> auf die Kandidatenmenge der Seitenleiste
-/// (<see cref="IAktiveAufgabenService.GetAktiveAufgabenAsync"/>) an und zählt ausschließlich
-/// den Zustand <see cref="KiAusfuehrungsZustand.Laeuft"/>. Laufender gehandelter Prozess und
+/// (<see cref="IAktiveAufgabenService.GetAktiveAufgabenAsync"/>) an und zählt den Zustand
+/// <see cref="KiAusfuehrungsZustand.Laeuft"/>. Laufender gehandelter Prozess und
 /// zeitgesteuerter Prompt werden dabei wie in der UI-Klassifikation berücksichtigt.
+/// Zusätzlich zählt jedes SCM-Ereignis im Status „Verzögert" als ausstehende
+/// Automatisierung, damit der Auto-Shutdown eine geplante Zustellung nicht überholt.
 /// </summary>
 public sealed class LaufendeAutomatisierungenZaehlung : ILaufendeAutomatisierungenZaehlung
 {
@@ -36,6 +40,7 @@ public sealed class LaufendeAutomatisierungenZaehlung : ILaufendeAutomatisierung
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var aktiveAufgabenService = scope.ServiceProvider.GetRequiredService<IAktiveAufgabenService>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         var aufgaben = await aktiveAufgabenService.GetAktiveAufgabenAsync(ct);
 
         var anzahl = 0;
@@ -51,6 +56,8 @@ public sealed class LaufendeAutomatisierungenZaehlung : ILaufendeAutomatisierung
                 anzahl++;
             }
         }
+
+        anzahl += await db.ScmIncomingEvents.CountAsync(x => x.Status == "Verzögert", ct);
 
         return anzahl;
     }
