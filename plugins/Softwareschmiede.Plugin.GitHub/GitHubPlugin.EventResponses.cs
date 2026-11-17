@@ -12,6 +12,8 @@ public sealed partial class GitHubPlugin
     public async Task<ScmResponseResult?> ReconcileResponseAsync(ScmResponseRequest request, CancellationToken ct = default)
     {
         ValidateResponse(request);
+        if (request.Kind == ScmResponseKind.IssueBodyUpdate)
+            return await ReconcileIssueBodyAsync(request, ct);
         if (request.Kind == ScmResponseKind.Reaction && request.ContentKind == ScmContentKind.PullRequestReview)
             return await ReconcileReviewReactionAsync(request, ct);
         var repository = request.Reference.Repository;
@@ -61,24 +63,44 @@ public sealed partial class GitHubPlugin
         }
         else
         {
-            var composed = request.Kind is ScmResponseKind.Comment or ScmResponseKind.PullRequest
+            var composed = request.Kind is ScmResponseKind.Comment or ScmResponseKind.PullRequest or ScmResponseKind.IssueBodyUpdate
                 ? await ComposeBodyAsync(request, client, repository, current, ct)
                 : null;
-            var (endpoint, body) = request.Kind switch
+            var (method, endpoint, body) = request.Kind switch
             {
-                ScmResponseKind.Comment => ($"{RepositoryEndpoint(repository)}/issues/{request.Reference.Number}/comments",
+                ScmResponseKind.Comment => ("POST", $"{RepositoryEndpoint(repository)}/issues/{request.Reference.Number}/comments",
                     (object)new { body = composed }),
-                ScmResponseKind.Reaction => (ReactionEndpoint(request), (object)new { content = request.Reaction }),
-                ScmResponseKind.PullRequest => ($"{RepositoryEndpoint(repository)}/pulls",
+                // Die Beschreibung wird vollständig ersetzt (Titel ausdrücklich unberührt) und
+                // trägt denselben Aktions-Marker wie Kommentare — damit findet der Reconcile-Pfad
+                // eine angewendete Änderung sicher wieder, statt erneut zu schreiben.
+                ScmResponseKind.IssueBodyUpdate => ("PATCH", $"{RepositoryEndpoint(repository)}/issues/{request.Reference.Number}",
+                    (object)new { body = composed }),
+                ScmResponseKind.Reaction => ("POST", ReactionEndpoint(request), (object)new { content = request.Reaction }),
+                ScmResponseKind.PullRequest => ("POST", $"{RepositoryEndpoint(repository)}/pulls",
                     (object)new { title = request.Title, body = composed, head = request.HeadBranch, @base = request.BaseBranch }),
                 _ => throw Permanent("Unbekannte GitHub-Antwortaktion.")
             };
-            result = await EventApiAsync(client, repository.Host, "POST", endpoint, body, true, ct);
+            result = await EventApiAsync(client, repository.Host, method, endpoint, body, true, ct);
         }
         var id = String(result, "id");
         if (string.IsNullOrWhiteSpace(id)) throw new ScmProviderException(ScmProviderFailureKind.Temporary,
             "GitHub-Schreibantwort enthält keine bestätigte Aktions-ID.", outcomeUncertain: true);
         return new(id, SafeResponseUrl(request, result));
+    }
+
+    /// <summary>Liest das Issue-Objekt selbst: Der Aktions-Marker im Remote-Body beweist die
+    /// bereits angewendete Beschreibungsänderung — ein Viewer-Vergleich entfällt, weil der
+    /// Issue-Autor nicht das Ereignis-Konto sein muss.</summary>
+    private async Task<ScmResponseResult?> ReconcileIssueBodyAsync(ScmResponseRequest request, CancellationToken ct)
+    {
+        var repository = request.Reference.Repository;
+        var client = ClientFor(repository.Konto);
+        var issue = await EventApiAsync(client, repository.Host, "GET",
+            $"{RepositoryEndpoint(repository)}/issues/{request.Reference.Number}", null, false, ct);
+        if (issue.ValueKind != JsonValueKind.Object) throw Permanent("Unvollständige GitHub-Antwort.");
+        return (String(issue, "body") ?? string.Empty).Contains(request.Marker, StringComparison.Ordinal)
+            ? new(Required(issue, "id"), SafeResponseUrl(request, issue), true)
+            : null;
     }
 
     private async Task<ScmResponseResult?> ReconcileReviewReactionAsync(ScmResponseRequest request, CancellationToken ct)
@@ -134,6 +156,11 @@ public sealed partial class GitHubPlugin
                         throw Permanent("Review-Ursprung fehlt.");
                 }
                 else _ = ReactionEndpoint(request);
+                break;
+            case ScmResponseKind.IssueBodyUpdate:
+                if (request.Reference.Kind != ScmReferenceKind.Issue)
+                    throw Permanent("Issue-Beschreibungen benötigen eine Issue-Referenz.");
+                if (string.IsNullOrWhiteSpace(request.Body)) throw Permanent("Neue Issue-Beschreibung fehlt.");
                 break;
             case ScmResponseKind.PullRequest:
                 if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.HeadBranch) || string.IsNullOrWhiteSpace(request.BaseBranch))

@@ -18,7 +18,7 @@ Speichert Inhaltshash und Revision einer beobachteten Textfassung sowie den Aufl
 
 ### `ScmOutgoingAction`
 
-Verfolgt Empfangsreaktionen, Wartehinweise und angeforderte Antworten einschließlich Aktionstyp, Remote-ID, Versuchszahl und Fehlerstatus. Neben `receipt` und `waiting` deckt der hostseitige Zweck `attachments` die Screenshot-Nachweise ab: Die Aktion trägt eine deterministische Aktions-ID und veröffentlicht die vom Agenten im `attachmentsPath`-Verzeichnis des Antwortkanals abgelegten Nachweis-Bilder als Kommentar-Anhänge; sie entsteht nur, wenn beim Abschluss mindestens eine Datei gesammelt oder verworfen wurde.
+Verfolgt Empfangsreaktionen, Wartehinweise und angeforderte Antworten einschließlich Aktionstyp, Remote-ID, Versuchszahl und Fehlerstatus. Neben `receipt` und `waiting` deckt der hostseitige Zweck `attachments` die Screenshot-Nachweise ab: Die Aktion trägt eine deterministische Aktions-ID und veröffentlicht die vom Agenten im `attachmentsPath`-Verzeichnis des Antwortkanals abgelegten Nachweis-Bilder als Kommentar-Anhänge; sie entsteht nur, wenn beim Abschluss mindestens eine Datei gesammelt oder verworfen wurde. Der hostseitige Zweck `issuebody` trägt Issue-Beschreibungs-Updates (`ScmResponseKind.IssueBodyUpdate`): Die Aktion ersetzt die Beschreibung remote über `PATCH issues/{n}` — Body inklusive Aktionsmarker, der Titel wird nicht gesendet — und gleicht eine bereits angewandte Beschreibung am Marker im Issue-Body ab.
 
 ### `ScmTaskLease`
 

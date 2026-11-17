@@ -144,8 +144,10 @@ public sealed class ScmEventOrchestrator(
                 if (receipt is null) return;
                 await outbox.ExecuteAsync(receipt, responder, ct);
             }
+            // Hostaktionen aller Zwecke werden unabhängig vom Zustellstatus nachgeholt;
+            // versuchsgebundene "ai:"-Aktionen bleiben dem Exchange-Abgleich vorbehalten.
             foreach (var action in await db.ScmOutgoingActions.Where(x => x.EventId == item.Id
-                && (x.Purpose == "waiting" || x.Purpose == "attachments") && x.Status != "Succeeded").ToListAsync(ct))
+                && !x.Purpose.StartsWith("ai:") && x.Status != "Succeeded").ToListAsync(ct))
                 await outbox.ExecuteAsync(action, responder, ct);
             if (item.Status == "Verarbeitet") return;
             if (item.DeliveryAttemptId is not null)
