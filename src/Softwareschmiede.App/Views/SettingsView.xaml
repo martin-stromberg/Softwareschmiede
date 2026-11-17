@@ -34,6 +34,7 @@
             <local:PluginSettingFieldTemplateSelector.IntegerTemplate>
                 <DataTemplate>
                     <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="{Binding Field.Key}"
                              Width="120"
                              HorizontalAlignment="Left" />
                 </DataTemplate>
@@ -425,6 +426,20 @@
                                          Padding="8,6"
                                          BorderBrush="{DynamicResource BorderBrush}" />
                                 <TextBlock Text="Schlüsselwort, mit dem ein SCM-Ereignis eine verzögerte Ausführung anfordert — im selben Text wie der Trigger, gefolgt von der Angabe: 30min, 4h, 2t/2d, 1w oder m&lt;Tag&gt; für den Kalendertag im Monat (z. B. m1). Maximal 32 Tage; der Wartezustand übersteht Neustart und blockiert den Auto-Shutdown. Leer lassen ist nicht zulässig; Standard: #verzögert."
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel AutomationProperties.Name="MaxParalleleAusfuehrungenBereich">
+                                <TextBlock Text="Maximale parallele Ausführungen"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,12,0,4" />
+                                <TextBox Text="{Binding MaxParalleleAusfuehrungen, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="MaxParalleleAusfuehrungen"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                                <TextBlock Text="Globales Limit gleichzeitig laufender KI-CLI-Ausführungen aus SCM-Ereignissen. Ganzzahl ≥ 1; leer = unbegrenzt. Bei Erreichen des Limits warten weitere Ereignisse mit Wartegrund, bis ein Platz frei wird; die Reihenfolge folgt der Priorisierung (Fortsetzungen vor fälligen Verzögerungen vor Eingangsreihenfolge). Pro KI-Plugin lässt sich zusätzlich ein eigenes Limit unter „Plugins“ festlegen."
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            TextWrapping="Wrap"
                                            Margin="0,4,0,0" />

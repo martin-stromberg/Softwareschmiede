@@ -227,6 +227,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ScmEventStore>();
         services.AddScoped<ScmEventOutbox>();
         services.AddScoped<ScmEventOrchestrator>();
+        services.AddScoped<ScmEventExecutionLimitService>();
         services.AddScoped<ScmEventTaskResolver>();
         services.AddScoped<ScmBackmergeService>();
         services.AddSingleton<ScmEventMonitoringService>();
@@ -311,6 +312,8 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
         services.AddSingleton<IBenachrichtigungsBannerService, WpfBannerService>();
         services.AddSingleton<IRunningAutomationStatusSource>(sp =>
+            sp.GetRequiredService<KiAusfuehrungsService>());
+        services.AddSingleton<ICliExecutionLimitSource>(sp =>
             sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<DarkModeService>();
         services.AddSingleton<AufgabenListenModusService>();

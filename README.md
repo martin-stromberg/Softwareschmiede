@@ -27,7 +27,7 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 - **IDE-Integration** mit Visual Studio für `.sln`/`.slnx` und Visual Studio Code als Fallback
 - **Dateiexplorer und Diff-Ansicht** direkt in der Aufgabendetailansicht
 - **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Ereignisüberwachung
-- **GitHub-Ereignisüberwachung** für Issues und Pull Requests aktivierter Projekt-Repositories — umschaltbar zwischen repository-weiter Überwachung mit Trigger-Keyword und der Notifications-Inbox eines separaten Bot-Kontos (@mention) — mit persistenter Queue und kontrollierter CLI-Zustellung
+- **GitHub-Ereignisüberwachung** für Issues und Pull Requests aktivierter Projekt-Repositories — umschaltbar zwischen repository-weiter Überwachung mit Trigger-Keyword und der Notifications-Inbox eines separaten Bot-Kontos (@mention) — mit persistenter Queue, kontrollierter CLI-Zustellung und begrenzbarer Parallelität (global und je KI-Plugin, jeweils leer = unbegrenzt); bei vollem Limit warten Ereignisse mit Wartegrund priorisiert (Fortsetzungen → fällige Verzögerungen → Eingangsreihenfolge) auf freie Plätze
 - **Pausierbare Aufgaben** mit manueller Pause und automatischer Pausierung bei erkannten KI-Session-Limits
 - **Zeitgesteuerte Prompts** mit persistenter Wartestellung — Pläne überleben Ansichtswechsel, CLI-Stopp und App-Neustart und werden zum Zielzeitpunkt bzw. beim nächsten CLI-Start zugestellt
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases mit konfigurierbarem Update-Modus und wählbarem Update-Pfad (ausschließlich stabile Versionen oder ausschließlich Release-Kandidaten)

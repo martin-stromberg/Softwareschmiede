@@ -237,10 +237,20 @@ public sealed class ScmEventMonitoringService(
                 ((x.Status != "Verarbeitet" && (x.NextAttemptUtc == null || x.NextAttemptUtc <= nowMilliseconds)) ||
                 db.ScmOutgoingActions.Any(action => action.EventId == x.Id && action.Status != "Succeeded"
                     && (action.NextAttemptUtc == null || action.NextAttemptUtc <= nowMilliseconds))))
-                .OrderBy(x => x.Sequence).Select(x => new { x.Id, x.Sequence }).Take(100).ToListAsync(ct);
+                .OrderBy(x => x.Sequence).Take(100)
+                .Select(x => new ScmDispatchPrioritaet.EreignisAuswahl(x.Id, x.AufgabeId, x.Sequence, x.Status, x.NextAttemptUtc))
+                .ToListAsync(ct);
             if (batch.Count == 0) break;
             afterSequence = batch[^1].Sequence;
-            foreach (var item in batch)
+            // Priorisierter Zugriff auf die begrenzten Ausführungsplätze: Fortsetzungen vor
+            // fälligen Verzögerungen (zeitaufsteigend) vor der Eingangsreihenfolge.
+            var batchAufgabeIds = batch.Select(x => x.AufgabeId).Distinct().ToList();
+            var aufgabenZustaende = await db.Aufgaben.AsNoTracking()
+                .Where(x => batchAufgabeIds.Contains(x.Id))
+                .Select(x => new { x.Id, x.Status, x.AusfuehrungsStatus, x.PausiertBisUtc })
+                .ToDictionaryAsync(x => x.Id,
+                    x => new ScmDispatchPrioritaet.AufgabenZustand(x.Status, x.AusfuehrungsStatus, x.PausiertBisUtc), ct);
+            foreach (var item in ScmDispatchPrioritaet.OrderForDispatch(batch, aufgabenZustaende))
             {
                 using var dispatchScope = scopes.CreateScope();
                 await dispatchScope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(item.Id, ct: ct);

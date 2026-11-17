@@ -1,0 +1,6 @@
+Baseline-Lauf auf dem Basisbranch (Vorab-Zusammenfassung; volle Logausgabe aus dem
+Planungslauf).
+
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface"
+
+Bestanden!   : Fehler:     0, erfolgreich:  2591, übersprungen:     3, gesamt:  2594 - Softwareschmiede.Tests.dll (net10.0)

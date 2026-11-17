@@ -151,9 +151,13 @@ public sealed class SettingsViewModelTests : IDisposable
 
         sut.KiPluginSelectedCommand.Execute(plugin);
 
-        sut.SelectedPluginSettings.Should().HaveCount(1);
+        // Neben den Plugin-Gruppen enthält die Auswahl die hostseitige Gruppe
+        // "Ausführungsbegrenzung" mit dem ParallelLimit-Feld (Issue 410).
+        sut.SelectedPluginSettings.Should().HaveCount(2);
         sut.SelectedPluginSettings[0].GroupName.Should().Be("Modell-Konfiguration");
         sut.SelectedPluginSettings[0].Entries[0].Field.Key.Should().Be("model");
+        sut.SelectedPluginSettings[1].GroupName.Should().Be("Ausführungsbegrenzung");
+        sut.SelectedPluginSettings[1].Entries[0].Field.Key.Should().Be("ParallelLimit");
     }
 
     /// <summary>LadenAsync lädt die gespeicherten Default-Plugins. Die Einstellungen selbst werden erst nach Auswahl eines Eintrags im Plugins-Register geladen (SelectedPluginSettings).</summary>

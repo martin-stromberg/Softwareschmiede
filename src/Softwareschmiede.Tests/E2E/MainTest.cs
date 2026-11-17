@@ -19,6 +19,7 @@ public partial class End2EndTest : WpfTestBase
             AppStarten_ZeigtVersionsTextInFusszeile_E2E(mainWindow);
             Einstellungen_SpeichernCodexAlsStandardKiPluginUndExecutablePath_PersistiertBeides_E2E(mainWindow);
             Einstellungen_AllgemeinEnthaeltNurVorhandeneAbschnitte_E2E(mainWindow);
+            Einstellungen_AusfuehrungsLimitsGlobalUndProPlugin_E2E(mainWindow);
             IdePluginSettings_AktivierungValidierungUndReihenfolge_E2E(mainWindow);
             return Task.CompletedTask;
         });
