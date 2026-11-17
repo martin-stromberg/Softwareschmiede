@@ -44,6 +44,12 @@ Ist ein Eintrag nicht mehr relevant (z. B. Anfrage hinfällig oder anderweitig e
 
 Die Liste zeigt den Verarbeitungsstatus. Bei erfolgreicher Bestätigung erhalten Kommentare und veröffentlichte Pull-Request-Reviews auf GitHub 👀; für Beschreibungen wird keine Reaktion gesetzt. Wartende Einträge zeigen den Grund, soweit er bekannt ist. Die Ereignisverarbeitung selbst beendet die Aufgabe nicht; unabhängig davon kann die optionale **Abschlussüberwachung** (Einstellungen → Automatisierung → Aufgaben beenden) die Aufgabe später automatisch beenden, sobald ihre verknüpfte SCM-Referenz geschlossen oder gemergt ist.
 
+## Screenshot-Nachweise
+
+Hat die CLI während des Laufs Nachweis-Bilder im vorgegebenen `attachmentsPath`-Verzeichnis des Antwortkanals abgelegt, veröffentlicht die Anwendung sie nach dem Abschluss als eigenen GitHub-Kommentar „Screenshot-Nachweise des abgeschlossenen Laufs.": Jedes gültige Bild erscheint eingebettet, eine vom Agenten deklarierte Unterschrift steht kursiv darunter. Dateien, die die Prüfung nicht bestehen (Format, Größe, unzulässiger Pfad u. a.), stehen im selben Kommentar als kursive Zeile „Übersprungen: `<Name>` (`<Grund>`)" — war nichts hochladbar, trägt der Kommentar die Überschrift „Die Screenshot-Nachweise des abgeschlossenen Laufs konnten nicht hochgeladen werden." und nennt ausschließlich die Übersprungen-Gründe.
+
+Schlägt der Upload oder das Posten des Kommentars fehl, bleibt die Aktion offen und erscheint in der Ereignisübersicht unter den **Integrationshinweisen** als „Screenshot-Nachweis (`<owner/repo>` Issue/Pull Request #N): `<Fehler>`". Für einen erneuten Versuch öffne das zugehörige Ereignis über den Filter **Verarbeitet** oder **Alle** und wähle **Erneut prüfen** — das setzt den Warte-Backoff zurück und führt die Aktion erneut aus; ein bereits angekommener Nachweis-Kommentar wird über einen unsichtbaren Marker erkannt und nicht doppelt erzeugt. Abgebrochene Ereignisse wiederholen nichts. Meldet der Hinweis einen ungewissen Ausgang, ist lediglich unklar, ob der Kommentar GitHub bereits erreicht hat — prüfe ihn in diesem Fall auf GitHub; ein automatischer Neuversand erfolgt nicht.
+
 ## Barrierefreiheit
 
 Die Ereignisliste kann mit der Tastatur bedient werden. Enter öffnet den ausgewählten Eintrag. Schaltflächen und Liste stellen Namen für unterstützende Bedienhilfen bereit.

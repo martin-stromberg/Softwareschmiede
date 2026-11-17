@@ -43,7 +43,7 @@ public sealed partial class GitHubPlugin
         return new(PluginPrefix, host, Required(metadata, "node_id"), canonicalOwner, canonicalName,
             String(remoteOwner, "node_id"), Required(viewer, "node_id"), Required(viewer, "login"),
             Boolean(permissions, "push") || Boolean(permissions, "admin") || Boolean(permissions, "maintain"),
-            repository.Konto);
+            repository.Konto, String(metadata, "id"));
     }
 
     /// <inheritdoc />
@@ -353,6 +353,14 @@ public sealed partial class GitHubPlugin
         { throw new ScmProviderException(ex.FailureKind, ex.Message, ex.RetryAfterUtc, true); }
         catch (Exception ex) when (ex is IOException or HttpRequestException or TimeoutException || (mutation && ex is OperationCanceledException))
         { throw new ScmProviderException(ScmProviderFailureKind.Temporary, "GitHub-Verbindung unterbrochen.", outcomeUncertain: mutation); }
+        return EvaluateResponse(response, $"HTTP {response.StatusCode}, {request.Host}/{request.Endpoint.Split('?')[0]}", mutation);
+    }
+
+    /// <summary>Einheitliche Status→<see cref="ScmProviderFailureKind"/>-Matrix und Backoff-Auswertung;
+    /// <paramref name="uncertain"/> gilt ausschließlich für sicher wiederholbare Aufrufe (Mutationen),
+    /// niemals für den Attachment-Upload-Teilschritt.</summary>
+    private static GitHubEventApiResponse EvaluateResponse(GitHubEventApiResponse response, string detail, bool uncertain)
+    {
         if (response.StatusCode is >= 200 and < 300) return response;
         var rateLimited = response.StatusCode == 429 || (response.StatusCode == 403
             && (Header(response, "X-RateLimit-Remaining") == "0" || Header(response, "Retry-After") is not null));
@@ -369,13 +377,13 @@ public sealed partial class GitHubPlugin
         else if (DateTimeOffset.TryParse(Header(response, "Retry-After"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var retryDate)) retry = retryDate;
         else if (long.TryParse(Header(response, "X-RateLimit-Reset"), out var reset) && reset is >= 0 and <= 253402300799)
             retry = DateTimeOffset.FromUnixTimeSeconds(reset);
-        throw new ScmProviderException(kind, EventFailureMessage(kind, $"HTTP {response.StatusCode}, {request.Host}/{request.Endpoint.Split('?')[0]}"), retry,
-            mutation && response.StatusCode >= 500);
+        throw new ScmProviderException(kind, EventFailureMessage(kind, detail), retry,
+            uncertain && response.StatusCode >= 500);
     }
 
     private static string EventFailureMessage(ScmProviderFailureKind kind, string detail) => kind switch
     {
-        ScmProviderFailureKind.Authentication => $"GitHub-Anmeldung abgelaufen oder ungültig. Öffnen Sie Einstellungen → Plugins → GitHub. Erneuern Sie unter Authentifizierung den Personal Access Token und speichern Sie. Klicken Sie anschließend hier auf Quellen erneut prüfen. Bis dahin werden neue Anfragen dieser Quelle nicht eingelesen ({detail}).",
+        ScmProviderFailureKind.Authentication => $"GitHub-Anmeldung abgelaufen oder ungültig. Öffnen Sie Einstellungen → Plugins → GitHub. Erneuern Sie unter Authentifizierung den Personal Access Token und speichern Sie. Klicken Sie anschließend auf Quellen erneut prüfen bzw. beim Ereignis auf Erneut prüfen. Bis dahin werden neue Anfragen dieser Quelle nicht eingelesen ({detail}).",
         ScmProviderFailureKind.Permission => $"GitHub-Zugriffsberechtigung fehlt. Prüfen Sie unter Einstellungen → Plugins → GitHub → Authentifizierung den Personal Access Token: Er benötigt Zugriff auf das betroffene Repository sowie Lese- und Schreibrechte für Issues und Pull Requests. Speichern Sie Änderungen und klicken Sie anschließend auf Quellen erneut prüfen bzw. beim Ereignis auf Erneut prüfen ({detail}).",
         _ => $"GitHub-Anfrage fehlgeschlagen ({detail})."
     };

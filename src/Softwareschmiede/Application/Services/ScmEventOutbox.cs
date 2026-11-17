@@ -10,19 +10,34 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Bestätigt oder rekonstruiert Remoteaktionen unabhängig von der Promptzustellung.</summary>
 public sealed class ScmEventOutbox(SoftwareschmiededDbContext db, TimeProvider time)
 {
-    /// <summary>Persistiert eine Aktion vor dem ersten Remoteaufruf.</summary>
+    /// <summary>Persistiert eine Aktion vor dem ersten Remoteaufruf. Eine bereits belegte
+    /// Aktions-ID wird nur bei identischem Ereignis, Zweck und Inhalt wiederverwendet —
+    /// die deterministischen Host-IDs (receipt/waiting/attachments) sind dem Agenten
+    /// errechenbar, darum wird eine Kollision geworfen statt die fremde Aktion still
+    /// als eigene auszugeben.</summary>
     public async Task<ScmOutgoingAction> EnsureAsync(ScmIncomingEvent item, string purpose, ScmResponseRequest request, CancellationToken ct)
     {
         var id = Guid.Parse(request.ActionId);
+        var requestJson = JsonSerializer.Serialize(request, ScmEventStore.JsonOptions);
         var action = await db.ScmOutgoingActions.FindAsync([id], ct);
-        if (action is not null) return action;
+        if (action is not null)
+        {
+            // Für „waiting" existieren zwei definierte Host-Texte (Verzögerungshinweis aus
+            // ScmEventStore.EnqueueDelayComment und Wartehinweis) — dort genügt die Zweckgleichheit;
+            // alle anderen Zwecke haben einen eindeutigen Inhalt.
+            if (action.EventId != item.Id || action.Purpose != purpose
+                || (purpose != "waiting" && action.RequestJson != requestJson))
+                throw new ScmActionIdCollisionException(
+                    "Aktionskennung wurde bereits für eine andere Aktion verwendet; sie wurde nicht still wiederverwendet. Antwortkanal prüfen; kein automatischer Neuversand.");
+            return action;
+        }
         action = new ScmOutgoingAction
         {
             Id = id,
             EventId = item.Id,
             AttemptId = purpose.StartsWith("ai:", StringComparison.Ordinal) ? item.DeliveryAttemptId : null,
             Purpose = purpose,
-            RequestJson = JsonSerializer.Serialize(request, ScmEventStore.JsonOptions)
+            RequestJson = requestJson
         };
         db.Add(action);
         await db.SaveChangesAsync(ct);
@@ -73,3 +88,7 @@ public sealed class ScmEventOutbox(SoftwareschmiededDbContext db, TimeProvider t
         }
     }
 }
+
+/// <summary>Eine deterministische Aktions-ID ist bereits für ein anderes Ereignis,
+/// einen anderen Zweck oder einen anderen Inhalt belegt.</summary>
+public sealed class ScmActionIdCollisionException(string message) : Exception(message);

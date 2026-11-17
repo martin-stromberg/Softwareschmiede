@@ -64,7 +64,10 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             await scope.ServiceProvider.GetRequiredService<ScmBackmergeMonitoringService>().RunOnceAsync(ct);
         });
         OpenEventCommand = Command(OpenAsync, () => SelectedEvent is { IsFinal: false, IsBlocked: false, AttemptId: null });
-        RetryCommand = Command(ct => WithEventAsync((service, item) => service.RetryAsync(item.Id, ct), ct), () => SelectedEvent is { IsFinal: false });
+        // Eine nach „Verarbeitet" permanent gescheiterte Outbox-Aktion (z. B. Screenshot-Nachweis)
+        // darf bewusst erneut geprüft werden — andere Endzustände bleiben ohne Retry.
+        RetryCommand = Command(ct => WithEventAsync((service, item) => service.RetryAsync(item.Id, ct), ct),
+            () => SelectedEvent is { IsFinal: false } or { CanRetryProcessed: true });
         CheckStatusCommand = Command(ct => WithEventAsync((service, item) => service.DispatchAsync(item.Id, ct: ct), ct), () => SelectedEvent is { IsFinal: false, AttemptId: not null });
         CancelCommand = Command(CancelAsync, () => SelectedEvent is { IsFinal: false });
         ConfirmReadyCommand = Command(ct => WithEventAsync((service, item) => service.ConfirmReadyAsync(item.Id, item.CliRunId!, ct), ct),
@@ -171,18 +174,31 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             var records = await query.OrderBy(x => x.Sequence).ToListAsync(ct);
             var taskIds = records.Select(x => x.AufgabeId).Distinct().ToArray();
             var tasks = await db.Aufgaben.AsNoTracking().Where(x => taskIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
-            var entries = records.Select(item => ScmEventQueueItem.From(item, tasks.GetValueOrDefault(item.AufgabeId))).ToList();
+            // Nicht abgeschlossene Outbox-Aktionen markieren, damit „Erneut prüfen" auch an
+            // einem „Verarbeitet"-Ereignis mit gescheiterter Folgeaktion angeboten werden kann.
+            var eventIds = records.Select(x => x.Id).ToArray();
+            var openActionEvents = (await db.ScmOutgoingActions.AsNoTracking()
+                .Where(x => x.Status != "Succeeded" && eventIds.Contains(x.EventId))
+                .Select(x => x.EventId).Distinct().ToListAsync(ct)).ToHashSet();
+            var entries = records.Select(item => ScmEventQueueItem.From(item, tasks.GetValueOrDefault(item.AufgabeId),
+                openActionEvents.Contains(item.Id))).ToList();
             // "Keine Aufgabe zugeordnet" ist der erwartete Normalzustand enumerierter Referenzen ohne lokale
             // Aufgabe und weder eine Unterbrechung noch ein Fehler — nur echte Beobachtungsfehler alarmieren.
             var sourceErrors = await db.ScmObservationCheckpoints.AsNoTracking()
                 .Where(x => x.Diagnostic != null && x.Diagnostic != ScmEventStore.UnassignedDiagnostic).ToListAsync(ct);
             // Routine-Verwerfungsdiagnosen der Inbox bleiben sichtbar, gelten aber nicht als Unterbrechung.
             var alertErrors = sourceErrors.Where(x => !x.Diagnostic!.StartsWith(ScmEventStore.InboxDiscardDiagnosticPrefix, StringComparison.Ordinal)).ToList();
-            var actionErrors = await db.ScmOutgoingActions.AsNoTracking().Where(x => x.Error != null).ToListAsync(ct);
+            var actionErrors = await db.ScmOutgoingActions.AsNoTracking().Where(x => x.Error != null)
+                .Join(db.ScmIncomingEvents.AsNoTracking(), x => x.EventId, e => e.Id,
+                    (x, e) => new { x.Purpose, x.Status, x.Error, x.NextAttemptUtc, Event = e })
+                .ToListAsync(ct);
             var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct);
+            // Die heilsame Schaltfläche unterscheidet sich: Quellen-Fehler löst ausschließlich
+            // „Quellen erneut prüfen", eine gesperrte Outbox-Aktion (z. B. Screenshot-Nachweis)
+            // nur das ereignisbezogene „Erneut prüfen" am betroffenen Ereignis.
             var diagnostic = string.Join(Environment.NewLine,
-                sourceErrors.Select(x => $"Quelle {x.SourceKey}: {x.Diagnostic} ({NextCheck(x.NextAttemptUtc)})")
-                    .Concat(actionErrors.Select(x => $"{ActionLabel(x.Purpose)}: {x.Error} ({NextCheck(x.NextAttemptUtc)})")));
+                sourceErrors.Select(x => $"Quelle {x.SourceKey}: {x.Diagnostic} ({NextCheck(x.NextAttemptUtc, "Quellen erneut prüfen erforderlich")})")
+                    .Concat(actionErrors.Select(x => $"{ActionLabel(x.Purpose)} {ActionReference(x.Event)}: {x.Error} ({NextCheck(x.NextAttemptUtc, ActionRecoveryHint(x.Event.Status, x.Status))})")));
             _dispatch(() =>
             {
                 if (_disposed || SelectedFilter != filter) return;
@@ -280,12 +296,21 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
         using var scope = _scopes.CreateScope();
         ct.ThrowIfCancellationRequested();
         await action(scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>(), item);
-        var current = await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents
-            .AsNoTracking().SingleOrDefaultAsync(x => x.Id == item.Id, ct);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var current = await db.ScmIncomingEvents.AsNoTracking().SingleOrDefaultAsync(x => x.Id == item.Id, ct);
         if (current is not null)
-            Message = current.Status == item.Status
+        {
+            // Ergebnisrückmeldung für Folgeaktionen (z. B. Screenshot-Nachweis), deren
+            // Ausgang der Ereignisstatus „Verarbeitet" nicht abbildet.
+            var openActions = await db.ScmOutgoingActions.AsNoTracking()
+                .CountAsync(x => x.EventId == item.Id && x.Status != "Succeeded", ct);
+            Message = (current.Status == item.Status
                 ? "Prüfung abgeschlossen. Status unverändert: " + item.StatusText + "."
-                : "Prüfung abgeschlossen. Der Status wurde aktualisiert.";
+                : "Prüfung abgeschlossen. Der Status wurde aktualisiert.")
+                + (openActions == 0 && item.HasOpenActions ? " Die offenen Folgeaktionen wurden abgeschlossen."
+                    : openActions > 0 ? $" {(openActions == 1 ? "Eine Folgeaktion ist" : openActions + " Folgeaktionen sind")} weiterhin offen — Details unter „Integrationshinweise“."
+                    : string.Empty);
+        }
     }
 
     private async Task ResendAsync(CancellationToken ct)
@@ -310,8 +335,29 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             : "Das Ereignis ist bereits abgeschlossen und konnte nicht abgebrochen werden.";
     }
 
-    private static string ActionLabel(string purpose) => purpose == "receipt" ? "Empfangsbestätigung" : purpose == "waiting" ? "Wartehinweis" : "KI-Antwort";
-    private static string NextCheck(long? next) => next == long.MaxValue ? "Erneut prüfen erforderlich" : next is > 0 ? $"nächste Prüfung {DateTimeOffset.FromUnixTimeMilliseconds(next.Value).ToLocalTime():g}" : "Prüfung ausstehend";
+    private static string ActionLabel(string purpose) => purpose == "receipt" ? "Empfangsbestätigung" : purpose == "waiting" ? "Wartehinweis" : purpose == "attachments" ? "Screenshot-Nachweis" : "KI-Antwort";
+    /// <summary>Benennt das betroffene Ereignis knapp, damit es in der Liste gefunden wird.</summary>
+    private static string ActionReference(ScmIncomingEvent item)
+    {
+        var reference = ScmEventStore.Observation(item).Reference;
+        return $"({reference.Repository.Owner}/{reference.Repository.Name} {(reference.Kind == Domain.ValueObjects.ScmReferenceKind.Issue ? "Issue" : "Pull Request")} #{reference.Number})";
+    }
+    /// <summary>Formuliert die nächste Prüfung; ein Hard-Stop benennt die heilsame Schaltfläche.</summary>
+    private static string NextCheck(long? next, string hardStop) => next == long.MaxValue ? hardStop
+        : next is > 0 ? $"nächste Prüfung {DateTimeOffset.FromUnixTimeMilliseconds(next.Value).ToLocalTime():g}" : "Prüfung ausstehend";
+    /// <summary>Der Hard-Stop-Hinweis muss zum Ereignis- und Aktionsstatus passen: „Erneut prüfen"
+    /// ist nur an einem „Verarbeitet"-Ereignis mit offener Folgeaktion erreichbar — dafür muss das
+    /// Ereignis im passenden Filter gefunden werden. Eine „Uncertain"-Aktion wird bewusst nur
+    /// abgeglichen und niemals automatisch erneut gesendet. An „Abgebrochen" existiert keine
+    /// Wiederholung.</summary>
+    private static string ActionRecoveryHint(string eventStatus, string actionStatus) => actionStatus == "Uncertain"
+        ? "Ausgang ungewiss; auf GitHub prüfen, ob die Aktion bereits angekommen ist — kein automatischer Neuversand"
+        : eventStatus switch
+        {
+            "Abgebrochen" => "keine Wiederholung verfügbar",
+            "Verarbeitet" => "Ereignis im Filter „Verarbeitet“ oder „Alle“ öffnen und dort „Erneut prüfen“ wählen",
+            _ => "beim Ereignis „Erneut prüfen“ wählen",
+        };
     private void OnChanged() => _dispatch(RefreshInBackground);
     private void RefreshInBackground() { if (!_disposed) RefreshAsync(_lifetime.Token).SafeFireAndForget(_logger, "ScmEventQueue.Refresh"); }
 
@@ -328,12 +374,15 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
 /// <summary>Unveränderlicher Anzeigesnapshot; Identitäten für Bestätigungen werden nie nachträglich ausgetauscht.</summary>
 public sealed record ScmEventQueueItem(Guid Id, Guid TaskId, string TaskTitle, string Repository, string Reference,
     string Kind, string Received, string Status, string StatusText, string Body, string Origin, string? Reason,
-    string? CliRunId, Guid? AttemptId, bool IsBlocked)
+    string? CliRunId, Guid? AttemptId, bool IsBlocked, bool HasOpenActions)
 {
     /// <summary>Der aktuelle Attempt ist abgeschlossen.</summary>
     public bool IsProcessed => Status == "Verarbeitet";
     /// <summary>Verarbeitet und Abgebrochen sind die abschließenden Endstatus ohne weitere Verarbeitung.</summary>
     public bool IsFinal => Status is "Verarbeitet" or "Abgebrochen";
+    /// <summary>Mindestens eine Outbox-Aktion (z. B. Screenshot-Nachweis oder Wartehinweis) ist noch
+    /// nicht abgeschlossen; erst dann darf ein „Verarbeitet"-Ereignis bewusst erneut geprüft werden.</summary>
+    public bool CanRetryProcessed => IsProcessed && HasOpenActions;
     /// <summary>Nur nicht abgeschlossene Ereignisse können vom Anwender endgültig abgebrochen werden.</summary>
     public bool CanCancel => !IsFinal;
     /// <summary>Unsicherheit benötigt eine ausdrückliche Warnungsbestätigung.</summary>
@@ -341,7 +390,7 @@ public sealed record ScmEventQueueItem(Guid Id, Guid TaskId, string TaskTitle, s
     /// <summary>Nur ein als bestätigbar markierter, noch nicht zugestellter Wartegrund bietet die Bestätigung an.</summary>
     public bool CanConfirmReady => !IsBlocked && AttemptId is null && CliRunId is not null && ScmCliWaitReason.IsConfirmable(Reason);
     /// <summary>Erstellt die menschenlesbare Projektion aus dauerhaften Daten.</summary>
-    public static ScmEventQueueItem From(ScmIncomingEvent item, Aufgabe? task)
+    public static ScmEventQueueItem From(ScmIncomingEvent item, Aufgabe? task, bool hasOpenActions)
     {
         var observation = ScmEventStore.Observation(item);
         var blocked = task is null || task.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert || task.PausiertBisUtc > DateTimeOffset.UtcNow;
@@ -353,6 +402,6 @@ public sealed record ScmEventQueueItem(Guid Id, Guid TaskId, string TaskTitle, s
             observation.ContentKind switch { Domain.ValueObjects.ScmContentKind.Description => "Beschreibung", Domain.ValueObjects.ScmContentKind.ReviewComment => "Review-Kommentar", Domain.ValueObjects.ScmContentKind.PullRequestReview => "Review", _ => "Kommentar" },
             DateTimeOffset.FromUnixTimeMilliseconds(item.ReceivedUtc).ToLocalTime().ToString("g"), item.Status,
             item.Status switch { "ZustellungVorbereitet" => "Zustellung vorbereitet", "InBearbeitung" => "In Bearbeitung", "ZustellungUngewiss" => "Zustellung ungewiss", "VerarbeitungUngeklärt" => "Verarbeitung ungeklärt", _ => item.Status },
-            observation.Body, observation.Url, reason, item.CliRunId, item.DeliveryAttemptId, blocked);
+            observation.Body, observation.Url, reason, item.CliRunId, item.DeliveryAttemptId, blocked, hasOpenActions);
     }
 }
