@@ -46,23 +46,28 @@ public partial class End2EndTest
         WaitForElement(mainWindow, cf => cf.ByName("ScmTriggerKeyword"), Short);
         Assert.True(settings.IsUeberwachungsmodusEnabled());
         Assert.True(settings.IsTriggerKeywordBereichVisible());
+        Assert.True(settings.IsDelayKeywordBereichVisible());
         Assert.True(settings.IsPromptAnhaengeBereichVisible());
 
-        // Überwachungsmodus „Separates Konto" blendet nur das Trigger-Keyword aus.
+        // Überwachungsmodus „Separates Konto" blendet nur das Trigger-Keyword aus;
+        // das Verzögerungs-Keyword bleibt in beiden Kontomodi sichtbar.
         settings.SetKontoModus("Separates Konto");
         Assert.False(settings.IsTriggerKeywordBereichVisible());
+        Assert.True(settings.IsDelayKeywordBereichVisible());
         Assert.True(settings.IsPromptAnhaengeBereichVisible());
         settings.SetKontoModus("Benutzerkonto");
         Assert.True(settings.IsTriggerKeywordBereichVisible());
 
-        // Schalter aus → Überwachungsmodus deaktiviert, beide Bereiche unsichtbar.
+        // Schalter aus → Überwachungsmodus deaktiviert, alle Bereiche unsichtbar.
         settings.SetScmMonitoringEnabledChecked(false);
         Assert.False(settings.IsUeberwachungsmodusEnabled());
         Assert.False(settings.IsTriggerKeywordBereichVisible());
+        Assert.False(settings.IsDelayKeywordBereichVisible());
         Assert.False(settings.IsPromptAnhaengeBereichVisible());
         settings.SetScmMonitoringEnabledChecked(true);
         Assert.True(settings.IsUeberwachungsmodusEnabled());
         Assert.True(settings.IsTriggerKeywordBereichVisible());
+        Assert.True(settings.IsDelayKeywordBereichVisible());
         settings.CollapseAufgabenAusfuehren();
         Assert.Equal("aktiviert", settings.GetAufgabenAusfuehrenStatus());
 

@@ -18,6 +18,8 @@
 
 Schreibe das Trigger-Keyword (Standard `$Softwareschmiede`) in die Beschreibung, einen Kommentar oder Review-Text des verknüpften Issues oder Pull Requests. Ergänze die konkrete Bitte im selben Text.
 
+> **Hinweis:** Im selben Text kannst du mit dem Verzögerungs-Keyword (Standard `#verzögert`, einstellbar unter Einstellungen → Automatisierung → Aufgaben ausführen) eine zeitversetzte Ausführung anfordern — etwa `#verzögert 30min`, `#verzögert 4h`, `#verzögert 2t`, `#verzögert 1w` oder `#verzögert m1` für den 1. eines Monats (bereits erreichte Tage zählen für den Folgemonat), maximal 32 Tage. Das Ereignis erhält dann den Status **Verzögert**, die Aufgabe wird bis dahin pausiert und der Empfang auf GitHub kommentiert; der Wartezustand übersteht Neustarts und blockiert den Auto-Shutdown. Eine ungültige Angabe wird auf GitHub begründet zurückgewiesen und die Anfrage regulär verarbeitet.
+
 > **Hinweis:** Im Überwachungsmodus **„Separates Konto“** wird die Anfrage stattdessen ausgelöst, indem der Repository-Owner — oder ein Repository-Workflow über das GitHub-Actions-Konto — das separate Konto frei stehend als `@Kontoname` in der Beschreibung oder einem Kommentar erwähnt. Benachrichtigungen zu Repositories, die nicht an einem Projekt erfasst und aktiviert sind, werden verworfen — ihre Anzahl erscheint in den Integrationshinweisen der Ereignisübersicht.
 
 > **Hinweis:** Ein Kommentar, auf den dein Konto bereits reagiert hat — etwa mit der von der Anwendung gesetzten 👀-Reaktion oder einer manuell vergebenen Reaktion —, gilt als bereits bearbeitet. Auch ein späteres Bearbeiten dieses Kommentars löst keine neue Anfrage aus; schreibe stattdessen einen neuen Kommentar.

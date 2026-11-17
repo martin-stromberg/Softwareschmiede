@@ -60,6 +60,31 @@ public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
         (await _sut.GetScmTriggerKeywordAsync()).Should().Be("!Bearbeite");
     }
 
+    /// <summary>Ohne gespeicherten Eintrag gilt das Standard-Verzögerungs-Keyword <c>#verzögert</c>.</summary>
+    [Fact]
+    public async Task GetScmDelayKeywordAsync_WithoutEntry_DefaultsToVerzoegert()
+        => (await _sut.GetScmDelayKeywordAsync()).Should().Be(ScmDelayDirective.DefaultDelayKeyword);
+
+    /// <summary>Ungültige gespeicherte Werte (leer/Leerraum) fallen auf den Standard zurück.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task GetScmDelayKeywordAsync_InvalidStoredValue_FallsBackToDefault(string stored)
+    {
+        await _sut.SetSettingAsync(AppEinstellungService.ScmDelayKeywordKey, stored);
+
+        (await _sut.GetScmDelayKeywordAsync()).Should().Be(ScmDelayDirective.DefaultDelayKeyword);
+    }
+
+    /// <summary>Ein gespeichertes Verzögerungs-Keyword wird getrimmt zurückgegeben.</summary>
+    [Fact]
+    public async Task GetScmDelayKeywordAsync_StoredValue_ReturnsTrimmed()
+    {
+        await _sut.SetSettingAsync(AppEinstellungService.ScmDelayKeywordKey, "  #warte  ");
+
+        (await _sut.GetScmDelayKeywordAsync()).Should().Be("#warte");
+    }
+
     /// <summary>Ohne gespeicherte Einträge liefert die gebündelte Anhang-Abfrage eine leere Zuordnung.</summary>
     [Fact]
     public async Task GetScmPromptAppendicesAsync_WithoutEntries_ReturnsEmpty()
