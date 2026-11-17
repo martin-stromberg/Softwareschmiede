@@ -324,12 +324,27 @@ public sealed class ScmEventOrchestrator(
     /// Prüf- oder Remote-Schritte mehr. Gibt zurück, ob der Übergang ausgeführt wurde.</summary>
     public async Task<bool> CancelAsync(Guid eventId, CancellationToken ct = default)
     {
+        var prior = await db.ScmIncomingEvents.Where(x => x.Id == eventId)
+            .Select(x => new { x.Status, x.NextAttemptUtc, x.AufgabeId }).SingleOrDefaultAsync(ct);
         var changed = await db.ScmIncomingEvents
             .Where(x => x.Id == eventId && x.Status != "Verarbeitet" && x.Status != "Abgebrochen")
             .ExecuteUpdateAsync(x => x
                 .SetProperty(p => p.Status, "Abgebrochen")
                 .SetProperty(p => p.Reason, "Vom Anwender abgebrochen. Eine eventuell laufende CLI-Verarbeitung wird dadurch nicht beendet; es folgen keine weiteren Zustell- oder Prüfversuche.")
                 .SetProperty(p => p.NextAttemptUtc, (long?)null), ct);
+        // Eine von der Verzögerungsdirektive gesetzte Aufgabenpause wird auf das nächste
+        // verbleibende Direktiven-Ziel zurückgestuft bzw. aufgehoben, wenn sie noch unverändert
+        // auf dem Zielzeitpunkt des abgebrochenen Ereignisses steht; fremd gesetzte Pausen bleiben.
+        if (changed != 0 && prior?.Status == "Verzögert" && prior.NextAttemptUtc is long deferredUntilMs)
+        {
+            var deferredUntil = DateTimeOffset.FromUnixTimeMilliseconds(deferredUntilMs);
+            var nextMs = await db.ScmIncomingEvents
+                .Where(x => x.AufgabeId == prior.AufgabeId && x.Status == "Verzögert" && x.NextAttemptUtc != null)
+                .MaxAsync(x => x.NextAttemptUtc, ct);
+            var nextUntil = nextMs is long ms ? DateTimeOffset.FromUnixTimeMilliseconds(ms) : (DateTimeOffset?)null;
+            await db.Aufgaben.Where(a => a.Id == prior.AufgabeId && a.PausiertBisUtc == deferredUntil)
+                .ExecuteUpdateAsync(a => a.SetProperty(p => p.PausiertBisUtc, nextUntil), ct);
+        }
         if (changed != 0) notifier.Notify();
         return changed != 0;
     }

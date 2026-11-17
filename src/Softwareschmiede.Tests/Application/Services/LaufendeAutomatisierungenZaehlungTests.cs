@@ -5,6 +5,7 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
@@ -20,16 +21,25 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         List<Aufgabe> aufgaben,
         IRunningAutomationStatusSource statusSource,
         out ServiceProvider provider)
-        => ErstelleZaehlung(aufgaben, statusSource, out provider, out _);
+        => ErstelleZaehlung(aufgaben, statusSource, out provider, out _, out _);
 
     private static LaufendeAutomatisierungenZaehlung ErstelleZaehlung(
         List<Aufgabe> aufgaben,
         IRunningAutomationStatusSource statusSource,
         out ServiceProvider provider,
         out PromptZeitVersandService promptZeitVersandService)
+        => ErstelleZaehlung(aufgaben, statusSource, out provider, out promptZeitVersandService, out _);
+
+    private static LaufendeAutomatisierungenZaehlung ErstelleZaehlung(
+        List<Aufgabe> aufgaben,
+        IRunningAutomationStatusSource statusSource,
+        out ServiceProvider provider,
+        out PromptZeitVersandService promptZeitVersandService,
+        out SoftwareschmiededDbContext db)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAktiveAufgabenService>(_ => new FakeAktiveAufgabenService(aufgaben));
+        services.AddSingleton(db = TestDbContextFactory.Create());
         provider = services.BuildServiceProvider();
 
         var kiService = TestKiAusfuehrungsServiceFactory.Create();
@@ -196,6 +206,48 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         using var _ = provider;
 
         (await sut.ZaehleAsync()).Should().Be(1);
+    }
+
+    /// <summary>Ein verzögert ausstehendes SCM-Ereignis zählt als ausstehende
+    /// Automatisierung und blockiert damit den Auto-Shutdown-Countdown.</summary>
+    [Fact]
+    public async Task ZaehleAsync_ZaehltVerzoegertesScmEreignis()
+    {
+        var sut = ErstelleZaehlung([], new FakeStatusSource(), out var provider, out var promptService, out var db);
+        using var _ = provider;
+        using var prompt = promptService;
+        db.ScmIncomingEvents.Add(new ScmIncomingEvent
+        {
+            AufgabeId = Guid.NewGuid(),
+            EventKey = "verzoegert/1",
+            Status = "Verzögert",
+            NextAttemptUtc = DateTimeOffset.UtcNow.AddHours(2).ToUnixTimeMilliseconds()
+        });
+        await db.SaveChangesAsync();
+
+        (await sut.ZaehleAsync()).Should().Be(1);
+    }
+
+    /// <summary>Abgeschlossene oder abgebrochene SCM-Ereignisse zählen nicht.</summary>
+    [Theory]
+    [InlineData("Verarbeitet")]
+    [InlineData("Abgebrochen")]
+    [InlineData("Wartend")]
+    [InlineData("Aufgenommen")]
+    public async Task ZaehleAsync_ZaehltNicht_BeiNichtVerzoegertemEreignisstatus(string status)
+    {
+        var sut = ErstelleZaehlung([], new FakeStatusSource(), out var provider, out var promptService, out var db);
+        using var _ = provider;
+        using var prompt = promptService;
+        db.ScmIncomingEvents.Add(new ScmIncomingEvent
+        {
+            AufgabeId = Guid.NewGuid(),
+            EventKey = $"status/{status}",
+            Status = status
+        });
+        await db.SaveChangesAsync();
+
+        (await sut.ZaehleAsync()).Should().Be(0);
     }
 
     private sealed class FakeAktiveAufgabenService(List<Aufgabe> aufgaben) : IAktiveAufgabenService

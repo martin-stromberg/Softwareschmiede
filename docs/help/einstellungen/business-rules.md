@@ -182,12 +182,13 @@
 - Gezählt wird ausschließlich der klassifizierte Zustand `KiAusfuehrungsZustand.Laeuft` über die gemeinsame `KiAusfuehrungsStatusKlassifikation`
 - `Wartet` (z. B. auf Eingabe wartende Session), `Pausiert`, `PromptInWartestellung` und `Bereit` zählen nicht als laufend
 - Eine pausierte Aufgabe mit physikalisch noch laufendem CLI-Prozess zählt nicht (Pause überlagert Laeuft); ein physisch wartender Prozess im Zustand „Wartet" verhindert den Shutdown nicht
+- Zusätzlich zählt jedes SCM-Inbox-Ereignis im Status `Verzögert` (per Verzögerungs-Keyword zurückgestellte Zustellung) als eine ausstehende Automatisierung — ein ausstehender Delay-Timer blockiert den Countdown unabhängig vom Aufgabenzustand
 
 **Verhalten:**
 - Der Countdown startet erst, wenn die fachliche Anzahl auf 0 fällt — nicht beim Wegfall des letzten Prozess-Handles
 - Wartende oder pausierte Sessions werden beim OS-Shutdown mit beendet (bei „Herunterfahren erzwingen" zwangsweise)
 
-**Umsetzung:** `LaufendeAutomatisierungenZaehlung.ZaehleAsync` — wendet `KiAusfuehrungsStatusKlassifikation.Klassifiziere` auf die Kandidatenmenge von `IAktiveAufgabenService.GetAktiveAufgabenAsync` an (gleiche Semantik wie `MainWindowViewModel.LaufendeAutomatisierungenAnzahl` auf der Seitenleisten-Liste).
+**Umsetzung:** `LaufendeAutomatisierungenZaehlung.ZaehleAsync` — wendet `KiAusfuehrungsStatusKlassifikation.Klassifiziere` auf die Kandidatenmenge von `IAktiveAufgabenService.GetAktiveAufgabenAsync` an (gleiche Semantik wie `MainWindowViewModel.LaufendeAutomatisierungenAnzahl` auf der Seitenleisten-Liste) und addiert die Anzahl der `ScmIncomingEvents` mit Status `Verzögert`.
 
 ## Automatisches Herunterfahren — Countdown-Semantik
 

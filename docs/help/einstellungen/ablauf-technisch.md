@@ -200,7 +200,8 @@ Der `AutoShutdownOrchestrator` (Application-Layer, Singleton) überwacht die Anz
 1. `LaufendeAutomatisierungenZaehlung.ZaehleAsync` öffnet einen DI-Scope (`IServiceScopeFactory`) und lädt Kandidaten über `IAktiveAufgabenService.GetAktiveAufgabenAsync`.
 2. Pro Aufgabe wird ein `KiAusfuehrungsStatusDaten` aus `Aufgabe.Status`, `AusfuehrungsStatus`, `AktiveRunId`, `LastHeartbeatUtc`, `LaufStatus`, `PausiertBisUtc`, `IRunningAutomationStatusSource.GetLiveLaufStatus(id)` und `PromptZeitVersandService.GetScheduledPromptStatus(id)` befüllt.
 3. `KiAusfuehrungsStatusKlassifikation.Klassifiziere` (aus der App in den Application-Layer verschoben, `public`) liefert den `KiAusfuehrungsZustand`; gezählt wird ausschließlich `Laeuft`.
-4. `MainWindowViewModel` wendet dieselbe Klassifikation (über den `internal` Adapter in `AppConverters.cs`) auf die gemappte `AktiveAufgabenListe` an und setzt `LaufendeAutomatisierungenAnzahl` — identisches Ergebnis ohne zweite DB-Abfrage.
+4. Zusätzlich zählt der Dienst `ScmIncomingEvents` mit Status `Verzögert` (per Verzögerungs-Keyword zurückgestellte SCM-Ereignisse) als ausstehende Automatisierungen — ein laufender Delay-Timer blockiert den Shutdown-Countdown unabhängig von der Aufgabenkandidatenmenge.
+5. `MainWindowViewModel` wendet dieselbe Klassifikation (über den `internal` Adapter in `AppConverters.cs`) auf die gemappte `AktiveAufgabenListe` an und setzt `LaufendeAutomatisierungenAnzahl` — identisches Ergebnis ohne zweite DB-Abfrage.
 
 Beteiligte Komponenten:
 - `LaufendeAutomatisierungenZaehlung` / `ILaufendeAutomatisierungenZaehlung` — Zählservice

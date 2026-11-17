@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Data;
 
@@ -37,9 +38,11 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
     /// <param name="unassigned">Kennzeichnet, ob die Quelle keiner lokalen Aufgabe zugeordnet ist.</param>
     /// <param name="triggerKeyword">Das aktuell konfigurierte Trigger-Keyword für die
     /// Ereignisvalidierung; leere Werte fallen auf den Standard zurück.</param>
+    /// <param name="delayKeyword">Das aktuell konfigurierte Verzögerungs-Keyword für die
+    /// Direktivenauswertung; leere Werte fallen auf den Standard zurück.</param>
     /// <param name="ct">Abbruchtoken.</param>
     public async Task AcceptBatchAsync(Guid? aufgabeId, string sourceKey, ScmEventBatch batch,
-        bool unassigned = false, string? triggerKeyword = null, CancellationToken ct = default)
+        bool unassigned = false, string? triggerKeyword = null, string? delayKeyword = null, CancellationToken ct = default)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var checkpoint = await db.ScmObservationCheckpoints.FindAsync([sourceKey], ct);
@@ -76,13 +79,31 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
             snapshot.Diagnostic = rejection;
             if (rejection is not null || await db.ScmIncomingEvents.AnyAsync(x => x.EventKey == observation.EventKey, ct))
                 continue;
-            db.Add(new ScmIncomingEvent
+            var item = new ScmIncomingEvent
             {
                 AufgabeId = aufgabeId!.Value,
                 EventKey = observation.EventKey,
                 ObservationJson = JsonSerializer.Serialize(observation, JsonOptions),
                 ReceivedUtc = time.GetUtcNow().ToUnixTimeMilliseconds()
-            });
+            };
+            var delay = ScmDelayDirective.Parse(observation.Body, delayKeyword, time.GetLocalNow());
+            if (delay.Kind is ScmDelayDirective.ResultKind.Deferred)
+            {
+                // Die Zustellung ruht persistiert bis zum Zielzeitpunkt; der Empfangskommentar
+                // wird über die Outbox beim nächsten Poll versendet, ohne die Zustellung auszulösen.
+                item.Status = "Verzögert";
+                item.NextAttemptUtc = delay.TargetUtc.ToUnixTimeMilliseconds();
+                item.Reason = $"Verzögerte Ausführung bis {delay.TargetUtc.ToLocalTime():g} ('{delay.Argument}').";
+                EnqueueDelayComment(item, observation,
+                    $"Die Anfrage wurde empfangen und wird verzögert bis {delay.TargetUtc.ToLocalTime():g} verarbeitet.");
+                await PauseForDelayAsync(aufgabeId.Value, delay.TargetUtc, ct);
+            }
+            else if (delay.Kind is ScmDelayDirective.ResultKind.Invalid)
+            {
+                EnqueueDelayComment(item, observation,
+                    $"Die Verzögerungsangabe wurde ignoriert: {delay.Reason} Die Anfrage wird regulär verarbeitet.");
+            }
+            db.Add(item);
             visibleChange = true;
         }
         checkpoint.WatermarkUtc = batch.Request.WatermarkUtc.ToUnixTimeMilliseconds();
@@ -95,6 +116,41 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         if (visibleChange || checkpoint.Diagnostic is not null) notifier.Notify();
+    }
+
+    /// <summary>Legt den Empfangskommentar einer verzögerten oder verworfenen Direktive als
+    /// wartende Hostaktion an. Die deterministische Aktions-ID verhindert doppelte Kommentare.</summary>
+    private void EnqueueDelayComment(ScmIncomingEvent item, ScmEventObservation observation, string body)
+    {
+        var actionId = ActionId(item.Id, "waiting");
+        db.Add(new ScmOutgoingAction
+        {
+            Id = actionId,
+            EventId = item.Id,
+            Purpose = "waiting",
+            RequestJson = JsonSerializer.Serialize(new ScmResponseRequest(observation.Reference,
+                actionId.ToString("D"), ScmResponseKind.Comment,
+                Body: $"{body}\n<!-- softwareschmiede:event:{item.Id:D}:waiting -->"), JsonOptions)
+        });
+    }
+
+    /// <summary>Pausiert die Aufgabe bis zum Direktiven-Zielzeitpunkt (Semantik von
+    /// <see cref="AufgabeService.SetPauseAsync"/>: nur startbare Stati, niemals verkürzend).</summary>
+    private async Task PauseForDelayAsync(Guid aufgabeId, DateTimeOffset untilUtc, CancellationToken ct)
+    {
+        var task = await db.Aufgaben.FindAsync([aufgabeId], ct);
+        if (task is null || task.Status is not (AufgabeStatus.Neu or AufgabeStatus.Gestartet or AufgabeStatus.Wartend)
+            || task.PausiertBisUtc >= untilUtc)
+            return;
+        task.PausiertBisUtc = untilUtc;
+        db.Protokolleintraege.Add(new Protokolleintrag
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabeId,
+            Typ = ProtokollTyp.SystemMeldung,
+            Inhalt = $"Aufgabe pausiert bis {untilUtc:O} (verzögerte SCM-Ausführung).",
+            Zeitstempel = time.GetUtcNow()
+        });
     }
 
     /// <summary>Beansprucht eine Aufgabe atomar für einen Prozess.</summary>

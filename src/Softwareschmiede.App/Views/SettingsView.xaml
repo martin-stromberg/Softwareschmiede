@@ -414,6 +414,21 @@
                                            TextWrapping="Wrap"
                                            Margin="0,4,0,0" />
                             </StackPanel>
+                            <StackPanel AutomationProperties.Name="DelayKeywordBereich"
+                                        Visibility="{Binding IsDelayKeywordSichtbar, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="Verzögerungs-Keyword"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,12,0,4" />
+                                <TextBox Text="{Binding ScmDelayKeyword, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="ScmDelayKeyword"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                                <TextBlock Text="Schlüsselwort, mit dem ein SCM-Ereignis eine verzögerte Ausführung anfordert — im selben Text wie der Trigger, gefolgt von der Angabe: 30min, 4h, 2t/2d, 1w oder m&lt;Tag&gt; für den Kalendertag im Monat (z. B. m1). Maximal 32 Tage; der Wartezustand übersteht Neustart und blockiert den Auto-Shutdown. Leer lassen ist nicht zulässig; Standard: #verzögert."
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,4,0,0" />
+                            </StackPanel>
                             <StackPanel AutomationProperties.Name="PromptAnhaengeBereich"
                                         Visibility="{Binding IsPromptAnhaengeSichtbar, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <TextBlock Text="Prompt-Anhänge"
