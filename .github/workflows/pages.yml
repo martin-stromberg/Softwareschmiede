@@ -1,0 +1,76 @@
+name: Deploy GitHub Pages
+
+# Deploys the static project site from site/ to GitHub Pages
+# (https://martin-stromberg.github.io/Softwareschmiede/). Triggers only on pushes to main
+# that touch the site sources or this workflow - consistent with the staging model, the
+# public site always reflects the main branch. One-time activation of Pages (source
+# "GitHub Actions") in the repository settings is a documented operational step, see
+# docs/CI_CD.md section "GitHub Pages".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Serializes deployments like release.yml's concurrency guard - two overlapping runs must
+# not race on the same Pages deployment.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Verify site artifacts
+        # Guard analogous to "Verify publish output" in .github/actions/build-and-package:
+        # fail with a clear message before an empty or broken deployment is uploaded.
+        run: |
+          missing=0
+          for artifact in site/index.html site/assets/favicon-hammer-pick.svg site/assets/css/site.css site/assets/Softwareschmiede.ico; do
+            if [ ! -f "$artifact" ]; then
+              echo "::error::Required site artifact '$artifact' is missing."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          echo "All required site artifacts are present."
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    # Fail-closed: a manual workflow_dispatch on a non-main ref must not publish that
+    # ref's site/ state - the public site always reflects main.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

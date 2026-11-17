@@ -46,3 +46,4 @@ Eigenschaften und Präsentation der Softwareschmiede Desktopanwendung.
 Interne Infrastruktur für Tests und Produktentwicklung. Diese Dokumentation ist für Entwickler bestimmt, nicht für Anwender.
 
 - [E2E-Test-Infrastruktur](e2e-test-infrastruktur/index.md) — View-Pattern für wartbare UI-Automatisierung. Strukturierte Klassenhierarchie mit `BaseWindowView` abstrahiert wiederholte FlaUI-Interaktionsmuster und ermöglicht automatische Erkennung der aktuellen Anwendungsansicht anhand charakteristischer UI-Marker.
+- [Projektseite (GitHub Pages)](projektseite/index.md) — Öffentliche, statische Landing-Page der Softwareschmiede unter `https://martin-stromberg.github.io/Softwareschmiede/`, ausgeliefert aus dem Quellordner `site/` über den Deploy-Workflow `pages.yml` vom `main`-Stand.

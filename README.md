@@ -4,6 +4,7 @@
 
 [![Pre-Release](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/staging-ci.yml/badge.svg)](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/staging-ci.yml)
 [![Release](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/release.yml/badge.svg)](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/release.yml)
+[![Projektseite](https://img.shields.io/badge/Projektseite-martin--stromberg.github.io%2FSoftwareschmiede-blue)](https://martin-stromberg.github.io/Softwareschmiede/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows und KI-CLI-Ausführung in einer nativen WPF-Anwendung. Die Oberfläche läuft lokal unter Windows, speichert Arbeitsdaten in SQLite und lädt SCM-, KI- und IDE-Plugins zur Laufzeit aus dem `plugins/`-Verzeichnis.
@@ -303,6 +304,7 @@ Die Konfigurationsbasis liegt in `src/Softwareschmiede/appsettings*.json`. Im ak
 ├── plugins/                               # Plugin-Projekte
 ├── docs/                                  # Feature-, Hilfe- und CI/CD-Dokumentation
 ├── scripts/                               # Build-/Release-Hilfsskripte
+├── site/                                  # Quellen der öffentlichen GitHub-Pages-Projektseite
 └── Softwareschmiede.slnx
 ```
 
@@ -336,6 +338,7 @@ Die Repository-Automation ist branchbasiert aufgebaut:
 - **`release.yml`** erstellt auf `main`-Pushes oder `v*.*.*`-Tags GitHub-Releases.
 - **`sync-staging-with-main.yml`** erstellt nach einem Release einen automatischen Backmerge-PR von `main` nach `staging`.
 - **`security-scan.yml`** führt zusätzlich einen geplanten Dependency-Sicherheitscheck aus.
+- **`pages.yml`** stellt die statische Projektseite aus `site/` über GitHub Pages unter [martin-stromberg.github.io/Softwareschmiede](https://martin-stromberg.github.io/Softwareschmiede/) bereit — ausgelöst durch Pushes auf `main` mit Änderungen unter `site/` sowie manuell per `workflow_dispatch`.
 - **`review-architecture-security.yml`**, **`review-nuget-packages.yml`** und **`review-compliance.yml`** legen zeitgesteuert Issues mit `@softwarewerkstatt`-Erwähnung an — monatlich am 1. Tag des Monats (Architektur- und Sicherheitsreview), wöchentlich montags (NuGet-Paketprüfung) und jährlich am 1. Januar (Compliance- und Copyright-Review). Eine labelbasierte Duplikatprüfung verhindert parallele offene Issues desselben Prüftyps; die Issues entstehen unter der Owner-Identität via `REVIEW_ISSUE_TOKEN` (verbindlicher Workflow-Bestandteil; die SCM-Ereignisüberwachung würde inzwischen auch das `github-actions`-Konto als Autor akzeptieren).
 - **`create-review-issue.yml`** enthält die gemeinsame Logik der drei Review-Workflows (`workflow_call`): Secret-Guard, Label-Erzeugung, Duplikatprüfung und Issue-Erzeugung.
 
