@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Softwareschmiede – KI-gestützter Softwareentwicklungs-Workflow für Windows</title>
+  <meta name="description" content="Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows und die Ausführung von KI-Agenten in einer lokalen Windows-Desktopanwendung.">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon-hammer-pick.svg">
+  <link rel="icon" type="image/x-icon" href="assets/Softwareschmiede.ico">
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="./">
+        <img src="assets/favicon-hammer-pick.svg" alt="" width="28" height="28">
+        Softwareschmiede
+      </a>
+      <nav class="site-nav" aria-label="Hauptnavigation">
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#screenshots">Screenshots</a></li>
+          <li><a href="#download">Download</a></li>
+          <li><a href="#dokumentation">Dokumentation</a></li>
+          <li><a href="https://github.com/martin-stromberg/Softwareschmiede">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+
+    <section class="hero">
+      <div class="container">
+        <h1>Softwareschmiede</h1>
+        <p class="tagline">KI-gestützter Softwareentwicklungs-Workflow als lokale Windows-Desktopanwendung.</p>
+        <p class="description">
+          Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows und
+          die Ausführung von KI-Agenten in einer lokalen Windows-Desktopanwendung. Die
+          Anwendung läuft vollständig auf dem eigenen Rechner und lässt sich über Plugins
+          an die eigenen Werkzeuge und Dienste anpassen.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://github.com/martin-stromberg/Softwareschmiede/releases/latest">Neueste Version herunterladen</a>
+          <a class="button" href="https://github.com/martin-stromberg/Softwareschmiede">Repository auf GitHub</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <h2>Features</h2>
+        <p class="section-intro">
+          Die wichtigsten Funktionen im Überblick – vom Aufgaben-Workflow bis zum eingebetteten Terminal.
+        </p>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3>Projekt- und Aufgabenverwaltung</h3>
+            <p>Projekte fassen Git-Repositories und Aufgaben zusammen. Kompakte Aufgabenliste mit umschaltbaren Anzeigemodi, To-Do-Listen, Protokollierung und pausierbaren Aufgaben.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Anbindung von GitHub, BitBucket und lokalen Ordnern</h3>
+            <p>Projekte werden per Plugin direkt mit GitHub-, BitBucket- oder lokalen Git-Repositories verbunden — die Einrichtung übernimmt die Anwendung, auch wenn das Repository mit einer SSH-Adresse verknüpft ist.</p>
+          </article>
+          <article class="feature-card">
+            <h3>KI-Agenten im eingebetteten Terminal</h3>
+            <p>Claude CLI, GitHub Copilot, Codex und Devin laufen interaktiv in einem eingebetteten Terminal direkt in der Aufgabendetailansicht.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Pull-Request-Workflow</h3>
+            <p>PR-Erstellung, Statusanzeige und Review-Integration direkt aus der Aufgabe heraus – vom ersten Prompt bis zum fertigen Pull Request.</p>
+          </article>
+          <article class="feature-card">
+            <h3>GitHub-Ereignisüberwachung</h3>
+            <p>Issues und Pull Requests aktivierter Repositories werden überwacht – repository-weit mit Trigger-Keyword oder über die Notifications-Inbox eines separaten Bot-Kontos – und steuern automatisch Aufgaben an.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Programmupdate aus der Anwendung</h3>
+            <p>Update-Prüfung und -Installation gegen GitHub-Releases mit konfigurierbarem Update-Modus, getrennten Kanälen für stabile Versionen und Release-Kandidaten sowie SHA-256-verifiziertem Paket.</p>
+          </article>
+          <article class="feature-card">
+            <h3>IDE- und Dateisystem-Integration</h3>
+            <p>Visual Studio für <code>.sln</code>/<code>.slnx</code> und Visual Studio Code als Fallback, Dateiexplorer und Diff-Ansicht direkt in der Aufgabendetailansicht.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Zeitgesteuerte Prompts &amp; Automatisierung</h3>
+            <p>Geplante Prompts bleiben auch über Neustarts erhalten und werden zum Zielzeitpunkt zugestellt – mit automatischer Abschlussüberwachung und optionalem Herunterfahren nach Abschluss aller laufenden Automatisierungen.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="screenshots">
+      <div class="container">
+        <h2>Screenshots</h2>
+        <p class="section-intro">
+          Ein Blick in die Anwendung – Dashboard, Projektverwaltung, eingebettetes Terminal und SCM-Ereignisse (jeweils im dunklen Design).
+        </p>
+        <div class="screenshot-grid">
+          <figure>
+            <img src="assets/screenshots/dashboard-dunkel.png" alt="Dashboard der Softwareschmiede mit Kennzahlen und aktiven Aufgaben im dunklen Design" loading="lazy">
+            <figcaption>Dashboard mit aktiven Aufgaben</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/screenshots/projektuebersicht-dunkel.png" alt="Projektübersicht der Softwareschmiede mit Projekt-Kacheln im dunklen Design" loading="lazy">
+            <figcaption>Projektübersicht</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/screenshots/projektansicht-dunkel.png" alt="Projektansicht der Softwareschmiede mit Aufgabenliste im dunklen Design" loading="lazy">
+            <figcaption>Projektansicht mit Aufgaben</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/screenshots/aufgabendetail-terminal-dunkel.png" alt="Aufgabendetailansicht mit eingebettetem Terminal im dunklen Design" loading="lazy">
+            <figcaption>Aufgabendetail mit eingebettetem Terminal</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/screenshots/scm-ereignisse-dunkel.png" alt="SCM-Ereignisse der Softwareschmiede mit eingehenden Aufgaben im dunklen Design" loading="lazy">
+            <figcaption>SCM-Ereignisse (Eingangskorb für Aufgaben)</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/screenshots/einstellungen-dunkel.png" alt="Einstellungen der Softwareschmiede im dunklen Design" loading="lazy">
+            <figcaption>Einstellungen</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="download">
+      <div class="container">
+        <h2>Download</h2>
+        <p class="section-intro">
+          Die Softwareschmiede wird über GitHub Releases ausgeliefert. Das aktuelle Release
+          enthält das fertig paketierte Archiv <code>release.zip</code> für Windows. Die
+          Anwendung aktualisiert sich auf Wunsch selbstständig über denselben Mechanismus.
+        </p>
+        <div class="link-cards">
+          <a class="link-card" href="https://github.com/martin-stromberg/Softwareschmiede/releases/latest">
+            <h3>Aktuelles Release</h3>
+            <p>Neueste stabile Version inklusive <code>release.zip</code>-Download auf GitHub Releases.</p>
+          </a>
+          <a class="link-card" href="https://github.com/martin-stromberg/Softwareschmiede/releases">
+            <h3>Alle Releases</h3>
+            <p>Versionshistorie, Release Notes und Vorabversionen (Release-Kandidaten).</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="dokumentation">
+      <div class="container">
+        <h2>Dokumentation &amp; Repository</h2>
+        <p class="section-intro">
+          Ausführliche Informationen zur Installation, zu den Plugins und zu allen
+          Funktionsbereichen finden sich im Repository.
+        </p>
+        <div class="link-cards">
+          <a class="link-card" href="https://github.com/martin-stromberg/Softwareschmiede">
+            <h3>GitHub-Repository</h3>
+            <p>Quellcode, Issues, Pull Requests und Projektverwaltung der Softwareschmiede.</p>
+          </a>
+          <a class="link-card" href="https://github.com/martin-stromberg/Softwareschmiede/blob/main/README.md">
+            <h3>README</h3>
+            <p>Überblick über Kernfunktionen, Terminalintegration, Programmupdate und Ereignisüberwachung.</p>
+          </a>
+          <a class="link-card" href="https://github.com/martin-stromberg/Softwareschmiede/blob/main/docs/help/index.md">
+            <h3>Anwenderdokumentation</h3>
+            <p>Strukturierte Hilfe zu Aufgaben, Projekten, Terminal, Plugins, Einstellungen und mehr.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <nav aria-label="Fußzeile">
+        <ul>
+          <li><a href="https://github.com/martin-stromberg/Softwareschmiede/blob/main/LICENSE">MIT-Lizenz</a></li>
+          <li><a href="https://github.com/martin-stromberg/Softwareschmiede/blob/main/SECURITY.md">Sicherheit (SECURITY.md)</a></li>
+          <li><a href="https://github.com/martin-stromberg/Softwareschmiede/blob/main/THIRD_PARTY_LICENSES.md">Drittanbieter-Lizenzen</a></li>
+          <li><a href="https://github.com/martin-stromberg/Softwareschmiede">GitHub-Repository</a></li>
+        </ul>
+      </nav>
+      <p>Softwareschmiede – KI-gestützter Softwareentwicklungs-Workflow als lokale Windows-Desktopanwendung. Lizenziert unter der MIT-Lizenz.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -15,24 +15,24 @@ Beide Jobs bauen und veröffentlichen dieselbe Anwendung, unterscheiden sich abe
 
 ### Test-Workflow
 
-Der separate Workflow `.github/workflows/test.yml` laeuft fuer Pull Requests nach `main` und fuer Pushes auf `main`. Er baut `src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj` auf `windows-latest` und trennt die Testauswertung:
+Die Testauswertung ist auf `.github/workflows/staging-ci.yml` („Pre-Release", Pushes auf `staging`), `.github/workflows/pr-staging-ci.yml` („PR CI for Staging", Pull Requests nach `staging`) und — als Release-Gate — `.github/workflows/release.yml` verteilt. Alle bauen `src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj` und `src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj` auf `windows-latest` und trennen die Testauswertung:
 
-- `Test regular` ist blockierend und fuehrt `Category!=OsInterface` aus.
-- `Test OS interfaces` fuehrt `Category=OsInterface` best-effort mit `continue-on-error: true` aus.
-- TRX-Dateien werden getrennt als `test-results-regular` und `test-results-os-interface` hochgeladen.
+- `Test regular` ist blockierend und fuehrt `Category!=OsInterface` aus (in `staging-ci.yml`/`pr-staging-ci.yml` inklusive Coverage-Schwelle von 70 % Zeilenabdeckung).
+- `Test OS interfaces` fuehrt `Category=OsInterface` best-effort als eigenen Job mit `continue-on-error: true` aus.
+- TRX-Dateien werden getrennt hochgeladen (`test-results-staging` bzw. `test-results-os-interface-staging`; in `pr-staging-ci.yml` `test-results-pr` bzw. `test-results-os-interface-pr`, im Release-Gate `test-results-release`).
 
 Die Trennung ersetzt den frueheren Ausschluss ueber `Category!=E2E&Category!=ConPTY`. E2E- und ConPTY-Tests behalten diese Kategorien, tragen aber zusaetzlich `OsInterface`.
 
 ### Staging-PR-Workflow
 
-Der Workflow `.github/workflows/pr.yml` laeuft fuer Pull Requests nach `staging` und zeigt fuer regulaere Feature-PRs einen gemeinsamen Job `validate & test`. Dieser Job fuehrt zuerst die Qualitaetspruefungen aus und startet die Tests erst danach:
+Der Workflow `.github/workflows/pr-staging-ci.yml` laeuft fuer Pull Requests nach `staging` und zeigt fuer regulaere Feature-PRs die parallel laufenden Jobs `static checks` und `build & test` — die Qualitaetspruefungen sind bewusst vom Testjob getrennt, damit Format-/Scan-/Analyse-Fehler sofort sichtbar werden statt erst nach dem Testlauf:
 
-- `Lint and format check` prueft `dotnet format Softwareschmiede.slnx --verify-no-changes --no-restore`.
-- `Security dependency scan` prueft verwundbare NuGet-Pakete inklusive transitiver Abhaengigkeiten und laedt das Scan-Log als `vulnerable-packages-pr` hoch.
-- `Static code analysis` baut die Solution mit `TreatWarningsAsErrors=true`.
-- Danach laufen die regulaeren Tests blockierend mit `Category!=OsInterface`; `Category=OsInterface` laeuft weiterhin best-effort mit `continue-on-error: true`.
+- `Format check` prueft `dotnet format Softwareschmiede.slnx --verify-no-changes --no-restore`.
+- `Security scan` prueft verwundbare NuGet-Pakete inklusive transitiver Abhaengigkeiten und laedt das Scan-Log als `vulnerable-packages-pr` hoch.
+- `Static analysis` baut die Solution mit `TreatWarningsAsErrors=true`.
+- Parallel dazu laufen die regulaeren Tests blockierend mit `Category!=OsInterface` (inkl. Coverage-Schwelle); `Category=OsInterface` laeuft weiterhin best-effort mit `continue-on-error: true` im eigenen Job `os-interface tests`.
 
-Pull Requests von `main` nach `staging` werden weiterhin ueber `back-merge-skip` erkannt; der kombinierte Validierungs-/Testjob wird fuer diesen Sonderfall uebersprungen.
+Pull Requests von `main` nach `staging` werden weiterhin ueber `detect-backmerge`/`back-merge-skip` erkannt; die Validierungs- und Testjobs werden fuer diesen Sonderfall uebersprungen.
 
 ### Job `release` (Push auf `main`)
 
@@ -51,12 +51,12 @@ Pull Requests von `main` nach `staging` werden weiterhin ueber `back-merge-skip`
 |---|------|-------|
 | 1 | `Checkout` (`fetch-depth: 0`) | Lädt das Repository auf dem Stand des gepushten Tags. |
 | 2 | `Build and package` (Composite Action `.github/actions/build-and-package`) | Identisch zum `release`-Job (kein Node/Semantic-Release-Setup nötig, da die Version durch den Tag bereits feststeht). |
-| 3 | `Create GitHub Release for manual tag` (`softprops/action-gh-release`, auf Commit-SHA gepinnt) | Erstellt direkt ein GitHub-Release für den gepushten Tag (`tag_name`/`name` = Tagname), generiert Release Notes automatisch (`generate_release_notes: true`) und lädt `release.zip` als Asset hoch — unabhängig von Commit-Typen, ohne Semantic-Release-Versionsberechnung. |
+| 3 | `Create manual-tag GitHub release` (`gh release create`) | Erstellt direkt ein GitHub-Release für den gepushten Tag (`--title` = Tagname), generiert Release Notes automatisch (`--generate-notes`) und lädt `release.zip` und `update.json` als Assets hoch — unabhängig von Commit-Typen, ohne Semantic-Release-Versionsberechnung. |
 
 ## Nebenläufigkeit und Supply-Chain-Absicherung
 
 - **Concurrency-Guard:** Der Workflow definiert `concurrency: { group: release, cancel-in-progress: false }`. Dadurch werden parallele Release-Laeufe serialisiert statt gleichzeitig ausgeführt — verhindert Wettlaufsituationen bei der berechneten Version sowie der Tag-/Release-Erstellung.
-- **Action-Pinning:** `softprops/action-gh-release` laeuft mit `permissions: contents: write` und wird daher auf einen festen Commit-SHA statt auf einen beweglichen Versions-Tag gepinnt (Kommentar im Workflow zeigt die zugehörige Version). Damit kann ein nachträglich umgebogener Tag keinen unbemerkten Code mit Schreibrechten auf das Repository ausführen. Der automatische `main`-Release nutzt die auf GitHub-hosted Runnern vorhandene `gh`-CLI statt einer externen Release-Action.
+- **Keine externe Release-Action:** Tag- und Release-Erstellung sowie Asset-Uploads laufen ueber die auf GitHub-hosted Runnern vorhandene `gh`-CLI (`gh release create`/`gh release upload`) bzw. — im automatischen Pfad — ueber `@semantic-release/github` aus den per `package-lock.json` fixierten npm-Dependencies. Es wird keine externe Release-Action mit `contents: write`-Rechten referenziert; eine Absicherung gegen nachtraeglich umgebogene Action-Tags ist damit an dieser Stelle nicht erforderlich.
 - **Publish-Guard:** Die Composite Action `build-and-package` prüft nach `dotnet publish`, ob `publish/Softwareschmiede.exe` sowie mindestens eine Plugin-DLL unter `publish/plugins/` vorhanden sind, und bricht den Workflow andernfalls kontrolliert ab — verhindert, dass ein leeres oder unvollständiges `release.zip` unbemerkt als GitHub-Release-Asset veröffentlicht wird.
 - **Rename für Release-Artefakt:** Der lokale Dev-/Test-Build erzeugt `Softwareschmiede.App.exe` (Projekt-`AssemblyName`); die Composite Action benennt die veröffentlichte Kopie direkt nach `dotnet publish` in `Softwareschmiede.exe` um. Damit der in Windows angezeigte Prozess-/Anwendungsname (u. a. `FileDescription`) ebenfalls `Softwareschmiede` lautet und nicht `Softwareschmiede.App`, setzt das App-Projekt die Versionsmetadaten `AssemblyTitle`/`Product`/`Company` nur bei übergebenem `ReleaseTag` auf `Softwareschmiede` — `AssemblyName` bleibt unverändert, da `Softwareschmiede.dll` bereits die Domain-Assembly ist und Identität/Referenzen des Managed-Assembly erhalten bleiben müssen. Grund: Diese Anwendung wird mit sich selbst weiterentwickelt — eine installierte Release-Kopie hostet oft die laufende Claude-Code-Session. Teilten sich Dev-Build und Release denselben Prozessnamen, könnte Tooling, das Build-Locks oder verwaiste Testprozesse anhand des Namens auflöst, versehentlich die Release-/Host-Instanz statt einer Testinstanz treffen (siehe `CLAUDE.md`, Abschnitt „Self-Hosting-Risiko").
 
@@ -100,6 +100,25 @@ Eine `concurrency`-Gruppe je Workflow mit `cancel-in-progress: false` serialisie
 3. **Collaborator-Status prüfen:** `@softwarewerkstatt` muss Collaborator mit Schreibrecht auf dem Repository sein, damit GitHub die Mention-Benachrichtigung zustellt (Betriebsvoraussetzung des SeparatesKonto-Modus, siehe `docs/help/plugins/github-ereignisse/installation.md`).
 4. **Probelauf:** Nach der Promotion nach `main` je Workflow einen `workflow_dispatch`-Lauf ausführen und prüfen, dass das Issue unter Autor `martin-stromberg` mit Typlabel und korrektem Body entsteht; ein zweiter Lauf muss „Skipped: an open review issue already exists" melden. Danach den Ereigniseingang in der SCM-Ereignisübersicht der Anwendung beobachten.
 
+## GitHub Pages
+
+Der Workflow `.github/workflows/pages.yml` („Deploy GitHub Pages") stellt die statische Projektseite aus dem Quellordner `site/` unter `https://martin-stromberg.github.io/Softwareschmiede/` bereit. Die Seite ist reines HTML/CSS ohne JavaScript und ohne Static-Site-Generator, deutschsprachig und folgt der Hell-/Dunkel-Einstellung des Systems (`prefers-color-scheme`; die Farbwerte stammen aus `src/Softwareschmiede.App/Themes/LightTheme.xaml`/`DarkTheme.xaml`).
+
+- **Trigger:** `push` auf `main` mit `paths`-Filter auf `site/**` und die Workflow-Datei — ein `main`-Push ohne Seitenänderung löst kein Deployment aus. Zusätzlich `workflow_dispatch` für eine manuelle Auslieferung ohne Code-Push (steht wie alle `workflow_dispatch`-Trigger erst zur Verfügung, sobald die Workflow-Datei auf `main` liegt). Der `deploy`-Job ist über `if: github.ref == 'refs/heads/main'` fail-closed abgesichert — ein manueller Dispatch auf einem Nicht-`main`-Ref baut das Artifact zwar, liefert aber nichts auf die öffentliche Seite aus.
+- **Deployment im Staging-Modell:** Seitenänderungen gehen wie jede andere Änderung über Feature-Branch → `staging` → Promotion-PR → manuellen Merge auf `main`; deployt wird ausschließlich der `main`-Stand — keine Deployments von Feature-Branches oder `staging` und keine Branch-Previews.
+- **Job `build`:** `actions/checkout` → Guard-Schritt, der `site/index.html`, `site/assets/favicon-hammer-pick.svg`, `site/assets/css/site.css` und `site/assets/Softwareschmiede.ico` auf Vorhandensein prüft und bei fehlenden Artefakten mit klarer Meldung abbricht (analog „Verify publish output" in `build-and-package`) → `actions/configure-pages` → `actions/upload-pages-artifact` mit `path: site`. Der Artifact-Upload umgeht Jekyll — weder `_config.yml` noch `.nojekyll` sind erforderlich.
+- **Job `deploy`:** `needs: build`, Umgebung `github-pages` (liefert den `url`-Output und die Deployment-Historie; wird beim ersten Lauf automatisch angelegt), `actions/deploy-pages`.
+- **Permissions:** `contents: read`, `pages: write`, `id-token: write` (Deploy-Berechtigung für `deploy-pages`).
+- **Concurrency:** `group: pages`, `cancel-in-progress: false` — Deployments werden serialisiert (Muster aus `release.yml`).
+
+Inhalte und Assets werden direkt unter `site/` gepflegt: Seiteninhalte in `site/index.html`, Styling in `site/assets/css/site.css`, Screenshots unter `site/assets/screenshots/`. Die lokale Vorschau funktioniert durch direktes Öffnen von `site/index.html` im Browser — alle internen Verweise sind relativ, ein Webserver ist nicht nötig.
+
+### Einmalige Betriebshandlung (Rollout)
+
+1. **Pages-Quelle aktivieren:** Im Repository unter `Settings` → `Pages` die Source auf **„GitHub Actions"** stellen (entspricht `build_type: workflow`; alternativ `gh api repos/martin-stromberg/Softwareschmiede/pages -X POST -f build_type=workflow` mit Admin-Token). Erfordert Admin-Rechte auf dem Repository.
+2. **Verifikation:** `gh api repos/martin-stromberg/Softwareschmiede/pages` muss danach HTTP 200 mit `build_type: workflow` liefern.
+3. **Probelauf:** Sobald der erste `main`-Stand die Workflow-Datei enthält (nach der Promotion `staging` → `main`), `pages.yml` per `workflow_dispatch` auslösen und die ausgegebene Page-URL manuell sichtprüfen (Hell-/Dunkel-Darstellung, Responsivität, Links, Screenshots).
+
 ## Secrets und Umgebungsvariablen
 
 | Name | Herkunft | Zweck |
@@ -120,6 +139,8 @@ Abgesehen von `REVIEW_ISSUE_TOKEN` für die geplanten Review-Workflows (einmalig
 | Release-Job meldet `Protected branch update failed` / `GH006` | Ein Release-Step versucht direkt nach `main` zu pushen | Der automatische Release darf keinen `git push HEAD:main` ausfuehren. Stattdessen muss der Release ueber `gh release create --target $GITHUB_SHA` bzw. die GitHub-API erstellt werden. |
 | `npm ci` schlägt fehl | NPM-Registry nicht erreichbar oder `package-lock.json` inkonsistent mit `package.json` | Workflow erneut ausführen (transiente Netzwerkfehler); bei dauerhaftem Fehler `package-lock.json` lokal aktualisieren und committen. |
 | Review-Workflow schlägt im Guard- oder Erzeugungsschritt fehl | Repository-Secret `REVIEW_ISSUE_TOKEN` fehlt oder der hinterlegte PAT ist abgelaufen bzw. entzogen (feingranulierte PATs haben max. 1 Jahr Gültigkeit) | Secret gemäß Abschnitt „Geplante Review-Workflows" (erneut) hinterlegen und den Lauf per `workflow_dispatch` wiederholen. |
+| `pages.yml`-Job `deploy` schlägt mit „Not Found"/„Pages site failed" fehl (Job `build` ist bereits grün) | GitHub Pages ist im Repository noch nicht aktiviert — die Source steht nicht auf „GitHub Actions" | Einmalige Betriebshandlung gemäß Abschnitt „GitHub Pages" durchführen, danach den Lauf per `Re-run failed jobs` oder `workflow_dispatch` wiederholen. |
+| `pages.yml`-Job `build` bricht im Guard-Schritt ab | Eines der Pflicht-Artefakte fehlt im Repository: `site/index.html`, `site/assets/favicon-hammer-pick.svg`, `site/assets/css/site.css` oder `site/assets/Softwareschmiede.ico` | Fehlende(s) Artefakt(e) unter `site/` bereitstellen und erneut auf `main` pushen bzw. `workflow_dispatch` auslösen. |
 
 ## Recovery-Verfahren bei Pipeline-Fehlern
 
