@@ -1,57 +1,142 @@
 # Abnahmeprüfung – Entwicklungsschritt 2
 
-Geprüft: Ausführungsbegrenzung mit Priorisierung (#410, Teil 1), Branch
+Geprüft: Ausführungsbegrenzung mit Priorisierung (#410, Teil 1), **Runde 2 nach Korrektur**, Branch
 `task/issue-410-c69c8e7f6eb14c4cbe407bdbdc9e1cd6-ausfuehrungsbegrenzung-schritt-2-ausfuehrungslimits`
-(Commits `999220b0` + `75be5e22`), Diff-Basis
+(Commits `999220b0` plan, `75be5e22` feat, `ec022835` fix), Diff-Basis
 `task/issue-410-c69c8e7f6eb14c4cbe407bdbdc9e1cd6-ausfuehrungsbegrenzung`.
+Runde 1 (`acceptance-schritt-2.1.md`) fand alle Akzeptanzkriterien erfüllt plus eine Abweichung:
+nicht-atomare Zulassungskontrolle (check-then-act) zwischen Limit-Prüfung und Prozess-Handle-Registrierung.
 
 ## Ergebnis
 
-**Status:** Abweichungen gefunden
+**Status:** Anforderung vollständig erfüllt
 
 ## Abweichungen
 
-- [x] **Zulassungskontrolle ist nicht atomar — nebenläufige Dispatches verschiedener Aufgaben können das Limit transient überschreiten.** *(Behoben in der Korrektur auf demselben Branch: `ScmEventExecutionLimitService.PruefeUndReserviereStartPlatzAsync` verbindet Check+Claim atomar über eine prozessweite Startplatz-Reservierung, die `DispatchCoreAsync` über das gesamte Startfenster hält und die bei Fehlschlag freigegeben bzw. nach 5 min verfallen wird; Nachweise `PruefeUndReserviereStartPlatzAsync_*` und `Dispatch_ConcurrentStartDuringHealthCheck_GlobalLimitOne_ExactlyOneStarts`.)* `ScmEventOrchestrator.DispatchCoreAsync` (`src/Softwareschmiede/Application/Services/ScmEventOrchestrator.cs:186-201`) prüft das Limit via `ScmEventExecutionLimitService.GetStartBlockReasonAsync` und startet erst danach den CLI-Prozess; die Registrierung des Laufs in `KiAusfuehrungsService._handles` erfolgt erst innerhalb des späteren Starts. `ScmTaskCoordinator.Shared` (`src/Softwareschmiede/Application/Services/ScmTaskCoordinator.cs:8,18`) serialisiert nur **pro Aufgabe** (`ConcurrentDictionary<Guid, SemaphoreSlim>`), nicht global. Reales Überschreitungsszenario: Globales Limit 1 — die Monitoring-Schleife startet eine CLI für Aufgabe A (Prüfung bestanden, Handle noch nicht registriert; das Fenster umfasst Plugin-Auflösung, `CheckHealthAsync` und Prozessstart, also realistisch Sekunden), während ein UI-Pfad — „Erneut prüfen" (`RetryAsync`), „Aus Queue öffnen" (`OpenFromQueueAsync`), `ConfirmReadyAsync`, `ResendAsync`, alle über `ScmEventQueueViewModel` (`src/Softwareschmiede.App/ViewModels/ScmEventQueueViewModel.cs:69-75,269,321`) erreichbar — für Aufgabe B dieselbe Prüfung mit Belegung 0 passiert und ebenfalls startet. Ergebnis: 2 laufende Ausführungen bei Limit 1. Innerhalb der reinen Hintergrundverarbeitung kann es nicht auftreten (Polling-Batch und `ScmEventExchangeService` dispatchen streng sequentiell; die Exchange-Schleife erreicht die Prüfung wegen des Reconcile-Early-Returns `ScmEventOrchestrator.cs:107` ohnehin nie); der Pfad erfordert Überlappung mit einer UI-Aktion oder zweier UI-Aktionen. Bewertung: enge, seltene Race mit spürbarem Zeitfenster — die geforderte Invariante „Limit erreicht → kein Start" ist unter Nebenläufigkeit nicht hart garantiert.
+- [x] **Zulassungskontrolle ist nicht atomar — nebenläufige Dispatches verschiedener Aufgaben können das Limit transient überschreiten.** *(Aus Runde 1 übernommen; durch `ec022835` geschlossen — Nachweis unten.)*
 
 ## Hinweise
 
-### Prüfnachweis gegen die Akzeptanzkriterien
+### Nachweis der Abweichungsschließung
 
-**AK 1 – Globales + je-Plugin-Limit setzbar, persistiert, wirksam; leer = unbegrenzt:**
-Globaler Wert `scm.execution.maxparallel` im Expander „Aufgaben ausführen" des „Automatisierung"-Tabs (`src/Softwareschmiede.App/Views/SettingsView.xaml:433-447`, eingebettet in den Abschnitt ab `:352`); Plugin-Limits `plugins.maxparallel.<prefix>` als hostseitiges Feld „ParallelLimit" in der Gruppe „Ausführungsbegrenzung" auf der KI-Plugin-Konfigurationsfläche (`SettingsViewModel.cs:27-32,895-898`), persistiert über `AppEinstellungService` — bewusst nicht über den Plugin-Credential-Store (`SpeicherePluginEinstellungenAsync`, `:912-921`). Wirksamkeit: `ScmEventExecutionLimitService.GetStartBlockReasonAsync` (`src/Softwareschmiede/Application/Services/ScmEventExecutionLimitService.cs:51-80`) wird unmittelbar vor dem CLI-Start im Orchestrator aufgerufen; `ParseLimit` (`:82-83`) behandelt leer/ungültig/<1 als unbegrenzt; `NullWennLeer` persistiert Leereingaben als `null`. Beide Limits gelten gleichzeitig, restriktiveres gewinnt (globales zuerst geprüft, `:75-78`).
+**Atomare Zulassung:** `ScmEventExecutionLimitService.PruefeUndReserviereStartPlatzAsync`
+(`src/Softwareschmiede/Application/Services/ScmEventExecutionLimitService.cs:85-110`) liest die Grenzen,
+betritt das prozessweite `ZulassungsGate` (`:64`, static `SemaphoreSlim(1,1)`) und wertet
+`WirksameBelegungAsync` (`:178-199`) — Handle-Belegung plus offene Reservierungen — erst **innerhalb**
+der Sperre aus; die Momentaufnahme kann damit zwischen Prüfung und Platzbelegung nicht veralten.
+Der Claim (Eintrag in die static `Reservierungen`-Map, `:66,102-103`) erfolgt unter derselben Sperre
+und zählt ab sofort für jeden weiteren Zulassungsversuch inkl. der reinen Prüfung
+(`GetStartBlockReasonAsync`, `:123-137`, selbes Gate, selbe Belegungsquelle — konsistent gehalten).
 
-**AK 2 – Limit erreicht → kein Start, Wartegrund, späterer Start:**
-Bei erreichtem Limit wird ein benutzerlesbarer Grund gesetzt (`ScmEventOrchestrator.cs:186-193`), ein `ProtokollTyp.SystemMeldung`-Eintrag nur bei Grundwechsel geschrieben und `WaitAsync` → Status `Wartend` ohne `NextAttemptUtc`-Härte — das Ereignis bleibt im nächsten Poll-Batch auswählbar (`ScmEventMonitoringService.cs:235-240`) und startet bei freiem Platz. Nachweise: `Dispatch_GlobalLimitReached_EventWaitsWithReason`, `Dispatch_SlotFreed_WaitingEventStarts`, `Dispatch_PluginLimitReached_OnlyThatPluginWaits`, `Dispatch_BothLimits_GlobalDecidesWhenReached`.
+**Reservierungs-Scope im Orchestrator:** `DispatchCoreAsync` hält die Reservierung per
+`using (zulassung.Reservierung)` (`src/Softwareschmiede/Application/Services/ScmEventOrchestrator.cs:198-208`)
+über Plugin-Auflösung (`:200`), Health-Check (`:201`) und Prozessstart (`:203-207`) — exakt das in
+Runde 1 benannte Überschreitungsfenster. Exit-Pfade lückenlos: Wartegrund-Pfad (`:191-197`) erhält per
+Konstruktion nie eine Reservierung (`Wartegrund` setzen ⇒ `Reservierung` = `null`, `:98-99`); Exception
+innerhalb des `using` (Health-Check-Fehlschlag → `InvalidOperationException`, Provider-/IO-Fehler,
+OCE) disposed vor dem Unwind in die Catches `:276-289` bzw. den `finally`-Block `:291-297`; Erfolg
+disposed am Blockende — die Handle-Registrierung (`KiAusfuehrungsService.cs:226` bzw. `:375` im
+Terminal-Session-Pfad, beide innerhalb der aufgerufenen `CliNeustartenAsync`/`ProzessStartenUndCliStartenAsync`)
+liegt zeitlich **vor** der Freigabe, die Übergabe an die echte Laufzählung ist also lückenlos.
+Kein Pfad kann eine Reservierung dauerhaft gezählt lassen: vergessene Freigabe (hängender Start)
+verfällt nach `ReservierungsLebensdauer` = 5 min (`:57`), Verfall-Prüfung und Entfernung laufen vor
+jeder Zählung in `WirksameBelegungAsync` (`:182-188`) über den injizierten `TimeProvider`.
 
-**AK 3 – Exakte Prioritätenreihenfolge bei freiem Slot:**
-`ScmDispatchPrioritaet.PrioritaetsKlasse` (`src/Softwareschmiede/Application/Services/ScmDispatchPrioritaet.cs:36-46`) bildet exakt: (1) Fortsetzung = nicht `Beendet`/`Archiviert` und (`PausiertBisUtc` gesetzt oder `AusfuehrungsStatus.Beendet` + Status `Neu`/`Gestartet`/`Wartend`) — da `AufgabeStatus` nur diese fünf Werte kennt, ist „nicht Beendet/Archiviert" identisch zur geforderten Statusliste; (2) `Status == "Verzögert"` zeitaufsteigend nach `NextAttemptUtc` (`OrderForDispatch`, `:52-60`, fehlende Zeit → Klassenende); (3) übrige nach `Sequence` als stabilem Tie-Breaker. Angewendet pro Batch in `ScmEventMonitoringService.cs:253-256` mit gebündeltem Aufgabenzustands-Lookup (`:247-252`). Nachweise: `ScmDispatchPrioritaetTests` (10 Tests inkl. Beendet/Archiviert-Ausschluss auch bei gesetzter Pause), Integrationstests `Monitor_PrioritizedDispatch_ContinuationThenDelayThenSequence` (inverse Sequence, exakte Startreihenfolge via `StartSpecs`) und `Monitor_GlobalLimitOne_ContinuationWinsSlotOverSequence`.
+**Restfenster-Analyse:** Ein Start kann das Limit nur noch überschreiten, wenn das Startfenster die
+5-min-Reservierungsdauer überschreitet (z. B. extremer Klon in `ProzessStartenUndCliStartenAsync` oder
+hängender Health-Check): dann verfällt der Platz, ein zweiter Dispatch wird zugelassen, und der
+verspätet fertige erste Start registriert ein zusätzliches Handle. Das ist eine bewusste, dokumentierte
+Restreichweite (Commit-Message, `review-code.md`, `business-rules.md`) — die Alternative (kein Verfall)
+würde bei jedem hängenden Start den Platz permanent verlieren. Das in Runde 1 beanstandete reale
+Szenario (nebeneinanderlaufende Dispatches im Sekunden-Fenster zwischen Prüfung und Handle) ist damit
+geschlossen.
 
-**AK 4 – AufgabeStatus.Beendet/Archiviert permanent gesperrt:**
-`BlockReason` (`ScmEventOrchestrator.cs:558-560`) sperrt vor jeder Startentscheidung und wird nach Sitzungsaufbau erneut geprüft (`:207-209`); die Priorisierung stuft solche Ereignisse nie in Klasse 1. Keine Reaktivierung: wiederholter Dispatch bleibt gesperrt (`Dispatch_EndedOrArchivedTask_StaysBlocked`, Theory über beide Stati).
+### Substanz der Korrektur-Tests
 
-**AK 5 – Laufende unberührt, Hostaktionen unbegrenzt, Pro-Plugin-Zählung korrekt:**
-Die Prüfung steht ausschließlich im Neu-Start-Zweig (`adapter is null || !adapter.IsAlive`, `:162-203`) — laufende Ausführungen werden nie angefasst; Zustellung an eine **lebende** Sitzung verbraucht keinen neuen Platz und läuft unbegrenzt. Hostaktionen (Empfangsquittung, Wartekommentare, Anhang-Uploads, Reconcile) laufen vor der Prüfung bzw. im `ReconcileAttemptAsync`-Pfad — unbegrenzt (`Dispatch_HostActions_UnlimitedWhileSlotOccupied`, `Dispatch_ReconcileAttempt_IgnoresLimit`). Zählung (`GetBelegungAsync`, `ScmEventExecutionLimitService.cs:85-106`): `KiAusfuehrungsService.GetLaufendeAufgabenIds` liefert laufende Handles exception-tolerant (`KiAusfuehrungsService.cs:135-143`); Attribution je Plugin über `ScmPromptSessionAdapter.PluginPrefix` bei lebender Sitzung (gebunden an den tatsächlich gestarteten Prefix, `KiAusfuehrungsService.cs:377`), sonst `Aufgabe.KiPluginPrefix` — genau die geforderte Ordnung; Prefixe leer → nur global gezählt; `OrdinalIgnoreCase`. Nachweis: `GetStartBlockReasonAsync_LebendeSession_ZaehltTatsaechlichesPlugin`, `_SessionTot_FaelltAufAufgabenPrefixZurueck`, `_GemischtePlugins_ZaehltNurEigenenPrefix`.
+- `PruefeUndReserviereStartPlatzAsync_ParalleleVersuche_NurEineReservierung`
+  (`src/Softwareschmiede.Tests/Application/Services/ScmEventExecutionLimitServiceTests.cs:284-313`):
+  8 parallele Aufrufe auf **8 getrennten Service-Instanzen mit eigenen DbContexts** (simuliert eigene
+  DI-Scopes), globales Limit 1 → exakt eine Reservierung, alle übrigen erhalten den Limit-Wartegrund.
+  Beweist die prozessweite Wirkung des static Gate über Instanzgrenzen hinweg — genau der Runde-1-Befund.
+- `..._Reservierung_BelegtGlobalenPlatz` / `..._BelegtNurEigenesPluginLimit` (`:245-278`): Reservierung
+  zählt sofort global bzw. nur fürs eigene Plugin-Limit, Freigabe stellt den Platz wieder her.
+- `..._Reservierung_VerfaelltNachLebensdauer` (`:318-333`): `FakeTimeProvider` treibt den Verfall
+  deterministisch; danach ist der Platz ohne Dispose wieder nutzbar.
+- `Dispatch_ConcurrentStartDuringHealthCheck_GlobalLimitOne_ExactlyOneStarts`
+  (`src/Softwareschmiede.IntegrationTests/Services/ScmEventDispatchTests_Limits.cs:263-301`):
+  deterministischer Race über `TaskCompletionSource` am `CheckHealthAsync`-Mock — der erste Dispatch
+  hält die Reservierung im echten Startfenster (kein Handle registriert), der zweite Dispatch einer
+  **anderen Aufgabe** wartet mit Limit-Grund statt zu starten (`Assert.Empty(fixture.Sessions)` belegt,
+  dass kein zweiter Prozessstart versucht wurde). Ohne die Korrektur liefe der zweite Dispatch in
+  denselben Health-Check und das Limit würde überschritten.
+- `Dispatch_StartFails_ReservationReleasedForNextDispatch` (`:306-326`): Health-Check-Fehlschlag →
+  `Wartend` mit ehrlichem Grund; der nächste Dispatch belegt den freigegebenen Platz sofort —
+  belegt die Freigabe im Fehlerpfad.
 
-**AK 6 – Tests:**
-Vier neue Suites + konsolidierter FlaUI-E2E: `ScmEventExecutionLimitServiceTests` (12), `ScmDispatchPrioritaetTests` (10), `SettingsViewModelTests_AusfuehrungsLimits` (11: Laden/Speichern/Validierung beider Felder inkl. „0", „-1", „abc", „1,5"), `ScmEventDispatchTests_Limits` (10 Integrationsfälle inkl. NextAttemptUtc-Reihenfolge, gemischte Plugins, UI-Pfad `OpenFromQueue_LimitReached_WaitsWithReason`), E2E `Einstellungen_AusfuehrungsLimitsGlobalUndProPlugin_E2E` (1 konsolidiertes Szenario in `General_BasisUndEinstellungen_E2E`, registriert `src/Softwareschmiede.Tests/E2E/MainTest.cs:22`) mit Persistenz-DB-Nachweis und Validierungs-Negativpfad. Dokumentierte Läufe (`docs/features/task/.../test-results.md` + `inventory/test-results/nach-implementierung-*.txt`): regulär 2639/2642 (3 bekannte Skips), Integration 322/322, OsInterface 66/71 (5 ConPTY-Sandbox-Skips), Build 0/0, `dotnet format` sauber.
+### Neue-Probleme-Prüfung (Korrektur-spezifisch)
 
-### Antworten auf die kritischen Prüffragen
-
-- **(a) Race:** Siehe Abweichung — Überschreitungspfad über nebenläufige UI-Dispatches ist plausibel; kein globaler Zulassungs-Lock vorhanden.
-- **(b) Verdrängung durch gesperrte Ereignisse:** `OrderForDispatch` ordnet den ganzen Batch inkl. gesperrter Kandidaten (z. B. zukünftig pausierte Aufgaben in Klasse 1, Ereignisse mit älteren offenen Geschwistern). Kein realer Slot-Verdrängungspfad: Diese Ereignisse kehren vor der Limit-Prüfung zurück (NextAttemptUtc-Guard `:126`, älteres-Ereignis-Guard `:127`, `BlockReason` `:134/:208`) und belegen nie einen Platz; der Dispatch ist sequentiell, daher kostet es nur Batch-Position, nicht den Ausführungsplatz.
-- **(c) „Beendeter Lauf" vs „AufgabeStatus.Beendet":** sauber getrennt — `AufgabeAusfuehrungsStatus.Beendet` (Lauf) + aktiver Aufgabenstatus steuert Klasse 1, `AufgabeStatus.Beendet`/`Archiviert` (Aufgabe) sperrt permanent; Tests belegen beide Seiten (`PrioritaetsKlasse_PausiertAberAufgabeBeendet_NichtKlasse1`).
-- **(d) Attribution bei Fallback:** Der Limit-Check läuft mit dem **aufgelösten** Prefix (nach Schritt-1-Fallback via `ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync`, `:167-168`), und laufende Sitzungen zählen über den am tatsächlichen Start gebundenen Adapter-Prefix — das tatsächlich gestartete Plugin wird gezählt.
-- **(e) Settings-Validierung:** leer/0/negativ/Text für beide Felder abgedeckt (global: `ValidiereMaxParalleleAusfuehrungen`, `:988-1000`; Plugin-Feld: `ValidierePflichtfelderFuerSettings` mit `ReferenceEquals(HostParallelLimitField)`-Sonderfall ≥ 1, `:1073-1082`); ungültig gespeicherte Werte gelten zusätzlich defensiv als unbegrenzt (`ParseLimit`).
-- **(f) Verzögerte Ereignisse/Retries:** Alle Pfade (Polling-Batch, `RetryAsync`, `ConfirmReadyAsync`, `ResendAsync`, `OpenFromQueueAsync`) münden in `DispatchCoreAsync` und damit in dieselbe Prüfung — keine Umgehung.
+- **Deadlocks:** Sperrordnung ist strikt einseitig: `ScmTaskCoordinator`-Aufgabensperre →
+  `ZulassungsGate` → `ReservierungenSync`. `ReservierungenSync` wird niemals über einen `await`
+  hinweg gehalten (`:182-188` synchroner Block; DB-Abfrage vor dem Lock); `Dispose` (`:236-240`)
+  wartet nie auf `ZulassungsGate` (non-blocking by design). `ZulassungsGate` selbst wird nur über
+  die kurze Belegungsabfrage (eine EF-Query + synchrone Handle-Reads) gehalten — `SemaphoreSlim`
+  ist async-fähig, kein Thread-Blocking; verschachtelte Aufgabensperren sind über `AsyncLocal`
+  reentrant (`ScmTaskCoordinator.cs:9,17`), und das globale Gate ist zum Zeitpunkt der
+  Start-Unteraufrufe (`CliNeustartenAsync` → erneut `ScmTaskCoordinator.RunAsync`) bereits freigegeben.
+- **Static Gate vs. scoped Service:** bewusste und notwendige Entscheidung — Reservierungen müssen
+  über alle DI-Scopes sichtbar sein; `TimeProvider` ist pro Instanz injiziert (Prod:
+  `TimeProvider.System`, `App.xaml.cs:305`; Fixture: `ScmDispatchFixture.cs:155`).
+- **UI-Thread:** kein synchrones Warten; `Dispose` hält `ReservierungenSync` nur für ein
+  Dictionary-Remove — auf dem Dispatcher-Kontext unkritisch.
+- **Shutdown:** Reservierungen sind rein prozessinterner Static-State; bei App-Ende verfallen sie
+  mit dem Prozess — kein Persistenz-Leak, kein Folgezustand.
+- **Test-Isolation des Static-State:** Unit-Assembly läuft mit `DisableTestParallelization`
+  (`src/Softwareschmiede.Tests/AssemblyInfo.cs`), `ReservierungenZuruecksetzen` in Ctor+Dispose.
+  In der Integration-Assembly konfiguriert ausschließlich `ScmEventDispatchTests_Limits` Limits;
+  alle übrigen Dispatches verlassen `PruefeUndReserviereStartPlatzAsync` bereits bei
+  `GetLimitsAsync` (`:87-89`) und berühren weder Gate noch Reservierungsbestand — kein
+  Cross-Class-Einfluss trotz paralleler Testklassen.
 
 ### Randbeobachtungen (keine Abweichungen)
 
-- **Batch-Grenze der Priorisierung:** `Take(100)` greift weiterhin die ältesten 100 Kandidaten nach `Sequence`; die Priorisierung wirkt innerhalb des Fensters. Ein Klasse-1-Ereignis jenseits des Fensters rückt erst in der nächsten Iteration derselben `while`-Schleife nach (`ScmEventMonitoringService.cs:232-258`) — dieselbe Zyklus-Ausführung, kein verlorener Slot.
-- **Wartegrund ohne Remote-Kommentar:** Der Limit-Wartegrund nutzt `WaitAsync` (Status + Reason + deduplizierter Protokolleintrag), nicht `WaitWithCommentAsync` — kein Issue-Kommentar-Spam bei jedem Poll-Zyklus; „ehrlich" ist der Grund im Ereignis und Protokoll sichtbar.
-- **Plugin-Feld lädt Rohwert:** `_kiPluginParallelLimits` lädt den gespeicherten Wert unsanitiert (`SettingsViewModel.cs:573-576`), während das globale Feld ungültige Werte beim Laden als leer darstellt (`:565-568`). Nur bei manuell veränderten Schlüsseln sichtbar; die Validierung verhindert das erneute Speichern — kosmetisch.
-- **Priorisierung mit veraltetem Aufgabenzustand:** Der Batch-Zustand wird einmalig vor dem Batch gelesen; der Dispatch selbst prüft alle Sperren erneut gegen den Live-Stand — Sortier-Ungenauigkeit ohne Korrektheitsrisiko.
-- Dokumentation konsistent: `changes.log`, `docs/RELEASE_NOTES.md`, Hilfeseiten (`einstellungen/*`, `github-ereignisse/business-rules.md`) beschreiben Limit-Semantik und Priorisierung zutreffend.
+- **Konservatives Doppelzählen im Übergabefenster:** Zwischen Handle-Registrierung und
+  `using`-Ende zählen Reservierung und Handle denselben Platz doppelt — eine nebenläufige Prüfung
+  in diesem Millisekunden-Fenster sieht einen Platz zu viel und wartet einen Poll-Zyklus zu früh.
+  Wirkt nur richtung Sicherheit (unter- statt Überzulassung), selbstkorrigierend.
+- **Test-Robustheit:** In `Dispatch_ConcurrentStartDuringHealthCheck_...` hat der `await
+  fixture.DispatchAsync(secondId)` (`:288`) keinen eigenen Timeout — bei einer Regression würde der
+  zweite Dispatch im blockierten Health-Check hängen und erst das Framework-Timeout entscheiden.
+  Das Prüfsignal bleibt korrekt (Timeout = Fail), nur langsamer.
+- **`GetStartBlockReasonAsync` ohne Produktionsaufrufer:** die reine Prüfung wird nur noch von
+  Tests genutzt (Produktionspfad: ausschließlich `PruefeUndReserviereStartPlatzAsync`,
+  `ScmEventOrchestrator.cs:190`); Semantik ist deckungsgleich gehalten (Gate + Reservierungen).
+- **Bewusst unlimitierte Pfade unverändert:** Starts ohne Zulassungskontrolle (manueller CLI-Start
+  im Aufgabenfenster, zeitgesteuerte Prompts) unterliegen dem Limit weiterhin nicht — dokumentierte
+  Entscheidung (`ScmEventExecutionLimitService.cs:93-96`, `review-code.md`), bereits Runde-1-Scope.
+- **Limit-Lesen außerhalb des Gate:** `GetLimitsAsync` (`:87`) läuft vor `ZulassungsGate.WaitAsync` —
+  korrekt, da die Grenzen Konfiguration sind; ein zeitgleich geändertes Limit gilt ab dem nächsten
+  Versuch (TOCTOU auf Config-Ebene, wie zuvor).
+
+### Stichprobe Gesamtanforderung (Regression gegen Runde-1-AK)
+
+Der Fix-Diff (`75be5e22..ec022835`) berührt außer Doku/Tests ausschließlich
+`ScmEventExecutionLimitService.cs` und den Zulassungs-Callsite in `ScmEventOrchestrator.cs` —
+Priorisierung (`ScmDispatchPrioritaet`), Settings-Persistenz/-UI, `BlockReason`, Polling-Batch und
+Hostaktionen-/Reconcile-Pfade sind unverändert. Stichproben: AK 2 — Wartegrund-Pfad mit
+dedupliziertem `SystemMeldung`-Eintrag identisch (`:191-197`); AK 5 — Zulassung steht weiterhin
+ausschließlich im Neu-Start-Zweig (`adapter is null || !adapter.IsAlive`, `:162`), Hostaktionen
+laufen vor der Prüfung, Reconcile daran vorbei; AK 1 — `ParseLimit`/Schlüssel unverändert;
+AK 3/4 — keinerlei Diff-Berührung.
 
 ### Eigenverifikation
 
-Vollständige Zeilenprüfung des Diff-Codes (Produktionspfad `ScmEventOrchestrator.cs:181-193`, `ScmEventMonitoringService.cs:229-258`, `ScmEventExecutionLimitService.cs`, `ScmDispatchPrioritaet.cs`, `ICliExecutionLimitSource.cs`, `KiAusfuehrungsService.cs:135-143,480-481`, `App.xaml.cs`-DI, `SettingsViewModel.cs`/`SettingsView.xaml`) sowie aller neuen Testdateien und des E2E-Szenarios. Die dokumentierten Testergebnisse wurden nicht eigenständig wiederholt (Lane-Dauer ~20 min); die Abnahme stützt sich auf die Codeprüfung und die abgelegten Laufprotokolle.
+Zeilenprüfung von `ScmEventExecutionLimitService.cs` (komplett) und `ScmEventOrchestrator.cs`
+(`DispatchCoreAsync` inkl. aller Exit-Pfade, `MutateAndDispatchAsync`, `OpenFromQueueAsync`),
+`KiAusfuehrungsService.cs:135-143,185-255,284-418` (Handle-Registrierung/-Entfernung),
+`EntwicklungsprozessService.cs:126-307` (Start-Unteraufrufe inkl. Reentrant-Sperre),
+`ScmTaskCoordinator.cs` (AsyncLocal-Reentranz), `ScmEventMonitoringService.cs:229-258`,
+`ScmEventExchangeService.cs:31`, Fixture `ScmDispatchFixture.cs` und sämtlicher neuer/geänderter
+Tests. Teil-Build verifiziert: `dotnet build src/Softwareschmiede/Softwareschmiede.csproj` →
+0 Warnungen, 0 Fehler. Dokumentierte Läufe nach dem Fix (`test-results.md`): reguläre Lane
+2644/2647 (3 Skips), Integration 324/324, `dotnet format` sauber; die Voll-Lane wurde nicht
+eigenständig wiederholt (~20 min).
