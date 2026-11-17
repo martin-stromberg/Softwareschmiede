@@ -51,6 +51,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private bool _isScmTaskCompletionEnabled = true;
     private string _scmTaskCompletionWaitMinutes = AppEinstellungService.ScmTaskCompletionDefaultWaitMinutes.ToString(System.Globalization.CultureInfo.InvariantCulture);
     private string _scmTriggerKeyword = ScmEventValidationService.DefaultTriggerKeyword;
+    private string _scmDelayKeyword = ScmDelayDirective.DefaultDelayKeyword;
     private string _scmPromptAppendixGeneral = string.Empty;
     private string _scmPromptAppendixIssue = string.Empty;
     private string _scmPromptAppendixIssueComment = string.Empty;
@@ -289,6 +290,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             if (!SetProperty(ref _isScmMonitoringEnabled, value)) return;
             OnPropertyChanged(nameof(IsUeberwachungsmodusEnabled));
             OnPropertyChanged(nameof(IsTriggerKeywordSichtbar));
+            OnPropertyChanged(nameof(IsDelayKeywordSichtbar));
             OnPropertyChanged(nameof(IsPromptAnhaengeSichtbar));
             OnPropertyChanged(nameof(AufgabenAusfuehrenStatusText));
         }
@@ -311,6 +313,10 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Das Trigger-Keyword wird nur bei aktivierter Ereignisüberwachung im Benutzerkonto-Modus benötigt.</summary>
     public bool IsTriggerKeywordSichtbar => IsScmMonitoringEnabled && SelectedKontoModus?.Modus == ScmKontoModus.Benutzerkonto;
+
+    /// <summary>Das Verzögerungs-Keyword ist in beiden Kontomodi wirksam, weil es aus dem
+    /// jeweils akzeptierten Triggertext gelesen wird; sichtbar bei aktiver Überwachung.</summary>
+    public bool IsDelayKeywordSichtbar => IsScmMonitoringEnabled;
 
     /// <summary>Die Prompt-Anhänge sind nur bei aktivierter Ereignisüberwachung relevant.</summary>
     public bool IsPromptAnhaengeSichtbar => IsScmMonitoringEnabled;
@@ -342,6 +348,14 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     {
         get => _scmTriggerKeyword;
         set => SetProperty(ref _scmTriggerKeyword, value);
+    }
+
+    /// <summary>Das Verzögerungs-Keyword, mit dem SCM-Ereignisse eine zeitversetzte Ausführung
+    /// anfordern (Standard: <c>#verzögert</c>).</summary>
+    public string ScmDelayKeyword
+    {
+        get => _scmDelayKeyword;
+        set => SetProperty(ref _scmDelayKeyword, value);
     }
 
     /// <summary>Prompt-Anhang, der bei jeder SCM-Ereignisart an den Prompt angehängt wird (leer = keiner).</summary>
@@ -526,6 +540,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             ScmTaskCompletionWaitMinutes = (await _einstellungService.GetScmTaskCompletionWaitMinutesAsync(ct))
                 .ToString(System.Globalization.CultureInfo.InvariantCulture);
             ScmTriggerKeyword = await _einstellungService.GetScmTriggerKeywordAsync(ct);
+            ScmDelayKeyword = await _einstellungService.GetScmDelayKeywordAsync(ct);
 
             var promptAnhaenge = await _einstellungService.GetScmPromptAppendicesAsync(ct);
             ScmPromptAppendixGeneral = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendGeneralKey) ?? string.Empty;
@@ -638,6 +653,10 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await _einstellungService.SetSettingAsync(
                 AppEinstellungService.ScmTriggerKeywordKey,
                 ScmTriggerKeyword.Trim(),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmDelayKeywordKey,
+                ScmDelayKeyword.Trim(),
                 ct);
             await _einstellungService.SetScmBackmergeModusAsync(backmergeModus, ct);
             await _einstellungService.SetScmKontoModusAsync(kontoModus, ct);
@@ -860,6 +879,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             && ValidierePflichtfelderFuerSettings(_selectedPluginSettings)
             && ValidierePromptVorlagen()
             && ValidiereScmTriggerKeyword()
+            && ValidiereScmDelayKeyword()
             && ValidiereScmTaskCompletionWait()
             && ValidiereScmKontoModus();
     }
@@ -925,6 +945,22 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(ScmTriggerKeyword))
         {
             FehlerMeldung = $"Das Trigger-Keyword für SCM-Ereignisse darf nicht leer sein. Standard: {ScmEventValidationService.DefaultTriggerKeyword}";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Das Verzögerungs-Keyword darf nicht leer sein; der Dienst fällt sonst auf den
+    /// Standard zurück. Das Feld ist nur wirksam, wenn die Ereignisüberwachung aktiv ist.</summary>
+    private bool ValidiereScmDelayKeyword()
+    {
+        if (!IsDelayKeywordSichtbar)
+            return true;
+
+        if (string.IsNullOrWhiteSpace(ScmDelayKeyword))
+        {
+            FehlerMeldung = $"Das Verzögerungs-Keyword für SCM-Ereignisse darf nicht leer sein. Standard: {ScmDelayDirective.DefaultDelayKeyword}";
             return false;
         }
 

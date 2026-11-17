@@ -6,7 +6,7 @@
 
 ### `ScmIncomingEvent`
 
-Enthält den dauerhaft angenommenen Ereignistext und Ursprung, Aufgabe, Status, Wartegrund, Versuchs- und Laufkennung sowie Zustellzeiten und Wiederholungsinformationen. Der im `ObservationJson` eingebettete Beobachtungspayload trägt optional `ViewerReactions` — die Inhalte der vom lesenden Ereignis-Konto gesetzten Reaktionen auf der Textfassung (GraphQL-`ReactionContent`-Werte); sie sind die Grundlage der instanzübergreifenden Duplikaterkennung. Ältere Datensätze ohne das Feld deserialisieren zu `null` und verhalten sich unverändert.
+Enthält den dauerhaft angenommenen Ereignistext und Ursprung, Aufgabe, Status, Wartegrund, Versuchs- und Laufkennung sowie Zustellzeiten und Wiederholungsinformationen. Der Status `Verzögert` kennzeichnet ein per Verzögerungs-Keyword zurückgestelltes Ereignis; sein `NextAttemptUtc` trägt den persistierten Zielzeitpunkt, bis zu dem die Zustellung ruht (Neustart-sicher, blockiert den Auto-Shutdown über `LaufendeAutomatisierungenZaehlung`). Der im `ObservationJson` eingebettete Beobachtungspayload trägt optional `ViewerReactions` — die Inhalte der vom lesenden Ereignis-Konto gesetzten Reaktionen auf der Textfassung (GraphQL-`ReactionContent`-Werte); sie sind die Grundlage der instanzübergreifenden Duplikaterkennung. Ältere Datensätze ohne das Feld deserialisieren zu `null` und verhalten sich unverändert.
 
 ### `ScmObservationCheckpoint`
 

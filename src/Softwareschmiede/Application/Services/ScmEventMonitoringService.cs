@@ -41,6 +41,7 @@ public sealed class ScmEventMonitoringService(
             return;
         }
         var triggerKeyword = await einstellungen.GetScmTriggerKeywordAsync(ct);
+        var delayKeyword = await einstellungen.GetScmDelayKeywordAsync(ct);
         var kontoModus = await einstellungen.GetScmKontoModusAsync(ct);
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         var tasks = await db.Aufgaben.AsNoTracking().Include(x => x.GitRepository).Include(x => x.IssueReferenz)
@@ -192,7 +193,7 @@ public sealed class ScmEventMonitoringService(
                             unassigned = resolution.Kind == ScmTaskResolutionKind.Unassigned;
                         }
                         await batchScope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(
-                            aufgabeId, sourceKey, batch, unassigned, triggerKeyword, ct);
+                            aufgabeId, sourceKey, batch, unassigned, triggerKeyword, delayKeyword, ct);
                     }
                     catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                     catch (Exception ex)
