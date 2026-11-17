@@ -19,6 +19,17 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private const string GitHubPluginPrefix = "Softwareschmiede.GitHub";
     private const string GitHubAgentTokenFieldKey = "AgentToken";
     private const string CommandLineParametersKey = "CommandLineParameters";
+    private const string ParallelLimitGruppenName = "Ausführungsbegrenzung";
+
+    /// <summary>Host-seitig deklariertes Limit-Feld für KI-Plugins; persistiert über
+    /// <see cref="ScmEventExecutionLimitService.PluginLimitKey(string)"/> in <see cref="AppEinstellungService"/>,
+    /// nicht über den pluginseitigen Credential Store.</summary>
+    private static readonly PluginSettingField HostParallelLimitField = new(
+        "ParallelLimit",
+        "Maximale parallele Ausführungen",
+        PluginSettingFieldType.Integer,
+        Placeholder: "unbegrenzt",
+        Description: "Ganzzahl ≥ 1; leer = unbegrenzt. Begrenzt die laufenden CLI-Ausführungen dieses KI-Plugins zusätzlich zum globalen Limit in „Aufgaben ausführen“.");
 
     private readonly AppEinstellungService _einstellungService;
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
@@ -52,6 +63,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private string _scmTaskCompletionWaitMinutes = AppEinstellungService.ScmTaskCompletionDefaultWaitMinutes.ToString(System.Globalization.CultureInfo.InvariantCulture);
     private string _scmTriggerKeyword = ScmEventValidationService.DefaultTriggerKeyword;
     private string _scmDelayKeyword = ScmDelayDirective.DefaultDelayKeyword;
+    private string _maxParalleleAusfuehrungen = string.Empty;
+    private readonly Dictionary<string, string?> _kiPluginParallelLimits = new(StringComparer.Ordinal);
     private string _scmPromptAppendixGeneral = string.Empty;
     private string _scmPromptAppendixIssue = string.Empty;
     private string _scmPromptAppendixIssueComment = string.Empty;
@@ -358,6 +371,14 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _scmDelayKeyword, value);
     }
 
+    /// <summary>Globales Limit paralleler CLI-Ausführungen für SCM-Ereignisse
+    /// (leer = unbegrenzt; gültig: Ganzzahl ≥ 1).</summary>
+    public string MaxParalleleAusfuehrungen
+    {
+        get => _maxParalleleAusfuehrungen;
+        set => SetProperty(ref _maxParalleleAusfuehrungen, value);
+    }
+
     /// <summary>Prompt-Anhang, der bei jeder SCM-Ereignisart an den Prompt angehängt wird (leer = keiner).</summary>
     public string ScmPromptAppendixGeneral
     {
@@ -542,6 +563,17 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             ScmTriggerKeyword = await _einstellungService.GetScmTriggerKeywordAsync(ct);
             ScmDelayKeyword = await _einstellungService.GetScmDelayKeywordAsync(ct);
 
+            var globalLimit = await _einstellungService.GetIntSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, ct);
+            MaxParalleleAusfuehrungen = globalLimit is >= 1
+                ? globalLimit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : string.Empty;
+            _kiPluginParallelLimits.Clear();
+            var pluginLimitWerte = await _einstellungService.GetSettingsAsync(
+                KiPlugins.Select(x => ScmEventExecutionLimitService.PluginLimitKey(x.PluginPrefix)).ToList(), ct);
+            foreach (var kiPlugin in KiPlugins)
+                _kiPluginParallelLimits[kiPlugin.PluginPrefix] =
+                    pluginLimitWerte.GetValueOrDefault(ScmEventExecutionLimitService.PluginLimitKey(kiPlugin.PluginPrefix));
+
             var promptAnhaenge = await _einstellungService.GetScmPromptAppendicesAsync(ct);
             ScmPromptAppendixGeneral = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendGeneralKey) ?? string.Empty;
             ScmPromptAppendixIssue = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendIssueKey) ?? string.Empty;
@@ -626,7 +658,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             foreach (var entry in SourceCodeManagementPlugins.Concat(DevelopmentAutomationPlugins).Concat(DevelopmentEnvironmentPlugins))
                 await _pluginActivationService.SetPluginEnabledAsync(entry.PluginPrefix, entry.IsEnabled, ct);
 
-            SpeicherePluginEinstellungen(_selectedPlugin?.Plugin, _selectedPluginSettings);
+            await SpeicherePluginEinstellungenAsync(_selectedPlugin?.Plugin, _selectedPluginSettings, ct);
 
             await _arbeitsverzeichnisService.SaveArbeitsverzeichnisAsync(_arbeitsverzeichnis, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, _defaultKiPlugin, ct);
@@ -657,6 +689,10 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await _einstellungService.SetSettingAsync(
                 AppEinstellungService.ScmDelayKeywordKey,
                 ScmDelayKeyword.Trim(),
+                ct);
+            await _einstellungService.SetSettingAsync(
+                ScmEventExecutionLimitService.GlobalLimitKey,
+                NullWennLeer(MaxParalleleAusfuehrungen?.Trim()),
                 ct);
             await _einstellungService.SetScmBackmergeModusAsync(backmergeModus, ct);
             await _einstellungService.SetScmKontoModusAsync(kontoModus, ct);
@@ -844,7 +880,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     private IReadOnlyList<PluginSettingGroupEntry> LadePluginEinstellungen(IPlugin plugin)
     {
-        return plugin.GetSettingGroups()
+        var gruppen = plugin.GetSettingGroups()
             .Select(group => new PluginSettingGroupEntry(
                 group.GroupName,
                 group.Fields.Select(field => new PluginSettingEntry(
@@ -853,13 +889,21 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                     useDefaultValue: !IsCodexCommandLineParameters(plugin, field)))
                 .ToList()))
             .ToList();
+        // Das Plugin-Parallel-Limit ist eine Host-Einstellung (AppEinstellung), kein
+        // plugindeklariertes Credential-Store-Feld — daher wird es hier eingespeist.
+        if (plugin is IKiPlugin)
+            gruppen.Add(new PluginSettingGroupEntry(ParallelLimitGruppenName,
+                [new PluginSettingEntry(HostParallelLimitField,
+                    _kiPluginParallelLimits.GetValueOrDefault(plugin.PluginPrefix),
+                    useDefaultValue: false)]));
+        return gruppen;
     }
 
     private static bool IsCodexCommandLineParameters(IPlugin plugin, PluginSettingField field) =>
         string.Equals(plugin.PluginPrefix, CodexPluginPrefix, StringComparison.Ordinal)
         && string.Equals(field.Key, CommandLineParametersKey, StringComparison.Ordinal);
 
-    private void SpeicherePluginEinstellungen(IPlugin? plugin, IReadOnlyList<PluginSettingGroupEntry> settings)
+    private async Task SpeicherePluginEinstellungenAsync(IPlugin? plugin, IReadOnlyList<PluginSettingGroupEntry> settings, CancellationToken ct)
     {
         if (plugin is null)
             return;
@@ -868,6 +912,14 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         {
             foreach (var entry in group.Entries)
             {
+                if (ReferenceEquals(entry.Field, HostParallelLimitField))
+                {
+                    var wert = NullWennLeer(entry.Value.Trim());
+                    await _einstellungService.SetSettingAsync(
+                        ScmEventExecutionLimitService.PluginLimitKey(plugin.PluginPrefix), wert, ct);
+                    _kiPluginParallelLimits[plugin.PluginPrefix] = wert;
+                    continue;
+                }
                 _pluginSettingsService.SetValue(plugin, entry.Field, entry.Value);
             }
         }
@@ -880,6 +932,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             && ValidierePromptVorlagen()
             && ValidiereScmTriggerKeyword()
             && ValidiereScmDelayKeyword()
+            && ValidiereMaxParalleleAusfuehrungen()
             && ValidiereScmTaskCompletionWait()
             && ValidiereScmKontoModus();
     }
@@ -925,6 +978,21 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 System.Globalization.CultureInfo.InvariantCulture, out var minuten) || minuten < 0)
         {
             FehlerMeldung = $"Die Wartezeit für die SCM-Abschlussüberwachung muss eine nicht negative Ganzzahl in Minuten sein. Standard: {AppEinstellungService.ScmTaskCompletionDefaultWaitMinutes}";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Das globale Parallel-Limit ist entweder leer (unbegrenzt) oder eine Ganzzahl ≥ 1.</summary>
+    private bool ValidiereMaxParalleleAusfuehrungen()
+    {
+        var wert = MaxParalleleAusfuehrungen?.Trim();
+        if (!string.IsNullOrEmpty(wert)
+            && (!int.TryParse(wert, System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out var limit) || limit < 1))
+        {
+            FehlerMeldung = "Das globale Limit paralleler CLI-Ausführungen muss leer (unbegrenzt) oder eine Ganzzahl größer oder gleich 1 sein.";
             return false;
         }
 
@@ -1004,9 +1072,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
                 if (entry.Field.FieldType == PluginSettingFieldType.Integer
                     && !string.IsNullOrEmpty(entry.Value)
-                    && !int.TryParse(entry.Value, out _))
+                    && (!int.TryParse(entry.Value, out var zahl)
+                        || (ReferenceEquals(entry.Field, HostParallelLimitField) && zahl < 1)))
                 {
-                    FehlerMeldung = $"Feld '{entry.Field.Label}' muss eine gültige Ganzzahl sein.";
+                    FehlerMeldung = ReferenceEquals(entry.Field, HostParallelLimitField)
+                        ? $"Feld '{entry.Field.Label}' muss leer (unbegrenzt) oder eine Ganzzahl größer oder gleich 1 sein."
+                        : $"Feld '{entry.Field.Label}' muss eine gültige Ganzzahl sein.";
                     return false;
                 }
 

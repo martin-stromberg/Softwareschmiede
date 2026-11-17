@@ -15,7 +15,7 @@ namespace Softwareschmiede.Application.Services;
 /// Singleton-Service, der laufende CLI-Prozesse für KI-Ausführungen verwaltet.
 /// Startet, stoppt und überwacht CLI-Prozesse pro Aufgabe.
 /// </summary>
-public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDisposable
+public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICliExecutionLimitSource, IDisposable
 {
     private static readonly TimeSpan ConPtyOutputDrainTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan CliOutputWriterDrainTimeout = TimeSpan.FromSeconds(2);

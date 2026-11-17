@@ -156,6 +156,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddSingleton<IOptions<TerminalSessionOptions>>(Options.Create(new TerminalSessionOptions()));
         services.AddSingleton<IOptions<ScmEventOptions>>(Options.Create(new ScmEventOptions()));
         services.AddSingleton<KiAusfuehrungsService>();
+        services.AddSingleton<ICliExecutionLimitSource>(sp => sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<PromptZeitVersandService>();
         services.AddSingleton<ScmEventStartupGate>();
         services.AddSingleton<ScmEventChangeNotifier>();
@@ -174,6 +175,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddScoped<ScmEventStore>();
         services.AddScoped<ScmEventOutbox>();
         services.AddScoped<ScmEventOrchestrator>();
+        services.AddScoped<ScmEventExecutionLimitService>();
         services.AddScoped<ScmEventTaskResolver>();
         services.AddScoped<ScmBackmergeService>();
         services.AddScoped(sp => new EntwicklungsprozessService(sp.GetRequiredService<AufgabeService>(), sp.GetRequiredService<ProtokollService>(),
@@ -192,13 +194,13 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
 
     internal async Task<(Guid TaskId, Guid EventId)> AddAsync(AufgabeStatus status = AufgabeStatus.Neu, bool configured = false, bool cloned = true,
         ScmReferenceKind referenceKind = ScmReferenceKind.Issue, ScmContentKind contentKind = ScmContentKind.IssueComment, string body = "$Softwareschmiede test",
-        ScmEventRepository? eventRepository = null, string? authorId = "U_1", string? authorLogin = "owner")
+        ScmEventRepository? eventRepository = null, string? authorId = "U_1", string? authorLogin = "owner", string? kiPluginPrefix = null)
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         var project = new Projekt { Id = Guid.NewGuid(), Name = "SCM" };
         var repository = new GitRepository { Id = Guid.NewGuid(), ProjektId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginTyp = Repository.ProviderPrefix, RepositoryName = "repo" };
-        var task = new Aufgabe { Id = Guid.NewGuid(), Titel = "SCM task", ProjektId = project.Id, GitRepositoryId = repository.Id, Status = status, KiPluginPrefix = configured ? KiProfile.Prefix : null };
+        var task = new Aufgabe { Id = Guid.NewGuid(), Titel = "SCM task", ProjektId = project.Id, GitRepositoryId = repository.Id, Status = status, KiPluginPrefix = configured ? (kiPluginPrefix ?? KiProfile.Prefix) : null };
         if (cloned) { task.LokalerKlonPfad = Path.Combine(Root, task.Id.ToString("N")); InitGit(task.LokalerKlonPfad); }
         db.AddRange(project, repository, task);
         await db.SaveChangesAsync();
@@ -248,6 +250,16 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         using var scope = Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().SetScmKontoModusAsync(modus);
     }
+
+    /// <summary>Schreibt eine generische Anwendungseinstellung (z. B. Ausführungslimits).</summary>
+    internal async Task SetSettingAsync(string schluessel, string? wert)
+    {
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().SetSettingAsync(schluessel, wert);
+    }
+
+    /// <summary>Der Singleton-Prozessverwalter der Fixture (für Start/Stop-Prüfungen).</summary>
+    internal KiAusfuehrungsService Cli => Services.GetRequiredService<KiAusfuehrungsService>();
 
     internal async Task DispatchAsync(Guid id)
     {

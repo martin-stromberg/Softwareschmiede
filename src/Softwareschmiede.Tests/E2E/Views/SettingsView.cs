@@ -235,6 +235,53 @@ public sealed class SettingsView : BaseWindowView
         return this;
     }
 
+    /// <returns>Der aktuelle Wert des globalen Felds „Maximale parallele Ausführungen“
+    /// (Expander „Aufgaben ausführen“ im „Automatisierung“-Tab).</returns>
+    public string GetMaxParalleleAusfuehrungen()
+        => WaitForElement(Window, cf => cf.ByName("MaxParalleleAusfuehrungen"), Short).AsTextBox().Text;
+
+    /// <summary>Setzt den Wert des globalen Felds „Maximale parallele Ausführungen“.</summary>
+    /// <param name="value">Der zu setzende Wert (leer = unbegrenzt).</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetMaxParalleleAusfuehrungen(string value)
+    {
+        WaitForElement(Window, cf => cf.ByName("MaxParalleleAusfuehrungen"), Short).AsTextBox().Text = value;
+        return this;
+    }
+
+    /// <summary>Wählt im „Plugins“-Tab den Listeneintrag eines SCM-/KI-Plugins aus
+    /// („{pluginPrefix}.Eintrag“), damit dessen Einstellungspanel geladen wird.</summary>
+    /// <param name="pluginPrefix">Der Plugin-Prefix, z. B. „Softwareschmiede.ClaudeCli“.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SelectPluginEntry(string pluginPrefix)
+    {
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).ClickInForeground();
+        return this;
+    }
+
+    /// <returns>Der aktuelle Wert des hostseitigen „ParallelLimit“-Felds im geöffneten
+    /// KI-Plugin-Einstellungspanel (Gruppe „Ausführungsbegrenzung“).</returns>
+    public string GetPluginParallelLimit()
+        => WaitForElement(Window, cf => cf.ByName("ParallelLimit"), Short).AsTextBox().Text;
+
+    /// <summary>Setzt den Wert des hostseitigen „ParallelLimit“-Felds im geöffneten
+    /// KI-Plugin-Einstellungspanel (leer = unbegrenzt).</summary>
+    /// <param name="value">Der zu setzende Wert.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetPluginParallelLimit(string value)
+    {
+        WaitForElement(Window, cf => cf.ByName("ParallelLimit"), Short).AsTextBox().Text = value;
+        return this;
+    }
+
+    /// <summary>Klickt „Speichern“ und wartet auf das Fehlerbanner (für Validierungs-Negativpfade).</summary>
+    /// <returns>Die angezeigte Fehlermeldung (HelpText des FehlerMeldung-Elements).</returns>
+    public string SaveSettingsExpectError()
+    {
+        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().ClickInForeground();
+        return GetHelpTextOrName(WaitForElement(Window, cf => cf.ByName("FehlerMeldung"), Short));
+    }
+
     /// <summary>Klickt den "Verwerfen"-Button und wartet, bis ein zuvor angezeigtes Fehlerbanner verschwindet.</summary>
     /// <returns>Diese Instanz.</returns>
     public SettingsView DiscardChanges()

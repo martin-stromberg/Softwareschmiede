@@ -1,0 +1,17 @@
+Nach-Implementierung-Lauf OS-Interface-Lane (Abschluss; SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 —
+ConPTY-Isolation in dieser Sandbox nicht möglich, betroffene Szenarien melden ehrlich Skipped).
+
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category=OsInterface"
+
+[xUnit.net]     Softwareschmiede.Tests.E2E.End2EndTest.ConPty_LifecycleUndReplay_E2E [SKIP]
+[xUnit.net]     Softwareschmiede.Tests.E2E.End2EndTest.TerminalText_LiveMarkCopyAndKeepSelection_E2E [SKIP]
+[xUnit.net]     Softwareschmiede.Tests.E2E.End2EndTest.ConPty_WeitereLebenszyklusSzenarien_E2E [SKIP]
+[xUnit.net]     Softwareschmiede.Tests.E2E.End2EndTest.ConPty_SessionReattach_KeineDoppelausgabe_E2E [SKIP]
+[xUnit.net]     Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungAusfuehrungTests.InitialisierungsskriptAusfuehrung [SKIP]
+
+Enthält den neuen konsolidierten E2E Einstellungen_AusfuehrungsLimitsGlobalUndProPlugin_E2E
+(innerhalb General_BasisUndEinstellungen_E2E): globales Limit + Plugin-Limit setzen,
+speichern, neu laden, persistieren, Validierungs-Negativpfad — bestanden
+(fokussierter Einzellauf des Szenarios: 1 m 9 s, bestanden).
+
+Bestanden!   : Fehler:     0, erfolgreich:    66, übersprungen:     5, gesamt:    71, Dauer: 16 m 45 s - Softwareschmiede.Tests.dll (net10.0)

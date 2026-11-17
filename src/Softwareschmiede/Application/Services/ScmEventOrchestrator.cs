@@ -17,7 +17,7 @@ public sealed class ScmEventOrchestrator(
     AufgabeService tasks, KiAusfuehrungsService cli, ScmEventExchangeProtocol exchange,
     ScmEventChangeNotifier notifier, IServiceScopeFactory scopes, TimeProvider time, IOptions<ScmEventOptions> options,
     AppEinstellungService einstellungen, PullRequestReferenzService pullRequestReferenzen,
-    ProtokollService protokoll)
+    ProtokollService protokoll, ScmEventExecutionLimitService executionLimits)
 {
     /// <summary>Versucht Zustellung oder rekonstruiert ausschließlich den schon begonnenen Versuch.</summary>
     public async Task DispatchAsync(Guid eventId, string? explicitPluginPrefix = null, CancellationToken ct = default)
@@ -181,14 +181,31 @@ public sealed class ScmEventOrchestrator(
                     }
                     if (string.IsNullOrWhiteSpace(prefix))
                     { await WaitWithCommentAsync(item, observation, responder, "Keine Standard-CLI konfiguriert. Ereignis öffnen und CLI auswählen.", ct); return; }
-                    var kiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);
-                    if (!await kiPlugin.CheckHealthAsync(ct)) throw new InvalidOperationException("Die ausgewählte CLI ist nicht startbereit.");
-                    var parameters = prefix.Contains("KiSimulator", StringComparison.OrdinalIgnoreCase) ? "--scm-exchange" : null;
-                    if (string.IsNullOrWhiteSpace(task.LokalerKlonPfad))
-                        await development.ProzessStartenUndCliStartenAsync(task.Id, task.GitRepository!.RepositoryUrl,
-                            task.BasisBranchName, prefix, ct, strictPluginSelection: true, optionalParameters: parameters);
-                    else
-                        await development.CliNeustartenAsync(task.Id, prefix, parameters, ct, strictPluginSelection: true);
+                    // Zulassungskontrolle unmittelbar vor dem CLI-Start: Erreichtes globales oder
+                    // Plugin-Limit lässt das Ereignis ohne neue Ausführung ehrlich warten. Prüfung
+                    // und Platzbelegung sind eine atomare Operation; die Reservierung deckt das
+                    // gesamte Startfenster (Plugin-Auflösung, Health-Check, Prozessstart) ab und
+                    // wird nach der Handle-Registrierung von der echten Laufzählung abgelöst —
+                    // so kann kein nebenläufiger Dispatch zwischen Prüfung und Start rutschen.
+                    var zulassung = await executionLimits.PruefeUndReserviereStartPlatzAsync(prefix, ct);
+                    if (zulassung.Wartegrund is not null)
+                    {
+                        if (!string.Equals(item.Reason, zulassung.Wartegrund, StringComparison.Ordinal))
+                            await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.SystemMeldung, zulassung.Wartegrund, ct: ct);
+                        await WaitAsync(item, zulassung.Wartegrund, ct);
+                        return;
+                    }
+                    using (zulassung.Reservierung)
+                    {
+                        var kiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);
+                        if (!await kiPlugin.CheckHealthAsync(ct)) throw new InvalidOperationException("Die ausgewählte CLI ist nicht startbereit.");
+                        var parameters = prefix.Contains("KiSimulator", StringComparison.OrdinalIgnoreCase) ? "--scm-exchange" : null;
+                        if (string.IsNullOrWhiteSpace(task.LokalerKlonPfad))
+                            await development.ProzessStartenUndCliStartenAsync(task.Id, task.GitRepository!.RepositoryUrl,
+                                task.BasisBranchName, prefix, ct, strictPluginSelection: true, optionalParameters: parameters);
+                        else
+                            await development.CliNeustartenAsync(task.Id, prefix, parameters, ct, strictPluginSelection: true);
+                    }
                     adapter = cli.GetScmPromptSession(task.Id);
                 }
                 if (adapter is null || !adapter.IsAlive)
