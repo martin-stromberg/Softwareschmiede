@@ -161,7 +161,24 @@ public sealed class ScmEventOrchestrator(
                 { await WaitWithCommentAsync(item, observation, responder, "Antwortkanal für diese CLI nicht verfügbar: Sitzung ohne geprüften Startvertrag.", ct); return; }
                 if (adapter is null || !adapter.IsAlive)
                 {
-                    var prefix = explicitPluginPrefix ?? await selection.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(task.KiPluginPrefix, task.ProjektId, ct);
+                    var prefix = explicitPluginPrefix;
+                    if (prefix is null)
+                    {
+                        var resolution = await selection.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(task.KiPluginPrefix, task.ProjektId, ct);
+                        prefix = resolution.PluginPrefix;
+                        if (prefix is null && resolution.IgnoredPluginPrefixes.Count > 0)
+                        {
+                            var reason = "Die gespeicherte Standard-CLI-Zuordnung ("
+                                + string.Join(", ", resolution.IgnoredPluginPrefixes.Select(x => $"'{x}'"))
+                                + ") ist nicht mehr installiert oder aktiviert, und es ist kein ausführbares Standard-Plugin konfiguriert. Plugin in den Einstellungen aktivieren oder Ereignis öffnen und CLI auswählen.";
+                            // Protokolleintrag nur bei geändertem Wartegrund, damit der Poll-Zyklus
+                            // nicht bei jedem Versuch denselben Eintrag erzeugt.
+                            if (!string.Equals(item.Reason, reason, StringComparison.Ordinal))
+                                await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.SystemMeldung, reason, ct: ct);
+                            await WaitWithCommentAsync(item, observation, responder, reason, ct);
+                            return;
+                        }
+                    }
                     if (string.IsNullOrWhiteSpace(prefix))
                     { await WaitWithCommentAsync(item, observation, responder, "Keine Standard-CLI konfiguriert. Ereignis öffnen und CLI auswählen.", ct); return; }
                     var kiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);

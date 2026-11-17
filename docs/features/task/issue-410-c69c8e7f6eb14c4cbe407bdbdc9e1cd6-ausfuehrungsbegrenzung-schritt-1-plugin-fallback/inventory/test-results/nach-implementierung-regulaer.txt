@@ -1,0 +1,24 @@
+  Wiederherzustellende Projekte werden ermittelt...
+  Alle Projekte sind für die Wiederherstellung auf dem neuesten Stand.
+  Softwareschmiede.Plugin.Contracts -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\src\Softwareschmiede.Plugin.Contracts\bin\Debug\net10.0\Softwareschmiede.Plugin.Contracts.dll
+  Softwareschmiede.Plugin.Codex -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\plugins\Softwareschmiede.Plugin.Codex\bin\Debug\net10.0\Softwareschmiede.Plugin.Codex.dll
+  Softwareschmiede.Plugin.GitHub -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\plugins\Softwareschmiede.Plugin.GitHub\bin\Debug\net10.0\Softwareschmiede.Plugin.GitHub.dll
+  Softwareschmiede.Plugin.BitBucket -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\plugins\Softwareschmiede.Plugin.BitBucket\bin\Debug\net10.0\Softwareschmiede.Plugin.BitBucket.dll
+  Softwareschmiede.Plugin.GitHubCopilot -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\Debug\net10.0\Softwareschmiede.Plugin.GitHubCopilot.dll
+  Softwareschmiede.Plugin.Devin -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\plugins\Softwareschmiede.Plugin.Devin\bin\Debug\net10.0\Softwareschmiede.Plugin.Devin.dll
+  Softwareschmiede.Plugin.LocalDirectory -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\plugins\Softwareschmiede.Plugin.LocalDirectory\bin\Debug\net10.0\Softwareschmiede.Plugin.LocalDirectory.dll
+  Softwareschmiede.Plugin.ClaudeCli -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\Debug\net10.0\Softwareschmiede.Plugin.ClaudeCli.dll
+  Softwareschmiede -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\src\Softwareschmiede\bin\Debug\net10.0\Softwareschmiede.dll
+  Softwareschmiede.Plugin.KiSimulator -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\plugins\Softwareschmiede.Plugin.KiSimulator\bin\Debug\net10.0\Softwareschmiede.Plugin.KiSimulator.dll
+  Softwareschmiede.App -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\src\Softwareschmiede.App\bin\Debug\net10.0-windows10.0.17763.0\Softwareschmiede.App.dll
+  Softwareschmiede.Tests -> D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\src\Softwareschmiede.Tests\bin\Debug\net10.0-windows10.0.17763.0\Softwareschmiede.Tests.dll
+Testlauf für "D:\Repositories\softwareschmiede\c69c8e7f-6eb1-4c4c-be40-7bdbdc9e1cd6\src\Softwareschmiede.Tests\bin\Debug\net10.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" (.NETCoreApp,Version=v10.0)
+Insgesamt 1 Testdateien stimmten mit dem angegebenen Muster überein.
+[xUnit.net 00:03:08.44]     Softwareschmiede.Tests.Infrastructure.Services.SystemShutdownServiceTests.ResolveShutdownCommand_Linux_BleibtUnveraendert [SKIP]
+  Übersprungen Softwareschmiede.Tests.Infrastructure.Services.SystemShutdownServiceTests.ResolveShutdownCommand_Linux_BleibtUnveraendert [< 1 ms]
+[xUnit.net 00:03:08.44]     Softwareschmiede.Tests.Infrastructure.Services.SystemShutdownServiceTests.ResolveShutdownCommand_MacOS_BleibtUnveraendert [SKIP]
+  Übersprungen Softwareschmiede.Tests.Infrastructure.Services.SystemShutdownServiceTests.ResolveShutdownCommand_MacOS_BleibtUnveraendert [< 1 ms]
+[xUnit.net 00:03:10.38]     Softwareschmiede.Tests.Application.Services.ArbeitsverzeichnisOeffnenServiceTests.Oeffne_AufNichtWindows_WirftPlatformNotSupportedException [SKIP]
+  Übersprungen Softwareschmiede.Tests.Application.Services.ArbeitsverzeichnisOeffnenServiceTests.Oeffne_AufNichtWindows_WirftPlatformNotSupportedException [< 1 ms]
+
+Bestanden!   : Fehler:     0, erfolgreich:  2591, übersprungen:     3, gesamt:  2594, Dauer: 3 m 10 s - Softwareschmiede.Tests.dll (net10.0)

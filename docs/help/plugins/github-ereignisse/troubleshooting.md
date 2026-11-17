@@ -14,6 +14,12 @@
 
 **Lösung:** Wähle den Eintrag und lies den angezeigten Wartegrund. Prüfe die CLI-Einstellungen oder den Aufgabenstatus und nutze anschließend **Erneut prüfen** beziehungsweise **Öffnen / CLI auswählen**.
 
+## Der Wartegrund meldet eine gespeicherte Standard-CLI-Zuordnung, die nicht mehr installiert oder aktiviert ist
+
+**Ursache:** Eine für Aufgabe, Projekt oder als globaler Standard gespeicherte CLI-Zuordnung zeigt auf ein KI-Plugin, das deaktiviert, deinstalliert oder nicht ladbar ist, und keine andere konfigurierte Standard-Stufe liefert ein ausführbares Plugin. Die automatische Auswahl überspringt solche Zuordnungen still in Richtung des nächsten Standards; erst wenn keine Stufe mehr ein ausführbares Plugin liefert, bleibt das Ereignis mit dieser Meldung wartend. Der Anlass steht zusätzlich als Systemmeldung im Aufgabenprotokoll. Der Eintrag ist dabei nicht dauerhaft gesperrt.
+
+**Lösung:** Aktiviere oder installiere das im Wartegrund benannte KI-Plugin unter **Einstellungen → Plugins**, oder korrigiere die gespeicherte Zuordnung (Aufgaben-/Projekt-Standard beziehungsweise **Standard KI-Plugin**). Danach genügt **Erneut prüfen** oder der nächste automatische Prüfzyklus — ein manuelles Entsperren ist nicht nötig. Alternativ kannst du das Ereignis öffnen und dort ausdrücklich eine CLI wählen; diese manuelle Auswahl wird allerdings streng geprüft und ersetzt nicht automatisch eine nicht verfügbare Wahl.
+
 ## Der Wartegrund meldet eine Vertrauensabfrage der CLI
 
 **Ursache:** Claude Code, Codex oder Devin fragt beim ersten Start in einem neuen Aufgabenverzeichnis, ob der Ordner vertrauenswürdig ist („Do you trust …"). Bei Devin überspringt der empfohlene Parameter `--respect-workspace-trust false` diese Abfrage; ohne ihn bleibt der Dialog offen. Solange der Dialog offen ist, darf die Anwendung nichts in die CLI eingeben.
