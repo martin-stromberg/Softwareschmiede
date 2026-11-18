@@ -18,7 +18,7 @@ werden vom Orchestrator selbst in getrennten, nacheinander ausgeführten Phasen 
 - [x] Planprüfung (`project-plan-check.md`, Status „Projektplan vollständig")
 - [x] Planungscommit
 - [x] Entwicklungsschritte-Tracking (`steps.md`, `status.html`)
-- [ ] Entwicklungsschleife (Schritte 1..n mit Lifecycle + Abnahme + Merge)
+- [x] Entwicklungsschleife (Schritte 1–3 mit Lifecycle + Abnahme + Merge)
 - [ ] Aufräumen (Projektverzeichnis per `git rm -r` entfernen)
 - [ ] Abschlusscommit
 
