@@ -52,7 +52,7 @@ public sealed class ProjektServiceTests : IDisposable
         var sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
 
         // Act
-        var result = (await sut.GetUnassignedRepositoriesAsync()).ToList();
+        var result = (await sut.GetUnassignedRepositoriesAsync(TestContext.Current.CancellationToken)).ToList();
 
         // Assert
         result.Should().HaveCount(2);
@@ -65,8 +65,8 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task GetUnassignedRepositoriesAsync_ShouldExcludeAssignedRepositories()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Test-Projekt", null);
-        await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/owner/repo1", "owner/repo1");
+        var projekt = await _sut.CreateAsync("Test-Projekt", null, TestContext.Current.CancellationToken);
+        await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/owner/repo1", "owner/repo1", ct: TestContext.Current.CancellationToken);
 
         var repoAssigned = new AvailableRepository("repo1", DateTime.UtcNow, "owner/repo1", "https://github.com/owner/repo1");
         var repoFree = new AvailableRepository("repo2", DateTime.UtcNow, "owner/repo2", "https://github.com/owner/repo2");
@@ -75,7 +75,7 @@ public sealed class ProjektServiceTests : IDisposable
         var sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
 
         // Act
-        var result = (await sut.GetUnassignedRepositoriesAsync()).ToList();
+        var result = (await sut.GetUnassignedRepositoriesAsync(TestContext.Current.CancellationToken)).ToList();
 
         // Assert
         result.Should().HaveCount(1);
@@ -100,7 +100,7 @@ public sealed class ProjektServiceTests : IDisposable
         var sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
 
         // Act
-        var result = (await sut.GetUnassignedRepositoriesAsync()).ToList();
+        var result = (await sut.GetUnassignedRepositoriesAsync(TestContext.Current.CancellationToken)).ToList();
 
         // Assert
         result.Should().HaveCount(3);
@@ -127,7 +127,7 @@ public sealed class ProjektServiceTests : IDisposable
         var sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
 
         // Act
-        var result = (await sut.GetUnassignedRepositoriesAsync()).ToList();
+        var result = (await sut.GetUnassignedRepositoriesAsync(TestContext.Current.CancellationToken)).ToList();
 
         // Assert
         result.Should().HaveCount(1);
@@ -139,8 +139,8 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task GetUnassignedRepositoriesAsync_ShouldReturnEmptyList_WhenAllRepositoriesAssigned()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Test-Projekt", null);
-        await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/owner/repo1", "owner/repo1");
+        var projekt = await _sut.CreateAsync("Test-Projekt", null, TestContext.Current.CancellationToken);
+        await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/owner/repo1", "owner/repo1", ct: TestContext.Current.CancellationToken);
 
         var repo = new AvailableRepository("repo1", DateTime.UtcNow, "owner/repo1", "https://github.com/owner/repo1");
         var plugin = CreatePluginMockWithRepositories(repo);
@@ -148,7 +148,7 @@ public sealed class ProjektServiceTests : IDisposable
         var sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
 
         // Act
-        var result = (await sut.GetUnassignedRepositoriesAsync()).ToList();
+        var result = (await sut.GetUnassignedRepositoriesAsync(TestContext.Current.CancellationToken)).ToList();
 
         // Assert
         result.Should().BeEmpty();
@@ -163,7 +163,7 @@ public sealed class ProjektServiceTests : IDisposable
         const string beschreibung = "Eine Beschreibung";
 
         // Act
-        var result = await _sut.CreateAsync(name, beschreibung);
+        var result = await _sut.CreateAsync(name, beschreibung, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -179,10 +179,10 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task CreateAsync_ShouldPersistProjekt_WhenCalledWithValidName()
     {
         // Arrange & Act
-        var result = await _sut.CreateAsync("Persistiertes Projekt", null);
+        var result = await _sut.CreateAsync("Persistiertes Projekt", null, TestContext.Current.CancellationToken);
 
         // Assert
-        var persisted = await _sut.GetByIdAsync(result.Id);
+        var persisted = await _sut.GetByIdAsync(result.Id, TestContext.Current.CancellationToken);
         persisted.Should().NotBeNull();
         persisted!.Name.Should().Be("Persistiertes Projekt");
     }
@@ -192,12 +192,12 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task GetAllAsync_ShouldReturnAllProjekteOrderedByName_WhenMultipleProjekteExist()
     {
         // Arrange
-        await _sut.CreateAsync("Zebra Projekt", null);
-        await _sut.CreateAsync("Alpha Projekt", null);
-        await _sut.CreateAsync("Mitte Projekt", null);
+        await _sut.CreateAsync("Zebra Projekt", null, TestContext.Current.CancellationToken);
+        await _sut.CreateAsync("Alpha Projekt", null, TestContext.Current.CancellationToken);
+        await _sut.CreateAsync("Mitte Projekt", null, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetAllAsync();
+        var result = await _sut.GetAllAsync(TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(3);
@@ -214,7 +214,7 @@ public sealed class ProjektServiceTests : IDisposable
         var nonExistentId = Guid.NewGuid();
 
         // Act
-        var result = await _sut.GetByIdAsync(nonExistentId);
+        var result = await _sut.GetByIdAsync(nonExistentId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
@@ -225,10 +225,10 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task UpdateAsync_ShouldUpdateNameAndBeschreibung_WhenProjektExists()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Alter Name", "Alte Beschreibung");
+        var projekt = await _sut.CreateAsync("Alter Name", "Alte Beschreibung", TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.UpdateAsync(projekt.Id, "Neuer Name", "Neue Beschreibung");
+        var result = await _sut.UpdateAsync(projekt.Id, "Neuer Name", "Neue Beschreibung", TestContext.Current.CancellationToken);
 
         // Assert
         result.Name.Should().Be("Neuer Name");
@@ -255,13 +255,13 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task ArchivierenAsync_ShouldSetStatusToArchiviert_WhenProjektExists()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Zu archivierendes Projekt", null);
+        var projekt = await _sut.CreateAsync("Zu archivierendes Projekt", null, TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.ArchivierenAsync(projekt.Id);
+        await _sut.ArchivierenAsync(projekt.Id, TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(projekt.Id);
+        var result = await _sut.GetByIdAsync(projekt.Id, TestContext.Current.CancellationToken);
         result!.Status.Should().Be(ProjektStatus.Archiviert);
     }
 
@@ -284,13 +284,13 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task DeleteAsync_ShouldRemoveProjekt_WhenProjektExists()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Zu löschendes Projekt", null);
+        var projekt = await _sut.CreateAsync("Zu löschendes Projekt", null, TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.DeleteAsync(projekt.Id);
+        await _sut.DeleteAsync(projekt.Id, TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(projekt.Id);
+        var result = await _sut.GetByIdAsync(projekt.Id, TestContext.Current.CancellationToken);
         result.Should().BeNull();
     }
 
@@ -313,14 +313,10 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task AddRepositoryAsync_ShouldAddRepository_WhenProjektExists()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit Repository", null);
+        var projekt = await _sut.CreateAsync("Projekt mit Repository", null, TestContext.Current.CancellationToken);
 
         // Act
-        var repo = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/repo",
-            "test/repo");
+        var repo = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/repo", "test/repo", ct: TestContext.Current.CancellationToken);
 
         // Assert
         repo.Should().NotBeNull();
@@ -335,17 +331,14 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task AddRepositoryAsync_ShouldUseSourceDirectoryForLocalDirectoryPlugin_WhenFieldValuesAreValid()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Lokales Projekt", null);
+        var projekt = await _sut.CreateAsync("Lokales Projekt", null, TestContext.Current.CancellationToken);
         var sourceDirectory = @"C:\repos\local-source";
 
         // Act
-        var repo = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "LocalDirectoryPlugin",
-            new Dictionary<string, string>
-            {
-                ["SourceDirectory"] = sourceDirectory
-            });
+        var repo = await _sut.AddRepositoryAsync(projekt.Id, "LocalDirectoryPlugin", new Dictionary<string, string>
+        {
+            ["SourceDirectory"] = sourceDirectory
+        }, TestContext.Current.CancellationToken);
 
         // Assert
         repo.RepositoryUrl.Should().Be(sourceDirectory);
@@ -358,7 +351,7 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task AddRepositoryAsync_ShouldThrow_WhenSourceDirectoryIsMissingForLocalDirectoryPlugin()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Lokales Projekt ohne SourceDirectory", null);
+        var projekt = await _sut.CreateAsync("Lokales Projekt ohne SourceDirectory", null, TestContext.Current.CancellationToken);
 
         // Act
         var act = () => _sut.AddRepositoryAsync(
@@ -376,15 +369,11 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task AddRepositoryAsync_ShouldMapRepositoryUrlToSourceDirectory_WhenUsingStringOverloadForLocalDirectoryPlugin()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Lokales Projekt per String-Overload", null);
+        var projekt = await _sut.CreateAsync("Lokales Projekt per String-Overload", null, TestContext.Current.CancellationToken);
         var sourceDirectory = @"C:\repos\local-source";
 
         // Act
-        var repo = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "LocalDirectoryPlugin",
-            sourceDirectory,
-            string.Empty);
+        var repo = await _sut.AddRepositoryAsync(projekt.Id, "LocalDirectoryPlugin", sourceDirectory, string.Empty, ct: TestContext.Current.CancellationToken);
 
         // Assert
         repo.RepositoryUrl.Should().Be(sourceDirectory);
@@ -401,16 +390,13 @@ public sealed class ProjektServiceTests : IDisposable
         string expectedRepositoryName)
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Lokales Projekt mit Randfällen", null);
+        var projekt = await _sut.CreateAsync("Lokales Projekt mit Randfällen", null, TestContext.Current.CancellationToken);
 
         // Act
-        var repo = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "LocalDirectoryPlugin",
-            new Dictionary<string, string>
-            {
-                ["SourceDirectory"] = sourceDirectoryInput
-            });
+        var repo = await _sut.AddRepositoryAsync(projekt.Id, "LocalDirectoryPlugin", new Dictionary<string, string>
+        {
+            ["SourceDirectory"] = sourceDirectoryInput
+        }, TestContext.Current.CancellationToken);
 
         // Assert
         repo.RepositoryUrl.Should().Be(sourceDirectoryInput.Trim());
@@ -424,7 +410,7 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task AddRepositoryAsync_ShouldThrow_WhenRepositoryUrlIsMissingForGitHubPlugin(string pluginPrefix)
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("GitHub-Projekt ohne URL", null);
+        var projekt = await _sut.CreateAsync("GitHub-Projekt ohne URL", null, TestContext.Current.CancellationToken);
 
         // Act
         var act = () => _sut.AddRepositoryAsync(
@@ -447,7 +433,7 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task AddRepositoryAsync_ShouldThrow_WhenRepositoryNameIsMissingForGitHubPlugin(string pluginPrefix)
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("GitHub-Projekt ohne Name", null);
+        var projekt = await _sut.CreateAsync("GitHub-Projekt ohne Name", null, TestContext.Current.CancellationToken);
 
         // Act
         var act = () => _sut.AddRepositoryAsync(
@@ -468,16 +454,13 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task AddRepositoryAsync_ShouldDeriveRepositoryName_FromRepositoryUrl_WhenNameMissing_ForNonGitHubPlugin()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Custom-SCM ohne Namen", null);
+        var projekt = await _sut.CreateAsync("Custom-SCM ohne Namen", null, TestContext.Current.CancellationToken);
 
         // Act
-        var repo = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "Softwareschmiede.CustomScm",
-            new Dictionary<string, string>
-            {
-                ["RepositoryUrl"] = "https://github.com/owner/repo"
-            });
+        var repo = await _sut.AddRepositoryAsync(projekt.Id, "Softwareschmiede.CustomScm", new Dictionary<string, string>
+        {
+            ["RepositoryUrl"] = "https://github.com/owner/repo"
+        }, TestContext.Current.CancellationToken);
 
         // Assert
         repo.RepositoryName.Should().Be("repo");
@@ -488,16 +471,13 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task AddRepositoryAsync_ShouldDeriveRepositoryName_FromLocalPath_WhenNameMissing_ForNonGitHubPlugin()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Custom-SCM mit lokalem Pfad", null);
+        var projekt = await _sut.CreateAsync("Custom-SCM mit lokalem Pfad", null, TestContext.Current.CancellationToken);
 
         // Act
-        var repo = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "Softwareschmiede.CustomScm",
-            new Dictionary<string, string>
-            {
-                ["RepositoryUrl"] = @"C:\repos\my-repo\"
-            });
+        var repo = await _sut.AddRepositoryAsync(projekt.Id, "Softwareschmiede.CustomScm", new Dictionary<string, string>
+        {
+            ["RepositoryUrl"] = @"C:\repos\my-repo\"
+        }, TestContext.Current.CancellationToken);
 
         // Assert
         repo.RepositoryName.Should().Be("my-repo");
@@ -508,7 +488,7 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task AddRepositoryAsync_ShouldThrow_WhenDerivedRepositoryNameIsEmpty_ForNonGitHubPlugin()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Custom-SCM mit nicht ableitbarem Namen", null);
+        var projekt = await _sut.CreateAsync("Custom-SCM mit nicht ableitbarem Namen", null, TestContext.Current.CancellationToken);
 
         // Act
         var act = () => _sut.AddRepositoryAsync(
@@ -529,17 +509,14 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task AddRepositoryAsync_ShouldPreferExplicitRepositoryName_OverDerivedName_ForNonGitHubPlugin()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Custom-SCM mit Override-Namen", null);
+        var projekt = await _sut.CreateAsync("Custom-SCM mit Override-Namen", null, TestContext.Current.CancellationToken);
 
         // Act
-        var repo = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "Softwareschmiede.CustomScm",
-            new Dictionary<string, string>
-            {
-                ["RepositoryUrl"] = "https://github.com/owner/repo",
-                ["RepositoryName"] = "override-name"
-            });
+        var repo = await _sut.AddRepositoryAsync(projekt.Id, "Softwareschmiede.CustomScm", new Dictionary<string, string>
+        {
+            ["RepositoryUrl"] = "https://github.com/owner/repo",
+            ["RepositoryName"] = "override-name"
+        }, TestContext.Current.CancellationToken);
 
         // Assert
         repo.RepositoryName.Should().Be("override-name");
@@ -550,14 +527,14 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task RemoveRepositoryAsync_ShouldRemoveRepository_WhenRepositoryExists()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt für Repository-Entfernung", null);
-        var repo = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/repo2", "test/repo2");
+        var projekt = await _sut.CreateAsync("Projekt für Repository-Entfernung", null, TestContext.Current.CancellationToken);
+        var repo = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/repo2", "test/repo2", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.RemoveRepositoryAsync(repo.Id);
+        await _sut.RemoveRepositoryAsync(repo.Id, TestContext.Current.CancellationToken);
 
         // Assert
-        var detail = await _sut.GetDetailAsync(projekt.Id);
+        var detail = await _sut.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
         detail!.Repositories.Should().BeEmpty();
     }
 
@@ -566,25 +543,18 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task SaveRepositoryStartKonfigurationAsync_ShouldCreateConfiguration_WhenRepositoryExists()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit Startkonfiguration", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/start",
-            "test/start");
+        var projekt = await _sut.CreateAsync("Projekt mit Startkonfiguration", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/start", "test/start", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var saved = await _sut.SaveRepositoryStartKonfigurationAsync(
-            repository.Id,
-            " scripts/start.ps1 ",
-            true);
+        var saved = await _sut.SaveRepositoryStartKonfigurationAsync(repository.Id, " scripts/start.ps1 ", true, TestContext.Current.CancellationToken);
 
         // Assert
         saved.GitRepositoryId.Should().Be(repository.Id);
         saved.StartScriptRelativePath.Should().Be("scripts/start.ps1");
         saved.Aktiv.Should().BeTrue();
 
-        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
         persisted.Should().NotBeNull();
         persisted!.StartScriptRelativePath.Should().Be("scripts/start.ps1");
     }
@@ -594,23 +564,13 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task SaveRepositoryStartKonfigurationAsync_ShouldUpdateExistingConfiguration_WhenAlreadyPresent()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit bestehender Konfiguration", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/start-existing",
-            "test/start-existing");
+        var projekt = await _sut.CreateAsync("Projekt mit bestehender Konfiguration", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/start-existing", "test/start-existing", ct: TestContext.Current.CancellationToken);
 
-        var first = await _sut.SaveRepositoryStartKonfigurationAsync(
-            repository.Id,
-            "scripts/start.ps1",
-            true);
+        var first = await _sut.SaveRepositoryStartKonfigurationAsync(repository.Id, "scripts/start.ps1", true, TestContext.Current.CancellationToken);
 
         // Act
-        var updated = await _sut.SaveRepositoryStartKonfigurationAsync(
-            repository.Id,
-            "scripts/updated.ps1",
-            false);
+        var updated = await _sut.SaveRepositoryStartKonfigurationAsync(repository.Id, "scripts/updated.ps1", false, TestContext.Current.CancellationToken);
 
         // Assert
         updated.Id.Should().Be(first.Id);
@@ -623,18 +583,14 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task SaveRepositoryWorkingDirectoryAsync_ShouldCreateConfiguration_WhenRepositoryExists()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit Arbeitsverzeichnis", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/workdir",
-            "test/workdir");
+        var projekt = await _sut.CreateAsync("Projekt mit Arbeitsverzeichnis", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/workdir", "test/workdir", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, "backend");
+        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, "backend", TestContext.Current.CancellationToken);
 
         // Assert
-        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
         persisted.Should().NotBeNull();
         persisted!.WorkingDirectoryRelativePath.Should().Be("backend");
     }
@@ -644,19 +600,15 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task SaveRepositoryWorkingDirectoryAsync_ShouldNormalizeDotToNull()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit Root-Arbeitsverzeichnis", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/workdir-root",
-            "test/workdir-root");
+        var projekt = await _sut.CreateAsync("Projekt mit Root-Arbeitsverzeichnis", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/workdir-root", "test/workdir-root", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, "backend");
-        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, ".");
+        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, "backend", TestContext.Current.CancellationToken);
+        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, ".", TestContext.Current.CancellationToken);
 
         // Assert
-        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
         persisted.Should().NotBeNull();
         persisted!.WorkingDirectoryRelativePath.Should().BeNull();
     }
@@ -666,18 +618,14 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task SaveRepositoryWorkingDirectoryAsync_ShouldNotCreateConfiguration_WhenRootAndNoneExists()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt ohne Startkonfiguration bei Root", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/workdir-noop",
-            "test/workdir-noop");
+        var projekt = await _sut.CreateAsync("Projekt ohne Startkonfiguration bei Root", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/workdir-noop", "test/workdir-noop", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, null);
+        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, null, TestContext.Current.CancellationToken);
 
         // Assert
-        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
         persisted.Should().BeNull();
     }
 
@@ -686,19 +634,15 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task SaveRepositoryWorkingDirectoryAsync_ShouldPreserveExistingStartScript()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit Startskript und Arbeitsverzeichnis", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/workdir-script",
-            "test/workdir-script");
-        await _sut.SaveRepositoryStartKonfigurationAsync(repository.Id, "scripts/start.ps1", true);
+        var projekt = await _sut.CreateAsync("Projekt mit Startskript und Arbeitsverzeichnis", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/workdir-script", "test/workdir-script", ct: TestContext.Current.CancellationToken);
+        await _sut.SaveRepositoryStartKonfigurationAsync(repository.Id, "scripts/start.ps1", true, TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, "backend");
+        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, "backend", TestContext.Current.CancellationToken);
 
         // Assert
-        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
         persisted.Should().NotBeNull();
         persisted!.StartScriptRelativePath.Should().Be("scripts/start.ps1");
         persisted.WorkingDirectoryRelativePath.Should().Be("backend");
@@ -709,15 +653,11 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task GetRepositoryStartKonfigurationAsync_ShouldReturnNull_WhenNoConfigurationExists()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt ohne Konfiguration", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/no-config",
-            "test/no-config");
+        var projekt = await _sut.CreateAsync("Projekt ohne Konfiguration", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/no-config", "test/no-config", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+        var result = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
@@ -728,12 +668,8 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task SaveRepositoryStartKonfigurationAsync_ShouldThrow_WhenScriptPathIsAbsolute()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit invalider Konfiguration", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/invalid",
-            "test/invalid");
+        var projekt = await _sut.CreateAsync("Projekt mit invalider Konfiguration", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/invalid", "test/invalid", ct: TestContext.Current.CancellationToken);
         var absolutePath = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\", "start.ps1");
 
         // Act
@@ -752,24 +688,18 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task SaveRepositoryInitialisierungskriptAsync_ShouldCreateConfiguration_WhenRepositoryExists()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit Initialisierungskonfiguration", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/init",
-            "test/init");
+        var projekt = await _sut.CreateAsync("Projekt mit Initialisierungskonfiguration", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/init", "test/init", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var saved = await _sut.SaveRepositoryInitialisierungskriptAsync(
-            repository.Id,
-            " scripts/init.ps1 ");
+        var saved = await _sut.SaveRepositoryInitialisierungskriptAsync(repository.Id, " scripts/init.ps1 ", TestContext.Current.CancellationToken);
 
         // Assert
         saved.Should().NotBeNull();
         saved!.GitRepositoryId.Should().Be(repository.Id);
         saved.InitialisierungsskriptRelativePath.Should().Be("scripts/init.ps1");
 
-        var persisted = await _sut.GetDetailAsync(projekt.Id);
+        var persisted = await _sut.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
         var persistedRepository = persisted!.Repositories.Single(r => r.Id == repository.Id);
         persistedRepository.InitialisierungKonfiguration.Should().NotBeNull();
         persistedRepository.InitialisierungKonfiguration!.InitialisierungsskriptRelativePath.Should().Be("scripts/init.ps1");
@@ -780,21 +710,13 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task SaveRepositoryInitialisierungskriptAsync_ShouldUpdateExistingConfiguration_WhenAlreadyPresent()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit bestehender Initialisierungskonfiguration", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/init-existing",
-            "test/init-existing");
+        var projekt = await _sut.CreateAsync("Projekt mit bestehender Initialisierungskonfiguration", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/init-existing", "test/init-existing", ct: TestContext.Current.CancellationToken);
 
-        var first = await _sut.SaveRepositoryInitialisierungskriptAsync(
-            repository.Id,
-            "scripts/init.ps1");
+        var first = await _sut.SaveRepositoryInitialisierungskriptAsync(repository.Id, "scripts/init.ps1", TestContext.Current.CancellationToken);
 
         // Act
-        var updated = await _sut.SaveRepositoryInitialisierungskriptAsync(
-            repository.Id,
-            "scripts/updated-init.ps1");
+        var updated = await _sut.SaveRepositoryInitialisierungskriptAsync(repository.Id, "scripts/updated-init.ps1", TestContext.Current.CancellationToken);
 
         // Assert
         updated.Should().NotBeNull();
@@ -811,21 +733,17 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task SaveRepositoryInitialisierungskriptAsync_ShouldDeleteExistingConfiguration_WhenPathIsNullOrEmpty(string? emptyPath)
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit zu löschender Initialisierungskonfiguration", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/init-delete",
-            "test/init-delete");
-        await _sut.SaveRepositoryInitialisierungskriptAsync(repository.Id, "scripts/init.ps1");
+        var projekt = await _sut.CreateAsync("Projekt mit zu löschender Initialisierungskonfiguration", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/init-delete", "test/init-delete", ct: TestContext.Current.CancellationToken);
+        await _sut.SaveRepositoryInitialisierungskriptAsync(repository.Id, "scripts/init.ps1", TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.SaveRepositoryInitialisierungskriptAsync(repository.Id, emptyPath);
+        var result = await _sut.SaveRepositoryInitialisierungskriptAsync(repository.Id, emptyPath, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
 
-        var persisted = await _sut.GetDetailAsync(projekt.Id);
+        var persisted = await _sut.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
         var persistedRepository = persisted!.Repositories.Single(r => r.Id == repository.Id);
         persistedRepository.InitialisierungKonfiguration.Should().BeNull();
     }
@@ -835,12 +753,8 @@ public sealed class ProjektServiceTests : IDisposable
     public async Task SaveRepositoryInitialisierungskriptAsync_ShouldThrow_WhenScriptPathIsAbsolute()
     {
         // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit invalider Initialisierungskonfiguration", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/init-invalid",
-            "test/init-invalid");
+        var projekt = await _sut.CreateAsync("Projekt mit invalider Initialisierungskonfiguration", null, TestContext.Current.CancellationToken);
+        var repository = await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/init-invalid", "test/init-invalid", ct: TestContext.Current.CancellationToken);
         var absolutePath = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\", "init.ps1");
 
         // Act

@@ -38,7 +38,7 @@ public sealed class KiSimulatorPluginTests
     [Fact]
     public async Task CheckHealthAsync_ShouldReturnTrue()
     {
-        var result = await _sut.CheckHealthAsync();
+        var result = await _sut.CheckHealthAsync(TestContext.Current.CancellationToken);
         result.Should().BeTrue();
     }
 
@@ -46,7 +46,7 @@ public sealed class KiSimulatorPluginTests
     [Fact]
     public async Task StartCliAsync_ShouldReturnProcessStartInfoWithCmdExe()
     {
-        var psi = await _sut.StartCliAsync(@"C:\repos\demo");
+        var psi = await _sut.StartCliAsync(@"C:\repos\demo", ct: TestContext.Current.CancellationToken);
 
         psi.FileName.Should().Be("cmd.exe");
         psi.WorkingDirectory.Should().Be(@"C:\repos\demo");
@@ -59,7 +59,7 @@ public sealed class KiSimulatorPluginTests
     [Fact]
     public async Task GetTerminalStartSpecAsync_LiefertInteraktiveShellMitBanner()
     {
-        var spec = await _sut.GetTerminalStartSpecAsync(@"C:\repos\demo");
+        var spec = await _sut.GetTerminalStartSpecAsync(@"C:\repos\demo", ct: TestContext.Current.CancellationToken);
 
         spec.FileName.Should().Be("cmd.exe");
         spec.Arguments.Should().Contain("/k");

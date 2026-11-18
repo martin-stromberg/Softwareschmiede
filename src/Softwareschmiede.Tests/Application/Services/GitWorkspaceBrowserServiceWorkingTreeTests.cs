@@ -29,13 +29,13 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src", "nested"));
-        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "readme.md"), "root file");
-        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "Program.cs"), "code");
-        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "nested", "Deep.cs"), "deep code");
+        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "readme.md"), "root file", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "Program.cs"), "code", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "nested", "Deep.cs"), "deep code", TestContext.Current.CancellationToken);
 
         var service = CreateService();
 
-        var nodes = await service.LoadWorkingTreeAsync(repositoryPath);
+        var nodes = await service.LoadWorkingTreeAsync(repositoryPath, ct: TestContext.Current.CancellationToken);
 
         nodes.Should().Contain(node => !node.IsDirectory && node.Name == "readme.md");
         var srcNode = nodes.Should().ContainSingle(node => node.IsDirectory && node.Name == "src").Subject;
@@ -51,11 +51,11 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src", "nested"));
-        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "nested", "Deep.cs"), "deep code");
+        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "nested", "Deep.cs"), "deep code", TestContext.Current.CancellationToken);
 
         var service = CreateService();
 
-        var nodes = await service.LoadWorkingTreeAsync(repositoryPath, maxInitialDepth: 2);
+        var nodes = await service.LoadWorkingTreeAsync(repositoryPath, maxInitialDepth: 2, ct: TestContext.Current.CancellationToken);
 
         var srcNode = nodes.Should().ContainSingle(node => node.IsDirectory && node.Name == "src").Subject;
         var nestedNode = srcNode.Children.Should().ContainSingle(node => node.IsDirectory && node.Name == "nested").Subject;
@@ -68,11 +68,11 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src"));
-        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "Program.cs"), "code");
+        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "Program.cs"), "code", TestContext.Current.CancellationToken);
 
         var service = CreateService();
 
-        var nodes = await service.LoadWorkingTreeAsync(repositoryPath, maxInitialDepth: 2);
+        var nodes = await service.LoadWorkingTreeAsync(repositoryPath, maxInitialDepth: 2, ct: TestContext.Current.CancellationToken);
 
         var srcNode = nodes.Should().ContainSingle(node => node.IsDirectory && node.Name == "src").Subject;
         srcNode.Depth.Should().Be(0);
@@ -89,7 +89,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
         var service = CreateService();
 
-        var nodes = await service.LoadWorkingTreeAsync(repositoryPath, maxInitialDepth: 2);
+        var nodes = await service.LoadWorkingTreeAsync(repositoryPath, maxInitialDepth: 2, ct: TestContext.Current.CancellationToken);
 
         var srcNode = nodes.Should().ContainSingle(node => node.IsDirectory && node.Name == "src").Subject;
         var nestedNode = srcNode.Children.Should().ContainSingle(node => node.IsDirectory && node.Name == "nested").Subject;
@@ -104,11 +104,11 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src"));
-        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "Program.cs"), "code");
+        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "Program.cs"), "code", TestContext.Current.CancellationToken);
 
         var service = CreateService();
 
-        var nodes = await service.LoadWorkingTreeAsync(repositoryPath, maxInitialDepth: 2);
+        var nodes = await service.LoadWorkingTreeAsync(repositoryPath, maxInitialDepth: 2, ct: TestContext.Current.CancellationToken);
 
         var srcNode = nodes.Should().ContainSingle(node => node.IsDirectory && node.Name == "src").Subject;
         srcNode.ChildrenLoaded.Should().BeTrue();
@@ -122,12 +122,12 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, ".git"));
-        await File.WriteAllTextAsync(Path.Combine(repositoryPath, ".git", "config"), "git-internals");
-        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "readme.md"), "root file");
+        await File.WriteAllTextAsync(Path.Combine(repositoryPath, ".git", "config"), "git-internals", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "readme.md"), "root file", TestContext.Current.CancellationToken);
 
         var service = CreateService();
 
-        var nodes = await service.LoadWorkingTreeAsync(repositoryPath);
+        var nodes = await service.LoadWorkingTreeAsync(repositoryPath, ct: TestContext.Current.CancellationToken);
 
         nodes.Should().NotContain(node => node.Name == ".git");
         nodes.Should().ContainSingle(node => node.Name == "readme.md");
@@ -140,7 +140,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
         var missingPath = Path.Combine(CreateTempDirectory(), "missing");
         var service = CreateService();
 
-        var nodes = await service.LoadWorkingTreeAsync(missingPath);
+        var nodes = await service.LoadWorkingTreeAsync(missingPath, ct: TestContext.Current.CancellationToken);
 
         nodes.Should().BeEmpty();
     }
@@ -151,11 +151,11 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src", "nested"));
-        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "Program.cs"), "code");
+        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "Program.cs"), "code", TestContext.Current.CancellationToken);
 
         var service = CreateService();
 
-        var nodes = await service.LoadSubtreeAsync(repositoryPath, "src", 1);
+        var nodes = await service.LoadSubtreeAsync(repositoryPath, "src", 1, TestContext.Current.CancellationToken);
 
         nodes.Should().Contain(node => !node.IsDirectory && node.Name == "Program.cs");
         nodes.Should().Contain(node => node.IsDirectory && node.Name == "nested");
@@ -168,11 +168,11 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src", "nested"));
-        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "Program.cs"), "code");
+        await File.WriteAllTextAsync(Path.Combine(repositoryPath, "src", "Program.cs"), "code", TestContext.Current.CancellationToken);
 
         var service = CreateService();
 
-        var nodes = await service.LoadSubtreeAsync(repositoryPath, "src", 3);
+        var nodes = await service.LoadSubtreeAsync(repositoryPath, "src", 3, TestContext.Current.CancellationToken);
 
         nodes.Should().NotBeEmpty();
         nodes.Should().OnlyContain(node => node.Depth == 3);
@@ -187,7 +187,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
         var service = CreateService();
 
-        var nodes = await service.LoadSubtreeAsync(repositoryPath, "src", 1);
+        var nodes = await service.LoadSubtreeAsync(repositoryPath, "src", 1, TestContext.Current.CancellationToken);
 
         var nestedNode = nodes.Should().ContainSingle(node => node.IsDirectory && node.Name == "nested").Subject;
         nestedNode.ChildrenLoaded.Should().BeFalse();
@@ -201,7 +201,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
         var repositoryPath = CreateTempDirectory();
         var service = CreateService();
 
-        var nodes = await service.LoadSubtreeAsync(repositoryPath, "does-not-exist", 1);
+        var nodes = await service.LoadSubtreeAsync(repositoryPath, "does-not-exist", 1, TestContext.Current.CancellationToken);
 
         nodes.Should().BeEmpty();
     }

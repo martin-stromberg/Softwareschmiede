@@ -47,7 +47,7 @@ public sealed class GitHubCopilotPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
 
-        var psi = await _sut.StartCliAsync("/repo/path");
+        var psi = await _sut.StartCliAsync("/repo/path", ct: TestContext.Current.CancellationToken);
 
         psi.FileName.Should().Be("copilot");
         psi.WorkingDirectory.Should().Be("/repo/path");
@@ -60,7 +60,7 @@ public sealed class GitHubCopilotPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHubCopilot.ExecutablePath"))
             .Returns(@"C:\tools\copilot.exe");
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.FileName.Should().Be(@"C:\tools\copilot.exe");
     }
@@ -69,7 +69,7 @@ public sealed class GitHubCopilotPluginTests
     [Fact]
     public async Task StartCliAsync_ShouldPassParameters_AsArguments()
     {
-        var psi = await _sut.StartCliAsync("/repo", "--continue");
+        var psi = await _sut.StartCliAsync("/repo", "--continue", TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Be("--continue");
     }
@@ -81,7 +81,7 @@ public sealed class GitHubCopilotPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token"))
             .Returns("ghp_test-token");
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.EnvironmentVariables["GH_TOKEN"].Should().Be("ghp_test-token");
     }
@@ -93,7 +93,7 @@ public sealed class GitHubCopilotPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHubCopilot.CommandLineParameters"))
             .Returns("--model gpt-4o");
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Contain("--model gpt-4o");
     }

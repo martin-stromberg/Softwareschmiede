@@ -55,8 +55,8 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
         var benutzerId = "test-user";
         var dto = new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Banner, BenachrichtigungsModus.Ton);
 
-        await _einstellungenService.SaveAsync(benutzerId, dto);
-        var geladen = await _einstellungenService.GetAsync(benutzerId);
+        await _einstellungenService.SaveAsync(benutzerId, dto, TestContext.Current.CancellationToken);
+        var geladen = await _einstellungenService.GetAsync(benutzerId, TestContext.Current.CancellationToken);
 
         geladen.BannerModus.Should().Be(BenachrichtigungsModus.Banner);
         geladen.TonModus.Should().Be(BenachrichtigungsModus.Ton);
@@ -89,11 +89,9 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
         };
         _db.Projekte.Add(projekt);
         _db.Aufgaben.Add(aufgabe);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        await _einstellungenService.SaveAsync(
-            benutzerId,
-            new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Deaktiviert));
+        await _einstellungenService.SaveAsync(benutzerId, new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Deaktiviert), TestContext.Current.CancellationToken);
 
         var sut = new BenachrichtigungsService(
             _einstellungenService,
@@ -101,7 +99,7 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
             benutzerService.Object,
             NullLogger<BenachrichtigungsService>.Instance);
 
-        await sut.DispatchAsync(aufgabeId, AufgabeStatus.Gestartet);
+        await sut.DispatchAsync(aufgabeId, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
 
         var logs = _db.BenachrichtigungsDispatchLogs.Where(l => l.AufgabeId == aufgabeId).ToList();
         logs.Should().NotBeEmpty();

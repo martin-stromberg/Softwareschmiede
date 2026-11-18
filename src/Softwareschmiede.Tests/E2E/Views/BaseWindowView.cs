@@ -54,7 +54,10 @@ public abstract class BaseWindowView
     }
 
     /// <summary>Zugriff auf das Navigationsmenü der Anwendung.</summary>
-    public virtual MenuView Menu => new(Window);
+    public virtual MenuView Menu => CreateMenu();
+
+    /// <summary>Erzeugt die Ansicht des Navigationsmenüs für <see cref="Window"/>.</summary>
+    protected virtual MenuView CreateMenu() => new(Window);
 
     /// <param name="parent">Das Element, dessen Teilbaum durchsucht wird.</param>
     /// <param name="conditionFunc">Die Suchbedingung.</param>

@@ -231,8 +231,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
     [Fact]
     public async Task AufgabeBranchName_WhenAufgabeHasBranchName_ReturnsBranchName()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/login-fix", Path.GetTempPath());
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/login-fix", Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -255,7 +255,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         // Assert
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && sut.Aufgabe == null)
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
 
         sut.Aufgabe.Should().NotBeNull("der AufgabeId-Setter muss LadenAsync per SafeFireAndForget auslösen");
     }
@@ -267,7 +267,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task LadeProtokolleAsync_ShouldLoadProtocols_WhenSuccessful()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
-        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Testinhalt");
+        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Testinhalt", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         typeof(TaskDetailViewModel).GetField("_aufgabeId", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(sut, aufgabe.Id);
@@ -321,8 +321,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task LadenAsync_ShouldNotWaitForProtocols()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
-        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Eintrag 1");
-        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.KiAntwort, "Eintrag 2");
+        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Eintrag 1", ct: TestContext.Current.CancellationToken);
+        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.KiAntwort, "Eintrag 2", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
 
@@ -333,7 +333,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && sut.Protokolleintraege.Count < 2)
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
 
         sut.Protokolleintraege.Should().HaveCount(2, "die Protokolleinträge müssen im Hintergrund nachgeladen werden");
     }
@@ -385,7 +385,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task ShowCliPanel_IsTrue_WhenAusfuehrungBeendetIst()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
-        await _aufgabeService.AktivenLaufBeendenAsync(aufgabe.Id);
+        await _aufgabeService.AktivenLaufBeendenAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
 
@@ -421,8 +421,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var tempDir = Directory.CreateTempSubdirectory().FullName;
         try
         {
-            var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
-            await _aufgabeService.StartenAsync(aufgabe.Id, "feature/dateien", tempDir);
+            var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+            await _aufgabeService.StartenAsync(aufgabe.Id, "feature/dateien", tempDir, ct: TestContext.Current.CancellationToken);
             var sut = CreateSut();
             sut.AufgabeId = aufgabe.Id;
             await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -451,8 +451,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var tempDir = Directory.CreateTempSubdirectory().FullName;
         try
         {
-            var aufgabeMitPfad = await _aufgabeService.CreateAsync(_projektId, "MitPfad", "Beschreibung");
-            await _aufgabeService.StartenAsync(aufgabeMitPfad.Id, "feature/mit-pfad", tempDir);
+            var aufgabeMitPfad = await _aufgabeService.CreateAsync(_projektId, "MitPfad", "Beschreibung", ct: TestContext.Current.CancellationToken);
+            await _aufgabeService.StartenAsync(aufgabeMitPfad.Id, "feature/mit-pfad", tempDir, ct: TestContext.Current.CancellationToken);
             var sutMitPfad = CreateSut();
             sutMitPfad.AufgabeId = aufgabeMitPfad.Id;
             await ((AsyncRelayCommand)sutMitPfad.LadenCommand).ExecuteAsync();
@@ -470,8 +470,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task ShowFileExplorerPanel_WertBleibtGecachtNachdemVerzeichnisNachtraeglichGeloeschtWurde()
     {
         var tempDir = Directory.CreateTempSubdirectory().FullName;
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "MitPfad", "Beschreibung");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/cache", tempDir);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "MitPfad", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/cache", tempDir, ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -605,7 +605,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
-        var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         aktualisiert!.Titel.Should().Be("Neuer Titel");
         aktualisiert.AnforderungsBeschreibung.Should().Be("Neue Beschreibung");
     }
@@ -696,7 +696,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LoeschenCommand).ExecuteAsync();
 
         zurueckAufgerufen.Should().BeTrue();
-        var geloescht = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var geloescht = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         geloescht.Should().BeNull();
     }
 
@@ -715,7 +715,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LoeschenCommand).ExecuteAsync();
 
         zurueckAufgerufen.Should().BeFalse();
-        var nochVorhanden = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var nochVorhanden = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         nochVorhanden.Should().NotBeNull();
     }
 
@@ -882,7 +882,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     [Fact]
     public async Task EditTitel_WirdNachLaden_MitAufgabeTitelInitialisiert()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Mein Titel", "Meine Beschreibung");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Mein Titel", "Meine Beschreibung", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -894,7 +894,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     [Fact]
     public async Task EditAnforderungsBeschreibung_WirdNachLaden_Initialisiert()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Titel", "Anforderung XYZ");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Titel", "Anforderung XYZ", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -941,9 +941,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.EditTitel = "Titel";
 
         // Aufgabe wird zwischen Laden und Speichern entfernt, damit UpdateAsync fehlschlägt
-        var entity = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var entity = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         _db.Aufgaben.Remove(entity!);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
@@ -962,9 +962,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.EditTitel = "Titel";
 
         // Aufgabe wird zwischen Laden und Speichern entfernt, damit UpdateAsync fehlschlägt
-        var entity = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var entity = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         _db.Aufgaben.Remove(entity!);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
@@ -1032,7 +1032,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
 
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var gespeichert = await pluginDefaultSettingsService.GetProjectDefaultPluginPrefixAsync(aufgabe.ProjektId, Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation);
+        var gespeichert = await pluginDefaultSettingsService.GetProjectDefaultPluginPrefixAsync(aufgabe.ProjektId, Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation, TestContext.Current.CancellationToken);
         gespeichert.Should().Be("Softwareschmiede.TestKi");
     }
 
@@ -1052,7 +1052,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
 
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var gespeichert = await pluginDefaultSettingsService.GetDefaultPluginPrefixAsync(Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation);
+        var gespeichert = await pluginDefaultSettingsService.GetDefaultPluginPrefixAsync(Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation, TestContext.Current.CancellationToken);
         gespeichert.Should().BeNull();
     }
 
@@ -1074,7 +1074,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.IsCliRunning.Should().BeTrue();
         sut.AktiverCliName.Should().Be("Test KI");
         sut.CliStatusText.Should().NotBe("Bereit Repository vor...");
-        var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         aktualisiert!.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
@@ -1099,7 +1099,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
         var startTask = ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
-        await cloneStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await cloneStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         sut.CliStatusText.Should().Be("Bereit Repository vor...");
 
@@ -1186,7 +1186,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
         sut.IsCliRunning.Should().BeTrue();
-        await _aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, "run-lebendig");
+        await _aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, "run-lebendig", TestContext.Current.CancellationToken);
 
         // Der deterministische Testlauncher bindet den eigenen (nicht beendbaren) Testprozess —
         // StopCliAsync schlägt damit genau wie bei einem echten, nicht terminierbaren Prozess fehl.
@@ -1194,7 +1194,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         sut.IsCliRunning.Should().BeTrue("der Prozess läuft nach dem fehlgeschlagenen Stopp weiter");
         sut.FehlerMeldung.Should().NotBeNullOrEmpty("der Benutzer erhält eine Fehlermeldung statt eines falschen Bereit-Zustands");
-        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         geladen!.AktiveRunId.Should().Be("run-lebendig",
             "die Laufdaten dürfen bei einem weiterlaufenden Prozess nicht als beendet geschrieben werden");
         geladen.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
@@ -1220,13 +1220,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
         sut.IsCliRunning.Should().BeTrue();
 
-        (await _aufgabeService.GetByIdAsync(aufgabe.Id))!.AktiveRunId.Should().BeNull(
+        (await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken))!.AktiveRunId.Should().BeNull(
             "ohne CliProcessManager in diesem Test fehlen die persistierten Laufdaten bereits — die Divergenz ist die Ausgangslage");
 
         var method = typeof(TaskDetailViewModel).GetMethod("StartCliAndUpdateStateAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         await (Task)method.Invoke(sut, new object?[] { "Softwareschmiede.TestKi", "/tmp/klon", null, CancellationToken.None })!;
 
-        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         geladen!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
         geladen.AktiveRunId.Should().NotBeNullOrEmpty();
         geladen.LastHeartbeatUtc.Should().NotBeNull();
@@ -1356,10 +1356,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task NachWiederoeffnen_ZeigtAktivenCliName_WhenStartPluginNurAusProjektDefaultKam()
     {
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(
-            _projektId,
-            PluginType.DevelopmentAutomation,
-            "Softwareschmiede.TestKi");
+        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(_projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
 
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
         var ersteVm = CreateSut();
@@ -1371,7 +1368,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _dialogServiceMock.Verify(d => d.ShowPluginSelectionDialogAsync(
             It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
 
-        var aktualisierteAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var aktualisierteAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         aktualisierteAufgabe!.KiPluginPrefix.Should().Be("Softwareschmiede.TestKi");
 
         ersteVm.Dispose();
@@ -1389,10 +1386,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task PluginAendernCommand_ZeigtNeuenAktivenCliName_WennVorherProjektDefaultLief()
     {
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(
-            _projektId,
-            PluginType.DevelopmentAutomation,
-            "Softwareschmiede.TestKi");
+        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(_projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
 
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
         var sut = CreateSut(pluginManager: _pluginManagerMockFuerPluginSelection.Object);
@@ -1413,7 +1407,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.IsCliRunning.Should().BeTrue();
         sut.AktiverCliName.Should().Be("Zweites KI");
 
-        var aktualisierteAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var aktualisierteAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         aktualisierteAufgabe!.KiPluginPrefix.Should().Be("Softwareschmiede.ZweitesKi");
     }
 
@@ -1422,10 +1416,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task CliNeustartenCommand_NachPluginWechsel_VerwendetGeaendertesPlugin_NichtProjektDefault()
     {
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(
-            _projektId,
-            PluginType.DevelopmentAutomation,
-            "Softwareschmiede.TestKi");
+        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(_projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
 
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
         var sut = CreateSut(pluginManager: _pluginManagerMockFuerPluginSelection.Object);
@@ -1532,9 +1523,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
     [Fact]
     public async Task TestLoadAsync_StartetCliNichtImplizit_StatusGestartetAktivOhneLaufendenProzess()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kein-Auto-Restart-Aufgabe", "Beschreibung");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", Path.GetTempPath());
-        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.TestKi");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kein-Auto-Restart-Aufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
@@ -1577,7 +1568,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     {
         var neueAufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
         var beendeteAusfuehrung = await ErstelleAufgabe(AufgabeStatus.Gestartet);
-        await _aufgabeService.AktivenLaufBeendenAsync(beendeteAusfuehrung.Id);
+        await _aufgabeService.AktivenLaufBeendenAsync(beendeteAusfuehrung.Id, TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.AufgabeId = neueAufgabe.Id;
@@ -1598,10 +1589,10 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task StartenCommand_StartetBeendeteAusfuehrungExplizitNeu()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Expliziter Neustart", "Beschreibung");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/explizit", arbeitsverzeichnis);
-        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.TestKi");
-        await _aufgabeService.AktivenLaufBeendenAsync(aufgabe.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Expliziter Neustart", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/explizit", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
+        await _aufgabeService.AktivenLaufBeendenAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
@@ -1633,8 +1624,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
     [Fact]
     public async Task StartenCommand_CanExecuteFalse_WhenAufgabeAbgeschlossenUndAusfuehrungBeendet()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Abgeschlossen", "Beschreibung");
-        await _aufgabeService.AbschliessenAsync(aufgabe.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Abgeschlossen", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.AbschliessenAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
@@ -1649,7 +1640,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     [Fact]
     public async Task LadenAsync_LaedtPromptVorlagenFuerAuswahl()
     {
-        await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter");
+        await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
 
@@ -1664,7 +1655,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     [Fact]
     public async Task PromptVorlageAuswaehlenCommand_OhneLaufendeSession_StuerztNichtAb()
     {
-        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter");
+        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
@@ -1726,9 +1717,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
             Aktiv = true
         };
         _db.GitRepositories.Add(repository);
-        await _db.SaveChangesAsync();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR-Aufgabe", "Beschreibung", repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr-aktionen", Path.GetTempPath());
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR-Aufgabe", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr-aktionen", Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         var sut = CreateSut(pluginManager: ErstelleGitPluginManager().Object);
 
         sut.AufgabeId = aufgabe.Id;
@@ -1785,9 +1776,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
             Aktiv = true
         };
         _db.GitRepositories.Add(repository);
-        await _db.SaveChangesAsync();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR aus UI", "Beschreibung", repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr-url", Path.GetTempPath());
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR aus UI", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr-url", Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
         var pluginActivationServiceForPr = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
@@ -1868,9 +1859,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
             Aktiv = true
         };
         _db.GitRepositories.Add(repository);
-        await _db.SaveChangesAsync();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR-Aufgabe ohne Capability", "Beschreibung", repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr-ohne-capability", Path.GetTempPath());
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR-Aufgabe ohne Capability", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr-ohne-capability", Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         var sut = CreateSut(pluginManager: ErstelleGitPluginManager(canCreatePullRequest: false).Object);
 
         sut.AufgabeId = aufgabe.Id;
@@ -1894,9 +1885,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
             Aktiv = true
         };
         _db.GitRepositories.Add(repository);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR-Aufgabe", "Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR-Aufgabe", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var pullRequest = new PullRequestReferenz
         {
             Id = Guid.NewGuid(),
@@ -1916,7 +1907,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             NextCheckUtc = DateTimeOffset.UtcNow.AddHours(1)
         };
         _db.PullRequestReferenzen.Add(pullRequest);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var gitPluginMock = new Mock<IGitPlugin>();
         gitPluginMock.SetupGet(p => p.PluginName).Returns("GitHub");
@@ -2043,7 +2034,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_CanExecute_WhenProviderSupportsCreateAndNoReferenceExists()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var sut = CreateSut(pluginManager: pluginManagerMock.Object);
@@ -2060,7 +2051,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_ShouldUseRepositoryUrl_ForProviderCapability()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: false);
         gitPluginMock.As<IIssueCreateProvider>()
             .Setup(p => p.CanCreateIssueAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
@@ -2081,7 +2072,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_CannotExecute_WhenProviderDoesNotSupportCreate()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: false);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var sut = CreateSut(pluginManager: pluginManagerMock.Object);
@@ -2098,7 +2089,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_CannotExecute_WhenProviderHasNoCreateCapability()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleGitPluginOhneIssueCreateMock();
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var sut = CreateSut(pluginManager: pluginManagerMock.Object);
@@ -2115,7 +2106,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_CannotExecute_WhenProviderCapabilityFails()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         gitPluginMock.As<IIssueCreateProvider>()
             .Setup(p => p.CanCreateIssueAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
@@ -2135,8 +2126,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_CannotExecute_WhenIssueReferenceExists()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
-        await _aufgabeService.UpdateIssueReferenzAsync(aufgabe.Id, new Issue(1, "Vorhanden", "Body", [], null, "https://example.test/1"));
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.UpdateIssueReferenzAsync(aufgabe.Id, new Issue(1, "Vorhanden", "Body", [], null, "https://example.test/1"), TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var sut = CreateSut(pluginManager: pluginManagerMock.Object);
@@ -2153,7 +2144,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldPersistCreatedIssueAndReloadTask()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://github.com/test/repo/issues/23");
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
@@ -2181,7 +2172,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldUpdateTaskDescriptionFromCreatedIssueBody_WhenOptionIsEnabled()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var createdIssue = new Issue(23, "Neu", "Provider Body", [], null, "https://github.com/test/repo/issues/23");
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
@@ -2206,7 +2197,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldUseLocalBodyFallback_WhenCreatedIssueBodyIsEmpty()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var createdIssue = new Issue(23, "Neu", "   ", [], null, "https://github.com/test/repo/issues/23");
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
@@ -2231,7 +2222,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldShowExternalIssueUrl_WhenLocalPersistenceFails()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://github.com/test/repo/issues/23");
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
@@ -2253,7 +2244,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         sut.FehlerMeldung.Should().Contain("die lokale Zuordnung oder Aufgabenbeschreibung konnte aber nicht gespeichert werden");
         sut.FehlerMeldung.Should().Contain("https://github.com/test/repo/issues/23");
-        (await _aufgabeService.GetDetailAsync(aufgabe.Id)).Should().BeNull();
+        (await _aufgabeService.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     /// <summary>IssueAnlegenAsync speichert keine lokale Referenz, wenn der Dialog abgebrochen wird.</summary>
@@ -2261,7 +2252,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldNotPersistReference_WhenDialogIsCancelled()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var dialogVm = new IssueCreateDialogViewModel(pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
@@ -2276,7 +2267,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
 
-        var reloaded = await _aufgabeService.GetDetailAsync(aufgabe.Id);
+        var reloaded = await _aufgabeService.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         reloaded!.IssueReferenz.Should().BeNull();
     }
 
@@ -2285,7 +2276,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldIgnoreSecondExecution_WhileCreateDialogIsOpen()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var dialogVm = new IssueCreateDialogViewModel(pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
@@ -2308,7 +2299,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         var first = ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
-        await dialogStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await dialogStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         sut.IssueAnlegenCommand.CanExecute(null).Should().BeFalse();
 
         var second = ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
@@ -2316,7 +2307,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await Task.WhenAll(first, second);
 
         dialogCalls.Should().Be(1);
-        (await _aufgabeService.GetDetailAsync(aufgabe.Id))!.IssueReferenz.Should().BeNull();
+        (await _aufgabeService.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken))!.IssueReferenz.Should().BeNull();
     }
 
     /// <summary>Nach extern erstelltem Issue wird keine lokale Referenz überschrieben, wenn parallel bereits zugeordnet wurde.</summary>
@@ -2324,7 +2315,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldNotOverwriteReference_WhenIssueWasAssignedAfterDialog()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://github.com/test/repo/issues/23");
         var parallelIssue = new Issue(99, "Parallel", "Body", [], null, "https://github.com/test/repo/issues/99");
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
@@ -2345,7 +2336,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
 
-        var reloaded = await _aufgabeService.GetDetailAsync(aufgabe.Id);
+        var reloaded = await _aufgabeService.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         reloaded!.IssueReferenz!.IssueNummer.Should().Be(99);
         reloaded.AnforderungsBeschreibung.Should().Be("Beschreibung");
         sut.FehlerMeldung.Should().Contain("extern erstellt");
@@ -2436,7 +2427,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.OeffneArbeitsverzeichnisCommand.CanExecute(null).Should().BeFalse("die Aufgabe hat noch kein Arbeitsverzeichnis");
 
         var arbeitsverzeichnis = CreateTempDirectory();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.OeffneArbeitsverzeichnisCommand.CanExecute(null).Should().BeTrue("das Arbeitsverzeichnis existiert jetzt");
@@ -2448,7 +2439,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabe();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(prozessStarterMock: prozessStarterMock);
@@ -2483,7 +2474,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.OeffneIdeCommand.CanExecute(null).Should().BeFalse();
 
         var arbeitsverzeichnis = CreateTempDirectory();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.KannIdeOeffnen.Should().BeTrue("das Arbeitsverzeichnis existiert jetzt, unabhängig von vorhandenen .sln-Dateien");
@@ -2500,7 +2491,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabe();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock: prozessStarterMock, visualStudioCodeLocator: locator);
@@ -2527,7 +2518,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabe();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(
             prozessStarterMock: prozessStarterMock,
@@ -2552,9 +2543,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabe();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
         var pluginActivationService = new PluginActivationService(_einstellungService, new Mock<IPluginManager>().Object, NullLogger<PluginActivationService>.Instance);
-        await pluginActivationService.SetPluginEnabledAsync("Softwareschmiede.VisualStudioCode", false);
+        await pluginActivationService.SetPluginEnabledAsync("Softwareschmiede.VisualStudioCode", false, TestContext.Current.CancellationToken);
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock: prozessStarterMock, visualStudioCodeLocator: locator);
@@ -2575,7 +2566,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var solutionPfad = Path.Combine(arbeitsverzeichnis, "Loesung.sln");
         File.WriteAllText(solutionPfad, string.Empty);
         var aufgabe = await ErstelleAufgabe();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock: prozessStarterMock, visualStudioCodeLocator: locator);
@@ -2601,7 +2592,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         File.WriteAllText(solutionPfad, string.Empty);
 
         var aufgabe = await ErstelleAufgabe();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(prozessStarterMock: prozessStarterMock);
@@ -2633,7 +2624,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         File.WriteAllText(zweiteSolution, string.Empty);
 
         var aufgabe = await ErstelleAufgabe();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(prozessStarterMock: prozessStarterMock);

@@ -26,9 +26,9 @@ public sealed class AufgabenListenModusServiceTests : IDisposable
     [Fact]
     public async Task SpeichernUndLaden_MenueModus_RoundtripUeberGetrennteScopes()
     {
-        await _sut.SpeichereMenueModusAsync(AufgabenListenModus.Repository);
+        await _sut.SpeichereMenueModusAsync(AufgabenListenModus.Repository, TestContext.Current.CancellationToken);
 
-        var geladen = await _sut.LadeMenueModusAsync();
+        var geladen = await _sut.LadeMenueModusAsync(TestContext.Current.CancellationToken);
         geladen.Should().Be(AufgabenListenModus.Repository);
     }
 
@@ -36,9 +36,9 @@ public sealed class AufgabenListenModusServiceTests : IDisposable
     [Fact]
     public async Task SpeichernUndLaden_DashboardModus_RoundtripUeberGetrennteScopes()
     {
-        await _sut.SpeichereDashboardModusAsync(AufgabenListenModus.Ki);
+        await _sut.SpeichereDashboardModusAsync(AufgabenListenModus.Ki, TestContext.Current.CancellationToken);
 
-        var geladen = await _sut.LadeDashboardModusAsync();
+        var geladen = await _sut.LadeDashboardModusAsync(TestContext.Current.CancellationToken);
         geladen.Should().Be(AufgabenListenModus.Ki);
     }
 
@@ -46,7 +46,7 @@ public sealed class AufgabenListenModusServiceTests : IDisposable
     [Fact]
     public async Task Lade_MenueModus_ReturnsDatum_WhenMissing()
     {
-        var geladen = await _sut.LadeMenueModusAsync();
+        var geladen = await _sut.LadeMenueModusAsync(TestContext.Current.CancellationToken);
         geladen.Should().Be(AufgabenListenModus.Datum);
     }
 
@@ -57,10 +57,10 @@ public sealed class AufgabenListenModusServiceTests : IDisposable
         using (var scope = _provider.CreateScope())
         {
             var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            await einstellungService.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey, "UnbekannterModus");
+            await einstellungService.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey, "UnbekannterModus", TestContext.Current.CancellationToken);
         }
 
-        var geladen = await _sut.LadeMenueModusAsync();
+        var geladen = await _sut.LadeMenueModusAsync(TestContext.Current.CancellationToken);
         geladen.Should().Be(AufgabenListenModus.Datum);
     }
 
@@ -71,10 +71,10 @@ public sealed class AufgabenListenModusServiceTests : IDisposable
         using (var scope = _provider.CreateScope())
         {
             var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            await einstellungService.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey, string.Empty);
+            await einstellungService.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey, string.Empty, TestContext.Current.CancellationToken);
         }
 
-        var geladen = await _sut.LadeDashboardModusAsync();
+        var geladen = await _sut.LadeDashboardModusAsync(TestContext.Current.CancellationToken);
         geladen.Should().Be(AufgabenListenModus.Datum);
     }
 
@@ -82,9 +82,9 @@ public sealed class AufgabenListenModusServiceTests : IDisposable
     [Fact]
     public async Task SchluesselUnabhaengig_MenueUndDashboardBeeinflussenSichNicht()
     {
-        await _sut.SpeichereMenueModusAsync(AufgabenListenModus.Repository);
+        await _sut.SpeichereMenueModusAsync(AufgabenListenModus.Repository, TestContext.Current.CancellationToken);
 
-        (await _sut.LadeMenueModusAsync()).Should().Be(AufgabenListenModus.Repository);
-        (await _sut.LadeDashboardModusAsync()).Should().Be(AufgabenListenModus.Datum);
+        (await _sut.LadeMenueModusAsync(TestContext.Current.CancellationToken)).Should().Be(AufgabenListenModus.Repository);
+        (await _sut.LadeDashboardModusAsync(TestContext.Current.CancellationToken)).Should().Be(AufgabenListenModus.Datum);
     }
 }

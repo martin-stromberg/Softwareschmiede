@@ -28,9 +28,9 @@ public sealed class ScmEventMonitoringServiceTests_Settings
 
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false);
+                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         fixture.Git.As<IScmEventSource>().Verify(x => x.GetEventRepositoryAsync(
             It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -46,18 +46,18 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+            Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             // Nur der Checkpoint der manuell eingespeisten Quelle existiert; der Monitor hat keine
             // eigenen Beobachtungs- oder Enumerations-Checkpoints angelegt.
-            Assert.DoesNotContain(await db.ScmObservationCheckpoints.ToListAsync(),
+            Assert.DoesNotContain(await db.ScmObservationCheckpoints.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
                 x => x.SourceKey.StartsWith("enumeration/") || x.SourceKey.Contains('/'));
         }
 
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, true);
+                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
         Assert.Single(fixture.Prompts);
@@ -74,29 +74,29 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId);
+            var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, cancellationToken: TestContext.Current.CancellationToken);
             item.DeliveryAttemptId = Guid.NewGuid();
             item.CliRunId = Guid.NewGuid().ToString("D");
             item.DeliveredUtc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             item.Status = "Zugestellt";
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false);
+                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
         }
         var exchange = new ScmEventExchangeService(fixture.Services.GetRequiredService<IServiceScopeFactory>(),
             TimeProvider.System, fixture.Services.GetRequiredService<ScmEventStartupGate>(),
             NullLogger<ScmEventExchangeService>.Instance);
 
-        await exchange.RunOnceAsync();
+        await exchange.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Empty(fixture.Responses);
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
 
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, true);
+                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
 
-        await exchange.RunOnceAsync();
+        await exchange.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.NotEmpty(fixture.Responses);
     }
@@ -113,16 +113,16 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         ConfigureObservations(fixture, number => number == 7 ? "!Bearbeite bitte" : "$Softwareschmiede bitte");
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "!Bearbeite");
+                .SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "!Bearbeite", TestContext.Current.CancellationToken);
 
-        await fixture.Monitor.RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(taskId, item.AufgabeId);
         Assert.Equal(7, ScmEventStore.Observation(item).Reference.Number);
-        Assert.Contains(await db.ScmContentSnapshots.Where(x => x.ContentKey.Contains("Issue/42/")).ToListAsync(),
+        Assert.Contains(await db.ScmContentSnapshots.Where(x => x.ContentKey.Contains("Issue/42/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             x => x.Diagnostic == "Kein Trigger");
     }
 
@@ -136,10 +136,10 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         var (_, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false);
+                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
 
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId);
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
 
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
         Assert.Single(fixture.Prompts);

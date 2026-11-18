@@ -27,7 +27,7 @@ public sealed class CliOutputProtokollWriterTests
             NullLogger<CliOutputProtokollWriter>.Instance);
 
         sut.OnOutputChunk(System.Text.Encoding.UTF8.GetBytes("erste\nzweite ohne ende"));
-        await sut.CompleteAsync(TimeSpan.FromSeconds(2));
+        await sut.CompleteAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
@@ -56,7 +56,7 @@ public sealed class CliOutputProtokollWriterTests
 
         sut.Should().BeAssignableTo<Softwareschmiede.Infrastructure.Terminal.ITerminalDiagnoseSink>();
         sut.OnDiagnoseChunk(System.Text.Encoding.UTF8.GetBytes("[Terminal-Diagnose] Markerzeile\r\n"));
-        await sut.CompleteAsync(TimeSpan.FromSeconds(2));
+        await sut.CompleteAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
@@ -123,16 +123,16 @@ public sealed class CliOutputProtokollWriterTests
         var sut = new CliOutputProtokollWriter(Guid.NewGuid(), scopeFactoryMock.Object, loggerMock.Object);
         var output = string.Concat(Enumerable.Range(0, CliOutputProtokollWriter.QueueCapacity + 100).Select(i => $"zeile {i}\n"));
 
-        var writeTask = Task.Run(() => sut.OnOutputChunk(Encoding.UTF8.GetBytes(output)));
+        var writeTask = Task.Run(() => sut.OnOutputChunk(Encoding.UTF8.GetBytes(output)), TestContext.Current.CancellationToken);
 
-        var warned = await Task.WhenAny(warningLogged.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var warned = await Task.WhenAny(warningLogged.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         warned.Should().Be(warningLogged.Task, "die bounded Queue muss bei Rueckstau Backpressure sichtbar machen");
         writeTask.IsCompleted.Should().BeFalse("die Queue darf bei blockierter Persistenz nicht unbegrenzt alle Zeilen aufnehmen");
 
         persistenzBlockiert.Set();
 
-        await writeTask.WaitAsync(TimeSpan.FromSeconds(5));
-        await sut.CompleteAsync(TimeSpan.FromSeconds(5));
+        await writeTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await sut.CompleteAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     /// <summary>CompleteAsync schliesst den Channel nicht, solange ein Chunk noch Zeilen in die volle Queue schreibt.</summary>
@@ -162,21 +162,21 @@ public sealed class CliOutputProtokollWriterTests
             .ToArray();
         var output = string.Concat(expectedLines.Select(line => line + "\n"));
 
-        var writeTask = Task.Run(() => sut.OnOutputChunk(Encoding.UTF8.GetBytes(output)));
+        var writeTask = Task.Run(() => sut.OnOutputChunk(Encoding.UTF8.GetBytes(output)), TestContext.Current.CancellationToken);
 
-        await saveBlocker.FirstSaveStarted.WaitAsync(TimeSpan.FromSeconds(5));
-        var queueFull = await Task.WhenAny(queueFullLogged.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        await saveBlocker.FirstSaveStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var queueFull = await Task.WhenAny(queueFullLogged.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         queueFull.Should().Be(queueFullLogged.Task, "der Test muss einen vollen Channel und einen blockierten Producer erreichen");
         writeTask.IsCompleted.Should().BeFalse("OnOutputChunk muss noch Zeilen aus dem bereits dekodierten Chunk queuen");
 
-        var cleanupTask = Task.Run(() => sut.CompleteAsync(TimeSpan.FromMilliseconds(100)));
-        await cleanupTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var cleanupTask = Task.Run(() => sut.CompleteAsync(TimeSpan.FromMilliseconds(100)), TestContext.Current.CancellationToken);
+        await cleanupTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         writeTask.IsCompleted.Should().BeFalse("der Timeout-Cleanup darf den Channel nicht schliessen, waehrend der Producer noch schreibt");
 
         saveBlocker.Release();
 
-        await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
-        await sut.CompleteAsync(TimeSpan.FromSeconds(10));
+        await writeTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await sut.CompleteAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -206,7 +206,7 @@ public sealed class CliOutputProtokollWriterTests
 
         var resetUtc = DateTimeOffset.UtcNow.AddHours(2);
         sut.OnOutputChunk(Encoding.UTF8.GetBytes($"[[SOFTWARESCHMIEDE_RATE_LIMIT:{resetUtc:O}]]\n"));
-        await sut.CompleteAsync(TimeSpan.FromSeconds(5));
+        await sut.CompleteAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -237,7 +237,7 @@ public sealed class CliOutputProtokollWriterTests
             NullLogger<CliOutputProtokollWriter>.Instance);
 
         sut.OnOutputChunk(Encoding.UTF8.GetBytes("normale ausgabe\n"));
-        await sut.CompleteAsync(TimeSpan.FromSeconds(5));
+        await sut.CompleteAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();

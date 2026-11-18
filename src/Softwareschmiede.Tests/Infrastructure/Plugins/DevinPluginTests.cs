@@ -72,7 +72,7 @@ public sealed class DevinPluginTests
     [Fact]
     public async Task GetTerminalStartSpecAsync_MapsPromptSubmitDelayIntoSpec()
     {
-        var spec = await _sut.GetTerminalStartSpecAsync("/repo");
+        var spec = await _sut.GetTerminalStartSpecAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         spec.PromptSubmitDelay.Should().Be(_sut.PromptSubmitDelay);
         spec.PromptSubmitRepeatCount.Should().Be(_sut.PromptSubmitRepeatCount);
@@ -86,7 +86,7 @@ public sealed class DevinPluginTests
     {
         _credentialStoreMock.Setup(store => store.GetCredential(It.IsAny<string>())).Returns((string?)null);
 
-        var psi = await _sut.StartCliAsync("/repo/path");
+        var psi = await _sut.StartCliAsync("/repo/path", ct: TestContext.Current.CancellationToken);
 
         Path.GetFileNameWithoutExtension(psi.FileName).Should().Be("devin");
         psi.WorkingDirectory.Should().Be("/repo/path");
@@ -102,7 +102,7 @@ public sealed class DevinPluginTests
         _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Devin.ExecutablePath"))
             .Returns(@"C:\tools\devin.exe");
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.FileName.Should().Be(@"C:\tools\devin.exe");
     }
@@ -114,7 +114,7 @@ public sealed class DevinPluginTests
         _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Devin.ExecutablePath"))
             .Returns("dotnet");
 
-        var helpText = await _sut.GetCliHelpTextAsync();
+        var helpText = await _sut.GetCliHelpTextAsync(TestContext.Current.CancellationToken);
 
         helpText.Should().NotBeNullOrWhiteSpace();
         helpText.Should().Contain("--help");
@@ -127,7 +127,7 @@ public sealed class DevinPluginTests
         _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Devin.ExecutablePath"))
             .Returns("\"C:\\tools\\devin.exe\"");
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.FileName.Should().Be(@"C:\tools\devin.exe");
     }
@@ -145,7 +145,7 @@ public sealed class DevinPluginTests
     [InlineData("--permission-mode plan")]
     public async Task StartCliAsync_ShouldPassOptionalDevinParameters_AsArguments(string parameters)
     {
-        var psi = await _sut.StartCliAsync("/repo", parameters);
+        var psi = await _sut.StartCliAsync("/repo", parameters, TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Be(parameters);
     }
@@ -157,7 +157,7 @@ public sealed class DevinPluginTests
         _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Devin.CommandLineParameters"))
             .Returns("--permission-mode plan --model sonnet");
 
-        var psi = await _sut.StartCliAsync("/repo", "--continue");
+        var psi = await _sut.StartCliAsync("/repo", "--continue", TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Be("--continue --permission-mode plan --model sonnet");
     }
@@ -171,7 +171,7 @@ public sealed class DevinPluginTests
         _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Devin.ApiKey"))
             .Returns("key-must-not-be-used");
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().NotContain("token-must-not-be-used");
         psi.Arguments.Should().NotContain("key-must-not-be-used");

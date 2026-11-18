@@ -10,10 +10,10 @@ namespace Softwareschmiede.Tests.Application.Services;
 public sealed class ArbeitsverzeichnisOeffnenServiceTests
 {
     /// <summary>Prüft, dass Oeffne unter Windows den Befehl "explorer.exe" mit dem gequoteten Verzeichnis als Argument an IProzessStarter übergibt. Läuft nur unter Windows, da ArbeitsverzeichnisOeffnenService auf den Windows-Fall reduziert ist (siehe Oeffne_AufNichtWindows_WirftPlatformNotSupportedException).</summary>
-    [SkippableFact]
+    [Fact]
     public void Oeffne_StartetPlattformbefehlMitVerzeichnis()
     {
-        Skip.If(!OperatingSystem.IsWindows(), "Test gilt nur für Windows, siehe ArbeitsverzeichnisOeffnenService.ResolveOeffnenBefehl.");
+        Assert.SkipWhen(!OperatingSystem.IsWindows(), "Test gilt nur für Windows, siehe ArbeitsverzeichnisOeffnenService.ResolveOeffnenBefehl.");
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var service = new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object);
@@ -30,10 +30,10 @@ public sealed class ArbeitsverzeichnisOeffnenServiceTests
     }
 
     /// <summary>Prüft, dass Oeffne auf Nicht-Windows-Betriebssystemen eine PlatformNotSupportedException wirft, ohne IProzessStarter aufzurufen. Läuft nur auf Nicht-Windows-Runnern; auf Windows wird der Test übersprungen, da ResolveOeffnenBefehl dort den Windows-Zweig nimmt.</summary>
-    [SkippableFact]
+    [Fact]
     public void Oeffne_AufNichtWindows_WirftPlatformNotSupportedException()
     {
-        Skip.If(OperatingSystem.IsWindows(), "Test gilt nur für Nicht-Windows-Betriebssysteme, siehe ArbeitsverzeichnisOeffnenService.ResolveOeffnenBefehl.");
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Test gilt nur für Nicht-Windows-Betriebssysteme, siehe ArbeitsverzeichnisOeffnenService.ResolveOeffnenBefehl.");
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var service = new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object);

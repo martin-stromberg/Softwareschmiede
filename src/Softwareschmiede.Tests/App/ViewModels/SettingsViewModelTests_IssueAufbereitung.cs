@@ -134,7 +134,7 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
     public async Task LadenAsync_GespeichertesPlugin_Vorausgewählt()
     {
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([CreateKiPlugin()]);
-        await _einstellungService.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, KiPrefix);
+        await _einstellungService.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, KiPrefix, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -158,10 +158,10 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmIssueAufbereitungEnabledKey)).Should().Be("True");
-        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey)).Should().Be("False");
-        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey)).Should().Be(KiPrefix);
-        var stored = await _db.GitRepositories.FindAsync(repository.Id);
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmIssueAufbereitungEnabledKey, TestContext.Current.CancellationToken)).Should().Be("True");
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey, TestContext.Current.CancellationToken)).Should().Be("False");
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, TestContext.Current.CancellationToken)).Should().Be(KiPrefix);
+        var stored = await _db.GitRepositories.FindAsync(new object?[] { repository.Id }, TestContext.Current.CancellationToken);
         stored!.IssueAufbereitungAktiv.Should().BeTrue();
     }
 
@@ -169,7 +169,7 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
     [Fact]
     public async Task SpeichernAsync_StandardEintrag_PersistiertNull()
     {
-        await _einstellungService.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, "alt.wert");
+        await _einstellungService.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, "alt.wert", TestContext.Current.CancellationToken);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         // „alt.wert" ist kein installiertes Plugin → Standard-Auswahl.
@@ -178,7 +178,7 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey)).Should().BeNull();
+        (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     /// <summary>Der Funktionsschalter steuert die Bedienbarkeit der Detail-Felder und den Header-Status.</summary>
@@ -202,7 +202,7 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
     public async Task LadenAsync_Repositories_MitAnzeigenameUndFlag()
     {
         var repository = await AddRepositoryAsync("mein-repo");
-        await new ProjektService(_db, NullLogger<ProjektService>.Instance).SetIssueAufbereitungAktivAsync(repository.Id, true);
+        await new ProjektService(_db, NullLogger<ProjektService>.Instance).SetIssueAufbereitungAktivAsync(repository.Id, true, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();

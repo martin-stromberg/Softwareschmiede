@@ -24,7 +24,7 @@ public sealed class AppEinstellungServiceTests_Automatisierung : IDisposable
     /// <summary>Ohne gespeicherten Eintrag gilt der ereignisgesteuerte Prüfmodus.</summary>
     [Fact]
     public async Task GetScmTaskCompletionPruefmodusAsync_WithoutEntry_DefaultsToEreignisgesteuert()
-        => (await _sut.GetScmTaskCompletionPruefmodusAsync()).Should().Be(ScmTaskCompletionPruefmodus.Ereignisgesteuert);
+        => (await _sut.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionPruefmodus.Ereignisgesteuert);
 
     /// <summary>Ungültige gespeicherte Werte fallen auf „Ereignisgesteuert“ zurück.</summary>
     [Theory]
@@ -32,8 +32,8 @@ public sealed class AppEinstellungServiceTests_Automatisierung : IDisposable
     [InlineData("99")]
     public async Task GetScmTaskCompletionPruefmodusAsync_InvalidStoredValue_FallsBackToEreignisgesteuert(string stored)
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmTaskCompletionPruefmodusKey, stored);
-        (await _sut.GetScmTaskCompletionPruefmodusAsync()).Should().Be(ScmTaskCompletionPruefmodus.Ereignisgesteuert);
+        await _sut.SetSettingAsync(AppEinstellungService.ScmTaskCompletionPruefmodusKey, stored, TestContext.Current.CancellationToken);
+        (await _sut.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionPruefmodus.Ereignisgesteuert);
     }
 
     /// <summary>Der persistierte Prüfmodus gilt zur Laufzeit.</summary>
@@ -42,8 +42,8 @@ public sealed class AppEinstellungServiceTests_Automatisierung : IDisposable
     [InlineData(ScmTaskCompletionPruefmodus.AlleAufgaben)]
     public async Task SetScmTaskCompletionPruefmodusAsync_PersistedValue_IsHonored(ScmTaskCompletionPruefmodus modus)
     {
-        await _sut.SetScmTaskCompletionPruefmodusAsync(modus);
-        (await _sut.GetScmTaskCompletionPruefmodusAsync()).Should().Be(modus);
+        await _sut.SetScmTaskCompletionPruefmodusAsync(modus, TestContext.Current.CancellationToken);
+        (await _sut.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(modus);
     }
 
     /// <summary>Ein nicht definierter Prüfmodus wird abgelehnt.</summary>
@@ -56,23 +56,23 @@ public sealed class AppEinstellungServiceTests_Automatisierung : IDisposable
     [Fact]
     public async Task BackmergeOptionen_WithoutEntry_DefaultFalseAndPersistIndependently()
     {
-        (await _sut.GetScmBackmergeDraftAktivierungAsync()).Should().BeFalse();
-        (await _sut.GetScmBackmergeAdminMergeAsync()).Should().BeFalse();
+        (await _sut.GetScmBackmergeDraftAktivierungAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
+        (await _sut.GetScmBackmergeAdminMergeAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
 
-        await _sut.SetScmBackmergeDraftAktivierungAsync(true);
+        await _sut.SetScmBackmergeDraftAktivierungAsync(true, TestContext.Current.CancellationToken);
 
-        (await _sut.GetScmBackmergeDraftAktivierungAsync()).Should().BeTrue();
-        (await _sut.GetScmBackmergeAdminMergeAsync()).Should().BeFalse("die Optionen sind unabhängig voneinander");
-        (await _sut.GetSettingAsync(AppEinstellungService.ScmBackmergeDraftAktivierungKey)).Should().Be("True");
+        (await _sut.GetScmBackmergeDraftAktivierungAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
+        (await _sut.GetScmBackmergeAdminMergeAsync(TestContext.Current.CancellationToken)).Should().BeFalse("die Optionen sind unabhängig voneinander");
+        (await _sut.GetSettingAsync(AppEinstellungService.ScmBackmergeDraftAktivierungKey, TestContext.Current.CancellationToken)).Should().Be("True");
 
-        await _sut.SetScmBackmergeAdminMergeAsync(true);
+        await _sut.SetScmBackmergeAdminMergeAsync(true, TestContext.Current.CancellationToken);
 
-        (await _sut.GetScmBackmergeAdminMergeAsync()).Should().BeTrue();
-        (await _sut.GetSettingAsync(AppEinstellungService.ScmBackmergeAdminMergeKey)).Should().Be("True");
+        (await _sut.GetScmBackmergeAdminMergeAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
+        (await _sut.GetSettingAsync(AppEinstellungService.ScmBackmergeAdminMergeKey, TestContext.Current.CancellationToken)).Should().Be("True");
 
-        await _sut.SetScmBackmergeDraftAktivierungAsync(false);
+        await _sut.SetScmBackmergeDraftAktivierungAsync(false, TestContext.Current.CancellationToken);
 
-        (await _sut.GetScmBackmergeDraftAktivierungAsync()).Should().BeFalse();
-        (await _sut.GetScmBackmergeAdminMergeAsync()).Should().BeTrue("das Zurücksetzen der einen Option lässt die andere unberührt");
+        (await _sut.GetScmBackmergeDraftAktivierungAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
+        (await _sut.GetScmBackmergeAdminMergeAsync(TestContext.Current.CancellationToken)).Should().BeTrue("das Zurücksetzen der einen Option lässt die andere unberührt");
     }
 }

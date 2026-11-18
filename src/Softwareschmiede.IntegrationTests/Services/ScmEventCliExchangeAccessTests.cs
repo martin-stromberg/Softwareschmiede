@@ -39,7 +39,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), run, "Softwareschmiede.KiSimulator", spec, session.Object, [], () => true);
         adapter.ReadyStatus.Should().Be(ScmPromptReadyStatus.Ready);
         adapter.ConfirmReady(run).Should().BeTrue();
-        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName));
+        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName), TestContext.Current.CancellationToken);
         access.Status.Should().Be(ScmExchangeAccessStatus.Denied);
         access.Reason.Should().Contain("schreibgeschützt");
         await FluentActions.Awaiting(() => adapter.WritePromptAsync("event")).Should().ThrowAsync<InvalidOperationException>();
@@ -64,13 +64,13 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         await GitInit(_root);
         var run = Guid.NewGuid();
         using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), run, prefix, spec, mock.Object, [], () => true);
-        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName));
+        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName), TestContext.Current.CancellationToken);
         access.Status.Should().Be(ScmExchangeAccessStatus.Unknown, "an unrestricted parent is not the file-tool execution context");
         access.RestrictedWriteSids.Should().BeEmpty();
         access.CliRunId.Should().Be(run);
         access.WorkingDirectory.Should().Be(_root);
         adapter.ReadyStatus.Should().Be(ScmPromptReadyStatus.Busy, "only the separate access probe was sent");
-        var outside = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, "neighbor-app-data"));
+        var outside = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, "neighbor-app-data"), TestContext.Current.CancellationToken);
         outside.Status.Should().Be(ScmExchangeAccessStatus.Denied);
         spec.Arguments.Should().NotContain("bypass").And.NotContain("dangerously");
         await FluentActions.Awaiting(() => adapter.WritePromptAsync("{\"body\":\"requirement\"}")).Should().ThrowAsync<InvalidOperationException>();
@@ -96,7 +96,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         adapter.CliRecognition.State.Should().Be(ScmCliRecognitionState.Unsupported);
         adapter.CliRecognition.Version.Should().NotBeNull();
         adapter.ReadyStatus.Should().Be(ScmPromptReadyStatus.Unknown);
-        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName));
+        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName), TestContext.Current.CancellationToken);
         access.Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         access.Reason.Should().Contain(version).And.Contain("nicht unterstützt");
         ScmCliWaitReason.IsConfirmable(access.Reason).Should().BeTrue();
@@ -113,7 +113,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), Guid.NewGuid(), prefix, spec, mock.Object, [], () => true);
         adapter.CliRecognition.State.Should().Be(ScmCliRecognitionState.Unsupported);
         adapter.CliRecognition.Version.Should().BeNull();
-        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName));
+        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName), TestContext.Current.CancellationToken);
         access.Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         access.Reason.Should().Contain("Version konnte nicht ermittelt");
         mock.Verify(session => session.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -168,7 +168,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         var reason = ScmCliWaitReason.Describe(adapter.CliRecognition);
         reason.Should().Contain("Shell").And.NotContain("Versionsbanner");
         ScmCliWaitReason.IsConfirmable(reason).Should().BeFalse();
-        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName));
+        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName), TestContext.Current.CancellationToken);
         access.Status.Should().Be(ScmExchangeAccessStatus.Unknown);
     }
 
@@ -186,7 +186,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         var reason = ScmCliWaitReason.Describe(adapter.CliRecognition);
         reason.Should().Contain("unbekannt").And.Contain("Promptformat");
         ScmCliWaitReason.IsConfirmable(reason).Should().BeFalse();
-        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName));
+        var access = await adapter.CheckExchangeAccessAsync(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName), TestContext.Current.CancellationToken);
         access.Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         mock.Verify(session => session.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -258,11 +258,11 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
     {
         var (prefix, spec) = await Spec(provider, "");
         var path = Path.Combine(_root, fileName);
-        await File.WriteAllTextAsync(path, content);
-        var bytes = await File.ReadAllBytesAsync(path);
+        await File.WriteAllTextAsync(path, content, TestContext.Current.CancellationToken);
+        var bytes = await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken);
         ScmCliConfigurationFile[] files = [new(path, content)];
         ScmCliAccessEvaluator.Evaluate(prefix, spec, Guid.NewGuid(), files).Status.Should().Be(expected);
-        (await File.ReadAllBytesAsync(path)).Should().Equal(bytes);
+        (await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken)).Should().Equal(bytes);
     }
 
     /// <summary>Changed files or a new run invalidate previous access; readiness confirmation cannot restore access.</summary>
@@ -274,7 +274,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
     {
         var (prefix, spec) = await Spec(provider, "");
         var path = Path.Combine(_root, provider == "Codex" ? "config.toml" : provider == "Devin" ? "config.json" : "settings.json");
-        await File.WriteAllTextAsync(path, content);
+        await File.WriteAllTextAsync(path, content, TestContext.Current.CancellationToken);
         await GitInit(_root);
         var current = true;
         var run = Guid.NewGuid();
@@ -285,17 +285,17 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
             .Returns((string text, CancellationToken token) => ScmDispatchFixture.CompleteProbeAsync(text, token));
         using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), run, prefix, spec, session.Object, [new(path, content)], () => current);
         var channel = Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName);
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Supported);
-        await File.AppendAllTextAsync(path, " ");
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Supported);
+        await File.AppendAllTextAsync(path, " ", TestContext.Current.CancellationToken);
         adapter.ConfirmReady(run).Should().BeTrue();
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
-        await File.WriteAllTextAsync(path, content);
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Supported);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+        await File.WriteAllTextAsync(path, content, TestContext.Current.CancellationToken);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Supported);
         current = false;
         adapter.ConfirmReady(run).Should().BeFalse();
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
     }
 
     private async Task<(string Prefix, TerminalSessionStartSpec Spec)> Spec(string provider, string arguments)

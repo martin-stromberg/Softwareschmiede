@@ -48,7 +48,7 @@ public sealed class GitHubNotificationSourceTests
             """);
         var plugin = Plugin(new FakeGitHubEventApi(), StoreWithAgentToken(), agent);
 
-        var result = await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null);
+        var result = await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null, TestContext.Current.CancellationToken);
 
         result.Should().HaveCount(2);
         result[0].Should().Be(new ScmNotification("T_1", "R_1", "github.com", "owner", "repo",
@@ -80,7 +80,7 @@ public sealed class GitHubNotificationSourceTests
             """);
         var plugin = Plugin(new FakeGitHubEventApi(), StoreWithAgentToken(), agent);
 
-        var result = await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null);
+        var result = await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null, TestContext.Current.CancellationToken);
 
         result.Should().ContainSingle().Which.Number.Should().Be(3);
     }
@@ -95,7 +95,7 @@ public sealed class GitHubNotificationSourceTests
         var plugin = Plugin(new FakeGitHubEventApi(), StoreWithAgentToken(), agent);
         var since = DateTimeOffset.Parse("2026-10-01T12:30:00Z");
 
-        await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", since);
+        await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", since, TestContext.Current.CancellationToken);
 
         agent.Requests.Should().ContainSingle()
             .Which.Endpoint.Should().Contain("since=" + Uri.EscapeDataString((since - TimeSpan.FromHours(2)).ToUniversalTime().ToString("O")));
@@ -123,7 +123,7 @@ public sealed class GitHubNotificationSourceTests
             """);
         var plugin = Plugin(new FakeGitHubEventApi(), StoreWithAgentToken(), agent);
 
-        var result = await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null);
+        var result = await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null, TestContext.Current.CancellationToken);
 
         result.Select(x => x.ThreadId).Should().Equal("T_1", "T_2");
         agent.Requests.Should().HaveCount(2);
@@ -138,7 +138,7 @@ public sealed class GitHubNotificationSourceTests
         var plugin = Plugin(new FakeGitHubEventApi(), StoreWithAgentToken(), agent);
 
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null));
+            () => ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null, TestContext.Current.CancellationToken));
         error.FailureKind.Should().Be(ScmProviderFailureKind.Temporary);
     }
 
@@ -151,7 +151,7 @@ public sealed class GitHubNotificationSourceTests
         agent.AddJson("notifications", "[]");
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
 
-        await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null);
+        await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null, TestContext.Current.CancellationToken);
 
         user.Requests.Should().BeEmpty();
         agent.Requests.Should().ContainSingle();
@@ -165,7 +165,7 @@ public sealed class GitHubNotificationSourceTests
         var plugin = Plugin(new FakeGitHubEventApi(), new Mock<ICredentialStore>(), agent);
 
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null));
+            () => ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", null, TestContext.Current.CancellationToken));
 
         error.FailureKind.Should().Be(ScmProviderFailureKind.Authentication);
         error.Message.Should().Contain("Einstellungen → Plugins → GitHub");
@@ -179,7 +179,7 @@ public sealed class GitHubNotificationSourceTests
     {
         var plugin = Plugin(new FakeGitHubEventApi(), StoreWithAgentToken(), new FakeGitHubEventApi());
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("not a host !!", null));
+            () => ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("not a host !!", null, TestContext.Current.CancellationToken));
         error.FailureKind.Should().Be(ScmProviderFailureKind.Permanent);
     }
 
@@ -196,7 +196,7 @@ public sealed class GitHubNotificationSourceTests
         var agent = new FakeGitHubEventApi();
         var plugin = Plugin(new FakeGitHubEventApi(), StoreWithAgentToken(), agent);
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => ((IScmNotificationSource)plugin).EnumerateNotificationsAsync(host, null));
+            () => ((IScmNotificationSource)plugin).EnumerateNotificationsAsync(host, null, TestContext.Current.CancellationToken));
         error.FailureKind.Should().Be(ScmProviderFailureKind.Permanent);
         agent.Requests.Should().BeEmpty();
     }

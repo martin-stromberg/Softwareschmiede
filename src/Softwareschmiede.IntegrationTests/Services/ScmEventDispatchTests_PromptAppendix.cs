@@ -26,11 +26,11 @@ public sealed class ScmEventDispatchTests_PromptAppendix
         using (var scope = fixture.Services.CreateScope())
         {
             var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "ALLGEMEIN");
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendIssueKey, "ISSUE");
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendIssueCommentKey, "ISSUE_KOMMENTAR");
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestKey, "PR");
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestCommentKey, "PR_KOMMENTAR");
+            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "ALLGEMEIN", TestContext.Current.CancellationToken);
+            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendIssueKey, "ISSUE", TestContext.Current.CancellationToken);
+            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendIssueCommentKey, "ISSUE_KOMMENTAR", TestContext.Current.CancellationToken);
+            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestKey, "PR", TestContext.Current.CancellationToken);
+            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestCommentKey, "PR_KOMMENTAR", TestContext.Current.CancellationToken);
         }
 
         var cases = new (ScmReferenceKind Kind, ScmContentKind Content, string Expected)[]
@@ -58,7 +58,7 @@ public sealed class ScmEventDispatchTests_PromptAppendix
             // Der gespeicherte Ereignistext und der unveränderliche Auftrag bleiben frei vom Anhang.
             Assert.Equal("$Softwareschmiede test", ScmEventStore.Observation(item).Body);
             var stored = JsonSerializer.Deserialize<ScmExchangeRequest>(
-                await File.ReadAllTextAsync(Path.Combine(item.ExchangePath!, "request.json")), Json);
+                await File.ReadAllTextAsync(Path.Combine(item.ExchangePath!, "request.json"), TestContext.Current.CancellationToken), Json);
             Assert.Equal("$Softwareschmiede test", stored!.Body);
         }
     }
@@ -90,8 +90,8 @@ public sealed class ScmEventDispatchTests_PromptAppendix
         using (var scope = fixture.Services.CreateScope())
         {
             var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "  ALLGEMEIN  ");
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendIssueCommentKey, "   ");
+            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "  ALLGEMEIN  ", TestContext.Current.CancellationToken);
+            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendIssueCommentKey, "   ", TestContext.Current.CancellationToken);
         }
         var (_, eventId) = await fixture.AddAsync(configured: true);
 
@@ -111,17 +111,17 @@ public sealed class ScmEventDispatchTests_PromptAppendix
         await fixture.InitializeAsync();
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "ALLGEMEIN");
+                .SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "ALLGEMEIN", TestContext.Current.CancellationToken);
         var (_, eventId) = await fixture.AddAsync(configured: true);
 
         await fixture.DispatchAsync(eventId);
 
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId);
+        var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, cancellationToken: TestContext.Current.CancellationToken);
         var observation = ScmEventStore.Observation(item);
         Assert.Equal(observation.EventKey, item.EventKey);
-        var snapshot = await db.ScmContentSnapshots.SingleAsync(x => x.ContentKey == observation.ContentKey);
+        var snapshot = await db.ScmContentSnapshots.SingleAsync(x => x.ContentKey == observation.ContentKey, cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(observation.BodyHash, snapshot.BodyHash);
     }
 }

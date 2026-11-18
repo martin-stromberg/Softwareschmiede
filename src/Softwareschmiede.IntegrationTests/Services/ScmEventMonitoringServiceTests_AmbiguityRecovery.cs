@@ -48,15 +48,15 @@ public sealed class ScmEventMonitoringServiceTests_AmbiguityRecovery
                         }).ToArray();
                     remainingTask = tasks[0].Id;
                     db.AddRange(tasks);
-                    await db.SaveChangesAsync();
+                    await db.SaveChangesAsync(TestContext.Current.CancellationToken);
                 }
                 ConfigureSource(fixture, observedAt);
-                await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+                await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
                 using (var scope = fixture.Services.CreateScope())
                 {
                     var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-                    Assert.Empty(await db.ScmIncomingEvents.ToListAsync());
-                    Assert.Contains(await db.ScmObservationCheckpoints.ToListAsync(), x => x.Diagnostic == "Mehrdeutige Zuordnung zu Aufgaben");
+                    Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+                    Assert.Contains(await db.ScmObservationCheckpoints.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => x.Diagnostic == "Mehrdeutige Zuordnung zu Aufgaben");
                 }
                 Assert.Empty(fixture.Prompts);
                 Assert.Empty(fixture.Sessions);
@@ -69,28 +69,28 @@ public sealed class ScmEventMonitoringServiceTests_AmbiguityRecovery
                 using (var scope = fixture.Services.CreateScope())
                 {
                     var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-                    db.IssueReferenzen.Remove(await db.IssueReferenzen.SingleAsync(x => x.AufgabeId != remainingTask));
-                    await db.SaveChangesAsync();
+                    db.IssueReferenzen.Remove(await db.IssueReferenzen.SingleAsync(x => x.AufgabeId != remainingTask, cancellationToken: TestContext.Current.CancellationToken));
+                    await db.SaveChangesAsync(TestContext.Current.CancellationToken);
                 }
                 ConfigureSource(fixture, observedAt, includeComment: false);
-                await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+                await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
                 using (var scope = fixture.Services.CreateScope())
                 {
                     var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-                    Assert.Empty(await db.ScmIncomingEvents.ToListAsync());
-                    Assert.Contains(await db.ScmObservationCheckpoints.ToListAsync(), x => x.Diagnostic == "Mehrdeutige Zuordnung zu Aufgaben");
+                    Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+                    Assert.Contains(await db.ScmObservationCheckpoints.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => x.Diagnostic == "Mehrdeutige Zuordnung zu Aufgaben");
                 }
                 clock.Now = clock.Now.AddDays(1);
                 ConfigureSource(fixture, observedAt);
-                await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
-                await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+                await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
+                await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
                 using var verification = fixture.Services.CreateScope();
                 var verifiedDb = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-                var item = Assert.Single(await verifiedDb.ScmIncomingEvents.ToListAsync());
+                var item = Assert.Single(await verifiedDb.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
                 Assert.Equal(remainingTask, item.AufgabeId);
                 Assert.Equal("$Softwareschmiede unchanged", ScmEventStore.Observation(item).Body);
-                Assert.All(await verifiedDb.ScmObservationCheckpoints.ToListAsync(), x => Assert.Null(x.Diagnostic));
-                Assert.All(await verifiedDb.ScmContentSnapshots.ToListAsync(), x => Assert.Null(x.Diagnostic));
+                Assert.All(await verifiedDb.ScmObservationCheckpoints.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => Assert.Null(x.Diagnostic));
+                Assert.All(await verifiedDb.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => Assert.Null(x.Diagnostic));
                 Assert.Equal(2, fixture.Responses.Count);
                 Assert.Empty(fixture.Prompts);
             }

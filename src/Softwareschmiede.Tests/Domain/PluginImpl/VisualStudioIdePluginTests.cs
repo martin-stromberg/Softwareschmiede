@@ -36,7 +36,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
         File.WriteAllText(Path.Combine(verzeichnis, "Loesung.sln"), string.Empty);
         var sut = CreateSut();
 
-        var result = await sut.CheckCompatibilityAsync(verzeichnis);
+        var result = await sut.CheckCompatibilityAsync(verzeichnis, TestContext.Current.CancellationToken);
 
         result.Should().Be(IdePluginCompatibility.Explicit);
     }
@@ -49,7 +49,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
         File.WriteAllText(Path.Combine(verzeichnis, "Loesung.slnx"), string.Empty);
         var sut = CreateSut();
 
-        var result = await sut.CheckCompatibilityAsync(verzeichnis);
+        var result = await sut.CheckCompatibilityAsync(verzeichnis, TestContext.Current.CancellationToken);
 
         result.Should().Be(IdePluginCompatibility.Explicit);
     }
@@ -62,7 +62,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
         File.WriteAllText(Path.Combine(verzeichnis, "readme.txt"), string.Empty);
         var sut = CreateSut();
 
-        var result = await sut.CheckCompatibilityAsync(verzeichnis);
+        var result = await sut.CheckCompatibilityAsync(verzeichnis, TestContext.Current.CancellationToken);
 
         result.Should().Be(IdePluginCompatibility.Incompatible);
     }
@@ -96,7 +96,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
         var sut = CreateSut();
         var nichtExistierendesVerzeichnis = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
 
-        var result = await sut.CheckCompatibilityAsync(nichtExistierendesVerzeichnis);
+        var result = await sut.CheckCompatibilityAsync(nichtExistierendesVerzeichnis, TestContext.Current.CancellationToken);
 
         result.Should().Be(IdePluginCompatibility.Incompatible);
     }
@@ -110,7 +110,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
         File.WriteAllText(Path.Combine(verzeichnis, "Erste.sln"), string.Empty);
         var sut = CreateSut();
 
-        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis);
+        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis, TestContext.Current.CancellationToken);
 
         entryPoints.Should().HaveCount(2);
         entryPoints.Select(ep => ep.Path).Should().BeInAscendingOrder(StringComparer.OrdinalIgnoreCase);
@@ -127,7 +127,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
         File.WriteAllText(solutionPfad, string.Empty);
         var sut = CreateSut();
 
-        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis);
+        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis, TestContext.Current.CancellationToken);
 
         entryPoints.Should().ContainSingle();
         entryPoints[0].Path.Should().Be(solutionPfad);
@@ -141,7 +141,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
         File.WriteAllText(Path.Combine(verzeichnis, "readme.txt"), string.Empty);
         var sut = CreateSut();
 
-        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis);
+        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis, TestContext.Current.CancellationToken);
 
         entryPoints.Should().BeEmpty();
     }
@@ -156,7 +156,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = new VisualStudioIdePlugin(prozessStarterMock.Object);
 
-        await sut.OpenEntryPointAsync(new IdeEntryPoint(solutionPfad));
+        await sut.OpenEntryPointAsync(new IdeEntryPoint(solutionPfad), TestContext.Current.CancellationToken);
 
         prozessStarterMock.Verify(
             p => p.Starten(It.Is<ProzessStartAnfrage>(a =>

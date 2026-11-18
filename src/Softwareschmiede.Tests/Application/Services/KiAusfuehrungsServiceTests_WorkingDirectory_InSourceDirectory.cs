@@ -122,7 +122,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
     public async Task StartCliAsync_ShouldThrow_WhenGitPluginNotPassed_EvenThoughSourceHasWorkingDirectory()
     {
         // Arrange
-        await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath);
+        await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath, TestContext.Current.CancellationToken);
 
         var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "backend" };
 

@@ -17,7 +17,7 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// Beide Szenarien starten (wie z. B. <c>End2EndTest.AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E</c>
 /// in <c>E2E_WorkingDirectory.cs</c>) einen tatsächlich laufenden CLI-Prozess und bleiben deshalb als
-/// gemeinsamer <c>[SkippableFact]</c> mit eigenem App-Lifecycle bestehen; beide Phasen stoppen den
+/// gemeinsamer <c>[Fact]</c> mit eigenem App-Lifecycle bestehen; beide Phasen stoppen den
 /// CLI-Prozess vor dem Aufräumen explizit, bevor die jeweils nächste Phase beginnt.
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
@@ -34,7 +34,7 @@ public sealed class E2E_RepositoryInitialisierungAusfuehrungTests : WpfTestBase
     /// Ausführung des Initialisierungsskripts nach dem Klonen, danach Fehlertoleranz bei einem
     /// fehlschlagenden Initialisierungsskript.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task InitialisierungsskriptAusfuehrung()
     {
         SkipWennConPtyNichtVerfuegbar();

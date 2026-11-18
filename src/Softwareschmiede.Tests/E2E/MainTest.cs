@@ -12,7 +12,7 @@ namespace Softwareschmiede.Tests.E2E;
 public partial class End2EndTest : WpfTestBase
 {
     /// <summary>Prüft Start und Einstellungen in einem isolierten App-Lifecycle.</summary>
-    [SkippableFact]
+    [Fact]
     public Task General_BasisUndEinstellungen_E2E()
         => MitFrischerAppAsync(mainWindow =>
         {
@@ -26,7 +26,7 @@ public partial class End2EndTest : WpfTestBase
         });
 
     /// <summary>Prüft Repository-, Aufgaben- und Terminal-Fallback-Szenarien isoliert.</summary>
-    [SkippableFact]
+    [Fact]
     public Task General_RepositoryUndAufgaben_E2E()
         => MitFrischerAppAsync(async mainWindow =>
         {
@@ -41,17 +41,17 @@ public partial class End2EndTest : WpfTestBase
         });
 
     /// <summary>Prüft die Wiedergabeaufzeichnung isoliert, damit Hänger direkt zuordenbar bleiben.</summary>
-    [SkippableFact]
+    [Fact]
     public Task General_Konsolenwiedergabe_E2E()
         => MitFrischerAppAsync(KonsolenTestfenster_OeffnetLaedtAufzeichnungUndSpieltAb_E2E);
 
     /// <summary>Prüft den Auto-Shutdown-Fluss (Issue 6) in einem eigenen App-Lifecycle plus Neustart.</summary>
-    [SkippableFact]
+    [Fact]
     public Task General_AutoShutdown_E2E()
         => MitFrischerAppAsync(AutoShutdown_CountdownAbbruchAufzeichnungUndPersistenz_E2E);
 
     /// <summary>Prüft View- und Dialognavigation in einem eigenen App-Lifecycle.</summary>
-    [SkippableFact]
+    [Fact]
     public Task General_ViewNavigation_E2E()
         => MitFrischerAppAsync(async mainWindow =>
         {
@@ -67,7 +67,7 @@ public partial class End2EndTest : WpfTestBase
         });
 
     /// <summary>Prüft die isolierten Update-Fixture-Smokes separat.</summary>
-    [SkippableFact]
+    [Fact]
     public async Task General_UpdateFixtureSmoke_E2E()
     {
         await Fixture_UsesIsolatedRealUpdatePipeline();
@@ -75,7 +75,7 @@ public partial class End2EndTest : WpfTestBase
     }
 
     /// <summary>Prüft die sieben isolierten Update-Startvarianten separat.</summary>
-    [SkippableFact]
+    [Fact]
     public async Task General_UpdateStartvarianten_E2E()
     {
         await Settings_AllModesAndUpdatePfadPersist();
@@ -117,7 +117,7 @@ public partial class End2EndTest : WpfTestBase
 
     /// <summary>Gezielt ausführbarer Pflichtnachweis E-02 für den Mauspfad. Er startet nur die
     /// dafür nötige Test-App statt des gesamten General-E2E-Bündels.</summary>
-    [SkippableFact]
+    [Fact]
     [Trait("Category", "E2E")]
     [Trait("Scenario", "TextCopyReplayMouse")]
     public async Task ReplayText_MarkAndCopyViaMouse_E2E()
@@ -136,7 +136,7 @@ public partial class End2EndTest : WpfTestBase
     /// <summary>Gezielt ausführbarer E-02-Nachweis für Fokus und Kopier-Shortcut auf einer
     /// bestehenden Auswahl. Die Umschalt-Pfeil-Auswahl ist als WPF-Integrationstest getrennt,
     /// weil die Windows-Injektion im E2E-Testdesktop Modifier nicht zuverlässig transportiert.</summary>
-    [SkippableFact]
+    [Fact]
     [Trait("Category", "E2E")]
     [Trait("Scenario", "TextCopyReplayKeyboard")]
     public async Task ReplayText_CopyShortcutWithFocusedSelection_E2E()
@@ -155,7 +155,7 @@ public partial class End2EndTest : WpfTestBase
     /// <summary>Gezielt ausführbarer Pflichtnachweis E-01 gegen eine echte ConPTY-Session.
     /// Er isoliert Auswahl, sichtbares Overlay und Kopieren vom großen Lifecycle-Sammeltest,
     /// damit ein früher Fehler in einer anderen Session-Phase den Nachweis nicht verdeckt.</summary>
-    [SkippableFact]
+    [Fact]
     [Trait("Category", "E2E")]
     [Trait("Scenario", "TextCopyLiveTerminal")]
     public async Task TerminalText_LiveMarkCopyAndKeepSelection_E2E()
@@ -180,7 +180,7 @@ public partial class End2EndTest : WpfTestBase
     }
 
     /// <summary>Prüft das Ab- und Wiederanbinden einer laufenden ConPTY-Session isoliert.</summary>
-    [SkippableFact]
+    [Fact]
     [Trait("Category", "E2E")]
     [Trait("Scenario", "ConPtySessionReattach")]
     public async Task ConPty_SessionReattach_KeineDoppelausgabe_E2E()
@@ -206,7 +206,7 @@ public partial class End2EndTest : WpfTestBase
     /// <summary>
     /// Führt ConPTY-abhängige UI-Szenarien in einem gemeinsamen App-Lifecycle aus.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task ConPty_LifecycleUndReplay_E2E()
     {
         SkipWennConPtyNichtVerfuegbar();
@@ -229,7 +229,7 @@ public partial class End2EndTest : WpfTestBase
     /// <see cref="ConPty_LifecycleUndReplay_E2E"/>, damit sein lang laufender UI- und Prozesszustand
     /// nicht von den unabhängigen Navigationsszenarien beeinflusst wird.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task ConPty_WeitereLebenszyklusSzenarien_E2E()
     {
         SkipWennConPtyNichtVerfuegbar();

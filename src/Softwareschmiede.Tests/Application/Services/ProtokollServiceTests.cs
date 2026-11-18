@@ -6,6 +6,7 @@ using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Tests.Helpers;
+using TestResult = Softwareschmiede.Domain.ValueObjects.TestResult;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
@@ -52,7 +53,7 @@ public sealed class ProtokollServiceTests : IDisposable
     public async Task AddEintragAsync_ShouldCreateAndPersistProtokollEintrag_WhenCalledWithValidData()
     {
         // Arrange & Act
-        var result = await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.Prompt, "Testinhalt", "TestAgent");
+        var result = await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.Prompt, "Testinhalt", "TestAgent", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -68,12 +69,12 @@ public sealed class ProtokollServiceTests : IDisposable
     public async Task GetByAufgabeAsync_ShouldReturnEntriesOrderedByZeitstempel_WhenMultipleEntriesExist()
     {
         // Arrange
-        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.GitAktion, "Erster Eintrag", null);
-        await Task.Delay(10); // leichte Verzögerung für unterschiedliche Zeitstempel
-        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.KiAntwort, "Zweiter Eintrag", "Agent");
+        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.GitAktion, "Erster Eintrag", null, TestContext.Current.CancellationToken);
+        await Task.Delay(10, TestContext.Current.CancellationToken); // leichte Verzögerung für unterschiedliche Zeitstempel
+        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.KiAntwort, "Zweiter Eintrag", "Agent", TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetByAufgabeAsync(_aufgabeId);
+        var result = await _sut.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(2);
@@ -95,7 +96,7 @@ public sealed class ProtokollServiceTests : IDisposable
             });
 
         // Act
-        var result = await _sut.AddTestErgebnisseAsync(_aufgabeId, testResult);
+        var result = await _sut.AddTestErgebnisseAsync(_aufgabeId, testResult, TestContext.Current.CancellationToken);
 
         // Assert
         result.Typ.Should().Be(ProtokollTyp.TestErgebnis);
@@ -117,7 +118,7 @@ public sealed class ProtokollServiceTests : IDisposable
             });
 
         // Act
-        var result = await _sut.AddTestErgebnisseAsync(_aufgabeId, testResult);
+        var result = await _sut.AddTestErgebnisseAsync(_aufgabeId, testResult, TestContext.Current.CancellationToken);
 
         // Assert
         result.Inhalt.Should().Contain("fehlgeschlagen");
@@ -128,10 +129,7 @@ public sealed class ProtokollServiceTests : IDisposable
     public async Task AddStatusUebergangAsync_ShouldCreateStatusUebergangEintrag_WhenCalled()
     {
         // Arrange & Act
-        var result = await _sut.AddStatusUebergangAsync(
-            _aufgabeId,
-            AufgabeStatus.Neu,
-            AufgabeStatus.Gestartet);
+        var result = await _sut.AddStatusUebergangAsync(_aufgabeId, AufgabeStatus.Neu, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
 
         // Assert
         result.Typ.Should().Be(ProtokollTyp.StatusUebergang);
@@ -144,12 +142,12 @@ public sealed class ProtokollServiceTests : IDisposable
     public async Task SuchenAsync_ShouldReturnMatchingEntries_WhenSuchbegriffMatchesInhalt()
     {
         // Arrange
-        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.Prompt, "Fehlerhafte Implementierung", null);
-        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.Prompt, "Gute Implementierung", null);
-        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.Prompt, "Kein Treffer hier", null);
+        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.Prompt, "Fehlerhafte Implementierung", null, TestContext.Current.CancellationToken);
+        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.Prompt, "Gute Implementierung", null, TestContext.Current.CancellationToken);
+        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.Prompt, "Kein Treffer hier", null, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.SuchenAsync(_aufgabeId, "Implementierung");
+        var result = await _sut.SuchenAsync(_aufgabeId, "Implementierung", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(2);
@@ -160,11 +158,11 @@ public sealed class ProtokollServiceTests : IDisposable
     public async Task SuchenAsync_ShouldReturnMatchingEntries_WhenSuchbegriffMatchesAgentName()
     {
         // Arrange
-        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.KiAntwort, "Inhalt A", "CopilotAgent");
-        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.KiAntwort, "Inhalt B", "AndererAgent");
+        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.KiAntwort, "Inhalt A", "CopilotAgent", TestContext.Current.CancellationToken);
+        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.KiAntwort, "Inhalt B", "AndererAgent", TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.SuchenAsync(_aufgabeId, "Copilot");
+        var result = await _sut.SuchenAsync(_aufgabeId, "Copilot", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(1);
@@ -176,10 +174,10 @@ public sealed class ProtokollServiceTests : IDisposable
     public async Task SuchenAsync_ShouldReturnEmptyList_WhenNoMatchFound()
     {
         // Arrange
-        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.Prompt, "Kein Treffer", null);
+        await _sut.AddEintragAsync(_aufgabeId, ProtokollTyp.Prompt, "Kein Treffer", null, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.SuchenAsync(_aufgabeId, "XYZNOTFOUND");
+        var result = await _sut.SuchenAsync(_aufgabeId, "XYZNOTFOUND", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeEmpty();
@@ -250,9 +248,9 @@ public sealed class ProtokollServiceTests : IDisposable
     {
         var markerLine = "[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-15T10:00:00Z]]";
 
-        await _sut.AddCliOutputAsync(_aufgabeId, markerLine);
+        await _sut.AddCliOutputAsync(_aufgabeId, markerLine, TestContext.Current.CancellationToken);
 
-        var eintraege = await _sut.GetByAufgabeAsync(_aufgabeId);
+        var eintraege = await _sut.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
         eintraege.Should().HaveCount(2);
         eintraege.Should().Contain(e => e.Typ == ProtokollTyp.CliOutput);
         eintraege.Should().Contain(e => e.Typ == ProtokollTyp.RateLimit);
@@ -262,9 +260,9 @@ public sealed class ProtokollServiceTests : IDisposable
     [Fact]
     public async Task AddCliOutputAsync_ShouldCreateSingleEntry_WhenNoMarker()
     {
-        await _sut.AddCliOutputAsync(_aufgabeId, "normale Ausgabe");
+        await _sut.AddCliOutputAsync(_aufgabeId, "normale Ausgabe", TestContext.Current.CancellationToken);
 
-        var eintraege = await _sut.GetByAufgabeAsync(_aufgabeId);
+        var eintraege = await _sut.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
         eintraege.Should().HaveCount(1);
         eintraege[0].Typ.Should().Be(ProtokollTyp.CliOutput);
         eintraege[0].Inhalt.Should().Be("normale Ausgabe");

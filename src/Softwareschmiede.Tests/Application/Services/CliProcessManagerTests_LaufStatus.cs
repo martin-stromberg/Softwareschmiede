@@ -201,7 +201,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
         // Verspätetes Event nach dem Stopp: darf keinen Effekt mehr haben (weder über die Abmeldung in
         // CliProcessManager, noch nachgelagert über den IsRunning-Guard der Laufdaten-Sicherstellung).
         ForceRuntimeStatusRefresh(session);
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
 
         LadeAufgabe().LaufStatus.Should().BeNull();
     }
@@ -219,7 +219,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
 
         // Session deterministisch in den Wartezustand bringen (Schwelle: 1 ms), damit die
         // Selbstheilung den Live-Substatus WartetAufEingabe persistiert.
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
         ForceRuntimeStatusRefresh(session);
 
         var method = typeof(CliProcessManager).GetMethod("OnRuntimeStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;

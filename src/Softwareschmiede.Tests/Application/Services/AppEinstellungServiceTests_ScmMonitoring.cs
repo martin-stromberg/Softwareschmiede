@@ -22,23 +22,23 @@ public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
     /// <summary>Ohne gespeicherten Eintrag ist die SCM-Ereignisüberwachung aktiviert.</summary>
     [Fact]
     public async Task GetScmMonitoringEnabledAsync_WithoutEntry_DefaultsToTrue()
-        => (await _sut.GetScmMonitoringEnabledAsync()).Should().BeTrue();
+        => (await _sut.GetScmMonitoringEnabledAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
 
     /// <summary>Der persistierte Schalter gilt zur Laufzeit in beide Richtungen.</summary>
     [Fact]
     public async Task GetScmMonitoringEnabledAsync_PersistedValue_IsHonored()
     {
-        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false);
-        (await _sut.GetScmMonitoringEnabledAsync()).Should().BeFalse();
+        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+        (await _sut.GetScmMonitoringEnabledAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
 
-        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, true);
-        (await _sut.GetScmMonitoringEnabledAsync()).Should().BeTrue();
+        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
+        (await _sut.GetScmMonitoringEnabledAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
     }
 
     /// <summary>Ohne gespeicherten Eintrag gilt der Standard-Trigger <c>$Softwareschmiede</c>.</summary>
     [Fact]
     public async Task GetScmTriggerKeywordAsync_WithoutEntry_DefaultsToSoftwareschmiede()
-        => (await _sut.GetScmTriggerKeywordAsync()).Should().Be(ScmEventValidationService.DefaultTriggerKeyword);
+        => (await _sut.GetScmTriggerKeywordAsync(TestContext.Current.CancellationToken)).Should().Be(ScmEventValidationService.DefaultTriggerKeyword);
 
     /// <summary>Ungültige gespeicherte Werte (leer/Leerraum) fallen auf den Standard zurück.</summary>
     [Theory]
@@ -46,24 +46,24 @@ public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
     [InlineData("   ")]
     public async Task GetScmTriggerKeywordAsync_InvalidStoredValue_FallsBackToDefault(string stored)
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, stored);
+        await _sut.SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, stored, TestContext.Current.CancellationToken);
 
-        (await _sut.GetScmTriggerKeywordAsync()).Should().Be(ScmEventValidationService.DefaultTriggerKeyword);
+        (await _sut.GetScmTriggerKeywordAsync(TestContext.Current.CancellationToken)).Should().Be(ScmEventValidationService.DefaultTriggerKeyword);
     }
 
     /// <summary>Ein gespeichertes Keyword wird getrimmt zurückgegeben.</summary>
     [Fact]
     public async Task GetScmTriggerKeywordAsync_StoredValue_ReturnsTrimmed()
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "  !Bearbeite  ");
+        await _sut.SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "  !Bearbeite  ", TestContext.Current.CancellationToken);
 
-        (await _sut.GetScmTriggerKeywordAsync()).Should().Be("!Bearbeite");
+        (await _sut.GetScmTriggerKeywordAsync(TestContext.Current.CancellationToken)).Should().Be("!Bearbeite");
     }
 
     /// <summary>Ohne gespeicherten Eintrag gilt das Standard-Verzögerungs-Keyword <c>#verzögert</c>.</summary>
     [Fact]
     public async Task GetScmDelayKeywordAsync_WithoutEntry_DefaultsToVerzoegert()
-        => (await _sut.GetScmDelayKeywordAsync()).Should().Be(ScmDelayDirective.DefaultDelayKeyword);
+        => (await _sut.GetScmDelayKeywordAsync(TestContext.Current.CancellationToken)).Should().Be(ScmDelayDirective.DefaultDelayKeyword);
 
     /// <summary>Ungültige gespeicherte Werte (leer/Leerraum) fallen auf den Standard zurück.</summary>
     [Theory]
@@ -71,34 +71,34 @@ public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
     [InlineData("   ")]
     public async Task GetScmDelayKeywordAsync_InvalidStoredValue_FallsBackToDefault(string stored)
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmDelayKeywordKey, stored);
+        await _sut.SetSettingAsync(AppEinstellungService.ScmDelayKeywordKey, stored, TestContext.Current.CancellationToken);
 
-        (await _sut.GetScmDelayKeywordAsync()).Should().Be(ScmDelayDirective.DefaultDelayKeyword);
+        (await _sut.GetScmDelayKeywordAsync(TestContext.Current.CancellationToken)).Should().Be(ScmDelayDirective.DefaultDelayKeyword);
     }
 
     /// <summary>Ein gespeichertes Verzögerungs-Keyword wird getrimmt zurückgegeben.</summary>
     [Fact]
     public async Task GetScmDelayKeywordAsync_StoredValue_ReturnsTrimmed()
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmDelayKeywordKey, "  #warte  ");
+        await _sut.SetSettingAsync(AppEinstellungService.ScmDelayKeywordKey, "  #warte  ", TestContext.Current.CancellationToken);
 
-        (await _sut.GetScmDelayKeywordAsync()).Should().Be("#warte");
+        (await _sut.GetScmDelayKeywordAsync(TestContext.Current.CancellationToken)).Should().Be("#warte");
     }
 
     /// <summary>Ohne gespeicherte Einträge liefert die gebündelte Anhang-Abfrage eine leere Zuordnung.</summary>
     [Fact]
     public async Task GetScmPromptAppendicesAsync_WithoutEntries_ReturnsEmpty()
-        => (await _sut.GetScmPromptAppendicesAsync()).Should().BeEmpty();
+        => (await _sut.GetScmPromptAppendicesAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
 
     /// <summary>Nur tatsächlich gespeicherte Anhang-Schlüssel erscheinen in der gebündelten Abfrage.</summary>
     [Fact]
     public async Task GetScmPromptAppendicesAsync_PersistedValues_AreReturned()
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "allgemein");
-        await _sut.SetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestCommentKey, "pr-kommentar\nmehrzeilig");
-        await _sut.SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "!Bearbeite");
+        await _sut.SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "allgemein", TestContext.Current.CancellationToken);
+        await _sut.SetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestCommentKey, "pr-kommentar\nmehrzeilig", TestContext.Current.CancellationToken);
+        await _sut.SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "!Bearbeite", TestContext.Current.CancellationToken);
 
-        var result = await _sut.GetScmPromptAppendicesAsync();
+        var result = await _sut.GetScmPromptAppendicesAsync(TestContext.Current.CancellationToken);
 
         result.Should().HaveCount(2);
         result[AppEinstellungService.ScmPromptAppendGeneralKey].Should().Be("allgemein");

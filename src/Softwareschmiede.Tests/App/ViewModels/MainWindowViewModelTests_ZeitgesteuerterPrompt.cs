@@ -82,12 +82,12 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task AktiveAufgabenAktualisierenAsync_MitGeplantemPrompt_SetztHasScheduledPrompt()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit geplantem Prompt", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit geplantem Prompt", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
         await _promptZeitVersandService.SchedulePromptAsync(aufgabe.Id, "Testprompt", DateTimeOffset.UtcNow.AddMinutes(5));
 
         var sut = CreateSut();
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id && a.HasScheduledPrompt);
     }
@@ -96,11 +96,11 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task AktiveAufgabenAktualisierenAsync_OhneGeplantenPrompt_HasScheduledPromptBleibtFalse()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne geplanten Prompt", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne geplanten Prompt", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id && !a.HasScheduledPrompt);
     }

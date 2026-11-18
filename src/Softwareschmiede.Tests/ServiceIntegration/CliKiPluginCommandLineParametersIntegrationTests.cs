@@ -16,7 +16,7 @@ public sealed class CliKiPluginCommandLineParametersIntegrationTests
         _credentialStore.SetCredential("Softwareschmiede.Codex.CommandLineParameters", "--verbose --model gpt-4");
         var sut = new CodexPlugin(_credentialStore, NullLogger<CodexPlugin>.Instance);
 
-        var psi = await sut.StartCliAsync("/repo/path");
+        var psi = await sut.StartCliAsync("/repo/path", ct: TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Contain("--verbose --model gpt-4");
     }
@@ -28,7 +28,7 @@ public sealed class CliKiPluginCommandLineParametersIntegrationTests
         _credentialStore.SetCredential("Softwareschmiede.Codex.CommandLineParameters", "--extra");
         var sut = new CodexPlugin(_credentialStore, NullLogger<CodexPlugin>.Instance);
 
-        var psi = await sut.StartCliAsync("/repo/path", "--session abc");
+        var psi = await sut.StartCliAsync("/repo/path", "--session abc", TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Be("--session abc --extra");
     }
@@ -40,7 +40,7 @@ public sealed class CliKiPluginCommandLineParametersIntegrationTests
         _credentialStore.SetCredential("Softwareschmiede.ClaudeCli.CommandLineParameters", "--dangerously-skip-permissions");
         var sut = new ClaudeCliPlugin(_credentialStore, NullLogger<ClaudeCliPlugin>.Instance);
 
-        var psi = await sut.StartCliAsync("/repo/path");
+        var psi = await sut.StartCliAsync("/repo/path", ct: TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Contain("--dangerously-skip-permissions");
     }
@@ -52,7 +52,7 @@ public sealed class CliKiPluginCommandLineParametersIntegrationTests
         _credentialStore.SetCredential("Softwareschmiede.GitHubCopilot.CommandLineParameters", "--model gpt-4o");
         var sut = new GitHubCopilotPlugin(_credentialStore, NullLogger<GitHubCopilotPlugin>.Instance);
 
-        var psi = await sut.StartCliAsync("/repo/path");
+        var psi = await sut.StartCliAsync("/repo/path", ct: TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Contain("--model gpt-4o");
     }
@@ -64,7 +64,7 @@ public sealed class CliKiPluginCommandLineParametersIntegrationTests
         _credentialStore.SetCredential("Softwareschmiede.Devin.CommandLineParameters", "--permission-mode plan");
         var sut = new DevinPlugin(_credentialStore, NullLogger<DevinPlugin>.Instance);
 
-        var psi = await sut.StartCliAsync("/repo/path");
+        var psi = await sut.StartCliAsync("/repo/path", ct: TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Contain("--permission-mode plan");
     }
@@ -76,7 +76,7 @@ public sealed class CliKiPluginCommandLineParametersIntegrationTests
         _credentialStore.SetCredential("Softwareschmiede.Codex.CommandLineParameters", "   ");
         var sut = new CodexPlugin(_credentialStore, NullLogger<CodexPlugin>.Instance);
 
-        var psi = await sut.StartCliAsync("/repo/path", "--initial");
+        var psi = await sut.StartCliAsync("/repo/path", "--initial", TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Be("--initial");
     }

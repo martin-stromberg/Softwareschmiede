@@ -151,7 +151,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task SchedulePrompt_LeereFelder_KeinScheduling()
     {
-        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter");
+        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
@@ -168,7 +168,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task SchedulePrompt_GueltigeZeit_RuftServiceAuf()
     {
-        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter");
+        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
@@ -197,7 +197,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task SchedulePrompt_UngueltigeStunde_SetztFehlerMeldung()
     {
-        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter");
+        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
@@ -346,7 +346,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task SelectedPromptVorlage_Aendert_LoestKannPromptPlanenPropertyChangedAus()
     {
-        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter");
+        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;

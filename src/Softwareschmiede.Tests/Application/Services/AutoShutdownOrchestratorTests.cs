@@ -194,7 +194,7 @@ public sealed class AutoShutdownOrchestratorTests
         runningSource.Raise(previous: 1, current: 0);
         notifier.NotifyLaufdatenChanged(Guid.NewGuid());
         timeProvider.Advance(TimeSpan.FromMinutes(10));
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         zaehlung.ZaehleAufrufe.Should().Be(0,
             "ohne aktiviertes Feature, armierten Countdown oder ausgelösten Shutdown ist die Zählung wirkungslos");
@@ -204,7 +204,7 @@ public sealed class AutoShutdownOrchestratorTests
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (zaehlung.ZaehleAufrufe < 1 && DateTime.UtcNow < deadline)
         {
-            await Task.Delay(10);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
         zaehlung.ZaehleAufrufe.Should().BeGreaterThanOrEqualTo(1);
@@ -392,7 +392,7 @@ public sealed class AutoShutdownOrchestratorTests
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (zaehlung.ZaehleAufrufe < 1 && DateTime.UtcNow < deadline)
         {
-            await Task.Delay(10);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
         zaehlung.ZaehleAufrufe.Should().Be(1);
@@ -404,10 +404,10 @@ public sealed class AutoShutdownOrchestratorTests
         deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (zaehlung.ZaehleAufrufe < 2 && DateTime.UtcNow < deadline)
         {
-            await Task.Delay(10);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         zaehlung.ZaehleAufrufe.Should().Be(2, "zwei Trigger während der Blockade ergeben genau einen koaleszierten Nachlauf");
         sut.CountdownEndeUtc.Should().NotBeNull();

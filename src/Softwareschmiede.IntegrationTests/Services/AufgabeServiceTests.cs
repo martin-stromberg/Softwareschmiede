@@ -5,6 +5,7 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.IntegrationTests.Infrastructure;
+using TestResult = Softwareschmiede.Domain.ValueObjects.TestResult;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
@@ -26,16 +27,16 @@ public sealed class AufgabeServiceTests
     public async Task CreateAsync_ShouldPersistAufgabe_WhenValidDataGiven()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         // Act
-        var created = await service.CreateAsync(projektId, "Test-Aufgabe", "Anforderungsbeschreibung");
+        var created = await service.CreateAsync(projektId, "Test-Aufgabe", "Anforderungsbeschreibung", ct: TestContext.Current.CancellationToken);
 
         // Assert – Persistenz via neuem Context prüfen
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.FindAsync(created.Id);
+        var loaded = await db2.Aufgaben.FindAsync(new object?[] { created.Id }, TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
         loaded!.Titel.Should().Be("Test-Aufgabe");
@@ -52,17 +53,17 @@ public sealed class AufgabeServiceTests
     public async Task StartenAsync_ShouldSetStatusInBearbeitungAndPersistBranchInfo_WhenAufgabeExists()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        var aufgabe = await service.CreateAsync(projektId, "Startbare Aufgabe", null);
+        var aufgabe = await service.CreateAsync(projektId, "Startbare Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await service.StartenAsync(aufgabe.Id, "task/feature-branch", @"C:\klone\aufgabe");
+        await service.StartenAsync(aufgabe.Id, "task/feature-branch", @"C:\klone\aufgabe", ct: TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
+        var loaded = await db2.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
 
         loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         loaded.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
@@ -77,20 +78,20 @@ public sealed class AufgabeServiceTests
     public async Task AbschliessenAsync_ShouldSetStatusAbgeschlossenAndClearBranchInfo_WhenAufgabeInBearbeitung()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        var aufgabe = await service.CreateAsync(projektId, "Abzuschließende Aufgabe", null);
-        await service.StartenAsync(aufgabe.Id, "task/fertig", @"C:\klone\fertig");
+        var aufgabe = await service.CreateAsync(projektId, "Abzuschließende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await service.StartenAsync(aufgabe.Id, "task/fertig", @"C:\klone\fertig", ct: TestContext.Current.CancellationToken);
 
         var vorAbschluss = DateTimeOffset.UtcNow.AddSeconds(-1);
 
         // Act
-        await service.AbschliessenAsync(aufgabe.Id);
+        await service.AbschliessenAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
+        var loaded = await db2.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
 
         loaded!.Status.Should().Be(AufgabeStatus.Beendet);
         loaded.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);
@@ -109,13 +110,13 @@ public sealed class AufgabeServiceTests
     public async Task GetDetailAsync_ShouldNotIncludeProtokolleintraege_WhenDataExists()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var protokollService = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
-        var aufgabe = await aufgabeService.CreateAsync(projektId, "Aufgabe mit Protokoll", null);
-        await protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Starte Analyse", "TestAgent");
+        var aufgabe = await aufgabeService.CreateAsync(projektId, "Aufgabe mit Protokoll", null, ct: TestContext.Current.CancellationToken);
+        await protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Starte Analyse", "TestAgent", TestContext.Current.CancellationToken);
 
         var testResult = new TestResult(
             true,
@@ -123,11 +124,11 @@ public sealed class AufgabeServiceTests
             {
                 new TestErgebnisInfo("Test1", TestStatus.Bestanden, null, TimeSpan.FromMilliseconds(42))
             });
-        await protokollService.AddTestErgebnisseAsync(aufgabe.Id, testResult);
+        await protokollService.AddTestErgebnisseAsync(aufgabe.Id, testResult, TestContext.Current.CancellationToken);
 
         // Act
-        var detail = await aufgabeService.GetDetailAsync(aufgabe.Id);
-        var protokolleintraege = await protokollService.GetByAufgabeAsync(aufgabe.Id);
+        var detail = await aufgabeService.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        var protokolleintraege = await protokollService.GetByAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         // Assert
         detail.Should().NotBeNull();
@@ -146,21 +147,21 @@ public sealed class AufgabeServiceTests
     public async Task DeleteAsync_ShouldCascadeDeleteProtokolleintraege_WhenAufgabeDeleted()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var protokollService = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
-        var aufgabe = await aufgabeService.CreateAsync(projektId, "Zu löschende Aufgabe", null);
-        await protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Irgendein Prompt");
-        await protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.KiAntwort, "Irgendeine Antwort");
+        var aufgabe = await aufgabeService.CreateAsync(projektId, "Zu löschende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Irgendein Prompt", ct: TestContext.Current.CancellationToken);
+        await protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.KiAntwort, "Irgendeine Antwort", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await aufgabeService.DeleteAsync(aufgabe.Id);
+        await aufgabeService.DeleteAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var geladen = await db2.Aufgaben.FindAsync(aufgabe.Id);
+        var geladen = await db2.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         var protokolle = db2.Protokolleintraege.Where(p => p.AufgabeId == aufgabe.Id).ToList();
 
         geladen.Should().BeNull();
@@ -174,17 +175,17 @@ public sealed class AufgabeServiceTests
     public async Task VerwerfenAsync_ShouldPersistArchivedStatus_WhenOffeneAufgabeArchiviertWird()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        var aufgabe = await service.CreateAsync(projektId, "Offene Aufgabe", null);
+        var aufgabe = await service.CreateAsync(projektId, "Offene Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await service.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Archivieren);
+        await service.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Archivieren, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
+        var loaded = await db2.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
 
         loaded!.Status.Should().Be(AufgabeStatus.Archiviert);
     }
@@ -196,20 +197,20 @@ public sealed class AufgabeServiceTests
     public async Task VerwerfenAsync_ShouldCascadeDeleteProtokolleintraege_WhenOffeneAufgabeGeloeschtWird()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var protokollService = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
-        var aufgabe = await aufgabeService.CreateAsync(projektId, "Offene Aufgabe", null);
-        await protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Ein Prompt");
+        var aufgabe = await aufgabeService.CreateAsync(projektId, "Offene Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Ein Prompt", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await aufgabeService.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Loeschen);
+        await aufgabeService.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Loeschen, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var geladen = await db2.Aufgaben.FindAsync(aufgabe.Id);
+        var geladen = await db2.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         var protokolle = db2.Protokolleintraege.Where(p => p.AufgabeId == aufgabe.Id).ToList();
 
         geladen.Should().BeNull();
@@ -225,11 +226,11 @@ public sealed class AufgabeServiceTests
     public async Task VerwerfenAsync_ShouldThrowWhenAufgabeIsNotOffen(VerwerfenAktion aktion)
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        var aufgabe = await service.CreateAsync(projektId, "Gestartete Aufgabe", null);
-        await service.StartenAsync(aufgabe.Id, "task/test", @"C:\klone\test");
+        var aufgabe = await service.CreateAsync(projektId, "Gestartete Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await service.StartenAsync(aufgabe.Id, "task/test", @"C:\klone\test", ct: TestContext.Current.CancellationToken);
 
         // Act
         var act = () => service.VerwerfenAsync(aufgabe.Id, aktion);
@@ -246,7 +247,7 @@ public sealed class AufgabeServiceTests
     public async Task CreateFromIssueAsync_ShouldPersistAufgabeWithIssueReferenz_WhenIssueGiven()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
@@ -259,10 +260,10 @@ public sealed class AufgabeServiceTests
             IssueUrl: "https://github.com/test/repo/issues/42");
 
         // Act
-        var aufgabe = await service.CreateFromIssueAsync(projektId, issue);
+        var aufgabe = await service.CreateFromIssueAsync(projektId, issue, ct: TestContext.Current.CancellationToken);
 
         // Assert – IssueReferenz via Detail-Abfrage laden
-        var detail = await service.GetDetailAsync(aufgabe.Id);
+        var detail = await service.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         detail!.IssueReferenz.Should().NotBeNull();
         detail.IssueReferenz!.IssueNummer.Should().Be(42);
@@ -277,29 +278,29 @@ public sealed class AufgabeServiceTests
     [Fact]
     public async Task TryAssignIssueReferenzIfNoneAsync_ShouldNotOverwrite_WhenReferenceIsAssignedAfterCallerCheck()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        var aufgabe = await service.CreateAsync(projektId, "Issue-Anlage", null);
+        var aufgabe = await service.CreateAsync(projektId, "Issue-Anlage", null, ct: TestContext.Current.CancellationToken);
         var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://example.test/23");
         var parallelIssue = new Issue(99, "Parallel", "Body", [], null, "https://example.test/99");
 
-        var standVorZuordnung = await service.GetDetailAsync(aufgabe.Id);
+        var standVorZuordnung = await service.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         standVorZuordnung!.IssueReferenz.Should().BeNull();
 
         await using (var parallelContext = db.CreateNewContext())
         {
             var parallelService = new AufgabeService(parallelContext, NullLogger<AufgabeService>.Instance, new TodoService(parallelContext, NullLogger<TodoService>.Instance));
-            await parallelService.UpdateIssueReferenzAsync(aufgabe.Id, parallelIssue);
+            await parallelService.UpdateIssueReferenzAsync(aufgabe.Id, parallelIssue, TestContext.Current.CancellationToken);
         }
 
-        var assigned = await service.TryAssignIssueReferenzIfNoneAsync(aufgabe.Id, createdIssue);
+        var assigned = await service.TryAssignIssueReferenzIfNoneAsync(aufgabe.Id, createdIssue, TestContext.Current.CancellationToken);
 
         assigned.Should().BeFalse();
         await using var assertContext = db.CreateNewContext();
         var reloaded = await assertContext.Aufgaben
             .Include(a => a.IssueReferenz)
-            .SingleAsync(a => a.Id == aufgabe.Id);
+            .SingleAsync(a => a.Id == aufgabe.Id, cancellationToken: TestContext.Current.CancellationToken);
         reloaded.IssueReferenz!.IssueNummer.Should().Be(99);
         reloaded.IssueReferenz.IssueUrl.Should().Be("https://example.test/99");
     }
@@ -311,18 +312,18 @@ public sealed class AufgabeServiceTests
     public async Task GetByProjektAsync_ShouldReturnAufgabenDescendingByDate_WhenMultipleAufgabenExist()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
-        await service.CreateAsync(projektId, "Erste Aufgabe", null);
-        await Task.Delay(5); // sicherstellen, dass ErstellungsDatum unterschiedlich ist
-        await service.CreateAsync(projektId, "Zweite Aufgabe", null);
-        await Task.Delay(5);
-        await service.CreateAsync(projektId, "Dritte Aufgabe", null);
+        await service.CreateAsync(projektId, "Erste Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await Task.Delay(5, TestContext.Current.CancellationToken); // sicherstellen, dass ErstellungsDatum unterschiedlich ist
+        await service.CreateAsync(projektId, "Zweite Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await Task.Delay(5, TestContext.Current.CancellationToken);
+        await service.CreateAsync(projektId, "Dritte Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        var result = await service.GetByProjektAsync(projektId);
+        var result = await service.GetByProjektAsync(projektId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(3);
@@ -337,18 +338,18 @@ public sealed class AufgabeServiceTests
     public async Task SetStatusAsync_ShouldSetStatusBeendet_WhenAufgabeIsGestartet()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        var aufgabe = await service.CreateAsync(projektId, "Aufgabe für Statuswechsel", null);
-        await service.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Gestartet);
+        var aufgabe = await service.CreateAsync(projektId, "Aufgabe für Statuswechsel", null, ct: TestContext.Current.CancellationToken);
+        await service.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
 
         // Act
-        await service.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
+        await service.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
+        var loaded = await db2.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
 
         loaded!.Status.Should().Be(AufgabeStatus.Beendet);
     }
@@ -363,7 +364,7 @@ public sealed class AufgabeServiceTests
     public async Task GetAktiveAufgabenAsync_ShouldSortByLetzterCliStartDescThenByErstellungsDatum_WhenUsingSqlite()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
@@ -401,10 +402,10 @@ public sealed class AufgabeServiceTests
         };
 
         db.Context.Aufgaben.AddRange(mitAltemStart, mitNeuemStart, ohneStart);
-        await db.Context.SaveChangesAsync();
+        await db.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
-        var result = await service.GetAktiveAufgabenAsync();
+        var result = await service.GetAktiveAufgabenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         result.Select(a => a.Id).Should().ContainInOrder(mitNeuemStart.Id, ohneStart.Id, mitAltemStart.Id);
@@ -417,17 +418,17 @@ public sealed class AufgabeServiceTests
     public async Task UpdateAsync_ShouldPersistAllFields_WhenAufgabeExists()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        var aufgabe = await service.CreateAsync(projektId, "Ursprünglicher Titel", "Alt");
+        var aufgabe = await service.CreateAsync(projektId, "Ursprünglicher Titel", "Alt", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await service.UpdateAsync(aufgabe.Id, "Neuer Titel", "Neue Anforderung", "copilot");
+        await service.UpdateAsync(aufgabe.Id, "Neuer Titel", "Neue Anforderung", "copilot", TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
+        var loaded = await db2.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
 
         loaded!.Titel.Should().Be("Neuer Titel");
         loaded.AnforderungsBeschreibung.Should().Be("Neue Anforderung");
@@ -442,24 +443,24 @@ public sealed class AufgabeServiceTests
     public async Task UpdateAsync_ShouldKeepAusfuehrungsStatus_WhenBeendeteAusfuehrungLoadedAndSaved()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        var aufgabe = await service.CreateAsync(projektId, "Persistierte Ausführung", "Alt");
+        var aufgabe = await service.CreateAsync(projektId, "Persistierte Ausführung", "Alt", ct: TestContext.Current.CancellationToken);
 
-        await service.StartenAsync(aufgabe.Id, "task/persistierte-ausfuehrung", @"C:\klone\persistiert");
-        await service.AktivenLaufSetzenAsync(aufgabe.Id, "lauf-alt");
-        await service.AktivenLaufBeendenAsync(aufgabe.Id);
+        await service.StartenAsync(aufgabe.Id, "task/persistierte-ausfuehrung", @"C:\klone\persistiert", ct: TestContext.Current.CancellationToken);
+        await service.AktivenLaufSetzenAsync(aufgabe.Id, "lauf-alt", TestContext.Current.CancellationToken);
+        await service.AktivenLaufBeendenAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         // Act
-        var detail = await service.GetDetailAsync(aufgabe.Id);
+        var detail = await service.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         detail!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);
 
-        await service.UpdateAsync(detail.Id, "Persistierte Ausführung aktualisiert", detail.AnforderungsBeschreibung, "copilot");
+        await service.UpdateAsync(detail.Id, "Persistierte Ausführung aktualisiert", detail.AnforderungsBeschreibung, "copilot", TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
+        var loaded = await db2.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
 
         loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         loaded.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);

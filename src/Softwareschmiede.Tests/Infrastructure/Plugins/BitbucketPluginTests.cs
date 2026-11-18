@@ -233,7 +233,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "{}", string.Empty));
 
-        await _sut.CheckHealthAsync();
+        await _sut.CheckHealthAsync(TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "curl",
@@ -266,7 +266,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "{}", string.Empty));
 
-        await _sut.CheckHealthAsync();
+        await _sut.CheckHealthAsync(TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "curl",
@@ -302,7 +302,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "{\"account_id\":\"123\"}", string.Empty));
 
-        var result = await _sut.CheckHealthAsync();
+        var result = await _sut.CheckHealthAsync(TestContext.Current.CancellationToken);
 
         result.Should().BeTrue();
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -351,7 +351,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, json, string.Empty));
 
-        var repos = (await _sut.GetAvailableRepositoriesAsync()).ToList();
+        var repos = (await _sut.GetAvailableRepositoriesAsync(TestContext.Current.CancellationToken)).ToList();
 
         repos.Should().HaveCount(1);
         repos[0].Name.Should().Be("my-repo");
@@ -400,7 +400,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, json, string.Empty));
 
-        var repos = (await _sut.GetAvailableRepositoriesAsync()).ToList();
+        var repos = (await _sut.GetAvailableRepositoriesAsync(TestContext.Current.CancellationToken)).ToList();
 
         repos.Should().HaveCount(1);
         repos[0].Name.Should().Be("My Repo");
@@ -440,7 +440,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, json, string.Empty));
 
-        var issues = (await _sut.GetIssuesAsync("any")).ToList();
+        var issues = (await _sut.GetIssuesAsync("any", TestContext.Current.CancellationToken)).ToList();
 
         issues.Should().HaveCount(1);
         issues[0].Titel.Should().Be("PROJ-1: Ein Issue ohne Beschreibung");
@@ -475,7 +475,7 @@ public sealed class BitbucketPluginTests
             .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>((_, args, _, _, _) => capturedArgs = args.ToList())
             .ReturnsAsync(new CliResult(0, """{"key":"PROJ-42","self":"https://jira.example.test/rest/api/3/issue/42"}""", string.Empty));
 
-        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Zeile 1\nZeile 2"));
+        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Zeile 1\nZeile 2"), TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
         result.Issue!.Titel.Should().Be("PROJ-42: Titel");
@@ -507,7 +507,7 @@ public sealed class BitbucketPluginTests
             .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey"))
             .Returns(jiraProject);
 
-        var result = await _sut.CanCreateIssueAsync("workspace/repo");
+        var result = await _sut.CanCreateIssueAsync("workspace/repo", TestContext.Current.CancellationToken);
 
         result.Should().BeFalse();
     }
@@ -523,7 +523,7 @@ public sealed class BitbucketPluginTests
             .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey"))
             .Returns("PROJ");
 
-        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Body"));
+        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Body"), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueCreateResultStatus.NotSupported);
         result.Issue.Should().BeNull();
@@ -549,7 +549,7 @@ public sealed class BitbucketPluginTests
             .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey"))
             .Returns("PROJ");
 
-        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest(" ", "Body"));
+        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest(" ", "Body"), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueCreateResultStatus.Failed);
         result.ErrorMessage.Should().Contain("Summary");
@@ -583,7 +583,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, """{"errors":{"summary":"Summary is required"}}""", string.Empty));
 
-        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Body"));
+        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Body"), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueCreateResultStatus.Failed);
         result.Issue.Should().BeNull();
@@ -661,7 +661,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "ref: refs/heads/main\r\tHEAD\r\n", string.Empty));
 
-        var branch = await _sut.GetDefaultBranchAsync("https://bitbucket.org/owner/repo.git");
+        var branch = await _sut.GetDefaultBranchAsync("https://bitbucket.org/owner/repo.git", TestContext.Current.CancellationToken);
 
         branch.Should().Be("main");
     }
@@ -681,7 +681,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.CloneRepositoryAsync("git@bitbucket.org:ws/repo.git", "/target/path");
+        await _sut.CloneRepositoryAsync("git@bitbucket.org:ws/repo.git", "/target/path", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -704,7 +704,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.CloneRepositoryAsync("ssh://git@bitbucket.org/ws/repo.git", "/target/path");
+        await _sut.CloneRepositoryAsync("ssh://git@bitbucket.org/ws/repo.git", "/target/path", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -730,7 +730,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.CloneRepositoryAsync("git@bitbucket.example.com:projects/KEY/repos/slug", "/target/path");
+        await _sut.CloneRepositoryAsync("git@bitbucket.example.com:projects/KEY/repos/slug", "/target/path", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -826,7 +826,7 @@ public sealed class BitbucketPluginTests
                 (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
             .ReturnsAsync(new CliResult(0, "git@bitbucket.org:ws/repo.git", string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://user:appPassword@bitbucket.org/ws/repo.git");
         var pushIndex = calls.FindIndex(c => c == "push --set-upstream origin feature/a");
@@ -860,7 +860,7 @@ public sealed class BitbucketPluginTests
                 (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
             .ReturnsAsync(new CliResult(0, "git@bitbucket.org:ws/repo.git", string.Empty));
 
-        await _sut.PullAsync("/repo");
+        await _sut.PullAsync("/repo", TestContext.Current.CancellationToken);
 
         var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://user:appPassword@bitbucket.org/ws/repo.git");
         var pullIndex = calls.FindIndex(c => c == "pull");
@@ -889,7 +889,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -926,7 +926,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PullAsync("/repo");
+        await _sut.PullAsync("/repo", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -955,7 +955,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "hash1\trefs/heads/main", string.Empty));
 
-        var result = (await _sut.GetRemoteBranchesAsync("git@bitbucket.org:ws/repo.git")).ToList();
+        var result = (await _sut.GetRemoteBranchesAsync("git@bitbucket.org:ws/repo.git", TestContext.Current.CancellationToken)).ToList();
 
         result.Should().Equal("main");
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -979,7 +979,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "ref: refs/heads/main\tHEAD", string.Empty));
 
-        var result = await _sut.GetDefaultBranchAsync("ssh://git@bitbucket.org/ws/repo.git");
+        var result = await _sut.GetDefaultBranchAsync("ssh://git@bitbucket.org/ws/repo.git", TestContext.Current.CancellationToken);
 
         result.Should().Be("main");
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -1020,7 +1020,7 @@ public sealed class BitbucketPluginTests
             SourceRef: null,
             HeadSha: null);
 
-        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec, TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -1060,7 +1060,7 @@ public sealed class BitbucketPluginTests
             SourceRef: null,
             HeadSha: null);
 
-        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec, TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -1117,7 +1117,7 @@ public sealed class BitbucketPluginTests
             SourceRef: null,
             HeadSha: null);
 
-        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec, TestContext.Current.CancellationToken);
 
         var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://user:appPassword@bitbucket.org/ws/repo.git");
         var fetchIndex = calls.FindIndex(c => c == "fetch --no-tags origin refs/heads/feature/pr");
@@ -1162,7 +1162,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "git@bitbucket.org:ws/repo.git", string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -1195,7 +1195,7 @@ public sealed class BitbucketPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -1236,7 +1236,7 @@ public sealed class BitbucketPluginTests
             OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
         var realNetrcBefore = File.Exists(realNetrcPath) ? File.ReadAllText(realNetrcPath) : null;
 
-        await _sut.PullAsync("/repo");
+        await _sut.PullAsync("/repo", TestContext.Current.CancellationToken);
 
         File.Exists(_netrcPath).Should().BeTrue();
         var content = File.ReadAllText(_netrcPath);

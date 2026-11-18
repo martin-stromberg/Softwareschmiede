@@ -27,17 +27,17 @@ public sealed class ScmEventDispatchTests
         await AddAliasLinksAsync(fixture, kind, alias);
         ConfigureObservations(fixture);
 
-        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
-        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
+        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Empty(await db.ScmIncomingEvents.ToListAsync());
-        Assert.All(await db.Aufgaben.ToListAsync(), task => Assert.Equal(AufgabeStatus.Neu, task.Status));
-        var checkpoints = await db.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync();
+        Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.All(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), task => Assert.Equal(AufgabeStatus.Neu, task.Status));
+        var checkpoints = await db.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(kind == ScmReferenceKind.Issue ? 2 : 4, checkpoints.Count);
         Assert.All(checkpoints, checkpoint => Assert.Equal("Mehrdeutige Zuordnung zu Aufgaben", checkpoint.Diagnostic));
-        Assert.All(await db.ScmContentSnapshots.ToListAsync(), snapshot => Assert.Equal("Mehrdeutige Zuordnung zu Aufgaben", snapshot.Diagnostic));
+        Assert.All(await db.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), snapshot => Assert.Equal("Mehrdeutige Zuordnung zu Aufgaben", snapshot.Diagnostic));
         Assert.Empty(fixture.Prompts);
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Responses);
@@ -52,15 +52,15 @@ public sealed class ScmEventDispatchTests
         await AddAliasLinksAsync(fixture, ScmReferenceKind.Issue, "git@github.com:owner/repo.git", secondNumber: 8);
         ConfigureObservations(fixture);
 
-        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var events = await db.ScmIncomingEvents.ToListAsync();
-        var references = await db.Aufgaben.Include(x => x.IssueReferenz).ToDictionaryAsync(x => x.Id, x => x.IssueReferenz!.IssueNummer);
+        var events = await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var references = await db.Aufgaben.Include(x => x.IssueReferenz).ToDictionaryAsync(x => x.Id, x => x.IssueReferenz!.IssueNummer, cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(2, events.Count);
         Assert.All(events, item => Assert.Equal(references[item.AufgabeId], ScmEventStore.Observation(item).Reference.Number));
-        Assert.All(await db.ScmObservationCheckpoints.ToListAsync(), checkpoint => Assert.Null(checkpoint.Diagnostic));
+        Assert.All(await db.ScmObservationCheckpoints.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), checkpoint => Assert.Null(checkpoint.Diagnostic));
     }
 
     /// <summary>A failed alias resolution cannot make another alias appear uniquely assigned; retry is bounded.</summary>
@@ -76,28 +76,28 @@ public sealed class ScmEventDispatchTests
             It.Is<ScmRepositoryContext>(context => context.RepositoryId == alias), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ScmProviderException(ScmProviderFailureKind.Authentication, "Zugang erneuern"));
         var monitor = fixture.Services.GetRequiredService<ScmEventMonitoringService>();
-        await monitor.RunOnceAsync();
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
         fixture.Git.As<IScmEventSource>().Verify(x => x.ReadEventsAsync(It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
         fixture.Git.As<IScmEventSource>().Verify(x => x.GetEventRepositoryAsync(
             It.Is<ScmRepositoryContext>(context => context.RepositoryId == alias), It.IsAny<CancellationToken>()), Times.Once);
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            Assert.Empty(await db.ScmIncomingEvents.ToListAsync());
-            var checkpoint = Assert.Single(await db.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync());
+            Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+            var checkpoint = Assert.Single(await db.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal("Authentication", checkpoint.ErrorCode);
             Assert.Equal(long.MaxValue, checkpoint.NextAttemptUtc);
             checkpoint.NextAttemptUtc = null;
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
             It.Is<ScmRepositoryContext>(context => context.RepositoryId == alias), It.IsAny<CancellationToken>())).ReturnsAsync(fixture.Repository);
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
         using var verification = fixture.Services.CreateScope();
         var verifiedDb = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Empty(await verifiedDb.ScmIncomingEvents.ToListAsync());
-        Assert.All(await verifiedDb.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync(),
+        Assert.Empty(await verifiedDb.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.All(await verifiedDb.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             checkpoint => Assert.Equal("Mehrdeutige Zuordnung zu Aufgaben", checkpoint.Diagnostic));
     }
 
@@ -111,7 +111,7 @@ public sealed class ScmEventDispatchTests
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var first = await db.ScmIncomingEvents.AsNoTracking().SingleAsync(x => x.Id == firstId);
+            var first = await db.ScmIncomingEvents.AsNoTracking().SingleAsync(x => x.Id == firstId, cancellationToken: TestContext.Current.CancellationToken);
             for (var index = 1; index < 100; index++)
                 db.ScmIncomingEvents.Add(new ScmIncomingEvent
                 {
@@ -120,10 +120,10 @@ public sealed class ScmEventDispatchTests
                     ObservationJson = first.ObservationJson,
                     ReceivedUtc = first.ReceivedUtc
                 });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         var (_, readyId) = await fixture.AddAsync(configured: true);
-        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
         var item = await fixture.EventAsync(readyId);
         Assert.Equal("Zugestellt", item.Status);
         Assert.NotNull(item.DeliveryAttemptId);
@@ -159,16 +159,16 @@ public sealed class ScmEventDispatchTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         fixture.CloneGate = async () => { entered.TrySetResult(); await release.Task; };
         var automatic = fixture.DispatchAsync(eventId);
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         using var manualScope = fixture.Services.CreateScope();
         var manual = manualScope.ServiceProvider.GetRequiredService<EntwicklungsprozessService>()
-            .ProzessStartenUndCliStartenAsync(taskId, "https://github.com/owner/repo", null, ScmDispatchFixture.KiPrefix);
+            .ProzessStartenUndCliStartenAsync(taskId, "https://github.com/owner/repo", null, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
         Assert.False(manual.IsCompleted);
         release.TrySetResult();
-        await Task.WhenAll(automatic, manual).WaitAsync(TimeSpan.FromSeconds(20));
+        await Task.WhenAll(automatic, manual).WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
         using var verification = fixture.Services.CreateScope();
-        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(taskId);
-        Assert.Equal("preserve workspace", await File.ReadAllTextAsync(Path.Combine(task!.LokalerKlonPfad!, "owned.txt")));
+        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
+        Assert.Equal("preserve workspace", await File.ReadAllTextAsync(Path.Combine(task!.LokalerKlonPfad!, "owned.txt"), TestContext.Current.CancellationToken));
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
         fixture.Git.Verify(x => x.CloneRepositoryAsync(Moq.It.IsAny<string>(), Moq.It.IsAny<string>(), Moq.It.IsAny<CancellationToken>()), Moq.Times.Once);

@@ -133,7 +133,7 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         sut.SelectedRepository = new AvailableRepository("repo2", DateTime.UtcNow, "owner/repo2", "https://example.com/repo2.git");
         await sut.CurrentLoadDirectoryStructureTask!;
 
-        var finished = await Task.WhenAny(firstLoadTask, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(firstLoadTask, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(firstLoadTask, "der vorherige Ladevorgang muss durch den Repository-Wechsel abgebrochen werden");
     }
 

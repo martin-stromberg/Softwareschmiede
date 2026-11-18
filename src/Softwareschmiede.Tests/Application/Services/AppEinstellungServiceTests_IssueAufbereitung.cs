@@ -23,23 +23,23 @@ public sealed class AppEinstellungServiceTests_IssueAufbereitung : IDisposable
     /// <summary>Ohne gespeicherten Eintrag ist die Issue-Aufbereitung deaktiviert (opt-in).</summary>
     [Fact]
     public async Task GetScmIssueAufbereitungEnabledAsync_WithoutEntry_DefaultsToFalse()
-        => (await _sut.GetScmIssueAufbereitungEnabledAsync()).Should().BeFalse();
+        => (await _sut.GetScmIssueAufbereitungEnabledAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
 
     /// <summary>Der persistierte Funktionsschalter gilt zur Laufzeit in beide Richtungen.</summary>
     [Fact]
     public async Task GetScmIssueAufbereitungEnabledAsync_PersistedValue_IsHonored()
     {
-        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmIssueAufbereitungEnabledKey, true);
-        (await _sut.GetScmIssueAufbereitungEnabledAsync()).Should().BeTrue();
+        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmIssueAufbereitungEnabledKey, true, TestContext.Current.CancellationToken);
+        (await _sut.GetScmIssueAufbereitungEnabledAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
 
-        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmIssueAufbereitungEnabledKey, false);
-        (await _sut.GetScmIssueAufbereitungEnabledAsync()).Should().BeFalse();
+        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmIssueAufbereitungEnabledKey, false, TestContext.Current.CancellationToken);
+        (await _sut.GetScmIssueAufbereitungEnabledAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
     }
 
     /// <summary>Ohne gespeicherten Eintrag greift der Plugin-Fallback (null).</summary>
     [Fact]
     public async Task GetScmIssueAufbereitungPluginPrefixAsync_WithoutEntry_ReturnsNull()
-        => (await _sut.GetScmIssueAufbereitungPluginPrefixAsync()).Should().BeNull();
+        => (await _sut.GetScmIssueAufbereitungPluginPrefixAsync(TestContext.Current.CancellationToken)).Should().BeNull();
 
     /// <summary>Leere gespeicherte Plugin-Werte fallen auf den Standard-Fallback zurück.</summary>
     [Theory]
@@ -47,33 +47,33 @@ public sealed class AppEinstellungServiceTests_IssueAufbereitung : IDisposable
     [InlineData("   ")]
     public async Task GetScmIssueAufbereitungPluginPrefixAsync_EmptyStoredValue_ReturnsNull(string stored)
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, stored);
+        await _sut.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, stored, TestContext.Current.CancellationToken);
 
-        (await _sut.GetScmIssueAufbereitungPluginPrefixAsync()).Should().BeNull();
+        (await _sut.GetScmIssueAufbereitungPluginPrefixAsync(TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     /// <summary>Ein gespeicherter Plugin-Prefix wird getrimmt zurückgegeben.</summary>
     [Fact]
     public async Task GetScmIssueAufbereitungPluginPrefixAsync_StoredValue_ReturnsTrimmed()
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, "  custom.auf  ");
+        await _sut.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, "  custom.auf  ", TestContext.Current.CancellationToken);
 
-        (await _sut.GetScmIssueAufbereitungPluginPrefixAsync()).Should().Be("custom.auf");
+        (await _sut.GetScmIssueAufbereitungPluginPrefixAsync(TestContext.Current.CancellationToken)).Should().Be("custom.auf");
     }
 
     /// <summary>Ohne gespeicherten Eintrag ist der Analyse-Kommentar aktiviert.</summary>
     [Fact]
     public async Task GetScmIssueAufbereitungKommentarEnabledAsync_WithoutEntry_DefaultsToTrue()
-        => (await _sut.GetScmIssueAufbereitungKommentarEnabledAsync()).Should().BeTrue();
+        => (await _sut.GetScmIssueAufbereitungKommentarEnabledAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
 
     /// <summary>Der persistierte Kommentar-Schalter gilt zur Laufzeit in beide Richtungen.</summary>
     [Fact]
     public async Task GetScmIssueAufbereitungKommentarEnabledAsync_PersistedValue_IsHonored()
     {
-        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey, false);
-        (await _sut.GetScmIssueAufbereitungKommentarEnabledAsync()).Should().BeFalse();
+        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey, false, TestContext.Current.CancellationToken);
+        (await _sut.GetScmIssueAufbereitungKommentarEnabledAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
 
-        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey, true);
-        (await _sut.GetScmIssueAufbereitungKommentarEnabledAsync()).Should().BeTrue();
+        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey, true, TestContext.Current.CancellationToken);
+        (await _sut.GetScmIssueAufbereitungKommentarEnabledAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
     }
 }

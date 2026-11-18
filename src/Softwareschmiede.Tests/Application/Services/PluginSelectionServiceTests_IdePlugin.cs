@@ -20,7 +20,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var pluginManager = CreatePluginManager([visualStudio]);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.PluginPrefix.Should().Be("Softwareschmiede.VisualStudio");
     }
@@ -34,7 +34,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var pluginManager = CreatePluginManager([visualStudio, vsCode]);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.PluginPrefix.Should().Be("Softwareschmiede.VisualStudio");
     }
@@ -48,7 +48,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var pluginManager = CreatePluginManager([vsCode, visualStudio]);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.PluginPrefix.Should().Be("Softwareschmiede.VisualStudio");
     }
@@ -62,7 +62,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var pluginManager = CreatePluginManager([visualStudio, vsCode]);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.PluginPrefix.Should().Be("Softwareschmiede.VisualStudioCode");
     }
@@ -75,9 +75,9 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
         var pluginManager = CreatePluginManager([visualStudio, vsCode]);
         var (sut, appEinstellungService) = CreateSut(pluginManager.Object);
-        await appEinstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode,Softwareschmiede.VisualStudio");
+        await appEinstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode,Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
 
-        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.PluginPrefix.Should().Be("Softwareschmiede.VisualStudioCode");
     }
@@ -90,7 +90,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var pluginManager = CreatePluginManager([], defaultPlugin);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.PluginPrefix.Should().Be("Softwareschmiede.VisualStudio");
     }
@@ -104,7 +104,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var pluginManager = CreatePluginManager([visualStudio], defaultPlugin);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.PluginPrefix.Should().Be("Softwareschmiede.VisualStudioCode");
     }
@@ -118,7 +118,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var pluginManager = CreatePluginManager([visualStudio, vsCode]);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Select(p => p.PluginPrefix).Should().BeEquivalentTo(
             ["Softwareschmiede.VisualStudio", "Softwareschmiede.VisualStudioCode"]);
@@ -133,7 +133,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var pluginManager = CreatePluginManager([vsCode, visualStudio]);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Select(p => p.PluginPrefix).Should().ContainInOrder(
             "Softwareschmiede.VisualStudio", "Softwareschmiede.VisualStudioCode");
@@ -147,9 +147,9 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var rider = CreateIdePlugin("Rider", "Softwareschmiede.Rider", IdePluginCompatibility.Explicit);
         var pluginManager = CreatePluginManager([visualStudio, rider]);
         var (sut, appEinstellungService) = CreateSut(pluginManager.Object);
-        await appEinstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Rider,Softwareschmiede.VisualStudio");
+        await appEinstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Rider,Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Select(p => p.PluginPrefix).Should().ContainInOrder(
             "Softwareschmiede.Rider", "Softwareschmiede.VisualStudio");
@@ -164,7 +164,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var pluginManager = CreatePluginManager([visualStudio, incompatible]);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Select(p => p.PluginPrefix).Should().BeEquivalentTo(["Softwareschmiede.VisualStudio"]);
     }
@@ -177,7 +177,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var pluginManager = CreatePluginManager([], defaultPlugin);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Should().ContainSingle().Which.PluginPrefix.Should().Be("Softwareschmiede.VisualStudio");
     }
@@ -191,7 +191,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var pluginManager = CreatePluginManager([visualStudio], defaultPlugin);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Should().ContainSingle().Which.PluginPrefix.Should().Be("Softwareschmiede.VisualStudioCode");
     }

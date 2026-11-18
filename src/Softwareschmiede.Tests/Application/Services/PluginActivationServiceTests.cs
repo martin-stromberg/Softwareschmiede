@@ -21,7 +21,7 @@ public sealed class PluginActivationServiceTests
         var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
-        var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.Unbekannt");
+        var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.Unbekannt", TestContext.Current.CancellationToken);
 
         // Assert
         enabled.Should().BeTrue();
@@ -37,8 +37,8 @@ public sealed class PluginActivationServiceTests
         var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
-        await sut.SetPluginEnabledAsync("Softwareschmiede.GitHub", false);
-        var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.GitHub");
+        await sut.SetPluginEnabledAsync("Softwareschmiede.GitHub", false, TestContext.Current.CancellationToken);
+        var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.GitHub", TestContext.Current.CancellationToken);
 
         // Assert
         enabled.Should().BeFalse();
@@ -55,10 +55,10 @@ public sealed class PluginActivationServiceTests
         var pluginManager = new Mock<IPluginManager>();
         pluginManager.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
         var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
-        await sut.SetPluginEnabledAsync("Softwareschmiede.GitLab", false);
+        await sut.SetPluginEnabledAsync("Softwareschmiede.GitLab", false, TestContext.Current.CancellationToken);
 
         // Act
-        var aktivePlugins = await sut.GetEnabledSourceCodeManagementPluginsAsync();
+        var aktivePlugins = await sut.GetEnabledSourceCodeManagementPluginsAsync(TestContext.Current.CancellationToken);
 
         // Assert
         aktivePlugins.Should().ContainSingle();
@@ -76,10 +76,10 @@ public sealed class PluginActivationServiceTests
         var pluginManager = new Mock<IPluginManager>();
         pluginManager.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
         var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
-        await sut.SetPluginEnabledAsync("Softwareschmiede.Copilot", false);
+        await sut.SetPluginEnabledAsync("Softwareschmiede.Copilot", false, TestContext.Current.CancellationToken);
 
         // Act
-        var aktivePlugins = await sut.GetEnabledDevelopmentAutomationPluginsAsync();
+        var aktivePlugins = await sut.GetEnabledDevelopmentAutomationPluginsAsync(TestContext.Current.CancellationToken);
 
         // Assert
         aktivePlugins.Should().ContainSingle();
@@ -97,10 +97,10 @@ public sealed class PluginActivationServiceTests
         var pluginManager = new Mock<IPluginManager>();
         pluginManager.Setup(m => m.GetIdePlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
         var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
-        await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudioCode", false);
+        await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudioCode", false, TestContext.Current.CancellationToken);
 
         // Act
-        var aktivePlugins = await sut.GetEnabledIdePluginsAsync();
+        var aktivePlugins = await sut.GetEnabledIdePluginsAsync(TestContext.Current.CancellationToken);
 
         // Assert
         aktivePlugins.Should().ContainSingle();
@@ -117,7 +117,7 @@ public sealed class PluginActivationServiceTests
         var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
-        var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.VisualStudio");
+        var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
 
         // Assert
         enabled.Should().BeTrue();
@@ -133,8 +133,8 @@ public sealed class PluginActivationServiceTests
         var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
-        await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false);
-        var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.VisualStudio");
+        await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false, TestContext.Current.CancellationToken);
+        var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
 
         // Assert
         enabled.Should().BeFalse();
@@ -150,10 +150,10 @@ public sealed class PluginActivationServiceTests
         var pluginManager = new Mock<IPluginManager>();
         pluginManager.Setup(m => m.GetIdePlugins()).Returns([plugin]);
         var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
-        await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false);
+        await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false, TestContext.Current.CancellationToken);
 
         // Act
-        var aktivePlugins = await sut.GetEnabledIdePluginsAsync();
+        var aktivePlugins = await sut.GetEnabledIdePluginsAsync(TestContext.Current.CancellationToken);
 
         // Assert
         aktivePlugins.Should().BeEmpty();

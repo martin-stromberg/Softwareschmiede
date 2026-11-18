@@ -17,11 +17,11 @@ public sealed class ArbeitsverzeichnisResolverTests
         await using var db = TestDbContextFactory.Create();
         var settings = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
         var configuredPath = Path.Combine(Path.GetTempPath(), $"resolver-ok-{Guid.NewGuid():N}");
-        await settings.SaveArbeitsverzeichnisAsync(configuredPath);
+        await settings.SaveArbeitsverzeichnisAsync(configuredPath, TestContext.Current.CancellationToken);
 
         var sut = new ArbeitsverzeichnisResolver(settings, NullLogger<ArbeitsverzeichnisResolver>.Instance);
 
-        var result = await sut.ResolveAsync();
+        var result = await sut.ResolveAsync(TestContext.Current.CancellationToken);
 
         result.UsedFallback.Should().BeFalse();
         result.ResolvedPath.Should().Be(Path.GetFullPath(configuredPath));
@@ -40,7 +40,7 @@ public sealed class ArbeitsverzeichnisResolverTests
         var settings = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
         var sut = new ArbeitsverzeichnisResolver(settings, NullLogger<ArbeitsverzeichnisResolver>.Instance);
 
-        var result = await sut.ResolveAsync();
+        var result = await sut.ResolveAsync(TestContext.Current.CancellationToken);
 
         result.UsedFallback.Should().BeTrue();
         result.ReasonCode.Should().Be("no-configured-path");
@@ -54,7 +54,7 @@ public sealed class ArbeitsverzeichnisResolverTests
         await using var db = TestDbContextFactory.Create();
         var settings = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
         var filePath = Path.Combine(Path.GetTempPath(), $"resolver-file-{Guid.NewGuid():N}.txt");
-        await File.WriteAllTextAsync(filePath, "file");
+        await File.WriteAllTextAsync(filePath, "file", TestContext.Current.CancellationToken);
         db.AppEinstellungen.Add(new AppEinstellung
         {
             Id = Guid.NewGuid(),
@@ -62,11 +62,11 @@ public sealed class ArbeitsverzeichnisResolverTests
             Wert = filePath,
             AktualisiertAm = DateTimeOffset.UtcNow
         });
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var sut = new ArbeitsverzeichnisResolver(settings, NullLogger<ArbeitsverzeichnisResolver>.Instance);
 
-        var result = await sut.ResolveAsync();
+        var result = await sut.ResolveAsync(TestContext.Current.CancellationToken);
 
         result.UsedFallback.Should().BeTrue();
         result.ReasonCode.Should().Be("not-writable-or-unavailable");
@@ -92,11 +92,11 @@ public sealed class ArbeitsverzeichnisResolverTests
             Wert = invalidPath,
             AktualisiertAm = DateTimeOffset.UtcNow
         });
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var sut = new ArbeitsverzeichnisResolver(settings, NullLogger<ArbeitsverzeichnisResolver>.Instance);
 
-        var result = await sut.ResolveAsync();
+        var result = await sut.ResolveAsync(TestContext.Current.CancellationToken);
 
         result.UsedFallback.Should().BeTrue();
         result.ReasonCode.Should().Be("invalid-path");

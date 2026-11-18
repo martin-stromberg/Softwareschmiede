@@ -199,7 +199,7 @@ public sealed class TerminalBufferTests
         {
             for (var i = 0; i < 2000; i++)
                 sut.Apply(new TextWrittenEvent("X"));
-        });
+        }, TestContext.Current.CancellationToken);
 
         var reader = Task.Run(() =>
         {
@@ -216,7 +216,7 @@ public sealed class TerminalBufferTests
             {
                 readerException = ex;
             }
-        });
+        }, TestContext.Current.CancellationToken);
 
         await AwaitOhneTimeoutExceptionAsync(writer, TimeSpan.FromSeconds(10));
         stop.Cancel();
@@ -241,7 +241,7 @@ public sealed class TerminalBufferTests
                 sut.Resize(10 + (i % 3), 5 + (i % 3));
                 sut.Apply(new TextWrittenEvent("Y"));
             }
-        });
+        }, TestContext.Current.CancellationToken);
 
         var reader = Task.Run(() =>
         {
@@ -260,7 +260,7 @@ public sealed class TerminalBufferTests
             {
                 readerException = ex;
             }
-        });
+        }, TestContext.Current.CancellationToken);
 
         await AwaitOhneTimeoutExceptionAsync(writer, TimeSpan.FromSeconds(10));
         stop.Cancel();

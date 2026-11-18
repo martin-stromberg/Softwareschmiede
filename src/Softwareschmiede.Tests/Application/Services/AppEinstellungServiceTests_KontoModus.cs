@@ -23,7 +23,7 @@ public sealed class AppEinstellungServiceTests_KontoModus : IDisposable
     /// <summary>Ohne gespeicherten Eintrag überwacht die Anwendung unter dem Benutzerkonto.</summary>
     [Fact]
     public async Task GetScmKontoModusAsync_WithoutEntry_DefaultsToBenutzerkonto()
-        => (await _sut.GetScmKontoModusAsync()).Should().Be(ScmKontoModus.Benutzerkonto);
+        => (await _sut.GetScmKontoModusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmKontoModus.Benutzerkonto);
 
     /// <summary>Ungültige gespeicherte Werte fallen auf „Benutzerkonto“ zurück.</summary>
     [Theory]
@@ -31,8 +31,8 @@ public sealed class AppEinstellungServiceTests_KontoModus : IDisposable
     [InlineData("99")]
     public async Task GetScmKontoModusAsync_InvalidStoredValue_FallsBackToBenutzerkonto(string stored)
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmKontoModusKey, stored);
-        (await _sut.GetScmKontoModusAsync()).Should().Be(ScmKontoModus.Benutzerkonto);
+        await _sut.SetSettingAsync(AppEinstellungService.ScmKontoModusKey, stored, TestContext.Current.CancellationToken);
+        (await _sut.GetScmKontoModusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmKontoModus.Benutzerkonto);
     }
 
     /// <summary>Der persistierte Modus gilt zur Laufzeit.</summary>
@@ -41,8 +41,8 @@ public sealed class AppEinstellungServiceTests_KontoModus : IDisposable
     [InlineData(ScmKontoModus.SeparatesKonto)]
     public async Task SetScmKontoModusAsync_PersistedValue_IsHonored(ScmKontoModus modus)
     {
-        await _sut.SetScmKontoModusAsync(modus);
-        (await _sut.GetScmKontoModusAsync()).Should().Be(modus);
+        await _sut.SetScmKontoModusAsync(modus, TestContext.Current.CancellationToken);
+        (await _sut.GetScmKontoModusAsync(TestContext.Current.CancellationToken)).Should().Be(modus);
     }
 
     /// <summary>Ein nicht definierter Modus wird abgelehnt.</summary>
