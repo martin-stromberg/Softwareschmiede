@@ -21,7 +21,9 @@ internal sealed record ScmKiProfile(string Prefix, string Arguments, string Bann
     IReadOnlyDictionary<string, string?> EnvironmentVariables, Func<string, Task>? OnWritePrompt = null)
 {
     /// <summary>Bisheriges Verhalten: deterministischer JSON-Simulator im SCM-Modus.</summary>
-    internal static ScmKiProfile Simulator => new("Softwareschmiede.KiSimulator", string.Empty,
+    internal static ScmKiProfile Simulator => CreateSimulator();
+
+    private static ScmKiProfile CreateSimulator() => new("Softwareschmiede.KiSimulator", string.Empty,
         "SCM_SIMULATOR_PROTOCOL_V1", "SCM_READY_V1",
         new Dictionary<string, string?> { ["SOFTWARESCHMIEDE_SCM_SIMULATOR"] = "1" });
 

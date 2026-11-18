@@ -11,7 +11,7 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 
 ## Überblick
 
-- **UI:** WPF auf `.NET 10` (`src/Softwareschmiede.App`)
+- **UI:** WPF auf `.NET 11` (`src/Softwareschmiede.App`)
 - **Kernlogik:** Application/Domain/Infrastructure in `src/Softwareschmiede`
 - **Persistenz:** SQLite via EF Core
 - **Logging:** Serilog (Konsole + Rolling File)

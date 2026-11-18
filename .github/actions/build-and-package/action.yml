@@ -1,6 +1,6 @@
 name: Build and package
 description: >
-  Provisions the .NET 10 SDK, restores, publishes Softwareschmiede.App (WPF, win-x64,
+  Provisions the .NET 11 SDK, restores, publishes Softwareschmiede.App (WPF, win-x64,
   self-contained) in Release mode, packages the result as release.zip, and generates the
   update manifest (update.json, Rezepte-format: SHA-256/size/URL per asset). Used by both
   the "prerelease" job in staging-ci.yml ("Pre-Release") and the "release" job in
@@ -20,17 +20,17 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Setup .NET 10
+    - name: Setup .NET 11
       uses: actions/setup-dotnet@v6
       with:
-        dotnet-version: '10.0.x'
+        dotnet-version: '11.0.x'
 
     - name: Restore dependencies
       run: dotnet restore
       shell: pwsh
 
     - name: Publish (win-x64, self-contained)
-      # Softwareschmiede.App is a WPF application (net10.0-windows) with no cross-platform
+      # Softwareschmiede.App is a WPF application (net11.0-windows) with no cross-platform
       # counterpart, so only win-x64 is published here - unlike the cross-platform App
       # projects (FinanceManager/VideoPlayer/Rezepte), which also publish linux-x64.
       # Self-contained per the App-Release schema (ci-target-schema.md section 6.1); the
