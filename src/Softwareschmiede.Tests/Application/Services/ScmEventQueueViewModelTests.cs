@@ -27,22 +27,22 @@ public sealed class ScmEventQueueViewModelTests
         await fixture.AddAsync();
         var scopes = new FailingScopes(fixture.Services.GetRequiredService<IServiceScopeFactory>()) { Fail = true };
         using var view = View(scopes, fixture);
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Contains("erneut laden", view.LoadError);
         Assert.False(view.IsEmpty);
         Assert.False(view.IsLoading);
         scopes.Fail = false;
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Null(view.LoadError);
         Assert.Single(view.Events);
         scopes.Fail = true;
         view.SelectedFilter = "Verarbeitet";
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Empty(view.Events);
         Assert.False(view.IsEmpty);
         Assert.NotNull(view.LoadError);
         scopes.Fail = false;
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Null(view.LoadError);
         Assert.True(view.IsEmpty);
         Assert.Empty(view.Events);
@@ -129,19 +129,16 @@ public sealed class ScmEventQueueViewModelTests
         var delivered = await fixture.EventAsync(eventId);
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
-        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"),
-            [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3]);
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId)));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [], false, Report: "fertig.")));
+        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3], TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId)), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], false, Report: "fertig.")), TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
 
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
         view.SelectedFilter = "Verarbeitet";
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         var item = Assert.Single(view.Events);
         Assert.True(item.HasOpenActions);
         Assert.Equal(1, attempts);
@@ -153,7 +150,7 @@ public sealed class ScmEventQueueViewModelTests
         Assert.Equal(2, attempts);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments")).Status);
+        Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments", cancellationToken: TestContext.Current.CancellationToken)).Status);
     }
 
     /// <summary>Eine gesperrte Outbox-Aktion benennt in den Integrationshinweisen das betroffene
@@ -179,10 +176,10 @@ public sealed class ScmEventQueueViewModelTests
                 NextAttemptUtc = long.MaxValue,
                 RequestJson = "{}"
             });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Contains("Screenshot-Nachweis", view.Diagnostics);
         Assert.Contains("owner/repo Issue #7", view.Diagnostics);
         Assert.Contains("Erneut prüfen", view.Diagnostics);
@@ -203,7 +200,7 @@ public sealed class ScmEventQueueViewModelTests
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            (await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId)).Status = status;
+            (await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, cancellationToken: TestContext.Current.CancellationToken)).Status = status;
             db.ScmOutgoingActions.Add(new ScmOutgoingAction
             {
                 Id = Guid.NewGuid(),
@@ -215,10 +212,10 @@ public sealed class ScmEventQueueViewModelTests
                 NextAttemptUtc = long.MaxValue,
                 RequestJson = "{}"
             });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Contains(hint, view.Diagnostics);
         if (retry is null) Assert.DoesNotContain("Erneut prüfen", view.Diagnostics);
         else Assert.Contains(retry, view.Diagnostics);
@@ -236,7 +233,7 @@ public sealed class ScmEventQueueViewModelTests
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            (await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId)).Status = "Verarbeitet";
+            (await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, cancellationToken: TestContext.Current.CancellationToken)).Status = "Verarbeitet";
             db.ScmOutgoingActions.Add(new ScmOutgoingAction
             {
                 Id = Guid.NewGuid(),
@@ -248,10 +245,10 @@ public sealed class ScmEventQueueViewModelTests
                 NextAttemptUtc = long.MaxValue,
                 RequestJson = "{}"
             });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Contains("Ausgang ungewiss", view.Diagnostics);
         Assert.Contains("GitHub", view.Diagnostics);
         Assert.Contains("kein automatischer Neuversand", view.Diagnostics);
@@ -282,17 +279,17 @@ public sealed class ScmEventQueueViewModelTests
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId);
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId, TestContext.Current.CancellationToken);
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
         view.SelectedFilter = "Wartend";
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Empty(view.Events);
         view.SelectedFilter = "Abgebrochen";
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         var item = Assert.Single(view.Events);
         Assert.Equal("Abgebrochen", item.Status);
         view.SelectedFilter = "Alle";
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Single(view.Events);
     }
 
@@ -312,21 +309,21 @@ public sealed class ScmEventQueueViewModelTests
                 Diagnostic = "GitHub-Anmeldung ungültig. Bitte erneut anmelden und anschließend Quellen erneut prüfen.",
                 NextAttemptUtc = long.MaxValue
             });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Empty(view.Events);
         Assert.Contains("neue Anfragen können fehlen", view.MonitoringNotice);
         Assert.Contains("erneut anmelden", view.MonitoringNotice);
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var source = (await db.ScmObservationCheckpoints.FindAsync("owner/repo"))!;
+            var source = (await db.ScmObservationCheckpoints.FindAsync(new object?[] { "owner/repo" }, TestContext.Current.CancellationToken))!;
             source.Diagnostic = null; source.ErrorCode = null; source.NextAttemptUtc = null;
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Null(view.MonitoringNotice);
     }
 
@@ -350,10 +347,10 @@ public sealed class ScmEventQueueViewModelTests
                 SourceKey = "github/github.com/owner%2Frepo/PullRequest/2/ReviewComment",
                 Diagnostic = ScmEventStore.UnassignedDiagnostic
             });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Null(view.MonitoringNotice);
         Assert.DoesNotContain(ScmEventStore.UnassignedDiagnostic, view.Diagnostics ?? string.Empty);
         using (var scope = fixture.Services.CreateScope())
@@ -366,9 +363,9 @@ public sealed class ScmEventQueueViewModelTests
                 Diagnostic = "GitHub-Anmeldung ungültig. Bitte erneut anmelden und anschließend Quellen erneut prüfen.",
                 NextAttemptUtc = long.MaxValue
             });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Contains("neue Anfragen können fehlen", view.MonitoringNotice);
         Assert.Contains("erneut anmelden", view.MonitoringNotice);
         Assert.DoesNotContain(ScmEventStore.UnassignedDiagnostic, view.Diagnostics ?? string.Empty);
@@ -390,10 +387,10 @@ public sealed class ScmEventQueueViewModelTests
                 SourceKey = "notifications/softwareschmiede.github/github.com",
                 Diagnostic = ScmEventStore.InboxDiscardDiagnosticPrefix + " 1 verarbeitet, 2 verworfen (Repository nicht registriert)."
             });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
-        await view.RefreshAsync();
+        await view.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.Null(view.MonitoringNotice);
         Assert.Contains("verworfen", view.Diagnostics);
         Assert.Contains("notifications/", view.Diagnostics);
@@ -410,8 +407,8 @@ public sealed class ScmEventQueueViewModelTests
         using (var scope = fixture.Services.CreateScope())
         {
             var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            await einstellungen.SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false);
-            await einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global);
+            await einstellungen.SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+            await einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global, TestContext.Current.CancellationToken);
         }
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
 

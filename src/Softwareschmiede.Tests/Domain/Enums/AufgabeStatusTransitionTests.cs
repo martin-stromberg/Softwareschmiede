@@ -38,11 +38,11 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     [Fact]
     public async Task TestStatusTransitions_NeuToGestartet_Direct_Succeeds()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Transition-Test", null);
+        var aufgabe = await _sut.CreateAsync(_projektId, "Transition-Test", null, ct: TestContext.Current.CancellationToken);
 
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
+        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
 
-        var result = await _sut.GetByIdAsync(aufgabe.Id);
+        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         result!.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
@@ -86,11 +86,11 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     {
         var aufgabe = await ErstelleAufgabeInStatus(AufgabeStatus.Gestartet);
 
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend);
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
+        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend, TestContext.Current.CancellationToken);
+        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
+        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet, TestContext.Current.CancellationToken);
 
-        var result = await _sut.GetByIdAsync(aufgabe.Id);
+        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         result!.Status.Should().Be(AufgabeStatus.Beendet);
     }
 
@@ -112,7 +112,7 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     [Fact]
     public async Task TestStatusValidation_InvalidTransition_ThrowsException()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Ungültiger Übergang", null);
+        var aufgabe = await _sut.CreateAsync(_projektId, "Ungültiger Übergang", null, ct: TestContext.Current.CancellationToken);
 
         var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
         await act.Should().ThrowAsync<InvalidStatusTransitionException>();

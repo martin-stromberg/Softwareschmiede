@@ -16,13 +16,13 @@ public sealed class ScmE2EFixtureTests_RuntimeResult
         {
             await using (var writer = new FileStream(path + ".result", FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
-                await JsonSerializer.SerializeAsync(writer, new { runId });
-                await writer.FlushAsync();
+                await JsonSerializer.SerializeAsync(writer, new { runId }, cancellationToken: TestContext.Current.CancellationToken);
+                await writer.FlushAsync(TestContext.Current.CancellationToken);
                 result = ScmE2EFixture.RuntimeResultAsync(path);
-                await Task.Delay(100);
+                await Task.Delay(100, TestContext.Current.CancellationToken);
                 Assert.False(result.IsCompleted, "The reader must wait while publication is in progress.");
             }
-            Assert.Equal(runId, await result.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.Equal(runId, await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         }
         finally
         {

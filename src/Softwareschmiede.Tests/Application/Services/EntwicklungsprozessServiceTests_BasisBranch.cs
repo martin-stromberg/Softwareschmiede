@@ -128,7 +128,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync("staging");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit fehlendem Basis-Branch", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit fehlendem Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.GetRemoteBranchesAsync(repository.RepositoryUrl, It.IsAny<CancellationToken>()))
             .ReturnsAsync(["main", "develop"]);
 
@@ -139,7 +139,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         await act.Should().ThrowAsync<GitBranchNotFoundException>();
         _gitPluginMock.Verify(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never,
             "die Validierung soll vor dem Klon fehlschlagen");
-        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         updatedAufgabe!.Status.Should().Be(AufgabeStatus.Neu);
     }
 
@@ -152,7 +152,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync("staging");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit vorhandenem Basis-Branch", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit vorhandenem Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.GetRemoteBranchesAsync(repository.RepositoryUrl, It.IsAny<CancellationToken>()))
             .ReturnsAsync(["main", "staging"]);
         _gitPluginMock.Setup(g => g.GetDefaultBranchAsync(repository.RepositoryUrl, It.IsAny<CancellationToken>()))
@@ -166,10 +166,10 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
             _gitPluginMock.Verify(g => g.GetRemoteBranchesAsync(repository.RepositoryUrl, It.IsAny<CancellationToken>()), Times.Once);
         }
@@ -188,7 +188,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync(null);
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne Basis-Branch", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var clonePath = SetupCloneWithDirectoryCreation();
@@ -196,10 +196,10 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
             _gitPluginMock.Verify(g => g.GetRemoteBranchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never,
                 "ohne konfigurierten Basis-Branch soll keine Remote-Validierung stattfinden");
@@ -220,7 +220,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync("staging");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Feature-Branch vom Basis-Branch", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Feature-Branch vom Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.GetRemoteBranchesAsync(repository.RepositoryUrl, It.IsAny<CancellationToken>()))
             .ReturnsAsync(["main", "staging"]);
         _gitPluginMock.Setup(g => g.GetDefaultBranchAsync(repository.RepositoryUrl, It.IsAny<CancellationToken>()))
@@ -234,7 +234,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             _gitPluginMock.Verify(g => g.CheckoutRemoteBranchAsync(It.IsAny<string>(), "staging", It.IsAny<CancellationToken>()), Times.Once);
@@ -243,7 +243,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
                 It.Is<string>(branch => branch.StartsWith("task/", StringComparison.Ordinal)),
                 "staging",
                 It.IsAny<CancellationToken>()), Times.Once);
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.BranchName.Should().StartWith("task/");
         }
         finally
@@ -261,7 +261,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync(null);
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Bestehenden Pull Request reviewen", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Bestehenden Pull Request reviewen", null, repository.Id, TestContext.Current.CancellationToken);
         _db.PullRequestReferenzen.Add(new PullRequestReferenz
         {
             Id = Guid.NewGuid(),
@@ -282,7 +282,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
             MonitoringPhase = PullRequestMonitoringPhase.Created,
             CreatedUtc = DateTimeOffset.UtcNow
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _gitPluginMock.Setup(g => g.CheckoutPullRequestSourceAsync(
                 It.IsAny<string>(),
@@ -294,7 +294,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             _gitPluginMock.Verify(g => g.CheckoutPullRequestSourceAsync(
@@ -309,7 +309,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
                 It.IsAny<CancellationToken>()), Times.Once);
             _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
 
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.BranchName.Should().Be("feature/existing-pr");
         }
         finally
@@ -327,7 +327,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync(null);
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Feature-Branch vom HEAD", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Feature-Branch vom HEAD", null, repository.Id, TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var clonePath = SetupCloneWithDirectoryCreation();
@@ -335,7 +335,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             _gitPluginMock.Verify(g => g.CheckoutRemoteBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);

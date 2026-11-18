@@ -20,7 +20,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         var arbeitsverzeichnis = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(arbeitsverzeichnis, "backend"));
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync("backend");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(prozessStarterMock);
@@ -41,7 +41,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(prozessStarterMock);
@@ -61,7 +61,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync("does-not-exist");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(prozessStarterMock);
@@ -85,7 +85,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         File.WriteAllText(solutionPfad, string.Empty);
 
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync(Path.Combine("src", "solutions"));
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(prozessStarterMock);

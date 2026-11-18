@@ -34,13 +34,13 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var reference = Assert.Single(await db.PullRequestReferenzen.ToListAsync());
+        var reference = Assert.Single(await db.PullRequestReferenzen.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(taskId, reference.AufgabeId);
         Assert.Equal(7, reference.PullRequestNumber);
         Assert.Equal("owner/repo", reference.RepositoryId);
         Assert.Equal(PullRequestReferenzRolle.CreatedByTask, reference.Rolle);
         Assert.Equal("https://github.com/owner/repo/pull/7", reference.Url);
-        Assert.NotNull((await db.Protokolleintraege.ToListAsync())
+        Assert.NotNull((await db.Protokolleintraege.ToListAsync(cancellationToken: TestContext.Current.CancellationToken))
             .FirstOrDefault(x => x.Inhalt.Contains("Pull Request #7")));
     }
 
@@ -58,7 +58,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         SetupPullRequestStatus(fixture, PullRequestStatus.Merged);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var task = await TaskAsync(fixture, taskId);
         Assert.Equal(AufgabeStatus.Gestartet, task.Status);
@@ -67,7 +67,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         Assert.False(fixture.Sessions[taskId].Object.Process.HasExited);
 
         time.Advance(TimeSpan.FromMinutes(5));
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         task = await TaskAsync(fixture, taskId);
         Assert.Equal(AufgabeStatus.Beendet, task.Status);
@@ -89,14 +89,14 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
         var promptService = fixture.Services.GetRequiredService<PromptZeitVersandService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
         Assert.NotNull((await TaskAsync(fixture, taskId)).ScmAbschlussErkanntUtc);
 
         await promptService.SchedulePromptAsync(taskId, "verspäteter Prompt", time.GetUtcNow().AddHours(1));
         Assert.NotNull(promptService.GetScheduledPromptStatus(taskId));
 
         time.Advance(TimeSpan.FromMinutes(5));
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(AufgabeStatus.Beendet, (await TaskAsync(fixture, taskId)).Status);
         Assert.Null(promptService.GetScheduledPromptStatus(taskId));
@@ -115,11 +115,11 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         SetupPullRequestStatus(fixture, PullRequestStatus.Closed);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
         Assert.NotNull((await TaskAsync(fixture, taskId)).ScmAbschlussErkanntUtc);
 
         SetupPullRequestStatus(fixture, PullRequestStatus.Open);
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var task = await TaskAsync(fixture, taskId);
         Assert.Null(task.ScmAbschlussErkanntUtc);
@@ -144,14 +144,14 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
             .ReturnsAsync(new Issue(7, "Issue", null, [], null, null) { IstGeschlossen = true });
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var task = await TaskAsync(fixture, taskId);
         Assert.Equal(AufgabeStatus.Gestartet, task.Status);
         Assert.Equal("Issue #7", task.ScmAbschlussReferenz);
 
         time.Advance(TimeSpan.FromMinutes(5));
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(AufgabeStatus.Beendet, (await TaskAsync(fixture, taskId)).Status);
     }
@@ -169,7 +169,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await AddIssueReferenceAsync(fixture, taskId, 7);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetScmKontoModusAsync(ScmKontoModus.SeparatesKonto);
+                .SetScmKontoModusAsync(ScmKontoModus.SeparatesKonto, TestContext.Current.CancellationToken);
         var contexts = new List<ScmRepositoryContext>();
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
@@ -180,7 +180,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
             });
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var context = Assert.Single(contexts);
         Assert.Equal(ScmKontoModus.Benutzerkonto, context.Konto);
@@ -202,9 +202,9 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
 
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmTaskCompletionEnabledKey, false);
+                .SetBoolSettingAsync(AppEinstellungService.ScmTaskCompletionEnabledKey, false, TestContext.Current.CancellationToken);
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
             It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -225,7 +225,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         SetupPullRequestStatus(fixture, PullRequestStatus.Open);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
         Assert.Null((await TaskAsync(fixture, taskId)).ScmAbschlussErkanntUtc);
 
         // Geschlossener PR, aber ein zweites, noch laufendes Ereignis: kein Countdown-Start.
@@ -233,13 +233,13 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var pending = await db.ScmIncomingEvents.SingleAsync(x => x.Id == pendingEventId);
+            var pending = await db.ScmIncomingEvents.SingleAsync(x => x.Id == pendingEventId, cancellationToken: TestContext.Current.CancellationToken);
             pending.AufgabeId = taskId;
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         SetupPullRequestStatus(fixture, PullRequestStatus.Merged);
         time.Advance(TimeSpan.FromMinutes(10));
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var task = await TaskAsync(fixture, taskId);
         Assert.Null(task.ScmAbschlussErkanntUtc);
@@ -259,14 +259,14 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         SetupPullRequestStatus(fixture, PullRequestStatus.Merged, number: 42);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
             "owner/repo", 42, It.IsAny<CancellationToken>()), Times.Once);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         var manual = await db.Aufgaben.Include(x => x.PullRequests)
-            .SingleAsync(x => x.PullRequests.Any(p => p.PullRequestNumber == 42));
+            .SingleAsync(x => x.PullRequests.Any(p => p.PullRequestNumber == 42), cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(manual.ScmAbschlussErkanntUtc);
         Assert.Equal("Pull Request #42", manual.ScmAbschlussReferenz);
     }
@@ -282,14 +282,14 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         SetupPullRequestStatus(fixture, PullRequestStatus.Merged, number: 42);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
             It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         var manual = await db.Aufgaben.Include(x => x.PullRequests)
-            .SingleAsync(x => x.PullRequests.Any(p => p.PullRequestNumber == 42));
+            .SingleAsync(x => x.PullRequests.Any(p => p.PullRequestNumber == 42), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Null(manual.ScmAbschlussErkanntUtc);
     }
 
@@ -309,14 +309,14 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
             .ReturnsAsync(new Issue(7, "Issue", null, [], null, null) { IstGeschlossen = true });
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var task = await TaskAsync(fixture, taskId);
         Assert.Equal("Issue #7", task.ScmAbschlussReferenz);
         Assert.Equal(AufgabeStatus.Gestartet, task.Status);
 
         time.Advance(TimeSpan.FromMinutes(5));
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(AufgabeStatus.Beendet, (await TaskAsync(fixture, taskId)).Status);
     }
@@ -333,7 +333,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await AddIssueReferenceAsync(fixture, taskId, null);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         // Referenz vorhanden, aber ohne gültige Issue-/PR-Nummer → kein Provider-Aufruf.
         fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
@@ -355,7 +355,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await SetPruefmodusAsync(fixture, ScmTaskCompletionPruefmodus.AlleAufgaben);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
             It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -380,7 +380,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await SetWaitAsync(fixture, 0);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         // Keine Referenz → der Kandidatenfilter sortiert die Aufgabe vor jedem Provider-Aufruf aus.
         fixture.Git.Verify(x => x.GetPullRequestStatusAsync(
@@ -392,7 +392,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         Assert.Equal(AufgabeStatus.Gestartet, task.Status);
 
         time.Advance(TimeSpan.FromMinutes(30));
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(AufgabeStatus.Gestartet, (await TaskAsync(fixture, taskId)).Status);
     }

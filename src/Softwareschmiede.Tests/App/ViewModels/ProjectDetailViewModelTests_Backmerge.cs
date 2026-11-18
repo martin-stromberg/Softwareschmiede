@@ -85,8 +85,8 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
     public async Task LadenAsync_ProjektbezogenerModus_OptionSichtbarUndFlagGeladen()
     {
         var projekt = await ErstelleProjektMitRepositoryAsync();
-        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeModus.Projektbezogen);
-        await _einstellungService.SetBackmergeProjektAktivAsync(projekt.Id, true);
+        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeModus.Projektbezogen, TestContext.Current.CancellationToken);
+        await _einstellungService.SetBackmergeProjektAktivAsync(projekt.Id, true, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await LadenAsync(sut, projekt.Id);
@@ -102,7 +102,7 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
     public async Task LadenAsync_NichtProjektbezogenerModus_OptionVerborgen(ScmBackmergeModus modus)
     {
         var projekt = await ErstelleProjektMitRepositoryAsync();
-        await _einstellungService.SetScmBackmergeModusAsync(modus);
+        await _einstellungService.SetScmBackmergeModusAsync(modus, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await LadenAsync(sut, projekt.Id);
@@ -115,7 +115,7 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
     public async Task LadenAsync_OhneBasisBranch_OptionVerborgen()
     {
         var projekt = await ErstelleProjektMitRepositoryAsync(basisBranch: null);
-        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeModus.Projektbezogen);
+        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeModus.Projektbezogen, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await LadenAsync(sut, projekt.Id);
@@ -128,17 +128,17 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
     public async Task IsBackmergeAutoMergeEnabled_Umschalten_PersistiertProjektFlag()
     {
         var projekt = await ErstelleProjektMitRepositoryAsync();
-        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeModus.Projektbezogen);
+        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeModus.Projektbezogen, TestContext.Current.CancellationToken);
         var sut = CreateSut();
         await LadenAsync(sut, projekt.Id);
 
         sut.IsBackmergeAutoMergeEnabled = true;
 
         var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (!await _einstellungService.GetBackmergeProjektAktivAsync(projekt.Id))
+        while (!await _einstellungService.GetBackmergeProjektAktivAsync(projekt.Id, TestContext.Current.CancellationToken))
         {
             DateTime.UtcNow.Should().BeBefore(deadline, "die Freigabe muss zeitnah persistiert werden");
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
         }
     }
 }

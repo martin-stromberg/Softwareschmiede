@@ -52,10 +52,10 @@ public sealed class PseudoConsoleSessionTests_WriteInputAsync
         var second = Encoding.UTF8.GetBytes("BBBB");
 
         var firstTask = session.WriteInputAsync(first, CancellationToken.None);
-        inputStream.FirstWriteStarted.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        inputStream.FirstWriteStarted.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).Should().BeTrue();
 
         var secondTask = session.WriteInputAsync(second, CancellationToken.None);
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         inputStream.WriteCalls.Should().Be(1, "der zweite Write darf erst nach Abschluss des ersten serialisierten Writes starten");
 
@@ -74,12 +74,12 @@ public sealed class PseudoConsoleSessionTests_WriteInputAsync
         var bytes = Encoding.UTF8.GetBytes("laufender paste");
 
         var writeTask = session.WriteInputAsync(bytes, CancellationToken.None);
-        inputStream.FirstWriteStarted.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        inputStream.FirstWriteStarted.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).Should().BeTrue();
 
         session.Dispose();
         inputStream.ReleaseFirstWrite();
 
-        var completed = await Task.WhenAny(writeTask, Task.Delay(TimeSpan.FromSeconds(5)));
+        var completed = await Task.WhenAny(writeTask, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         completed.Should().Be(writeTask, "ein laufender Input-Write darf durch Dispose() nicht haengen bleiben");
         await writeTask;

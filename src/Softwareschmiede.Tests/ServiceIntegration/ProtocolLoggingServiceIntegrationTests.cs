@@ -40,10 +40,10 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
     {
         await SeedAufgabeAsync();
 
-        await _protokollService.AddCliOutputAsync(_aufgabeId, "Zeile 1 der Ausgabe");
-        await _protokollService.AddCliOutputAsync(_aufgabeId, "Zeile 2 der Ausgabe");
+        await _protokollService.AddCliOutputAsync(_aufgabeId, "Zeile 1 der Ausgabe", TestContext.Current.CancellationToken);
+        await _protokollService.AddCliOutputAsync(_aufgabeId, "Zeile 2 der Ausgabe", TestContext.Current.CancellationToken);
 
-        var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId);
+        var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
         eintraege.Should().HaveCount(2);
         eintraege.All(e => e.Typ == ProtokollTyp.CliOutput).Should().BeTrue();
     }
@@ -56,9 +56,9 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
         var zeilen = Enumerable.Range(1, 5).Select(i => $"Ausgabezeile {i}").ToList();
 
         foreach (var zeile in zeilen)
-            await _protokollService.AddCliOutputAsync(_aufgabeId, zeile);
+            await _protokollService.AddCliOutputAsync(_aufgabeId, zeile, TestContext.Current.CancellationToken);
 
-        var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId);
+        var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
         eintraege.Should().HaveCount(5);
         for (var i = 0; i < zeilen.Count; i++)
             eintraege[i].Inhalt.Should().Be(zeilen[i]);
@@ -70,9 +70,9 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
     {
         await SeedAufgabeAsync();
 
-        await _protokollService.AddStatusUebergangAsync(_aufgabeId, AufgabeStatus.Neu, AufgabeStatus.Gestartet);
+        await _protokollService.AddStatusUebergangAsync(_aufgabeId, AufgabeStatus.Neu, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
 
-        var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId);
+        var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
         eintraege.Should().HaveCount(1);
         eintraege[0].Typ.Should().Be(ProtokollTyp.StatusUebergang);
         eintraege[0].Inhalt.Should().Contain("Gestartet");

@@ -20,14 +20,14 @@ public sealed class WorkdirMigrationTests
     [Fact]
     public async Task MigrateAsync_ShouldApplyAndRollbackIssueReferenzSourceKeyMigration()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
 
         (await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey")).Should().NotBeNull();
 
-        await db.Context.Database.MigrateAsync(PreviousBeforeIssueReferenzSourceKeyMigration);
+        await db.Context.Database.MigrateAsync(PreviousBeforeIssueReferenzSourceKeyMigration, cancellationToken: TestContext.Current.CancellationToken);
         (await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey")).Should().BeNull();
 
-        await db.Context.Database.MigrateAsync(AddIssueReferenzSourceKeyMigration);
+        await db.Context.Database.MigrateAsync(AddIssueReferenzSourceKeyMigration, cancellationToken: TestContext.Current.CancellationToken);
         var column = await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey");
         column.Should().NotBeNull();
         column!.NotNull.Should().BeFalse("Migration muss rückwärtskompatibel als nullable sein.");
@@ -37,14 +37,14 @@ public sealed class WorkdirMigrationTests
     [Fact]
     public async Task MigrateAsync_ShouldApplyAndRollbackWorkdirMigration()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
 
         (await TableExistsAsync(db, "AppEinstellungen")).Should().BeTrue();
 
-        await db.Context.Database.MigrateAsync(PreviousMigration);
+        await db.Context.Database.MigrateAsync(PreviousMigration, cancellationToken: TestContext.Current.CancellationToken);
         (await TableExistsAsync(db, "AppEinstellungen")).Should().BeFalse();
 
-        await db.Context.Database.MigrateAsync(WorkdirMigration);
+        await db.Context.Database.MigrateAsync(WorkdirMigration, cancellationToken: TestContext.Current.CancellationToken);
         (await TableExistsAsync(db, "AppEinstellungen")).Should().BeTrue();
     }
 
@@ -52,14 +52,14 @@ public sealed class WorkdirMigrationTests
     [Fact]
     public async Task MigrateAsync_ShouldApplyAndRollbackKiPluginPrefixMigration_AsNullableColumn()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
 
         (await ColumnInfoAsync(db, "Aufgaben", "KiPluginPrefix")).Should().NotBeNull();
 
-        await db.Context.Database.MigrateAsync(PreviousBeforeKiPluginPrefixMigration);
+        await db.Context.Database.MigrateAsync(PreviousBeforeKiPluginPrefixMigration, cancellationToken: TestContext.Current.CancellationToken);
         (await ColumnInfoAsync(db, "Aufgaben", "KiPluginPrefix")).Should().BeNull();
 
-        await db.Context.Database.MigrateAsync(AddKiPluginPrefixMigration);
+        await db.Context.Database.MigrateAsync(AddKiPluginPrefixMigration, cancellationToken: TestContext.Current.CancellationToken);
         var column = await ColumnInfoAsync(db, "Aufgaben", "KiPluginPrefix");
         column.Should().NotBeNull();
         column!.NotNull.Should().BeFalse("Migration muss rückwärtskompatibel als nullable sein.");
@@ -69,9 +69,9 @@ public sealed class WorkdirMigrationTests
     [Fact]
     public async Task MigrateAsync_AddAufgabeAusfuehrungsStatus_BackfilledAlleAltStatus()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
 
-        await db.Context.Database.MigrateAsync(PreviousBeforeAusfuehrungsStatusMigration);
+        await db.Context.Database.MigrateAsync(PreviousBeforeAusfuehrungsStatusMigration, cancellationToken: TestContext.Current.CancellationToken);
         (await ColumnInfoAsync(db, "Aufgaben", "AusfuehrungsStatus")).Should().BeNull();
 
         var projektId = Guid.NewGuid().ToString();
@@ -91,7 +91,7 @@ public sealed class WorkdirMigrationTests
         var beendetId = await InsertLegacyAufgabeAsync(db, projektId, "Beendet", null);
         var archiviertId = await InsertLegacyAufgabeAsync(db, projektId, "Archiviert", "lauf-alt");
 
-        await db.Context.Database.MigrateAsync(AddAufgabeAusfuehrungsStatusMigration);
+        await db.Context.Database.MigrateAsync(AddAufgabeAusfuehrungsStatusMigration, cancellationToken: TestContext.Current.CancellationToken);
 
         var column = await ColumnInfoAsync(db, "Aufgaben", "AusfuehrungsStatus");
         column.Should().NotBeNull();

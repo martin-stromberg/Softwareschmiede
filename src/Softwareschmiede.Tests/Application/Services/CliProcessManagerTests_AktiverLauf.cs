@@ -191,7 +191,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         aufgabe.AktiveRunId.Should().NotBeNullOrEmpty();
         aufgabe.LastHeartbeatUtc.Should().NotBeNull();
         aufgabe.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
-        notifierFired.Wait(TimeSpan.FromSeconds(2)).Should().BeTrue(
+        notifierFired.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken).Should().BeTrue(
             "erfolgreiche Laufdaten-Persistierung meldet die UI-Aktualisierung");
     }
 
@@ -212,12 +212,12 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         using (var scope = _provider.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var tracked = await db.Aufgaben.FindAsync(_aufgabeId);
+            var tracked = await db.Aufgaben.FindAsync(new object?[] { _aufgabeId }, TestContext.Current.CancellationToken);
             tracked!.AktiveRunId = null;
             tracked.LastHeartbeatUtc = null;
             tracked.LaufStatus = null;
             tracked.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var method = typeof(CliProcessManager).GetMethod("AktualisierungAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;

@@ -71,7 +71,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         var sut = ErstelleZaehlung([], new FakeStatusSource(), out var provider);
         using var _ = provider;
 
-        (await sut.ZaehleAsync()).Should().Be(0);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(0);
     }
 
     /// <summary>Eine Aufgabe mit aktivem Lauf-Nachweis zaehlt als laufend.</summary>
@@ -81,7 +81,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         var sut = ErstelleZaehlung([ErstelleLaufendeAufgabe()], new FakeStatusSource(), out var provider);
         using var _ = provider;
 
-        (await sut.ZaehleAsync()).Should().Be(1);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(1);
     }
 
     /// <summary>Persistierter Substatus WartetAufEingabe zaehlt nicht als laufend.</summary>
@@ -93,7 +93,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         var sut = ErstelleZaehlung([aufgabe], new FakeStatusSource(), out var provider);
         using var _ = provider;
 
-        (await sut.ZaehleAsync()).Should().Be(0);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(0);
     }
 
     /// <summary>Eine wartende Aufgabe ohne Lauf-Nachweis zaehlt nicht.</summary>
@@ -106,7 +106,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         var sut = ErstelleZaehlung([aufgabe], new FakeStatusSource(), out var provider);
         using var _ = provider;
 
-        (await sut.ZaehleAsync()).Should().Be(0);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(0);
     }
 
     /// <summary>Eine pausierte Aufgabe zaehlt nicht als laufend.</summary>
@@ -118,7 +118,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         var sut = ErstelleZaehlung([aufgabe], new FakeStatusSource(), out var provider);
         using var _ = provider;
 
-        (await sut.ZaehleAsync()).Should().Be(0);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(0);
     }
 
     /// <summary>Eine beendete Aufgabe zaehlt nicht.</summary>
@@ -135,7 +135,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         var sut = ErstelleZaehlung([aufgabe], new FakeStatusSource(), out var provider);
         using var _ = provider;
 
-        (await sut.ZaehleAsync()).Should().Be(0);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(0);
     }
 
     /// <summary>Live-Status Laeuft schlaegt auf Laeuft durch und zaehlt.</summary>
@@ -150,7 +150,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         var sut = ErstelleZaehlung([aufgabe], statusSource, out var provider);
         using var _ = provider;
 
-        (await sut.ZaehleAsync()).Should().Be(1);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(1);
     }
 
     /// <summary>Live-Status WartetAufEingabe zaehlt nicht (wartender Prozess blockiert nicht).</summary>
@@ -164,7 +164,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         var sut = ErstelleZaehlung([aufgabe], statusSource, out var provider);
         using var _ = provider;
 
-        (await sut.ZaehleAsync()).Should().Be(0);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(0);
     }
 
     /// <summary>
@@ -183,7 +183,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         await promptService.SchedulePromptAsync(aufgabe.Id, "spaeter senden", DateTimeOffset.UtcNow.AddMinutes(10));
         promptService.GetScheduledPromptStatus(aufgabe.Id).Should().NotBeNull();
 
-        (await sut.ZaehleAsync()).Should().Be(0);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(0);
     }
 
     /// <summary>In einer gemischten Kandidatenmenge zaehlt nur der Zustand Laeuft.</summary>
@@ -205,7 +205,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         var sut = ErstelleZaehlung([laufend, wartend, pausiert, bereit], new FakeStatusSource(), out var provider);
         using var _ = provider;
 
-        (await sut.ZaehleAsync()).Should().Be(1);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(1);
     }
 
     /// <summary>Ein verzögert ausstehendes SCM-Ereignis zählt als ausstehende
@@ -223,9 +223,9 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
             Status = "Verzögert",
             NextAttemptUtc = DateTimeOffset.UtcNow.AddHours(2).ToUnixTimeMilliseconds()
         });
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        (await sut.ZaehleAsync()).Should().Be(1);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(1);
     }
 
     /// <summary>Abgeschlossene oder abgebrochene SCM-Ereignisse zählen nicht.</summary>
@@ -245,9 +245,9 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
             EventKey = $"status/{status}",
             Status = status
         });
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        (await sut.ZaehleAsync()).Should().Be(0);
+        (await sut.ZaehleAsync(TestContext.Current.CancellationToken)).Should().Be(0);
     }
 
     private sealed class FakeAktiveAufgabenService(List<Aufgabe> aufgaben) : IAktiveAufgabenService

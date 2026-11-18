@@ -66,7 +66,7 @@ public sealed class ClaudeCliPluginTests
     [Fact]
     public async Task StartCliAsync_ShouldReturnProcessStartInfo_WithClaudeCommand()
     {
-        var psi = await _sut.StartCliAsync("/repo/path");
+        var psi = await _sut.StartCliAsync("/repo/path", ct: TestContext.Current.CancellationToken);
 
         Path.GetFileNameWithoutExtension(psi.FileName).Should().BeEquivalentTo("claude");
         psi.WorkingDirectory.Should().Be("/repo/path");
@@ -76,7 +76,7 @@ public sealed class ClaudeCliPluginTests
     [Fact]
     public async Task StartCliAsync_ShouldPassParameters_AsArguments()
     {
-        var psi = await _sut.StartCliAsync("/repo", "--continue session-123");
+        var psi = await _sut.StartCliAsync("/repo", "--continue session-123", TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Be("--continue session-123");
     }
@@ -88,7 +88,7 @@ public sealed class ClaudeCliPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.ClaudeCli.Token"))
             .Returns("sk-ant-test-key");
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.EnvironmentVariables["ANTHROPIC_API_KEY"].Should().Be("sk-ant-test-key");
     }
@@ -100,7 +100,7 @@ public sealed class ClaudeCliPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.ClaudeCli.Token"))
             .Returns((string?)null);
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.EnvironmentVariables.ContainsKey("ANTHROPIC_API_KEY").Should().BeFalse();
     }
@@ -122,7 +122,7 @@ public sealed class ClaudeCliPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.ClaudeCli.CommandLineParameters"))
             .Returns("--dangerously-skip-permissions");
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Contain("--dangerously-skip-permissions");
     }

@@ -40,7 +40,7 @@ public partial class End2EndTest
         // Vergangenheit, weshalb der Test in diesem terminalen 1-Minuten-Fenster übersprungen wird,
         // statt eine unerreichbare Zielzeit zu wählen.
         var jetzt = DateTime.Now;
-        Skip.If(jetzt.Hour == 23 && jetzt.Minute >= 59, "Letzte Tagesminute: Mitternachts-Guard würde eine bereits vergangene Zielzeit liefern.");
+        Assert.SkipWhen(jetzt.Hour == 23 && jetzt.Minute >= 59, "Letzte Tagesminute: Mitternachts-Guard würde eine bereits vergangene Zielzeit liefern.");
 
         var zielzeitKandidat = jetzt.AddMinutes(5);
         var zielzeit = zielzeitKandidat.Date == jetzt.Date

@@ -49,11 +49,11 @@ public sealed class AufzeichnenderSystemShutdownServiceTests : IDisposable
         var sut = new AufzeichnenderSystemShutdownService(
             NullLogger<AufzeichnenderSystemShutdownService>.Instance, logPfad);
 
-        await sut.RequestShutdownAsync(erzwingen: true);
-        await sut.RequestShutdownAsync(erzwingen: false);
+        await sut.RequestShutdownAsync(erzwingen: true, cancellationToken: TestContext.Current.CancellationToken);
+        await sut.RequestShutdownAsync(erzwingen: false, cancellationToken: TestContext.Current.CancellationToken);
 
         File.Exists(logPfad).Should().BeTrue();
-        var zeilen = await File.ReadAllLinesAsync(logPfad);
+        var zeilen = await File.ReadAllLinesAsync(logPfad, TestContext.Current.CancellationToken);
         zeilen.Should().HaveCount(2);
         zeilen[0].Should().StartWith("erzwingen=True|");
         zeilen[0].Should().EndWith($"|pid={Environment.ProcessId}");
@@ -69,7 +69,7 @@ public sealed class AufzeichnenderSystemShutdownServiceTests : IDisposable
         var sut = new AufzeichnenderSystemShutdownService(
             NullLogger<AufzeichnenderSystemShutdownService>.Instance, logPfad);
 
-        var task = sut.RequestShutdownAsync(erzwingen: false);
+        var task = sut.RequestShutdownAsync(erzwingen: false, cancellationToken: TestContext.Current.CancellationToken);
 
         task.IsCompletedSuccessfully.Should().BeTrue();
         await task;

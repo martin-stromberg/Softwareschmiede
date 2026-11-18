@@ -142,7 +142,7 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
             Aktiv = true
         };
         var repository = await CreateRepositoryAsync(initialisierungKonfiguration);
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Initialisierungsskript nach Klon", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Initialisierungsskript nach Klon", null, repository.Id, TestContext.Current.CancellationToken);
 
         var cliRunnerMock = new Mock<ICliRunner>();
         cliRunnerMock.Setup(runner => runner.RunAsync(
@@ -170,7 +170,7 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
         try
         {
             // Act
-            await sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+            await sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             cliRunnerMock.Verify(
@@ -181,7 +181,7 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
                     It.IsAny<IDictionary<string, string>?>(),
                     It.IsAny<CancellationToken>()),
                 Times.Once);
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
         }
         finally
@@ -202,7 +202,7 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
             Aktiv = true
         };
         var repository = await CreateRepositoryAsync(initialisierungKonfiguration);
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Initialisierungsskript schlägt fehl", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Initialisierungsskript schlägt fehl", null, repository.Id, TestContext.Current.CancellationToken);
 
         var cliRunnerMock = new Mock<ICliRunner>();
         cliRunnerMock.Setup(runner => runner.RunAsync(
@@ -222,12 +222,12 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
         try
         {
             // Act
-            await sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+            await sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
-            var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+            var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
             protokoll.Should().Contain(entry =>
                 entry.Typ == ProtokollTyp.GitAktion
                 && entry.Inhalt.Contains("Hinweis: Das Repository-Initialisierungsskript konnte nicht ausgeführt werden", StringComparison.Ordinal));
@@ -256,7 +256,7 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
             Aktiv = true
         };
         var repository = await CreateRepositoryAsync(initialisierungKonfiguration, startKonfiguration);
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Reihenfolge Init vor Start", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Reihenfolge Init vor Start", null, repository.Id, TestContext.Current.CancellationToken);
 
         var ausfuehrungsReihenfolge = new List<string>();
         var cliRunnerMock = new Mock<ICliRunner>();
@@ -297,7 +297,7 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
         try
         {
             // Act
-            await sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+            await sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             ausfuehrungsReihenfolge.Should().Equal("init", "start");

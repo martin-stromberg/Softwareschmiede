@@ -145,7 +145,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio");
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode");
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio, vsCode]);
-        await _einstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Unbekannt,Softwareschmiede.VisualStudioCode");
+        await _einstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Unbekannt,Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -160,7 +160,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio");
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode");
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio, vsCode]);
-        await _einstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode");
+        await _einstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -237,7 +237,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         await ((AsyncRelayCommand)sut.VerwerfenCommand).ExecuteAsync();
 
         sut.DevelopmentEnvironmentPlugins.Single(e => e.PluginPrefix == "Softwareschmiede.VisualStudioCode").IsEnabled.Should().BeTrue();
-        var gespeicherterStatus = await _pluginActivationService.IsPluginEnabledAsync("Softwareschmiede.VisualStudioCode");
+        var gespeicherterStatus = await _pluginActivationService.IsPluginEnabledAsync("Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
         gespeicherterStatus.Should().BeTrue();
     }
 
@@ -254,7 +254,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         sut.DevelopmentEnvironmentPlugins.Single(e => e.PluginPrefix == "Softwareschmiede.VisualStudioCode").IsEnabled = false;
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
-        var gespeicherterStatus = await _pluginActivationService.IsPluginEnabledAsync("Softwareschmiede.VisualStudioCode");
+        var gespeicherterStatus = await _pluginActivationService.IsPluginEnabledAsync("Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
         gespeicherterStatus.Should().BeFalse();
     }
 }

@@ -24,7 +24,7 @@ public sealed class GitPluginBaseTests
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
         var sut = new TestGitPlugin(cli.Object);
 
-        await sut.CreateBranchAsync("/repo", "feature/x");
+        await sut.CreateBranchAsync("/repo", "feature/x", ct: TestContext.Current.CancellationToken);
 
         cli.VerifyAll();
     }
@@ -85,7 +85,7 @@ public sealed class GitPluginBaseTests
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
         var sut = new TestGitPlugin(cli.Object);
 
-        await sut.CreateBranchAsync("/repo", "feature/x", "staging");
+        await sut.CreateBranchAsync("/repo", "feature/x", "staging", TestContext.Current.CancellationToken);
 
         cli.VerifyAll();
     }
@@ -111,7 +111,7 @@ public sealed class GitPluginBaseTests
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
         var sut = new TestGitPlugin(cli.Object);
 
-        await sut.CommitAsync("/repo", "msg");
+        await sut.CommitAsync("/repo", "msg", TestContext.Current.CancellationToken);
 
         cli.VerifyAll();
     }
@@ -177,7 +177,7 @@ public sealed class GitPluginBaseTests
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
         var sut = new TestGitPlugin(cli.Object);
 
-        await sut.CheckoutRemoteBranchAsync("/repo", "feature/x");
+        await sut.CheckoutRemoteBranchAsync("/repo", "feature/x", TestContext.Current.CancellationToken);
 
         cli.VerifyAll();
     }
@@ -228,7 +228,7 @@ public sealed class GitPluginBaseTests
     {
         var sut = new TestGitPlugin(new Mock<ICliRunner>().Object);
 
-        var capabilities = await sut.GetGitActionCapabilitiesAsync();
+        var capabilities = await sut.GetGitActionCapabilitiesAsync(ct: TestContext.Current.CancellationToken);
 
         capabilities.RepositoryKind.Should().Be(RepositoryKind.RemoteGit);
         capabilities.IsWorkingDirectoryCopy.Should().BeFalse();
@@ -244,9 +244,9 @@ public sealed class GitPluginBaseTests
     {
         var sut = new TestGitPlugin(new Mock<ICliRunner>().Object);
 
-        var canCreate = await sut.CanCreateIssueAsync("repo");
-        var createResult = await sut.CreateIssueAsync("repo", new IssueCreateRequest("Titel", "Body"));
-        var templateResult = await sut.GetIssueTemplatesAsync("repo");
+        var canCreate = await sut.CanCreateIssueAsync("repo", TestContext.Current.CancellationToken);
+        var createResult = await sut.CreateIssueAsync("repo", new IssueCreateRequest("Titel", "Body"), TestContext.Current.CancellationToken);
+        var templateResult = await sut.GetIssueTemplatesAsync("repo", TestContext.Current.CancellationToken);
 
         canCreate.Should().BeFalse();
         createResult.Status.Should().Be(IssueCreateResultStatus.NotSupported);

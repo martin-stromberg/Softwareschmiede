@@ -15,15 +15,15 @@ public sealed class AufgabeServiceTests_IssueEvents
     [Fact]
     public async Task CreateFromIssueEventAsync_ShouldPersistSourceKey()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var (projektId, repositoryId) = await CreateProjektMitRepositoryAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var issue = new Issue(9, "Issue Titel", "Beschreibung", ["bug"], null, "https://github.com/owner/repo/issues/9");
 
-        var created = await service.CreateFromIssueEventAsync(projektId, issue, repositoryId, "test-scm/github.com/R_1/Issue/9");
+        var created = await service.CreateFromIssueEventAsync(projektId, issue, repositoryId, "test-scm/github.com/R_1/Issue/9", TestContext.Current.CancellationToken);
 
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.Include(x => x.IssueReferenz).SingleAsync(x => x.Id == created.Id);
+        var loaded = await db2.Aufgaben.Include(x => x.IssueReferenz).SingleAsync(x => x.Id == created.Id, cancellationToken: TestContext.Current.CancellationToken);
         loaded.Titel.Should().Be("Issue Titel");
         loaded.GitRepositoryId.Should().Be(repositoryId);
         loaded.IssueReferenz!.IssueNummer.Should().Be(9);
@@ -34,33 +34,33 @@ public sealed class AufgabeServiceTests_IssueEvents
     [Fact]
     public async Task CreateFromIssueEventAsync_ShouldReuseExisting_WhenSourceKeyExists()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var (projektId, repositoryId) = await CreateProjektMitRepositoryAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var issue = new Issue(9, "Issue Titel", "Beschreibung", [], null, null);
 
-        var first = await service.CreateFromIssueEventAsync(projektId, issue, repositoryId, "test-scm/github.com/R_1/Issue/9");
-        var second = await service.CreateFromIssueEventAsync(projektId, issue, repositoryId, "test-scm/github.com/R_1/Issue/9");
+        var first = await service.CreateFromIssueEventAsync(projektId, issue, repositoryId, "test-scm/github.com/R_1/Issue/9", TestContext.Current.CancellationToken);
+        var second = await service.CreateFromIssueEventAsync(projektId, issue, repositoryId, "test-scm/github.com/R_1/Issue/9", TestContext.Current.CancellationToken);
 
         second.Id.Should().Be(first.Id);
-        (await db.Context.Aufgaben.CountAsync()).Should().Be(1);
-        (await db.Context.IssueReferenzen.CountAsync()).Should().Be(1);
+        (await db.Context.Aufgaben.CountAsync(cancellationToken: TestContext.Current.CancellationToken)).Should().Be(1);
+        (await db.Context.IssueReferenzen.CountAsync(cancellationToken: TestContext.Current.CancellationToken)).Should().Be(1);
     }
 
     /// <summary>Ein abweichender SourceKey erzeugt eine eigene Aufgabe.</summary>
     [Fact]
     public async Task CreateFromIssueEventAsync_ShouldCreateSeparateTask_ForDifferentSourceKey()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var (projektId, repositoryId) = await CreateProjektMitRepositoryAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var issue = new Issue(9, "Issue Titel", "Beschreibung", [], null, null);
 
-        var first = await service.CreateFromIssueEventAsync(projektId, issue, repositoryId, "test-scm/github.com/R_1/Issue/9");
-        var second = await service.CreateFromIssueEventAsync(projektId, issue, repositoryId, "test-scm/github.com/R_1/Issue/10");
+        var first = await service.CreateFromIssueEventAsync(projektId, issue, repositoryId, "test-scm/github.com/R_1/Issue/9", TestContext.Current.CancellationToken);
+        var second = await service.CreateFromIssueEventAsync(projektId, issue, repositoryId, "test-scm/github.com/R_1/Issue/10", TestContext.Current.CancellationToken);
 
         second.Id.Should().NotBe(first.Id);
-        (await db.Context.Aufgaben.CountAsync()).Should().Be(2);
+        (await db.Context.Aufgaben.CountAsync(cancellationToken: TestContext.Current.CancellationToken)).Should().Be(2);
     }
 
     private static async Task<(Guid ProjektId, Guid RepositoryId)> CreateProjektMitRepositoryAsync(DatabaseFixture db)

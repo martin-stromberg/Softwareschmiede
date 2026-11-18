@@ -30,7 +30,7 @@ public sealed class PullRequestMonitoringServiceTests
         using var provider = BuildProvider(db, plugin.Object);
         var sut = provider.GetRequiredService<PullRequestMonitoringService>();
 
-        await sut.RunOnceAsync();
+        await sut.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.PreMergeRunning, saved.MonitoringPhase);
@@ -39,7 +39,7 @@ public sealed class PullRequestMonitoringServiceTests
 
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
         var due = await provider.GetRequiredService<PullRequestReferenzService>()
-            .GetDueForMonitoringAsync(_timeProvider.GetUtcNow(), 10);
+            .GetDueForMonitoringAsync(_timeProvider.GetUtcNow(), 10, TestContext.Current.CancellationToken);
         Assert.Contains(due, p => p.Id == pullRequest.Id);
     }
 
@@ -57,7 +57,7 @@ public sealed class PullRequestMonitoringServiceTests
             .ReturnsAsync([]);
         using var provider = BuildProvider(db, plugin.Object);
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync();
+        await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.PostMergeUncertain, saved.MonitoringPhase);
@@ -95,7 +95,7 @@ public sealed class PullRequestMonitoringServiceTests
                 ["Softwareschmiede.GitHub.PullRequestCompletionStrategy"] = "ApprovalOnly"
             });
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync();
+        await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.Approved, saved.MonitoringPhase);
@@ -140,9 +140,9 @@ public sealed class PullRequestMonitoringServiceTests
             });
         var sut = provider.GetRequiredService<PullRequestMonitoringService>();
 
-        await sut.RunOnceAsync();
+        await sut.RunOnceAsync(TestContext.Current.CancellationToken);
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
-        await sut.RunOnceAsync();
+        await sut.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.Approved, saved.MonitoringPhase);
@@ -185,7 +185,7 @@ public sealed class PullRequestMonitoringServiceTests
                 ["Softwareschmiede.GitHub.PullRequestCompletionStrategy"] = "AutoMerge"
             });
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync();
+        await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.Approved, saved.MonitoringPhase);
@@ -226,9 +226,9 @@ public sealed class PullRequestMonitoringServiceTests
             });
         var sut = provider.GetRequiredService<PullRequestMonitoringService>();
 
-        await sut.RunOnceAsync();
+        await sut.RunOnceAsync(TestContext.Current.CancellationToken);
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
-        await sut.RunOnceAsync();
+        await sut.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.Approved, saved.MonitoringPhase);
@@ -258,7 +258,7 @@ public sealed class PullRequestMonitoringServiceTests
             ]);
         using var provider = BuildProvider(db, plugin.Object);
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync();
+        await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.PreMergeSucceeded, saved.MonitoringPhase);
@@ -282,7 +282,7 @@ public sealed class PullRequestMonitoringServiceTests
             ]);
         using var provider = BuildProvider(db, plugin.Object);
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync();
+        await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.PostMergeSucceeded, saved.MonitoringPhase);
@@ -298,7 +298,7 @@ public sealed class PullRequestMonitoringServiceTests
         var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
         var service = new PullRequestReferenzService(db, _timeProvider, NullLogger<PullRequestReferenzService>.Instance);
 
-        var due = await service.GetDueForMonitoringAsync(_timeProvider.GetUtcNow(), 10);
+        var due = await service.GetDueForMonitoringAsync(_timeProvider.GetUtcNow(), 10, TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain(due, p => p.Id == pullRequest.Id);
     }
@@ -320,7 +320,7 @@ public sealed class PullRequestMonitoringServiceTests
             ]);
         using var provider = BuildProvider(db, plugin.Object);
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(aufgabe.Id);
+        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestStatus.Merged, saved.Status);
@@ -352,7 +352,7 @@ public sealed class PullRequestMonitoringServiceTests
                 ["Softwareschmiede.GitHub.AutoCompletePullRequests"] = "true"
             });
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(aufgabe.Id);
+        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestStatus.Open, saved.Status);

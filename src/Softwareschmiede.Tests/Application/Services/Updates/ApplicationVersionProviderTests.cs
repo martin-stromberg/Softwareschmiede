@@ -20,10 +20,10 @@ public sealed class ApplicationVersionProviderTests
   "commit": "abc",
   "createdAtUtc": "2026-07-14T00:00:00Z"
 }
-""");
+""", TestContext.Current.CancellationToken);
         var sut = new ApplicationVersionProvider(temp.Path, NullLogger<ApplicationVersionProvider>.Instance);
 
-        var result = await sut.GetInstalledVersionAsync();
+        var result = await sut.GetInstalledVersionAsync(TestContext.Current.CancellationToken);
 
         result.Should().NotBeNull();
         result!.Version.Should().Be("1.2.3");
@@ -40,10 +40,10 @@ public sealed class ApplicationVersionProviderTests
   "version": "v1.3.0-rc.1+build.7",
   "tagName": "v1.3.0-rc.1"
 }
-""");
+""", TestContext.Current.CancellationToken);
         var sut = new ApplicationVersionProvider(temp.Path, NullLogger<ApplicationVersionProvider>.Instance);
 
-        var result = await sut.GetInstalledVersionAsync();
+        var result = await sut.GetInstalledVersionAsync(TestContext.Current.CancellationToken);
 
         result.Should().NotBeNull();
         result!.Version.Should().Be("1.3.0-rc.1+build.7");
@@ -58,10 +58,10 @@ public sealed class ApplicationVersionProviderTests
     public async Task GetInstalledVersionAsync_ShouldReturnNull_WhenVersionJsonIsInvalid(string json)
     {
         using var temp = new TempDirectory();
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "version.json"), json);
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "version.json"), json, TestContext.Current.CancellationToken);
         var sut = new ApplicationVersionProvider(temp.Path, NullLogger<ApplicationVersionProvider>.Instance);
 
-        var result = await sut.GetInstalledVersionAsync();
+        var result = await sut.GetInstalledVersionAsync(TestContext.Current.CancellationToken);
 
         result.Should().BeNull();
     }

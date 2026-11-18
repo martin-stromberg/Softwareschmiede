@@ -246,7 +246,7 @@ public sealed class IssueCreateDialogViewModelTests
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
 
         var first = ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
-        await _issueProvider.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await _issueProvider.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         sut.CanSubmit.Should().BeFalse();
         sut.ErstellenCommand.CanExecute(null).Should().BeFalse();
@@ -363,11 +363,11 @@ public sealed class IssueCreateDialogViewModelTests
             db, NullLogger<Softwareschmiede.Application.Services.AppEinstellungService>.Instance);
         var activationService = new Softwareschmiede.Application.Services.PluginActivationService(
             einstellungService, _pluginManagerMock.Object, NullLogger<Softwareschmiede.Application.Services.PluginActivationService>.Instance);
-        await activationService.SetPluginEnabledAsync("FailKi", false);
+        await activationService.SetPluginEnabledAsync("FailKi", false, TestContext.Current.CancellationToken);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance, activationService);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
 
-        await sut.FiltereAktivePluginsAsync();
+        await sut.FiltereAktivePluginsAsync(TestContext.Current.CancellationToken);
 
         sut.VerfuegbareKiPlugins.Should().ContainSingle();
         sut.VerfuegbareKiPlugins.Should().Contain("FakeKi");

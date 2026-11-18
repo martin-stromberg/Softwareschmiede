@@ -148,7 +148,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
     {
         // Arrange
         var repository = await CreateRepositoryWithWorkingDirectoryAsync("does-not-exist");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Arbeitsverzeichnis fehlt", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Arbeitsverzeichnis fehlt", null, repository.Id, TestContext.Current.CancellationToken);
         var clonePath = SetupCloneWithDirectoryCreation();
 
         try
@@ -176,7 +176,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
     {
         // Arrange
         var repository = await CreateRepositoryWithWorkingDirectoryAsync("backend");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Arbeitsverzeichnis vorhanden", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Arbeitsverzeichnis vorhanden", null, repository.Id, TestContext.Current.CancellationToken);
         var clonePath = SetupCloneWithDirectoryCreation();
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns((string _, string path, CancellationToken _) =>
@@ -188,10 +188,10 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
         }
         finally
@@ -210,7 +210,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
     {
         // Arrange
         var repository = await CreateRepositoryWithWorkingDirectoryAsync("does-not-exist");
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Ohne GitOrchestrationService", null, repository.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Ohne GitOrchestrationService", null, repository.Id, TestContext.Current.CancellationToken);
         var clonePath = SetupCloneWithDirectoryCreation();
 
         var sutOhneValidation = new EntwicklungsprozessService(
@@ -229,10 +229,10 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         try
         {
             // Act
-            await sutOhneValidation.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+            await sutOhneValidation.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
         }
         finally

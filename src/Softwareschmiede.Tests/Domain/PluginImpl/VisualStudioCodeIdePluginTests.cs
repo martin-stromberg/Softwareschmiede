@@ -29,7 +29,7 @@ public sealed class VisualStudioCodeIdePluginTests
     {
         var sut = CreateSut(VisualStudioCodeAvailability.NotAvailable);
 
-        var result = await sut.CheckCompatibilityAsync(@"C:\beliebiges\repository");
+        var result = await sut.CheckCompatibilityAsync(@"C:\beliebiges\repository", TestContext.Current.CancellationToken);
 
         result.Should().Be(IdePluginCompatibility.Fallback);
     }
@@ -63,7 +63,7 @@ public sealed class VisualStudioCodeIdePluginTests
         var repositoryPfad = @"C:\repos\meinprojekt";
         var sut = CreateSut(VisualStudioCodeAvailability.NotAvailable);
 
-        var entryPoints = await sut.FindEntryPointsAsync(repositoryPfad);
+        var entryPoints = await sut.FindEntryPointsAsync(repositoryPfad, TestContext.Current.CancellationToken);
 
         entryPoints.Should().ContainSingle();
         entryPoints[0].Path.Should().Be(repositoryPfad);
@@ -78,7 +78,7 @@ public sealed class VisualStudioCodeIdePluginTests
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = new VisualStudioCodeIdePlugin(prozessStarterMock.Object, CreateLocator(new VisualStudioCodeAvailability(true, "code.cmd")));
 
-        await sut.OpenEntryPointAsync(new IdeEntryPoint(repositoryPfad));
+        await sut.OpenEntryPointAsync(new IdeEntryPoint(repositoryPfad), TestContext.Current.CancellationToken);
 
         prozessStarterMock.Verify(
             p => p.Starten(It.Is<ProzessStartAnfrage>(a =>

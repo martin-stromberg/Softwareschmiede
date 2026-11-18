@@ -44,7 +44,7 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
         var running = await CreateActiveTaskAsync("Laeuft", AufgabeLaufStatus.Laeuft);
         var sut = new CliUpdateSafetyService(_aufgabeService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
-        var result = await sut.CheckAsync();
+        var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 
         result.RequiresConfirmation.Should().BeTrue();
         result.RiskyTaskCount.Should().Be(1);
@@ -67,7 +67,7 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
             DateTimeOffset.UtcNow.AddMinutes(-(AufgabeRecoveryService.HeartbeatTimeoutMinutes + 1)));
         var sut = new CliUpdateSafetyService(_aufgabeService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
-        var result = await sut.CheckAsync();
+        var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 
         result.RequiresConfirmation.Should().BeFalse();
         result.RiskyTaskCount.Should().Be(0);
@@ -82,10 +82,10 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     public async Task CheckAsync_ShouldNotTreatTaskWithFutureSessionLimitAsRisky()
     {
         var limited = await CreateActiveTaskAsync("Limitiert", AufgabeLaufStatus.Laeuft, kiPluginPrefix: "Test.Plugin");
-        await _kiPluginLimitService.VerarbeiteRateLimitAsync(limited.Id, DateTimeOffset.UtcNow.AddHours(2));
+        await _kiPluginLimitService.VerarbeiteRateLimitAsync(limited.Id, DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
         var sut = new CliUpdateSafetyService(_aufgabeService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
-        var result = await sut.CheckAsync();
+        var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 
         result.RequiresConfirmation.Should().BeFalse();
         result.RiskyTaskCount.Should().Be(0);
@@ -100,10 +100,10 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     public async Task CheckAsync_ShouldTreatTaskWithExpiredSessionLimitAsRisky()
     {
         var expired = await CreateActiveTaskAsync("Abgelaufen", AufgabeLaufStatus.Laeuft, kiPluginPrefix: "Test.Plugin");
-        await _kiPluginLimitService.VerarbeiteRateLimitAsync(expired.Id, DateTimeOffset.UtcNow.AddMinutes(-5));
+        await _kiPluginLimitService.VerarbeiteRateLimitAsync(expired.Id, DateTimeOffset.UtcNow.AddMinutes(-5), TestContext.Current.CancellationToken);
         var sut = new CliUpdateSafetyService(_aufgabeService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
-        var result = await sut.CheckAsync();
+        var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 
         result.RequiresConfirmation.Should().BeTrue();
         result.RiskyTasks.Should().Contain(t => t.Contains(expired.Titel, StringComparison.Ordinal));

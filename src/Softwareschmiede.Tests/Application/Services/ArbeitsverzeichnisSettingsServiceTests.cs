@@ -25,12 +25,12 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
         var sut = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
         var configuredPath = Path.Combine(Path.GetTempPath(), "unit-workdir");
 
-        await sut.SaveArbeitsverzeichnisAsync(configuredPath);
+        await sut.SaveArbeitsverzeichnisAsync(configuredPath, TestContext.Current.CancellationToken);
 
-        var reloaded = await sut.GetArbeitsverzeichnisAsync();
+        var reloaded = await sut.GetArbeitsverzeichnisAsync(TestContext.Current.CancellationToken);
         reloaded.Should().Be(Path.GetFullPath(configuredPath));
 
-        var persisted = await db.AppEinstellungen.FirstOrDefaultAsync(a => a.Schluessel == ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey);
+        var persisted = await db.AppEinstellungen.FirstOrDefaultAsync(a => a.Schluessel == ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey, cancellationToken: TestContext.Current.CancellationToken);
         persisted.Should().NotBeNull();
         persisted!.Wert.Should().Be(Path.GetFullPath(configuredPath));
     }
@@ -42,9 +42,9 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
         await using var db = CreateDb();
         var sut = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
 
-        await sut.SaveArbeitsverzeichnisAsync(" ");
+        await sut.SaveArbeitsverzeichnisAsync(" ", TestContext.Current.CancellationToken);
 
-        var reloaded = await sut.GetArbeitsverzeichnisAsync();
+        var reloaded = await sut.GetArbeitsverzeichnisAsync(TestContext.Current.CancellationToken);
         reloaded.Should().BeNull();
     }
 
@@ -79,7 +79,7 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
         await using var db = CreateDb();
         var sut = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
         var parentFile = Path.Combine(Path.GetTempPath(), $"workdir-parent-file-{Guid.NewGuid():N}.tmp");
-        await File.WriteAllTextAsync(parentFile, "occupied");
+        await File.WriteAllTextAsync(parentFile, "occupied", TestContext.Current.CancellationToken);
         var invalidDirectoryPath = Path.Combine(parentFile, "child");
 
         var act = () => sut.SaveArbeitsverzeichnisAsync(invalidDirectoryPath);

@@ -49,7 +49,7 @@ public sealed class TodoServiceTests : IDisposable
     public async Task CreateTodoAsync_CreatesAndSavesTodo()
     {
         // Act
-        var result = await _sut.CreateTodoAsync(_aufgabeId, "Erstes Todo");
+        var result = await _sut.CreateTodoAsync(_aufgabeId, "Erstes Todo", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -79,11 +79,11 @@ public sealed class TodoServiceTests : IDisposable
     public async Task MarkTodoAsCompletedAsync_SetsErledigtAm()
     {
         // Arrange
-        var todo = await _sut.CreateTodoAsync(_aufgabeId, "Zu erledigendes Todo");
+        var todo = await _sut.CreateTodoAsync(_aufgabeId, "Zu erledigendes Todo", TestContext.Current.CancellationToken);
         var vorMarkierung = DateTimeOffset.UtcNow;
 
         // Act
-        await _sut.MarkTodoAsCompletedAsync(todo.Id);
+        await _sut.MarkTodoAsCompletedAsync(todo.Id, TestContext.Current.CancellationToken);
 
         // Assert
         var aktualisiert = _db.Todos.Find(todo.Id);
@@ -96,10 +96,10 @@ public sealed class TodoServiceTests : IDisposable
     public async Task DeleteTodoAsync_RemovesFromDatabase()
     {
         // Arrange
-        var todo = await _sut.CreateTodoAsync(_aufgabeId, "Zu löschendes Todo");
+        var todo = await _sut.CreateTodoAsync(_aufgabeId, "Zu löschendes Todo", TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.DeleteTodoAsync(todo.Id);
+        await _sut.DeleteTodoAsync(todo.Id, TestContext.Current.CancellationToken);
 
         // Assert
         var geloescht = _db.Todos.Find(todo.Id);
@@ -111,12 +111,12 @@ public sealed class TodoServiceTests : IDisposable
     public async Task GetOpenTodosAsync_ReturnsOnlyOpen()
     {
         // Arrange
-        var offen = await _sut.CreateTodoAsync(_aufgabeId, "Offenes Todo");
-        var erledigt = await _sut.CreateTodoAsync(_aufgabeId, "Erledigtes Todo");
-        await _sut.MarkTodoAsCompletedAsync(erledigt.Id);
+        var offen = await _sut.CreateTodoAsync(_aufgabeId, "Offenes Todo", TestContext.Current.CancellationToken);
+        var erledigt = await _sut.CreateTodoAsync(_aufgabeId, "Erledigtes Todo", TestContext.Current.CancellationToken);
+        await _sut.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetOpenTodosAsync(_aufgabeId);
+        var result = await _sut.GetOpenTodosAsync(_aufgabeId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().ContainSingle();
@@ -128,12 +128,12 @@ public sealed class TodoServiceTests : IDisposable
     public async Task GetAllTodosAsync_ReturnsAll()
     {
         // Arrange
-        var offen = await _sut.CreateTodoAsync(_aufgabeId, "Offenes Todo");
-        var erledigt = await _sut.CreateTodoAsync(_aufgabeId, "Erledigtes Todo");
-        await _sut.MarkTodoAsCompletedAsync(erledigt.Id);
+        var offen = await _sut.CreateTodoAsync(_aufgabeId, "Offenes Todo", TestContext.Current.CancellationToken);
+        var erledigt = await _sut.CreateTodoAsync(_aufgabeId, "Erledigtes Todo", TestContext.Current.CancellationToken);
+        await _sut.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetAllTodosAsync(_aufgabeId);
+        var result = await _sut.GetAllTodosAsync(_aufgabeId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(2);
@@ -145,13 +145,13 @@ public sealed class TodoServiceTests : IDisposable
     public async Task GetTodoCountAsync_ReturnsCorrectCount()
     {
         // Arrange
-        await _sut.CreateTodoAsync(_aufgabeId, "Todo 1");
-        await _sut.CreateTodoAsync(_aufgabeId, "Todo 2");
-        var erledigt = await _sut.CreateTodoAsync(_aufgabeId, "Todo 3");
-        await _sut.MarkTodoAsCompletedAsync(erledigt.Id);
+        await _sut.CreateTodoAsync(_aufgabeId, "Todo 1", TestContext.Current.CancellationToken);
+        await _sut.CreateTodoAsync(_aufgabeId, "Todo 2", TestContext.Current.CancellationToken);
+        var erledigt = await _sut.CreateTodoAsync(_aufgabeId, "Todo 3", TestContext.Current.CancellationToken);
+        await _sut.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetTodoCountAsync(_aufgabeId);
+        var result = await _sut.GetTodoCountAsync(_aufgabeId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(2);
@@ -173,14 +173,14 @@ public sealed class TodoServiceTests : IDisposable
         });
         _db.SaveChanges();
 
-        await _sut.CreateTodoAsync(_aufgabeId, "Aufgabe 1 - offen 1");
-        await _sut.CreateTodoAsync(_aufgabeId, "Aufgabe 1 - offen 2");
-        var erledigt = await _sut.CreateTodoAsync(_aufgabeId, "Aufgabe 1 - erledigt");
-        await _sut.MarkTodoAsCompletedAsync(erledigt.Id);
-        await _sut.CreateTodoAsync(zweiteAufgabeId, "Aufgabe 2 - offen");
+        await _sut.CreateTodoAsync(_aufgabeId, "Aufgabe 1 - offen 1", TestContext.Current.CancellationToken);
+        await _sut.CreateTodoAsync(_aufgabeId, "Aufgabe 1 - offen 2", TestContext.Current.CancellationToken);
+        var erledigt = await _sut.CreateTodoAsync(_aufgabeId, "Aufgabe 1 - erledigt", TestContext.Current.CancellationToken);
+        await _sut.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
+        await _sut.CreateTodoAsync(zweiteAufgabeId, "Aufgabe 2 - offen", TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetOpenTodoCountsAsync([_aufgabeId, zweiteAufgabeId, _aufgabeId]);
+        var result = await _sut.GetOpenTodoCountsAsync([_aufgabeId, zweiteAufgabeId, _aufgabeId], TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(2);
@@ -193,12 +193,12 @@ public sealed class TodoServiceTests : IDisposable
     public async Task GetOpenTodoCountsAsync_ShouldReturnOnlyMatchingCounts()
     {
         // Arrange
-        await _sut.CreateTodoAsync(_aufgabeId, "Offen");
+        await _sut.CreateTodoAsync(_aufgabeId, "Offen", TestContext.Current.CancellationToken);
         var unbekannteAufgabeId = Guid.NewGuid();
 
         // Act
-        var result = await _sut.GetOpenTodoCountsAsync([_aufgabeId, unbekannteAufgabeId]);
-        var emptyResult = await _sut.GetOpenTodoCountsAsync([]);
+        var result = await _sut.GetOpenTodoCountsAsync([_aufgabeId, unbekannteAufgabeId], TestContext.Current.CancellationToken);
+        var emptyResult = await _sut.GetOpenTodoCountsAsync([], TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().ContainSingle();

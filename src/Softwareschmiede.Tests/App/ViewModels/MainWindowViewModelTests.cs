@@ -129,13 +129,13 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldFillObservableCollection_WhenCalled()
     {
         // Arrange
-        await _aufgabeService.CreateAsync(_projektId, "Gestartete Aufgabe", null);
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Zu startende Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon");
+        await _aufgabeService.CreateAsync(_projektId, "Gestartete Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Zu startende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id);
@@ -146,18 +146,18 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldSetOpenTodoCountPerTask()
     {
         // Arrange
-        var mitTodos = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit Todos", null);
-        var ohneTodos = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne Todos", null);
-        await _aufgabeService.StartenAsync(mitTodos.Id, "feature/mit-todos", "/tmp/mit-todos");
-        await _aufgabeService.StartenAsync(ohneTodos.Id, "feature/ohne-todos", "/tmp/ohne-todos");
-        await _todoService.CreateTodoAsync(mitTodos.Id, "Offen 1");
-        await _todoService.CreateTodoAsync(mitTodos.Id, "Offen 2");
-        var erledigt = await _todoService.CreateTodoAsync(mitTodos.Id, "Erledigt");
-        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id);
+        var mitTodos = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit Todos", null, ct: TestContext.Current.CancellationToken);
+        var ohneTodos = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne Todos", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(mitTodos.Id, "feature/mit-todos", "/tmp/mit-todos", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(ohneTodos.Id, "feature/ohne-todos", "/tmp/ohne-todos", ct: TestContext.Current.CancellationToken);
+        await _todoService.CreateTodoAsync(mitTodos.Id, "Offen 1", TestContext.Current.CancellationToken);
+        await _todoService.CreateTodoAsync(mitTodos.Id, "Offen 2", TestContext.Current.CancellationToken);
+        var erledigt = await _todoService.CreateTodoAsync(mitTodos.Id, "Erledigt", TestContext.Current.CancellationToken);
+        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         sut.AktiveAufgabenListe.Single(a => a.Id == mitTodos.Id).OffeneTodoCount.Should().Be(2);
@@ -171,15 +171,15 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldMapLiveLaufStatus()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Live-Status-Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/live", "/tmp/live");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Live-Status-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/live", "/tmp/live", ct: TestContext.Current.CancellationToken);
         _runningStatusSourceMock
             .Setup(s => s.GetLiveLaufStatus(aufgabe.Id))
             .Returns(AufgabeLaufStatus.WartetAufEingabe);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var item = sut.AktiveAufgabenListe.Single(a => a.Id == aufgabe.Id);
@@ -192,13 +192,13 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         // Arrange
         var pausiertBis = DateTimeOffset.UtcNow.AddHours(2);
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pausierte Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pause", "/tmp/pause");
-        await _aufgabeService.SetPauseAsync(aufgabe.Id, pausiertBis);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pausierte Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pause", "/tmp/pause", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.SetPauseAsync(aufgabe.Id, pausiertBis, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var item = sut.AktiveAufgabenListe.Single(a => a.Id == aufgabe.Id);
@@ -211,16 +211,16 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task OffeneTodosAnzeigenCommand_ShouldOpenDialogForSelectedTask()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Dialog-Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/dialog", "/tmp/dialog");
-        await _todoService.CreateTodoAsync(aufgabe.Id, "Offenes Todo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Dialog-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/dialog", "/tmp/dialog", ct: TestContext.Current.CancellationToken);
+        await _todoService.CreateTodoAsync(aufgabe.Id, "Offenes Todo", TestContext.Current.CancellationToken);
         OpenTodosDialogViewModel? capturedViewModel = null;
         _dialogServiceMock
             .Setup(d => d.ShowOpenTodosDialogAsync(It.IsAny<OpenTodosDialogViewModel>(), It.IsAny<CancellationToken>()))
             .Callback<OpenTodosDialogViewModel, CancellationToken>((vm, _) => capturedViewModel = vm)
             .Returns(Task.CompletedTask);
         var sut = CreateSut(dialogService: _dialogServiceMock.Object);
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Act
         var command = (AsyncRelayCommand)sut.AktiveAufgabenListe.Single().OffeneTodosAnzeigenCommand!;
@@ -250,7 +250,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         // Arrange
         var sut = CreateSut();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Detail-Aufgabe", null);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Detail-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
         ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
@@ -265,7 +265,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         // Arrange
         var sut = CreateSut();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe für Navigation", null);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe für Navigation", null, ct: TestContext.Current.CancellationToken);
 
         // Act
         ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
@@ -280,13 +280,13 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task NavigateZuAufgabeCommand_ShouldSetTitleToLoadedTaskTitle()
     {
         var sut = CreateSut();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Fenstertitel-Aufgabe", null);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Fenstertitel-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && sut.Title != "Softwareschmiede – Fenstertitel-Aufgabe")
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
 
         sut.Title.Should().Be("Softwareschmiede – Fenstertitel-Aufgabe");
     }
@@ -296,8 +296,8 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task ProjectTaskNavigation_ShouldSetTitleToLoadedTaskTitle()
     {
         var sut = CreateSut();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Projektlisten-Aufgabe", null);
-        var projekt = await _db.Projekte.FindAsync(_projektId);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Projektlisten-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var projekt = await _db.Projekte.FindAsync(new object?[] { _projektId }, TestContext.Current.CancellationToken);
 
         sut.NavigateToProjectListCommand.Execute(null);
         var projectListViewModel = (ProjectListViewModel)sut.CurrentView!;
@@ -308,7 +308,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && sut.Title != "Softwareschmiede – Projektlisten-Aufgabe")
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
 
         sut.Title.Should().Be("Softwareschmiede – Projektlisten-Aufgabe");
     }
@@ -318,8 +318,8 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task NavigateToDashboardCommand_ShouldIgnoreLateProjectTaskTitleCallback()
     {
         var sut = CreateSut();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Spaeter Projekttitel", null);
-        var projekt = await _db.Projekte.FindAsync(_projektId);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Spaeter Projekttitel", null, ct: TestContext.Current.CancellationToken);
+        var projekt = await _db.Projekte.FindAsync(new object?[] { _projektId }, TestContext.Current.CancellationToken);
 
         sut.NavigateToProjectListCommand.Execute(null);
         var projectListViewModel = (ProjectListViewModel)sut.CurrentView!;
@@ -338,12 +338,12 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task NavigateToDashboardCommand_ShouldClearPreviousTaskTitle()
     {
         var sut = CreateSut();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Alter Aufgabentitel", null);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Alter Aufgabentitel", null, ct: TestContext.Current.CancellationToken);
 
         ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && sut.Title != "Softwareschmiede – Alter Aufgabentitel")
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
 
         sut.NavigateToDashboardCommand.Execute(null);
 
@@ -355,7 +355,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task NavigateToDashboardCommand_ShouldIgnoreLateTaskTitleCallback()
     {
         var sut = CreateSut();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Spaeter Aufgabentitel", null);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Spaeter Aufgabentitel", null, ct: TestContext.Current.CancellationToken);
 
         ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
         var detailViewModel = (TaskDetailViewModel)sut.CurrentView!;
@@ -372,8 +372,8 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         // Arrange
         var sut = CreateSut();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "FireAndForget-Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/fire-and-forget", "/tmp/klon");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "FireAndForget-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/fire-and-forget", "/tmp/klon", ct: TestContext.Current.CancellationToken);
 
         // Act: CurrentView-Wechsel löst im Setter SafeFireAndForget(AktiveAufgabenAktualisierenAsync) aus
         ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
@@ -381,7 +381,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         // Assert: die Aktualisierung läuft asynchron im Hintergrund und füllt die Liste
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && !sut.AktiveAufgabenListe.Any(a => a.Id == aufgabe.Id))
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
 
         sut.AktiveAufgabenListe.Should().Contain(a => a.Id == aufgabe.Id,
             "der CurrentView-Setter muss AktiveAufgabenAktualisierenAsync per SafeFireAndForget auslösen");
@@ -404,15 +404,15 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldMarkCurrentTaskAsActive_WhenTaskDetailIsCurrentView()
     {
         // Arrange
-        var erste = await _aufgabeService.CreateAsync(_projektId, "Erste Aufgabe", null);
-        var zweite = await _aufgabeService.CreateAsync(_projektId, "Zweite Aufgabe", null);
-        await _aufgabeService.StartenAsync(erste.Id, "feature/erste", "/tmp/erste");
-        await _aufgabeService.StartenAsync(zweite.Id, "feature/zweite", "/tmp/zweite");
+        var erste = await _aufgabeService.CreateAsync(_projektId, "Erste Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var zweite = await _aufgabeService.CreateAsync(_projektId, "Zweite Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(erste.Id, "feature/erste", "/tmp/erste", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(zweite.Id, "feature/zweite", "/tmp/zweite", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
         ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(zweite.Id);
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         sut.AktiveAufgabenListe.Should().ContainSingle(a => a.IsAktiv);
@@ -424,17 +424,17 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldMoveActiveMarker_WhenNavigatingToAnotherTask()
     {
         // Arrange
-        var erste = await _aufgabeService.CreateAsync(_projektId, "Erste Aufgabe", null);
-        var zweite = await _aufgabeService.CreateAsync(_projektId, "Zweite Aufgabe", null);
-        await _aufgabeService.StartenAsync(erste.Id, "feature/erste", "/tmp/erste");
-        await _aufgabeService.StartenAsync(zweite.Id, "feature/zweite", "/tmp/zweite");
+        var erste = await _aufgabeService.CreateAsync(_projektId, "Erste Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var zweite = await _aufgabeService.CreateAsync(_projektId, "Zweite Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(erste.Id, "feature/erste", "/tmp/erste", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(zweite.Id, "feature/zweite", "/tmp/zweite", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
         ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(erste.Id);
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
         ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(zweite.Id);
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         sut.AktiveAufgabenListe.Should().ContainSingle(a => a.IsAktiv);
@@ -447,14 +447,14 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldKeepActiveMarker_WhenListIsRefreshed()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Refresh-Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/refresh", "/tmp/refresh");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Refresh-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/refresh", "/tmp/refresh", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         sut.AktiveAufgabenListe.Should().ContainSingle(a => a.IsAktiv);
@@ -466,12 +466,12 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldNotMarkAnyTaskActive_WhenCurrentViewIsDashboard()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Dashboard-Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/dashboard", "/tmp/dashboard");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Dashboard-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/dashboard", "/tmp/dashboard", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         sut.AktiveAufgabenListe.Should().NotContain(a => a.IsAktiv);
@@ -503,13 +503,13 @@ public sealed class MainWindowViewModelTests : IDisposable
             PluginTyp = "Softwareschmiede.GitHub",
             Aktiv = true
         });
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Plugin-Aufgabe", null, repositoryId);
-        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.Codex");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/plugin", "/tmp/plugin");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Plugin-Aufgabe", null, repositoryId, TestContext.Current.CancellationToken);
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.Codex", TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/plugin", "/tmp/plugin", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var item = sut.AktiveAufgabenListe.Should().ContainSingle().Subject;
@@ -522,13 +522,13 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldFallbackToStoredPrefix_WhenPluginIsUnknown()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Fallback-Aufgabe", null);
-        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Unbekannt.KI");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/fallback", "/tmp/fallback");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Fallback-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Unbekannt.KI", TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/fallback", "/tmp/fallback", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var item = sut.AktiveAufgabenListe.Should().ContainSingle().Subject;
@@ -551,12 +551,12 @@ public sealed class MainWindowViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin.Object]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin.Object]);
 
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Ohne Prefix", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ohne-prefix", "/tmp/ohne-prefix");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Ohne Prefix", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ohne-prefix", "/tmp/ohne-prefix", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var item = sut.AktiveAufgabenListe.Should().ContainSingle().Subject;
@@ -570,7 +570,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         // Arrange
         var sut = CreateSut();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe für Dashboard-Navigation", null);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe für Dashboard-Navigation", null, ct: TestContext.Current.CancellationToken);
         var dashboardViewModel = (DashboardViewModel)sut.CurrentView!;
 
         // Act
@@ -587,8 +587,8 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         // Arrange
         var sut = CreateSut();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Event-Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/event", "/tmp/klon");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Event-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/event", "/tmp/klon", ct: TestContext.Current.CancellationToken);
 
         // Act
         _runningStatusSourceMock.Raise(m => m.RunningCountChanged += null, 0, 1);
@@ -596,7 +596,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         // Assert
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && !sut.AktiveAufgabenListe.Any(a => a.Id == aufgabe.Id))
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
 
         sut.AktiveAufgabenListe.Should().Contain(a => a.Id == aufgabe.Id,
             "RunningCountChanged muss AktiveAufgabenAktualisierenAsync auslösen");
@@ -609,17 +609,17 @@ public sealed class MainWindowViewModelTests : IDisposable
         // Arrange
         var notifier = new AufgabeLaufdatenChangedNotifier();
         var converter = new KiAusfuehrungsStatusConverter();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Laufdaten-Event-Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/laufdaten-event", "/tmp/klon");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Laufdaten-Event-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/laufdaten-event", "/tmp/klon", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut(laufdatenChangedNotifier: notifier);
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
         var initialItem = sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id).Subject;
         initialItem.AktiveRunId.Should().BeNull();
         converter.Convert(initialItem, typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture)
             .Should().Be("✓ Bereit");
 
         // Act
-        await _aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, "run-laufdaten-event");
+        await _aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, "run-laufdaten-event", TestContext.Current.CancellationToken);
         notifier.NotifyLaufdatenChanged(aufgabe.Id);
 
         // Assert
@@ -627,7 +627,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         while (DateTime.UtcNow < deadline
                && sut.AktiveAufgabenListe.Single(a => a.Id == aufgabe.Id).AktiveRunId is null)
         {
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
         }
 
         var refreshedItem = sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id).Subject;
@@ -666,19 +666,19 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && sut.AktiveAufgabenListe.All(a => a.Id != aufgabe.Id))
-            await Task.Delay(25);
+            await Task.Delay(25, TestContext.Current.CancellationToken);
 
         sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id,
             "der vom Konstruktor gestartete Hintergrund-Refresh soll vor der Re-Entrancy-Pruefung abgeschlossen sein");
 
         aufgabeService.Aktivieren();
-        var ersterAufrufTask = Task.Run(() => sut.AktiveAufgabenAktualisierenAsync());
-        await aufgabeService.ErsterVerzoegerterAbruf.WaitAsync(TimeSpan.FromSeconds(5));
+        var ersterAufrufTask = Task.Run(() => sut.AktiveAufgabenAktualisierenAsync(), TestContext.Current.CancellationToken);
+        await aufgabeService.ErsterVerzoegerterAbruf.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Act: der zweite Aufruf überlappt den noch laufenden, verzögerten ersten Aufruf
         try
         {
-            await sut.AktiveAufgabenAktualisierenAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             // Assert: der übersprungene Aufruf fragt die verzögerte Datenquelle kein zweites Mal ab
             aufgabeService.VerzoegerteAbrufe.Should().Be(1,
@@ -687,7 +687,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         finally
         {
             aufgabeService.Fortsetzen();
-            await ersterAufrufTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await ersterAufrufTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         }
     }
 
@@ -699,8 +699,8 @@ public sealed class MainWindowViewModelTests : IDisposable
         var sut = CreateSut();
         sut.Dispose();
 
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Nach-Dispose-Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/dispose", "/tmp/klon");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Nach-Dispose-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/dispose", "/tmp/klon", ct: TestContext.Current.CancellationToken);
 
         // Act
         var act = () => _runningStatusSourceMock.Raise(m => m.RunningCountChanged += null, 0, 1);
@@ -708,7 +708,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         // Assert
         act.Should().NotThrow();
 
-        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
         sut.AktiveAufgabenListe.Should().NotContain(a => a.Id == aufgabe.Id,
             "nach Dispose() darf RunningCountChanged keine Aktualisierung mehr auslösen");
     }
@@ -741,7 +741,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && aufgabeService.Abrufe == 0)
-            await Task.Delay(25);
+            await Task.Delay(25, TestContext.Current.CancellationToken);
 
         var abrufeVorDispose = aufgabeService.Abrufe;
         sut.Dispose();
@@ -752,7 +752,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         // Assert
         act.Should().NotThrow();
 
-        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
         aufgabeService.Abrufe.Should().Be(abrufeVorDispose,
             "nach Dispose() darf LaufdatenChanged keine Aktualisierung mehr auslösen");
     }
@@ -772,7 +772,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         // Assert
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && sut.CurrentVersion is null)
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
 
         sut.CurrentVersion.Should().Be("Version 1.2.3");
     }
@@ -792,7 +792,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         // Assert
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && sut.CurrentVersion is null)
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
 
         sut.CurrentVersion.Should().Be("Version unbekannt");
     }
@@ -812,15 +812,15 @@ public sealed class MainWindowViewModelTests : IDisposable
             PluginTyp = "LocalDirectoryPlugin",
             Aktiv = true
         });
-        await _db.SaveChangesAsync();
-        var mitRepo = await _aufgabeService.CreateAsync(_projektId, "Repo-Aufgabe", null, repositoryId);
-        var ohneRepo = await _aufgabeService.CreateAsync(_projektId, "Freie Aufgabe", null);
-        await _aufgabeService.StartenAsync(mitRepo.Id, "feature/repo", "/tmp/repo");
-        await _aufgabeService.StartenAsync(ohneRepo.Id, "feature/frei", "/tmp/frei");
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var mitRepo = await _aufgabeService.CreateAsync(_projektId, "Repo-Aufgabe", null, repositoryId, TestContext.Current.CancellationToken);
+        var ohneRepo = await _aufgabeService.CreateAsync(_projektId, "Freie Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(mitRepo.Id, "feature/repo", "/tmp/repo", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(ohneRepo.Id, "feature/frei", "/tmp/frei", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         sut.AktiveAufgabenListe.Single(a => a.Id == mitRepo.Id).RepositoryName.Should().Be("mein-repo");
@@ -854,17 +854,17 @@ public sealed class MainWindowViewModelTests : IDisposable
             PluginTyp = "Softwareschmiede.GitHub",
             Aktiv = true
         });
-        await _db.SaveChangesAsync();
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Symbol-Aufgabe", null, repositoryId);
-        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.Codex");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/symbol", "/tmp/symbol");
-        var unbekannt = await _aufgabeService.CreateAsync(_projektId, "Unbekannte KI", null);
-        await _aufgabeService.UpdateAsync(unbekannt.Id, unbekannt.Titel, unbekannt.AnforderungsBeschreibung, "Unbekannt.KI");
-        await _aufgabeService.StartenAsync(unbekannt.Id, "feature/unbekannt", "/tmp/unbekannt");
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Symbol-Aufgabe", null, repositoryId, TestContext.Current.CancellationToken);
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.Codex", TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/symbol", "/tmp/symbol", ct: TestContext.Current.CancellationToken);
+        var unbekannt = await _aufgabeService.CreateAsync(_projektId, "Unbekannte KI", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.UpdateAsync(unbekannt.Id, unbekannt.Titel, unbekannt.AnforderungsBeschreibung, "Unbekannt.KI", TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(unbekannt.Id, "feature/unbekannt", "/tmp/unbekannt", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var item = sut.AktiveAufgabenListe.Single(a => a.Id == aufgabe.Id);
@@ -887,18 +887,18 @@ public sealed class MainWindowViewModelTests : IDisposable
         kiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin.Object]);
 
-        var mitKi = await _aufgabeService.CreateAsync(_projektId, "KI-Aufgabe", null);
-        await _aufgabeService.UpdateAsync(mitKi.Id, mitKi.Titel, mitKi.AnforderungsBeschreibung, "Softwareschmiede.Codex");
-        await _aufgabeService.StartenAsync(mitKi.Id, "feature/ki", "/tmp/ki");
-        var unbekannt = await _aufgabeService.CreateAsync(_projektId, "Unbekannte KI", null);
-        await _aufgabeService.UpdateAsync(unbekannt.Id, unbekannt.Titel, unbekannt.AnforderungsBeschreibung, "Unbekannt.KI");
-        await _aufgabeService.StartenAsync(unbekannt.Id, "feature/unbekannt", "/tmp/unbekannt");
-        var ohneKi = await _aufgabeService.CreateAsync(_projektId, "Ohne KI", null);
-        await _aufgabeService.StartenAsync(ohneKi.Id, "feature/ohne", "/tmp/ohne");
+        var mitKi = await _aufgabeService.CreateAsync(_projektId, "KI-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.UpdateAsync(mitKi.Id, mitKi.Titel, mitKi.AnforderungsBeschreibung, "Softwareschmiede.Codex", TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(mitKi.Id, "feature/ki", "/tmp/ki", ct: TestContext.Current.CancellationToken);
+        var unbekannt = await _aufgabeService.CreateAsync(_projektId, "Unbekannte KI", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.UpdateAsync(unbekannt.Id, unbekannt.Titel, unbekannt.AnforderungsBeschreibung, "Unbekannt.KI", TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(unbekannt.Id, "feature/unbekannt", "/tmp/unbekannt", ct: TestContext.Current.CancellationToken);
+        var ohneKi = await _aufgabeService.CreateAsync(_projektId, "Ohne KI", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(ohneKi.Id, "feature/ohne", "/tmp/ohne", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var aufgeloest = sut.AktiveAufgabenListe.Single(a => a.Id == mitKi.Id);
@@ -928,15 +928,15 @@ public sealed class MainWindowViewModelTests : IDisposable
             PluginTyp = "LocalDirectoryPlugin",
             Aktiv = true
         });
-        await _db.SaveChangesAsync();
-        var mitRepo = await _aufgabeService.CreateAsync(_projektId, "Repo-Aufgabe", null, repositoryId);
-        var ohneRepo = await _aufgabeService.CreateAsync(_projektId, "Freie Aufgabe", null);
-        await _aufgabeService.StartenAsync(mitRepo.Id, "feature/repo", "/tmp/repo");
-        await _aufgabeService.StartenAsync(ohneRepo.Id, "feature/frei", "/tmp/frei");
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var mitRepo = await _aufgabeService.CreateAsync(_projektId, "Repo-Aufgabe", null, repositoryId, TestContext.Current.CancellationToken);
+        var ohneRepo = await _aufgabeService.CreateAsync(_projektId, "Freie Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(mitRepo.Id, "feature/repo", "/tmp/repo", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(ohneRepo.Id, "feature/frei", "/tmp/frei", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var mitGruppe = sut.AktiveAufgabenListe.Single(a => a.Id == mitRepo.Id);
@@ -952,18 +952,18 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldMapSortierZeitpunkt()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Sortier-Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/sort", "/tmp/sort");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Sortier-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/sort", "/tmp/sort", ct: TestContext.Current.CancellationToken);
         // StartenAsync setzt LetzterCliStartUtc bewusst auf null — der Zeitstempel entsteht erst
         // beim echten CLI-Prozessstart (CliProcessManager → AktivenLaufSetzenAsync).
-        await _aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, Guid.NewGuid().ToString());
+        await _aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, Guid.NewGuid().ToString(), TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        var gelesen = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var gelesen = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         var item = sut.AktiveAufgabenListe.Single(a => a.Id == aufgabe.Id);
         gelesen!.LetzterCliStartUtc.Should().NotBeNull(
             "die gestartete Aufgabe muss einen CLI-Startzeitpunkt haben, damit der Test den ??-Zweig belegt");
@@ -1006,13 +1006,13 @@ public sealed class MainWindowViewModelTests : IDisposable
             using (var scope = provider.CreateScope())
             {
                 var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-                await einstellungen.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey, "Repository");
+                await einstellungen.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey, "Repository", TestContext.Current.CancellationToken);
             }
 
             var sut = CreateSut(aufgabenListenModusService: modusService);
 
             // Act
-            await sut.GespeichertenAufgabenListenModusLadenAsync();
+            await sut.GespeichertenAufgabenListenModusLadenAsync(TestContext.Current.CancellationToken);
 
             // Assert
             sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Repository);
@@ -1039,15 +1039,15 @@ public sealed class MainWindowViewModelTests : IDisposable
             {
                 using var scope = provider.CreateScope();
                 wert = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                    .GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey);
+                    .GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey, TestContext.Current.CancellationToken);
                 if (wert != "Ki")
-                    await Task.Delay(50);
+                    await Task.Delay(50, TestContext.Current.CancellationToken);
             }
             wert.Should().Be("Ki");
 
             // Act & Assert: die Wiederherstellung würde den gesetzten Benutzer-Modus nicht
             // überschreiben (Race-Guard) und keinen zweiten Schreibzugriff auslösen.
-            await sut.GespeichertenAufgabenListenModusLadenAsync();
+            await sut.GespeichertenAufgabenListenModusLadenAsync(TestContext.Current.CancellationToken);
             sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Ki);
         }
     }

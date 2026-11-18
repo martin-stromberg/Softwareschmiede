@@ -64,7 +64,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
     [Fact]
     public async Task ArbeitsverzeichnisBearbeitenCommand_CanExecuteFalse_OhneRepository()
     {
-        var projekt = await _projektService.CreateAsync("Ohne-Repository-Projekt", null);
+        var projekt = await _projektService.CreateAsync("Ohne-Repository-Projekt", null, TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.ProjektId = projekt.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -104,7 +104,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
 
         await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();
 
-        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id);
+        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
         startKonfiguration.Should().NotBeNull();
         startKonfiguration!.WorkingDirectoryRelativePath.Should().Be("frontend");
     }
@@ -129,7 +129,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
 
         await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();
 
-        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id);
+        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
         startKonfiguration.Should().NotBeNull();
         startKonfiguration!.WorkingDirectoryRelativePath.Should().Be("backend");
     }
@@ -154,7 +154,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
 
         await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();
 
-        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id);
+        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
         startKonfiguration!.WorkingDirectoryRelativePath.Should().BeNull();
     }
 }

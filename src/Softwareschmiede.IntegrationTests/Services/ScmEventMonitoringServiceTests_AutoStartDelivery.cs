@@ -28,13 +28,13 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         fixture.ConfigureIssue(9);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
-                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix);
+                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
 
-        await fixture.Monitor.RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var task = Assert.Single(await db.Aufgaben.Include(x => x.IssueReferenz).ToListAsync());
+        var task = Assert.Single(await db.Aufgaben.Include(x => x.IssueReferenz).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(AufgabeStatus.Gestartet, task.Status);
         Assert.Equal(AufgabeAusfuehrungsStatus.Aktiv, task.AusfuehrungsStatus);
         Assert.Equal(repositoryId, task.GitRepositoryId);
@@ -43,7 +43,7 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         Assert.StartsWith(fixture.Root, task.LokalerKlonPfad);
         Assert.NotNull(task.BranchName);
         Assert.StartsWith("task/issue-9-", task.BranchName);
-        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(task.Id, item.AufgabeId);
         Assert.Equal("Zugestellt", item.Status);
         Assert.NotNull(item.DeliveryAttemptId);
@@ -66,13 +66,13 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         fixture.ConfigureIssue(9);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator");
+                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator", TestContext.Current.CancellationToken);
 
-        await fixture.Monitor.RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var task = Assert.Single(await db.Aufgaben.Include(x => x.IssueReferenz).ToListAsync());
+        var task = Assert.Single(await db.Aufgaben.Include(x => x.IssueReferenz).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(AufgabeStatus.Gestartet, task.Status);
         Assert.Equal(AufgabeAusfuehrungsStatus.Aktiv, task.AusfuehrungsStatus);
         Assert.Equal(repositoryId, task.GitRepositoryId);
@@ -81,7 +81,7 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         Assert.StartsWith(fixture.Root, task.LokalerKlonPfad);
         Assert.NotNull(task.BranchName);
         Assert.StartsWith("task/issue-9-", task.BranchName);
-        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(task.Id, item.AufgabeId);
         Assert.Equal("Zugestellt", item.Status);
         Assert.NotNull(item.DeliveryAttemptId);
@@ -104,16 +104,16 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         fixture.ConfigureIssue(9);
         var monitor = fixture.Monitor;
 
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Guid eventId;
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var task = Assert.Single(await db.Aufgaben.ToListAsync());
+            var task = Assert.Single(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal(AufgabeStatus.Gestartet, task.Status);
             Assert.Null(task.LokalerKlonPfad);
-            var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+            var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             eventId = item.Id;
             Assert.Equal("Wartend", item.Status);
             Assert.Equal("Keine Standard-CLI konfiguriert. Ereignis öffnen und CLI auswählen.", item.Reason);
@@ -124,27 +124,27 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         Assert.Contains(fixture.Responses, x => x.Kind == ScmResponseKind.Comment);
 
         // Ein Folgelauf ohne CLI erzeugt weder eine zweite Aufgabe noch ein verlorenes Ereignis.
-        await monitor.RunOnceAsync();
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            Assert.Single(await db.Aufgaben.ToListAsync());
-            var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+            Assert.Single(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+            var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal("Wartend", item.Status);
         }
 
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
-                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix);
+                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId);
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
 
         using var verification = fixture.Services.CreateScope();
         var verifiedDb = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var verified = await verifiedDb.ScmIncomingEvents.SingleAsync(x => x.Id == eventId);
+        var verified = await verifiedDb.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("Zugestellt", verified.Status);
         Assert.NotNull(verified.DeliveryAttemptId);
-        var startedTask = await verifiedDb.Aufgaben.SingleAsync();
+        var startedTask = await verifiedDb.Aufgaben.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(startedTask.LokalerKlonPfad);
         Assert.Equal(ScmDispatchFixture.KiPrefix, startedTask.KiPluginPrefix);
         Assert.Single(fixture.Sessions);
@@ -162,32 +162,31 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
         fixture.ConfigureIssue(9);
-        await fixture.Monitor.RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
         Guid eventId;
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+            var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             eventId = item.Id;
             Assert.Equal("Wartend", item.Status);
         }
 
         Aufgabe? selectedTask = null;
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().OpenFromQueueAsync(
-                eventId, (task, _, _) =>
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().OpenFromQueueAsync(eventId, (task, _, _) =>
                 {
                     selectedTask = task;
                     return Task.FromResult<string?>(ScmDispatchFixture.KiPrefix);
-                });
+                }, TestContext.Current.CancellationToken);
 
         Assert.NotNull(selectedTask);
         using var verification = fixture.Services.CreateScope();
         var verifiedDb = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var verified = await verifiedDb.ScmIncomingEvents.SingleAsync(x => x.Id == eventId);
+        var verified = await verifiedDb.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("Zugestellt", verified.Status);
         Assert.NotNull(verified.DeliveryAttemptId);
-        var task = await verifiedDb.Aufgaben.SingleAsync();
+        var task = await verifiedDb.Aufgaben.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(selectedTask!.Id, task.Id);
         Assert.Equal(AufgabeStatus.Gestartet, task.Status);
         Assert.NotNull(task.LokalerKlonPfad);
@@ -209,15 +208,15 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
 
-        await fixture.Monitor.RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var task = Assert.Single(await db.Aufgaben.ToListAsync());
+        var task = Assert.Single(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(taskId, task.Id);
         Assert.Equal(status, task.Status);
         Assert.Null(task.LokalerKlonPfad);
-        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(taskId, item.AufgabeId);
         Assert.Equal("Wartend", item.Status);
         Assert.Contains(paused ? "pausiert" : "beendet/archiviert", item.Reason);

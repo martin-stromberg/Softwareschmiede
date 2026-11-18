@@ -29,7 +29,7 @@ public sealed class GitHubEventSourceTests
     {
         var api = new FakeApi();
         Identity(api);
-        var result = await Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, remote));
+        var result = await Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, remote), TestContext.Current.CancellationToken);
         Assert.Equal(Repository, result);
         Assert.All(api.Requests, request => Assert.Equal("GET", request.Method));
     }
@@ -44,7 +44,7 @@ public sealed class GitHubEventSourceTests
         api.Add("page=2", new[] { new { id = 12, node_id = "C_12" } });
         api.AddGraph(new { node = Node("C_11", "$Softwareschmiede edited", Created.AddMinutes(1), "U_2", "intruder") });
         api.AddGraph(new { node = Node("C_12", "$softwareschmiede second") });
-        var result = await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment));
+        var result = await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment), TestContext.Current.CancellationToken);
         Assert.Equal(2, result.Observations.Count);
         var edited = Assert.Single(result.Observations, x => x.RemoteNodeId == "C_11");
         Assert.Equal("$Softwareschmiede edited", edited.Body);
@@ -64,7 +64,7 @@ public sealed class GitHubEventSourceTests
         var api = new FakeApi();
         api.Add("comments?", new[] { new { id = 1, node_id = "C_1" } });
         api.AddGraph(new { node = Node("C_1", "$Softwareschmiede bitte", authorId: "U_gha", authorLogin: "github-actions[bot]") });
-        var observation = Assert.Single((await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment))).Observations);
+        var observation = Assert.Single((await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment), TestContext.Current.CancellationToken)).Observations);
         Assert.Equal("U_gha", observation.AuthorId);
         Assert.Equal("github-actions[bot]", observation.AuthorLogin);
         api.AssertComplete();
@@ -78,7 +78,7 @@ public sealed class GitHubEventSourceTests
         api.Add("comments?", new[] { new { id = 11, node_id = "C_11" } },
             new() { ["Link"] = "<https://api.github.com/repos/owner/repo/issues/7/comments?page=2>; rel=\"next\"" });
         api.AddStatus("page=2", 503);
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment)));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment), TestContext.Current.CancellationToken));
         Assert.Equal(ScmProviderFailureKind.Temporary, error.FailureKind);
         Assert.Equal(2, api.Requests.Count);
     }
@@ -92,7 +92,7 @@ public sealed class GitHubEventSourceTests
     {
         var api = new FakeApi();
         api.Add("comments?", Array.Empty<object>(), new() { ["Link"] = $"<{next}>; rel=\"next\"" });
-        await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment)));
+        await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment), TestContext.Current.CancellationToken));
         Assert.Single(api.Requests);
     }
 
@@ -107,7 +107,7 @@ public sealed class GitHubEventSourceTests
         api.AddGraph(new { repository = new { issue = Node("I_7", "A", Created.AddMinutes(3)) } });
         var plugin = Plugin(api);
         var observations = new List<ScmEventObservation>();
-        for (var index = 0; index < 4; index++) observations.Add(Assert.Single((await plugin.ReadEventsAsync(Read(Issue, ScmContentKind.Description))).Observations));
+        for (var index = 0; index < 4; index++) observations.Add(Assert.Single((await plugin.ReadEventsAsync(Read(Issue, ScmContentKind.Description), TestContext.Current.CancellationToken)).Observations));
         Assert.Equal(observations[0].EventKey, observations[1].EventKey);
         Assert.NotEqual(observations[0].EventKey, observations[3].EventKey);
         Assert.NotEqual(observations[2].BodyHash, observations[3].BodyHash);
@@ -122,8 +122,8 @@ public sealed class GitHubEventSourceTests
         api.AddGraph(new { repository = new { issue = Node("I_7", "$Softwareschmiede", Created.AddMinutes(1), null, null) } });
         api.AddGraph(new { repository = new { issue = Node("I_7", "$Softwareschmiede", Created.AddMinutes(1), "U_1", "owner") } });
         var plugin = Plugin(api);
-        var first = Assert.Single((await plugin.ReadEventsAsync(Read(Issue, ScmContentKind.Description))).Observations);
-        var second = Assert.Single((await plugin.ReadEventsAsync(Read(Issue, ScmContentKind.Description) with { SinceUtc = Created.AddHours(1) })).Observations);
+        var first = Assert.Single((await plugin.ReadEventsAsync(Read(Issue, ScmContentKind.Description), TestContext.Current.CancellationToken)).Observations);
+        var second = Assert.Single((await plugin.ReadEventsAsync(Read(Issue, ScmContentKind.Description) with { SinceUtc = Created.AddHours(1) }, TestContext.Current.CancellationToken)).Observations);
         Assert.Null(first.EditorId);
         Assert.Equal("U_1", second.EditorId);
         Assert.Equal(first.EventKey, second.EventKey);
@@ -135,7 +135,7 @@ public sealed class GitHubEventSourceTests
     {
         var api = new FakeApi();
         api.AddGraph(new { repository = new { issue = Node("I_7", "new", Created.AddHours(2)) } });
-        var batch = await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.Description));
+        var batch = await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.Description), TestContext.Current.CancellationToken);
         Assert.Empty(batch.Observations);
     }
 
@@ -146,7 +146,7 @@ public sealed class GitHubEventSourceTests
         var api = new FakeApi();
         api.AddGraph(Reviews(new[] { Review("R_20", "PENDING", null), Review("R_21", "APPROVED", Created) }, true, "cursor-2"));
         api.AddGraph(Reviews(new[] { Review("R_22", "COMMENTED", Created) }, false, null));
-        var batch = await Plugin(api).ReadEventsAsync(Read(PullRequest, ScmContentKind.PullRequestReview));
+        var batch = await Plugin(api).ReadEventsAsync(Read(PullRequest, ScmContentKind.PullRequestReview), TestContext.Current.CancellationToken);
         Assert.Equal(new[] { "R_21", "R_22" }, batch.Observations.Select(x => x.RemoteNodeId));
         Assert.Contains("cursor-2", api.Requests[1].JsonBody);
         Assert.All(batch.Observations, x => Assert.Equal(ScmContentKind.PullRequestReview, x.ContentKind));
@@ -162,8 +162,8 @@ public sealed class GitHubEventSourceTests
         api.Add("pulls/8/comments?", new[] { new { id = 1, node_id = "C" } });
         api.AddGraph(new { node = Node("C", "text") });
         var plugin = Plugin(api);
-        var conversation = Assert.Single((await plugin.ReadEventsAsync(Read(PullRequest, ScmContentKind.IssueComment))).Observations);
-        var line = Assert.Single((await plugin.ReadEventsAsync(Read(PullRequest, ScmContentKind.ReviewComment))).Observations);
+        var conversation = Assert.Single((await plugin.ReadEventsAsync(Read(PullRequest, ScmContentKind.IssueComment), TestContext.Current.CancellationToken)).Observations);
+        var line = Assert.Single((await plugin.ReadEventsAsync(Read(PullRequest, ScmContentKind.ReviewComment), TestContext.Current.CancellationToken)).Observations);
         Assert.NotEqual(conversation.ContentKey, line.ContentKey);
         Assert.Contains("PullRequestReviewComment", api.Requests[3].JsonBody);
     }
@@ -178,7 +178,7 @@ public sealed class GitHubEventSourceTests
         var foreign = Node("C_2", "$Softwareschmiede\n<!-- softwareschmiede:action:abc -->");
         foreign["author"] = new { id = "U_2", login = "foreign" };
         api.AddGraph(new { node = foreign });
-        var batch = await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment));
+        var batch = await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment), TestContext.Current.CancellationToken);
         Assert.Equal("C_2", Assert.Single(batch.Observations).RemoteNodeId);
     }
 
@@ -196,7 +196,7 @@ public sealed class GitHubEventSourceTests
             new { content = "THUMBS_UP", viewerHasReacted = false }
         })
         });
-        var observation = Assert.Single((await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment))).Observations);
+        var observation = Assert.Single((await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment), TestContext.Current.CancellationToken)).Observations);
         Assert.Equal(["EYES"], observation.ViewerReactions);
         Assert.True(observation.ViewerHasReacted);
         api.AssertComplete();
@@ -217,7 +217,7 @@ public sealed class GitHubEventSourceTests
             new { content = "THUMBS_UP", viewerHasReacted = false }
         })
         });
-        var batch = await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment));
+        var batch = await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment), TestContext.Current.CancellationToken);
         Assert.Equal(2, batch.Observations.Count);
         Assert.All(batch.Observations, x =>
         {
@@ -237,7 +237,7 @@ public sealed class GitHubEventSourceTests
         var incomplete = Node("C_1", "$Softwareschmiede");
         incomplete.Remove("reactionGroups");
         api.AddGraph(new { node = incomplete });
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment)));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment), TestContext.Current.CancellationToken));
         Assert.Equal(ScmProviderFailureKind.Permanent, error.FailureKind);
     }
 
@@ -248,7 +248,7 @@ public sealed class GitHubEventSourceTests
         var api = new FakeApi();
         api.Add("comments?", new[] { new { id = 1, node_id = "C_1" } });
         api.AddGraph(new { node = Node("C_1", "$Softwareschmiede") });
-        await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment));
+        await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.IssueComment), TestContext.Current.CancellationToken);
         var graph = Assert.Single(api.Requests, x => x.Method == "POST");
         Assert.Contains("reactionGroups", graph.JsonBody);
         Assert.Contains("viewerHasReacted", graph.JsonBody);
@@ -261,7 +261,7 @@ public sealed class GitHubEventSourceTests
     {
         var api = new FakeApi();
         api.AddGraph(new { repository = new { issue = Node("I", "same") } });
-        var item = Assert.Single((await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.Description))).Observations);
+        var item = Assert.Single((await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.Description), TestContext.Current.CancellationToken)).Observations);
         var variants = new[]
         {
             item,
@@ -286,7 +286,7 @@ public sealed class GitHubEventSourceTests
         var api = new FakeApi();
         api.AddStatus("user", status, new() { ["Retry-After"] = "90" });
         var before = DateTimeOffset.UtcNow;
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo")));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo"), TestContext.Current.CancellationToken));
         Assert.Equal(status == 403 ? ScmProviderFailureKind.RateLimit : expected, error.FailureKind);
         Assert.DoesNotContain("secret", error.Message);
         Assert.True(error.RetryAfterUtc >= before.AddSeconds(89));
@@ -301,7 +301,7 @@ public sealed class GitHubEventSourceTests
     {
         var api = new FakeApi();
         api.AddStatus("user", status);
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo")));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo"), TestContext.Current.CancellationToken));
         Assert.Contains("Einstellungen → Plugins → GitHub", error.Message);
         Assert.Contains("Authentifizierung", error.Message);
         Assert.Contains("Personal Access Token", error.Message);
@@ -316,7 +316,7 @@ public sealed class GitHubEventSourceTests
     {
         var api = new FakeApi();
         api.Add("graphql", new { data = new { repository = new { issue = Node("I", "text") } }, errors = new[] { new { type = "FORBIDDEN", message = "secret" } } });
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.Description)));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.Description), TestContext.Current.CancellationToken));
         Assert.Equal(ScmProviderFailureKind.Permission, error.FailureKind);
         Assert.DoesNotContain("secret", error.Message);
     }
@@ -331,7 +331,7 @@ public sealed class GitHubEventSourceTests
             new() { ["Link"] = "<https://api.github.com/repos/owner/repo/issues/comments/42/reactions?page=2>; rel=\"next\"" });
         api.Add("page=2", new[] { new { id = 2, content = "eyes", user = new { node_id = "U_1", login = "OWNER" } } });
         var result = await Plugin(api).ExecuteResponseAsync(new(Issue, "reaction-1", ScmResponseKind.Reaction,
-            Reaction: "eyes", ContentKind: ScmContentKind.IssueComment, RemoteCommentId: "42"));
+            Reaction: "eyes", ContentKind: ScmContentKind.IssueComment, RemoteCommentId: "42"), TestContext.Current.CancellationToken);
         Assert.True(result.AlreadyExisted);
         Assert.Equal("2", result.RemoteId);
         Assert.All(api.Requests, x => Assert.Equal("GET", x.Method));
@@ -347,14 +347,14 @@ public sealed class GitHubEventSourceTests
         api.Add("comments?", Array.Empty<object>());
         api.AddFailure("issues/7/comments", new TimeoutException("secret"));
         var plugin = Plugin(api);
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ExecuteResponseAsync(request));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ExecuteResponseAsync(request, TestContext.Current.CancellationToken));
         Assert.True(error.OutcomeUncertain);
         Assert.DoesNotContain("secret", error.Message);
         var posted = api.Requests.Last();
         Assert.Equal("POST", posted.Method);
         Assert.Contains(request.Marker, JsonDocument.Parse(posted.JsonBody!).RootElement.GetProperty("body").GetString());
         api.Add("comments?", new[] { new { id = 23, body = "Wartet\n" + request.Marker, user = new { node_id = "U_1", login = "owner" } } });
-        Assert.Equal("23", (await plugin.ReconcileResponseAsync(request))!.RemoteId);
+        Assert.Equal("23", (await plugin.ReconcileResponseAsync(request, TestContext.Current.CancellationToken))!.RemoteId);
         Assert.Single(api.Requests, x => x.Method == "POST");
     }
 
@@ -367,7 +367,7 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
                 Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", "Neues Layout")]);
             var api = new FakeApi();
@@ -376,7 +376,7 @@ public sealed class GitHubEventSourceTests
             api.AddUpload("nachweis.png", new { url = "https://github.com/user-attachments/assets/abc" });
             api.Add("issues/7/comments", new { id = 99, html_url = "https://github.com/owner/repo/issues/7#issuecomment-99" });
 
-            var result = await Plugin(api).ExecuteResponseAsync(request);
+            var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
             Assert.Equal("99", result.RemoteId);
             var upload = Assert.Single(api.UploadRequests);
@@ -402,7 +402,7 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
                 Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
             var api = new FakeApi();
@@ -412,7 +412,7 @@ public sealed class GitHubEventSourceTests
             api.AddUpload("nachweis.png", new { url = "https://github.com/user-attachments/assets/xyz" });
             api.Add("issues/7/comments", new { id = 98 });
 
-            var result = await Plugin(api).ExecuteResponseAsync(request);
+            var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
             Assert.Equal("98", result.RemoteId);
             Assert.Equal("777", Assert.Single(api.UploadRequests).RepositoryId);
@@ -428,14 +428,14 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
                 Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
             var api = new FakeApi();
             Identity(api, numericId: 12345);
             api.Add("comments?", new[] { new { id = 5, body = "alt\n" + request.Marker, user = new { node_id = "U_1", login = "owner" } } });
 
-            var result = await Plugin(api).ExecuteResponseAsync(request);
+            var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
             Assert.True(result.AlreadyExisted);
             Assert.Empty(api.UploadRequests);
@@ -456,7 +456,7 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
                 Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
             var api = new FakeApi();
@@ -464,7 +464,7 @@ public sealed class GitHubEventSourceTests
             api.Add("comments?", Array.Empty<object>());
             api.AddUploadJson("nachweis.png", body);
 
-            var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+            var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken));
 
             Assert.False(error.OutcomeUncertain);
         }
@@ -478,7 +478,7 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
                 Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
             var api = new FakeApi();
@@ -486,7 +486,7 @@ public sealed class GitHubEventSourceTests
             api.Add("comments?", Array.Empty<object>());
             api.AddUploadStatus("nachweis.png", 500);
 
-            var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+            var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken));
 
             Assert.Equal(ScmProviderFailureKind.Temporary, error.FailureKind);
             Assert.False(error.OutcomeUncertain);
@@ -508,7 +508,7 @@ public sealed class GitHubEventSourceTests
         api.Add("comments?", Array.Empty<object>());
         api.Add("issues/7/comments", new { id = 97 });
 
-        var result = await Plugin(api).ExecuteResponseAsync(request);
+        var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal("97", result.RemoteId);
         Assert.Empty(api.UploadRequests);
@@ -528,7 +528,7 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             const string injected = "<!-- softwareschmiede:action:injected -->";
             var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
                 Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png",
@@ -539,7 +539,7 @@ public sealed class GitHubEventSourceTests
             api.AddUpload("nachweis.png", new { url = "https://github.com/user-attachments/assets/abc" });
             api.Add("issues/7/comments", new { id = 96 });
 
-            var result = await Plugin(api).ExecuteResponseAsync(request);
+            var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
             Assert.Equal("96", result.RemoteId);
             var body = JsonDocument.Parse(api.Requests.Last().JsonBody!).RootElement.GetProperty("body").GetString()!;
@@ -563,7 +563,7 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
                 Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png",
                     "Vorher<!-<!--- softwareschmiede:action:injected --->->Nachher")]);
@@ -573,7 +573,7 @@ public sealed class GitHubEventSourceTests
             api.AddUpload("nachweis.png", new { url = "https://github.com/user-attachments/assets/abc" });
             api.Add("issues/7/comments", new { id = 93 });
 
-            var result = await Plugin(api).ExecuteResponseAsync(request);
+            var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
             Assert.Equal("93", result.RemoteId);
             var body = JsonDocument.Parse(api.Requests.Last().JsonBody!).RootElement.GetProperty("body").GetString()!;
@@ -599,7 +599,7 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
                 Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png",
                     "Vorher @org/team siehe [klick](https://evil.example) `code` *kursiv* _unter_ \\pfad\u2028Zeile2 <!-- softwareschmiede:action:x -->")]);
@@ -609,7 +609,7 @@ public sealed class GitHubEventSourceTests
             api.AddUpload("nachweis.png", new { url = "https://github.com/user-attachments/assets/abc" });
             api.Add("issues/7/comments", new { id = 92 });
 
-            var result = await Plugin(api).ExecuteResponseAsync(request);
+            var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
             Assert.Equal("92", result.RemoteId);
             var body = JsonDocument.Parse(api.Requests.Last().JsonBody!).RootElement.GetProperty("body").GetString()!;
@@ -643,7 +643,7 @@ public sealed class GitHubEventSourceTests
         Directory.CreateDirectory(target);
         try
         {
-            await File.WriteAllBytesAsync(Path.Combine(target, "nachweis.png"), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(Path.Combine(target, "nachweis.png"), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             var junction = new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"")
             { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
             using (var process = Process.Start(junction)!)
@@ -658,7 +658,7 @@ public sealed class GitHubEventSourceTests
             api.Add("comments?", Array.Empty<object>());
             api.Add("issues/7/comments", new { id = 91 });
 
-            var result = await Plugin(api).ExecuteResponseAsync(request);
+            var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
             Assert.Equal("91", result.RemoteId);
             Assert.Empty(api.UploadRequests);
@@ -683,7 +683,7 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
                 Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
             var api = new FakeApi();
@@ -691,7 +691,7 @@ public sealed class GitHubEventSourceTests
             api.Add("comments?", Array.Empty<object>());
             api.AddFailure("repos/owner/repo", new FormatException("corrupt"));
 
-            var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+            var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken));
 
             Assert.Equal(ScmProviderFailureKind.Temporary, error.FailureKind);
             Assert.False(error.OutcomeUncertain);
@@ -709,7 +709,7 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
                 Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
             foreach (var failure in new Exception[] { new FormatException("corrupt"), new OperationCanceledException() })
@@ -719,7 +719,7 @@ public sealed class GitHubEventSourceTests
                 api.Add("comments?", Array.Empty<object>());
                 api.AddUploadFailure("nachweis.png", failure);
 
-                var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+                var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken));
 
                 Assert.Equal(ScmProviderFailureKind.Temporary, error.FailureKind);
                 Assert.False(error.OutcomeUncertain);
@@ -737,7 +737,7 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+            await File.WriteAllBytesAsync(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
             var gheRepository = Repository with { Host = "ghe.example.com" };
             var request = new ScmResponseRequest(Issue with { Repository = gheRepository },
                 "action-1", ScmResponseKind.Comment, "Screenshot-Nachweise des abgeschlossenen Laufs.",
@@ -747,7 +747,7 @@ public sealed class GitHubEventSourceTests
             api.Add("comments?", Array.Empty<object>());
             api.Add("issues/7/comments", new { id = 95 });
 
-            var result = await Plugin(api).ExecuteResponseAsync(request);
+            var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
             Assert.Equal("95", result.RemoteId);
             Assert.Empty(api.UploadRequests);
@@ -769,7 +769,7 @@ public sealed class GitHubEventSourceTests
         var path = Path.Combine(Path.GetTempPath(), "scm-attach-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            await File.WriteAllTextAsync(path, "kein bild mehr");
+            await File.WriteAllTextAsync(path, "kein bild mehr", TestContext.Current.CancellationToken);
             var request = new ScmResponseRequest(Issue, "action-1", ScmResponseKind.Comment, "Nachweis",
                 Attachments: [new ScmResponseAttachment(path, "nachweis.png", "image/png", null)]);
             var api = new FakeApi();
@@ -777,7 +777,7 @@ public sealed class GitHubEventSourceTests
             api.Add("comments?", Array.Empty<object>());
             api.Add("issues/7/comments", new { id = 94 });
 
-            var result = await Plugin(api).ExecuteResponseAsync(request);
+            var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
             Assert.Equal("94", result.RemoteId);
             Assert.Empty(api.UploadRequests);
@@ -797,7 +797,7 @@ public sealed class GitHubEventSourceTests
         Identity(api);
         api.Add("comments?", Array.Empty<object>());
         api.AddStatus("issues/7/comments", 403);
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(new(Issue, "action-1", ScmResponseKind.Comment, "Antwort")));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(new(Issue, "action-1", ScmResponseKind.Comment, "Antwort"), TestContext.Current.CancellationToken));
         Assert.Equal(ScmProviderFailureKind.Permission, error.FailureKind);
         Assert.False(error.OutcomeUncertain);
     }
@@ -808,7 +808,7 @@ public sealed class GitHubEventSourceTests
     {
         var api = new FakeApi();
         Identity(api, "U_2");
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(new(Issue, "action-1", ScmResponseKind.Comment, "Antwort")));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(new(Issue, "action-1", ScmResponseKind.Comment, "Antwort"), TestContext.Current.CancellationToken));
         Assert.Equal(ScmProviderFailureKind.Permission, error.FailureKind);
         Assert.All(api.Requests, x => Assert.Equal("GET", x.Method));
     }
@@ -822,7 +822,7 @@ public sealed class GitHubEventSourceTests
         api.Add("pulls?state=all", Array.Empty<object>());
         api.Add("repos/owner/repo/pulls", new { id = 88, html_url = "https://github.com/owner/repo/pull/22" });
         var request = new ScmResponseRequest(Issue, "pr-1", ScmResponseKind.PullRequest, "$Softwareschmiede\n\u001b\0\"text\"", Title: "Resultat", HeadBranch: "feature/a", BaseBranch: "main");
-        var result = await Plugin(api).ExecuteResponseAsync(request);
+        var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal("88", result.RemoteId);
         using var body = JsonDocument.Parse(api.Requests.Last().JsonBody!);
         Assert.Equal("feature/a", body.RootElement.GetProperty("head").GetString());
@@ -842,7 +842,7 @@ public sealed class GitHubEventSourceTests
         api.Add("issues/7", new { id = 77, body = "alte Beschreibung", html_url = "https://github.com/owner/repo/issues/7" });
         api.Add("issues/7", new { id = 77, body = "Verbesserte Beschreibung.\n\n" + request.Marker, html_url = "https://github.com/owner/repo/issues/7" });
 
-        var result = await Plugin(api).ExecuteResponseAsync(request);
+        var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal("77", result.RemoteId);
         Assert.False(result.AlreadyExisted);
@@ -868,7 +868,7 @@ public sealed class GitHubEventSourceTests
         Identity(api);
         api.Add("issues/7", new { id = 77, body = "Verbesserte Beschreibung.\n\n" + request.Marker, html_url = "https://github.com/owner/repo/issues/7" });
 
-        var result = await Plugin(api).ExecuteResponseAsync(request);
+        var result = await Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
         Assert.True(result.AlreadyExisted);
         Assert.Equal("77", result.RemoteId);
@@ -886,7 +886,7 @@ public sealed class GitHubEventSourceTests
         var api = new FakeApi();
         api.Add("issues/7", new { id = 77, body = "Verbesserte Beschreibung.\n\n" + request.Marker, html_url = "https://github.com/owner/repo/issues/7" });
 
-        var result = await Plugin(api).ReconcileResponseAsync(request);
+        var result = await Plugin(api).ReconcileResponseAsync(request, TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.True(result!.AlreadyExisted);
@@ -906,7 +906,7 @@ public sealed class GitHubEventSourceTests
         var request = new ScmResponseRequest(pullRequest ? PullRequest : Issue, "action-1", ScmResponseKind.IssueBodyUpdate, body);
 
         var api = new FakeApi();
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken));
 
         Assert.Equal(ScmProviderFailureKind.Permanent, error.FailureKind);
         Assert.Empty(api.Requests);
@@ -928,7 +928,7 @@ public sealed class GitHubEventSourceTests
         api.Add("issues/7", new { id = 77, body = "alte Beschreibung" });
         api.AddStatus("issues/7", status, status == 429 ? new() { ["Retry-After"] = "30" } : null);
 
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(request, TestContext.Current.CancellationToken));
 
         Assert.Equal(kind, error.FailureKind);
         Assert.Equal(uncertain, error.OutcomeUncertain);
@@ -953,7 +953,7 @@ public sealed class GitHubEventSourceTests
         routed.Add("issues/7", new { id = 77, body = "Neue Beschreibung." });
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
 
-        var result = await plugin.ExecuteResponseAsync(request);
+        var result = await plugin.ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal("77", result.RemoteId);
         Assert.Empty(idle.Requests);
@@ -969,7 +969,7 @@ public sealed class GitHubEventSourceTests
         api.AddGraph(new { repository = new { issues = Page(new[] { Ref(7), Ref(8) }, true, "c1") } });
         api.AddGraph(new { repository = new { issues = Page(new[] { Ref(9) }, false, null) } });
         api.AddGraph(new { repository = new { pullRequests = Page(new[] { Ref(3) }, false, null) } });
-        var result = await Plugin(api).EnumerateReferencesAsync(Repository, null);
+        var result = await Plugin(api).EnumerateReferencesAsync(Repository, null, TestContext.Current.CancellationToken);
         Assert.Equal(new[]
         {
             new ScmEventReference(Repository, ScmReferenceKind.Issue, 7),
@@ -992,7 +992,7 @@ public sealed class GitHubEventSourceTests
         api.AddGraph(new { repository = new { pullRequests = Page(new[] { Ref(3) }, false, null) } });
         api.AddGraph(new { repository = new { issues = Page(new[] { Ref(5, Created), Ref(4, Created.AddHours(-1)) }, false, null) } });
         api.AddGraph(new { repository = new { pullRequests = Page(new[] { Ref(2, Created.AddMinutes(1)), Ref(1, Created.AddDays(-1)) }, false, null) } });
-        var result = await Plugin(api).EnumerateReferencesAsync(Repository, Created);
+        var result = await Plugin(api).EnumerateReferencesAsync(Repository, Created, TestContext.Current.CancellationToken);
         Assert.Equal(new[]
         {
             new ScmEventReference(Repository, ScmReferenceKind.Issue, 7),
@@ -1011,7 +1011,7 @@ public sealed class GitHubEventSourceTests
     {
         var api = new FakeApi();
         api.AddStatus("graphql", 503);
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).EnumerateReferencesAsync(Repository, null));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).EnumerateReferencesAsync(Repository, null, TestContext.Current.CancellationToken));
         Assert.Equal(ScmProviderFailureKind.Temporary, error.FailureKind);
     }
 
@@ -1030,7 +1030,7 @@ public sealed class GitHubEventSourceTests
             { Content = new StringContent("{\"id\":42}", System.Text.Encoding.UTF8, "application/json") };
         });
         var client = new GitHubHttpApiClient(() => "token-secret", handler);
-        var result = await client.SendAsync(new("github.com", "POST", "repos/owner/repo/issues/7/comments", json));
+        var result = await client.SendAsync(new("github.com", "POST", "repos/owner/repo/issues/7/comments", json), TestContext.Current.CancellationToken);
         Assert.Equal(201, result.StatusCode);
         Assert.Equal("{\"id\":42}", result.Body);
         Assert.NotNull(captured);
@@ -1056,7 +1056,7 @@ public sealed class GitHubEventSourceTests
             milestone = new { title = "v1" },
             html_url = "https://github.com/owner/repo/issues/7"
         });
-        var result = await Plugin(api).ReadIssueAsync(Issue);
+        var result = await Plugin(api).ReadIssueAsync(Issue, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.Equal(7, result!.Nummer);
         Assert.Equal("Fehler im Import", result.Titel);
@@ -1073,7 +1073,7 @@ public sealed class GitHubEventSourceTests
     {
         var api = new FakeApi();
         api.Add("issues/7", new { number = 7, title = "PR", pull_request = new { url = "x" } });
-        Assert.Null(await Plugin(api).ReadIssueAsync(Issue));
+        Assert.Null(await Plugin(api).ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
         api.AssertComplete();
     }
 
@@ -1093,7 +1093,7 @@ public sealed class GitHubEventSourceTests
             head = new { @ref = "feature/x", sha = "abc", repo = new { full_name = "owner/repo", clone_url = "https://github.com/owner/repo.git" } },
             @base = new { @ref = "main" }
         });
-        var result = await Plugin(api).ReadPullRequestAsync(PullRequest);
+        var result = await Plugin(api).ReadPullRequestAsync(PullRequest, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.Equal(8, result!.Nummer);
         Assert.Equal("feature/x", result.BranchName);
@@ -1111,7 +1111,7 @@ public sealed class GitHubEventSourceTests
     {
         var api = new FakeApi();
         api.AddStatus("issues/7", 404);
-        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadIssueAsync(Issue));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
         Assert.Equal(ScmProviderFailureKind.Permanent, error.FailureKind);
     }
 
@@ -1125,8 +1125,7 @@ public sealed class GitHubEventSourceTests
         Identity(agent);
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
 
-        var result = await plugin.GetEventRepositoryAsync(
-            new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo", ScmKontoModus.SeparatesKonto));
+        var result = await plugin.GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo", ScmKontoModus.SeparatesKonto), TestContext.Current.CancellationToken);
 
         Assert.Equal(Repository with { Konto = ScmKontoModus.SeparatesKonto }, result);
         Assert.Empty(user.Requests);
@@ -1148,7 +1147,7 @@ public sealed class GitHubEventSourceTests
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
         var reference = Issue with { Repository = Repository with { Konto = konto } };
 
-        var batch = await plugin.ReadEventsAsync(Read(reference, ScmContentKind.Description));
+        var batch = await plugin.ReadEventsAsync(Read(reference, ScmContentKind.Description), TestContext.Current.CancellationToken);
 
         Assert.Single(batch.Observations);
         Assert.Single(routed.Requests);
@@ -1172,7 +1171,7 @@ public sealed class GitHubEventSourceTests
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
         var reference = Issue with { Repository = Repository with { Konto = konto } };
 
-        var result = await plugin.ExecuteResponseAsync(new(reference, "action-1", ScmResponseKind.Comment, "Antwort"));
+        var result = await plugin.ExecuteResponseAsync(new(reference, "action-1", ScmResponseKind.Comment, "Antwort"), TestContext.Current.CancellationToken);
 
         Assert.Equal("99", result.RemoteId);
         Assert.Empty(idle.Requests);

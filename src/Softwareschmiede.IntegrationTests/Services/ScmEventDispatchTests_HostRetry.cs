@@ -39,11 +39,11 @@ public sealed class ScmEventDispatchTests_HostRetry
         var retryAt = manualRetry ? long.MaxValue : clock.Now.AddHours(2).ToUnixTimeMilliseconds();
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents
-                .Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(e => e.NextAttemptUtc, retryAt));
+                .Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(e => e.NextAttemptUtc, retryAt), cancellationToken: TestContext.Current.CancellationToken);
 
         fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         clock.Now = clock.Now.AddHours(1);
-        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, hostAttempts);
         fixture.Ki.Verify(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -53,17 +53,17 @@ public sealed class ScmEventDispatchTests_HostRetry
         if (manualRetry)
         {
             using var scope = fixture.Services.CreateScope();
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId);
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
         }
         else
         {
             clock.Now = clock.Now.AddHours(1);
-            await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+            await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
         }
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
-        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
         Assert.Single(fixture.Prompts);
     }
 
@@ -81,17 +81,17 @@ public sealed class ScmEventDispatchTests_HostRetry
         await fixture.DispatchAsync(eventId);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents
-                .Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(e => e.Status, "Verarbeitet"));
+                .Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(e => e.Status, "Verarbeitet"), cancellationToken: TestContext.Current.CancellationToken);
         fixture.Git.As<IScmEventResponder>().Setup(x => x.ExecuteResponseAsync(
             It.IsAny<ScmResponseRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ScmResponseResult("remote", null, false));
         clock.Now = clock.Now.AddHours(1);
 
-        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync()).Status);
+        Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Status);
         Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);

@@ -113,7 +113,7 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
     public async Task ValidateWorkingDirectoryAfterCloneAsync_ShouldSucceed_WhenGitPluginResolvesInSourceDirectoryPath()
     {
         // Arrange
-        await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath);
+        await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath, TestContext.Current.CancellationToken);
         var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "backend" };
 
         // Act
@@ -131,7 +131,7 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
     public async Task ValidateWorkingDirectoryAfterCloneAsync_ShouldThrow_WhenGitPluginNotPassed()
     {
         // Arrange
-        await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath);
+        await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath, TestContext.Current.CancellationToken);
         var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "backend" };
 
         // Act

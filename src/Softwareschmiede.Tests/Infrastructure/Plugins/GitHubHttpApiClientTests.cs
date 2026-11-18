@@ -24,7 +24,7 @@ public sealed class GitHubHttpApiClientTests
             captured = request;
             return Task.FromResult(Response(HttpStatusCode.OK, "{}"));
         });
-        await client.SendAsync(new(host, "GET", endpoint));
+        await client.SendAsync(new(host, "GET", endpoint), TestContext.Current.CancellationToken);
         captured!.RequestUri!.ToString().Should().Be(expected);
     }
 
@@ -34,7 +34,7 @@ public sealed class GitHubHttpApiClientTests
     {
         var client = Client(_ => Task.FromResult(Response(HttpStatusCode.OK, "{}")));
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => client.SendAsync(new("not a host !!", "GET", "user")));
+            () => client.SendAsync(new("not a host !!", "GET", "user"), TestContext.Current.CancellationToken));
         error.FailureKind.Should().Be(ScmProviderFailureKind.Permanent);
     }
 
@@ -55,7 +55,7 @@ public sealed class GitHubHttpApiClientTests
             return Task.FromResult(Response(HttpStatusCode.OK, "{}"));
         });
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => client.SendAsync(new(host, "GET", "user")));
+            () => client.SendAsync(new(host, "GET", "user"), TestContext.Current.CancellationToken));
         error.FailureKind.Should().Be(ScmProviderFailureKind.Permanent);
         called.Should().BeFalse();
     }
@@ -72,7 +72,7 @@ public sealed class GitHubHttpApiClientTests
             captured = request;
             return Task.FromResult(Response(HttpStatusCode.OK, "{}"));
         }, () => token);
-        await client.SendAsync(new("github.com", "GET", "user"));
+        await client.SendAsync(new("github.com", "GET", "user"), TestContext.Current.CancellationToken);
         captured!.Headers.Accept.ToString().Should().Be("application/vnd.github+json");
         captured.Headers.GetValues("X-GitHub-Api-Version").Should().Equal("2022-11-28");
         captured.Headers.UserAgent.ToString().Should().Be("Softwareschmiede");
@@ -93,7 +93,7 @@ public sealed class GitHubHttpApiClientTests
     {
         var token = "token-a";
         var client = Client(_ => Task.FromResult(Response(HttpStatusCode.OK, "{}")), () => token);
-        await client.SendAsync(new("github.com", "GET", "user"));
+        await client.SendAsync(new("github.com", "GET", "user"), TestContext.Current.CancellationToken);
         token = "token-b";
         HttpRequestMessage? captured = null;
         var second = Client(request =>
@@ -101,7 +101,7 @@ public sealed class GitHubHttpApiClientTests
             captured = request;
             return Task.FromResult(Response(HttpStatusCode.OK, "{}"));
         }, () => token);
-        await second.SendAsync(new("github.com", "GET", "user"));
+        await second.SendAsync(new("github.com", "GET", "user"), TestContext.Current.CancellationToken);
         captured!.Headers.Authorization!.Parameter.Should().Be("token-b");
     }
 
@@ -117,7 +117,7 @@ public sealed class GitHubHttpApiClientTests
             capturedContentType = request.Content.Headers.ContentType!.MediaType;
             return Response(HttpStatusCode.OK, "{}");
         });
-        await client.SendAsync(new("github.com", "POST", "repos/o/r/issues", "{\"title\":\"t\"}"));
+        await client.SendAsync(new("github.com", "POST", "repos/o/r/issues", "{\"title\":\"t\"}"), TestContext.Current.CancellationToken);
         capturedBody.Should().Be("{\"title\":\"t\"}");
         capturedContentType.Should().Be("application/json");
     }
@@ -134,7 +134,7 @@ public sealed class GitHubHttpApiClientTests
             response.Headers.TryAddWithoutValidation("Retry-After", "30");
             return Task.FromResult(response);
         });
-        var result = await client.SendAsync(new("github.com", "GET", "notifications"));
+        var result = await client.SendAsync(new("github.com", "GET", "notifications"), TestContext.Current.CancellationToken);
         result.StatusCode.Should().Be(200);
         result.Body.Should().Be("[]");
         result.Headers!["Link"].Should().Contain("page=2");
@@ -147,7 +147,7 @@ public sealed class GitHubHttpApiClientTests
     public async Task SendAsync_ErrorStatus_ReturnsStatusAndBody()
     {
         var client = Client(_ => Task.FromResult(Response(HttpStatusCode.NotFound, "{\"message\":\"Not Found\"}")));
-        var result = await client.SendAsync(new("github.com", "GET", "repos/o/r"));
+        var result = await client.SendAsync(new("github.com", "GET", "repos/o/r"), TestContext.Current.CancellationToken);
         result.StatusCode.Should().Be(404);
         result.Body.Should().Contain("Not Found");
     }
@@ -163,7 +163,7 @@ public sealed class GitHubHttpApiClientTests
     {
         var client = Client(_ => throw new HttpRequestException("refused secret-token"));
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => client.SendAsync(new("github.com", method, endpoint, method == "GET" ? null : "{}")));
+            () => client.SendAsync(new("github.com", method, endpoint, method == "GET" ? null : "{}"), TestContext.Current.CancellationToken));
         error.FailureKind.Should().Be(ScmProviderFailureKind.Temporary);
         error.OutcomeUncertain.Should().Be(uncertain);
     }
@@ -190,14 +190,14 @@ public sealed class GitHubHttpApiClientTests
             captured = request;
             return Task.FromResult(Response(HttpStatusCode.Unauthorized, "{\"message\":\"Bad credentials\"}"));
         }, () => token);
-        var result = await client.SendAsync(new("github.com", "GET", "user"));
+        var result = await client.SendAsync(new("github.com", "GET", "user"), TestContext.Current.CancellationToken);
         captured!.RequestUri!.ToString().Should().NotContain(token);
         result.Body.Should().NotContain(token);
         result.Headers!.Values.Should().OnlyContain(v => !v.Contains(token));
 
         var failing = Client(_ => throw new HttpRequestException("network down"), () => token);
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => failing.SendAsync(new("github.com", "GET", "user")));
+            () => failing.SendAsync(new("github.com", "GET", "user"), TestContext.Current.CancellationToken));
         error.Message.Should().NotContain(token);
         error.ToString().Should().NotContain(token);
     }
@@ -216,7 +216,7 @@ public sealed class GitHubHttpApiClientTests
             return Response(HttpStatusCode.OK, "{\"url\":\"https://github.com/user-attachments/assets/abc\"}");
         });
         var data = new byte[] { 1, 2, 3 };
-        var result = await client.UploadAsync(new("github.com", "12345", "nachweis 1.png", "image/png", data));
+        var result = await client.UploadAsync(new("github.com", "12345", "nachweis 1.png", "image/png", data), TestContext.Current.CancellationToken);
         result.StatusCode.Should().Be(200);
         captured!.RequestUri!.AbsoluteUri.Should().Be(
             "https://uploads.github.com/user-attachments/assets?name=nachweis%201.png&content_type=image%2Fpng&repository_id=12345");
@@ -240,7 +240,7 @@ public sealed class GitHubHttpApiClientTests
             return Task.FromResult(Response(HttpStatusCode.OK, "{}"));
         });
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => client.UploadAsync(new("ghe.example.com", "1", "a.png", "image/png", [1])));
+            () => client.UploadAsync(new("ghe.example.com", "1", "a.png", "image/png", [1]), TestContext.Current.CancellationToken));
         error.FailureKind.Should().Be(ScmProviderFailureKind.Permanent);
         called.Should().BeFalse();
     }
@@ -258,7 +258,7 @@ public sealed class GitHubHttpApiClientTests
             return Task.FromResult(Response(HttpStatusCode.OK, "{}"));
         });
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => client.UploadAsync(new("github.com", "1", "a.png", "image/png", new byte[size])));
+            () => client.UploadAsync(new("github.com", "1", "a.png", "image/png", new byte[size]), TestContext.Current.CancellationToken));
         error.FailureKind.Should().Be(ScmProviderFailureKind.Permanent);
         called.Should().BeFalse();
     }
@@ -274,7 +274,7 @@ public sealed class GitHubHttpApiClientTests
             ? throw new TaskCanceledException("timeout")
             : throw new HttpRequestException("refused secret-token"));
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => client.UploadAsync(new("github.com", "1", "a.png", "image/png", [1])));
+            () => client.UploadAsync(new("github.com", "1", "a.png", "image/png", [1]), TestContext.Current.CancellationToken));
         error.FailureKind.Should().Be(ScmProviderFailureKind.Temporary);
         error.OutcomeUncertain.Should().BeFalse();
         error.Message.Should().NotContain("secret-token");
@@ -287,7 +287,7 @@ public sealed class GitHubHttpApiClientTests
     {
         var client = Client(_ => Task.FromResult(Response(HttpStatusCode.OK, "{}")));
         var error = await Assert.ThrowsAsync<ScmProviderException>(
-            () => client.UploadAsync(new("github.com", "1", "a.png", "not a\nmime", [1])));
+            () => client.UploadAsync(new("github.com", "1", "a.png", "not a\nmime", [1]), TestContext.Current.CancellationToken));
         error.FailureKind.Should().Be(ScmProviderFailureKind.Temporary);
         error.OutcomeUncertain.Should().BeFalse();
     }

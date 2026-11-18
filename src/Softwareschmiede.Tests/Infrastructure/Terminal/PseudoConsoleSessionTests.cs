@@ -23,7 +23,7 @@ public sealed class PseudoConsoleSessionTests
         using var session = CreateSession(new ThrowingStream(), loggerMock.Object);
 
         var readLoopTask = GetReadLoopTask(session);
-        var completed = await Task.WhenAny(readLoopTask, Task.Delay(TimeSpan.FromSeconds(5)));
+        var completed = await Task.WhenAny(readLoopTask, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         completed.Should().Be(readLoopTask, "die Leseschleife muss nach einem Lesefehler sauber beendet werden");
         readLoopTask.IsFaulted.Should().BeFalse("ein Lesefehler darf die Leseschleife nicht mit einer unbehandelten Exception beenden");
@@ -48,7 +48,7 @@ public sealed class PseudoConsoleSessionTests
 
         session.Dispose();
 
-        var completed = await Task.WhenAny(readLoopTask, Task.Delay(TimeSpan.FromSeconds(5)));
+        var completed = await Task.WhenAny(readLoopTask, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         completed.Should().Be(readLoopTask, "die Leseschleife muss nach Abbruch des CancellationTokens zeitnah enden");
         readLoopTask.IsFaulted.Should().BeFalse("der Abbruch der Leseschleife darf keine unbehandelte Exception verursachen");
@@ -184,7 +184,7 @@ public sealed class PseudoConsoleSessionTests
         // Sicherstellen, dass die Leseschleife den Read tatsächlich schon erreicht hat, bevor Dispose() aufgerufen
         // wird — sonst könnte Cancel() bereits vor dem ersten ReadAsync-Aufruf greifen und die Schleife würde die
         // while-Bedingung nie mehr betreten, statt (wie hier beabsichtigt) mitten im Read hängen zu bleiben.
-        outputStream.ReadStarted.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+        outputStream.ReadStarted.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).Should().BeTrue(
             "die Leseschleife muss den ersten Read erreicht haben, damit dieser Test das gewünschte Szenario prüft");
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -221,7 +221,7 @@ public sealed class PseudoConsoleSessionTests
         };
         gate.Set();
 
-        bufferChanged.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+        bufferChanged.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).Should().BeTrue(
             "BufferChanged muss nach Verarbeitung der gelesenen Ausgabe gefeuert werden");
         characterAtEventTime.Should().Be(
             'H',
@@ -242,9 +242,9 @@ public sealed class PseudoConsoleSessionTests
 
         session.BufferChanged += (_, _) => bufferChanged.Set();
 
-        bufferChanged.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        bufferChanged.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).Should().BeTrue();
         sink.Output.Should().Be("HELLO");
-        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         sink.IsCompleted.Should().BeTrue("die Senke muss beim Ende der Leseschleife abgeschlossen werden");
         session.Buffer.GetRow(0)[0].Character.Should().Be('H');
     }
@@ -266,10 +266,10 @@ public sealed class PseudoConsoleSessionTests
         };
         gate.Set();
 
-        chunkFired.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        chunkFired.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).Should().BeTrue();
         received.ToString().Should().Contain("RAW");
         received.ToString().Should().Contain("\x1b[31m", "OutputChunk liefert die Rohbytes inkl. Escape-Sequenzen");
-        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     /// <summary>Regression: Ruft ein <see cref="ITerminalOutputSink"/>-Aufruf (vor dem Parse/Apply des
@@ -286,7 +286,7 @@ public sealed class PseudoConsoleSessionTests
             outputSink: sink);
         sink.Session = session;
 
-        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         var zeile = new string(session.Buffer.GetRow(0).Select(c => c.Character).ToArray()).TrimEnd();
         zeile.Should().Be("AB",
@@ -324,7 +324,7 @@ public sealed class PseudoConsoleSessionTests
         using var session = CreateSession(new FixedContentStream("A\r\nB"));
         var bufferChanged = new ManualResetEventSlim(false);
         session.BufferChanged += (_, _) => bufferChanged.Set();
-        bufferChanged.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        bufferChanged.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).Should().BeTrue();
 
         session.Buffer.GetRow(0)[0].Character.Should().Be('A');
         session.Buffer.GetRow(1)[0].Character.Should().Be('B');
@@ -342,7 +342,7 @@ public sealed class PseudoConsoleSessionTests
     {
         using var session = CreateSession(new FixedContentStream("A\x1b[8;73;142tB"));
 
-        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         session.Buffer.Cols.Should().Be(142);
         session.Buffer.Rows.Should().Be(73);
@@ -370,8 +370,8 @@ public sealed class PseudoConsoleSessionTests
         using var session = CreateSession(new FixedContentStream("X"));
         session.Exited += (_, _) => exited = true;
 
-        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
-        await Task.Delay(200);
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
 
         exited.Should().BeFalse("der Testprozess läuft noch — Exited darf bei reinem Stream-EOF nicht feuern");
     }
@@ -403,7 +403,7 @@ public sealed class PseudoConsoleSessionTests
     {
         using var session = CreateSession(new ThrowingStream());
 
-        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         session.Failure.Should().NotBeNull("ein Leseschleifen-Fehler muss über Failure dauerhaft sichtbar bleiben");
         session.Failure!.Phase.Should().Be("ReadLoop");

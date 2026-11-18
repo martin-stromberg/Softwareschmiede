@@ -57,18 +57,14 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         var bodyActionId = Guid.NewGuid();
         var commentActionId = Guid.NewGuid();
 
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
         Directory.CreateDirectory(Path.Combine(directory, "actions"));
-        await File.WriteAllTextAsync(Path.Combine(directory, "actions", bodyActionId + ".json"),
-            JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, bodyActionId,
-                "issueBodyUpdate", Body: "Optimierte Anforderungsbeschreibung."), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "actions", commentActionId + ".json"),
-            JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, commentActionId,
-                "comment", Body: "Analyse: Schwachstellen, offene Fragen, Risiken."), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [bodyActionId, commentActionId], false, Report: "Beschreibung optimiert."), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "actions", bodyActionId + ".json"), JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, bodyActionId,
+                "issueBodyUpdate", Body: "Optimierte Anforderungsbeschreibung."), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "actions", commentActionId + ".json"), JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, commentActionId,
+                "comment", Body: "Analyse: Schwachstellen, offene Fragen, Risiken."), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [bodyActionId, commentActionId], false, Report: "Beschreibung optimiert."), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -99,18 +95,14 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         var directory = delivered.ExchangePath!;
         var bodyActionId = Guid.NewGuid();
         var commentActionId = Guid.NewGuid();
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
         Directory.CreateDirectory(Path.Combine(directory, "actions"));
-        await File.WriteAllTextAsync(Path.Combine(directory, "actions", bodyActionId + ".json"),
-            JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, bodyActionId,
-                "issueBodyUpdate", Body: "Optimierte Beschreibung."), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "actions", commentActionId + ".json"),
-            JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, commentActionId,
-                "comment", Body: "Analyse-Dokumentation."), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [bodyActionId, commentActionId]), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "actions", bodyActionId + ".json"), JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, bodyActionId,
+                "issueBodyUpdate", Body: "Optimierte Beschreibung."), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "actions", commentActionId + ".json"), JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, commentActionId,
+                "comment", Body: "Analyse-Dokumentation."), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [bodyActionId, commentActionId]), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -136,15 +128,12 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
         var bodyActionId = Guid.NewGuid();
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
         Directory.CreateDirectory(Path.Combine(directory, "actions"));
-        await File.WriteAllTextAsync(Path.Combine(directory, "actions", bodyActionId + ".json"),
-            JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, bodyActionId,
-                "issueBodyUpdate", Body: "Optimierte Beschreibung."), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [bodyActionId]), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "actions", bodyActionId + ".json"), JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, bodyActionId,
+                "issueBodyUpdate", Body: "Optimierte Beschreibung."), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [bodyActionId]), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -197,7 +186,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         Assert.Empty(fixture.Sessions);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Contains(await db.Protokolleintraege.ToListAsync(), x => x.Inhalt.Contains("custom.auf"));
+        Assert.Contains(await db.Protokolleintraege.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => x.Inhalt.Contains("custom.auf"));
     }
 
     /// <summary>Die Ausführung zählt in die #410-Begrenzung: Bei erreichtem globalem Limit
@@ -283,7 +272,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         Assert.Empty(fixture.Responses);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Contains(await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(),
+        Assert.Contains(await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             x => x.Inhalt.Contains("geschlossen"));
     }
 
@@ -305,15 +294,12 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
         var bodyActionId = Guid.NewGuid();
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
         Directory.CreateDirectory(Path.Combine(directory, "actions"));
-        await File.WriteAllTextAsync(Path.Combine(directory, "actions", bodyActionId + ".json"),
-            JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, bodyActionId,
-                "issueBodyUpdate", Body: "Optimierte Beschreibung."), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [bodyActionId]), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "actions", bodyActionId + ".json"), JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId, bodyActionId,
+                "issueBodyUpdate", Body: "Optimierte Beschreibung."), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [bodyActionId]), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -324,7 +310,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         Assert.DoesNotContain(fixture.Responses, x => x.Kind == ScmResponseKind.Comment); // kein Fehlerkommentar
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Contains(await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(),
+        Assert.Contains(await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             x => x.Inhalt.Contains("Issue-Aufbereitung fehlgeschlagen"));
     }
 
@@ -342,11 +328,9 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         var delivered = await fixture.EventAsync(eventId);
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [], true, "Issue konnte nicht sinnvoll verbessert werden."), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], true, "Issue konnte nicht sinnvoll verbessert werden."), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);

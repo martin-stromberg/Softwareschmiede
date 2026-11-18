@@ -25,11 +25,9 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         await using var db = CreateDb();
         var sut = new BenachrichtigungsEinstellungenService(db);
 
-        await sut.SaveAsync(
-            "user-a",
-            new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Ton));
+        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Ton), TestContext.Current.CancellationToken);
 
-        var loaded = await sut.GetAsync("user-a");
+        var loaded = await sut.GetAsync("user-a", TestContext.Current.CancellationToken);
         loaded.BannerModus.Should().Be(BenachrichtigungsModus.Deaktiviert);
         loaded.TonModus.Should().Be(BenachrichtigungsModus.Ton);
     }
@@ -41,7 +39,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         await using var db = CreateDb();
         var sut = new BenachrichtigungsEinstellungenService(db);
 
-        var loaded = await sut.GetAsync("unknown-user");
+        var loaded = await sut.GetAsync("unknown-user", TestContext.Current.CancellationToken);
 
         loaded.BannerModus.Should().Be(BenachrichtigungsModus.Banner);
         loaded.TonModus.Should().Be(BenachrichtigungsModus.Deaktiviert);
@@ -54,11 +52,11 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         await using var db = CreateDb();
         var sut = new BenachrichtigungsEinstellungenService(db);
 
-        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Ton));
-        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Banner, BenachrichtigungsModus.Deaktiviert));
+        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Ton), TestContext.Current.CancellationToken);
+        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Banner, BenachrichtigungsModus.Deaktiviert), TestContext.Current.CancellationToken);
 
         db.BenachrichtigungsEinstellungen.Should().ContainSingle(e => e.BenutzerId == "user-a");
-        var loaded = await sut.GetAsync("user-a");
+        var loaded = await sut.GetAsync("user-a", TestContext.Current.CancellationToken);
         loaded.BannerModus.Should().Be(BenachrichtigungsModus.Banner);
         loaded.TonModus.Should().Be(BenachrichtigungsModus.Deaktiviert);
     }
@@ -138,9 +136,9 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         var sut = new BenachrichtigungsEinstellungenService(db);
         var mp3Bytes = new byte[] { 0x49, 0x44, 0x33, 0x04, 0x00, 0x00 };
 
-        await sut.UploadAudioAsync("user-a", "alert.mp3", "audio/mpeg", mp3Bytes);
+        await sut.UploadAudioAsync("user-a", "alert.mp3", "audio/mpeg", mp3Bytes, TestContext.Current.CancellationToken);
 
-        var payload = await sut.GetAudioPayloadAsync("user-a");
+        var payload = await sut.GetAudioPayloadAsync("user-a", TestContext.Current.CancellationToken);
         payload.Should().NotBeNull();
         payload!.MimeType.Should().Be("audio/mpeg");
         payload.Base64Inhalt.Should().Be(Convert.ToBase64String(mp3Bytes));
@@ -155,9 +153,9 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         var wavBytes = new byte[] { 0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45 };
         var veryLongName = $"..\\evil\\{new string('a', 260)}.wav";
 
-        await sut.UploadAudioAsync("user-a", veryLongName, null, wavBytes);
+        await sut.UploadAudioAsync("user-a", veryLongName, null, wavBytes, TestContext.Current.CancellationToken);
 
-        var info = await sut.GetAudioInfoAsync("user-a");
+        var info = await sut.GetAudioInfoAsync("user-a", TestContext.Current.CancellationToken);
         info.HatBenutzerdefinierteDatei.Should().BeTrue();
         info.Dateiname.Should().NotContain("\\");
         info.Dateiname.Should().NotContain("/");
@@ -185,12 +183,12 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         await using var db = CreateDb();
         var sut = new BenachrichtigungsEinstellungenService(db);
         var oggBytes = new byte[] { 0x4F, 0x67, 0x67, 0x53, 0x00 };
-        await sut.UploadAudioAsync("user-a", "alarm.ogg", "audio/ogg", oggBytes);
+        await sut.UploadAudioAsync("user-a", "alarm.ogg", "audio/ogg", oggBytes, TestContext.Current.CancellationToken);
 
-        await sut.RemoveAudioAsync("user-a");
+        await sut.RemoveAudioAsync("user-a", TestContext.Current.CancellationToken);
 
-        var info = await sut.GetAudioInfoAsync("user-a");
-        var payload = await sut.GetAudioPayloadAsync("user-a");
+        var info = await sut.GetAudioInfoAsync("user-a", TestContext.Current.CancellationToken);
+        var payload = await sut.GetAudioPayloadAsync("user-a", TestContext.Current.CancellationToken);
         info.HatBenutzerdefinierteDatei.Should().BeFalse();
         payload.Should().BeNull();
     }
@@ -210,10 +208,10 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
             Inhalt = [],
             HochgeladenAm = DateTimeOffset.UtcNow
         });
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var sut = new BenachrichtigungsEinstellungenService(db);
-        var payload = await sut.GetAudioPayloadAsync("user-a");
+        var payload = await sut.GetAudioPayloadAsync("user-a", TestContext.Current.CancellationToken);
 
         payload.Should().BeNull();
     }

@@ -51,7 +51,7 @@ public sealed class ScmEventDispatchTests_Limits
         await fixture.DispatchAsync(secondId);
         Assert.Equal("Wartend", (await fixture.EventAsync(secondId)).Status);
 
-        await fixture.Cli.StopCliAsync(firstTask);
+        await fixture.Cli.StopCliAsync(firstTask, TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(secondId);
 
         Assert.Equal("Zugestellt", (await fixture.EventAsync(secondId)).Status);
@@ -130,7 +130,7 @@ public sealed class ScmEventDispatchTests_Limits
                 .SetProperty(p => p.CliRunId, Guid.NewGuid().ToString("D"))
                 .SetProperty(p => p.ExchangePath, exchangeDir)
                 .SetProperty(p => p.ExchangeRestrictedWriteSidsJson, "[]")
-                .SetProperty(p => p.Attempts, 1));
+                .SetProperty(p => p.Attempts, 1), cancellationToken: TestContext.Current.CancellationToken);
         }
 
         await fixture.DispatchAsync(secondId);
@@ -180,16 +180,16 @@ public sealed class ScmEventDispatchTests_Limits
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
             await db.ScmIncomingEvents.Where(x => x.Id == delayedFruehId).ExecuteUpdateAsync(x => x
                 .SetProperty(p => p.Status, "Verzögert")
-                .SetProperty(p => p.NextAttemptUtc, (long?)now.AddMinutes(-10).ToUnixTimeMilliseconds()));
+                .SetProperty(p => p.NextAttemptUtc, (long?)now.AddMinutes(-10).ToUnixTimeMilliseconds()), cancellationToken: TestContext.Current.CancellationToken);
             await db.ScmIncomingEvents.Where(x => x.Id == delayedSpaetId).ExecuteUpdateAsync(x => x
                 .SetProperty(p => p.Status, "Verzögert")
-                .SetProperty(p => p.NextAttemptUtc, (long?)now.AddMinutes(-5).ToUnixTimeMilliseconds()));
+                .SetProperty(p => p.NextAttemptUtc, (long?)now.AddMinutes(-5).ToUnixTimeMilliseconds()), cancellationToken: TestContext.Current.CancellationToken);
             await db.Aufgaben.Where(x => x.Id == continuationTask).ExecuteUpdateAsync(x => x
                 .SetProperty(p => p.Status, AufgabeStatus.Gestartet)
-                .SetProperty(p => p.AusfuehrungsStatus, AufgabeAusfuehrungsStatus.Beendet));
+                .SetProperty(p => p.AusfuehrungsStatus, AufgabeAusfuehrungsStatus.Beendet), cancellationToken: TestContext.Current.CancellationToken);
         }
 
-        await fixture.Monitor.RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var startOrder = fixture.StartSpecs.Select(x => Path.GetFileName(x.WorkingDirectory)).ToList();
         var expectedOrder = new[]
@@ -218,10 +218,10 @@ public sealed class ScmEventDispatchTests_Limits
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
             await db.Aufgaben.Where(x => x.Id == continuationTask).ExecuteUpdateAsync(x => x
                 .SetProperty(p => p.Status, AufgabeStatus.Gestartet)
-                .SetProperty(p => p.AusfuehrungsStatus, AufgabeAusfuehrungsStatus.Beendet));
+                .SetProperty(p => p.AusfuehrungsStatus, AufgabeAusfuehrungsStatus.Beendet), cancellationToken: TestContext.Current.CancellationToken);
         }
 
-        await fixture.Monitor.RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Single(fixture.Sessions);
         Assert.True(fixture.Sessions.ContainsKey(continuationTask));
@@ -245,8 +245,7 @@ public sealed class ScmEventDispatchTests_Limits
         using (var scope = fixture.Services.CreateScope())
         {
             var orchestrator = scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>();
-            await orchestrator.OpenFromQueueAsync(secondId,
-                (_, _, _) => Task.FromResult<string?>(ScmDispatchFixture.KiPrefix));
+            await orchestrator.OpenFromQueueAsync(secondId, (_, _, _) => Task.FromResult<string?>(ScmDispatchFixture.KiPrefix), TestContext.Current.CancellationToken);
         }
 
         var second = await fixture.EventAsync(secondId);
@@ -281,8 +280,8 @@ public sealed class ScmEventDispatchTests_Limits
                 return true;
             });
 
-        var first = Task.Run(() => fixture.DispatchAsync(firstId));
-        await healthCheckEntered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        var first = Task.Run(() => fixture.DispatchAsync(firstId), TestContext.Current.CancellationToken);
+        await healthCheckEntered.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
         // Zweiter Dispatch während des offenen Startfensters: kein Prozess-Handle aktiv.
         await fixture.DispatchAsync(secondId);
@@ -293,7 +292,7 @@ public sealed class ScmEventDispatchTests_Limits
         Assert.Empty(fixture.Sessions);
 
         releaseHealthCheck.SetResult();
-        await first.WaitAsync(TimeSpan.FromSeconds(30));
+        await first.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
         Assert.Single(fixture.Sessions);
         Assert.Equal("Zugestellt", (await fixture.EventAsync(firstId)).Status);

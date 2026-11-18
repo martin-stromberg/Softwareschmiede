@@ -50,13 +50,13 @@ public sealed class OpenTodosDialogViewModelTests : IDisposable
     public async Task LoadAsync_ShouldLoadOnlyOpenTodosAndSetTaskData()
     {
         // Arrange
-        var offen = await _todoService.CreateTodoAsync(_aufgabeId, "Offen");
-        var erledigt = await _todoService.CreateTodoAsync(_aufgabeId, "Erledigt");
-        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id);
+        var offen = await _todoService.CreateTodoAsync(_aufgabeId, "Offen", TestContext.Current.CancellationToken);
+        var erledigt = await _todoService.CreateTodoAsync(_aufgabeId, "Erledigt", TestContext.Current.CancellationToken);
+        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
         var sut = new OpenTodosDialogViewModel(_todoService, NullLogger<OpenTodosDialogViewModel>.Instance);
 
         // Act
-        await sut.LoadAsync(_aufgabeId, "Aufgabentitel");
+        await sut.LoadAsync(_aufgabeId, "Aufgabentitel", TestContext.Current.CancellationToken);
 
         // Assert
         sut.AufgabeId.Should().Be(_aufgabeId);
@@ -72,12 +72,12 @@ public sealed class OpenTodosDialogViewModelTests : IDisposable
     public async Task LoadAsync_ShouldSetEmptyState_WhenNoOpenTodosExist()
     {
         // Arrange
-        var erledigt = await _todoService.CreateTodoAsync(_aufgabeId, "Erledigt");
-        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id);
+        var erledigt = await _todoService.CreateTodoAsync(_aufgabeId, "Erledigt", TestContext.Current.CancellationToken);
+        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
         var sut = new OpenTodosDialogViewModel(_todoService, NullLogger<OpenTodosDialogViewModel>.Instance);
 
         // Act
-        await sut.LoadAsync(_aufgabeId, "Leere Aufgabe");
+        await sut.LoadAsync(_aufgabeId, "Leere Aufgabe", TestContext.Current.CancellationToken);
 
         // Assert
         sut.Todos.Should().BeEmpty();

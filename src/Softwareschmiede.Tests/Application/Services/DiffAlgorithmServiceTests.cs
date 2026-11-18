@@ -32,7 +32,7 @@ public sealed class DiffAlgorithmServiceTests
         const string target = "a\nx\nc";
 
         // Act
-        var (blocks, added, removed, modified) = await _sut.GenerateDiffAsync(source, target, Guid.NewGuid());
+        var (blocks, added, removed, modified) = await _sut.GenerateDiffAsync(source, target, Guid.NewGuid(), TestContext.Current.CancellationToken);
 
         // Assert
         added.Should().Be(1);
@@ -60,7 +60,7 @@ public sealed class DiffAlgorithmServiceTests
     public async Task GenerateDiffAsync_ShouldSplitBlocks_WhenChangeTypeSwitchesBetweenRemovedAndAdded()
     {
         // Act
-        var (blocks, _, _, _) = await _sut.GenerateDiffAsync("a", "b", Guid.NewGuid());
+        var (blocks, _, _, _) = await _sut.GenerateDiffAsync("a", "b", Guid.NewGuid(), TestContext.Current.CancellationToken);
 
         // Assert
         blocks.Should().HaveCount(2);

@@ -29,7 +29,7 @@ public sealed class TerminalReplaySessionTests
             new MemoryStream(),
             new ChunkedStream(chunks),
             options: optionen);
-        await GetReadLoopTask(liveSession).WaitAsync(TimeSpan.FromSeconds(5));
+        await GetReadLoopTask(liveSession).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var liveText = BufferAlsText(liveSession.Buffer);
 
         var timeProvider = new FakeTimeProvider();
@@ -43,7 +43,7 @@ public sealed class TerminalReplaySessionTests
         replay.Exited += (_, _) => beendet.TrySetResult();
 
         replay.WiedergabeStarten();
-        await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         BufferAlsText(replay.Buffer).Should().Be(liveText,
             "die Wiedergabe derselben Roh-Chunks muss denselben Bufferzustand wie die Live-Session ergeben");
@@ -74,12 +74,12 @@ public sealed class TerminalReplaySessionTests
 
         // 30 s reale Pause sind durch die 50-ms-Schwelle verkürzt: nach 40 ms noch kein zweiter Chunk.
         timeProvider.Advance(TimeSpan.FromMilliseconds(40));
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
         session.AktuellerChunkIndex.Should().Be(1);
 
         // Großzügiger Advance deckt auch einen erst nach dem ersten Advance angelegten Delay-Timer ab.
         timeProvider.Advance(TimeSpan.FromSeconds(30));
-        await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         session.AktuellerChunkIndex.Should().Be(2);
     }
 
@@ -107,7 +107,7 @@ public sealed class TerminalReplaySessionTests
         // Auch nach Ablauf der realen Pause darf während der Pausierung kein Chunk angewendet werden —
         // unabhängig davon, ob die Schleife bereits im Delay oder noch am Pause-Gate parkt.
         timeProvider.Advance(TimeSpan.FromMinutes(1));
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
         session.AktuellerChunkIndex.Should().Be(1,
             "während der Pausierung darf kein weiterer Chunk angewendet werden");
 
@@ -161,7 +161,7 @@ public sealed class TerminalReplaySessionTests
         session.WiedergabeStarten();
         session.RuntimeStatus.Should().Be(CliRuntimeStatus.Laeuft);
 
-        var args = await exitedArgs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var args = await exitedArgs.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         args.ExitCode.Should().BeNull("die Replay-Session hat keinen echten Prozess-Exit-Code");
         session.ExitCode.Should().BeNull();
         session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inaktiv, "nach der Wiedergabe ist die Session wieder inaktiv");
@@ -183,7 +183,7 @@ public sealed class TerminalReplaySessionTests
         session.Exited += (_, _) => beendet.TrySetResult();
 
         session.WiedergabeStarten();
-        await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         empfangen.Should().HaveCount(2);
         empfangen[0].Should().Equal(roh1);
@@ -222,7 +222,7 @@ public sealed class TerminalReplaySessionTests
             "die Geometrie einer Replay-Session ist auf die Aufzeichnungs-Header-Werte fixiert");
         session.Resize(10, 10).Should().BeTrue();
         session.Resize(0, -3).Should().BeTrue("Resize ist ein Stub und darf nie fehlschlagen");
-        (await session.DrainOutputAsync(TimeSpan.FromSeconds(1))).Should().BeTrue();
+        (await session.DrainOutputAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken)).Should().BeTrue();
         session.RebuildBufferFromReplay(); // darf auf leerem gespieltem Präfix nicht werfen
     }
 
@@ -244,8 +244,8 @@ public sealed class TerminalReplaySessionTests
 
         session.WiedergabeStarten();
         session.WiedergabeStarten();
-        await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await Task.Delay(100);
+        await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         exitedCount.Should().Be(1, "ein bereits gestarteter Durchlauf darf nicht erneut gestartet werden");
     }
@@ -267,7 +267,7 @@ public sealed class TerminalReplaySessionTests
         await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
         session.Dispose();
         timeProvider.Advance(TimeSpan.FromHours(2));
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
 
         exited.Should().BeFalse("nach Dispose darf kein Exited mehr gefeuert werden");
         session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inaktiv);
@@ -308,7 +308,7 @@ public sealed class TerminalReplaySessionTests
         try
         {
             session.WiedergabeStarten();
-            ersterChunkErreicht.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+            ersterChunkErreicht.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).Should().BeTrue(
                 "die Wiedergabe-Schleife muss den ersten Chunk erreicht haben");
             session.Dispose();
         }
@@ -320,7 +320,7 @@ public sealed class TerminalReplaySessionTests
             session.Dispose();
         }
 
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
         session.AktuellerChunkIndex.Should().BeLessThan(chunkCount,
             "nach dem Abbruch dürfen die restlichen Chunks nicht mehr angewendet werden");
     }
@@ -497,7 +497,7 @@ public sealed class TerminalReplaySessionTests
         await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
         // Der Schleife Zeit geben, im Delay des zweiten Chunks zu parken (30 s auf der
         // Fake-Zeit) — danach ist der Parkpunkt deterministisch.
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
 
         session.Pausieren();
         session.SchrittZurueck().Should().BeTrue();
@@ -560,7 +560,7 @@ public sealed class TerminalReplaySessionTests
         // Die vom Ende-Schritt geweckte Schleife sieht Position == Count und terminiert ohne
         // weitere Chunk-Anwendung (Exited ist bereits signalisiert — kein zweites Event);
         // mit dem Schleifen-Task ist auch das Lauf-Flag freigegeben.
-        await GetPlaybackTask(session)!.WaitAsync(TimeSpan.FromSeconds(5));
+        await GetPlaybackTask(session)!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         exitedCount.Should().Be(1);
 
         // Rückwärtsschritt + erneutes Starten: ein neuer Durchlauf setzt an der
@@ -618,11 +618,11 @@ public sealed class TerminalReplaySessionTests
         // Die aufgeweckte Schleife muss am Terminations-Flag enden, statt an Position 1
         // die zeitgesteuerte Wiedergabe fortzusetzen (dieser Test würde sonst im
         // FakeTimeProvider-Delay parken und hier in den Timeout laufen).
-        await GetPlaybackTask(session)!.WaitAsync(TimeSpan.FromSeconds(5));
+        await GetPlaybackTask(session)!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Auch nach großzügigem Zeitsprung darf nichts mehr angewendet oder signalisiert werden.
         timeProvider.Advance(TimeSpan.FromMinutes(5));
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
         session.AktuellerChunkIndex.Should().Be(1,
             "die terminierte Schleife darf keine Chunks mehr anwenden");
         empfangen.Should().HaveCount(2, "nur die beiden Schritt-Chunks wurden angewendet");
@@ -654,7 +654,7 @@ public sealed class TerminalReplaySessionTests
         session.AktuellerChunkIndex.Should().Be(3);
         // Das Lauf-Flag wird erst im finally der Schleife freigegeben — der Task-Abschluss
         // ist der deterministische Wartepunkt für die Re-Armierung.
-        await GetPlaybackTask(session)!.WaitAsync(TimeSpan.FromSeconds(5));
+        await GetPlaybackTask(session)!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         session.SchrittZurueck().Should().BeTrue();
         session.AktuellerChunkIndex.Should().Be(2);
@@ -692,7 +692,7 @@ public sealed class TerminalReplaySessionTests
         // Der Schleife Zeit geben, im 30-s-Fake-Delay des zweiten Chunks zu parken — bis zum
         // nächsten Advance kann sie das Terminations-Flag nicht lesen (Delays sind nicht
         // ge-gatet; das Fenster entspricht dem realen bis zur ZeitrafferSchwelle).
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
         session.Pausieren();
 
         // Pausiert bis ans Ende schreiten: setzt das Terminations-Flag und feuert Exited;

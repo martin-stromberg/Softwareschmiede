@@ -126,11 +126,9 @@ public sealed class ScmEventDispatchTests_AgentActions
         var directory = delivered.ExchangePath!;
         var actionsBefore = fixture.Responses.Count;
 
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [], false, Report: "Konflikt im Arbeitsverzeichnis behoben; PR #7 per gh pr merge --admin gemergt."), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], false, Report: "Konflikt im Arbeitsverzeichnis behoben; PR #7 per gh pr merge --admin gemergt."), Json), TestContext.Current.CancellationToken);
 
         // Der stabile zweite Lesevorgang des Kanals verarbeitet die Meldungen.
         await fixture.DispatchAsync(eventId);
@@ -144,7 +142,7 @@ public sealed class ScmEventDispatchTests_AgentActions
         Assert.Equal(actionsBefore, fixture.Responses.Count);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.DoesNotContain(await db.ScmOutgoingActions.ToListAsync(), x => x.Purpose.StartsWith("ai:", StringComparison.Ordinal));
+        Assert.DoesNotContain(await db.ScmOutgoingActions.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => x.Purpose.StartsWith("ai:", StringComparison.Ordinal));
     }
 
     /// <summary>Ein Abschluss ohne Kanalaktionen, Bericht und Begründung bleibt ein Protokollfehler
@@ -160,10 +158,8 @@ public sealed class ScmEventDispatchTests_AgentActions
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
 
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId, []), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId, []), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -186,11 +182,9 @@ public sealed class ScmEventDispatchTests_AgentActions
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
 
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [], true, "Keine Schreibberechtigung für den erlaubten Schritt; lokal nichts geändert."), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], true, "Keine Schreibberechtigung für den erlaubten Schritt; lokal nichts geändert."), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
