@@ -206,6 +206,20 @@ public sealed class ProjektService
             .ToListAsync(ct);
     }
 
+    /// <summary>Setzt das Issue-Aufbereitungs-Flag eines Repositories (wirkt nur gemeinsam mit
+    /// dem globalen Funktionsschalter <c>scm.issueaufbereitung.enabled</c>).</summary>
+    /// <param name="repositoryId">Die Repository-ID.</param>
+    /// <param name="aktiv">Der neue Flag-Wert.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public async Task SetIssueAufbereitungAktivAsync(Guid repositoryId, bool aktiv, CancellationToken ct = default)
+    {
+        var repository = await _db.GitRepositories.FindAsync([repositoryId], ct)
+            ?? throw new InvalidOperationException("Repository nicht gefunden.");
+        repository.IssueAufbereitungAktiv = aktiv;
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Issue-Aufbereitung für Repository {RepositoryId} auf {Aktiv} gesetzt.", repositoryId, aktiv);
+    }
+
     /// <summary>Gibt alle unzugeordneten Repositories aus allen SCM-Plugins zurück, sortiert nach UpdatedAt absteigend, dann Name aufsteigend.</summary>
     public async Task<IEnumerable<AvailableRepository>> GetUnassignedRepositoriesAsync(CancellationToken ct = default)
     {

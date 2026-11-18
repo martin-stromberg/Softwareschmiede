@@ -62,4 +62,9 @@ public sealed class ScmIncomingEvent
 
     /// <summary>ReadyConfirmedRunId des Ereignisprozesses.</summary>
     public string? ReadyConfirmedRunId { get; set; }
+
+    /// <summary>Zweck-Kennzeichnung des Ereignisses; <see langword="null"/> kennzeichnet ein
+    /// reguläres externes Ereignis. Intern erzeugte Ereignisse (z. B. <c>"IssueAufbereitung"</c>)
+    /// umgehen die Trigger-Validierung und folgen ihrem eigenen Ausführungspfad.</summary>
+    public string? Zweck { get; set; }
 }

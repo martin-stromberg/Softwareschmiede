@@ -10,7 +10,13 @@ using Softwareschmiede.Infrastructure.Data;
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>Atomare Inboxaufnahme, Wiederholungsplanung und instanzübergreifende Aufgabenleases.</summary>
-public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeNotifier notifier, TimeProvider time)
+/// <param name="db">Datenbankkontext.</param>
+/// <param name="notifier">Benachrichtigt Ansichten über dauerhafte Änderungen.</param>
+/// <param name="time">Zeitquelle.</param>
+/// <param name="startPruefungsAusloeser">Optionaler Auslöser der SCM-Startprüfung; wird bei
+/// einer durch die Verzögerungsdirektive gesetzten Aufgabenpause benachrichtigt.</param>
+public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeNotifier notifier, TimeProvider time,
+    ScmStartPruefungsAusloeser? startPruefungsAusloeser = null)
 {
     /// <summary>Diagnose für Referenzen, die mehreren Aufgaben zugeordnet werden könnten.</summary>
     public const string AmbiguousAssignmentDiagnostic = "Mehrdeutige Zuordnung zu Aufgaben";
@@ -59,6 +65,7 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
             .Select(Uri.EscapeDataString)) + "/";
         var sourceSnapshots = await db.ScmContentSnapshots.Where(x => x.ContentKey.StartsWith(contentPrefix)).ToListAsync(ct);
         var unassignedDiagnostic = unassigned ? UnassignedDiagnostic : AmbiguousAssignmentDiagnostic;
+        var pauseGesetzt = false;
         foreach (var observation in batch.Observations.OrderBy(x => x.Revision).ThenBy(x => x.EventKey, StringComparer.Ordinal))
         {
             var snapshot = await db.ScmContentSnapshots.FindAsync([observation.ContentKey], ct);
@@ -96,7 +103,7 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
                 item.Reason = $"Verzögerte Ausführung bis {delay.TargetUtc.ToLocalTime():g} ('{delay.Argument}').";
                 EnqueueDelayComment(item, observation,
                     $"Die Anfrage wurde empfangen und wird verzögert bis {delay.TargetUtc.ToLocalTime():g} verarbeitet.");
-                await PauseForDelayAsync(aufgabeId.Value, delay.TargetUtc, ct);
+                pauseGesetzt |= await PauseForDelayAsync(aufgabeId.Value, delay.TargetUtc, ct);
             }
             else if (delay.Kind is ScmDelayDirective.ResultKind.Invalid)
             {
@@ -116,6 +123,9 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         if (visibleChange || checkpoint.Diagnostic is not null) notifier.Notify();
+        // Pausen-Setzpfad der SCM-Startprüfung: erst nach dem Commit auslösen, damit die
+        // Prüfung den persistierten Pausenzustand sieht.
+        if (pauseGesetzt) startPruefungsAusloeser?.StartpruefungAnfordern();
     }
 
     /// <summary>Legt den Empfangskommentar einer verzögerten oder verworfenen Direktive als
@@ -136,12 +146,13 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
 
     /// <summary>Pausiert die Aufgabe bis zum Direktiven-Zielzeitpunkt (Semantik von
     /// <see cref="AufgabeService.SetPauseAsync"/>: nur startbare Stati, niemals verkürzend).</summary>
-    private async Task PauseForDelayAsync(Guid aufgabeId, DateTimeOffset untilUtc, CancellationToken ct)
+    /// <returns><see langword="true"/>, wenn die Pause tatsächlich (neu) gesetzt wurde.</returns>
+    private async Task<bool> PauseForDelayAsync(Guid aufgabeId, DateTimeOffset untilUtc, CancellationToken ct)
     {
         var task = await db.Aufgaben.FindAsync([aufgabeId], ct);
         if (task is null || task.Status is not (AufgabeStatus.Neu or AufgabeStatus.Gestartet or AufgabeStatus.Wartend)
             || task.PausiertBisUtc >= untilUtc)
-            return;
+            return false;
         task.PausiertBisUtc = untilUtc;
         db.Protokolleintraege.Add(new Protokolleintrag
         {
@@ -151,6 +162,7 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
             Inhalt = $"Aufgabe pausiert bis {untilUtc:O} (verzögerte SCM-Ausführung).",
             Zeitstempel = time.GetUtcNow()
         });
+        return true;
     }
 
     /// <summary>Beansprucht eine Aufgabe atomar für einen Prozess.</summary>

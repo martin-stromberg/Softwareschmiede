@@ -21,6 +21,11 @@ public sealed class GitRepository
     /// <summary>Gibt an, ob das Repository aktiv ist.</summary>
     public bool Aktiv { get; set; } = true;
 
+    /// <summary>Gibt an, ob neu angelegte Issues dieses Repositorys für die Issue-Aufbereitung
+    /// überwacht werden (wirkt nur gemeinsam mit dem globalen Funktionsschalter
+    /// <c>scm.issueaufbereitung.enabled</c>).</summary>
+    public bool IssueAufbereitungAktiv { get; set; }
+
     /// <summary>Konfigurierter Basis-Branch, von dem neue Feature-Branches abgezweigt werden. <c>null</c> bedeutet: Remote-Standard-Branch wird verwendet.</summary>
     public string? DefaultSourceBranchName { get; set; }
 

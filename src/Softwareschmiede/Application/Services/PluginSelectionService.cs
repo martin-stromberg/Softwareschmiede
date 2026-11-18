@@ -126,6 +126,91 @@ public sealed class PluginSelectionService
     }
 
     /// <summary>
+    /// Löst das KI-Plugin-Prefix für die automatische SCM-Ereignisausführung aktivierungsbewusst auf:
+    /// Aufgaben-Plugin → Projekt-Default → Global-Default (<c>plugins.default.*</c>) → in den
+    /// Einstellungen konfigurierte Standard-CLI (<see cref="AppEinstellungService.DefaultKiPluginKey"/>).
+    /// Eine Stufe gilt nur, wenn das zugeordnete Plugin installiert, ladbar und aktiviert ist;
+    /// konfigurierte, nicht ausführbare Zuordnungen werden ignoriert und im Ergebnis benannt.
+    /// Anders als <see cref="ResolveDevelopmentAutomationPluginWithProjectScopeAsync"/> führt diese
+    /// Variante nie zu einer deaktivierten oder nicht vorhandenen Zuordnung.
+    /// </summary>
+    public async Task<KiPluginResolution> ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(
+        string? aufgabenPluginPrefix,
+        Guid projektId,
+        CancellationToken ct = default)
+    {
+        var enabledPlugins = await _pluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync(ct);
+        var ignored = new List<string>();
+
+        string? ResolveEnabledPrefix(string? configuredPrefix)
+        {
+            if (string.IsNullOrWhiteSpace(configuredPrefix))
+            {
+                return null;
+            }
+
+            var trimmed = configuredPrefix.Trim();
+            var match = enabledPlugins.FirstOrDefault(plugin =>
+                string.Equals(plugin.PluginPrefix, trimmed, StringComparison.OrdinalIgnoreCase));
+            if (match is not null)
+            {
+                return match.PluginPrefix;
+            }
+
+            if (!ignored.Any(x => string.Equals(x, trimmed, StringComparison.OrdinalIgnoreCase)))
+            {
+                ignored.Add(trimmed);
+                _logger.LogWarning(
+                    "Gespeicherte KI-Plugin-Zuordnung '{PluginPrefix}' ist nicht mehr installiert oder aktiviert und wird ignoriert.",
+                    trimmed);
+            }
+
+            return null;
+        }
+
+        if (ResolveEnabledPrefix(aufgabenPluginPrefix) is { } taskPlugin)
+        {
+            return new(taskPlugin, ignored);
+        }
+
+        var projectDefault = await _defaultSettingsService.GetProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, ct);
+        if (ResolveEnabledPrefix(projectDefault) is { } projectPlugin)
+        {
+            return new(projectPlugin, ignored);
+        }
+
+        var globalDefault = await _defaultSettingsService.GetDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ct);
+        if (ResolveEnabledPrefix(globalDefault) is { } globalPlugin)
+        {
+            return new(globalPlugin, ignored);
+        }
+
+        if (_appEinstellungService is not null)
+        {
+            var configured = await _appEinstellungService.GetSettingAsync(AppEinstellungService.DefaultKiPluginKey, ct);
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                var trimmed = configured.Trim();
+                var match = FindKiPlugin(enabledPlugins, trimmed);
+                if (match is not null)
+                {
+                    return new(match.PluginPrefix, ignored);
+                }
+
+                if (!ignored.Any(x => string.Equals(x, trimmed, StringComparison.OrdinalIgnoreCase)))
+                {
+                    ignored.Add(trimmed);
+                    _logger.LogWarning(
+                        "Konfigurierte Standard-CLI '{DefaultKiPlugin}' ist nicht installiert oder nicht aktiviert.",
+                        trimmed);
+                }
+            }
+        }
+
+        return new(null, ignored);
+    }
+
+    /// <summary>
     /// Löst die in den Einstellungen konfigurierte Standard-CLI (<see cref="AppEinstellungService.DefaultKiPluginKey"/>)
     /// auf einen Plugin-Prefix auf. Die Einstellungen speichern den <see cref="IPlugin.PluginName"/>;
     /// zur Robustheit wird zusätzlich der <see cref="IPlugin.PluginPrefix"/> akzeptiert. Passt der gespeicherte
@@ -145,9 +230,7 @@ public sealed class PluginSelectionService
         }
 
         var trimmed = configured.Trim();
-        var match = _pluginManager.GetDevelopmentAutomationPlugins().FirstOrDefault(plugin =>
-            string.Equals(plugin.PluginName, trimmed, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(plugin.PluginPrefix, trimmed, StringComparison.OrdinalIgnoreCase));
+        var match = FindKiPlugin(_pluginManager.GetDevelopmentAutomationPlugins(), trimmed);
         if (match is null)
         {
             _logger.LogWarning("Konfigurierte Standard-CLI '{DefaultKiPlugin}' ist nicht installiert.", trimmed);
@@ -155,6 +238,13 @@ public sealed class PluginSelectionService
 
         return match?.PluginPrefix;
     }
+
+    /// <summary>Findet das KI-Plugin, dessen <see cref="IPlugin.PluginName"/> oder
+    /// <see cref="IPlugin.PluginPrefix"/> dem konfigurierten Wert entspricht.</summary>
+    private static IKiPlugin? FindKiPlugin(IReadOnlyList<IKiPlugin> plugins, string nameOrPrefix)
+        => plugins.FirstOrDefault(plugin =>
+            string.Equals(plugin.PluginName, nameOrPrefix, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(plugin.PluginPrefix, nameOrPrefix, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Löst das IDE-Plugin für das angegebene Repository auf: aktivierte Plugins werden in der
@@ -328,3 +418,8 @@ public sealed class PluginSelectionService
         return $"1-{plugin.PluginName}";
     }
 }
+
+/// <summary>Ergebnis der aktivierungsbewussten KI-Plugin-Auflösung: der aufgelöste Prefix
+/// (oder <c>null</c>, wenn keine ausführbare Zuordnung existiert) sowie die konfigurierten,
+/// nicht ausführbaren Zuordnungen, die dabei ignoriert wurden.</summary>
+public sealed record KiPluginResolution(string? PluginPrefix, IReadOnlyList<string> IgnoredPluginPrefixes);

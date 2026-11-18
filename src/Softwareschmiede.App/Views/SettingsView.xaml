@@ -34,6 +34,7 @@
             <local:PluginSettingFieldTemplateSelector.IntegerTemplate>
                 <DataTemplate>
                     <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="{Binding Field.Key}"
                              Width="120"
                              HorizontalAlignment="Left" />
                 </DataTemplate>
@@ -429,6 +430,20 @@
                                            TextWrapping="Wrap"
                                            Margin="0,4,0,0" />
                             </StackPanel>
+                            <StackPanel AutomationProperties.Name="MaxParalleleAusfuehrungenBereich">
+                                <TextBlock Text="Maximale parallele Ausführungen"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,12,0,4" />
+                                <TextBox Text="{Binding MaxParalleleAusfuehrungen, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="MaxParalleleAusfuehrungen"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                                <TextBlock Text="Globales Limit gleichzeitig laufender KI-CLI-Ausführungen aus SCM-Ereignissen. Ganzzahl ≥ 1; leer = unbegrenzt. Bei Erreichen des Limits warten weitere Ereignisse mit Wartegrund, bis ein Platz frei wird; die Reihenfolge folgt der Priorisierung (Fortsetzungen vor fälligen Verzögerungen vor Eingangsreihenfolge). Pro KI-Plugin lässt sich zusätzlich ein eigenes Limit unter „Plugins“ festlegen."
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,4,0,0" />
+                            </StackPanel>
                             <StackPanel AutomationProperties.Name="PromptAnhaengeBereich"
                                         Visibility="{Binding IsPromptAnhaengeSichtbar, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <TextBlock Text="Prompt-Anhänge"
@@ -495,6 +510,85 @@
                                          Padding="8,6"
                                          BorderBrush="{DynamicResource BorderBrush}" />
                             </StackPanel>
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- Issue-Aufbereitung -->
+                    <Expander AutomationProperties.Name="IssueAufbereitungExpander"
+                              IsExpanded="False"
+                              Foreground="{DynamicResource PrimaryTextBrush}"
+                              Margin="0,0,0,16">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Issue-Aufbereitung"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock Text="{Binding IssueAufbereitungStatusText}"
+                                           AutomationProperties.Name="IssueAufbereitungStatus"
+                                           AutomationProperties.HelpText="{Binding IssueAufbereitungStatusText}"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Expander.Header>
+                        <StackPanel Margin="0,8,0,0">
+                            <CheckBox IsChecked="{Binding IsIssueAufbereitungEnabled, Mode=TwoWay}"
+                                      AutomationProperties.Name="IssueAufbereitungEnabledCheckBox"
+                                      Content="Neu angelegte Issues automatisch analysieren und verbessern"
+                                      Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Wenn aktiviert, werden neu angelegte Issues der ausgewählten Repositories automatisch von einer KI-CLI analysiert: Die Beschreibung wird auf Verständlichkeit, Vollständigkeit, offene Fragen, Risiken und Zielkonflikte geprüft und remote durch eine optimierte Fassung ersetzt (der Titel bleibt unverändert). Die Ausführung zählt in die Ausführungsbegrenzung aus „Aufgaben ausführen“. Die Änderung wirkt ohne Neustart."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="22,4,0,0" />
+                            <TextBlock Text="KI-Plugin für die Aufbereitung"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       Margin="0,12,0,4" />
+                            <ComboBox SelectedItem="{Binding SelectedIssueAufbereitungKiPlugin, UpdateSourceTrigger=PropertyChanged}"
+                                      AutomationProperties.Name="IssueAufbereitungPluginComboBox"
+                                      ItemsSource="{Binding IssueAufbereitungKiPluginOptionen}"
+                                      IsEnabled="{Binding IsIssueAufbereitungFelderEnabled}"
+                                      HorizontalAlignment="Stretch"
+                                      Padding="8,6">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Text="Welche CLI die Analyse ausführt. „Globale Standard-CLI verwenden“ nutzt dieselbe Auflösungskette wie SCM-Ereignisse (Projekt-Standard → globaler Standard). Ist das gewählte Plugin nicht installiert oder deaktiviert, wartet der Auftrag mit ehrlichem Grund."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0" />
+                            <TextBlock Text="Überwachte Repositories"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       Margin="0,12,0,4" />
+                            <ItemsControl ItemsSource="{Binding IssueAufbereitungRepositories}"
+                                          AutomationProperties.Name="IssueAufbereitungRepositoriesList"
+                                          IsEnabled="{Binding IsIssueAufbereitungFelderEnabled}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                  AutomationProperties.Name="{Binding RepositoryName}"
+                                                  Content="{Binding RepositoryName}"
+                                                  Foreground="{DynamicResource PrimaryTextBrush}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="Nur in den hier markierten Repositories lösen neu angelegte Issues eine Aufbereitung aus. Die Auswahl wirkt erst gemeinsam mit dem Funktionsschalter oben — und vorausgesetzt, das Repository wird von der Ereignisüberwachung erfasst (registriertes Projekt-Repository)."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0" />
+                            <CheckBox IsChecked="{Binding IsIssueAufbereitungKommentarEnabled, Mode=TwoWay}"
+                                      AutomationProperties.Name="IssueAufbereitungCommentCheckBox"
+                                      Content="Analyseergebnisse als Issue-Kommentar dokumentieren"
+                                      IsEnabled="{Binding IsIssueAufbereitungFelderEnabled}"
+                                      Foreground="{DynamicResource PrimaryTextBrush}"
+                                      Margin="0,12,0,0" />
+                            <TextBlock Text="Zusätzlich zur ersetzten Beschreibung wird ein Kommentar mit Schwachstellen, offenen Fragen, Lösungsansätzen, Risiken, Zielkonflikten und Verbesserungsvorschlägen angelegt. Fehler werden dagegen nie als Kommentar am Issue gemeldet."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="22,4,0,0" />
                         </StackPanel>
                     </Expander>
 

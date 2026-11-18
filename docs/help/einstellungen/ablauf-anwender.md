@@ -62,7 +62,8 @@ Die Registerkarte **Automatisierung** (direkt nach **Allgemein**) bündelt die z
    - **Benutzerkonto** — (Standard) die Projekt-Repositories werden repository-weit überwacht; Auslöser ist das **Trigger-Keyword** (Standard `$Softwareschmiede`), das nur in diesem Modus sichtbar ist
    - **Separates Konto** — es werden ausschließlich die GitHub-Benachrichtigungen eines separaten Kontos überwacht; Auslöser ist eine frei stehende `@`-Erwähnung dieses Kontos. Dafür muss unter **Plugins → GitHub → Authentifizierung** ein **Personal Access Token des separaten Kontos** hinterlegt sein, sonst bricht das Speichern mit einer Fehlermeldung ab
 4. Pflegen Sie bei Bedarf die mehrzeiligen **Prompt-Anhänge** (Allgemein, Issue, Issue-Kommentar, Pull Request, Pull-Request-Kommentar) — Texte, die bei der Zustellung an den Prompt angehängt werden; sie sind nur bei aktivierter Funktion sichtbar
-5. Klicken Sie **Speichern**
+5. Tragen Sie bei Bedarf unter **Maximale parallele Ausführungen** eine Ganzzahl ≥ 1 ein — so viele KI-CLI-Ausführungen aus SCM-Ereignissen dürfen höchstens gleichzeitig laufen; ein leeres Feld bedeutet unbegrenzt. Ist das Limit erreicht, warten weitere Ereignisse mit Wartegrund, bis ein Platz frei wird (Reihenfolge: Fortsetzungen vor fälligen Verzögerungen vor Eingangsreihenfolge); laufende Ausführungen werden nie unterbrochen
+6. Klicken Sie **Speichern**
 
 > **Hinweis:** Der Überwachungsmodus ist nur bei aktivierter Funktion bedienbar. Details zum Verhalten finden Sie in der [GitHub-Ereignisüberwachung](../plugins/github-ereignisse/index.md).
 
@@ -136,6 +137,14 @@ Die Registerkarte **Automatisierung** (direkt nach **Allgemein**) bündelt die z
 7. Klicken Sie **Speichern**
 
 > **Hinweis:** Speichern Sie den API-Schlüssel an einem sicheren Ort. Die Anwendung speichert ihn verschlüsselt im Windows Credential Store, Sie können ihn aber nicht später abrufen.
+
+### Parallele Ausführungen eines KI-Plugins begrenzen
+
+1. Wählen Sie in der Liste **KI** das gewünschte KI-Plugin
+2. Tragen Sie in der Gruppe **Ausführungsbegrenzung** im Feld **Maximale parallele Ausführungen** eine Ganzzahl ≥ 1 ein — leer bedeutet unbegrenzt (Platzhalter „unbegrenzt")
+3. Klicken Sie **Speichern**
+
+> **Hinweis:** Das Plugin-Limit gilt zusätzlich zum globalen Limit unter **Automatisierung → Aufgaben ausführen**; bei erreichtem Limit wartet das Ereignis mit Wartegrund, laufende Ausführungen werden nicht unterbrochen.
 
 ### Codex-CLI-Parameter konfigurieren
 

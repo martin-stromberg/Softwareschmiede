@@ -42,6 +42,15 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für den Laufzeit-Schalter "SCM-Ereignisüberwachung aktiviert".</summary>
     public const string ScmMonitoringEnabledKey = "scm.monitoring.enabled";
 
+    /// <summary>Schlüssel für den globalen Schalter der Issue-Aufbereitung (Erkennung neu angelegter Issues und interner Aufbereitungsauftrag).</summary>
+    public const string ScmIssueAufbereitungEnabledKey = "scm.issueaufbereitung.enabled";
+
+    /// <summary>Schlüssel für den Plugin-Prefix, mit dem die Issue-Aufbereitung ausgeführt werden soll; leer bedeutet Fallback auf das globale Standard-Plugin.</summary>
+    public const string ScmIssueAufbereitungPluginKey = "scm.issueaufbereitung.plugin";
+
+    /// <summary>Schlüssel für den Schalter, ob die Issue-Aufbereitung ihre Analyse als Issue-Kommentar dokumentieren soll.</summary>
+    public const string ScmIssueAufbereitungKommentarEnabledKey = "scm.issueaufbereitung.comment.enabled";
+
     /// <summary>Schlüssel für das konfigurierbare SCM-Trigger-Keyword.</summary>
     public const string ScmTriggerKeywordKey = "scm.trigger.keyword";
 
@@ -198,6 +207,38 @@ public sealed class AppEinstellungService
     /// <returns><see langword="true"/>, wenn die SCM-Ereignisüberwachung aktiv ist.</returns>
     public async Task<bool> GetScmMonitoringEnabledAsync(CancellationToken ct = default)
         => await GetBoolSettingAsync(ScmMonitoringEnabledKey, ct) ?? true;
+
+    /// <summary>
+    /// Ermittelt, ob die Issue-Aufbereitung (Erkennung neu angelegter Issues und interner
+    /// Aufbereitungsauftrag) global freigeschaltet ist. Standard: <see langword="false"/> (opt-in).
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn die Issue-Aufbereitung global aktiviert ist.</returns>
+    public async Task<bool> GetScmIssueAufbereitungEnabledAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(ScmIssueAufbereitungEnabledKey, ct) ?? false;
+
+    /// <summary>
+    /// Liest den konfigurierten Plugin-Prefix der Issue-Aufbereitung
+    /// (<see cref="ScmIssueAufbereitungPluginKey"/>). Fehlende oder leere Werte liefern
+    /// <see langword="null"/> (Fallback auf das globale Standard-Plugin); gespeicherte Werte werden
+    /// getrimmt zurückgegeben.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Der Plugin-Prefix oder <see langword="null"/> für den Standard-Fallback.</returns>
+    public async Task<string?> GetScmIssueAufbereitungPluginPrefixAsync(CancellationToken ct = default)
+    {
+        var wert = await GetSettingAsync(ScmIssueAufbereitungPluginKey, ct);
+        return string.IsNullOrWhiteSpace(wert) ? null : wert.Trim();
+    }
+
+    /// <summary>
+    /// Ermittelt, ob die Issue-Aufbereitung ihre Analyse als Issue-Kommentar dokumentieren soll
+    /// (<see cref="ScmIssueAufbereitungKommentarEnabledKey"/>). Standard: <see langword="true"/>.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn die Analyse kommentiert werden soll.</returns>
+    public async Task<bool> GetScmIssueAufbereitungKommentarEnabledAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(ScmIssueAufbereitungKommentarEnabledKey, ct) ?? true;
 
     /// <summary>Bildet den Einstellungsschlüssel der projektbezogenen Backmerge-Freigabe.</summary>
     /// <param name="projektId">Die Projekt-ID.</param>
