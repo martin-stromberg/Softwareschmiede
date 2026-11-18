@@ -12,9 +12,9 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Erkennt am repository-weiten Enumerationskanal neu angelegte Issues und reiht dafür
 /// einen dedizierten, trigger-freien Aufbereitungsauftrag ein: eine als Zweck markierte Aufgabe mit
 /// <see cref="IssueReferenz"/> im eigenen <c>IssueAufbereitung</c>-Namensraum plus ein internes
-/// <see cref="ScmIncomingEvent"/>, das ohne Trigger-Validierung angelegt, geparkt wird
-/// (<see cref="ScmIncomingEvent.NextAttemptUtc"/> = <see cref="long.MaxValue"/>) und erst durch den
-/// Aufbereitungs-Ausführungspfad (Entwicklungsschritt 6) verarbeitet wird.</summary>
+/// <see cref="ScmIncomingEvent"/>, das ohne Trigger-Validierung angelegt wird und sofort fällig
+/// über den dedizierten Aufbereitungs-Ausführungspfad des Orchestrierers verarbeitet wird
+/// (Entwicklungsschritt 6).</summary>
 /// <param name="db">Datenbankkontext.</param>
 /// <param name="aufgaben">Anlage der Aufbereitungs-Aufgabe samt SourceKey-Dedup.</param>
 /// <param name="einstellungen">Persistierte Funktionskonfiguration (Plugin-Schlüssel, Kommentar-Schalter).</param>
@@ -105,9 +105,10 @@ public sealed class ScmIssueAufbereitungsService(
                 continue;
             }
             var pluginPrefix = await einstellungen.GetScmIssueAufbereitungPluginPrefixAsync(ct);
-            var kommentar = await einstellungen.GetScmIssueAufbereitungKommentarEnabledAsync(ct);
             var task = await aufgaben.CreateFromIssueEventAsync(repository.ProjektId, issue,
                 repository.Id, AufbereitungsSourceKey(reference), ct, Zweck, pluginPrefix);
+            // Sofort fällig (NextAttemptUtc bleibt leer): Plugin-Auflösung, Kommentar-Schalter und
+            // Ausführungsbegrenzung wirken erst zum Ausführungszeitpunkt im Orchestrator.
             var item = new ScmIncomingEvent
             {
                 AufgabeId = task.Id,
@@ -115,9 +116,7 @@ public sealed class ScmIssueAufbereitungsService(
                 ObservationJson = JsonSerializer.Serialize(observation, ScmEventStore.JsonOptions),
                 ReceivedUtc = time.GetUtcNow().ToUnixTimeMilliseconds(),
                 Zweck = Zweck,
-                NextAttemptUtc = long.MaxValue,
-                Reason = $"Interner Aufbereitungsauftrag für Issue #{issue.Nummer}." +
-                    (kommentar ? " Die Analyse soll als Issue-Kommentar dokumentiert werden." : string.Empty)
+                Reason = $"Interner Aufbereitungsauftrag für Issue #{issue.Nummer}."
             };
             db.ScmIncomingEvents.Add(item);
             db.Protokolleintraege.Add(new Protokolleintrag

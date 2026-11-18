@@ -68,6 +68,7 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
             _pluginActivationService,
             _pluginSettingsService,
             _promptVorlagenService,
+            new ProjektService(_db, NullLogger<ProjektService>.Instance),
             NullLogger<SettingsViewModel>.Instance,
             new Mock<IDialogService>().Object,
             new Mock<IServiceProvider>().Object);

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
@@ -17,7 +18,8 @@ public sealed class ScmEventOrchestrator(
     AufgabeService tasks, KiAusfuehrungsService cli, ScmEventExchangeProtocol exchange,
     ScmEventChangeNotifier notifier, IServiceScopeFactory scopes, TimeProvider time, IOptions<ScmEventOptions> options,
     AppEinstellungService einstellungen, PullRequestReferenzService pullRequestReferenzen,
-    ProtokollService protokoll, ScmEventExecutionLimitService executionLimits)
+    ProtokollService protokoll, ScmEventExecutionLimitService executionLimits,
+    ILogger<ScmEventOrchestrator> logger)
 {
     /// <summary>
     /// Startprüfung: Dispatcht alle fälligen, nicht abgeschlossenen Ereignisse in der priorisierten
@@ -128,12 +130,11 @@ public sealed class ScmEventOrchestrator(
             var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, ct);
             // Ein Abbruch ist endgültig: keine Hostaktionen, kein Abgleich und keine Zustellung mehr.
             if (item.Status == "Abgebrochen") return;
-            // Interner Aufbereitungsauftrag: bleibt bis zum eigenen Ausführungspfad geparkt;
-            // der generische Zustellpfad würde den rohen Issue-Body als Prompt zustellen.
+            // Interner Aufbereitungsauftrag: dedizierter Ausführungspfad; der generische
+            // Zustellpfad würde den rohen Issue-Body als Prompt zustellen.
             if (item.Zweck == ScmIssueAufbereitungsService.Zweck)
             {
-                item.NextAttemptUtc = long.MaxValue;
-                await WaitAsync(item, "Die Ausführung der Issue-Aufbereitung ist noch nicht verfügbar.", ct);
+                await DispatchAufbereitungAsync(item, explicitPluginPrefix, ct);
                 return;
             }
             var observation = ScmEventStore.Observation(item);
@@ -499,7 +500,7 @@ public sealed class ScmEventOrchestrator(
             foreach (var action in messages.Actions)
             {
                 if (await IsCancelledAsync(item.Id, ct)) return;
-                var responseKind = action.Kind switch { "comment" => ScmResponseKind.Comment, "reaction" => ScmResponseKind.Reaction, _ => ScmResponseKind.PullRequest };
+                var responseKind = action.Kind switch { "comment" => ScmResponseKind.Comment, "reaction" => ScmResponseKind.Reaction, "issueBodyUpdate" => ScmResponseKind.IssueBodyUpdate, _ => ScmResponseKind.PullRequest };
                 var response = new ScmResponseRequest(observation.Reference, action.ActionId.ToString("D"), responseKind,
                     action.Body, action.Reaction, observation.ContentKind, observation.RemoteCommentId, observation.RemoteNodeId, action.Title, action.Head, action.Base);
                 var existing = await db.ScmOutgoingActions.FindAsync([action.ActionId], ct);
@@ -569,6 +570,377 @@ public sealed class ScmEventOrchestrator(
             // die Aufgabe nach seinem Merge/Schluss beenden.
             if (messages.Complete is { PullRequestNumber: > 0 } withPullRequest)
                 await LinkReportedPullRequestAsync(item, observation, withPullRequest.PullRequestNumber.Value, ct);
+        }
+        var now = time.GetUtcNow().ToUnixTimeMilliseconds();
+        if (item.Status == "ZustellungVorbereitet")
+        {
+            item.Status = "ZustellungUngewiss";
+            item.Reason = "Unterbrochener Zustellversuch; keine automatische Wiederholung.";
+        }
+        if (item.Status is "Zugestellt" or "InBearbeitung")
+        {
+            var timeout = item.AcceptedUtc is null ? options.Value.AcceptanceTimeout : options.Value.CompletionTimeout;
+            var began = item.AcceptedUtc ?? item.DeliveredUtc ?? now;
+            var session = cli.GetScmPromptSession(item.AufgabeId);
+            if (now - began > timeout.TotalMilliseconds || session is null || !session.IsAlive || session.CliRunId != runId)
+            {
+                item.Status = "VerarbeitungUngeklärt";
+                item.Reason = item.AcceptedUtc is null ? "Annahme fehlt oder CLI-Sitzung beendet. Kein automatischer Neuversand." : "Korrelierter Abschluss fehlt oder CLI-Sitzung beendet.";
+            }
+        }
+        if (await IsCancelledAsync(item.Id, ct)) return;
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Dedizierter Ausführungspfad für interne Aufbereitungsaufträge
+    /// (<see cref="ScmIssueAufbereitungsService.Zweck"/>): Spiegelt den generischen Zustellpfad,
+    /// liefert aber den festen Analyse-Prompt statt des Ereignistexts, erzeugt nie einen
+    /// Kommentar am Issue und wertet das Analyse-Ergebnis über den eigenen Abgleich aus.
+    /// Die Ausführung zählt über die gemeinsame Reservierung in die #410-Begrenzung.</summary>
+    private async Task DispatchAufbereitungAsync(ScmIncomingEvent item, string? explicitPluginPrefix, CancellationToken ct)
+    {
+        var observation = ScmEventStore.Observation(item);
+        var plugin = plugins.GetSourceCodeManagementPlugins().FirstOrDefault(x => x.PluginPrefix == observation.Reference.Repository.ProviderPrefix);
+        if (plugin is not IScmEventSource source || plugin is not IScmEventResponder responder)
+        {
+            await WaitAsync(item, "SCM-Anbieter ist nicht verfügbar.", ct);
+            return;
+        }
+        // Hostaktionen (außer versuchsgebundene "ai:"-Aktionen) werden unabhängig vom
+        // Zustellstatus nachgeholt, ohne einen zweiten Prompt.
+        foreach (var action in await db.ScmOutgoingActions.Where(x => x.EventId == item.Id
+            && !x.Purpose.StartsWith("ai:") && x.Status != "Succeeded").ToListAsync(ct))
+            await outbox.ExecuteAsync(action, responder, ct);
+        if (item.Status == "Verarbeitet") return;
+        if (item.DeliveryAttemptId is not null)
+        {
+            try { await ReconcileAufbereitungAttemptAsync(item, observation, responder, ct); }
+            catch (ScmActionIdCollisionException ex)
+            {
+                item.Status = "VerarbeitungUngeklärt";
+                item.Reason = ex.Message;
+                await db.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            {
+                item.Status = "VerarbeitungUngeklärt";
+                item.Reason = "Antwortkanal ist nicht mehr verfügbar oder enthält keine gültige Meldung. Status erneut prüfen; kein automatischer Neuversand.";
+                await db.SaveChangesAsync(ct);
+            }
+            return;
+        }
+        if (item.NextAttemptUtc > time.GetUtcNow().ToUnixTimeMilliseconds()) return;
+        var task = await db.Aufgaben.Include(x => x.GitRepository).Include(x => x.IssueReferenz)
+            .SingleOrDefaultAsync(x => x.Id == item.AufgabeId, ct);
+        if (task is null) { await WaitAsync(item, "Zugehörige Aufgabe wurde entfernt.", ct); return; }
+        var blocked = BlockReason(task);
+        if (blocked is not null) { await WaitAsync(item, blocked, ct); return; }
+        try
+        {
+            // Wirksamkeitsprüfung der Schalter zum Ausführungszeitpunkt: Eine deaktivierte
+            // Funktion oder ein abgewähltes Repository lässt den Auftrag ehrlich warten,
+            // ohne dass er verloren geht oder remote irgendetwas sichtbar wird.
+            if (!await einstellungen.GetScmIssueAufbereitungEnabledAsync(ct))
+            { await WaitAsync(item, "Die Issue-Aufbereitung ist in den Einstellungen deaktiviert.", ct); return; }
+            if (task.GitRepository?.IssueAufbereitungAktiv != true)
+            { await WaitAsync(item, "Die Issue-Aufbereitung ist für dieses Repository deaktiviert.", ct); return; }
+            var currentRepository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(task.GitRepositoryId!.Value,
+                plugin.PluginPrefix, $"https://{observation.Reference.Repository.Host}/{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}",
+                observation.Reference.Repository.Konto), ct);
+            if (currentRepository.RepositoryId != observation.Reference.Repository.RepositoryId || !currentRepository.CanWrite)
+            { await WaitAsync(item, "Schreibberechtigung für den Ereignisursprung fehlt. Prüfen Sie unter Einstellungen → Plugins → GitHub → Authentifizierung den Personal Access Token und klicken Sie anschließend beim Ereignis auf Erneut prüfen.", ct); return; }
+            var issue = await source.ReadIssueAsync(observation.Reference, ct);
+            if (issue is null)
+            { await WaitAsync(item, "Das Issue konnte nicht gelesen werden. Erneut prüfen.", ct); return; }
+            if (issue.IstGeschlossen)
+            {
+                // Analyse eines bereits geschlossenen Issues wäre unredlich als Erfolg gemeldet;
+                // ohne Änderung am Issue wird der Auftrag mit Begründung abgeschlossen.
+                item.Status = "Verarbeitet";
+                item.Reason = null;
+                await db.SaveChangesAsync(ct);
+                await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.SystemMeldung,
+                    $"Issue #{issue.Nummer} ist bereits geschlossen; die Aufbereitung wurde ohne Änderung abgeschlossen.", ct: ct);
+                return;
+            }
+            if (task.Status == AufgabeStatus.Neu) await tasks.SetStatusAsync(task.Id, AufgabeStatus.Gestartet, ct);
+            var adapter = cli.GetScmPromptSession(task.Id);
+            if (adapter?.IsAlive == true && explicitPluginPrefix is not null &&
+                !string.Equals(adapter.PluginPrefix, explicitPluginPrefix, StringComparison.OrdinalIgnoreCase))
+            { await WaitAsync(item, "Inzwischen läuft eine andere CLI. Bitte die laufende Sitzung bestätigen oder die CLI über die Aufgabe regulär wechseln.", ct); return; }
+            if (adapter is null && cli.GetTerminalSession(task.Id) is not null)
+            { await WaitAsync(item, "Antwortkanal für diese CLI nicht verfügbar: Sitzung ohne geprüften Startvertrag.", ct); return; }
+            if (adapter is null || !adapter.IsAlive)
+            {
+                var prefix = explicitPluginPrefix;
+                if (prefix is null)
+                {
+                    // Aufbereitungs-Plugin (Einstellung bzw. in der Aufgabe hinterlegtes Prefix),
+                    // danach die #411-Kette: Projekt-Default → Global-Default → ki.plugin.default.
+                    var resolution = await selection.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(
+                        await einstellungen.GetScmIssueAufbereitungPluginPrefixAsync(ct) ?? task.KiPluginPrefix, task.ProjektId, ct);
+                    prefix = resolution.PluginPrefix;
+                    if (prefix is null && resolution.IgnoredPluginPrefixes.Count > 0)
+                    {
+                        var reason = "Die konfigurierte KI-Plugin-Zuordnung der Issue-Aufbereitung ("
+                            + string.Join(", ", resolution.IgnoredPluginPrefixes.Select(x => $"'{x}'"))
+                            + ") ist nicht mehr installiert oder aktiviert, und es ist kein ausführbares Standard-Plugin konfiguriert. Plugin in den Einstellungen aktivieren oder Ereignis öffnen und CLI auswählen.";
+                        if (!string.Equals(item.Reason, reason, StringComparison.Ordinal))
+                            await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.SystemMeldung, reason, ct: ct);
+                        await WaitAsync(item, reason, ct);
+                        return;
+                    }
+                }
+                if (string.IsNullOrWhiteSpace(prefix))
+                { await WaitAsync(item, "Keine ausführbare CLI für die Issue-Aufbereitung konfiguriert. Ereignis öffnen und CLI auswählen.", ct); return; }
+                // Zulassungskontrolle unmittelbar vor dem CLI-Start: Erreichtes globales oder
+                // Plugin-Limit lässt den Auftrag ohne neue Ausführung ehrlich warten.
+                var zulassung = await executionLimits.PruefeUndReserviereStartPlatzAsync(prefix, ct);
+                if (zulassung.Wartegrund is not null)
+                {
+                    if (!string.Equals(item.Reason, zulassung.Wartegrund, StringComparison.Ordinal))
+                        await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.SystemMeldung, zulassung.Wartegrund, ct: ct);
+                    await WaitAsync(item, zulassung.Wartegrund, ct);
+                    return;
+                }
+                using (zulassung.Reservierung)
+                {
+                    var kiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);
+                    if (!await kiPlugin.CheckHealthAsync(ct)) throw new InvalidOperationException("Die ausgewählte CLI ist nicht startbereit.");
+                    var parameters = prefix.Contains("KiSimulator", StringComparison.OrdinalIgnoreCase) ? "--scm-exchange" : null;
+                    if (string.IsNullOrWhiteSpace(task.LokalerKlonPfad))
+                        await development.ProzessStartenUndCliStartenAsync(task.Id, task.GitRepository!.RepositoryUrl,
+                            task.BasisBranchName, prefix, ct, strictPluginSelection: true, optionalParameters: parameters);
+                    else
+                        await development.CliNeustartenAsync(task.Id, prefix, parameters, ct, strictPluginSelection: true);
+                }
+                adapter = cli.GetScmPromptSession(task.Id);
+            }
+            if (adapter is null || !adapter.IsAlive)
+            { await WaitAsync(item, "CLI-Sitzung ist nicht verfügbar.", ct); return; }
+            await db.Entry(task).ReloadAsync(ct);
+            blocked = BlockReason(task);
+            if (blocked is not null) { await WaitAsync(item, blocked, ct); return; }
+            if (task.Status == AufgabeStatus.Neu) await tasks.SetStatusAsync(task.Id, AufgabeStatus.Gestartet, ct);
+            item.CliRunId = adapter.CliRunId.ToString("D");
+            var ready = await adapter.WaitForInputReadyAsync(ct);
+            if (ready != ScmPromptReadyStatus.Ready)
+            {
+                var recognition = adapter.CliRecognition;
+                var reason = ready == ScmPromptReadyStatus.TrustPrompt
+                    ? "Die CLI wartet auf die Bestätigung der Vertrauenswürdigkeit dieses Ordners. Bitte die Abfrage im Terminal der laufenden CLI-Sitzung beantworten; die Zustellung wird danach automatisch fortgesetzt."
+                    : adapter.IsBusy ? "CLI beschäftigt; wartet auf Eingabebereitschaft."
+                    : recognition.State != ScmCliRecognitionState.Supported
+                    ? ScmCliWaitReason.Describe(recognition)
+                    : ScmCliWaitReason.UnknownReady;
+                await WaitAsync(item, reason, ct);
+                return;
+            }
+            if (adapter.IsBusy) { await WaitAsync(item, "CLI beschäftigt; wartet auf Eingabebereitschaft.", ct); return; }
+            var access = await adapter.CheckExchangeAccessAsync(Path.Combine(adapter.WorkingDirectory, ScmEventExchangeProtocol.DirectoryName), ct, task.Titel);
+            if (access.Status != ScmExchangeAccessStatus.Supported)
+            { await WaitAsync(item, "Antwortkanal für diese CLI nicht verfügbar: " + access.Reason, ct); return; }
+            var attemptId = Guid.NewGuid();
+            // Der Analyse-Prompt wird aus persistierten Erkennungsdaten gebaut und bleibt damit
+            // beim Wiederanlauf bitgleich rekonstruierbar (Prüfung gegen request.json).
+            var promptBody = ScmIssueAufbereitungPrompt.Build(task.IssueReferenz?.Titel ?? task.Titel, observation.Body);
+            var attempt = await exchange.PrepareAsync(new(item.Id, attemptId, adapter.CliRunId, task.Id, promptBody,
+                ScmIssueAufbereitungsService.Zweck, $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}",
+                issue.IssueUrl ?? observation.Url), adapter.WorkingDirectory, ct, access.RestrictedWriteSids);
+            if (!ReferenceEquals(adapter, cli.GetScmPromptSession(task.Id)) || !adapter.IsAlive)
+            { await WaitAsync(item, "CLI-Sitzung hat sich geändert. Erneut prüfen.", ct); return; }
+            if (await IsCancelledAsync(item.Id, ct)) return;
+            item.Status = "ZustellungVorbereitet";
+            item.DeliveryAttemptId = attemptId;
+            item.CliRunId = adapter.CliRunId.ToString("D");
+            item.ExchangePath = attempt.DirectoryPath;
+            item.ExchangeRestrictedWriteSidsJson = JsonSerializer.Serialize(access.RestrictedWriteSids);
+            item.DeliveredUtc = time.GetUtcNow().ToUnixTimeMilliseconds();
+            item.Attempts++;
+            item.Reason = null;
+            item.NextAttemptUtc = null;
+            await db.SaveChangesAsync(ct);
+            try
+            {
+                if (await IsCancelledAsync(item.Id, ct)) return;
+                await adapter.WritePromptAsync(attempt.Prompt, ct);
+                if (await IsCancelledAsync(item.Id, CancellationToken.None)) return;
+                item.Status = "Zugestellt";
+            }
+            catch (Exception)
+            {
+                if (await IsCancelledAsync(item.Id, CancellationToken.None)) return;
+                item.Status = "ZustellungUngewiss";
+                item.Reason = "Der Schreibversuch wurde begonnen, konnte aber nicht sicher bestätigt werden. Keine automatische Wiederholung.";
+            }
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (ScmProviderException ex)
+        {
+            item.ErrorCode = ex.FailureKind.ToString();
+            item.NextAttemptUtc = ex.FailureKind is ScmProviderFailureKind.Authentication or ScmProviderFailureKind.Permission
+                ? long.MaxValue : ScmEventStore.RetryAt(++item.Attempts, time.GetUtcNow().ToUnixTimeMilliseconds(), ex.RetryAfterUtc);
+            logger.LogWarning(ex, "Issue-Aufbereitung {EventId}: Anbieter-Fehler ({FailureKind}).", item.Id, ex.FailureKind);
+            await ProtokolliereAufbereitungsFehlerAsync(item, ex.Message, ct);
+            await WaitAsync(item, ex.Message, ct);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            // Konfigurations-, Arbeitsverzeichnis- und Startfehler verlangen einen bewussten
+            // Neuversand nach Korrektur — kein automatischer Retry, keine Remote-Änderung.
+            item.NextAttemptUtc = long.MaxValue;
+            logger.LogError(ex, "Issue-Aufbereitung {EventId} fehlgeschlagen.", item.Id);
+            await ProtokolliereAufbereitungsFehlerAsync(item, ex.Message, ct);
+            await WaitAsync(item, ex.Message, ct);
+        }
+    }
+
+    /// <summary>Gibt Analyse- und Rückschreibefehler der Aufbereitung als ehrlichen
+    /// Protokolleintrag am Vorgang aus (dedupliziert nach Wartegrund, damit der
+    /// Poll-Zyklus nicht bei jedem Versuch denselben Eintrag erzeugt). Es wird
+    /// bewusst kein Kommentar am Issue erzeugt.</summary>
+    private async Task ProtokolliereAufbereitungsFehlerAsync(ScmIncomingEvent item, string reason, CancellationToken ct)
+    {
+        if (string.Equals(item.Reason, reason, StringComparison.Ordinal)) return;
+        await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.SystemMeldung,
+            "Issue-Aufbereitung fehlgeschlagen: " + reason, ct: ct);
+    }
+
+    /// <summary>Abgleich des Aufbereitungs-Versuchs: Die CLI liefert ihre Analyse als
+    /// „issueBodyUpdate"- und „comment"-Aktionen über den Exchange-Kanal; der Host erzeugt daraus
+    /// idempotente Outbox-Aktionen (<see cref="ScmResponseKind.IssueBodyUpdate"/> ersetzt nur die
+    /// Beschreibung — der Titel bleibt unverändert). Der Kommentar-Schalter wird hier hostseitig
+    /// erzwungen: Bei deaktiviertem Schalter wird eine gelieferte Kommentaraktion verworfen und
+    /// protokolliert, bei aktivem Schalter ist ein erfolgreicher Kommentar Abschlusskriterium.
+    /// Kein Wartehinweis-, Fehler- oder Attachments-Kommentar am Issue.</summary>
+    private async Task ReconcileAufbereitungAttemptAsync(ScmIncomingEvent item, ScmEventObservation observation,
+        IScmEventResponder responder, CancellationToken ct)
+    {
+        if (item.ExchangePath is null || !Guid.TryParse(item.CliRunId, out var runId)) return;
+        var task = await db.Aufgaben.Include(x => x.IssueReferenz)
+            .SingleOrDefaultAsync(x => x.Id == item.AufgabeId, ct);
+        var promptBody = ScmIssueAufbereitungPrompt.Build(task?.IssueReferenz?.Titel ?? task?.Titel, observation.Body);
+        var request = new ScmExchangeRequest(item.Id, item.DeliveryAttemptId!.Value, runId, item.AufgabeId, promptBody,
+            ScmIssueAufbereitungsService.Zweck, $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url);
+        var attempt = new ScmExchangeAttempt(request, item.ExchangePath)
+        {
+            RestrictedWriteSids = JsonSerializer.Deserialize<string[]>(item.ExchangeRestrictedWriteSidsJson ?? "[]") ?? []
+        };
+        var messages = await exchange.ReadAsync(attempt, ct);
+        if (await IsCancelledAsync(item.Id, ct)) return;
+        if (messages.Diagnostic is not null)
+        {
+            item.Status = "VerarbeitungUngeklärt";
+            item.Reason = messages.Diagnostic;
+        }
+        var kommentarErlaubt = await einstellungen.GetScmIssueAufbereitungKommentarEnabledAsync(ct);
+        if (messages.Accepted is not null)
+        {
+            item.AcceptedUtc ??= time.GetUtcNow().ToUnixTimeMilliseconds();
+            item.Status = "InBearbeitung";
+            item.Reason = null;
+            var skippedComments = 0;
+            var skippedActionIds = new HashSet<Guid>();
+            foreach (var action in messages.Actions)
+            {
+                if (await IsCancelledAsync(item.Id, ct)) return;
+                ScmResponseKind responseKind;
+                if (action.Kind == "issueBodyUpdate")
+                {
+                    responseKind = ScmResponseKind.IssueBodyUpdate;
+                }
+                else if (action.Kind == "comment")
+                {
+                    // Der Kommentar-Schalter ist eine Host-Entscheidung: Bei „aus" wird die
+                    // gelieferte Dokumentation ehrlich verworfen (Result success=false), damit
+                    // das Issue unverändert bleibt und die CLI das Ergebnis sieht.
+                    if (!kommentarErlaubt)
+                    {
+                        skippedComments++;
+                        skippedActionIds.Add(action.ActionId);
+                        await exchange.WriteResultAsync(attempt, new(1, item.Id, request.AttemptId, runId, action.ActionId,
+                            false, null, "Der Dokumentations-Kommentar ist in den Einstellungen deaktiviert."), ct);
+                        continue;
+                    }
+                    responseKind = ScmResponseKind.Comment;
+                }
+                else
+                {
+                    item.Status = "VerarbeitungUngeklärt";
+                    item.Reason = $"Nicht unterstützte Analyse-Aktion '{action.Kind}'.";
+                    await exchange.WriteResultAsync(attempt, new(1, item.Id, request.AttemptId, runId, action.ActionId,
+                        false, null, "Aktionsart wird für die Issue-Aufbereitung nicht unterstützt."), ct);
+                    break;
+                }
+                var response = new ScmResponseRequest(observation.Reference, action.ActionId.ToString("D"), responseKind,
+                    action.Body, action.Reaction, observation.ContentKind, observation.RemoteCommentId, observation.RemoteNodeId, action.Title, action.Head, action.Base);
+                var existing = await db.ScmOutgoingActions.FindAsync([action.ActionId], ct);
+                if (existing is not null && (existing.EventId != item.Id || existing.AttemptId != item.DeliveryAttemptId || existing.RequestJson != JsonSerializer.Serialize(response, ScmEventStore.JsonOptions)))
+                {
+                    item.Status = "VerarbeitungUngeklärt";
+                    item.Reason = "Aktionskennung wurde für einen anderen Inhalt oder Versuch verwendet.";
+                    break;
+                }
+                var outgoing = await outbox.EnsureAsync(item, "ai:" + action.ActionId.ToString("D"), response, ct);
+                await outbox.ExecuteAsync(outgoing, responder, ct);
+                await exchange.WriteResultAsync(attempt, new(1, item.Id, request.AttemptId, runId, action.ActionId,
+                    outgoing.Status == "Succeeded", outgoing.RemoteId, outgoing.Error), ct);
+                if (outgoing.Status != "Succeeded")
+                {
+                    // Fehlgeschlagene Rückschreibung: ehrlich unklar, Log + Protokolleintrag;
+                    // kein Fehlerkommentar am Issue.
+                    item.Status = "VerarbeitungUngeklärt";
+                    logger.LogError("Issue-Aufbereitung {EventId}: Aktion {ActionId} fehlgeschlagen: {Error}", item.Id, action.ActionId, outgoing.Error);
+                    await ProtokolliereAufbereitungsFehlerAsync(item, outgoing.Error ?? "Unbekannter Fehler.", ct);
+                    item.Reason = outgoing.Error;
+                }
+            }
+            if (skippedComments > 0)
+                await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.SystemMeldung,
+                    $"{skippedComments} Analyse-Kommentar(e) verworfen: Der Dokumentations-Kommentar ist in den Einstellungen deaktiviert.", ct: ct);
+            if (messages.Complete is { } complete && item.Status == "InBearbeitung")
+            {
+                var actions = await db.ScmOutgoingActions.Where(x => x.EventId == item.Id && x.AttemptId == item.DeliveryAttemptId).ToListAsync(ct);
+                var completeSet = complete.ActionIds.ToHashSet();
+                if (complete.NoRemoteAction && actions.Count == 0)
+                {
+                    item.Status = "Verarbeitet";
+                    item.Reason = null;
+                    if (!string.IsNullOrWhiteSpace(complete.Report))
+                        await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.SystemMeldung,
+                            "Issue-Aufbereitung abgeschlossen ohne Remote-Änderung: " + complete.Report, ct: ct);
+                }
+                else if (!complete.NoRemoteAction
+                    && completeSet.Except(skippedActionIds).ToHashSet() is { } erwartet
+                    && actions.Count == erwartet.Count && actions.All(x => erwartet.Contains(x.Id) && x.Status == "Succeeded")
+                    && actions.Any(x => JsonSerializer.Deserialize<ScmResponseRequest>(x.RequestJson, ScmEventStore.JsonOptions)?.Kind == ScmResponseKind.IssueBodyUpdate))
+                {
+                    // Abschlusskriterien: ≥1 erfolgreiches IssueBodyUpdate; bei aktivem
+                    // Kommentar-Schalter zusätzlich ≥1 erfolgreicher Analyse-Kommentar.
+                    var commentOk = !kommentarErlaubt || actions.Any(x =>
+                        JsonSerializer.Deserialize<ScmResponseRequest>(x.RequestJson, ScmEventStore.JsonOptions)?.Kind == ScmResponseKind.Comment);
+                    if (commentOk)
+                    {
+                        item.Status = "Verarbeitet";
+                        item.Reason = null;
+                        if (!string.IsNullOrWhiteSpace(complete.Report))
+                            await protokoll.AddEintragAsync(item.AufgabeId, ProtokollTyp.SystemMeldung,
+                                "Issue-Aufbereitung abgeschlossen: " + complete.Report, ct: ct);
+                    }
+                    else
+                    {
+                        item.Status = "VerarbeitungUngeklärt";
+                        await ProtokolliereAufbereitungsFehlerAsync(item, "Der dokumentierende Analyse-Kommentar wurde nicht remote bestätigt.", ct);
+                        item.Reason = "Der dokumentierende Analyse-Kommentar wurde nicht remote bestätigt.";
+                    }
+                }
+                else if (!complete.NoRemoteAction)
+                {
+                    item.Status = "VerarbeitungUngeklärt";
+                    item.Reason = "Die optimierte Issue-Beschreibung wurde nicht remote bestätigt. Status erneut prüfen; kein automatischer Neuversand.";
+                }
+            }
         }
         var now = time.GetUtcNow().ToUnixTimeMilliseconds();
         if (item.Status == "ZustellungVorbereitet")

@@ -562,7 +562,7 @@ public sealed class ScmEventExchangeProtocol
             requestPath = attempt.RequestPath,
             attachmentsPath = attempt.AttachmentsPath,
             acceptedSchema = new { protocolVersion = 1, eventId = attempt.Request.EventId, attemptId = attempt.Request.AttemptId, cliRunId = attempt.Request.CliRunId },
-            actionSchema = "{protocolVersion:1,eventId,attemptId,cliRunId,actionId:UUID,kind:comment|reaction|pullRequest,body?,reaction?,head?,base?,title?}; Ursprung ist unveränderlich, keine Ziel-URLs zulässig.",
+            actionSchema = "{protocolVersion:1,eventId,attemptId,cliRunId,actionId:UUID,kind:comment|reaction|pullRequest|issueBodyUpdate,body?,reaction?,head?,base?,title?}; Ursprung ist unveränderlich, keine Ziel-URLs zulässig.",
             completeSchema = "{protocolVersion:1,eventId,attemptId,cliRunId,actionIds:[UUID],noRemoteAction:false,report?,pullRequestNumber?,attachments?:[{path,caption?}]}; selbst ausgeführte Remoteaktionen meldet report als knapper Ergebnisbericht (actionIds:[] erlaubt); ohne jede Remoteaktion actionIds:[],noRemoteAction:true,reason:Begründung; pullRequestNumber meldet die Nummer eines selbst angelegten Pull Requests; attachments listet optional Nachweis-Bilder mit Pfad (relativ zum Versuchsverzeichnis, höchstens 1024 Zeichen) und Unterschrift (höchstens 1000 Zeichen); höchstens 32 Einträge, ungültige Einträge werden einzeln übersprungen.",
         }, Json)!.AsObject();
         // Der konfigurierte Anhang wird nur im Prompt ergänzt und bleibt damit einzeilig;
@@ -586,6 +586,7 @@ public sealed class ScmEventExchangeProtocol
             "comment" => !string.IsNullOrWhiteSpace(action.Body),
             "reaction" => action.Reaction is "+1" or "-1" or "laugh" or "confused" or "heart" or "hooray" or "rocket" or "eyes",
             "pullRequest" => !string.IsNullOrWhiteSpace(action.Title) && SafeBranch(action.Head) && SafeBranch(action.Base),
+            "issueBodyUpdate" => !string.IsNullOrWhiteSpace(action.Body),
             _ => false,
         };
         if (!valid) throw new IOException("Unbekannte oder unvollständige SCM-Aktion.");

@@ -334,6 +334,87 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public SettingsView OpenProzessablaeufe() => OpenExpander("ProzessablaeufeExpander");
 
+    /// <summary>Wechselt in den "Automatisierung"-Tab und klappt den Expander
+    /// "Issue-Aufbereitung" auf, damit seine Steuerelemente in der UIA-Struktur existieren.</summary>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView OpenIssueAufbereitung() => OpenExpander("IssueAufbereitungExpander");
+
+    /// <returns>Der Status der Funktion „Issue-Aufbereitung“ (Header-Statustext des Expanders).</returns>
+    public string GetIssueAufbereitungStatus()
+        => GetHelpTextOrName(WaitForElement(Window, cf => cf.ByName("IssueAufbereitungStatus"), Short));
+
+    /// <returns>Der Zustand des Funktionsschalters der Issue-Aufbereitung.</returns>
+    public bool IsIssueAufbereitungEnabled()
+        => WaitForElement(Window, cf => cf.ByName("IssueAufbereitungEnabledCheckBox"), Short).AsCheckBox().IsChecked ?? false;
+
+    /// <summary>Setzt den Funktionsschalter der Issue-Aufbereitung.</summary>
+    /// <param name="enabled">Der neue Zustand.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetIssueAufbereitungEnabled(bool enabled)
+    {
+        WaitForElement(Window, cf => cf.ByName("IssueAufbereitungEnabledCheckBox"), Short).AsCheckBox().IsChecked = enabled;
+        return this;
+    }
+
+    /// <returns>Der aktuell in der Aufbereitungs-Plugin-ComboBox angezeigte Eintrag (Label).</returns>
+    public string GetIssueAufbereitungPlugin()
+        => WaitForElement(Window, cf => cf.ByName("IssueAufbereitungPluginComboBox"), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+
+    /// <summary>Wählt einen Eintrag der Aufbereitungs-Plugin-ComboBox anhand seines Labels aus.</summary>
+    /// <param name="label">Das sichtbare Label der Option (z. B. „Globale Standard-CLI verwenden“).</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetIssueAufbereitungPlugin(string label)
+    {
+        var box = WaitForElement(Window, cf => cf.ByName("IssueAufbereitungPluginComboBox"), Short);
+        SelectComboBoxItemByClick(box, label, Short);
+        ElementWaitHelper.WaitForSelectedComboBoxItem(box, label, Short);
+        return this;
+    }
+
+    /// <returns>Die sichtbaren Labels aller Aufbereitungs-Plugin-Optionen.</returns>
+    public string[] GetIssueAufbereitungPluginOptionen()
+    {
+        var box = WaitForElement(Window, cf => cf.ByName("IssueAufbereitungPluginComboBox"), Short).AsComboBox();
+        box.Expand();
+        // Die Items werden erst beim Öffnen des Dropdowns materialisiert.
+        var deadline = DateTime.UtcNow + Short;
+        string[] labels;
+        while ((labels = box.Items.Select(x => x.Text).ToArray()).Length == 0 && DateTime.UtcNow < deadline)
+            Thread.Sleep(50);
+        box.Collapse();
+        return labels;
+    }
+
+    /// <summary>Setzt die Auswahl-Checkbox eines Repositorys in der Aufbereitungs-Liste
+    /// anhand seines Anzeigenamens.</summary>
+    /// <param name="repositoryName">Der Repository-Anzeigename.</param>
+    /// <param name="selected">Der neue Zustand.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetIssueAufbereitungRepository(string repositoryName, bool selected)
+    {
+        WaitForElement(Window, cf => cf.ByName("IssueAufbereitungRepositoriesList"), Short);
+        WaitForElement(Window, cf => cf.ByName(repositoryName), Short).AsCheckBox().IsChecked = selected;
+        return this;
+    }
+
+    /// <returns>Der Auswahlzustand eines Repositorys in der Aufbereitungs-Liste.</returns>
+    /// <param name="repositoryName">Der Repository-Anzeigename.</param>
+    public bool IsIssueAufbereitungRepositorySelected(string repositoryName)
+        => WaitForElement(Window, cf => cf.ByName(repositoryName), Short).AsCheckBox().IsChecked ?? false;
+
+    /// <returns>Der Zustand des Kommentar-Schalters der Issue-Aufbereitung.</returns>
+    public bool IsIssueAufbereitungKommentarEnabled()
+        => WaitForElement(Window, cf => cf.ByName("IssueAufbereitungCommentCheckBox"), Short).AsCheckBox().IsChecked ?? false;
+
+    /// <summary>Setzt den Kommentar-Schalter der Issue-Aufbereitung.</summary>
+    /// <param name="enabled">Der neue Zustand.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetIssueAufbereitungKommentarEnabled(bool enabled)
+    {
+        WaitForElement(Window, cf => cf.ByName("IssueAufbereitungCommentCheckBox"), Short).AsCheckBox().IsChecked = enabled;
+        return this;
+    }
+
     /// <summary>Klappt den Expander "Aufgaben ausführen" zu (no-op, wenn er bereits zu ist).</summary>
     /// <returns>Diese Instanz.</returns>
     public SettingsView CollapseAufgabenAusfuehren() => CollapseExpander("AufgabenAusfuehrenExpander");

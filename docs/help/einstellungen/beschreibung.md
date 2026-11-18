@@ -65,7 +65,7 @@ Das Arbeitsverzeichnis bestimmt, wo die Softwareschmiede lokale Repository-Klons
 
 ### Automatisierung
 
-Die Registerkarte **„Automatisierung"** (direkt nach „Allgemein") bündelt die drei zyklischen Automatisierungsfunktionen der SCM-Verarbeitung in drei auf-/zuklappbaren Panels. Jede Panel-Titelleiste zeigt zusätzlich zum Namen an, ob die Funktion gerade **aktiviert** oder **deaktiviert** ist — auch im zugeklappten Zustand. Alle Schalter wirken nach dem Speichern ohne Neustart; die drei Funktionen lassen sich unabhängig voneinander ein- und ausschalten.
+Die Registerkarte **„Automatisierung"** (direkt nach „Allgemein") bündelt die zyklischen Automatisierungsfunktionen der SCM-Verarbeitung in auf-/zuklappbaren Panels. Jede Panel-Titelleiste zeigt zusätzlich zum Namen an, ob die Funktion gerade **aktiviert** oder **deaktiviert** ist — auch im zugeklappten Zustand. Alle Schalter wirken nach dem Speichern ohne Neustart; die Funktionen lassen sich unabhängig voneinander ein- und ausschalten.
 
 **Panel „Aufgaben ausführen":** Die Checkbox **„Aufgaben automatisch starten"** schaltet die Ereignisüberwachung ein oder aus. Die Auswahlbox **„Überwachungsmodus"** legt den Eingangskanal fest:
 
@@ -93,6 +93,12 @@ Die Backmerge-Prüfung läuft in einem eigenen Zyklus: unabhängig vom Schalter 
 - **„Bei blockiertem Merge Admin-Merge erlauben"** — der Merge läuft zuerst regulär; scheitert er am Branch-Schutz (z. B. fehlende Statuschecks oder Reviews), wird er mit dieser Option einmalig als Admin-Merge wiederholt, der den Branch-Schutz umgeht
 
 Voraussetzungen für einen Auto-Merge: ein vom Repository-Hauptbranch abweichender Basis-Branch am Projekt-Repository, ein Token mit Schreibrecht (für den Admin-Merge ein Token mit Admin-Recht) und ein vom Provider als mergebar gemeldeter, offener Pull Request. Die Auswahl wird erst nach einem Klick auf „Speichern" übernommen.
+
+**Panel „Issue-Aufbereitung":** Die Checkbox **„Neu angelegte Issues automatisch aufbereiten"** schaltet die Issue-Aufbereitung ein oder aus (Standard: aus). Ist sie aktiv, startet jedes danach neu angelegte Issue in einem freigeschalteten Repository eine KI-Analyse, die die Issue-Beschreibung anhand fester Qualitätskriterien verbessert und remote ersetzt — der Titel bleibt unverändert (Details: [GitHub-Ereignisüberwachung](../plugins/github-ereignisse/index.md)). Die übrigen Felder sind nur bei aktivierter Funktion bedienbar:
+
+- **„Funktions-Plugin"** wählt die KI-CLI für die Analyse; die Option **„Globale Standard-CLI verwenden"** nutzt dieselbe Auflösungskette wie SCM-Ereignisse (Projekt-Standard → globaler Standard). Ist ein gewähltes Plugin nicht installiert oder deaktiviert, wartet der Auftrag mit ehrlichem Grund statt zu starten.
+- **Repository-Auswahl** — nur in den markierten Repositories lösen neu angelegte Issues eine Aufbereitung aus; die Auswahl wirkt zusätzlich zum globalen Schalter und setzt die Ereignisüberwachung des Repositorys voraus.
+- **„Analyse-Ergebnisse als Kommentar dokumentieren"** (Standard: an) legt fest, ob die Analyse zusätzlich als Issue-Kommentar dokumentiert wird; bei deaktiviertem Schalter wird nur die Beschreibung ersetzt.
 
 ### Updates
 

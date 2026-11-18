@@ -9,11 +9,12 @@
 | `ScmEventMonitoringService` | Hintergrunddienst | Pollt lokal verknüpfte Referenzen und dispatcht gespeicherte Einträge. |
 | `ScmBackmergeMonitoringService` | Hintergrunddienst | Eigener Backmerge-Prüfzyklus: löst aktive Projekt-Repositories kanonisch unter dem Benutzerkonto auf, enumeriert sie mit eigenen Checkpoints (`backmerge-repository/`, `backmerge-enumeration/`) und ruft die Bewertung auf — unabhängig von `scm.monitoring.enabled` und `scm.monitoring.accountmode`. |
 | `ScmBackmergeService` | Application Service | Bewertet enumerierte Pull-Request-Referenzen auf das Backmerge-Muster und führt den Merge aus (zuerst regulär; optionale Draft-Aktivierung über `MarkPullRequestReadyAsync`, optionaler Admin-Merge-Fallback). |
-| `ScmIssueAufbereitungsService` | Application Service | „Issue erstellt"-Erkennung am Enumerationskanal: hält den Beobachtungsbeginn je Repository (`issueaufbereitung/`-Checkpoint), legt bei neu angelegten Issues die Zweck-markierte Aufbereitungs-Aufgabe samt geparktem internen Ereignis an. |
+| `ScmIssueAufbereitungsService` | Application Service | „Issue erstellt"-Erkennung am Enumerationskanal: hält den Beobachtungsbeginn je Repository (`issueaufbereitung/`-Checkpoint), legt bei neu angelegten Issues die Zweck-markierte Aufbereitungs-Aufgabe samt sofort fälligem internen Ereignis an. |
+| `ScmIssueAufbereitungPrompt` | Application Service | Baut den deterministischen Analyse-Prompt der Aufbereitung (Titel + Beschreibung + feste Qualitätskriterien + Ausgabevertrag `issueBodyUpdate`/`comment`). |
 | `ScmTaskCompletionMonitoringService` | Hintergrunddienst | Abschlussüberwachung: prüft zyklisch verknüpfte SCM-Referenzen der durch den Prüfmodus (`scm.taskcompletion.scope`) bestimmten Aufgaben und beendet sie nach der konfigurierten Wartezeit. |
 | `GitHubPlugin` | SCM-Provider | Implementiert `IScmEventSource`, `IScmEventResponder` und `IScmAgentAccess`; liest GitHub-Inhalte, führt unterstützte Antworten aus und stellt Agenten die SCM-Anbindung als Prozessumgebung bereit. |
 | `ScmEventStore` / `SoftwareschmiededDbContext` | Persistenz | Speichert Ereignisse, Snapshots, Checkpoints, Aktionen und Aufgaben-Leases. |
-| `ScmEventOrchestrator` | Application Service | Prüft Aufgabenstatus und CLI, koordiniert Zustellung sowie Wiederaufnahme. |
+| `ScmEventOrchestrator` | Application Service | Prüft Aufgabenstatus und CLI, koordiniert Zustellung sowie Wiederaufnahme; verzweigt `Zweck`-markierte Aufbereitungs-Ereignisse in `DispatchAufbereitungAsync` (Schalter, Plugin-Fallback, #410-Reservation, Exchange-Reconcile). |
 | `IScmPromptSessionAdapter` / `ScmEventExchangeService` | CLI-Austausch | Prüft den Antwortkanal und korreliert Annahme, Aktionen und Abschluss mit Lauf und Versuch. |
 | `ScmEventQueueViewModel` / `ScmEventQueueView` | Oberfläche | Zeigt Einträge und ermöglicht kontrollierte Queue-Aktionen. |
 

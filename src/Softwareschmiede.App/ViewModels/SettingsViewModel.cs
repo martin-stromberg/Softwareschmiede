@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Application.Services.Updates;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -38,6 +39,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private readonly PluginActivationService _pluginActivationService;
     private readonly PluginSettingsService _pluginSettingsService;
     private readonly PromptVorlagenService _promptVorlagenService;
+    private readonly ProjektService _projektService;
     private readonly ILogger<SettingsViewModel> _logger;
     private readonly IDialogService _dialogService;
     private readonly IServiceProvider _serviceProvider;
@@ -64,6 +66,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private string _scmTriggerKeyword = ScmEventValidationService.DefaultTriggerKeyword;
     private string _scmDelayKeyword = ScmDelayDirective.DefaultDelayKeyword;
     private string _maxParalleleAusfuehrungen = string.Empty;
+    private bool _isIssueAufbereitungEnabled;
+    private bool _isIssueAufbereitungKommentarEnabled = true;
+    private IssueAufbereitungKiPluginOption? _selectedIssueAufbereitungKiPlugin;
     private readonly Dictionary<string, string?> _kiPluginParallelLimits = new(StringComparer.Ordinal);
     private string _scmPromptAppendixGeneral = string.Empty;
     private string _scmPromptAppendixIssue = string.Empty;
@@ -379,6 +384,48 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _maxParalleleAusfuehrungen, value);
     }
 
+    /// <summary>Gibt an, ob die automatische Issue-Aufbereitung aktiviert ist (Laufzeit-Schalter).</summary>
+    public bool IsIssueAufbereitungEnabled
+    {
+        get => _isIssueAufbereitungEnabled;
+        set
+        {
+            if (!SetProperty(ref _isIssueAufbereitungEnabled, value)) return;
+            OnPropertyChanged(nameof(IsIssueAufbereitungFelderEnabled));
+            OnPropertyChanged(nameof(IssueAufbereitungStatusText));
+        }
+    }
+
+    /// <summary>Gibt an, ob die Analyseergebnisse zusätzlich als Issue-Kommentar dokumentiert werden.</summary>
+    public bool IsIssueAufbereitungKommentarEnabled
+    {
+        get => _isIssueAufbereitungKommentarEnabled;
+        set => SetProperty(ref _isIssueAufbereitungKommentarEnabled, value);
+    }
+
+    /// <summary>Ausgewähltes Funktions-Plugin der Issue-Aufbereitung
+    /// (<see cref="IssueAufbereitungKiPluginOption.PluginPrefix"/> = <c>null</c> bedeutet:
+    /// Fallback auf die globale Standard-CLI).</summary>
+    public IssueAufbereitungKiPluginOption? SelectedIssueAufbereitungKiPlugin
+    {
+        get => _selectedIssueAufbereitungKiPlugin;
+        set => SetProperty(ref _selectedIssueAufbereitungKiPlugin, value);
+    }
+
+    /// <summary>Verfügbare KI-Plugin-Auswahl für die Aufbereitung, beginnend mit dem
+    /// Standard-Eintrag für den Fallback auf die globale Standard-CLI.</summary>
+    public ObservableCollection<IssueAufbereitungKiPluginOption> IssueAufbereitungKiPluginOptionen { get; } = [];
+
+    /// <summary>Überwachte Repositories mit Aufbereitungs-Auswahl (persistiertes Flag
+    /// <see cref="GitRepository.IssueAufbereitungAktiv"/>).</summary>
+    public ObservableCollection<IssueAufbereitungRepositoryEntry> IssueAufbereitungRepositories { get; } = [];
+
+    /// <summary>Die Detail-Felder der Aufbereitung sind nur bei aktivierter Funktion bedienbar.</summary>
+    public bool IsIssueAufbereitungFelderEnabled => IsIssueAufbereitungEnabled;
+
+    /// <summary>Statuszeile des „Issue-Aufbereitung“-Bereichs im Ausklapp-Header.</summary>
+    public string IssueAufbereitungStatusText => IsIssueAufbereitungEnabled ? "aktiviert" : "deaktiviert";
+
     /// <summary>Prompt-Anhang, der bei jeder SCM-Ereignisart an den Prompt angehängt wird (leer = keiner).</summary>
     public string ScmPromptAppendixGeneral
     {
@@ -462,6 +509,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         PluginActivationService pluginActivationService,
         PluginSettingsService pluginSettingsService,
         PromptVorlagenService promptVorlagenService,
+        ProjektService projektService,
         ILogger<SettingsViewModel> logger,
         IDialogService dialogService,
         IServiceProvider serviceProvider)
@@ -473,6 +521,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         _pluginActivationService = pluginActivationService;
         _pluginSettingsService = pluginSettingsService;
         _promptVorlagenService = promptVorlagenService;
+        _projektService = projektService;
         _logger = logger;
         _dialogService = dialogService;
         _serviceProvider = serviceProvider;
@@ -567,6 +616,23 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             MaxParalleleAusfuehrungen = globalLimit is >= 1
                 ? globalLimit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
                 : string.Empty;
+
+            // Issue-Aufbereitung: Funktionsschalter, Funktions-Plugin (leer = globale
+            // Standard-CLI), Repository-Auswahl und Kommentar-Schalter.
+            IsIssueAufbereitungEnabled = await _einstellungService.GetScmIssueAufbereitungEnabledAsync(ct);
+            IsIssueAufbereitungKommentarEnabled = await _einstellungService.GetScmIssueAufbereitungKommentarEnabledAsync(ct);
+            var aufbereitungsPrefix = await _einstellungService.GetScmIssueAufbereitungPluginPrefixAsync(ct);
+            IssueAufbereitungKiPluginOptionen.Clear();
+            IssueAufbereitungKiPluginOptionen.Add(IssueAufbereitungKiPluginOption.Standard);
+            foreach (var kiPlugin in KiPlugins)
+                IssueAufbereitungKiPluginOptionen.Add(new IssueAufbereitungKiPluginOption(kiPlugin.PluginPrefix, kiPlugin.PluginName));
+            SelectedIssueAufbereitungKiPlugin = IssueAufbereitungKiPluginOptionen
+                .FirstOrDefault(x => string.Equals(x.PluginPrefix, aufbereitungsPrefix, StringComparison.Ordinal))
+                ?? IssueAufbereitungKiPluginOption.Standard;
+
+            IssueAufbereitungRepositories.Clear();
+            foreach (var repository in await _projektService.GetAllRepositoriesAsync(ct))
+                IssueAufbereitungRepositories.Add(new IssueAufbereitungRepositoryEntry(repository, repository.IssueAufbereitungAktiv));
             _kiPluginParallelLimits.Clear();
             var pluginLimitWerte = await _einstellungService.GetSettingsAsync(
                 KiPlugins.Select(x => ScmEventExecutionLimitService.PluginLimitKey(x.PluginPrefix)).ToList(), ct);
@@ -694,6 +760,20 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 ScmEventExecutionLimitService.GlobalLimitKey,
                 NullWennLeer(MaxParalleleAusfuehrungen?.Trim()),
                 ct);
+            await _einstellungService.SetBoolSettingAsync(
+                AppEinstellungService.ScmIssueAufbereitungEnabledKey,
+                IsIssueAufbereitungEnabled,
+                ct);
+            await _einstellungService.SetBoolSettingAsync(
+                AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey,
+                IsIssueAufbereitungKommentarEnabled,
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmIssueAufbereitungPluginKey,
+                SelectedIssueAufbereitungKiPlugin?.PluginPrefix,
+                ct);
+            foreach (var repositoryEntry in IssueAufbereitungRepositories)
+                await _projektService.SetIssueAufbereitungAktivAsync(repositoryEntry.Repository.Id, repositoryEntry.IsSelected, ct);
             await _einstellungService.SetScmBackmergeModusAsync(backmergeModus, ct);
             await _einstellungService.SetScmKontoModusAsync(kontoModus, ct);
             await _einstellungService.SetScmTaskCompletionPruefmodusAsync(pruefmodus, ct);
@@ -1213,5 +1293,48 @@ public sealed class PromptVorlageEntry : ViewModelBase
     {
         get => _prompttext;
         set => SetProperty(ref _prompttext, value);
+    }
+}
+
+/// <summary>Auswahloption des Funktions-Plugins für die Issue-Aufbereitung.
+/// <see cref="PluginPrefix"/> = <c>null</c> steht für den Standard-Eintrag
+/// „Globale Standard-CLI verwenden" (Fallback-Kette der Plugin-Auflösung).</summary>
+/// <param name="PluginPrefix">Der Plugin-Prefix oder <c>null</c> für die globale Standard-CLI.</param>
+/// <param name="Label">Der Anzeigename der Option.</param>
+public sealed record IssueAufbereitungKiPluginOption(string? PluginPrefix, string Label)
+{
+    /// <summary>Der Standard-Eintrag: Kein dediziertes Funktions-Plugin — es greift die
+    /// Plugin-Auflösungskette (Projekt-Default → Global-Default → konfigurierter Standard).</summary>
+    public static IssueAufbereitungKiPluginOption Standard { get; } = new(null, "Globale Standard-CLI verwenden");
+
+    /// <inheritdoc />
+    public override string ToString() => Label;
+}
+
+/// <summary>Editierbarer Repository-Eintrag der Issue-Aufbereitung (persistiertes Flag
+/// <see cref="GitRepository.IssueAufbereitungAktiv"/>). Der Anzeigename ist der
+/// Repository-Name — keine internen Kennungen als Benutzereingabe.</summary>
+public sealed class IssueAufbereitungRepositoryEntry : ViewModelBase
+{
+    private bool _isSelected;
+
+    /// <inheritdoc cref="IssueAufbereitungRepositoryEntry"/>
+    public IssueAufbereitungRepositoryEntry(GitRepository repository, bool isSelected)
+    {
+        Repository = repository;
+        _isSelected = isSelected;
+    }
+
+    /// <summary>Die zugehörige Repository-Entität.</summary>
+    public GitRepository Repository { get; }
+
+    /// <summary>Anzeigename (Repository-Name).</summary>
+    public string RepositoryName => Repository.RepositoryName;
+
+    /// <summary>Gibt an, ob neu angelegte Issues dieses Repositorys aufbereitet werden.</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => SetProperty(ref _isSelected, value);
     }
 }
