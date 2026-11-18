@@ -24,6 +24,6 @@ werden vom Orchestrator selbst in getrennten, nacheinander ausgeführten Phasen 
 
 ## Vorbereitende SCM-Sequenz (aus Issue-Kommentar, vor Entwicklungsstart)
 
-- [ ] Release-Lauf zu Promotion #418 abwarten (Run 44268624839)
-- [ ] Backmerge-PR #419 (main → staging) per Admin-Merge schließen — Kontext: martin-stromberg
-- [ ] Task-Branch auf aktualisiertes staging rebasen
+- [x] Release-Lauf zu Promotion #418 abwarten (Run 44268624839) — v1.69.0 veröffentlicht
+- [x] Backmerge-PR #419 (main → staging) per Admin-Merge schließen — Kontext: martin-stromberg — gemergt (Merge-Commit 7a689b56)
+- [x] Task-Branch auf aktualisiertes staging rebasen — sauber, keine Konflikte
