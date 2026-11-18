@@ -18,6 +18,6 @@ wurde ein Statuskommentar mit diesem Hinweis hinterlassen.
 - [x] Planprüfung (`project-plan-check.md`, Status: vollständig)
 - [x] Planungscommit (`plan: ...`)
 - [x] Entwicklungsschritte-Tracking (`steps.md` + `status.html`)
-- [ ] Entwicklungsschleife (Schritte siehe `steps.md`)
+- [x] Entwicklungsschleife (alle 6 Schritte fertig, Abnahmen siehe acceptance-schritt-*.md)
 - [ ] Aufräumen (Projektverzeichnis entfernt)
 - [ ] Abschlusscommit (`feat: ...`)
