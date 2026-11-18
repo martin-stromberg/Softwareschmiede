@@ -74,7 +74,7 @@ Ein Tag-Push löst in `.github/workflows/release.yml` den eigenständigen Job `r
   (ConPTY) werden benötigt.
 - **.NET SDK 10.0+** inkl. der **.NET Desktop-Workload** (`Microsoft.NET.Sdk.WindowsDesktop`), da
   `Softwareschmiede.App` und `Softwareschmiede.Tests` gegen
-  `net10.0-windows10.0.17763.0` (WPF) bauen.
+  `net11.0-windows10.0.17763.0` (WPF) bauen.
 - **Git** und optional die **GitHub CLI** (`gh`).
 
 ```powershell

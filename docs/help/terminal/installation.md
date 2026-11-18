@@ -7,7 +7,7 @@
 | Anforderung | Details |
 |-------------|---------|
 | Betriebssystem | Windows 10 Build 17763+ / Windows 11 (Pseudo Console API; ältere Builds → diagnostizierter Pipe-Fallback) |
-| .NET | .NET 9+ mit TFM `net10.0-windows10.0.17763.0` |
+| .NET | .NET 11 mit TFM `net11.0-windows10.0.17763.0` |
 | KI-Plugin | Plugin muss `IKiPlugin.GetTerminalStartSpecAsync` liefern (bei `CliKiPluginBase`-Plugins automatisch aus `BuildProcessStartInfo` gemappt) und ein startfähiges CLI bereitstellen |
 
 Das Terminal-System benötigt die Pseudo Console API (`CreatePseudoConsole`), die erst ab Windows 10 Build 17763 verfügbar ist — auf älteren Builds greift der Pipe-Fallback (sichtbar als „eingeschränkter Modus"), CLIs mit `RequiresPty`-Anforderung schlagen dort fehl. Das CLI-Tool selbst (z. B. `claude.exe`, `codex.cmd`) muss installiert und über die `PATH`-Umgebungsvariable erreichbar sein; nackte Befehlsnamen werden mit PATHEXT-Semantik aufgelöst, `.cmd`/`.bat`-Shims (z. B. npm-Installationen) werden intern zu `cmd.exe /d /s /c` normalisiert.
