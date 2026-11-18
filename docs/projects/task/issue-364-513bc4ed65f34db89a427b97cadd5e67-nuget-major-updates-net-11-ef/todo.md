@@ -11,13 +11,13 @@ werden vom Orchestrator selbst in getrennten, nacheinander ausgeführten Phasen 
 - [x] Branchprüfung (kein Hauptbranch, sauberer Git-Zustand)
 - [x] Verzeichnis/Tracking (`docs/projects/{branchname}/`, diese todo.md)
 - [x] Einstiegspunkt ermittelt (neues Projekt — keine Artefakte vorhanden)
-- [ ] Anforderung aufbereitet (`requirement.md`)
-- [ ] Bestandsaufnahme (`inventory.md`)
-- [ ] Projektplan (`project-plan.md`)
-- [ ] Offene Punkte geklärt
-- [ ] Planprüfung (`project-plan-check.md`, Status „Projektplan vollständig")
-- [ ] Planungscommit
-- [ ] Entwicklungsschritte-Tracking (`steps.md`, `status.html`)
+- [x] Anforderung aufbereitet (`requirement.md`)
+- [x] Bestandsaufnahme (`inventory.md`)
+- [x] Projektplan (`project-plan.md`)
+- [x] Offene Punkte geklärt
+- [x] Planprüfung (`project-plan-check.md`, Status „Projektplan vollständig")
+- [x] Planungscommit
+- [x] Entwicklungsschritte-Tracking (`steps.md`, `status.html`)
 - [ ] Entwicklungsschleife (Schritte 1..n mit Lifecycle + Abnahme + Merge)
 - [ ] Aufräumen (Projektverzeichnis per `git rm -r` entfernen)
 - [ ] Abschlusscommit
