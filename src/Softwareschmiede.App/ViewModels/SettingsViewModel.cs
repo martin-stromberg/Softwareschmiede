@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Application.Services.Updates;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -19,6 +20,17 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private const string GitHubPluginPrefix = "Softwareschmiede.GitHub";
     private const string GitHubAgentTokenFieldKey = "AgentToken";
     private const string CommandLineParametersKey = "CommandLineParameters";
+    private const string ParallelLimitGruppenName = "Ausführungsbegrenzung";
+
+    /// <summary>Host-seitig deklariertes Limit-Feld für KI-Plugins; persistiert über
+    /// <see cref="ScmEventExecutionLimitService.PluginLimitKey(string)"/> in <see cref="AppEinstellungService"/>,
+    /// nicht über den pluginseitigen Credential Store.</summary>
+    private static readonly PluginSettingField HostParallelLimitField = new(
+        "ParallelLimit",
+        "Maximale parallele Ausführungen",
+        PluginSettingFieldType.Integer,
+        Placeholder: "unbegrenzt",
+        Description: "Ganzzahl ≥ 1; leer = unbegrenzt. Begrenzt die laufenden CLI-Ausführungen dieses KI-Plugins zusätzlich zum globalen Limit in „Aufgaben ausführen“.");
 
     private readonly AppEinstellungService _einstellungService;
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
@@ -27,6 +39,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private readonly PluginActivationService _pluginActivationService;
     private readonly PluginSettingsService _pluginSettingsService;
     private readonly PromptVorlagenService _promptVorlagenService;
+    private readonly ProjektService _projektService;
     private readonly ILogger<SettingsViewModel> _logger;
     private readonly IDialogService _dialogService;
     private readonly IServiceProvider _serviceProvider;
@@ -52,6 +65,11 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private string _scmTaskCompletionWaitMinutes = AppEinstellungService.ScmTaskCompletionDefaultWaitMinutes.ToString(System.Globalization.CultureInfo.InvariantCulture);
     private string _scmTriggerKeyword = ScmEventValidationService.DefaultTriggerKeyword;
     private string _scmDelayKeyword = ScmDelayDirective.DefaultDelayKeyword;
+    private string _maxParalleleAusfuehrungen = string.Empty;
+    private bool _isIssueAufbereitungEnabled;
+    private bool _isIssueAufbereitungKommentarEnabled = true;
+    private IssueAufbereitungKiPluginOption? _selectedIssueAufbereitungKiPlugin;
+    private readonly Dictionary<string, string?> _kiPluginParallelLimits = new(StringComparer.Ordinal);
     private string _scmPromptAppendixGeneral = string.Empty;
     private string _scmPromptAppendixIssue = string.Empty;
     private string _scmPromptAppendixIssueComment = string.Empty;
@@ -358,6 +376,56 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _scmDelayKeyword, value);
     }
 
+    /// <summary>Globales Limit paralleler CLI-Ausführungen für SCM-Ereignisse
+    /// (leer = unbegrenzt; gültig: Ganzzahl ≥ 1).</summary>
+    public string MaxParalleleAusfuehrungen
+    {
+        get => _maxParalleleAusfuehrungen;
+        set => SetProperty(ref _maxParalleleAusfuehrungen, value);
+    }
+
+    /// <summary>Gibt an, ob die automatische Issue-Aufbereitung aktiviert ist (Laufzeit-Schalter).</summary>
+    public bool IsIssueAufbereitungEnabled
+    {
+        get => _isIssueAufbereitungEnabled;
+        set
+        {
+            if (!SetProperty(ref _isIssueAufbereitungEnabled, value)) return;
+            OnPropertyChanged(nameof(IsIssueAufbereitungFelderEnabled));
+            OnPropertyChanged(nameof(IssueAufbereitungStatusText));
+        }
+    }
+
+    /// <summary>Gibt an, ob die Analyseergebnisse zusätzlich als Issue-Kommentar dokumentiert werden.</summary>
+    public bool IsIssueAufbereitungKommentarEnabled
+    {
+        get => _isIssueAufbereitungKommentarEnabled;
+        set => SetProperty(ref _isIssueAufbereitungKommentarEnabled, value);
+    }
+
+    /// <summary>Ausgewähltes Funktions-Plugin der Issue-Aufbereitung
+    /// (<see cref="IssueAufbereitungKiPluginOption.PluginPrefix"/> = <c>null</c> bedeutet:
+    /// Fallback auf die globale Standard-CLI).</summary>
+    public IssueAufbereitungKiPluginOption? SelectedIssueAufbereitungKiPlugin
+    {
+        get => _selectedIssueAufbereitungKiPlugin;
+        set => SetProperty(ref _selectedIssueAufbereitungKiPlugin, value);
+    }
+
+    /// <summary>Verfügbare KI-Plugin-Auswahl für die Aufbereitung, beginnend mit dem
+    /// Standard-Eintrag für den Fallback auf die globale Standard-CLI.</summary>
+    public ObservableCollection<IssueAufbereitungKiPluginOption> IssueAufbereitungKiPluginOptionen { get; } = [];
+
+    /// <summary>Überwachte Repositories mit Aufbereitungs-Auswahl (persistiertes Flag
+    /// <see cref="GitRepository.IssueAufbereitungAktiv"/>).</summary>
+    public ObservableCollection<IssueAufbereitungRepositoryEntry> IssueAufbereitungRepositories { get; } = [];
+
+    /// <summary>Die Detail-Felder der Aufbereitung sind nur bei aktivierter Funktion bedienbar.</summary>
+    public bool IsIssueAufbereitungFelderEnabled => IsIssueAufbereitungEnabled;
+
+    /// <summary>Statuszeile des „Issue-Aufbereitung“-Bereichs im Ausklapp-Header.</summary>
+    public string IssueAufbereitungStatusText => IsIssueAufbereitungEnabled ? "aktiviert" : "deaktiviert";
+
     /// <summary>Prompt-Anhang, der bei jeder SCM-Ereignisart an den Prompt angehängt wird (leer = keiner).</summary>
     public string ScmPromptAppendixGeneral
     {
@@ -441,6 +509,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         PluginActivationService pluginActivationService,
         PluginSettingsService pluginSettingsService,
         PromptVorlagenService promptVorlagenService,
+        ProjektService projektService,
         ILogger<SettingsViewModel> logger,
         IDialogService dialogService,
         IServiceProvider serviceProvider)
@@ -452,6 +521,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         _pluginActivationService = pluginActivationService;
         _pluginSettingsService = pluginSettingsService;
         _promptVorlagenService = promptVorlagenService;
+        _projektService = projektService;
         _logger = logger;
         _dialogService = dialogService;
         _serviceProvider = serviceProvider;
@@ -542,6 +612,34 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             ScmTriggerKeyword = await _einstellungService.GetScmTriggerKeywordAsync(ct);
             ScmDelayKeyword = await _einstellungService.GetScmDelayKeywordAsync(ct);
 
+            var globalLimit = await _einstellungService.GetIntSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, ct);
+            MaxParalleleAusfuehrungen = globalLimit is >= 1
+                ? globalLimit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : string.Empty;
+
+            // Issue-Aufbereitung: Funktionsschalter, Funktions-Plugin (leer = globale
+            // Standard-CLI), Repository-Auswahl und Kommentar-Schalter.
+            IsIssueAufbereitungEnabled = await _einstellungService.GetScmIssueAufbereitungEnabledAsync(ct);
+            IsIssueAufbereitungKommentarEnabled = await _einstellungService.GetScmIssueAufbereitungKommentarEnabledAsync(ct);
+            var aufbereitungsPrefix = await _einstellungService.GetScmIssueAufbereitungPluginPrefixAsync(ct);
+            IssueAufbereitungKiPluginOptionen.Clear();
+            IssueAufbereitungKiPluginOptionen.Add(IssueAufbereitungKiPluginOption.Standard);
+            foreach (var kiPlugin in KiPlugins)
+                IssueAufbereitungKiPluginOptionen.Add(new IssueAufbereitungKiPluginOption(kiPlugin.PluginPrefix, kiPlugin.PluginName));
+            SelectedIssueAufbereitungKiPlugin = IssueAufbereitungKiPluginOptionen
+                .FirstOrDefault(x => string.Equals(x.PluginPrefix, aufbereitungsPrefix, StringComparison.Ordinal))
+                ?? IssueAufbereitungKiPluginOption.Standard;
+
+            IssueAufbereitungRepositories.Clear();
+            foreach (var repository in await _projektService.GetAllRepositoriesAsync(ct))
+                IssueAufbereitungRepositories.Add(new IssueAufbereitungRepositoryEntry(repository, repository.IssueAufbereitungAktiv));
+            _kiPluginParallelLimits.Clear();
+            var pluginLimitWerte = await _einstellungService.GetSettingsAsync(
+                KiPlugins.Select(x => ScmEventExecutionLimitService.PluginLimitKey(x.PluginPrefix)).ToList(), ct);
+            foreach (var kiPlugin in KiPlugins)
+                _kiPluginParallelLimits[kiPlugin.PluginPrefix] =
+                    pluginLimitWerte.GetValueOrDefault(ScmEventExecutionLimitService.PluginLimitKey(kiPlugin.PluginPrefix));
+
             var promptAnhaenge = await _einstellungService.GetScmPromptAppendicesAsync(ct);
             ScmPromptAppendixGeneral = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendGeneralKey) ?? string.Empty;
             ScmPromptAppendixIssue = promptAnhaenge.GetValueOrDefault(AppEinstellungService.ScmPromptAppendIssueKey) ?? string.Empty;
@@ -626,7 +724,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             foreach (var entry in SourceCodeManagementPlugins.Concat(DevelopmentAutomationPlugins).Concat(DevelopmentEnvironmentPlugins))
                 await _pluginActivationService.SetPluginEnabledAsync(entry.PluginPrefix, entry.IsEnabled, ct);
 
-            SpeicherePluginEinstellungen(_selectedPlugin?.Plugin, _selectedPluginSettings);
+            await SpeicherePluginEinstellungenAsync(_selectedPlugin?.Plugin, _selectedPluginSettings, ct);
 
             await _arbeitsverzeichnisService.SaveArbeitsverzeichnisAsync(_arbeitsverzeichnis, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, _defaultKiPlugin, ct);
@@ -658,6 +756,24 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 AppEinstellungService.ScmDelayKeywordKey,
                 ScmDelayKeyword.Trim(),
                 ct);
+            await _einstellungService.SetSettingAsync(
+                ScmEventExecutionLimitService.GlobalLimitKey,
+                NullWennLeer(MaxParalleleAusfuehrungen?.Trim()),
+                ct);
+            await _einstellungService.SetBoolSettingAsync(
+                AppEinstellungService.ScmIssueAufbereitungEnabledKey,
+                IsIssueAufbereitungEnabled,
+                ct);
+            await _einstellungService.SetBoolSettingAsync(
+                AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey,
+                IsIssueAufbereitungKommentarEnabled,
+                ct);
+            await _einstellungService.SetSettingAsync(
+                AppEinstellungService.ScmIssueAufbereitungPluginKey,
+                SelectedIssueAufbereitungKiPlugin?.PluginPrefix,
+                ct);
+            foreach (var repositoryEntry in IssueAufbereitungRepositories)
+                await _projektService.SetIssueAufbereitungAktivAsync(repositoryEntry.Repository.Id, repositoryEntry.IsSelected, ct);
             await _einstellungService.SetScmBackmergeModusAsync(backmergeModus, ct);
             await _einstellungService.SetScmKontoModusAsync(kontoModus, ct);
             await _einstellungService.SetScmTaskCompletionPruefmodusAsync(pruefmodus, ct);
@@ -844,7 +960,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     private IReadOnlyList<PluginSettingGroupEntry> LadePluginEinstellungen(IPlugin plugin)
     {
-        return plugin.GetSettingGroups()
+        var gruppen = plugin.GetSettingGroups()
             .Select(group => new PluginSettingGroupEntry(
                 group.GroupName,
                 group.Fields.Select(field => new PluginSettingEntry(
@@ -853,13 +969,21 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                     useDefaultValue: !IsCodexCommandLineParameters(plugin, field)))
                 .ToList()))
             .ToList();
+        // Das Plugin-Parallel-Limit ist eine Host-Einstellung (AppEinstellung), kein
+        // plugindeklariertes Credential-Store-Feld — daher wird es hier eingespeist.
+        if (plugin is IKiPlugin)
+            gruppen.Add(new PluginSettingGroupEntry(ParallelLimitGruppenName,
+                [new PluginSettingEntry(HostParallelLimitField,
+                    _kiPluginParallelLimits.GetValueOrDefault(plugin.PluginPrefix),
+                    useDefaultValue: false)]));
+        return gruppen;
     }
 
     private static bool IsCodexCommandLineParameters(IPlugin plugin, PluginSettingField field) =>
         string.Equals(plugin.PluginPrefix, CodexPluginPrefix, StringComparison.Ordinal)
         && string.Equals(field.Key, CommandLineParametersKey, StringComparison.Ordinal);
 
-    private void SpeicherePluginEinstellungen(IPlugin? plugin, IReadOnlyList<PluginSettingGroupEntry> settings)
+    private async Task SpeicherePluginEinstellungenAsync(IPlugin? plugin, IReadOnlyList<PluginSettingGroupEntry> settings, CancellationToken ct)
     {
         if (plugin is null)
             return;
@@ -868,6 +992,14 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         {
             foreach (var entry in group.Entries)
             {
+                if (ReferenceEquals(entry.Field, HostParallelLimitField))
+                {
+                    var wert = NullWennLeer(entry.Value.Trim());
+                    await _einstellungService.SetSettingAsync(
+                        ScmEventExecutionLimitService.PluginLimitKey(plugin.PluginPrefix), wert, ct);
+                    _kiPluginParallelLimits[plugin.PluginPrefix] = wert;
+                    continue;
+                }
                 _pluginSettingsService.SetValue(plugin, entry.Field, entry.Value);
             }
         }
@@ -880,6 +1012,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             && ValidierePromptVorlagen()
             && ValidiereScmTriggerKeyword()
             && ValidiereScmDelayKeyword()
+            && ValidiereMaxParalleleAusfuehrungen()
             && ValidiereScmTaskCompletionWait()
             && ValidiereScmKontoModus();
     }
@@ -925,6 +1058,21 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 System.Globalization.CultureInfo.InvariantCulture, out var minuten) || minuten < 0)
         {
             FehlerMeldung = $"Die Wartezeit für die SCM-Abschlussüberwachung muss eine nicht negative Ganzzahl in Minuten sein. Standard: {AppEinstellungService.ScmTaskCompletionDefaultWaitMinutes}";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Das globale Parallel-Limit ist entweder leer (unbegrenzt) oder eine Ganzzahl ≥ 1.</summary>
+    private bool ValidiereMaxParalleleAusfuehrungen()
+    {
+        var wert = MaxParalleleAusfuehrungen?.Trim();
+        if (!string.IsNullOrEmpty(wert)
+            && (!int.TryParse(wert, System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out var limit) || limit < 1))
+        {
+            FehlerMeldung = "Das globale Limit paralleler CLI-Ausführungen muss leer (unbegrenzt) oder eine Ganzzahl größer oder gleich 1 sein.";
             return false;
         }
 
@@ -1004,9 +1152,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
                 if (entry.Field.FieldType == PluginSettingFieldType.Integer
                     && !string.IsNullOrEmpty(entry.Value)
-                    && !int.TryParse(entry.Value, out _))
+                    && (!int.TryParse(entry.Value, out var zahl)
+                        || (ReferenceEquals(entry.Field, HostParallelLimitField) && zahl < 1)))
                 {
-                    FehlerMeldung = $"Feld '{entry.Field.Label}' muss eine gültige Ganzzahl sein.";
+                    FehlerMeldung = ReferenceEquals(entry.Field, HostParallelLimitField)
+                        ? $"Feld '{entry.Field.Label}' muss leer (unbegrenzt) oder eine Ganzzahl größer oder gleich 1 sein."
+                        : $"Feld '{entry.Field.Label}' muss eine gültige Ganzzahl sein.";
                     return false;
                 }
 
@@ -1142,5 +1293,48 @@ public sealed class PromptVorlageEntry : ViewModelBase
     {
         get => _prompttext;
         set => SetProperty(ref _prompttext, value);
+    }
+}
+
+/// <summary>Auswahloption des Funktions-Plugins für die Issue-Aufbereitung.
+/// <see cref="PluginPrefix"/> = <c>null</c> steht für den Standard-Eintrag
+/// „Globale Standard-CLI verwenden" (Fallback-Kette der Plugin-Auflösung).</summary>
+/// <param name="PluginPrefix">Der Plugin-Prefix oder <c>null</c> für die globale Standard-CLI.</param>
+/// <param name="Label">Der Anzeigename der Option.</param>
+public sealed record IssueAufbereitungKiPluginOption(string? PluginPrefix, string Label)
+{
+    /// <summary>Der Standard-Eintrag: Kein dediziertes Funktions-Plugin — es greift die
+    /// Plugin-Auflösungskette (Projekt-Default → Global-Default → konfigurierter Standard).</summary>
+    public static IssueAufbereitungKiPluginOption Standard { get; } = new(null, "Globale Standard-CLI verwenden");
+
+    /// <inheritdoc />
+    public override string ToString() => Label;
+}
+
+/// <summary>Editierbarer Repository-Eintrag der Issue-Aufbereitung (persistiertes Flag
+/// <see cref="GitRepository.IssueAufbereitungAktiv"/>). Der Anzeigename ist der
+/// Repository-Name — keine internen Kennungen als Benutzereingabe.</summary>
+public sealed class IssueAufbereitungRepositoryEntry : ViewModelBase
+{
+    private bool _isSelected;
+
+    /// <inheritdoc cref="IssueAufbereitungRepositoryEntry"/>
+    public IssueAufbereitungRepositoryEntry(GitRepository repository, bool isSelected)
+    {
+        Repository = repository;
+        _isSelected = isSelected;
+    }
+
+    /// <summary>Die zugehörige Repository-Entität.</summary>
+    public GitRepository Repository { get; }
+
+    /// <summary>Anzeigename (Repository-Name).</summary>
+    public string RepositoryName => Repository.RepositoryName;
+
+    /// <summary>Gibt an, ob neu angelegte Issues dieses Repositorys aufbereitet werden.</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => SetProperty(ref _isSelected, value);
     }
 }

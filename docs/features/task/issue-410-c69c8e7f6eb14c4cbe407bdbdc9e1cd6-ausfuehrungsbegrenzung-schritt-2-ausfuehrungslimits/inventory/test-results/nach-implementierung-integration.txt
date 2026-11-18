@@ -1,0 +1,5 @@
+Nach-Implementierung-Lauf (Abschluss; SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1).
+
+dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj
+
+Bestanden!   : Fehler:     0, erfolgreich:   322, übersprungen:     0, gesamt:   322, Dauer: 41 s - Softwareschmiede.IntegrationTests.dll (net10.0)

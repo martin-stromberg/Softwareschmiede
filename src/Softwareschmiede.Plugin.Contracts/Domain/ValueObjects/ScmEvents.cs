@@ -51,13 +51,22 @@ public sealed record ScmEventObservation(ScmEventReference Reference, ScmContent
     public string EventKey => $"{ContentKey}/{Revision.ToUniversalTime():O}/{BodyHash}";
 }
 
-/// <summary>Vom Antwortkanal erlaubte Remoteaktion.</summary>
-public enum ScmResponseKind { Comment, Reaction, PullRequest }
+/// <summary>Vom Antwortkanal erlaubte Remoteaktion. <see cref="IssueBodyUpdate"/> ersetzt
+/// ausschließlich die Beschreibung einer Issue-Referenz — der Titel bleibt ausdrücklich
+/// unberührt. Neue Werte werden aus Kompatibilitätsgründen (numerische JSON-Persistenz in
+/// der Outbox-Aktionsanfrage) ausschließlich am Ende angehängt.</summary>
+public enum ScmResponseKind { Comment, Reaction, PullRequest, IssueBodyUpdate }
 
 /// <summary>Vom Host validierte lokale Nachweis-Datei, die das Plugin zum Attachment-Speicher hochlädt.</summary>
 public sealed record ScmResponseAttachment(string Path, string Name, string ContentType, string? Caption);
 
-/// <summary>Antwort mit ausschließlich vom Host vorgegebenem Ursprung und deterministischer Aktions-ID.</summary>
+/// <summary>Antwort mit ausschließlich vom Host vorgegebenem Ursprung und deterministischer Aktions-ID.
+/// Bei <see cref="ScmResponseKind.IssueBodyUpdate"/> trägt <see cref="Body"/> die vollständige neue
+/// Issue-Beschreibung; der Anbieter versieht den Remote-Text wie bei Kommentaren mit dem
+/// <see cref="Marker"/> als Reconcile-Anker. <see cref="Title"/>, <see cref="Reaction"/>,
+/// <see cref="HeadBranch"/>, <see cref="BaseBranch"/>, <see cref="Attachments"/>,
+/// <see cref="RemoteCommentId"/> und <see cref="RemoteNodeId"/> bleiben dabei ohne Wirkung —
+/// insbesondere wird der Issue-Titel niemals verändert.</summary>
 public sealed record ScmResponseRequest(ScmEventReference Reference, string ActionId, ScmResponseKind Kind,
     string? Body = null, string? Reaction = null, ScmContentKind? ContentKind = null,
     string? RemoteCommentId = null, string? RemoteNodeId = null, string? Title = null,

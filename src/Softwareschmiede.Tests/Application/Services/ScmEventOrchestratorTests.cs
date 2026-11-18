@@ -114,7 +114,7 @@ public sealed class ScmEventOrchestratorTests
     }
 
     /// <summary>A settings default that names no installed plugin is not guessed around:
-    /// the event keeps the actionable waiting state.</summary>
+    /// the event keeps an actionable waiting state that names the ignored assignment.</summary>
     [Fact]
     public async Task UnresolvableSettingsDefaultCli_KeepsWaitingState()
     {
@@ -127,7 +127,98 @@ public sealed class ScmEventOrchestratorTests
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);
-        Assert.Contains("Keine Standard-CLI", item.Reason);
+        Assert.Contains("nicht mehr installiert oder aktiviert", item.Reason);
+        Assert.Contains("Nicht installiert", item.Reason);
+        Assert.Empty(fixture.Sessions);
+        Assert.Empty(fixture.Prompts);
+    }
+
+    /// <summary>A deactivated task plugin assignment is ignored: the dispatch falls back to the
+    /// activated global default plugin, delivers the event and persists the used prefix.</summary>
+    [Fact]
+    public async Task DisabledTaskPlugin_FallsBackToGlobalDefault_Delivers()
+    {
+        var second = new ScmKiProfile("Softwareschmiede.OtherKi", string.Empty, "OTHER", "OTHER>",
+            new Dictionary<string, string?>());
+        await using var fixture = new ScmDispatchFixture(ki2: second);
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            (await db.Aufgaben.FindAsync(taskId))!.KiPluginPrefix = second.Prefix;
+            await db.SaveChangesAsync();
+            await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
+                .SetPluginEnabledAsync(second.Prefix, false);
+            await scope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
+                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix);
+        }
+        await fixture.DispatchAsync(eventId);
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("Zugestellt", item.Status);
+        Assert.NotNull(item.DeliveryAttemptId);
+        Assert.Single(fixture.Sessions);
+        Assert.Single(fixture.Prompts);
+        using var verification = fixture.Services.CreateScope();
+        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(taskId);
+        Assert.Equal(ScmDispatchFixture.KiPrefix, task!.KiPluginPrefix);
+    }
+
+    /// <summary>With no executable plugin configured the event waits honestly: an understandable
+    /// reason and a protocol entry are recorded, no hard NextAttemptUtc lock is applied, and the
+    /// delivery proceeds once the plugin is activated again.</summary>
+    [Fact]
+    public async Task UnavailablePlugins_EventWaitsWithoutHardLock_ResumesAfterFix()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
+                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, false);
+        await fixture.DispatchAsync(eventId);
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("Wartend", item.Status);
+        Assert.Null(item.NextAttemptUtc);
+        Assert.Contains("nicht mehr installiert oder aktiviert", item.Reason);
+        Assert.Contains(ScmDispatchFixture.KiPrefix, item.Reason);
+        Assert.Empty(fixture.Sessions);
+        Assert.Empty(fixture.Prompts);
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var entries = await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync();
+            Assert.Contains(entries, x => x.Typ == ProtokollTyp.SystemMeldung && x.Inhalt.Contains(ScmDispatchFixture.KiPrefix));
+        }
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
+                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, true);
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId);
+        item = await fixture.EventAsync(eventId);
+        Assert.Equal("Zugestellt", item.Status);
+        Assert.NotNull(item.DeliveryAttemptId);
+        Assert.Single(fixture.Sessions);
+        Assert.Single(fixture.Prompts);
+    }
+
+    /// <summary>An explicit user selection stays strict: a deactivated explicit prefix keeps the
+    /// existing failure path with a hard NextAttemptUtc lock instead of a silent fallback.</summary>
+    [Fact]
+    public async Task ExplicitPluginPrefix_RemainsStrict_LocksOnUnavailable()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (_, eventId) = await fixture.AddAsync(configured: true);
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
+                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, false);
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(eventId, ScmDispatchFixture.KiPrefix);
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("Wartend", item.Status);
+        Assert.Equal(long.MaxValue, item.NextAttemptUtc);
+        Assert.Contains("nicht mehr installiert oder aktiviert", item.Reason);
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Prompts);
     }

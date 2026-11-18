@@ -331,6 +331,216 @@ public sealed class PluginSelectionServiceTests
         resolved.Should().BeNull();
     }
 
+    /// <summary>Aktivierungsbewusste Auflösung: Ein aktiviertes Aufgaben-Prefix gewinnt
+    /// vor Projekt- und Global-Default.</summary>
+    [Fact]
+    public async Task ResolveEnabledPlugin_TaskPrefixEnabled_Wins()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var projektId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi");
+        await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.GlobalKi");
+
+        var task = CreateKiPlugin("Task", "Softwareschmiede.TaskKi");
+        var project = CreateKiPlugin("Project", "Softwareschmiede.ProjectKi");
+        var globalKi = CreateKiPlugin("Global", "Softwareschmiede.GlobalKi");
+        var pluginManager = CreatePluginManager([task, project, globalKi]);
+        var activationService = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
+
+        // Act
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.TaskKi", projektId);
+
+        // Assert
+        resolution.PluginPrefix.Should().Be("Softwareschmiede.TaskKi");
+        resolution.IgnoredPluginPrefixes.Should().BeEmpty();
+    }
+
+    /// <summary>Aktivierungsbewusste Auflösung: Ein deaktiviertes Aufgaben-Prefix wird ignoriert
+    /// und der aktivierte Projekt-Default gewählt.</summary>
+    [Fact]
+    public async Task ResolveEnabledPlugin_TaskPrefixDisabled_FallsBackToProjectDefault()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var projektId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi");
+
+        var task = CreateKiPlugin("Task", "Softwareschmiede.TaskKi");
+        var project = CreateKiPlugin("Project", "Softwareschmiede.ProjectKi");
+        var pluginManager = CreatePluginManager([task, project]);
+        var activationService = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        await activationService.SetPluginEnabledAsync("Softwareschmiede.TaskKi", false);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
+
+        // Act
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.TaskKi", projektId);
+
+        // Assert
+        resolution.PluginPrefix.Should().Be("Softwareschmiede.ProjectKi");
+        resolution.IgnoredPluginPrefixes.Should().ContainSingle().Which.Should().Be("Softwareschmiede.TaskKi");
+    }
+
+    /// <summary>Aktivierungsbewusste Auflösung: Ein nicht installiertes Aufgaben-Prefix wird
+    /// ignoriert und der aktivierte Projekt-Default gewählt.</summary>
+    [Fact]
+    public async Task ResolveEnabledPlugin_TaskPrefixNotInstalled_FallsBack()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var projektId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi");
+
+        var project = CreateKiPlugin("Project", "Softwareschmiede.ProjectKi");
+        var pluginManager = CreatePluginManager([project]);
+        var activationService = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
+
+        // Act
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.Missing", projektId);
+
+        // Assert
+        resolution.PluginPrefix.Should().Be("Softwareschmiede.ProjectKi");
+        resolution.IgnoredPluginPrefixes.Should().ContainSingle().Which.Should().Be("Softwareschmiede.Missing");
+    }
+
+    /// <summary>Aktivierungsbewusste Auflösung: Ein deaktivierter Projekt-Default wird ignoriert
+    /// und der aktivierte Global-Default gewählt.</summary>
+    [Fact]
+    public async Task ResolveEnabledPlugin_ProjectDefaultDisabled_FallsBackToGlobalDefault()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var projektId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi");
+        await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.GlobalKi");
+
+        var project = CreateKiPlugin("Project", "Softwareschmiede.ProjectKi");
+        var globalKi = CreateKiPlugin("Global", "Softwareschmiede.GlobalKi");
+        var pluginManager = CreatePluginManager([project, globalKi]);
+        var activationService = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        await activationService.SetPluginEnabledAsync("Softwareschmiede.ProjectKi", false);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
+
+        // Act
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(null, projektId);
+
+        // Assert
+        resolution.PluginPrefix.Should().Be("Softwareschmiede.GlobalKi");
+        resolution.IgnoredPluginPrefixes.Should().ContainSingle().Which.Should().Be("Softwareschmiede.ProjectKi");
+    }
+
+    /// <summary>Aktivierungsbewusste Auflösung: Ein deaktivierter Global-Default wird ignoriert
+    /// und die in den Einstellungen konfigurierte Standard-CLI (ki.plugin.default) gewählt.</summary>
+    [Fact]
+    public async Task ResolveEnabledPlugin_GlobalDefaultDisabled_FallsBackToSettingsDefault()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        await einstellungen.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator CLI");
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.GlobalKi");
+
+        var globalKi = CreateKiPlugin("Global", "Softwareschmiede.GlobalKi");
+        var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
+        var pluginManager = CreatePluginManager([globalKi, simulator]);
+        var activationService = new PluginActivationService(einstellungen, pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        await activationService.SetPluginEnabledAsync("Softwareschmiede.GlobalKi", false);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, einstellungen);
+
+        // Act
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(null, Guid.NewGuid());
+
+        // Assert
+        resolution.PluginPrefix.Should().Be("Softwareschmiede.KiSimulator");
+        resolution.IgnoredPluginPrefixes.Should().ContainSingle().Which.Should().Be("Softwareschmiede.GlobalKi");
+    }
+
+    /// <summary>Aktivierungsbewusste Auflösung: Sind alle konfigurierten Zuordnungen deaktiviert,
+    /// wird null zurückgegeben und jede ignorierte Zuordnung benannt.</summary>
+    [Fact]
+    public async Task ResolveEnabledPlugin_AllConfiguredDisabled_ReturnsNullWithIgnored()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        await einstellungen.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator CLI");
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var projektId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi");
+        await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.GlobalKi");
+
+        var task = CreateKiPlugin("Task", "Softwareschmiede.TaskKi");
+        var project = CreateKiPlugin("Project", "Softwareschmiede.ProjectKi");
+        var globalKi = CreateKiPlugin("Global", "Softwareschmiede.GlobalKi");
+        var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
+        var pluginManager = CreatePluginManager([task, project, globalKi, simulator]);
+        var activationService = new PluginActivationService(einstellungen, pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        foreach (var prefix in new[] { "Softwareschmiede.TaskKi", "Softwareschmiede.ProjectKi", "Softwareschmiede.GlobalKi", "Softwareschmiede.KiSimulator" })
+            await activationService.SetPluginEnabledAsync(prefix, false);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, einstellungen);
+
+        // Act
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.TaskKi", projektId);
+
+        // Assert
+        resolution.PluginPrefix.Should().BeNull();
+        resolution.IgnoredPluginPrefixes.Should().BeEquivalentTo(
+            ["Softwareschmiede.TaskKi", "Softwareschmiede.ProjectKi", "Softwareschmiede.GlobalKi", "Simulator CLI"]);
+    }
+
+    /// <summary>Aktivierungsbewusste Auflösung: Ist nichts konfiguriert, wird null mit
+    /// leerer Ignoriert-Liste zurückgegeben.</summary>
+    [Fact]
+    public async Task ResolveEnabledPlugin_NothingConfigured_ReturnsNullEmptyIgnored()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
+        var pluginManager = CreatePluginManager([simulator]);
+        var activationService = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
+
+        // Act
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(null, Guid.NewGuid());
+
+        // Assert
+        resolution.PluginPrefix.Should().BeNull();
+        resolution.IgnoredPluginPrefixes.Should().BeEmpty();
+    }
+
+    /// <summary>Aktivierungsbewusste Auflösung: Ein auf ein deaktiviertes Plugin zeigender
+    /// Einstellungen-Default (ki.plugin.default) wird ignoriert und führt zu null.</summary>
+    [Fact]
+    public async Task ResolveEnabledPlugin_SettingsDefaultDisabled_ReturnsNull()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        await einstellungen.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator CLI");
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+
+        var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
+        var pluginManager = CreatePluginManager([simulator]);
+        var activationService = new PluginActivationService(einstellungen, pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        await activationService.SetPluginEnabledAsync("Softwareschmiede.KiSimulator", false);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, einstellungen);
+
+        // Act
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(null, Guid.NewGuid());
+
+        // Assert
+        resolution.PluginPrefix.Should().BeNull();
+        resolution.IgnoredPluginPrefixes.Should().ContainSingle().Which.Should().Be("Simulator CLI");
+    }
+
     private static Mock<IPluginManager> CreatePluginManager(
         IReadOnlyList<IKiPlugin> kiPlugins,
         IReadOnlyList<IGitPlugin>? gitPlugins = null)

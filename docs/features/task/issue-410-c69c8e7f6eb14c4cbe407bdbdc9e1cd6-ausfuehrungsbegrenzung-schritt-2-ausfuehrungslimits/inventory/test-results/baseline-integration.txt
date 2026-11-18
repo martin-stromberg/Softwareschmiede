@@ -1,0 +1,6 @@
+Baseline-Lauf auf dem Basisbranch (Vorab-Zusammenfassung; volle Logausgabe aus dem
+Planungslauf).
+
+dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj
+
+Bestanden!   : Fehler:     0, erfolgreich:   302, übersprungen:     0, gesamt:   302 - Softwareschmiede.IntegrationTests.dll (net10.0)

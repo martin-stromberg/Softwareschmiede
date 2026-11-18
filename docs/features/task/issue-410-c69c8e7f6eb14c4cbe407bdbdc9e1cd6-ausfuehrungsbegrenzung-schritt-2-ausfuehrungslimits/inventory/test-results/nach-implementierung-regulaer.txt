@@ -1,0 +1,12 @@
+Nach-Implementierung-Lauf (Abschluss; SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1).
+
+dotnet build Softwareschmiede.slnx -c Debug
+Der Buildvorgang wurde erfolgreich ausgeführt. 0 Warnung(en), 0 Fehler
+
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface"
+
+[xUnit.net]     Softwareschmiede.Tests.Infrastructure.Services.SystemShutdownServiceTests.ResolveShutdownCommand_Linux_BleibtUnveraendert [SKIP]
+[xUnit.net]     Softwareschmiede.Tests.Infrastructure.Services.SystemShutdownServiceTests.ResolveShutdownCommand_MacOS_BleibtUnveraendert [SKIP]
+[xUnit.net]     Softwareschmiede.Tests.Application.Services.ArbeitsverzeichnisOeffnenServiceTests.Oeffne_AufNichtWindows_WirftPlatformNotSupportedException [SKIP]
+
+Bestanden!   : Fehler:     0, erfolgreich:  2639, übersprungen:     3, gesamt:  2642, Dauer: 3 m 13 s - Softwareschmiede.Tests.dll (net10.0)
