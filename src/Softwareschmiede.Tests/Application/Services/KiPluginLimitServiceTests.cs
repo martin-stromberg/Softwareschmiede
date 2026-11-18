@@ -51,11 +51,11 @@ public sealed class KiPluginLimitServiceTests : IDisposable
         var aufgabe = await ErstelleLaufendeAufgabeAsync("Ausloeser", TestPrefix);
         var resetUtc = DateTimeOffset.UtcNow.AddHours(2);
 
-        await _sut.VerarbeiteRateLimitAsync(aufgabe.Id, resetUtc);
+        await _sut.VerarbeiteRateLimitAsync(aufgabe.Id, resetUtc, TestContext.Current.CancellationToken);
 
         var einstellung = await _db.AppEinstellungen
             .AsNoTracking()
-            .SingleOrDefaultAsync(e => e.Schluessel == KiPluginLimitService.SessionLimitKeyPrefix + TestPrefix);
+            .SingleOrDefaultAsync(e => e.Schluessel == KiPluginLimitService.SessionLimitKeyPrefix + TestPrefix, cancellationToken: TestContext.Current.CancellationToken);
         einstellung.Should().NotBeNull();
         einstellung!.Wert.Should().NotBeNullOrEmpty();
         DateTimeOffset.Parse(einstellung.Wert!, null, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal)
@@ -69,18 +69,18 @@ public sealed class KiPluginLimitServiceTests : IDisposable
         var a1 = await ErstelleLaufendeAufgabeAsync("Peer A", TestPrefix);
         var a2 = await ErstelleLaufendeAufgabeAsync("Peer B", TestPrefix);
         var fremd = await ErstelleLaufendeAufgabeAsync("Fremdes Plugin", "Softwareschmiede.AnderesKi");
-        var nichtGestartet = await _aufgabeService.CreateAsync(_projektId, "Nicht gestartet", null);
-        var neuTracked = await _db.Aufgaben.FindAsync(nichtGestartet.Id);
+        var nichtGestartet = await _aufgabeService.CreateAsync(_projektId, "Nicht gestartet", null, ct: TestContext.Current.CancellationToken);
+        var neuTracked = await _db.Aufgaben.FindAsync(new object?[] { nichtGestartet.Id }, TestContext.Current.CancellationToken);
         neuTracked!.KiPluginPrefix = TestPrefix;
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var notified = new List<Guid>();
         _notifier.LaufdatenChanged += id => notified.Add(id);
 
         var resetUtc = DateTimeOffset.UtcNow.AddHours(3);
-        await _sut.VerarbeiteRateLimitAsync(a1.Id, resetUtc);
+        await _sut.VerarbeiteRateLimitAsync(a1.Id, resetUtc, TestContext.Current.CancellationToken);
 
-        var geladene = await _db.Aufgaben.AsNoTracking().ToListAsync();
+        var geladene = await _db.Aufgaben.AsNoTracking().ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         geladene.Single(a => a.Id == a1.Id).PausiertBisUtc.Should().BeCloseTo(resetUtc, TimeSpan.FromSeconds(5));
         geladene.Single(a => a.Id == a2.Id).PausiertBisUtc.Should().BeCloseTo(resetUtc, TimeSpan.FromSeconds(5));
         geladene.Single(a => a.Id == fremd.Id).PausiertBisUtc.Should().BeNull("ein fremder Plugin-Prefix darf nicht pausiert werden");
@@ -91,7 +91,7 @@ public sealed class KiPluginLimitServiceTests : IDisposable
         // Jede pausierte Aufgabe erhält einen SystemMeldung-Protokolleintrag.
         var systemMeldungen = await _db.Protokolleintraege
             .Where(e => e.Typ == ProtokollTyp.SystemMeldung && e.Inhalt.Contains("Session-Limit"))
-            .ToListAsync();
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         systemMeldungen.Should().HaveCount(2);
     }
 
@@ -101,11 +101,10 @@ public sealed class KiPluginLimitServiceTests : IDisposable
     {
         var aufgabe = await ErstelleLaufendeAufgabeAsync("Ausloeser", TestPrefix);
 
-        await _sut.VerarbeiteRateLimitAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddMinutes(-5));
+        await _sut.VerarbeiteRateLimitAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddMinutes(-5), TestContext.Current.CancellationToken);
 
-        (await _db.Aufgaben.FindAsync(aufgabe.Id))!.PausiertBisUtc.Should().BeNull();
-        (await _db.AppEinstellungen.SingleOrDefaultAsync(
-            e => e.Schluessel == KiPluginLimitService.SessionLimitKeyPrefix + TestPrefix))
+        (await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken))!.PausiertBisUtc.Should().BeNull();
+        (await _db.AppEinstellungen.SingleOrDefaultAsync(e => e.Schluessel == KiPluginLimitService.SessionLimitKeyPrefix + TestPrefix, cancellationToken: TestContext.Current.CancellationToken))
             .Should().NotBeNull("der Wert wird auch bei abgelaufenem Limit persistiert");
     }
 
@@ -114,16 +113,13 @@ public sealed class KiPluginLimitServiceTests : IDisposable
     public async Task GetAktiveSessionLimitsAsync_ShouldReturnOnlyFutureLimits()
     {
         var aufgabe = await ErstelleLaufendeAufgabeAsync("Ausloeser", TestPrefix);
-        await _sut.VerarbeiteRateLimitAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1));
+        await _sut.VerarbeiteRateLimitAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
 
         // Abgelaufenes Limit für ein zweites Prefix direkt seeden.
         var appEinstellungen = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
-        await appEinstellungen.SetSettingAsync(
-            KiPluginLimitService.SessionLimitKeyPrefix + "Softwareschmiede.Abgelaufen",
-            DateTimeOffset.UtcNow.AddMinutes(-10).ToString("O"));
+        await appEinstellungen.SetSettingAsync(KiPluginLimitService.SessionLimitKeyPrefix + "Softwareschmiede.Abgelaufen", DateTimeOffset.UtcNow.AddMinutes(-10).ToString("O"), TestContext.Current.CancellationToken);
 
-        var limits = await _sut.GetAktiveSessionLimitsAsync(
-            [TestPrefix, "Softwareschmiede.Abgelaufen", "Softwareschmiede.OhneLimit"]);
+        var limits = await _sut.GetAktiveSessionLimitsAsync([TestPrefix, "Softwareschmiede.Abgelaufen", "Softwareschmiede.OhneLimit"], TestContext.Current.CancellationToken);
 
         limits.Should().ContainKey(TestPrefix);
         limits.Should().NotContainKey("Softwareschmiede.Abgelaufen");
@@ -135,25 +131,25 @@ public sealed class KiPluginLimitServiceTests : IDisposable
     public async Task VerarbeiteRateLimitAsync_ShouldDoNothing_WhenAusloeserOhnePrefix()
     {
         var peer = await ErstelleLaufendeAufgabeAsync("Peer", TestPrefix);
-        var aufgabeOhnePrefix = await _aufgabeService.CreateAsync(_projektId, "Ohne Prefix", null);
-        var tracked = await _db.Aufgaben.FindAsync(aufgabeOhnePrefix.Id);
+        var aufgabeOhnePrefix = await _aufgabeService.CreateAsync(_projektId, "Ohne Prefix", null, ct: TestContext.Current.CancellationToken);
+        var tracked = await _db.Aufgaben.FindAsync(new object?[] { aufgabeOhnePrefix.Id }, TestContext.Current.CancellationToken);
         tracked!.Status = AufgabeStatus.Gestartet;
         tracked.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var notified = new List<Guid>();
         _notifier.LaufdatenChanged += id => notified.Add(id);
 
-        await _sut.VerarbeiteRateLimitAsync(aufgabeOhnePrefix.Id, DateTimeOffset.UtcNow.AddHours(2));
+        await _sut.VerarbeiteRateLimitAsync(aufgabeOhnePrefix.Id, DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
 
-        (await _db.AppEinstellungen.ToListAsync())
+        (await _db.AppEinstellungen.ToListAsync(cancellationToken: TestContext.Current.CancellationToken))
             .Should().BeEmpty("ohne KiPluginPrefix darf kein Session-Limit persistiert werden");
-        (await _db.Aufgaben.FindAsync(peer.Id))!.PausiertBisUtc
+        (await _db.Aufgaben.FindAsync(new object?[] { peer.Id }, TestContext.Current.CancellationToken))!.PausiertBisUtc
             .Should().BeNull("keine Aufgabe darf pausiert werden");
         notified.Should().BeEmpty();
         (await _db.Protokolleintraege
                 .Where(e => e.Typ == ProtokollTyp.SystemMeldung)
-                .ToListAsync())
+                .ToListAsync(cancellationToken: TestContext.Current.CancellationToken))
             .Should().BeEmpty();
     }
 
@@ -162,19 +158,19 @@ public sealed class KiPluginLimitServiceTests : IDisposable
     public async Task VerarbeiteRateLimitAsync_ShouldNotPause_WhenAufgabeBeendet()
     {
         var ausloeser = await ErstelleLaufendeAufgabeAsync("Ausloeser", TestPrefix);
-        var beendet = await _aufgabeService.CreateAsync(_projektId, "Beendete Aufgabe", null);
-        var beendetTracked = await _db.Aufgaben.FindAsync(beendet.Id);
+        var beendet = await _aufgabeService.CreateAsync(_projektId, "Beendete Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var beendetTracked = await _db.Aufgaben.FindAsync(new object?[] { beendet.Id }, TestContext.Current.CancellationToken);
         beendetTracked!.Status = AufgabeStatus.Beendet;
         beendetTracked.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
         beendetTracked.KiPluginPrefix = TestPrefix;
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var notified = new List<Guid>();
         _notifier.LaufdatenChanged += id => notified.Add(id);
 
-        await _sut.VerarbeiteRateLimitAsync(ausloeser.Id, DateTimeOffset.UtcNow.AddHours(1));
+        await _sut.VerarbeiteRateLimitAsync(ausloeser.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
 
-        (await _db.Aufgaben.FindAsync(beendet.Id))!.PausiertBisUtc
+        (await _db.Aufgaben.FindAsync(new object?[] { beendet.Id }, TestContext.Current.CancellationToken))!.PausiertBisUtc
             .Should().BeNull("eine beendete Aufgabe darf nicht pausiert werden");
         notified.Should().NotContain(beendet.Id);
     }
@@ -189,12 +185,12 @@ public sealed class KiPluginLimitServiceTests : IDisposable
         laengerPausiert.PausiertBisUtc = manuellBis;
         var kuerzerPausiert = await ErstelleLaufendeAufgabeAsync("Kürzer pausiert", TestPrefix);
         kuerzerPausiert.PausiertBisUtc = DateTimeOffset.UtcNow.AddMinutes(30);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var resetUtc = DateTimeOffset.UtcNow.AddHours(2);
-        await _sut.VerarbeiteRateLimitAsync(ausloeser.Id, resetUtc);
+        await _sut.VerarbeiteRateLimitAsync(ausloeser.Id, resetUtc, TestContext.Current.CancellationToken);
 
-        var geladene = await _db.Aufgaben.AsNoTracking().ToListAsync();
+        var geladene = await _db.Aufgaben.AsNoTracking().ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         geladene.Single(a => a.Id == laengerPausiert.Id).PausiertBisUtc
             .Should().BeCloseTo(manuellBis, TimeSpan.FromSeconds(5),
                 "eine längere manuelle Pause darf durch den früheren Limit-Reset nicht verkürzt werden");

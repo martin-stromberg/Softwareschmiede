@@ -27,8 +27,8 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
     {
         var geometry = new WindowGeometrySettings(X: 200, Y: 150, Width: 1400, Height: 900);
 
-        await _einstellungService.SetWindowGeometryAsync(geometry);
-        var geladen = await _einstellungService.GetWindowGeometryAsync();
+        await _einstellungService.SetWindowGeometryAsync(geometry, TestContext.Current.CancellationToken);
+        var geladen = await _einstellungService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
 
         geladen.X.Should().Be(200);
         geladen.Y.Should().Be(150);
@@ -40,7 +40,7 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
     [Fact]
     public async Task Fenstergeometrie_OhneGespeicherteWerte_GibtNull_Zurueck()
     {
-        var geladen = await _einstellungService.GetWindowGeometryAsync();
+        var geladen = await _einstellungService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
 
         geladen.X.Should().BeNull();
         geladen.Y.Should().BeNull();
@@ -52,10 +52,10 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
     [Fact]
     public async Task Fenstergeometrie_KannMehrmalsAktualisiert_Werden()
     {
-        await _einstellungService.SetWindowGeometryAsync(new WindowGeometrySettings(100, 100, 1200, 800));
-        await _einstellungService.SetWindowGeometryAsync(new WindowGeometrySettings(300, 250, 1600, 1000));
+        await _einstellungService.SetWindowGeometryAsync(new WindowGeometrySettings(100, 100, 1200, 800), TestContext.Current.CancellationToken);
+        await _einstellungService.SetWindowGeometryAsync(new WindowGeometrySettings(300, 250, 1600, 1000), TestContext.Current.CancellationToken);
 
-        var geladen = await _einstellungService.GetWindowGeometryAsync();
+        var geladen = await _einstellungService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
 
         geladen.X.Should().Be(300);
         geladen.Y.Should().Be(250);
@@ -67,10 +67,10 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
     [Fact]
     public async Task Fenstergeometrie_BeimNeustart_WirdWiederhergestellt()
     {
-        await _einstellungService.SetWindowGeometryAsync(new WindowGeometrySettings(50, 75, 1280, 720));
+        await _einstellungService.SetWindowGeometryAsync(new WindowGeometrySettings(50, 75, 1280, 720), TestContext.Current.CancellationToken);
 
         var neuerService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
-        var geladen = await neuerService.GetWindowGeometryAsync();
+        var geladen = await neuerService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
 
         geladen.X.Should().Be(50);
         geladen.Y.Should().Be(75);

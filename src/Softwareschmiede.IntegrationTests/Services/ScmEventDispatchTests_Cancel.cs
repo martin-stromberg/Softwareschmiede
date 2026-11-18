@@ -18,8 +18,8 @@ public sealed class ScmEventDispatchTests_Cancel
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
-            Assert.True(await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId));
-        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+            Assert.True(await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId, TestContext.Current.CancellationToken));
+        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
         Assert.Equal("Abgebrochen", (await fixture.EventAsync(eventId)).Status);
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Prompts);
@@ -45,9 +45,9 @@ public sealed class ScmEventDispatchTests_Cancel
         await fixture.DispatchAsync(eventId);
         Assert.Equal(1, calls);
         using (var scope = fixture.Services.CreateScope())
-            Assert.True(await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId));
+            Assert.True(await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId, TestContext.Current.CancellationToken));
         clock.Now = clock.Now.AddHours(1);
-        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync();
+        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
         Assert.Equal("Abgebrochen", (await fixture.EventAsync(eventId)).Status);
         Assert.Equal(1, calls);
     }

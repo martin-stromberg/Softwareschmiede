@@ -133,7 +133,7 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
     public async Task ExportCliRawAsync_ShouldAbort_WhenDialogCancelled()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-output-1");
+        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-output-1", TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -157,13 +157,13 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
     public async Task ExportCliRawAsync_ShouldWriteOnlyCliOutput_InChronologicalOrder()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "prompt-1");
-        await Task.Delay(5);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1");
-        await Task.Delay(5);
-        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.SystemMeldung, "sys-1");
-        await Task.Delay(5);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-2");
+        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "prompt-1", ct: TestContext.Current.CancellationToken);
+        await Task.Delay(5, TestContext.Current.CancellationToken);
+        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1", TestContext.Current.CancellationToken);
+        await Task.Delay(5, TestContext.Current.CancellationToken);
+        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.SystemMeldung, "sys-1", ct: TestContext.Current.CancellationToken);
+        await Task.Delay(5, TestContext.Current.CancellationToken);
+        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-2", TestContext.Current.CancellationToken);
 
         var exportPfad = Path.Combine(Path.GetTempPath(), $"cli-raw-export-{Guid.NewGuid():N}.raw");
         var sut = CreateSut();
@@ -184,7 +184,7 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
             await ((AsyncRelayCommand)sut.ExportCliRawCommand).ExecuteAsync();
 
             File.Exists(exportPfad).Should().BeTrue();
-            var inhalt = await File.ReadAllTextAsync(exportPfad);
+            var inhalt = await File.ReadAllTextAsync(exportPfad, TestContext.Current.CancellationToken);
             inhalt.Should().Be($"cli-1{Environment.NewLine}cli-2");
         }
         finally
@@ -199,7 +199,7 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
     public async Task ExportCliRawAsync_ShouldSetFehlerMeldung_WhenTargetPathIsNotRaw()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1");
+        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1", TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -223,7 +223,7 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
     public async Task ExportCliRawAsync_ShouldSetFehlerMeldung_WhenFileWriteFails()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1");
+        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1", TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();

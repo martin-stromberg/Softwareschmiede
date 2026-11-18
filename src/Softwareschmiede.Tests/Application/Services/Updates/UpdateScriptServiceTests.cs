@@ -21,9 +21,9 @@ public sealed class UpdateScriptServiceTests
             NullLogger<UpdateScriptService>.Instance,
             temp.Path);
 
-        var scriptPath = await sut.CreateScriptAsync(temp.Path, Path.Combine(temp.Path, "extracted"), "Softwareschmiede.exe", Path.Combine(temp.Path, "update.log"));
+        var scriptPath = await sut.CreateScriptAsync(temp.Path, Path.Combine(temp.Path, "extracted"), "Softwareschmiede.exe", Path.Combine(temp.Path, "update.log"), TestContext.Current.CancellationToken);
 
-        var script = await File.ReadAllTextAsync(scriptPath);
+        var script = await File.ReadAllTextAsync(scriptPath, TestContext.Current.CancellationToken);
         script.Should().Contain("param(");
         script.Should().Contain("[int]$AppPid");
         script.Should().Contain("[string]$TargetDirectory");
@@ -57,7 +57,7 @@ public sealed class UpdateScriptServiceTests
             Path.Combine(temp.Path, "updates", "update.log"),
             RequiresElevation: true);
 
-        await sut.StartScriptAsync(preparation);
+        await sut.StartScriptAsync(preparation, TestContext.Current.CancellationToken);
 
         launcher.FileName.Should().NotBeNullOrWhiteSpace();
         launcher.RunElevated.Should().BeTrue();
@@ -81,7 +81,7 @@ public sealed class UpdateScriptServiceTests
     {
         using var temp = new TempDirectory();
         var pwshPath = Path.Combine(temp.Path, "pwsh.exe");
-        await File.WriteAllTextAsync(pwshPath, string.Empty);
+        await File.WriteAllTextAsync(pwshPath, string.Empty, TestContext.Current.CancellationToken);
         var launcher = new CapturingLauncher();
         var sut = new UpdateScriptService(
             launcher,
@@ -91,7 +91,7 @@ public sealed class UpdateScriptServiceTests
             [Path.Combine(temp.Path, "missing-powershell.exe"), pwshPath]);
         var preparation = CreatePreparation(temp.Path, requiresElevation: false);
 
-        await sut.StartScriptAsync(preparation);
+        await sut.StartScriptAsync(preparation, TestContext.Current.CancellationToken);
 
         launcher.FileName.Should().Be(pwshPath);
     }

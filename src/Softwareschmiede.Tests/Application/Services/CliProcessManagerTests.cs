@@ -49,16 +49,16 @@ public sealed class CliProcessManagerTests : IDisposable
         var semaphoresField = typeof(CliProcessManager).GetField("_updateSemaphores", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var semaphores = (ConcurrentDictionary<Guid, SemaphoreSlim>)semaphoresField.GetValue(_sut)!;
         var semaphore = semaphores[aufgabeId];
-        await semaphore.WaitAsync();
+        await semaphore.WaitAsync(TestContext.Current.CancellationToken);
 
         var method = typeof(CliProcessManager).GetMethod("AktualisierungAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(_sut, new object[] { aufgabeId })!;
 
-        await Task.Delay(TimeSpan.FromMilliseconds(200));
+        await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
         task.IsCompleted.Should().BeFalse("AktualisierungAsync muss blockieren, solange die Semaphore der Aufgabe belegt ist");
 
         semaphore.Release();
-        var finished = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(task, "AktualisierungAsync muss nach Freigabe der Semaphore fortschreiten");
         task.IsCompletedSuccessfully.Should().BeTrue();
     }
@@ -78,12 +78,12 @@ public sealed class CliProcessManagerTests : IDisposable
         var semaphoresField = typeof(CliProcessManager).GetField("_updateSemaphores", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var semaphores = (ConcurrentDictionary<Guid, SemaphoreSlim>)semaphoresField.GetValue(_sut)!;
         var semaphoreA = semaphores[aufgabeIdA];
-        await semaphoreA.WaitAsync();
+        await semaphoreA.WaitAsync(TestContext.Current.CancellationToken);
 
         var method = typeof(CliProcessManager).GetMethod("AktualisierungAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var taskB = (Task)method.Invoke(_sut, new object[] { aufgabeIdB })!;
 
-        var finished = await Task.WhenAny(taskB, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(taskB, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(taskB, "die Semaphore einer anderen Aufgabe darf den Heartbeat-Update von Aufgabe B nicht blockieren");
         taskB.IsCompletedSuccessfully.Should().BeTrue();
 

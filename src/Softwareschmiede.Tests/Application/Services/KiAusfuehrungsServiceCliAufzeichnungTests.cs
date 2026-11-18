@@ -40,7 +40,7 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
         var aufgabeId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
-        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         var aufzeichnung = sut.GetCliAufzeichnung(aufgabeId);
         aufzeichnung.Should().NotBeNull();
@@ -76,7 +76,7 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
         var aufgabeId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
-        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         sut.GetCliAufzeichnung(aufgabeId).Should().BeNull("bei deaktiviertem Budget wird kein Recorder erstellt");
         handle.OutputSink.Should().BeOfType<CliOutputProtokollWriter>(
@@ -94,7 +94,7 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
         var aufgabeId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
-        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         handle.OutputSink.Should().BeOfType<CompositeTerminalOutputSink>(
             "der an die Session übergebene Sink muss die Composite-Instanz sein (Recorder + Writer)");
@@ -117,7 +117,7 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
         var aufgabeId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
-        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         var aufzeichnung = sut.GetCliAufzeichnung(aufgabeId);
         aufzeichnung.Should().NotBeNull();
@@ -142,7 +142,7 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
             .ToList();
 
         foreach (var id in aufgabeIds)
-            await sut.StartTerminalSessionAsync(id, pluginMock.Object, Path.GetTempPath());
+            await sut.StartTerminalSessionAsync(id, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         sut.GetCliAufzeichnung(aufgabeIds[0]).Should().BeNull(
             "der älteste Mitschnitt wird über der Retention-Grenze verworfen");
@@ -163,7 +163,7 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
         var aufgabeId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
-        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         var aufzeichnung = sut.GetCliAufzeichnung(aufgabeId);
         aufzeichnung.Should().NotBeNull();

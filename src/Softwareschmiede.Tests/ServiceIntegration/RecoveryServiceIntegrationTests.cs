@@ -40,7 +40,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync();
+        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
         kandidaten.Should().Contain(aufgabe.Id);
     }
@@ -55,7 +55,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync();
+        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
         kandidaten.Should().NotContain(aufgabe.Id);
     }
@@ -70,7 +70,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync();
+        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
         kandidaten.Should().Contain(aufgabe.Id);
     }
@@ -85,7 +85,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         var running = new E2EFakeRunningStatusSource(isRunning: true);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync();
+        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
         kandidaten.Should().NotContain(aufgabe.Id);
     }
@@ -100,9 +100,9 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        await sut.RecoverManuellAsync(aufgabe.Id);
+        await sut.RecoverManuellAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
-        var geladen = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var geladen = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         geladen!.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 

@@ -31,7 +31,7 @@ public sealed class GitHubSinceWindowTests
         var plugin = new GitHubPlugin(Mock.Of<ICliRunner>(), store.Object, NullLogger<GitHubPlugin>.Instance, new FakeGitHubEventApi(), agent,
             GitHubPluginTests.CreateMissingNetrcPath());
 
-        await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", Since);
+        await ((IScmNotificationSource)plugin).EnumerateNotificationsAsync("github.com", Since, TestContext.Current.CancellationToken);
 
         RequestedSince(agent.Requests.Should().ContainSingle().Subject.Endpoint)
             .Should().BeOnOrBefore(Since.AddHours(-2));
@@ -47,7 +47,7 @@ public sealed class GitHubSinceWindowTests
             null, GitHubPluginTests.CreateMissingNetrcPath());
 
         await plugin.ReadEventsAsync(new ScmEventReadRequest(new ScmEventReference(Repository, ScmReferenceKind.Issue, 27),
-            ScmContentKind.IssueComment, Since, Since.AddMinutes(2)));
+            ScmContentKind.IssueComment, Since, Since.AddMinutes(2)), TestContext.Current.CancellationToken);
 
         RequestedSince(api.Requests.Should().ContainSingle().Subject.Endpoint)
             .Should().BeOnOrBefore(Since.AddHours(-2));

@@ -28,14 +28,14 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
     [Fact]
     public async Task StartenAsync_Setzt_Status_AufGestartet()
     {
-        var projekt = await _projektService.CreateAsync("Startup-Projekt", null);
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Startup-Aufgabe", null);
+        var projekt = await _projektService.CreateAsync("Startup-Projekt", null, TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Startup-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         aufgabe.Status.Should().Be(AufgabeStatus.Neu);
 
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test-branch", "/tmp/repo");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test-branch", "/tmp/repo", ct: TestContext.Current.CancellationToken);
 
-        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         geladen!.Status.Should().Be(AufgabeStatus.Gestartet);
         geladen.BranchName.Should().Be("feature/test-branch");
         geladen.LokalerKlonPfad.Should().Be("/tmp/repo");
@@ -45,13 +45,13 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
     [Fact]
     public async Task StatusUebergang_Gestartet_NachWartend_IstErlaubt()
     {
-        var projekt = await _projektService.CreateAsync("Uebergang-Projekt", null);
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Uebergang-Aufgabe", null);
+        var projekt = await _projektService.CreateAsync("Uebergang-Projekt", null, TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Uebergang-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
-        await _aufgabeService.StartenAsync(aufgabe.Id, "main", "/tmp/repo");
-        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "main", "/tmp/repo", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend, TestContext.Current.CancellationToken);
 
-        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         geladen!.Status.Should().Be(AufgabeStatus.Wartend);
     }
 
@@ -59,14 +59,14 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
     [Fact]
     public async Task StatusUebergang_Wartend_NachGestartet_IstErlaubt()
     {
-        var projekt = await _projektService.CreateAsync("Resume-Projekt", null);
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Resume-Aufgabe", null);
+        var projekt = await _projektService.CreateAsync("Resume-Projekt", null, TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Resume-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
-        await _aufgabeService.StartenAsync(aufgabe.Id, "main", "/tmp/repo");
-        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend);
-        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "main", "/tmp/repo", ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend, TestContext.Current.CancellationToken);
+        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
 
-        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         geladen!.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 }

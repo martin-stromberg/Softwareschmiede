@@ -86,7 +86,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedIssues);
 
         // Act
-        var result = (await _sut.IssuesAbrufenAsync("owner/repo")).ToList();
+        var result = (await _sut.IssuesAbrufenAsync("owner/repo", TestContext.Current.CancellationToken)).ToList();
 
         // Assert
         result.Should().BeEquivalentTo(expectedIssues);
@@ -98,15 +98,15 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task CommitAsync_ShouldCommitAndAddLogEntry_WhenAufgabeHasKlonpfad()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Commit Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/commit", @"C:\repos\task-1");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Commit Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/commit", @"C:\repos\task-1", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.CommitAsync(aufgabe.Id, "feat: add tests");
+        await _sut.CommitAsync(aufgabe.Id, "feat: add tests", TestContext.Current.CancellationToken);
 
         // Assert
         _gitPluginMock.Verify(g => g.CommitAsync(@"C:\repos\task-1", "feat: add tests", It.IsAny<CancellationToken>()), Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Commit: feat: add tests"));
     }
 
@@ -118,20 +118,16 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var selectedPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
         var sut = CreateSutWithPlugins(defaultPluginMock, selectedPluginMock);
 
-        var projekt = await _projektService.CreateAsync("Projekt mit explizitem Plugin", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "LocalDirectoryPlugin",
-            @"C:\repos\source",
-            "source");
-        var repositoryEntity = await _db.GitRepositories.FindAsync(repository.Id);
+        var projekt = await _projektService.CreateAsync("Projekt mit explizitem Plugin", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "LocalDirectoryPlugin", @"C:\repos\source", "source", ct: TestContext.Current.CancellationToken);
+        var repositoryEntity = await _db.GitRepositories.FindAsync(new object?[] { repository.Id }, TestContext.Current.CancellationToken);
         repositoryEntity!.PluginTyp = "  localdirectoryplugin  ";
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Commit mit Pluginauswahl", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/selection", @"C:\repos\task-selection");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Commit mit Pluginauswahl", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/selection", @"C:\repos\task-selection", ct: TestContext.Current.CancellationToken);
 
-        await sut.CommitAsync(aufgabe.Id, "feat: selected plugin");
+        await sut.CommitAsync(aufgabe.Id, "feat: selected plugin", TestContext.Current.CancellationToken);
 
         selectedPluginMock.Verify(
             plugin => plugin.CommitAsync(@"C:\repos\task-selection", "feat: selected plugin", It.IsAny<CancellationToken>()),
@@ -146,15 +142,15 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task ResetAsync_ShouldLogHead_WhenTargetRefIsNull()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Reset Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/reset", @"C:\repos\task-2");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Reset Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/reset", @"C:\repos\task-2", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.ResetAsync(aufgabe.Id, "hard", null);
+        await _sut.ResetAsync(aufgabe.Id, "hard", null, TestContext.Current.CancellationToken);
 
         // Assert
         _gitPluginMock.Verify(g => g.ResetAsync(@"C:\repos\task-2", "hard", null, It.IsAny<CancellationToken>()), Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Reset (hard) auf HEAD"));
     }
 
@@ -163,11 +159,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PushAsync_ShouldThrowInvalidOperationException_WhenBranchNameIsMissing()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Push Aufgabe", null);
-        var entity = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Push Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var entity = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         entity!.LokalerKlonPfad = @"C:\repos\task-3";
         entity.BranchName = null;
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
         var act = () => _sut.PushAsync(aufgabe.Id);
@@ -181,14 +177,14 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pull Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pull", @"C:\repos\task-pull");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pull Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pull", @"C:\repos\task-pull", ct: TestContext.Current.CancellationToken);
         _gitPluginMock.SetupGet(g => g.PluginPrefix).Returns("LocalDirectoryPlugin");
 
-        await _sut.PullAsync(aufgabe.Id);
+        await _sut.PullAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.PullAsync(@"C:\repos\task-pull", It.IsAny<CancellationToken>()), Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Kein Merge"));
     }
 
@@ -196,14 +192,14 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pull Aufgabe Remote", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pull-remote", @"C:\repos\task-pull-remote");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pull Aufgabe Remote", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pull-remote", @"C:\repos\task-pull-remote", ct: TestContext.Current.CancellationToken);
         _gitPluginMock.SetupGet(g => g.PluginPrefix).Returns("GitHubPlugin");
 
-        await _sut.PullAsync(aufgabe.Id);
+        await _sut.PullAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.PullAsync(@"C:\repos\task-pull-remote", It.IsAny<CancellationToken>()), Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Änderungen vom Remote geholt"));
         protokoll.Should().NotContain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Kein Merge"));
     }
@@ -216,17 +212,13 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var localPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
         var sut = CreateSutWithPlugins(defaultPluginMock, localPluginMock);
 
-        var projekt = await _projektService.CreateAsync("Projekt mit lokalem Repository", null);
-        await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "LocalDirectoryPlugin",
-            @"C:\repos\project-source",
-            "source");
+        var projekt = await _projektService.CreateAsync("Projekt mit lokalem Repository", null, TestContext.Current.CancellationToken);
+        await _projektService.AddRepositoryAsync(projekt.Id, "LocalDirectoryPlugin", @"C:\repos\project-source", "source", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Pull ohne Repo-Verknüpfung", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/local-pull", @"C:\repos\task-local-pull");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Pull ohne Repo-Verknüpfung", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/local-pull", @"C:\repos\task-local-pull", ct: TestContext.Current.CancellationToken);
 
-        await sut.PullAsync(aufgabe.Id);
+        await sut.PullAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         localPluginMock.Verify(
             plugin => plugin.PullAsync(@"C:\repos\task-local-pull", It.IsAny<CancellationToken>()),
@@ -234,7 +226,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         defaultPluginMock.Verify(
             plugin => plugin.PullAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Kein Merge"));
     }
 
@@ -246,17 +238,13 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var selectedPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
         var sut = CreateSutWithPlugins(defaultPluginMock, selectedPluginMock);
 
-        var projekt = await _projektService.CreateAsync("Projekt mit ungültigem Plugin", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "Unknown.Plugin",
-            "https://example.com/repo.git",
-            "repo");
+        var projekt = await _projektService.CreateAsync("Projekt mit ungültigem Plugin", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "Unknown.Plugin", "https://example.com/repo.git", "repo", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Commit mit ungültigem Plugin", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/fallback", @"C:\repos\task-fallback");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Commit mit ungültigem Plugin", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/fallback", @"C:\repos\task-fallback", ct: TestContext.Current.CancellationToken);
 
-        await sut.CommitAsync(aufgabe.Id, "feat: fallback default");
+        await sut.CommitAsync(aufgabe.Id, "feat: fallback default", TestContext.Current.CancellationToken);
 
         defaultPluginMock.Verify(
             plugin => plugin.CommitAsync(@"C:\repos\task-fallback", "feat: fallback default", It.IsAny<CancellationToken>()),
@@ -274,22 +262,14 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var selectedPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
         var sut = CreateSutWithPlugins(defaultPluginMock, selectedPluginMock);
 
-        var projekt = await _projektService.CreateAsync("Projekt mit mehreren Repositories", null);
-        await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "LocalDirectoryPlugin",
-            @"C:\repos\source-a",
-            "source-a");
-        await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "Softwareschmiede.GitHub",
-            "https://github.com/example/repo-b",
-            "repo-b");
+        var projekt = await _projektService.CreateAsync("Projekt mit mehreren Repositories", null, TestContext.Current.CancellationToken);
+        await _projektService.AddRepositoryAsync(projekt.Id, "LocalDirectoryPlugin", @"C:\repos\source-a", "source-a", ct: TestContext.Current.CancellationToken);
+        await _projektService.AddRepositoryAsync(projekt.Id, "Softwareschmiede.GitHub", "https://github.com/example/repo-b", "repo-b", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Commit ohne Repo-Verknüpfung", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ambiguous-selection", @"C:\repos\task-ambiguous");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Commit ohne Repo-Verknüpfung", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ambiguous-selection", @"C:\repos\task-ambiguous", ct: TestContext.Current.CancellationToken);
 
-        await sut.CommitAsync(aufgabe.Id, "feat: default because ambiguous");
+        await sut.CommitAsync(aufgabe.Id, "feat: default because ambiguous", TestContext.Current.CancellationToken);
 
         defaultPluginMock.Verify(
             plugin => plugin.CommitAsync(@"C:\repos\task-ambiguous", "feat: default because ambiguous", It.IsAny<CancellationToken>()),
@@ -303,13 +283,13 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Merge Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/merge", @"C:\repos\task-merge");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Merge Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/merge", @"C:\repos\task-merge", ct: TestContext.Current.CancellationToken);
 
-        await _sut.MergeToSourceAsync(aufgabe.Id);
+        await _sut.MergeToSourceAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.MergeToSourceAsync(@"C:\repos\task-merge", It.IsAny<CancellationToken>()), Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("ins Quellverzeichnis übernommen"));
     }
 
@@ -317,7 +297,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task MergeToSourceAsync_ShouldThrowInvalidOperationException_WhenLocalPathIsMissing()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Merge ohne Pfad", null);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Merge ohne Pfad", null, ct: TestContext.Current.CancellationToken);
 
         var act = () => _sut.MergeToSourceAsync(aufgabe.Id);
 
@@ -330,8 +310,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Capabilities Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/caps", @"C:\repos\task-caps");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Capabilities Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/caps", @"C:\repos\task-caps", ct: TestContext.Current.CancellationToken);
         var expected = new GitActionCapabilities(
             RepositoryKind.LocalDirectory,
             IsWorkingDirectoryCopy: true,
@@ -344,7 +324,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.GetGitActionCapabilitiesAsync(@"C:\repos\task-caps", It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
 
-        var result = await _sut.GetGitActionCapabilitiesAsync(aufgabe.Id);
+        var result = await _sut.GetGitActionCapabilitiesAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         result.Should().Be(expected);
         _gitPluginMock.Verify(g => g.GetGitActionCapabilitiesAsync(@"C:\repos\task-caps", It.IsAny<CancellationToken>()), Times.Once);
@@ -365,7 +345,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task GetGitActionCapabilitiesAsync_ShouldForwardNullLocalPath_WhenTaskHasNoLocalPath()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Capabilities ohne Pfad", null);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Capabilities ohne Pfad", null, ct: TestContext.Current.CancellationToken);
         var expected = new GitActionCapabilities(
             RepositoryKind.RemoteGit,
             IsWorkingDirectoryCopy: false,
@@ -378,7 +358,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.GetGitActionCapabilitiesAsync(null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
 
-        var result = await _sut.GetGitActionCapabilitiesAsync(aufgabe.Id);
+        var result = await _sut.GetGitActionCapabilitiesAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
         result.Should().Be(expected);
         _gitPluginMock.Verify(g => g.GetGitActionCapabilitiesAsync(null, It.IsAny<CancellationToken>()), Times.Once);
@@ -389,15 +369,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldUseTaskRepositoryAndLog_WhenAufgabeHasLinkedRepository()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Git-Orchestration-Testprojekt", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/repo",
-            "test/repo");
+        var projekt = await _projektService.CreateAsync("Git-Orchestration-Testprojekt", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/repo", "test/repo", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR Aufgabe", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr", @"C:\repos\task-4");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR Aufgabe", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr", @"C:\repos\task-4", ct: TestContext.Current.CancellationToken);
         var expectedPr = new PullRequest(42, "PR Titel", "https://example/pr/42", "feature/pr");
 
         _gitPluginMock
@@ -405,7 +381,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedPr);
 
         // Act
-        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Custom title", body: "Custom body");
+        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Custom title", body: "Custom body", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(expectedPr);
@@ -415,7 +391,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(
             g => g.CreatePullRequestAsync("test/repo", "feature/pr", null, "Custom title", "Custom body", It.IsAny<CancellationToken>()),
             Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("vor Pull-Request-Erstellung gepusht"));
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Pull Request erstellt: #42"));
     }
@@ -425,15 +401,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldUseCommitListBody_WhenWorkspaceSnapshotAvailable()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Projekt mit Commitliste", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/commit-body",
-            "test/commit-body");
+        var projekt = await _projektService.CreateAsync("Projekt mit Commitliste", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/commit-body", "test/commit-body", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Commits", "Alte Anforderung", repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/commit-body", @"C:\repos\task-commit-body");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Commits", "Alte Anforderung", repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/commit-body", @"C:\repos\task-commit-body", ct: TestContext.Current.CancellationToken);
 
         var workspaceBrowserMock = new Mock<IGitWorkspaceBrowserService>();
         workspaceBrowserMock
@@ -483,7 +455,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(new PullRequest(44, "PR mit Commits", "https://example/pr/44", "feature/commit-body"));
 
         // Act
-        await sut.PullRequestErstellenAsync(aufgabe.Id);
+        await sut.PullRequestErstellenAsync(aufgabe.Id, ct: TestContext.Current.CancellationToken);
 
         // Assert
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
@@ -504,17 +476,13 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldUseTaskBasisBranch_WhenLoadingWorkspaceSnapshotForBody()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Projekt mit Staging", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/basis-branch",
-            "test/basis-branch");
+        var projekt = await _projektService.CreateAsync("Projekt mit Staging", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/basis-branch", "test/basis-branch", ct: TestContext.Current.CancellationToken);
         repository.DefaultSourceBranchName = "main";
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Staging-Basis", "Alte Anforderung", repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/staging-basis", @"C:\repos\task-staging", "staging");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Staging-Basis", "Alte Anforderung", repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/staging-basis", @"C:\repos\task-staging", "staging", TestContext.Current.CancellationToken);
 
         var workspaceBrowserMock = new Mock<IGitWorkspaceBrowserService>();
         workspaceBrowserMock
@@ -562,7 +530,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(new PullRequest(45, "PR mit Staging-Basis", "https://example/pr/45", "feature/staging-basis"));
 
         // Act
-        await sut.PullRequestErstellenAsync(aufgabe.Id);
+        await sut.PullRequestErstellenAsync(aufgabe.Id, ct: TestContext.Current.CancellationToken);
 
         // Assert
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
@@ -583,15 +551,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldUseProjectRepository_WhenAufgabeHasNoLinkedRepository()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Projekt mit Repository", null);
-        await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/project-repo",
-            "test/project-repo");
+        var projekt = await _projektService.CreateAsync("Projekt mit Repository", null, TestContext.Current.CancellationToken);
+        await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/project-repo", "test/project-repo", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Repo", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-repo", @"C:\repos\task-5");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Repo", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-repo", @"C:\repos\task-5", ct: TestContext.Current.CancellationToken);
         var expectedPr = new PullRequest(43, "PR Titel", "https://example/pr/43", "feature/no-repo");
 
         _gitPluginMock
@@ -599,10 +563,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedPr);
 
         // Act
-        var result = await _sut.PullRequestErstellenAsync(
-            aufgabe.Id,
-            title: "Titel aus Aufgabe",
-            body: "Body aus Aufgabe");
+        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel aus Aufgabe", body: "Body aus Aufgabe", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(expectedPr);
@@ -616,18 +577,14 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldCallPluginWithBaseBranch_WhenConfigured()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Projekt mit Basis-Branch", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/basis-branch-repo",
-            "test/basis-branch-repo");
-        var repositoryEntity = await _db.GitRepositories.FindAsync(repository.Id);
+        var projekt = await _projektService.CreateAsync("Projekt mit Basis-Branch", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/basis-branch-repo", "test/basis-branch-repo", ct: TestContext.Current.CancellationToken);
+        var repositoryEntity = await _db.GitRepositories.FindAsync(new object?[] { repository.Id }, TestContext.Current.CancellationToken);
         repositoryEntity!.DefaultSourceBranchName = "staging";
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Basis-Branch", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/basis-branch", @"C:\repos\task-basis-branch");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/basis-branch", @"C:\repos\task-basis-branch", ct: TestContext.Current.CancellationToken);
         var expectedPr = new PullRequest(90, "PR Titel", "https://example/pr/90", "feature/basis-branch");
 
         _gitPluginMock
@@ -635,7 +592,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedPr);
 
         // Act
-        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(expectedPr);
@@ -649,15 +606,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldCallPluginWithoutBaseBranch_WhenNotConfigured()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Projekt ohne Basis-Branch", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/no-basis-branch-repo",
-            "test/no-basis-branch-repo");
+        var projekt = await _projektService.CreateAsync("Projekt ohne Basis-Branch", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/no-basis-branch-repo", "test/no-basis-branch-repo", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Basis-Branch", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-basis-branch", @"C:\repos\task-no-basis-branch");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-basis-branch", @"C:\repos\task-no-basis-branch", ct: TestContext.Current.CancellationToken);
         var expectedPr = new PullRequest(91, "PR Titel", "https://example/pr/91", "feature/no-basis-branch");
 
         _gitPluginMock
@@ -665,7 +618,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedPr);
 
         // Act
-        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(expectedPr);
@@ -678,15 +631,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldAppendClosingDirectiveAndLogIssue_WhenAufgabeHasIssueReference()
     {
-        var projekt = await _projektService.CreateAsync("Projekt mit Issue", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/issue-repo",
-            "test/issue-repo");
+        var projekt = await _projektService.CreateAsync("Projekt mit Issue", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/issue-repo", "test/issue-repo", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Issue", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/issue", @"C:\repos\task-issue");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Issue", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/issue", @"C:\repos\task-issue", ct: TestContext.Current.CancellationToken);
         _db.IssueReferenzen.Add(new IssueReferenz
         {
             Id = Guid.NewGuid(),
@@ -695,7 +644,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Titel = "Issue 123",
             LabelsJson = "[]"
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _gitPluginMock
             .Setup(g => g.CreatePullRequestAsync(
@@ -707,7 +656,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(77, "PR", "https://example/pr/77", "feature/issue"));
 
-        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/issue-repo",
@@ -717,7 +666,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             It.Is<string>(body => body == $"Body{Environment.NewLine}{Environment.NewLine}Closes #123"),
             It.IsAny<CancellationToken>()), Times.Once);
 
-        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Issue #123"));
     }
 
@@ -725,15 +674,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyAlreadyContainsDirective()
     {
-        var projekt = await _projektService.CreateAsync("Projekt mit bestehender Direktive", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/existing-directive",
-            "test/existing-directive");
+        var projekt = await _projektService.CreateAsync("Projekt mit bestehender Direktive", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/existing-directive", "test/existing-directive", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Duplikat", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-dup", @"C:\repos\task-no-dup");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Duplikat", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-dup", @"C:\repos\task-no-dup", ct: TestContext.Current.CancellationToken);
         _db.IssueReferenzen.Add(new IssueReferenz
         {
             Id = Guid.NewGuid(),
@@ -742,7 +687,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Titel = "Issue 88",
             LabelsJson = "[]"
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         const string existingBody = "Implementierung abgeschlossen.\nFixes #88";
         _gitPluginMock
@@ -755,7 +700,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(78, "PR", "https://example/pr/78", "feature/no-dup"));
 
-        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody);
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/existing-directive",
@@ -771,15 +716,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldUseOnlyClosingDirective_WhenBodyIsWhitespaceAndIssueExists()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Projekt mit Whitespace-Body", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/whitespace-body",
-            "test/whitespace-body");
+        var projekt = await _projektService.CreateAsync("Projekt mit Whitespace-Body", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/whitespace-body", "test/whitespace-body", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Whitespace-Body", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/whitespace", @"C:\repos\task-whitespace");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Whitespace-Body", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/whitespace", @"C:\repos\task-whitespace", ct: TestContext.Current.CancellationToken);
         _db.IssueReferenzen.Add(new IssueReferenz
         {
             Id = Guid.NewGuid(),
@@ -788,7 +729,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Titel = "Issue 501",
             LabelsJson = "[]"
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _gitPluginMock
             .Setup(g => g.CreatePullRequestAsync(
@@ -801,7 +742,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(new PullRequest(79, "PR", "https://example/pr/79", "feature/whitespace"));
 
         // Act
-        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "   ");
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "   ", ct: TestContext.Current.CancellationToken);
 
         // Assert
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
@@ -818,15 +759,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldAppendClosingDirectiveForCurrentIssue_WhenBodyContainsDirectiveForAnotherIssue()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Projekt mit anderer Direktive", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/other-directive",
-            "test/other-directive");
+        var projekt = await _projektService.CreateAsync("Projekt mit anderer Direktive", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/other-directive", "test/other-directive", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit anderer Direktive", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/other-directive", @"C:\repos\task-other-directive");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit anderer Direktive", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/other-directive", @"C:\repos\task-other-directive", ct: TestContext.Current.CancellationToken);
         _db.IssueReferenzen.Add(new IssueReferenz
         {
             Id = Guid.NewGuid(),
@@ -835,7 +772,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Titel = "Issue 123",
             LabelsJson = "[]"
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         const string existingBody = "Implementierung abgeschlossen.\nCloses #41";
         var expectedBody = $"{existingBody.TrimEnd()}{Environment.NewLine}{Environment.NewLine}Closes #123";
@@ -850,7 +787,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(new PullRequest(80, "PR", "https://example/pr/80", "feature/other-directive"));
 
         // Act
-        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody);
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
 
         // Assert
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
@@ -866,15 +803,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldKeepBodyUnchanged_WhenIssueReferenceHasNoIssueNumber()
     {
-        var projekt = await _projektService.CreateAsync("Projekt mit Issue ohne Nummer", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/no-issue-number",
-            "test/no-issue-number");
+        var projekt = await _projektService.CreateAsync("Projekt mit Issue ohne Nummer", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/no-issue-number", "test/no-issue-number", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Issue-Nummer", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-issue-number", @"C:\repos\task-no-issue-number");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Issue-Nummer", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-issue-number", @"C:\repos\task-no-issue-number", ct: TestContext.Current.CancellationToken);
         _db.IssueReferenzen.Add(new IssueReferenz
         {
             Id = Guid.NewGuid(),
@@ -883,7 +816,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Titel = "Issue ohne Nummer",
             LabelsJson = "[]"
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _gitPluginMock
             .Setup(g => g.CreatePullRequestAsync(
@@ -895,7 +828,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(82, "PR", "https://example/pr/82", "feature/no-issue-number"));
 
-        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/no-issue-number",
@@ -912,15 +845,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [InlineData(-7)]
     public async Task PullRequestErstellenAsync_ShouldKeepBodyUnchanged_WhenIssueNumberIsNotPositive(int issueNummer)
     {
-        var projekt = await _projektService.CreateAsync($"Projekt mit Issue {issueNummer}", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            $"https://github.com/test/non-positive-{Math.Abs(issueNummer)}",
-            $"test/non-positive-{Math.Abs(issueNummer)}");
+        var projekt = await _projektService.CreateAsync($"Projekt mit Issue {issueNummer}", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", $"https://github.com/test/non-positive-{Math.Abs(issueNummer)}", $"test/non-positive-{Math.Abs(issueNummer)}", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, $"PR mit Issue {issueNummer}", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, $"feature/non-positive-{Math.Abs(issueNummer)}", @"C:\repos\task-non-positive");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, $"PR mit Issue {issueNummer}", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, $"feature/non-positive-{Math.Abs(issueNummer)}", @"C:\repos\task-non-positive", ct: TestContext.Current.CancellationToken);
         _db.IssueReferenzen.Add(new IssueReferenz
         {
             Id = Guid.NewGuid(),
@@ -929,7 +858,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Titel = $"Issue {issueNummer}",
             LabelsJson = "[]"
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _gitPluginMock
             .Setup(g => g.CreatePullRequestAsync(
@@ -941,7 +870,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(83, "PR", "https://example/pr/83", $"feature/non-positive-{Math.Abs(issueNummer)}"));
 
-        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             $"test/non-positive-{Math.Abs(issueNummer)}",
@@ -956,15 +885,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyContainsQualifiedIssueReference()
     {
-        var projekt = await _projektService.CreateAsync("Projekt mit qualifizierter Direktive", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/qualified-directive",
-            "test/qualified-directive");
+        var projekt = await _projektService.CreateAsync("Projekt mit qualifizierter Direktive", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/qualified-directive", "test/qualified-directive", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit qualifizierter Direktive", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/qualified-directive", @"C:\repos\task-qualified-directive");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit qualifizierter Direktive", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/qualified-directive", @"C:\repos\task-qualified-directive", ct: TestContext.Current.CancellationToken);
         _db.IssueReferenzen.Add(new IssueReferenz
         {
             Id = Guid.NewGuid(),
@@ -973,7 +898,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Titel = "Issue 321",
             LabelsJson = "[]"
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         const string existingBody = "Implementierung abgeschlossen.\nFixes owner/repo#321";
         _gitPluginMock
@@ -986,7 +911,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(84, "PR", "https://example/pr/84", "feature/qualified-directive"));
 
-        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody);
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/qualified-directive",
@@ -1003,15 +928,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [InlineData("Closed #654")]
     public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyUsesAlternativeClosingVerb(string directive)
     {
-        var projekt = await _projektService.CreateAsync($"Projekt mit Direktive {directive}", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/alternative-directive",
-            "test/alternative-directive");
+        var projekt = await _projektService.CreateAsync($"Projekt mit Direktive {directive}", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/alternative-directive", "test/alternative-directive", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit alternativer Direktive", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/alternative-directive", @"C:\repos\task-alternative-directive");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit alternativer Direktive", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/alternative-directive", @"C:\repos\task-alternative-directive", ct: TestContext.Current.CancellationToken);
         _db.IssueReferenzen.Add(new IssueReferenz
         {
             Id = Guid.NewGuid(),
@@ -1020,7 +941,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Titel = "Issue 654",
             LabelsJson = "[]"
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var existingBody = $"Implementierung abgeschlossen.{Environment.NewLine}{directive}";
         _gitPluginMock
@@ -1033,7 +954,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(85, "PR", "https://example/pr/85", "feature/alternative-directive"));
 
-        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody);
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/alternative-directive",
@@ -1049,20 +970,12 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldThrowInvalidOperationException_WhenMultipleActiveRepositoriesExist()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Projekt mit mehreren Repositories", null);
-        await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/repo-a",
-            "test/repo-a");
-        await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/repo-b",
-            "test/repo-b");
+        var projekt = await _projektService.CreateAsync("Projekt mit mehreren Repositories", null, TestContext.Current.CancellationToken);
+        await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/repo-a", "test/repo-a", ct: TestContext.Current.CancellationToken);
+        await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/repo-b", "test/repo-b", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mehrdeutig", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ambiguous", @"C:\repos\task-6");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mehrdeutig", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ambiguous", @"C:\repos\task-6", ct: TestContext.Current.CancellationToken);
 
         // Act
         var act = () => _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
@@ -1080,9 +993,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldThrowInvalidOperationException_WhenNoActiveRepositoryExists()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Projekt ohne Repository", null);
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Repository", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-active-repo", @"C:\repos\task-no-active-repo");
+        var projekt = await _projektService.CreateAsync("Projekt ohne Repository", null, TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Repository", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-active-repo", @"C:\repos\task-no-active-repo", ct: TestContext.Current.CancellationToken);
 
         // Act
         var act = () => _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
@@ -1100,15 +1013,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldResolveRepositoryId_FromSshRepositoryUrl()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Projekt mit SSH-Repository", null);
-        var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "git@github.com:owner/repo.git",
-            "owner/repo");
+        var projekt = await _projektService.CreateAsync("Projekt mit SSH-Repository", null, TestContext.Current.CancellationToken);
+        var repository = await _projektService.AddRepositoryAsync(projekt.Id, "GitHub", "git@github.com:owner/repo.git", "owner/repo", ct: TestContext.Current.CancellationToken);
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit SSH-URL", null, repository.Id);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ssh-url", @"C:\repos\task-ssh-url");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit SSH-URL", null, repository.Id, TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ssh-url", @"C:\repos\task-ssh-url", ct: TestContext.Current.CancellationToken);
         var expectedPr = new PullRequest(81, "SSH PR", "https://example/pr/81", "feature/ssh-url");
 
         _gitPluginMock
@@ -1122,7 +1031,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedPr);
 
         // Act
-        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(expectedPr);

@@ -62,7 +62,7 @@ public sealed class ScmEventOrchestratorTests
                 ReceivedUtc = time.ToUnixTimeMilliseconds()
             };
             db.AddRange(project, repository, task, incomingEvent);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
             eventId = incomingEvent.Id;
         }
         await fixture.DispatchAsync(eventId);
@@ -84,7 +84,7 @@ public sealed class ScmEventOrchestratorTests
         var (taskId, eventId) = await fixture.AddAsync();
         await fixture.DispatchAsync(eventId);
         using var scope = fixture.Services.CreateScope();
-        var task = await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(taskId);
+        var task = await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
         Assert.Equal(AufgabeStatus.Gestartet, task!.Status);
         Assert.Contains("Keine Standard-CLI", (await fixture.EventAsync(eventId)).Reason);
         Assert.Empty(fixture.Sessions);
@@ -101,7 +101,7 @@ public sealed class ScmEventOrchestratorTests
         var (taskId, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator");
+                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator", TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Zugestellt", item.Status);
@@ -109,7 +109,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
         using var verification = fixture.Services.CreateScope();
-        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(taskId);
+        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
         Assert.Equal(ScmDispatchFixture.KiPrefix, task!.KiPluginPrefix);
     }
 
@@ -123,7 +123,7 @@ public sealed class ScmEventOrchestratorTests
         var (_, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Nicht installiert");
+                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Nicht installiert", TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);
@@ -146,12 +146,12 @@ public sealed class ScmEventOrchestratorTests
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            (await db.Aufgaben.FindAsync(taskId))!.KiPluginPrefix = second.Prefix;
-            await db.SaveChangesAsync();
+            (await db.Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.KiPluginPrefix = second.Prefix;
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
-                .SetPluginEnabledAsync(second.Prefix, false);
+                .SetPluginEnabledAsync(second.Prefix, false, TestContext.Current.CancellationToken);
             await scope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
-                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix);
+                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
         }
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
@@ -160,7 +160,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
         using var verification = fixture.Services.CreateScope();
-        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(taskId);
+        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
         Assert.Equal(ScmDispatchFixture.KiPrefix, task!.KiPluginPrefix);
     }
 
@@ -175,7 +175,7 @@ public sealed class ScmEventOrchestratorTests
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
-                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, false);
+                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, false, TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);
@@ -187,14 +187,14 @@ public sealed class ScmEventOrchestratorTests
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var entries = await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync();
+            var entries = await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
             Assert.Contains(entries, x => x.Typ == ProtokollTyp.SystemMeldung && x.Inhalt.Contains(ScmDispatchFixture.KiPrefix));
         }
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
-                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, true);
+                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, true, TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId);
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
         item = await fixture.EventAsync(eventId);
         Assert.Equal("Zugestellt", item.Status);
         Assert.NotNull(item.DeliveryAttemptId);
@@ -212,9 +212,9 @@ public sealed class ScmEventOrchestratorTests
         var (_, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
-                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, false);
+                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, false, TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(eventId, ScmDispatchFixture.KiPrefix);
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(eventId, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);
         Assert.Equal(long.MaxValue, item.NextAttemptUtc);
@@ -236,11 +236,11 @@ public sealed class ScmEventOrchestratorTests
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            if (paused) { (await db.Aufgaben.FindAsync(taskId))!.PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(1); await db.SaveChangesAsync(); }
+            if (paused) { (await db.Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(1); await db.SaveChangesAsync(TestContext.Current.CancellationToken); }
         }
         await fixture.DispatchAsync(eventId);
         using var verification = fixture.Services.CreateScope();
-        Assert.Equal(status, (await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(taskId))!.Status);
+        Assert.Equal(status, (await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.Status);
         Assert.Empty(fixture.Sessions);
         Assert.Equal("Wartend", (await fixture.EventAsync(eventId)).Status);
     }
@@ -258,18 +258,18 @@ public sealed class ScmEventOrchestratorTests
         var channel = Path.Combine(adapter.WorkingDirectory, ScmEventExchangeProtocol.DirectoryName);
         Directory.CreateDirectory(channel);
         var foreign = Path.Combine(channel, "foreign.txt");
-        await File.WriteAllTextAsync(foreign, "retain");
+        await File.WriteAllTextAsync(foreign, "retain", TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"));
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"), TestContext.Current.CancellationToken);
         Assert.Null((await fixture.EventAsync(eventId)).DeliveryAttemptId);
-        Assert.Equal("retain", await File.ReadAllTextAsync(foreign));
-        await cli.GetTerminalSession(taskId)!.WriteInputAsync(new byte[] { 65 });
+        Assert.Equal("retain", await File.ReadAllTextAsync(foreign, TestContext.Current.CancellationToken));
+        await cli.GetTerminalSession(taskId)!.WriteInputAsync(new byte[] { 65 }, TestContext.Current.CancellationToken);
         fixture.SetPrompt(taskId, "SCM_UNKNOWN_V1");
         Assert.Equal(ScmPromptReadyStatus.Unknown, adapter.ReadyStatus);
         File.Delete(foreign);
         Directory.Delete(channel);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId);
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
         var item = await fixture.EventAsync(eventId);
         Assert.Null(item.DeliveryAttemptId);
         Assert.Null(item.ReadyConfirmedRunId);
@@ -298,7 +298,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Empty(fixture.Prompts);
         using (var scope = fixture.Services.CreateScope())
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D")));
+                scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"), TestContext.Current.CancellationToken));
         Assert.Empty(fixture.Prompts);
         fixture.SetPrompt(taskId, "SCM_READY_V1");
         await fixture.DispatchAsync(eventId);
@@ -321,10 +321,10 @@ public sealed class ScmEventOrchestratorTests
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            await db.ScmIncomingEvents.ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)long.MaxValue));
+            await db.ScmIncomingEvents.ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)long.MaxValue), cancellationToken: TestContext.Current.CancellationToken);
         }
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"));
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"), TestContext.Current.CancellationToken);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Zugestellt", item.Status);
         Assert.NotNull(item.DeliveryAttemptId);
@@ -349,7 +349,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Equal(ScmCliRecognitionState.Unknown, adapter.CliRecognition.State);
         using var scope = fixture.Services.CreateScope();
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D")));
+            scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"), TestContext.Current.CancellationToken));
         Assert.Contains("unbekannt", error.Message);
         Assert.Empty(fixture.Prompts);
     }
@@ -380,7 +380,7 @@ public sealed class ScmEventOrchestratorTests
             var adapter = fixture.Services.GetRequiredService<KiAusfuehrungsService>().GetScmPromptSession(taskId)!;
             Assert.Equal(ScmCliRecognitionState.Unsupported, adapter.CliRecognition.State);
             using (var scope = fixture.Services.CreateScope())
-                await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"));
+                await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"), TestContext.Current.CancellationToken);
             ScmIncomingEvent item;
             var attempts = 0;
             do

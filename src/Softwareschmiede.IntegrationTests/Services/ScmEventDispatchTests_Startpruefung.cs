@@ -35,7 +35,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         await fixture.StartPruefung.StartAsync(CancellationToken.None);
         try
         {
-            await fixture.Cli.StopCliAsync(firstTask);
+            await fixture.Cli.StopCliAsync(firstTask, TestContext.Current.CancellationToken);
             // Wie PseudoConsoleSession: das Session-Ende wird als Exited-Ereignis gemeldet.
             fixture.Sessions[firstTask].Raise(x => x.Exited += null, new TerminalSessionExitedEventArgs(0));
 
@@ -61,7 +61,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         using (var scope = fixture.Services.CreateScope())
         {
             await scope.ServiceProvider.GetRequiredService<AufgabeService>()
-                .SetPauseAsync(taskId, DateTimeOffset.UtcNow.AddMinutes(10));
+                .SetPauseAsync(taskId, DateTimeOffset.UtcNow.AddMinutes(10), TestContext.Current.CancellationToken);
         }
 
         await fixture.DispatchAsync(eventId);
@@ -74,7 +74,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
             using (var scope = fixture.Services.CreateScope())
             {
                 await scope.ServiceProvider.GetRequiredService<AufgabeService>()
-                    .SetPauseAsync(taskId, null);
+                    .SetPauseAsync(taskId, null, TestContext.Current.CancellationToken);
             }
 
             await WaitForAsync(async () => (await fixture.EventAsync(eventId)).Status == "Zugestellt",
@@ -103,7 +103,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            Assert.NotNull(await db.Aufgaben.Where(x => x.Id == taskId).Select(x => x.PausiertBisUtc).SingleAsync());
+            Assert.NotNull(await db.Aufgaben.Where(x => x.Id == taskId).Select(x => x.PausiertBisUtc).SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
         }
     }
 
@@ -119,7 +119,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
             await db.Aufgaben.Where(x => x.Id == taskId)
-                .ExecuteUpdateAsync(x => x.SetProperty(p => p.AusfuehrungsStatus, AufgabeAusfuehrungsStatus.Aktiv));
+                .ExecuteUpdateAsync(x => x.SetProperty(p => p.AusfuehrungsStatus, AufgabeAusfuehrungsStatus.Aktiv), cancellationToken: TestContext.Current.CancellationToken);
         }
         var angefordert = 0;
         fixture.Ausloeser.Angefordert += () => angefordert++;
@@ -127,14 +127,14 @@ public sealed class ScmEventDispatchTests_Startpruefung
         using (var scope = fixture.Services.CreateScope())
         {
             await scope.ServiceProvider.GetRequiredService<KiPluginLimitService>()
-                .VerarbeiteRateLimitAsync(taskId, DateTimeOffset.UtcNow.AddHours(1));
+                .VerarbeiteRateLimitAsync(taskId, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
         }
 
         Assert.True(angefordert >= 1, "Die Session-Limit-Pause hat keinen Auslöser gemeldet.");
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            Assert.NotNull(await db.Aufgaben.Where(x => x.Id == taskId).Select(x => x.PausiertBisUtc).SingleAsync());
+            Assert.NotNull(await db.Aufgaben.Where(x => x.Id == taskId).Select(x => x.PausiertBisUtc).SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
         }
     }
 
@@ -155,11 +155,11 @@ public sealed class ScmEventDispatchTests_Startpruefung
         fixture.Ausloeser.StartpruefungAnfordern();
         fixture.Ausloeser.StartpruefungAnfordern();
         await Task.WhenAll(
-            fixture.StartPruefung.RunOnceAsync(),
-            fixture.StartPruefung.RunOnceAsync(),
-            fixture.Monitor.RunOnceAsync());
+            fixture.StartPruefung.RunOnceAsync(TestContext.Current.CancellationToken),
+            fixture.StartPruefung.RunOnceAsync(TestContext.Current.CancellationToken),
+            fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken));
         fixture.Ausloeser.StartpruefungAnfordern();
-        await fixture.StartPruefung.RunOnceAsync();
+        await fixture.StartPruefung.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Single(fixture.Sessions);
         var second = await fixture.EventAsync(secondId);
@@ -178,7 +178,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         var (_, eventId) = await fixture.AddAsync(configured: true);
 
         fixture.Ausloeser.StartpruefungAnfordern();
-        await fixture.StartPruefung.RunOnceAsync();
+        await fixture.StartPruefung.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Empty(fixture.Sessions);
         Assert.NotEqual("Zugestellt", (await fixture.EventAsync(eventId)).Status);
@@ -198,11 +198,11 @@ public sealed class ScmEventDispatchTests_Startpruefung
         using (var scope = fixture.Services.CreateScope())
         {
             await scope.ServiceProvider.GetRequiredService<EntwicklungsprozessService>()
-                .CliNeustartenAsync(nonScmTask, ScmDispatchFixture.KiPrefix, null, strictPluginSelection: true);
+                .CliNeustartenAsync(nonScmTask, ScmDispatchFixture.KiPrefix, null, TestContext.Current.CancellationToken, strictPluginSelection: true);
         }
         Assert.True(fixture.Cli.IsRunning(nonScmTask));
 
-        await fixture.StartPruefung.RunOnceAsync();
+        await fixture.StartPruefung.RunOnceAsync(TestContext.Current.CancellationToken);
         var waiting = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", waiting.Status);
         Assert.Contains("globale Limit", waiting.Reason);
@@ -210,7 +210,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         await fixture.StartPruefung.StartAsync(CancellationToken.None);
         try
         {
-            await fixture.Cli.StopCliAsync(nonScmTask);
+            await fixture.Cli.StopCliAsync(nonScmTask, TestContext.Current.CancellationToken);
             fixture.Sessions[nonScmTask].Raise(x => x.Exited += null, new TerminalSessionExitedEventArgs(0));
             await WaitForAsync(async () => (await fixture.EventAsync(eventId)).Status == "Zugestellt",
                 "Das wartende Ereignis wurde nach dem Ende des Nicht-SCM-Laufs nicht ereignisgesteuert gestartet.");

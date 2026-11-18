@@ -68,7 +68,7 @@ public sealed class CliOutputRecorderTests
         timeProvider.Advance(TimeSpan.FromSeconds(2));
         sut.Complete();
         timeProvider.Advance(TimeSpan.FromSeconds(5));
-        await sut.CompleteAsync(TimeSpan.FromSeconds(1));
+        await sut.CompleteAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
 
         var aufzeichnung = sut.GetAufzeichnung();
         aufzeichnung.EndeUtc.Should().Be(timeProvider.Start + TimeSpan.FromSeconds(2),

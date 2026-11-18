@@ -25,11 +25,11 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     {
         var body = "\"remote\"\r\n" + new string(Enumerable.Range(0, 160).Where(value => value < 32 || value >= 127).Select(value => (char)value).ToArray());
         var request = Request(body);
-        var attempt = await _protocol.PrepareAsync(request, _root);
+        var attempt = await _protocol.PrepareAsync(request, _root, TestContext.Current.CancellationToken);
         attempt.Prompt.Any(char.IsControl).Should().BeFalse();
         using var document = JsonDocument.Parse(attempt.Prompt);
         document.RootElement.GetProperty("request").GetProperty("body").GetString().Should().Be(body);
-        JsonSerializer.Deserialize<ScmExchangeRequest>(await File.ReadAllTextAsync(attempt.RequestPath), Json).Should().Be(request);
+        JsonSerializer.Deserialize<ScmExchangeRequest>(await File.ReadAllTextAsync(attempt.RequestPath, TestContext.Current.CancellationToken), Json).Should().Be(request);
         Git("check-ignore", "--", attempt.RequestPath).Should().Contain("request.json");
         Git("ls-files", "--", ScmEventExchangeProtocol.DirectoryName).Should().BeEmpty();
         Git("status", "--porcelain").Should().BeEmpty();
@@ -42,13 +42,13 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     {
         var suffix = "Bearbeitungsregeln:\nImmer Tests ausführen.";
         var request = Request();
-        var attempt = await _protocol.PrepareAsync(request, _root, promptSuffix: suffix);
+        var attempt = await _protocol.PrepareAsync(request, _root, TestContext.Current.CancellationToken, promptSuffix: suffix);
         attempt.PromptSuffix.Should().Be(suffix);
         attempt.Prompt.Any(char.IsControl).Should().BeFalse("der Anhang muss einzeilig im JSON-Prompt kodiert bleiben");
         using var document = JsonDocument.Parse(attempt.Prompt);
         document.RootElement.GetProperty("promptSuffix").GetString().Should().Be(suffix);
         document.RootElement.GetProperty("request").GetProperty("body").GetString().Should().Be(request.Body);
-        JsonSerializer.Deserialize<ScmExchangeRequest>(await File.ReadAllTextAsync(attempt.RequestPath), Json).Should().Be(request);
+        JsonSerializer.Deserialize<ScmExchangeRequest>(await File.ReadAllTextAsync(attempt.RequestPath, TestContext.Current.CancellationToken), Json).Should().Be(request);
     }
 
     /// <summary>Ohne Anhang bleibt der Prompt unverändert: Es gibt kein leeres promptSuffix-Feld.</summary>
@@ -58,7 +58,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [InlineData("   ")]
     public async Task Prepare_EmptyPromptSuffix_OmitsField(string? suffix)
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root, promptSuffix: suffix);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken, promptSuffix: suffix);
         using var document = JsonDocument.Parse(attempt.Prompt);
         document.RootElement.TryGetProperty("promptSuffix", out _).Should().BeFalse();
     }
@@ -112,26 +112,26 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     {
         var directory = Directory.CreateDirectory(Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName));
         var path = Path.Combine(directory.FullName, "foreign.txt");
-        await File.WriteAllTextAsync(path, "belongs to the user");
+        await File.WriteAllTextAsync(path, "belongs to the user", TestContext.Current.CancellationToken);
         if (tracked) Git("add", "--", path);
         var prepare = () => _protocol.PrepareAsync(Request(), _root);
         await prepare.Should().ThrowAsync<IOException>();
-        (await File.ReadAllTextAsync(path)).Should().Be("belongs to the user");
+        (await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken)).Should().Be("belongs to the user");
     }
 
     /// <summary>Two stable observations are required for direct Write publication.</summary>
     [Fact]
     public async Task Read_DoesNotExecutePartialOrFirstObservedMessages()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
         var path = Path.Combine(attempt.DirectoryPath, "accepted.json");
-        await File.WriteAllTextAsync(path, "{\"protocolVersion\":");
-        (await _protocol.ReadAsync(attempt)).Accepted.Should().BeNull();
+        await File.WriteAllTextAsync(path, "{\"protocolVersion\":", TestContext.Current.CancellationToken);
+        (await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken)).Accepted.Should().BeNull();
         await Write(path, new ScmExchangeAccepted(1, request.EventId, request.AttemptId, request.CliRunId));
-        (await _protocol.ReadAsync(attempt)).Accepted.Should().BeNull();
-        (await _protocol.ReadAsync(attempt)).Accepted.Should().NotBeNull();
-        (await _protocol.ReadAsync(attempt)).Complete.Should().BeNull("acceptance does not imply completion");
+        (await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken)).Accepted.Should().BeNull();
+        (await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken)).Accepted.Should().NotBeNull();
+        (await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken)).Complete.Should().BeNull("acceptance does not imply completion");
     }
 
     /// <summary>Responses cannot change remote targets or correlate to another delivery attempt.</summary>
@@ -143,7 +143,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [InlineData("target")]
     public async Task Read_RejectsInvalidCorrelationAndUnknownRemoteTargets(string invalid)
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
         var id = Guid.NewGuid();
         var data = new Dictionary<string, object?>
@@ -158,8 +158,8 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         };
         if (invalid == "target") data["url"] = "https://example.invalid/another-repository";
         await Write(Path.Combine(attempt.DirectoryPath, "actions", id + ".json"), data);
-        await _protocol.ReadAsync(attempt);
-        var result = await _protocol.ReadAsync(attempt);
+        await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
+        var result = await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
         result.Actions.Should().BeEmpty();
         result.Diagnostic.Should().NotBeNullOrWhiteSpace();
     }
@@ -168,22 +168,22 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [Fact]
     public async Task Read_RejectsModifiedRequest()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         await Write(attempt.RequestPath, attempt.Request with { OriginUrl = "https://example.invalid/changed" });
-        (await _protocol.ReadAsync(attempt)).Diagnostic.Should().Contain("verändert");
+        (await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken)).Diagnostic.Should().Contain("verändert");
     }
 
     /// <summary>A correlated result may transition failure to success, but success is immutable.</summary>
     [Fact]
     public async Task Result_AllowsRetryButNeverChangesSuccess()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
         var failed = new ScmExchangeActionResult(1, request.EventId, request.AttemptId, request.CliRunId, Guid.NewGuid(), false, Error: "403");
-        await _protocol.WriteResultAsync(attempt, failed);
+        await _protocol.WriteResultAsync(attempt, failed, TestContext.Current.CancellationToken);
         var success = failed with { Success = true, Error = null, RemoteId = "comment-1" };
-        await _protocol.WriteResultAsync(attempt, success);
-        await _protocol.WriteResultAsync(attempt, success);
+        await _protocol.WriteResultAsync(attempt, success, TestContext.Current.CancellationToken);
+        await _protocol.WriteResultAsync(attempt, success, TestContext.Current.CancellationToken);
         var overwrite = () => _protocol.WriteResultAsync(attempt, success with { RemoteId = "comment-2" });
         await overwrite.Should().ThrowAsync<IOException>();
     }
@@ -194,12 +194,12 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [InlineData("No change needed", true)]
     public async Task Complete_RequiresReasonForNoAction(string? reason, bool valid)
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
         await Write(Path.Combine(attempt.DirectoryPath, "complete.json"),
             new ScmExchangeComplete(1, request.EventId, request.AttemptId, request.CliRunId, [], true, reason));
-        await _protocol.ReadAsync(attempt);
-        var result = await _protocol.ReadAsync(attempt);
+        await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
+        var result = await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
         (result.Complete is not null).Should().Be(valid);
     }
 
@@ -212,12 +212,12 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [InlineData(null, false)]
     public async Task Complete_SelfExecutedRemoteActions_RequireReport(string? report, bool valid)
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
         await Write(Path.Combine(attempt.DirectoryPath, "complete.json"),
             new ScmExchangeComplete(1, request.EventId, request.AttemptId, request.CliRunId, [], false, Report: report));
-        await _protocol.ReadAsync(attempt);
-        var result = await _protocol.ReadAsync(attempt);
+        await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
+        var result = await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
         (result.Complete is not null).Should().Be(valid);
         if (valid)
         {
@@ -235,13 +235,13 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [InlineData("Zusätzlich Label gesetzt.")]
     public async Task Complete_ChannelActions_StayValidWithOrWithoutReport(string? report)
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
         var actionId = Guid.NewGuid();
         await Write(Path.Combine(attempt.DirectoryPath, "complete.json"),
             new ScmExchangeComplete(1, request.EventId, request.AttemptId, request.CliRunId, [actionId], false, Report: report));
-        await _protocol.ReadAsync(attempt);
-        var result = await _protocol.ReadAsync(attempt);
+        await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
+        var result = await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
         result.Complete.Should().NotBeNull();
         result.Complete!.ActionIds.Should().BeEquivalentTo([actionId]);
     }
@@ -254,13 +254,13 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [InlineData(-3, false)]
     public async Task Complete_ReportedPullRequestNumber_IsValidated(int number, bool valid)
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
         await Write(Path.Combine(attempt.DirectoryPath, "complete.json"),
             new ScmExchangeComplete(1, request.EventId, request.AttemptId, request.CliRunId,
                 [], false, Report: "PR angelegt.", PullRequestNumber: number));
-        await _protocol.ReadAsync(attempt);
-        var result = await _protocol.ReadAsync(attempt);
+        await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
+        var result = await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
         (result.Complete is not null).Should().Be(valid);
         if (valid)
             result.Complete!.PullRequestNumber.Should().Be(number);
@@ -272,7 +272,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [Fact]
     public async Task Prompt_DocumentsPullRequestNumberReporting()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         using var document = JsonDocument.Parse(attempt.Prompt);
         document.RootElement.GetProperty("instruction").GetString()!.Should().Contain("pullRequestNumber");
         document.RootElement.GetProperty("completeSchema").GetString()!.Should().Contain("pullRequestNumber");
@@ -283,7 +283,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [Fact]
     public async Task Prepare_CreatesPrivateScreenshotsDirectory()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         attempt.AttachmentsPath.Should().Be(Path.Combine(attempt.DirectoryPath, "screenshots"));
         Directory.Exists(attempt.AttachmentsPath).Should().BeTrue();
         Git("check-ignore", "--", Path.Combine(attempt.AttachmentsPath, "probe.png")).Should().NotBeEmpty();
@@ -294,7 +294,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [Fact]
     public async Task Prompt_DocumentsAttachmentsPathAndCompleteAttachments()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         using var document = JsonDocument.Parse(attempt.Prompt);
         document.RootElement.GetProperty("attachmentsPath").GetString().Should().Be(attempt.AttachmentsPath);
         var instruction = document.RootElement.GetProperty("instruction").GetString()!;
@@ -317,7 +317,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [InlineData("   ", null)]
     public async Task Complete_Attachments_AreParsedWithoutRejectingTheCompletion(string? path, string? caption)
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
         var data = new Dictionary<string, object?>
         {
@@ -331,8 +331,8 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
             ["attachments"] = new[] { new Dictionary<string, object?> { ["path"] = path, ["caption"] = caption } }
         };
         await Write(Path.Combine(attempt.DirectoryPath, "complete.json"), data);
-        await _protocol.ReadAsync(attempt);
-        var result = await _protocol.ReadAsync(attempt);
+        await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
+        var result = await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
         result.Diagnostic.Should().BeNull();
         var attachment = Assert.Single(result.Complete!.Attachments!);
         attachment.Path.Should().Be(path);
@@ -346,7 +346,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [InlineData(1, 1001)]
     public async Task Complete_Attachments_OversizedDeclarations_ParseAndSkipAtCollection(int entries, int? captionChars)
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
         var attachments = Enumerable.Range(0, entries)
             .Select(_ => (object)new { path = "screenshots/nachweis.png", caption = captionChars is { } c ? new string('x', c) : null })
@@ -363,11 +363,11 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
             ["attachments"] = attachments
         };
         await Write(Path.Combine(attempt.DirectoryPath, "complete.json"), data);
-        await _protocol.ReadAsync(attempt);
-        var result = await _protocol.ReadAsync(attempt);
+        await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
+        var result = await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
         result.Diagnostic.Should().BeNull();
         result.Complete.Should().NotBeNull();
-        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete);
+        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete, TestContext.Current.CancellationToken);
         collected.Attachments.Should().BeEmpty();
         if (entries > ScmEventExchangeProtocol.MaximumAttachmentEntries)
             collected.Skipped.Should().Contain(x => x.Contains("Eintragslimit"));
@@ -380,7 +380,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [Fact]
     public async Task Complete_Attachments_NullElement_ParsesAndIsSkippedAtCollection()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
         var data = new Dictionary<string, object?>
         {
@@ -394,11 +394,11 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
             ["attachments"] = new object?[] { null }
         };
         await Write(Path.Combine(attempt.DirectoryPath, "complete.json"), data);
-        await _protocol.ReadAsync(attempt);
-        var result = await _protocol.ReadAsync(attempt);
+        await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
+        var result = await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
         result.Diagnostic.Should().BeNull();
         Assert.Single(result.Complete!.Attachments!).Should().BeNull();
-        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete);
+        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete, TestContext.Current.CancellationToken);
         collected.Attachments.Should().BeEmpty();
         collected.Skipped.Should().ContainSingle(x => x.Contains("ohne verwertbaren Pfad"));
     }
@@ -412,17 +412,16 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [InlineData("{\"path\":\"screenshots/a.png\"}")]
     public async Task Complete_Attachments_StructurallyWrongField_ParsesAndIsSkippedAtCollection(string attachmentsJson)
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
-        await File.WriteAllTextAsync(Path.Combine(attempt.DirectoryPath, "complete.json"),
-            "{\"protocolVersion\":1,\"eventId\":\"" + request.EventId + "\",\"attemptId\":\"" + request.AttemptId
+        await File.WriteAllTextAsync(Path.Combine(attempt.DirectoryPath, "complete.json"), "{\"protocolVersion\":1,\"eventId\":\"" + request.EventId + "\",\"attemptId\":\"" + request.AttemptId
             + "\",\"cliRunId\":\"" + request.CliRunId + "\",\"actionIds\":[],\"noRemoteAction\":true,"
-            + "\"reason\":\"Nichts geändert.\",\"attachments\":" + attachmentsJson + "}");
-        await _protocol.ReadAsync(attempt);
-        var result = await _protocol.ReadAsync(attempt);
+            + "\"reason\":\"Nichts geändert.\",\"attachments\":" + attachmentsJson + "}", TestContext.Current.CancellationToken);
+        await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
+        var result = await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
         result.Diagnostic.Should().BeNull();
         result.Complete.Should().NotBeNull();
-        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete);
+        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete, TestContext.Current.CancellationToken);
         collected.Attachments.Should().BeEmpty();
         collected.Skipped.Should().ContainSingle(x => x.Contains("ohne verwertbaren Pfad"));
     }
@@ -434,21 +433,19 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [Fact]
     public async Task Complete_Attachments_MixedInvalidEntries_ParseAndSkipIndividually()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var request = attempt.Request;
-        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, "echt.png"),
-            [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-        await File.WriteAllTextAsync(Path.Combine(attempt.DirectoryPath, "complete.json"),
-            "{\"protocolVersion\":1,\"eventId\":\"" + request.EventId + "\",\"attemptId\":\"" + request.AttemptId
+        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, "echt.png"), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(attempt.DirectoryPath, "complete.json"), "{\"protocolVersion\":1,\"eventId\":\"" + request.EventId + "\",\"attemptId\":\"" + request.AttemptId
             + "\",\"cliRunId\":\"" + request.CliRunId + "\",\"actionIds\":[],\"noRemoteAction\":true,"
             + "\"reason\":\"Nichts geändert.\",\"attachments\":[\"screenshots/echt.png\",7,"
             + "{\"path\":123,\"caption\":\"c\"},{\"path\":\"screenshots/echt.png\",\"extra\":true,\"caption\":\"Vorher\"},"
-            + "{\"caption\":\"kein pfad\"}]}");
-        await _protocol.ReadAsync(attempt);
-        var result = await _protocol.ReadAsync(attempt);
+            + "{\"caption\":\"kein pfad\"}]}", TestContext.Current.CancellationToken);
+        await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
+        var result = await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
         result.Diagnostic.Should().BeNull();
         result.Complete!.Attachments.Should().HaveCount(5);
-        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete);
+        var collected = await _protocol.CollectAttachmentsAsync(attempt, result.Complete, TestContext.Current.CancellationToken);
         var attachment = collected.Attachments.Should().ContainSingle().Subject;
         attachment.Name.Should().Be("echt.png");
         attachment.Caption.Should().Be("Vorher");
@@ -461,7 +458,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     [Fact]
     public async Task Prompt_InstructsSelfExecutedActionsWithRepositoryContext()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         using var document = JsonDocument.Parse(attempt.Prompt);
         var instruction = document.RootElement.GetProperty("instruction").GetString()!;
         instruction.Should().Contain("request.repository");

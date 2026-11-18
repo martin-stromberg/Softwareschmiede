@@ -79,7 +79,7 @@ public sealed class E2E_IdePluginSelection : IDisposable
         File.WriteAllText(Path.Combine(repository, "Loesung.sln"), string.Empty);
 
         var (pluginSelectionService, prozessStarter, pluginActivationService) = CreateStackWithActivationService();
-        await pluginActivationService.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false);
+        await pluginActivationService.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false, TestContext.Current.CancellationToken);
 
         await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 

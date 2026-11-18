@@ -149,7 +149,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     public async Task AufzeichnungOeffnen_KorrupteDatei_ZeigtFehlermeldung()
     {
         var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-korrupt-{Guid.NewGuid():N}.clireplay");
-        await File.WriteAllBytesAsync(pfad, Encoding.ASCII.GetBytes("kein clireplay"));
+        await File.WriteAllBytesAsync(pfad, Encoding.ASCII.GetBytes("kein clireplay"), TestContext.Current.CancellationToken);
         _tempFiles.Add(pfad);
         SetupOpenDialog(pfad);
         var sut = CreateSut();
@@ -219,7 +219,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("A")),
                 new CliOutputChunkRecord(TimeSpan.FromMinutes(5), Encoding.UTF8.GetBytes("B")),
             ],
-        });
+        }, TestContext.Current.CancellationToken);
         _tempFiles.Add(pfad);
         SetupOpenDialog(pfad);
         var sut = CreateSut();
@@ -236,7 +236,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         // Die reale Pause des zweiten Chunks (5 min → auf 1 s Schwelle verkürzt) läuft im
         // Pausiert-Zustand ab, ohne dass der Chunk angewendet wird.
         _timeProvider.Advance(TimeSpan.FromMinutes(10));
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
         replay.AktuellerChunkIndex.Should().Be(1,
             "während der Pausierung darf kein weiterer Chunk angewendet werden");
 
@@ -376,7 +376,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("A")),
                 new CliOutputChunkRecord(TimeSpan.FromMinutes(5), Encoding.UTF8.GetBytes("B")),
             ],
-        });
+        }, TestContext.Current.CancellationToken);
         _tempFiles.Add(pfad);
         SetupOpenDialog(pfad);
         var sut = CreateSut();
@@ -510,7 +510,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("A")),
                 new CliOutputChunkRecord(TimeSpan.FromMinutes(5), Encoding.UTF8.GetBytes("B")),
             ],
-        });
+        }, TestContext.Current.CancellationToken);
         _tempFiles.Add(pfad);
         SetupOpenDialog(pfad);
         var sut = CreateSut();
@@ -567,7 +567,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("A")),
                 new CliOutputChunkRecord(TimeSpan.FromMinutes(5), Encoding.UTF8.GetBytes("B")),
             ],
-        });
+        }, TestContext.Current.CancellationToken);
         _tempFiles.Add(pfad);
         SetupOpenDialog(pfad);
         var sut = CreateSut();
@@ -680,7 +680,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 new CliOutputChunkRecord(TimeSpan.FromMinutes(5), Encoding.UTF8.GetBytes("B")),
                 new CliOutputChunkRecord(TimeSpan.FromMinutes(10), Encoding.UTF8.GetBytes("C")),
             ],
-        });
+        }, TestContext.Current.CancellationToken);
         _tempFiles.Add(pfad);
         SetupOpenDialog(pfad);
         var sut = CreateSut();

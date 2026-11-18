@@ -55,7 +55,7 @@ public sealed class CliReplayExportServiceTests : IDisposable
         var sut = new CliReplayExportService(kiService, _store, NullLogger<CliReplayExportService>.Instance);
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.SetupTerminalSpec();
-        await kiService.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        await kiService.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         sut.HatAufzeichnung(aufgabeId).Should().BeTrue();
     }
@@ -78,15 +78,15 @@ public sealed class CliReplayExportServiceTests : IDisposable
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.SetupTerminalSpec();
 
-        await kiService.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        await kiService.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         var zielPfad = Path.Combine(Path.GetTempPath(), $"cli-replay-{Guid.NewGuid():N}.clireplay");
         try
         {
-            await sut.ExportCliReplayAsync(aufgabeId, zielPfad);
+            await sut.ExportCliReplayAsync(aufgabeId, zielPfad, TestContext.Current.CancellationToken);
 
             File.Exists(zielPfad).Should().BeTrue();
-            var geladen = await _store.LadeAsync(zielPfad);
+            var geladen = await _store.LadeAsync(zielPfad, TestContext.Current.CancellationToken);
             geladen.AufgabeId.Should().Be(aufgabeId);
             geladen.PluginName.Should().Be("TestPlugin");
             geladen.Chunks.Should().HaveCount(2);

@@ -75,7 +75,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, sourceJson, string.Empty));
 
-        var result = (await _sut.GetRepositoryStructureAsync("https://bitbucket.org/workspace/repo", maxDepth: 2)).ToList();
+        var result = (await _sut.GetRepositoryStructureAsync("https://bitbucket.org/workspace/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken)).ToList();
 
         var paths = result.Select(e => e.Path).ToList();
         paths.Should().Contain(["backend", "frontend", "backend/src", "backend/README.md"]);
@@ -118,7 +118,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, page2Json, string.Empty));
 
-        var result = (await _sut.GetRepositoryStructureAsync("https://bitbucket.org/workspace/repo", maxDepth: 2)).ToList();
+        var result = (await _sut.GetRepositoryStructureAsync("https://bitbucket.org/workspace/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken)).ToList();
 
         result.Select(e => e.Path).Should().BeEquivalentTo(["backend", "frontend"]);
     }
@@ -136,7 +136,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(1, string.Empty, "connection failed"));
 
-        var result = await _sut.GetRepositoryStructureAsync("https://bitbucket.org/workspace/repo", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureAsync("https://bitbucket.org/workspace/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -154,7 +154,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(1, string.Empty, "connection failed"));
 
-        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://bitbucket.org/workspace/repo", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://bitbucket.org/workspace/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(RepositoryStructureLoadStatus.Failed);
     }
@@ -173,7 +173,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, sourceJson, string.Empty));
 
-        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://bitbucket.org/workspace/repo", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://bitbucket.org/workspace/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(RepositoryStructureLoadStatus.Success);
         result.Entries.Should().BeEmpty();
@@ -193,7 +193,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, errorJson, string.Empty));
 
-        var result = await _sut.GetRepositoryStructureAsync("https://bitbucket.org/workspace/repo", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureAsync("https://bitbucket.org/workspace/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -202,7 +202,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
     [Fact]
     public async Task GetRepositoryStructureAsync_ShouldReturnEmpty_ForUnparsableUrl()
     {
-        var result = await _sut.GetRepositoryStructureAsync(string.Empty, maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureAsync(string.Empty, maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -269,7 +269,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, backendJson, string.Empty));
 
-        var result = (await _sut.GetRepositoryStructureAsync("https://bitbucket.example.com/projects/PROJ/repos/repo/browse", maxDepth: 2)).ToList();
+        var result = (await _sut.GetRepositoryStructureAsync("https://bitbucket.example.com/projects/PROJ/repos/repo/browse", maxDepth: 2, ct: TestContext.Current.CancellationToken)).ToList();
 
         var paths = result.Select(e => e.Path).ToList();
         paths.Should().Contain(["backend", "backend/src", "README.md"]);
@@ -293,7 +293,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(1, string.Empty, "connection refused"));
 
-        var result = await _sut.GetRepositoryStructureAsync("https://bitbucket.example.com/projects/PROJ/repos/repo/browse", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureAsync("https://bitbucket.example.com/projects/PROJ/repos/repo/browse", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -314,7 +314,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(1, string.Empty, "connection refused"));
 
-        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://bitbucket.example.com/projects/PROJ/repos/repo/browse", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://bitbucket.example.com/projects/PROJ/repos/repo/browse", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(RepositoryStructureLoadStatus.Failed);
     }
@@ -335,7 +335,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, sourceJson, string.Empty));
 
-        var result = await _sut.GetRepositoryStructureLoadResultAsync("git@bitbucket.org:ws/repo", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureLoadResultAsync("git@bitbucket.org:ws/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(RepositoryStructureLoadStatus.Success);
         _cliRunnerMock.Verify(c => c.RunAsync(

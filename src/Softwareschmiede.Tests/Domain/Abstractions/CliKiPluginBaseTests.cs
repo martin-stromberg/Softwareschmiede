@@ -17,7 +17,7 @@ public sealed class CliKiPluginBaseTests
     {
         var sut = new TestCliKiPlugin(supportsSession: false);
 
-        var result = await sut.StartCliAsync("/repo/path");
+        var result = await sut.StartCliAsync("/repo/path", ct: TestContext.Current.CancellationToken);
 
         result.FileName.Should().Be("test-cli");
         result.WorkingDirectory.Should().Be("/repo/path");
@@ -40,7 +40,7 @@ public sealed class CliKiPluginBaseTests
     {
         var sut = new TestCliKiPlugin(supportsSession: true);
 
-        var result = await sut.StartCliAsync("/repo", "session-123");
+        var result = await sut.StartCliAsync("/repo", "session-123", TestContext.Current.CancellationToken);
 
         result.Arguments.Should().Be("session-123");
     }
@@ -51,7 +51,7 @@ public sealed class CliKiPluginBaseTests
     {
         var sut = new TestCliKiPluginWithHelpOverride();
 
-        var result = await sut.GetCliHelpTextAsync();
+        var result = await sut.GetCliHelpTextAsync(TestContext.Current.CancellationToken);
 
         result.Should().BeNull();
     }
@@ -62,7 +62,7 @@ public sealed class CliKiPluginBaseTests
     {
         var sut = new TestCliKiPluginWithDotnetHelp();
 
-        var result = await sut.GetCliHelpTextAsync();
+        var result = await sut.GetCliHelpTextAsync(TestContext.Current.CancellationToken);
 
         result.Should().NotBeNullOrWhiteSpace();
     }
@@ -73,7 +73,7 @@ public sealed class CliKiPluginBaseTests
     {
         var sut = new TestCliKiPluginWithShortTimeout("dotnet", TimeSpan.FromMilliseconds(1));
 
-        var result = await sut.GetCliHelpTextAsync();
+        var result = await sut.GetCliHelpTextAsync(TestContext.Current.CancellationToken);
 
         result.Should().BeNull();
     }
@@ -87,7 +87,7 @@ public sealed class CliKiPluginBaseTests
             .Returns("--verbose");
         var sut = new TestCliKiPluginWithCredentialStore(credentialStoreMock.Object);
 
-        var result = await sut.StartCliAsync("/repo");
+        var result = await sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         result.Arguments.Should().Be("--verbose");
     }
@@ -101,7 +101,7 @@ public sealed class CliKiPluginBaseTests
             .Returns("--extra-flag");
         var sut = new TestCliKiPluginWithCredentialStore(credentialStoreMock.Object);
 
-        var result = await sut.StartCliAsync("/repo", "--initial-flag");
+        var result = await sut.StartCliAsync("/repo", "--initial-flag", TestContext.Current.CancellationToken);
 
         result.Arguments.Should().Be("--initial-flag --extra-flag");
     }
@@ -114,7 +114,7 @@ public sealed class CliKiPluginBaseTests
         credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
         var sut = new TestCliKiPluginWithCredentialStore(credentialStoreMock.Object);
 
-        var result = await sut.StartCliAsync("/repo", "--initial");
+        var result = await sut.StartCliAsync("/repo", "--initial", TestContext.Current.CancellationToken);
 
         result.Arguments.Should().Be("--initial");
     }
@@ -156,7 +156,7 @@ public sealed class CliKiPluginBaseTests
     {
         var sut = new TestCliKiPlugin(supportsSession: true);
 
-        var spec = await sut.GetTerminalStartSpecAsync("/repo", "session-42");
+        var spec = await sut.GetTerminalStartSpecAsync("/repo", "session-42", TestContext.Current.CancellationToken);
 
         spec.FileName.Should().Be("test-cli");
         spec.Arguments.Should().Be("session-42");
@@ -184,7 +184,7 @@ public sealed class CliKiPluginBaseTests
     {
         var sut = new TestCliKiPluginRequiresPty();
 
-        var spec = await sut.GetTerminalStartSpecAsync("/repo");
+        var spec = await sut.GetTerminalStartSpecAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         spec.Capabilities.Should().HaveFlag(TerminalProviderCapabilities.RequiresPty);
         spec.Capabilities.Should().HaveFlag(TerminalProviderCapabilities.SupportsPty);

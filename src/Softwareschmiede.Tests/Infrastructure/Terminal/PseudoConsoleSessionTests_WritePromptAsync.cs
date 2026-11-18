@@ -93,7 +93,7 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
         {
             await Task.Delay(30);
             await session.WriteInputAsync(new byte[] { (byte)'x' }, CancellationToken.None);
-        });
+        }, TestContext.Current.CancellationToken);
 
         await Task.WhenAll(promptTask, keyboardTask);
 
@@ -182,7 +182,7 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
         {
             await Task.Delay(70);
             await session.WriteInputAsync(new byte[] { (byte)'x' }, CancellationToken.None);
-        });
+        }, TestContext.Current.CancellationToken);
 
         await Task.WhenAll(promptTask, keyboardTask);
 

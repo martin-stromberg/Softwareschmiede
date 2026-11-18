@@ -36,9 +36,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        await sut.RecoverManuellAsync(aufgabe.Id);
+        await sut.RecoverManuellAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
-        var loaded = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var loaded = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         _db.Protokolleintraege.Count(e => e.AufgabeId == aufgabe.Id && e.Typ == ProtokollTyp.StatusUebergang).Should().Be(1);
         _db.Protokolleintraege.Single(e => e.AufgabeId == aufgabe.Id).Inhalt.Should().Contain("Manuelle Wiederherstellung");
@@ -52,9 +52,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        await sut.RecoverManuellAsync(aufgabe.Id);
+        await sut.RecoverManuellAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
-        var loaded = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var loaded = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         loaded.RecoveryVersion.Should().Be(1);
         _db.Protokolleintraege.Count(e => e.AufgabeId == aufgabe.Id && e.Typ == ProtokollTyp.StatusUebergang).Should().Be(1);
@@ -185,13 +185,13 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         };
 
         _db.Aufgaben.AddRange(aufgabeAlt, aufgabeWartend, aufgabeFrisch, aufgabeBeendeteAusfuehrung, aufgabeNeu);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
         // Act
-        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync()).ToList();
+        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
 
         // Assert
         kandidaten.Should().Contain(aufgabeAlt.Id);
@@ -216,12 +216,12 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
         _db.Aufgaben.Add(aufgabe);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(true);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync()).ToList();
+        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
 
         kandidaten.Should().BeEmpty();
     }
@@ -253,12 +253,12 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
         _db.Aufgaben.AddRange(pausiert, abgelaufenePause);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync()).ToList();
+        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
 
         kandidaten.Should().NotContain(pausiert.Id, "eine aktiv pausierte Aufgabe ist kein Recovery-Kandidat");
         kandidaten.Should().Contain(abgelaufenePause.Id, "eine abgelaufene Pause darf die Recovery-Erkennung nicht blockieren");
@@ -269,9 +269,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     public async Task RecoverManuellAsync_ShouldThrow_WhenTaskIsPaused()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        var tracked = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var tracked = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         tracked!.PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(1);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);

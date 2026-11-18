@@ -72,7 +72,7 @@ public sealed class GitHubPluginTests
         _api.AddJson("issues?state=open", json);
 
         // Act
-        var result = (await _sut.GetIssuesAsync("owner/repo")).ToList();
+        var result = (await _sut.GetIssuesAsync("owner/repo", TestContext.Current.CancellationToken)).ToList();
 
         // Assert
         result.Should().HaveCount(2);
@@ -93,7 +93,7 @@ public sealed class GitHubPluginTests
         _api.AddStatus("issues?state=open", 401);
 
         // Act
-        var result = await _sut.GetIssuesAsync("owner/repo");
+        var result = await _sut.GetIssuesAsync("owner/repo", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeEmpty();
@@ -127,7 +127,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddJson("code-scanning/alerts?state=open", json);
 
-        var result = (await _sut.GetAlertsAsync("https://github.com/owner/repo.git")).ToList();
+        var result = (await _sut.GetAlertsAsync("https://github.com/owner/repo.git", TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
         result[0].SourceKey.Should().Be("github:code-scanning:owner/repo:7");
@@ -168,7 +168,7 @@ public sealed class GitHubPluginTests
             new() { ["Link"] = "<https://api.github.com/repos/owner/repo/code-scanning/alerts?state=open&per_page=100&page=2>; rel=\"next\"" });
         _api.AddJson("page=2", page2Json);
 
-        var result = (await _sut.GetAlertsAsync("owner/repo")).ToList();
+        var result = (await _sut.GetAlertsAsync("owner/repo", TestContext.Current.CancellationToken)).ToList();
 
         result.Select(a => a.AlertNumber).Should().Equal(1, 2);
         result.Select(a => a.SourceKey).Should().Equal(
@@ -183,7 +183,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddStatus("code-scanning/alerts", 404);
 
-        var result = await _sut.GetAlertsAsync("owner/repo");
+        var result = await _sut.GetAlertsAsync("owner/repo", TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -196,7 +196,7 @@ public sealed class GitHubPluginTests
         _api.AddStatus("code-scanning/alerts", 403,
             new() { ["X-RateLimit-Remaining"] = "5000" });
 
-        var result = await _sut.GetAlertsAsync("owner/repo");
+        var result = await _sut.GetAlertsAsync("owner/repo", TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -228,7 +228,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo/issues/17", string.Empty));
 
-        var result = await _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest("Titel", "Body"));
+        var result = await _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest("Titel", "Body"), TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
         result.Issue!.Nummer.Should().Be(17);
@@ -241,7 +241,7 @@ public sealed class GitHubPluginTests
     [Fact]
     public async Task CreateIssueAsync_ShouldReturnFailed_WhenRepositoryIdIsMissing()
     {
-        var result = await _sut.CreateIssueAsync(" ", new IssueCreateRequest("Titel", "Body"));
+        var result = await _sut.CreateIssueAsync(" ", new IssueCreateRequest("Titel", "Body"), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueCreateResultStatus.Failed);
         result.ErrorMessage.Should().Contain("Repository-ID");
@@ -257,7 +257,7 @@ public sealed class GitHubPluginTests
     [Fact]
     public async Task CreateIssueAsync_ShouldReturnFailed_WhenTitleIsMissing()
     {
-        var result = await _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest(" ", "Body"));
+        var result = await _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest(" ", "Body"), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueCreateResultStatus.Failed);
         result.ErrorMessage.Should().Contain("Titel");
@@ -282,7 +282,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(1, string.Empty, "permission denied"));
 
-        var result = await _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest("Titel", "Body"));
+        var result = await _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest("Titel", "Body"), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueCreateResultStatus.Failed);
         result.Issue.Should().BeNull();
@@ -339,7 +339,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddJson("pulls?state=open", json);
 
-        var result = (await _sut.GetOpenPullRequestsAsync("https://github.com/owner/repo.git")).ToList();
+        var result = (await _sut.GetOpenPullRequestsAsync("https://github.com/owner/repo.git", TestContext.Current.CancellationToken)).ToList();
 
         result.Should().ContainSingle();
         result[0].RepositoryId.Should().Be("owner/repo");
@@ -353,7 +353,7 @@ public sealed class GitHubPluginTests
     [Fact]
     public async Task GetOpenPullRequestsAsync_ShouldReturnEmpty_WhenRepositoryIdIsIncomplete()
     {
-        var result = await _sut.GetOpenPullRequestsAsync("repo");
+        var result = await _sut.GetOpenPullRequestsAsync("repo", TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -381,7 +381,7 @@ public sealed class GitHubPluginTests
         _api.AddJson("contents/.github/ISSUE_TEMPLATE", listJson);
         _api.AddJson("contents/.github/ISSUE_TEMPLATE/bug.md", contentJson);
 
-        var result = await _sut.GetIssueTemplatesAsync("owner/repo");
+        var result = await _sut.GetIssueTemplatesAsync("owner/repo", TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueTemplateLoadResultStatus.Success);
         result.Templates.Should().ContainSingle()
@@ -404,7 +404,7 @@ public sealed class GitHubPluginTests
         _api.AddJson("contents/.github/ISSUE_TEMPLATE", listJson);
         _api.AddJson("contents/.github/ISSUE_TEMPLATE/bug%23fix%25.md", contentJson);
 
-        var result = await _sut.GetIssueTemplatesAsync("owner/repo");
+        var result = await _sut.GetIssueTemplatesAsync("owner/repo", TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueTemplateLoadResultStatus.Success);
         result.Templates.Should().ContainSingle();
@@ -427,7 +427,7 @@ public sealed class GitHubPluginTests
         _api.AddJson("contents/.github/ISSUE_TEMPLATE", listJson);
         _api.AddJson("contents/.github/ISSUE_TEMPLATE/bug.md", contentJson);
 
-        var result = await _sut.GetIssueTemplatesAsync("https://github.com/owner/repo.git");
+        var result = await _sut.GetIssueTemplatesAsync("https://github.com/owner/repo.git", TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueTemplateLoadResultStatus.Success);
         result.Templates.Should().ContainSingle();
@@ -453,7 +453,7 @@ public sealed class GitHubPluginTests
         _api.AddJson("contents/.github/ISSUE_TEMPLATE", listJson);
         _api.AddJson("contents/.github/ISSUE_TEMPLATE/bug.md", contentJson);
 
-        var result = await _sut.GetIssueTemplatesAsync("owner/repo");
+        var result = await _sut.GetIssueTemplatesAsync("owner/repo", TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueTemplateLoadResultStatus.Success);
         result.Templates.Should().ContainSingle()
@@ -471,7 +471,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddStatus("contents/.github/ISSUE_TEMPLATE", 404);
 
-        var result = await _sut.GetIssueTemplatesAsync("owner/repo");
+        var result = await _sut.GetIssueTemplatesAsync("owner/repo", TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueTemplateLoadResultStatus.Success);
         result.Templates.Should().BeEmpty();
@@ -484,7 +484,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddStatus("contents/.github/ISSUE_TEMPLATE", 403);
 
-        var result = await _sut.GetIssueTemplatesAsync("owner/repo");
+        var result = await _sut.GetIssueTemplatesAsync("owner/repo", TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(IssueTemplateLoadResultStatus.Failed);
         result.Templates.Should().BeEmpty();
@@ -506,7 +506,7 @@ public sealed class GitHubPluginTests
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
         // Act
-        await _sut.CloneRepositoryAsync("https://github.com/test/repo", "/target/path");
+        await _sut.CloneRepositoryAsync("https://github.com/test/repo", "/target/path", TestContext.Current.CancellationToken);
 
         // Assert
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -533,7 +533,7 @@ public sealed class GitHubPluginTests
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
         // Act
-        await _sut.CloneRepositoryAsync("https://github.com/test/repo", "/target/path");
+        await _sut.CloneRepositoryAsync("https://github.com/test/repo", "/target/path", TestContext.Current.CancellationToken);
 
         // Assert
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -641,7 +641,7 @@ public sealed class GitHubPluginTests
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
         // Act
-        await _sut.CreateBranchAsync("/local/path", "feature/my-branch");
+        await _sut.CreateBranchAsync("/local/path", "feature/my-branch", ct: TestContext.Current.CancellationToken);
 
         // Assert
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -668,7 +668,7 @@ public sealed class GitHubPluginTests
             .ReturnsAsync(new CliResult(0, prUrl, string.Empty));
 
         // Act
-        var result = await _sut.CreatePullRequestAsync("owner/repo", "feature/branch", null, title: "My PR", body: "Body");
+        var result = await _sut.CreatePullRequestAsync("owner/repo", "feature/branch", null, title: "My PR", body: "Body", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Nummer.Should().Be(42);
@@ -709,7 +709,7 @@ public sealed class GitHubPluginTests
         _api.AddJson("user", """{"login":"owner","node_id":"U_1"}""");
 
         // Act
-        var result = await _sut.CheckHealthAsync();
+        var result = await _sut.CheckHealthAsync(TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeTrue();
@@ -726,7 +726,7 @@ public sealed class GitHubPluginTests
         _api.AddStatus("user", 401);
 
         // Act
-        var result = await _sut.CheckHealthAsync();
+        var result = await _sut.CheckHealthAsync(TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeFalse();
@@ -796,7 +796,7 @@ public sealed class GitHubPluginTests
         _api.AddJson("actions/runs?head_sha=head123", preMergeJson);
         _api.AddJson("actions/runs?head_sha=merge456", postMergeJson);
 
-        var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, headSha, mergeSha);
+        var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, headSha, mergeSha, TestContext.Current.CancellationToken);
 
         result.Should().HaveCount(2);
         result.Should().Contain(r => r.ProviderRunId == "1" && r.Name == "Build" && !r.IsPostMerge);
@@ -834,7 +834,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddJson("actions/runs?head_sha=head123", runsJson);
 
-        var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, headSha);
+        var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, headSha, ct: TestContext.Current.CancellationToken);
 
         result.Should().ContainSingle();
         result[0].Name.Should().Be("Tests: Missing Translation for Statement Draft Validation Results");
@@ -880,7 +880,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddJson("actions/runs?head_sha=merge123", runsJson);
 
-        var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, mergeCommitSha: mergeSha);
+        var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, mergeCommitSha: mergeSha, ct: TestContext.Current.CancellationToken);
 
         result.Select(r => r.Name).Should().BeEquivalentTo(
         [
@@ -902,10 +902,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "approved", string.Empty));
 
-        var result = await _sut.CompletePullRequestAsync(
-            "owner/repo",
-            42,
-            new PullRequestCompletionOptions(PullRequestCompletionStrategy.ApprovalOnly));
+        var result = await _sut.CompletePullRequestAsync("owner/repo", 42, new PullRequestCompletionOptions(PullRequestCompletionStrategy.ApprovalOnly), TestContext.Current.CancellationToken);
 
         result.Success.Should().BeTrue();
         result.PullRequestMerged.Should().BeFalse();
@@ -952,10 +949,7 @@ public sealed class GitHubPluginTests
             .ReturnsAsync(new CliResult(0, "Auto-merge enabled", string.Empty));
         _api.AddJson("graphql", openStatusJson);
 
-        var result = await _sut.CompletePullRequestAsync(
-            "owner/repo",
-            42,
-            new PullRequestCompletionOptions(PullRequestCompletionStrategy.AutoMerge));
+        var result = await _sut.CompletePullRequestAsync("owner/repo", 42, new PullRequestCompletionOptions(PullRequestCompletionStrategy.AutoMerge), TestContext.Current.CancellationToken);
 
         result.Success.Should().BeTrue();
         result.PullRequestMerged.Should().BeFalse();
@@ -997,7 +991,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -1047,7 +1041,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -1084,7 +1078,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -1160,7 +1154,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PullAsync("/repo");
+        await _sut.PullAsync("/repo", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -1197,7 +1191,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PullAsync("/repo");
+        await _sut.PullAsync("/repo", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -1235,7 +1229,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PullAsync("/repo");
+        await _sut.PullAsync("/repo", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -1345,7 +1339,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.ResetAsync("/repo", "hard", "HEAD~1");
+        await _sut.ResetAsync("/repo", "hard", "HEAD~1", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.VerifyAll();
     }
@@ -1362,7 +1356,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.ResetAsync("/repo", "soft", null);
+        await _sut.ResetAsync("/repo", "soft", null, TestContext.Current.CancellationToken);
 
         _cliRunnerMock.VerifyAll();
     }
@@ -1385,7 +1379,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, output, string.Empty));
 
-        var result = (await _sut.GetRemoteBranchesAsync("https://github.com/owner/repo.git")).ToList();
+        var result = (await _sut.GetRemoteBranchesAsync("https://github.com/owner/repo.git", TestContext.Current.CancellationToken)).ToList();
 
         result.Should().Equal("feature/a", "feature/z", "main");
     }
@@ -1402,7 +1396,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(1, string.Empty, "error"));
 
-        var result = await _sut.GetRemoteBranchesAsync("repo");
+        var result = await _sut.GetRemoteBranchesAsync("repo", TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -1419,7 +1413,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "ref: refs/heads/master\tHEAD", string.Empty));
 
-        var result = await _sut.GetDefaultBranchAsync("https://github.com/owner/repo.git");
+        var result = await _sut.GetDefaultBranchAsync("https://github.com/owner/repo.git", TestContext.Current.CancellationToken);
 
         result.Should().Be("master");
     }
@@ -1436,7 +1430,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(1, string.Empty, "error"));
 
-        var result = await _sut.GetDefaultBranchAsync("repo");
+        var result = await _sut.GetDefaultBranchAsync("repo", TestContext.Current.CancellationToken);
 
         result.Should().Be("main");
     }
@@ -1466,7 +1460,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://github.com/owner/repo");
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
 
         environment["GH_TOKEN"].Should().Be("agent-token");
         environment["GIT_TERMINAL_PROMPT"].Should().Be("0");
@@ -1484,7 +1478,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://ghe.example.com/owner/repo.git");
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://ghe.example.com/owner/repo.git", TestContext.Current.CancellationToken);
 
         environment["GH_TOKEN"].Should().Be("agent-token");
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
@@ -1500,7 +1494,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl, TestContext.Current.CancellationToken);
 
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
         environment["GIT_CONFIG_KEY_0"].Should().Be(expectedKey);
@@ -1513,7 +1507,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://oauth2:geheim@ghe.example.com/o/r.git");
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://oauth2:geheim@ghe.example.com/o/r.git", TestContext.Current.CancellationToken);
 
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
         environment["GIT_CONFIG_KEY_0"].Should().Be("http.https://ghe.example.com/.extraheader");
@@ -1529,7 +1523,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl, TestContext.Current.CancellationToken);
 
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
         environment["GIT_CONFIG_KEY_0"].Should().Be("http.https://ghe.example.com/.extraheader");
@@ -1546,7 +1540,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl, TestContext.Current.CancellationToken);
 
         environment["GIT_TERMINAL_PROMPT"].Should().Be("0");
         environment["GH_TOKEN"].Should().Be("agent-token");
@@ -1562,7 +1556,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://github.com/owner/repo");
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
 
         environment.Should().ContainKey("GIT_TERMINAL_PROMPT").WhoseValue.Should().Be("0");
         environment.Should().NotContainKey("GH_TOKEN");
@@ -1577,7 +1571,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("user-token");
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.AgentToken")).Returns("bot-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto, "https://github.com/owner/repo");
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
 
         environment["GH_TOKEN"].Should().Be("bot-token");
         var expected = "AUTHORIZATION: basic " + Convert.ToBase64String(
@@ -1627,7 +1621,7 @@ public sealed class GitHubPluginTests
 
         var error = await Assert.ThrowsAsync<ScmProviderException>(
             () => _sut.ReadEventsAsync(new(new(repository, ScmReferenceKind.Issue, 1), ScmContentKind.Description,
-                null, DateTimeOffset.UtcNow)));
+                null, DateTimeOffset.UtcNow), TestContext.Current.CancellationToken));
 
         error.FailureKind.Should().Be(ScmProviderFailureKind.Authentication);
         error.Message.Should().Contain("Einstellungen → Plugins → GitHub");
@@ -1662,7 +1656,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddJson("graphql", statusJson);
 
-        var result = await _sut.GetPullRequestStatusAsync("owner/repo", 42);
+        var result = await _sut.GetPullRequestStatusAsync("owner/repo", 42, TestContext.Current.CancellationToken);
 
         var request = _api.Requests.Should().ContainSingle().Which;
         request.Method.Should().Be("POST");
@@ -1720,7 +1714,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddJson("user/repos?affiliation=owner", json);
 
-        var result = (await _sut.GetAvailableRepositoriesAsync()).ToList();
+        var result = (await _sut.GetAvailableRepositoriesAsync(TestContext.Current.CancellationToken)).ToList();
 
         result.Should().HaveCount(2);
         result[0].Name.Should().Be("repo");
@@ -1740,7 +1734,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddStatus("user/repos?affiliation=owner", 403);
 
-        var result = await _sut.GetAvailableRepositoriesAsync();
+        var result = await _sut.GetAvailableRepositoriesAsync(TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -1773,7 +1767,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddJson("graphql", statusJson);
 
-        var result = await _sut.GetPullRequestStatusAsync("owner/repo", 42);
+        var result = await _sut.GetPullRequestStatusAsync("owner/repo", 42, TestContext.Current.CancellationToken);
 
         var request = _api.Requests.Should().ContainSingle().Which;
         request.JsonBody.Should().Contain("isDraft");
@@ -1808,7 +1802,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _api.AddJson("graphql", statusJson);
 
-        var result = await _sut.GetPullRequestStatusAsync("owner/repo", 42);
+        var result = await _sut.GetPullRequestStatusAsync("owner/repo", 42, TestContext.Current.CancellationToken);
 
         result.IsDraft.Should().BeFalse();
     }
@@ -1826,7 +1820,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "marked ready", string.Empty));
 
-        var result = await _sut.MarkPullRequestReadyAsync("owner/repo", 42);
+        var result = await _sut.MarkPullRequestReadyAsync("owner/repo", 42, TestContext.Current.CancellationToken);
 
         result.Success.Should().BeTrue();
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -1850,7 +1844,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(1, string.Empty, "not a draft"));
 
-        var result = await _sut.MarkPullRequestReadyAsync("owner/repo", 42);
+        var result = await _sut.MarkPullRequestReadyAsync("owner/repo", 42, TestContext.Current.CancellationToken);
 
         result.Success.Should().BeFalse();
         result.Message.Should().Contain("not a draft");
@@ -1869,7 +1863,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(1, string.Empty, "Resource not accessible by integration (requires protected branch bypass)"));
 
-        var result = await _sut.MarkPullRequestReadyAsync("owner/repo", 42);
+        var result = await _sut.MarkPullRequestReadyAsync("owner/repo", 42, TestContext.Current.CancellationToken);
 
         result.Success.Should().BeFalse();
         result.Blocked.Should().BeTrue();
@@ -1879,7 +1873,7 @@ public sealed class GitHubPluginTests
     [Fact]
     public async Task MarkPullRequestReadyAsync_WithoutRepositoryId_ReturnsFailed()
     {
-        var result = await _sut.MarkPullRequestReadyAsync(" ", 42);
+        var result = await _sut.MarkPullRequestReadyAsync(" ", 42, TestContext.Current.CancellationToken);
 
         result.Success.Should().BeFalse();
         result.Message.Should().Contain("Repository-ID fehlt");
@@ -1924,7 +1918,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "ref: refs/heads/main\tHEAD", string.Empty));
 
-        var result = await _sut.GetDefaultBranchAsync("https://github.com/owner/repo.git");
+        var result = await _sut.GetDefaultBranchAsync("https://github.com/owner/repo.git", TestContext.Current.CancellationToken);
 
         result.Should().Be("main");
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -1973,7 +1967,7 @@ public sealed class GitHubPluginTests
             SourceRef: null,
             HeadSha: null);
 
-        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec, TestContext.Current.CancellationToken);
 
         // Vorab-Hygiene der betreuten Arbeitskopie: Remote-URL lesen und
         // plugin-geschriebenes core.sshCommand prüfen.
@@ -2018,7 +2012,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.CloneRepositoryAsync("git@github.com:owner/repo.git", "/target/path");
+        await _sut.CloneRepositoryAsync("git@github.com:owner/repo.git", "/target/path", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2048,7 +2042,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.CloneRepositoryAsync("ssh://git@github.com/owner/repo.git", "/target/path");
+        await _sut.CloneRepositoryAsync("ssh://git@github.com/owner/repo.git", "/target/path", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2094,7 +2088,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.CloneRepositoryAsync("https://github.com/owner/repo.git", "/target/path");
+        await _sut.CloneRepositoryAsync("https://github.com/owner/repo.git", "/target/path", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2148,7 +2142,7 @@ public sealed class GitHubPluginTests
                 (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
             .ReturnsAsync(new CliResult(0, "git@github.com:owner/repo.git", string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://github.com/owner/repo.git");
         var pushIndex = calls.FindIndex(c => c == "push --set-upstream origin feature/a");
@@ -2182,7 +2176,7 @@ public sealed class GitHubPluginTests
                 (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
             .ReturnsAsync(new CliResult(0, "git@github.com:owner/repo.git", string.Empty));
 
-        await _sut.PullAsync("/repo");
+        await _sut.PullAsync("/repo", TestContext.Current.CancellationToken);
 
         var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://github.com/owner/repo.git");
         var pullIndex = calls.FindIndex(c => c == "pull");
@@ -2235,7 +2229,7 @@ public sealed class GitHubPluginTests
                 (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         var unsetIndex = calls.FindIndex(c => c == "config --unset core.sshCommand");
         var pushIndex = calls.FindIndex(c => c == "push --set-upstream origin feature/a");
@@ -2278,7 +2272,7 @@ public sealed class GitHubPluginTests
                 (_, args, _, _, _) => calls.Add(string.Join(' ', args)))
             .ReturnsAsync(new CliResult(0, "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null", string.Empty));
 
-        await _sut.PullAsync("/repo");
+        await _sut.PullAsync("/repo", TestContext.Current.CancellationToken);
 
         var unsetIndex = calls.FindIndex(c => c == "config --unset core.sshCommand");
         var pullIndex = calls.FindIndex(c => c == "pull");
@@ -2316,7 +2310,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "ssh -o StrictHostKeyChecking=no -i /key", string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2360,7 +2354,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "ssh -i /key", string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2404,7 +2398,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PullAsync("/repo");
+        await _sut.PullAsync("/repo", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2448,7 +2442,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PullAsync("/repo");
+        await _sut.PullAsync("/repo", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2501,7 +2495,7 @@ public sealed class GitHubPluginTests
             SourceRef: null,
             HeadSha: null);
 
-        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec, TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2524,7 +2518,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "hash1\trefs/heads/main", string.Empty));
 
-        var result = await _sut.GetRemoteBranchesAsync("git@github.com:owner/repo.git");
+        var result = await _sut.GetRemoteBranchesAsync("git@github.com:owner/repo.git", TestContext.Current.CancellationToken);
 
         result.Should().Equal("main");
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -2548,7 +2542,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "ref: refs/heads/main\tHEAD", string.Empty));
 
-        var result = await _sut.GetDefaultBranchAsync("ssh://git@github.com/owner/repo.git");
+        var result = await _sut.GetDefaultBranchAsync("ssh://git@github.com/owner/repo.git", TestContext.Current.CancellationToken);
 
         result.Should().Be("main");
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -2594,7 +2588,7 @@ public sealed class GitHubPluginTests
             SourceRef: null,
             HeadSha: null);
 
-        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec, TestContext.Current.CancellationToken);
 
         var setUrlIndex = calls.FindIndex(c => c == "remote set-url origin https://github.com/owner/repo.git");
         var fetchIndex = calls.FindIndex(c => c == "fetch --no-tags origin refs/heads/feature/pr");
@@ -2646,7 +2640,7 @@ public sealed class GitHubPluginTests
             SourceRef: null,
             HeadSha: null);
 
-        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec, TestContext.Current.CancellationToken);
 
         var unsetIndex = calls.FindIndex(c => c == "config --unset core.sshCommand");
         var fetchIndex = calls.FindIndex(c => c == "fetch --no-tags origin refs/heads/feature/pr");
@@ -2694,7 +2688,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, remoteUrl, string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2725,7 +2719,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.CloneRepositoryAsync("https://ghe.example.com/owner/repo.git", "/target/path");
+        await _sut.CloneRepositoryAsync("https://ghe.example.com/owner/repo.git", "/target/path", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2764,7 +2758,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2803,7 +2797,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PushBranchAsync("/repo", "feature/a");
+        await _sut.PushBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2843,7 +2837,7 @@ public sealed class GitHubPluginTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
-        await _sut.PullAsync("/repo");
+        await _sut.PullAsync("/repo", TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2891,7 +2885,7 @@ public sealed class GitHubPluginTests
             SourceRef: null,
             HeadSha: null);
 
-        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec, TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
@@ -2939,7 +2933,7 @@ public sealed class GitHubPluginTests
             SourceRef: null,
             HeadSha: null);
 
-        await _sut.CheckoutPullRequestSourceAsync("/repo", spec);
+        await _sut.CheckoutPullRequestSourceAsync("/repo", spec, TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",

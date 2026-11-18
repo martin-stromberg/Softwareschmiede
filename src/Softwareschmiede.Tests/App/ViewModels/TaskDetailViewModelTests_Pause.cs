@@ -173,7 +173,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
     public async Task IstPausiert_UndPauseAnzeigeText_ReflektierenGeladenenWert()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _aufgabeService.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(2));
+        await _aufgabeService.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
         var sut = await LadeSutAsync(aufgabe);
 
         sut.IstPausiert.Should().BeTrue();
@@ -189,7 +189,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         var sut = await LadeSutAsync(aufgabe);
         sut.StartenCommand.CanExecute(null).Should().BeTrue("ohne Pause ist der Start erlaubt");
 
-        await _aufgabeService.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1));
+        await _aufgabeService.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.StartenCommand.CanExecute(null).Should().BeFalse("eine pausierte Aufgabe darf nicht gestartet werden");
@@ -203,7 +203,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         var sut = await LadeSutAsync(aufgabe);
         sut.KannCliNeuStarten.Should().BeTrue("ohne Pause ist der CLI-Neustart bei beendeter Ausführung erlaubt");
 
-        await _aufgabeService.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1));
+        await _aufgabeService.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.KannCliNeuStarten.Should().BeFalse("eine pausierte Aufgabe darf nicht neu gestartet werden");
@@ -214,7 +214,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
     [Fact]
     public async Task PromptGuards_False_WhenAufgabePausiert()
     {
-        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter");
+        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
         var sut = await LadeSutAsync(aufgabe);
 
@@ -225,7 +225,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         sut.KannPromptVorlageSenden.Should().BeTrue();
         sut.KannPromptPlanen.Should().BeTrue();
 
-        await _aufgabeService.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1));
+        await _aufgabeService.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         // LadenAsync setzt IsCliRunning aus dem KiService neu — für die Guard-Prüfung erneut
@@ -254,7 +254,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
         await ((AsyncRelayCommand)sut.PauseEinstellenCommand).ExecuteAsync();
 
-        var geladen = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var geladen = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         geladen!.PausiertBisUtc.Should().BeCloseTo(pausiertBis, TimeSpan.FromSeconds(5));
         sut.IstPausiert.Should().BeTrue();
         notified.Should().Contain(aufgabe.Id);
@@ -272,13 +272,13 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
             .ReturnsAsync(new AufgabePausierenErgebnis(null, Aufheben: true));
 
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _aufgabeService.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1));
+        await _aufgabeService.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
         var sut = await LadeSutAsync(aufgabe);
         sut.IstPausiert.Should().BeTrue();
 
         await ((AsyncRelayCommand)sut.PauseEinstellenCommand).ExecuteAsync();
 
-        var geladen = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var geladen = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         geladen!.PausiertBisUtc.Should().BeNull();
         sut.IstPausiert.Should().BeFalse();
         sut.PauseAnzeigeText.Should().BeNull();
@@ -297,6 +297,6 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
         await ((AsyncRelayCommand)sut.PauseEinstellenCommand).ExecuteAsync();
 
-        (await _db.Aufgaben.FindAsync(aufgabe.Id))!.PausiertBisUtc.Should().BeNull();
+        (await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken))!.PausiertBisUtc.Should().BeNull();
     }
 }

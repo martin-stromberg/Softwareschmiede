@@ -25,7 +25,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
         var arbeitsverzeichnis = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(arbeitsverzeichnis, "backend"));
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync("backend");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
@@ -49,7 +49,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
@@ -72,7 +72,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable);
@@ -97,7 +97,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
         Directory.CreateDirectory(unterverzeichnis);
 
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync("backend");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));

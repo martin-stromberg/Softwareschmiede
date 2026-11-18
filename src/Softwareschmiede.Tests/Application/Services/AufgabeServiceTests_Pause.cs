@@ -38,18 +38,18 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
     [Fact]
     public async Task SetPauseAsync_ShouldPersistPausiertBisUtc_AndWriteSystemLog()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Pausierbare Aufgabe", null);
+        var aufgabe = await _sut.CreateAsync(_projektId, "Pausierbare Aufgabe", null, ct: TestContext.Current.CancellationToken);
         var pausiertBis = DateTimeOffset.UtcNow.AddHours(2);
 
-        await _sut.SetPauseAsync(aufgabe.Id, pausiertBis);
+        await _sut.SetPauseAsync(aufgabe.Id, pausiertBis, TestContext.Current.CancellationToken);
 
-        var geladen = await _db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == aufgabe.Id);
+        var geladen = await _db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == aufgabe.Id, cancellationToken: TestContext.Current.CancellationToken);
         geladen.PausiertBisUtc.Should().NotBeNull();
         geladen.PausiertBisUtc!.Value.Should().BeCloseTo(pausiertBis, TimeSpan.FromSeconds(5));
 
         var eintraege = await _db.Protokolleintraege
             .Where(e => e.AufgabeId == aufgabe.Id && e.Typ == ProtokollTyp.SystemMeldung)
-            .ToListAsync();
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         eintraege.Should().ContainSingle(e => e.Inhalt.Contains("pausiert", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -57,17 +57,17 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
     [Fact]
     public async Task SetPauseAsync_ShouldClearPause_WhenNull()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Pausierte Aufgabe", null);
-        await _sut.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1));
+        var aufgabe = await _sut.CreateAsync(_projektId, "Pausierte Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _sut.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
 
-        await _sut.SetPauseAsync(aufgabe.Id, null);
+        await _sut.SetPauseAsync(aufgabe.Id, null, TestContext.Current.CancellationToken);
 
-        var geladen = await _db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == aufgabe.Id);
+        var geladen = await _db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == aufgabe.Id, cancellationToken: TestContext.Current.CancellationToken);
         geladen.PausiertBisUtc.Should().BeNull();
 
         var eintraege = await _db.Protokolleintraege
             .Where(e => e.AufgabeId == aufgabe.Id && e.Typ == ProtokollTyp.SystemMeldung)
-            .ToListAsync();
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         eintraege.Should().Contain(e => e.Inhalt.Contains("aufgehoben", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -78,15 +78,15 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
     [InlineData(AufgabeStatus.Wartend)]
     public async Task SetPauseAsync_ShouldAllowActiveStatuses(AufgabeStatus status)
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, $"Aufgabe {status}", null);
-        var tracked = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var aufgabe = await _sut.CreateAsync(_projektId, $"Aufgabe {status}", null, ct: TestContext.Current.CancellationToken);
+        var tracked = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         tracked!.Status = status;
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var act = () => _sut.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddMinutes(30));
 
         await act.Should().NotThrowAsync();
-        (await _db.Aufgaben.FindAsync(aufgabe.Id))!.PausiertBisUtc.Should().NotBeNull();
+        (await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken))!.PausiertBisUtc.Should().NotBeNull();
     }
 
     /// <summary>SetPauseAsync lehnt nicht-pausierbare Stati (Beendet, Archiviert) ab.</summary>
@@ -95,10 +95,10 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
     [InlineData(AufgabeStatus.Archiviert)]
     public async Task SetPauseAsync_ShouldThrow_WhenStatusNotPausable(AufgabeStatus status)
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, $"Aufgabe {status}", null);
-        var tracked = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var aufgabe = await _sut.CreateAsync(_projektId, $"Aufgabe {status}", null, ct: TestContext.Current.CancellationToken);
+        var tracked = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
         tracked!.Status = status;
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var act = () => _sut.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddHours(1));
 
@@ -110,7 +110,7 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
     [Fact]
     public async Task SetPauseAsync_ShouldThrow_WhenTimestampInPast()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Aufgabe", null);
+        var aufgabe = await _sut.CreateAsync(_projektId, "Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         var act = () => _sut.SetPauseAsync(aufgabe.Id, DateTimeOffset.UtcNow.AddMinutes(-1));
 

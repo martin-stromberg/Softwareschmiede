@@ -31,12 +31,10 @@ public sealed class ScmEventDispatchTests_Attachments
         var delivered = await fixture.EventAsync(eventId);
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
-        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"), Png);
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [], false, Report: "UI angepasst."), Json));
+        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"), Png, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], false, Report: "UI angepasst."), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -51,7 +49,7 @@ public sealed class ScmEventDispatchTests_Attachments
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var action = await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments");
+            var action = await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments", cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal("Succeeded", action.Status);
             Assert.Null(action.AttemptId);
         }
@@ -72,18 +70,16 @@ public sealed class ScmEventDispatchTests_Attachments
         var delivered = await fixture.EventAsync(eventId);
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
-        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "gemeldet.png"), Png);
-        await File.WriteAllBytesAsync(Path.Combine(directory, "nichtgeprueft.exe"), Png);
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "gemeldet.png"), Png, TestContext.Current.CancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "nichtgeprueft.exe"), Png, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
                 [], false, Report: "UI angepasst.",
                 Attachments:
                 [
                     new ScmExchangeAttachment("screenshots/gemeldet.png", "Vorher"),
                     new ScmExchangeAttachment("../escape.png")
-                ]), Json));
+                ]), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -111,14 +107,12 @@ public sealed class ScmEventDispatchTests_Attachments
         var delivered = await fixture.EventAsync(eventId);
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
-        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"), Png);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"), Png, TestContext.Current.CancellationToken);
         for (var i = 0; i < 12; i++)
-            await File.WriteAllTextAsync(Path.Combine(directory, "screenshots", $"ungueltig-{i:D2}.png"), "kein bild");
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [], false, Report: "UI angepasst."), Json));
+            await File.WriteAllTextAsync(Path.Combine(directory, "screenshots", $"ungueltig-{i:D2}.png"), "kein bild", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], false, Report: "UI angepasst."), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -144,12 +138,10 @@ public sealed class ScmEventDispatchTests_Attachments
         var delivered = await fixture.EventAsync(eventId);
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
-        await File.WriteAllTextAsync(Path.Combine(directory, "screenshots", "ungueltig.png"), "kein bild");
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [], false, Report: "UI angepasst."), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "screenshots", "ungueltig.png"), "kein bild", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], false, Report: "UI angepasst."), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -160,7 +152,7 @@ public sealed class ScmEventDispatchTests_Attachments
         Assert.Contains("Übersprungen: ungueltig.png (Datei-Signatur passt nicht zum Bildformat)", request.Body);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments")).Status);
+        Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments", cancellationToken: TestContext.Current.CancellationToken)).Status);
     }
 
     /// <summary>Eine ungültige attachments-Deklaration kippt den sonst gültigen Abschluss nicht
@@ -176,16 +168,14 @@ public sealed class ScmEventDispatchTests_Attachments
         var delivered = await fixture.EventAsync(eventId);
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
                 [], false, Report: "UI angepasst.",
                 Attachments:
                 [
                     new ScmExchangeAttachment(""),
                     new ScmExchangeAttachment("fehlend.png", new string('x', ScmEventExchangeProtocol.MaximumCaptionChars + 1))
-                ]), Json));
+                ]), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -211,15 +201,12 @@ public sealed class ScmEventDispatchTests_Attachments
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
         var usurped = ScmEventStore.ActionId(eventId, "attachments");
-        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"), Png);
-        await File.WriteAllTextAsync(Path.Combine(directory, "actions", usurped.ToString("D") + ".json"),
-            JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                usurped, "comment", Body: "Agenten-Kommentar unter der Nachweis-ID."), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [usurped], false, Report: "UI angepasst."), Json));
+        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"), Png, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "actions", usurped.ToString("D") + ".json"), JsonSerializer.Serialize(new ScmExchangeAction(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                usurped, "comment", Body: "Agenten-Kommentar unter der Nachweis-ID."), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [usurped], false, Report: "UI angepasst."), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -231,10 +218,10 @@ public sealed class ScmEventDispatchTests_Attachments
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
         // Die vorweggenommene ai-Aktion wurde regulär ausgeführt; keine attachments-Aktion
         // hat sie still als Succeeded-Nachweis übernommen.
-        var action = await db.ScmOutgoingActions.SingleAsync(x => x.Id == usurped);
+        var action = await db.ScmOutgoingActions.SingleAsync(x => x.Id == usurped, cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("ai:" + usurped.ToString("D"), action.Purpose);
         Assert.Equal("Succeeded", action.Status);
-        Assert.Empty(await db.ScmOutgoingActions.Where(x => x.Purpose == "attachments").ToListAsync());
+        Assert.Empty(await db.ScmOutgoingActions.Where(x => x.Purpose == "attachments").ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.DoesNotContain(fixture.Responses, x => x.Attachments is { Count: > 0 });
     }
 
@@ -250,11 +237,9 @@ public sealed class ScmEventDispatchTests_Attachments
         var delivered = await fixture.EventAsync(eventId);
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [], false, Report: "UI angepasst."), Json));
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], false, Report: "UI angepasst."), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -263,7 +248,7 @@ public sealed class ScmEventDispatchTests_Attachments
         Assert.DoesNotContain(fixture.Responses, x => x.Attachments is { Count: > 0 });
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Empty(await db.ScmOutgoingActions.Where(x => x.Purpose == "attachments").ToListAsync());
+        Assert.Empty(await db.ScmOutgoingActions.Where(x => x.Purpose == "attachments").ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     /// <summary>Auch ein begründeter Abschluss ohne Remoteaktionen sendet vorhandene
@@ -278,12 +263,10 @@ public sealed class ScmEventDispatchTests_Attachments
         var delivered = await fixture.EventAsync(eventId);
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
-        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"), Png);
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [], true, "Nur Screenshots zur Dokumentation; nichts geändert."), Json));
+        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"), Png, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], true, "Nur Screenshots zur Dokumentation; nichts geändert."), Json), TestContext.Current.CancellationToken);
 
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
@@ -315,12 +298,10 @@ public sealed class ScmEventDispatchTests_Attachments
         var delivered = await fixture.EventAsync(eventId);
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
-        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"), Png);
-        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
-        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
-            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [], false, Report: "UI angepasst."), Json));
+        await File.WriteAllBytesAsync(Path.Combine(directory, "screenshots", "nachweis.png"), Png, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"), JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json), TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"), JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], false, Report: "UI angepasst."), Json), TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
 
@@ -328,18 +309,18 @@ public sealed class ScmEventDispatchTests_Attachments
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var action = await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments");
+            var action = await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments", cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal("Failed", action.Status);
             Assert.NotNull(action.NextAttemptUtc);
         }
 
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId);
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, attempts);
         using var verification = fixture.Services.CreateScope();
         var db2 = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Equal("Succeeded", (await db2.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments")).Status);
+        Assert.Equal("Succeeded", (await db2.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments", cancellationToken: TestContext.Current.CancellationToken)).Status);
         Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
     }
 }

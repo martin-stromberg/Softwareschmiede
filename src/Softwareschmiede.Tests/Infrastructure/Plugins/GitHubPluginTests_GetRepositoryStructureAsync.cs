@@ -74,7 +74,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
             """;
         _api.AddJson("git/trees/main?recursive=1", treeJson);
 
-        var result = (await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2)).ToList();
+        var result = (await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken)).ToList();
 
         var paths = result.Select(e => e.Path).ToList();
         paths.Should().Contain(["backend", "frontend", "backend/src", "backend/README.md"]);
@@ -96,7 +96,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
 
         GitPluginBase<GitHubPlugin> plugin = _sut;
 
-        var result = await plugin.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2);
+        var result = await plugin.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Select(e => e.Path).Should().Contain("src");
     }
@@ -108,7 +108,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
         SetupDefaultBranch();
         _api.AddStatus("git/trees/", 404);
 
-        var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -120,7 +120,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
         SetupDefaultBranch();
         _api.AddStatus("git/trees/", 404);
 
-        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://github.com/owner/repo", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://github.com/owner/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(RepositoryStructureLoadStatus.Failed);
     }
@@ -129,7 +129,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
     [Fact]
     public async Task GetRepositoryStructureAsync_ShouldReturnEmpty_ForUnparsableUrl()
     {
-        var result = await _sut.GetRepositoryStructureAsync(string.Empty, maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureAsync(string.Empty, maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
         _cliRunnerMock.Verify(c => c.RunAsync(
@@ -151,7 +151,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
         const string treeJson = """{ "tree": [ { "path": "src", "type": "tree" } ] }""";
         _api.AddJson("repos/owner/repo/git/trees/main?recursive=1", treeJson);
 
-        var result = await _sut.GetRepositoryStructureAsync("git@github.com:owner/repo.git", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureAsync("git@github.com:owner/repo.git", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Select(e => e.Path).Should().Contain("src");
     }
@@ -169,7 +169,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
         const string treeJson = """{ "tree": [ { "path": "src", "type": "tree" } ] }""";
         _api.AddJson("repos/owner/repo/git/trees/main?recursive=1", treeJson);
 
-        var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo/", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo/", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Select(e => e.Path).Should().Contain("src");
     }
@@ -187,7 +187,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
             """;
         _api.AddJson("git/trees/", treeJson);
 
-        var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Select(e => e.Path).Should().Contain("backend");
     }
@@ -200,8 +200,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
         const string treeJson = """{ "tree": [ { "path": "src", "type": "tree" } ] }""";
         _api.AddJson("git/trees/feature/x%23y%25z?recursive=1", treeJson);
 
-        var result = await _sut.GetRepositoryStructureLoadResultAsync(
-            "https://github.com/owner/repo", maxDepth: 2, branchName: "feature/x#y%z");
+        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://github.com/owner/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken, branchName: "feature/x#y%z");
 
         result.Status.Should().Be(RepositoryStructureLoadStatus.Success);
         _api.Requests.Should().ContainSingle().Which.Endpoint
@@ -215,7 +214,7 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
         SetupDefaultBranch();
         _api.AddJson("git/trees/", "not-json");
 
-        var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2);
+        var result = await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }

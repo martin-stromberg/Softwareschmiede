@@ -35,8 +35,8 @@ public sealed class ScmEventDispatchTests_Delay
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            await db.ScmIncomingEvents.Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)null));
-            await db.Aufgaben.Where(x => x.Id == taskId).ExecuteUpdateAsync(x => x.SetProperty(p => p.PausiertBisUtc, (DateTimeOffset?)null));
+            await db.ScmIncomingEvents.Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)null), cancellationToken: TestContext.Current.CancellationToken);
+            await db.Aufgaben.Where(x => x.Id == taskId).ExecuteUpdateAsync(x => x.SetProperty(p => p.PausiertBisUtc, (DateTimeOffset?)null), cancellationToken: TestContext.Current.CancellationToken);
         }
         await fixture.DispatchAsync(eventId);
 
@@ -54,13 +54,13 @@ public sealed class ScmEventDispatchTests_Delay
         Assert.Equal("Verzögert", (await fixture.EventAsync(eventId)).Status);
 
         using (var scope = fixture.Services.CreateScope())
-            Assert.True(await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId));
+            Assert.True(await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId, TestContext.Current.CancellationToken));
 
         Assert.Equal("Abgebrochen", (await fixture.EventAsync(eventId)).Status);
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            Assert.Null((await db.Aufgaben.SingleAsync(x => x.Id == taskId)).PausiertBisUtc);
+            Assert.Null((await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausiertBisUtc);
         }
         await fixture.DispatchAsync(eventId);
         Assert.Empty(fixture.Prompts);

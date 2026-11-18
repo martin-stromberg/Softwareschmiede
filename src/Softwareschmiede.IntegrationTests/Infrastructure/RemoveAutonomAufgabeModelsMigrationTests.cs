@@ -23,8 +23,8 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
     [Fact]
     public async Task Migration_RemoveAutonomAufgabeModels_EntferntTabellenUndEinstellung()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
-        await db.Context.Database.MigrateAsync(PreviousMigration);
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
+        await db.Context.Database.MigrateAsync(PreviousMigration, cancellationToken: TestContext.Current.CancellationToken);
         foreach (var tabelle in EntfernteTabellen)
         {
             (await TableExistsAsync(db, tabelle)).Should().BeTrue($"Vorbedingung: {tabelle} existiert vor der Migration");
@@ -36,7 +36,7 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
         await ErstelleEinstellungAsync(db, EntfernterEinstellungsSchluessel, "true");
         await ErstelleEinstellungAsync(db, AppEinstellungService.ScmMonitoringEnabledKey, "false");
 
-        await db.Context.Database.MigrateAsync(RemoveMigration);
+        await db.Context.Database.MigrateAsync(RemoveMigration, cancellationToken: TestContext.Current.CancellationToken);
 
         foreach (var tabelle in EntfernteTabellen)
         {
@@ -51,14 +51,14 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
     [Fact]
     public async Task Migration_RemoveAutonomAufgabeModels_SetztLaufzustandZurueck()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
-        await db.Context.Database.MigrateAsync(PreviousMigration);
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
+        await db.Context.Database.MigrateAsync(PreviousMigration, cancellationToken: TestContext.Current.CancellationToken);
 
         var projektId = await ErstelleProjektAsync(db);
         var aufgabeId = await ErstelleAufgabeAsync(db, projektId, "Gestartet", "Aktiv", ErstelleLaufzustand("feature/aktiv"));
         await FuegeKonfigurationMitKindzeilenEinAsync(db, aufgabeId);
 
-        await db.Context.Database.MigrateAsync(RemoveMigration);
+        await db.Context.Database.MigrateAsync(RemoveMigration, cancellationToken: TestContext.Current.CancellationToken);
 
         var aufgabe = await LeseAufgabeAsync(db, aufgabeId);
         aufgabe.Should().NotBeNull("die Aufgabe-Zeile muss erhalten bleiben");
@@ -79,14 +79,14 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
     [InlineData("Archiviert")]
     public async Task Migration_RemoveAutonomAufgabeModels_BehaeltAusfuehrungsStatusAbgeschlossenerAufgaben(string status)
     {
-        await using var db = await DatabaseFixture.CreateAsync();
-        await db.Context.Database.MigrateAsync(PreviousMigration);
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
+        await db.Context.Database.MigrateAsync(PreviousMigration, cancellationToken: TestContext.Current.CancellationToken);
 
         var projektId = await ErstelleProjektAsync(db);
         var aufgabeId = await ErstelleAufgabeAsync(db, projektId, status, "Beendet", ErstelleLaufzustand("feature/fertig"));
         await FuegeKonfigurationMitKindzeilenEinAsync(db, aufgabeId);
 
-        await db.Context.Database.MigrateAsync(RemoveMigration);
+        await db.Context.Database.MigrateAsync(RemoveMigration, cancellationToken: TestContext.Current.CancellationToken);
 
         var aufgabe = await LeseAufgabeAsync(db, aufgabeId);
         aufgabe.Should().NotBeNull("die Aufgabe-Zeile muss erhalten bleiben");
@@ -103,8 +103,8 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
     [Fact]
     public async Task Migration_RemoveAutonomAufgabeModels_BehaeltRegulaereAufgaben()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
-        await db.Context.Database.MigrateAsync(PreviousMigration);
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
+        await db.Context.Database.MigrateAsync(PreviousMigration, cancellationToken: TestContext.Current.CancellationToken);
 
         var projektId = await ErstelleProjektAsync(db);
         var laufzustand = ErstelleLaufzustand("feature/regulaer");
@@ -112,7 +112,7 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
         var konfigurierteId = await ErstelleAufgabeAsync(db, projektId, "Gestartet", "Aktiv", ErstelleLaufzustand("feature/konfiguriert"));
         await FuegeKonfigurationMitKindzeilenEinAsync(db, konfigurierteId);
 
-        await db.Context.Database.MigrateAsync(RemoveMigration);
+        await db.Context.Database.MigrateAsync(RemoveMigration, cancellationToken: TestContext.Current.CancellationToken);
 
         var aufgabe = await LeseAufgabeAsync(db, regulaereId);
         aufgabe.Should().Be(new AufgabeZeile(
@@ -130,14 +130,14 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
     [Fact]
     public async Task Migration_RemoveAutonomAufgabeModels_Down_ErzeugtSchemaOhneDaten()
     {
-        await using var db = await DatabaseFixture.CreateAsync();
-        await db.Context.Database.MigrateAsync(PreviousMigration);
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
+        await db.Context.Database.MigrateAsync(PreviousMigration, cancellationToken: TestContext.Current.CancellationToken);
         var projektId = await ErstelleProjektAsync(db);
         var aufgabeId = await ErstelleAufgabeAsync(db, projektId, "Neu", "NichtGestartet", laufzustand: null);
         await FuegeKonfigurationMitKindzeilenEinAsync(db, aufgabeId);
-        await db.Context.Database.MigrateAsync(RemoveMigration);
+        await db.Context.Database.MigrateAsync(RemoveMigration, cancellationToken: TestContext.Current.CancellationToken);
 
-        await db.Context.Database.MigrateAsync(PreviousMigration);
+        await db.Context.Database.MigrateAsync(PreviousMigration, cancellationToken: TestContext.Current.CancellationToken);
 
         foreach (var tabelle in EntfernteTabellen)
         {

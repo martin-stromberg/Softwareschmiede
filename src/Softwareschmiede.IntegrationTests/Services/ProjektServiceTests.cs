@@ -17,15 +17,15 @@ public sealed class ProjektServiceTests
     public async Task CreateAsync_ShouldPersistProjekt_WhenValidNameGiven()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
 
         // Act
-        var created = await service.CreateAsync("Testprojekt Alpha", "Beschreibung des Testprojekts");
+        var created = await service.CreateAsync("Testprojekt Alpha", "Beschreibung des Testprojekts", TestContext.Current.CancellationToken);
 
         // Assert – zweiter Context auf gleicher Datei liest zurück
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Projekte.FindAsync(created.Id);
+        var loaded = await db2.Projekte.FindAsync(new object?[] { created.Id }, TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be("Testprojekt Alpha");
@@ -40,15 +40,15 @@ public sealed class ProjektServiceTests
     public async Task GetAllAsync_ShouldReturnProjectsAlphabeticallySorted_WhenMultipleProjectsExist()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
 
-        await service.CreateAsync("Zebra Projekt", null);
-        await service.CreateAsync("Alpha Projekt", null);
-        await service.CreateAsync("Mitte Projekt", null);
+        await service.CreateAsync("Zebra Projekt", null, TestContext.Current.CancellationToken);
+        await service.CreateAsync("Alpha Projekt", null, TestContext.Current.CancellationToken);
+        await service.CreateAsync("Mitte Projekt", null, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await service.GetAllAsync();
+        var result = await service.GetAllAsync(TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(3);
@@ -64,15 +64,15 @@ public sealed class ProjektServiceTests
     public async Task GetDetailAsync_ShouldIncludeRepositoriesAndAufgaben_WhenProjektHasRelatedData()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
 
-        var projekt = await service.CreateAsync("Projekt mit Repos", null);
-        await service.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/repo", "test-repo");
-        await service.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/repo2", "test-repo2");
+        var projekt = await service.CreateAsync("Projekt mit Repos", null, TestContext.Current.CancellationToken);
+        await service.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/repo", "test-repo", ct: TestContext.Current.CancellationToken);
+        await service.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/repo2", "test-repo2", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var detail = await service.GetDetailAsync(projekt.Id);
+        var detail = await service.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
 
         // Assert
         detail.Should().NotBeNull();
@@ -87,16 +87,16 @@ public sealed class ProjektServiceTests
     public async Task ArchivierenAsync_ShouldSetStatusToArchiviert_WhenProjektExists()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var projekt = await service.CreateAsync("Zu archivierendes Projekt", null);
+        var projekt = await service.CreateAsync("Zu archivierendes Projekt", null, TestContext.Current.CancellationToken);
 
         // Act
-        await service.ArchivierenAsync(projekt.Id);
+        await service.ArchivierenAsync(projekt.Id, TestContext.Current.CancellationToken);
 
         // Assert – Persistenz via neuem Context prüfen
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Projekte.FindAsync(projekt.Id);
+        var loaded = await db2.Projekte.FindAsync(new object?[] { projekt.Id }, TestContext.Current.CancellationToken);
 
         loaded!.Status.Should().Be(ProjektStatus.Archiviert);
     }
@@ -108,20 +108,20 @@ public sealed class ProjektServiceTests
     public async Task DeleteAsync_ShouldCascadeDeleteAufgaben_WhenProjektIsDeleted()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
-        var projekt = await projektService.CreateAsync("Zu löschendes Projekt", null);
-        await aufgabeService.CreateAsync(projekt.Id, "Aufgabe 1", null);
-        await aufgabeService.CreateAsync(projekt.Id, "Aufgabe 2", null);
+        var projekt = await projektService.CreateAsync("Zu löschendes Projekt", null, TestContext.Current.CancellationToken);
+        await aufgabeService.CreateAsync(projekt.Id, "Aufgabe 1", null, ct: TestContext.Current.CancellationToken);
+        await aufgabeService.CreateAsync(projekt.Id, "Aufgabe 2", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await projektService.DeleteAsync(projekt.Id);
+        await projektService.DeleteAsync(projekt.Id, TestContext.Current.CancellationToken);
 
         // Assert – Projekt und Aufgaben sind weg
         await using var db2 = db.CreateNewContext();
-        var geladenesP = await db2.Projekte.FindAsync(projekt.Id);
+        var geladenesP = await db2.Projekte.FindAsync(new object?[] { projekt.Id }, TestContext.Current.CancellationToken);
         var aufgaben = db2.Aufgaben.Where(a => a.ProjektId == projekt.Id).ToList();
 
         geladenesP.Should().BeNull();
@@ -135,20 +135,16 @@ public sealed class ProjektServiceTests
     public async Task AddRepositoryAsync_ShouldPersistRepository_WhenProjektExists()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var projekt = await service.CreateAsync("Projekt mit Repository", null);
+        var projekt = await service.CreateAsync("Projekt mit Repository", null, TestContext.Current.CancellationToken);
 
         // Act
-        var repo = await service.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/myrepo",
-            "myrepo");
+        var repo = await service.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/myrepo", "myrepo", ct: TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.GitRepositories.FindAsync(repo.Id);
+        var loaded = await db2.GitRepositories.FindAsync(new object?[] { repo.Id }, TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
         loaded!.RepositoryName.Should().Be("myrepo");
@@ -165,23 +161,20 @@ public sealed class ProjektServiceTests
     public async Task AddRepositoryAsync_ShouldPersistSourceDirectory_WhenLocalDirectoryPluginIsUsed()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var projekt = await service.CreateAsync("Projekt mit lokalem Verzeichnis", null);
+        var projekt = await service.CreateAsync("Projekt mit lokalem Verzeichnis", null, TestContext.Current.CancellationToken);
         var sourceDirectory = @"C:\repos\integration-local";
 
         // Act
-        var repo = await service.AddRepositoryAsync(
-            projekt.Id,
-            "LocalDirectoryPlugin",
-            new Dictionary<string, string>
-            {
-                ["SourceDirectory"] = sourceDirectory
-            });
+        var repo = await service.AddRepositoryAsync(projekt.Id, "LocalDirectoryPlugin", new Dictionary<string, string>
+        {
+            ["SourceDirectory"] = sourceDirectory
+        }, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.GitRepositories.FindAsync(repo.Id);
+        var loaded = await db2.GitRepositories.FindAsync(new object?[] { repo.Id }, TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
         loaded!.RepositoryUrl.Should().Be(sourceDirectory);
@@ -196,16 +189,16 @@ public sealed class ProjektServiceTests
     public async Task UpdateAsync_ShouldPersistChanges_WhenProjektExists()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var projekt = await service.CreateAsync("Ursprünglicher Name", "Alt");
+        var projekt = await service.CreateAsync("Ursprünglicher Name", "Alt", TestContext.Current.CancellationToken);
 
         // Act
-        await service.UpdateAsync(projekt.Id, "Neuer Name", "Neue Beschreibung");
+        await service.UpdateAsync(projekt.Id, "Neuer Name", "Neue Beschreibung", TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Projekte.FindAsync(projekt.Id);
+        var loaded = await db2.Projekte.FindAsync(new object?[] { projekt.Id }, TestContext.Current.CancellationToken);
 
         loaded!.Name.Should().Be("Neuer Name");
         loaded.Beschreibung.Should().Be("Neue Beschreibung");
@@ -218,11 +211,11 @@ public sealed class ProjektServiceTests
     public async Task GetByIdAsync_ShouldReturnNull_WhenProjektDoesNotExist()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
 
         // Act
-        var result = await service.GetByIdAsync(Guid.NewGuid());
+        var result = await service.GetByIdAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
@@ -235,17 +228,17 @@ public sealed class ProjektServiceTests
     public async Task RemoveRepositoryAsync_ShouldDeleteRepository_WhenRepositoryExists()
     {
         // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
+        await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var projekt = await service.CreateAsync("Projekt", null);
-        var repo = await service.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/x/y", "y");
+        var projekt = await service.CreateAsync("Projekt", null, TestContext.Current.CancellationToken);
+        var repo = await service.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/x/y", "y", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await service.RemoveRepositoryAsync(repo.Id);
+        await service.RemoveRepositoryAsync(repo.Id, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.GitRepositories.FindAsync(repo.Id);
+        var loaded = await db2.GitRepositories.FindAsync(new object?[] { repo.Id }, TestContext.Current.CancellationToken);
         loaded.Should().BeNull();
     }
 }

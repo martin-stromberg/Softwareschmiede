@@ -29,7 +29,7 @@ public sealed class UpdatePackageServiceTests
         var sut = CreateSut(temp.Path, handler);
         var progressItems = new List<UpdatePreparationProgress>();
 
-        var result = await sut.PreparePackageAsync(CreateUpdateInfo(), new Progress<UpdatePreparationProgress>(progressItems.Add));
+        var result = await sut.PreparePackageAsync(CreateUpdateInfo(), new Progress<UpdatePreparationProgress>(progressItems.Add), TestContext.Current.CancellationToken);
 
         File.Exists(result.ZipPath).Should().BeTrue();
         File.Exists(Path.Combine(result.ExtractedDirectory, "Softwareschmiede.exe")).Should().BeTrue();
@@ -108,8 +108,7 @@ public sealed class UpdatePackageServiceTests
             }));
         var sut = CreateSut(temp.Path, handler);
 
-        var result = await sut.PreparePackageAsync(
-            CreateUpdateInfo(manifestFallbackDownloadUrl: ManifestFallbackAssetApiUrl), null);
+        var result = await sut.PreparePackageAsync(CreateUpdateInfo(manifestFallbackDownloadUrl: ManifestFallbackAssetApiUrl), null, TestContext.Current.CancellationToken);
 
         File.Exists(Path.Combine(result.ExtractedDirectory, "Softwareschmiede.exe")).Should().BeTrue();
         handler.RequestedUrls.Should().Equal(
@@ -159,7 +158,7 @@ public sealed class UpdatePackageServiceTests
         var zipBytes = CreateZip(includeExe: true, includeVersion: true, version: "1.4.0-rc.1");
         var sut = CreateSut(temp.Path, zipBytes);
 
-        var result = await sut.PreparePackageAsync(CreateUpdateInfo("1.4.0-rc.1", isPrerelease: true), null);
+        var result = await sut.PreparePackageAsync(CreateUpdateInfo("1.4.0-rc.1", isPrerelease: true), null, TestContext.Current.CancellationToken);
 
         result.ExtractedDirectory.Should().Be(Path.Combine(temp.Path, "updates", "extracted", "1.4.0-rc.1"));
         File.Exists(Path.Combine(result.ExtractedDirectory, "version.json")).Should().BeTrue();
@@ -174,7 +173,7 @@ public sealed class UpdatePackageServiceTests
         using var temp = new TempDirectory(basePath);
         var sut = CreateSut(temp.Path, CreateZip(includeExe: true, includeVersion: true));
 
-        var result = await sut.PreparePackageAsync(CreateUpdateInfo(), null);
+        var result = await sut.PreparePackageAsync(CreateUpdateInfo(), null, TestContext.Current.CancellationToken);
 
         result.ExtractedDirectory.Should().StartWith(temp.Path);
         File.Exists(result.ScriptPath).Should().BeTrue();
@@ -239,7 +238,7 @@ public sealed class UpdatePackageServiceTests
             }));
         var sut = CreateSut(temp.Path, handler);
 
-        var result = await sut.PreparePackageAsync(CreateUpdateInfo(fallbackDownloadUrl: FallbackAssetApiUrl), null);
+        var result = await sut.PreparePackageAsync(CreateUpdateInfo(fallbackDownloadUrl: FallbackAssetApiUrl), null, TestContext.Current.CancellationToken);
 
         File.Exists(result.ZipPath).Should().BeTrue();
         File.Exists(Path.Combine(result.ExtractedDirectory, "Softwareschmiede.exe")).Should().BeTrue();
@@ -299,7 +298,7 @@ public sealed class UpdatePackageServiceTests
         Directory.CreateDirectory(baseDirectory);
         Directory.CreateDirectory(outsideDirectory);
         var sentinel = Path.Combine(outsideDirectory, "sentinel.txt");
-        await File.WriteAllTextAsync(sentinel, "keep");
+        await File.WriteAllTextAsync(sentinel, "keep", TestContext.Current.CancellationToken);
         var options = new UpdateOptions { UpdateDirectoryName = "..\\app2" };
         var sut = CreateSut(baseDirectory, CreateZip(includeExe: true, includeVersion: true), options: options);
 

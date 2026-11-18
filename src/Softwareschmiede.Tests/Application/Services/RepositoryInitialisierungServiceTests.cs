@@ -110,7 +110,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
         var configuration = CreateConfig();
         configuration.Aktiv = false;
 
-        await sut.RunAsync(_repositoryRootPath, configuration);
+        await sut.RunAsync(_repositoryRootPath, configuration, TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(
             runner => runner.RunAsync(
@@ -158,7 +158,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
             .ReturnsAsync(new CliResult(0, "ok", string.Empty));
 
         var sut = CreateSut();
-        await sut.RunAsync(_repositoryRootPath, configuration);
+        await sut.RunAsync(_repositoryRootPath, configuration, TestContext.Current.CancellationToken);
 
         _cliRunnerMock.VerifyAll();
     }
@@ -177,7 +177,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
         var capture = SetupCliRunnerCapture();
 
         var sut = CreateSut();
-        await sut.RunAsync(_repositoryRootPath, configuration);
+        await sut.RunAsync(_repositoryRootPath, configuration, TestContext.Current.CancellationToken);
 
         capture.Command.Should().Be("cmd.exe");
         capture.Args.Should().ContainInOrder("/c", scriptPath);
@@ -194,7 +194,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
         var capture = SetupCliRunnerCapture();
 
         var sut = CreateSut();
-        await sut.RunAsync(_repositoryRootPath, configuration);
+        await sut.RunAsync(_repositoryRootPath, configuration, TestContext.Current.CancellationToken);
 
         capture.Command.Should().Be(scriptPath);
         capture.Args.Should().BeEmpty();

@@ -21,7 +21,7 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(update));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(UpdateCheckStatus.UpdateVerfuegbar);
         result.Update.Should().Be(update);
@@ -39,7 +39,7 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(UpdateReleaseLookupResult.KeinTreffer);
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(UpdateCheckStatus.KeinUpdate);
         result.Update.Should().BeNull();
@@ -57,7 +57,7 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(UpdateReleaseLookupResult.Fehlgeschlagen);
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(UpdateCheckStatus.NichtPruefbar);
         result.Update.Should().BeNull();
@@ -73,7 +73,7 @@ public sealed class UpdateServiceTests
         var releaseClient = new Mock<IUpdateReleaseClient>();
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(UpdateCheckStatus.NichtPruefbar);
         releaseClient.Verify(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -103,7 +103,7 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(update));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(updatePfad));
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(updatePfad), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(UpdateCheckStatus.UpdateVerfuegbar);
         result.Update.Should().Be(update);

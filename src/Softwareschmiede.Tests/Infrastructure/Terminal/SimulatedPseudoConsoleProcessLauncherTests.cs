@@ -180,9 +180,9 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
         var inner = new MemoryStream();
         var stream = CreateCrSubmittingInputStream(inner);
 
-        await stream.WriteAsync(new byte[] { (byte)'a', (byte)'\r' });
+        await stream.WriteAsync(new byte[] { (byte)'a', (byte)'\r' }, TestContext.Current.CancellationToken);
         inner.ToArray().Should().Equal("a"u8.ToArray(), "das '\\r' am Chunk-Ende wird zunächst zurückgehalten");
-        await stream.FlushAsync();
+        await stream.FlushAsync(TestContext.Current.CancellationToken);
 
         inner.ToArray().Should().Equal("a\r\n"u8.ToArray());
     }

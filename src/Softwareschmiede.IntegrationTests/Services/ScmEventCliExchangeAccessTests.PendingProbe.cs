@@ -33,21 +33,21 @@ public sealed partial class ScmEventCliExchangeAccessTests
         var run = Guid.NewGuid();
         using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), run, prefix, spec, session.Object, [], () => true, time);
         var channel = Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName);
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         // The resend delay has not elapsed: re-checks only re-read the pending probe.
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         for (var sends = 1; sends < 3; sends++)
         {
             time.Now = time.Now.AddSeconds(61);
             session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
-            (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+            (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
             session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(sends + 1));
         }
         // The cap prevents endless prompts into a dead session; the remaining path is a regular restart.
         time.Now = time.Now.AddSeconds(61);
         session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
-        var exhausted = await adapter.CheckExchangeAccessAsync(channel);
+        var exhausted = await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken);
         exhausted.Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         exhausted.Reason.Should().Contain("neu starten");
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
@@ -64,10 +64,10 @@ public sealed partial class ScmEventCliExchangeAccessTests
         var session = Session("Devin CLI\nv3000.11.92", "❭");
         using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), Guid.NewGuid(), prefix, spec, session.Object, [], () => true, time);
         var channel = Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName);
-        await adapter.CheckExchangeAccessAsync(channel, sessionName: "Neues Spiel: Vokabel-Quiz");
+        await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken, sessionName: "Neues Spiel: Vokabel-Quiz");
         time.Now = time.Now.AddSeconds(61);
         session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
-        await adapter.CheckExchangeAccessAsync(channel);
+        await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken);
         var sent = session.Invocations.Where(call => call.Method.Name == nameof(ITerminalSession.WritePromptAsync))
             .Select(call => (string)call.Arguments[0]!).ToList();
         sent.Should().HaveCount(2);
@@ -92,28 +92,28 @@ public sealed partial class ScmEventCliExchangeAccessTests
         var run = Guid.NewGuid();
         using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), run, prefix, spec, session.Object, [], () => true, time);
         var channel = Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName);
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         // The dialog swallows the already sent probe and is a distinct, non-confirmable wait state.
         SetScreen(session, banner, trust);
         adapter.ReadyStatus.Should().Be(ScmPromptReadyStatus.TrustPrompt);
         adapter.ConfirmReady(run).Should().BeFalse();
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         // After the user answers, the pending probe still waits for the resend delay.
         SetScreen(session, banner, prompt);
         adapter.ReadyStatus.Should().Be(ScmPromptReadyStatus.Ready);
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         time.Now = time.Now.AddSeconds(61);
         session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
         // The file tool completes the re-delivered challenge on the second attempt.
         var sent = (string)session.Invocations.Last(call => call.Method.Name == nameof(ITerminalSession.WritePromptAsync)).Arguments[0]!;
-        await ScmDispatchFixture.CompleteProbeAsync(sent);
+        await ScmDispatchFixture.CompleteProbeAsync(sent, TestContext.Current.CancellationToken);
         session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Supported);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Supported);
     }
 
     /// <summary>A trust screen while a probe is pending never receives input and never resets the probe.</summary>
@@ -132,7 +132,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         adapter.IsBusy.Should().BeFalse();
         adapter.ConfirmReady(run).Should().BeFalse();
         var channel = Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName);
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

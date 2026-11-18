@@ -31,9 +31,9 @@ public sealed class CliReplayAufzeichnungStoreTests
         };
 
         using var stream = new MemoryStream();
-        await store.SpeichernAsync(stream, quelle);
+        await store.SpeichernAsync(stream, quelle, TestContext.Current.CancellationToken);
         stream.Position = 0;
-        var geladen = await store.LadeAsync(stream);
+        var geladen = await store.LadeAsync(stream, TestContext.Current.CancellationToken);
 
         geladen.AufgabeId.Should().Be(quelle.AufgabeId);
         geladen.PluginName.Should().Be(quelle.PluginName);
@@ -69,9 +69,9 @@ public sealed class CliReplayAufzeichnungStoreTests
         };
 
         using var stream = new MemoryStream();
-        await store.SpeichernAsync(stream, quelle);
+        await store.SpeichernAsync(stream, quelle, TestContext.Current.CancellationToken);
         stream.Position = 0;
-        var geladen = await store.LadeAsync(stream);
+        var geladen = await store.LadeAsync(stream, TestContext.Current.CancellationToken);
 
         geladen.EndeUtc.Should().BeNull();
     }
@@ -134,7 +134,7 @@ public sealed class CliReplayAufzeichnungStoreTests
             Rows = -5,
             IstVollstaendig = true,
             Chunks = [],
-        });
+        }, TestContext.Current.CancellationToken);
         stream.Position = 0;
 
         var act = () => store.LadeAsync(stream);
@@ -157,7 +157,7 @@ public sealed class CliReplayAufzeichnungStoreTests
             Rows = 24,
             IstVollstaendig = true,
             Chunks = [new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("abcdef"))],
-        });
+        }, TestContext.Current.CancellationToken);
 
         // Die letzten 3 Bytes des einzigen Chunks abschneiden.
         stream.SetLength(stream.Length - 3);
@@ -174,7 +174,7 @@ public sealed class CliReplayAufzeichnungStoreTests
     {
         var store = new CliReplayAufzeichnungStore();
         using var stream = new MemoryStream();
-        await store.SpeichernAsync(stream, CreateAufzeichnung());
+        await store.SpeichernAsync(stream, CreateAufzeichnung(), TestContext.Current.CancellationToken);
 
         // 5 Bytes hinter dem regulären Dateiende würden als leeres Ende erkannt werden —
         // ein abgeschnittener 12-Byte-Record-Header (1..11 Bytes) muss dagegen fehlschlagen.
@@ -234,9 +234,9 @@ public sealed class CliReplayAufzeichnungStoreTests
         };
 
         using var stream = new MemoryStream();
-        await store.SpeichernAsync(stream, quelle);
+        await store.SpeichernAsync(stream, quelle, TestContext.Current.CancellationToken);
         stream.Position = 0;
-        var geladen = await store.LadeAsync(stream);
+        var geladen = await store.LadeAsync(stream, TestContext.Current.CancellationToken);
 
         geladen.StartUtc.Should().Be(quelle.StartUtc, "derselbe Zeitpunkt muss erhalten bleiben");
         geladen.StartUtc.Offset.Should().Be(TimeSpan.Zero, "die Speicherung erfolgt UTC-normalisiert");
@@ -255,10 +255,10 @@ public sealed class CliReplayAufzeichnungStoreTests
         try
         {
             var quelle = CreateAufzeichnung();
-            await store.SpeichernAsync(pfad, quelle);
+            await store.SpeichernAsync(pfad, quelle, TestContext.Current.CancellationToken);
 
             File.Exists(pfad).Should().BeTrue();
-            var geladen = await store.LadeAsync(pfad);
+            var geladen = await store.LadeAsync(pfad, TestContext.Current.CancellationToken);
             geladen.AufgabeId.Should().Be(quelle.AufgabeId);
             geladen.Chunks.Should().HaveCount(1);
             geladen.Chunks[0].Data.Should().Equal(Encoding.UTF8.GetBytes("payload"));
