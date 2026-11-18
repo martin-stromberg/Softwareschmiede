@@ -200,7 +200,7 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
         sut.IsEditingInitialisierungsskript.Should().BeFalse();
         sut.SelectedInitialisierungsskript.Should().Be("scripts/new.ps1");
-        var persisted = await _projektService.GetDetailAsync(projekt.Id);
+        var persisted = await _projektService.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
         persisted!.Repositories.Single(r => r.Id == repository.Id).InitialisierungKonfiguration!.InitialisierungsskriptRelativePath.Should().Be("scripts/new.ps1");
     }
 
@@ -224,7 +224,7 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
         await ((AsyncRelayCommand)sut.SaveInitialisierungsskriptCommand).ExecuteAsync();
 
-        var persisted = await _projektService.GetDetailAsync(projekt.Id);
+        var persisted = await _projektService.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
         var konfiguration = persisted!.Repositories.Single(r => r.Id == repository.Id).InitialisierungKonfiguration;
         konfiguration.Should().NotBeNull();
         konfiguration!.InitialisierungsskriptRelativePath.Should().Be("scripts/init.ps1");
@@ -253,7 +253,7 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
         sut.IsEditingInitialisierungsskript.Should().BeFalse();
         sut.SelectedInitialisierungsskript.Should().Be("scripts/init.ps1");
-        var persisted = await _projektService.GetDetailAsync(projekt.Id);
+        var persisted = await _projektService.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
         persisted!.Repositories.Single(r => r.Id == repository.Id).InitialisierungKonfiguration!.InitialisierungsskriptRelativePath.Should().Be("scripts/init.ps1");
     }
 }

@@ -121,7 +121,7 @@ public sealed class ScmEventDispatchTests_IssueBodyUpdate
             It.IsAny<ScmResponseRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ScmResponseResult("issue-77"));
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId);
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
 
         var stored = await ActionAsync(fixture, action.Id);
         Assert.Equal("Succeeded", stored.Status);

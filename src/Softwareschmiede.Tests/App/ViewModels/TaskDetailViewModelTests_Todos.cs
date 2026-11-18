@@ -51,8 +51,8 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
     public async Task LoadAsync_LoadsTodos()
     {
         var aufgabe = await ErstelleAufgabe();
-        await _todoService.CreateTodoAsync(aufgabe.Id, "Erstes Todo");
-        await _todoService.CreateTodoAsync(aufgabe.Id, "Zweites Todo");
+        await _todoService.CreateTodoAsync(aufgabe.Id, "Erstes Todo", TestContext.Current.CancellationToken);
+        await _todoService.CreateTodoAsync(aufgabe.Id, "Zweites Todo", TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
@@ -67,9 +67,9 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
     public async Task OffeneTodoCount_UpdatesCorrectly()
     {
         var aufgabe = await ErstelleAufgabe();
-        await _todoService.CreateTodoAsync(aufgabe.Id, "Offenes Todo");
-        var erledigt = await _todoService.CreateTodoAsync(aufgabe.Id, "Erledigtes Todo");
-        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id);
+        await _todoService.CreateTodoAsync(aufgabe.Id, "Offenes Todo", TestContext.Current.CancellationToken);
+        var erledigt = await _todoService.CreateTodoAsync(aufgabe.Id, "Erledigtes Todo", TestContext.Current.CancellationToken);
+        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
@@ -93,7 +93,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
         sut.TodoList.Todos.Should().ContainSingle(t => t.Beschreibung == "Neues Todo");
         sut.TodoList.OffeneTodoCount.Should().Be(1);
         sut.TodoList.NeuesTodoBeschreibung.Should().BeNullOrEmpty();
-        var alleTodos = await _todoService.GetAllTodosAsync(aufgabe.Id);
+        var alleTodos = await _todoService.GetAllTodosAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         alleTodos.Should().ContainSingle();
     }
 
@@ -102,7 +102,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
     public async Task TodoLoeschenCommand_DeletesTodo()
     {
         var aufgabe = await ErstelleAufgabe();
-        var todo = await _todoService.CreateTodoAsync(aufgabe.Id, "Zu löschendes Todo");
+        var todo = await _todoService.CreateTodoAsync(aufgabe.Id, "Zu löschendes Todo", TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -110,7 +110,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
         await ((AsyncRelayCommand<Guid>)sut.TodoList.TodoLoeschenCommand).ExecuteAsync(todo.Id);
 
         sut.TodoList.Todos.Should().BeEmpty();
-        var alleTodos = await _todoService.GetAllTodosAsync(aufgabe.Id);
+        var alleTodos = await _todoService.GetAllTodosAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         alleTodos.Should().BeEmpty();
     }
 
@@ -119,7 +119,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
     public async Task TodoAlsErledigtMarkierenCommand_MarksTodoCompleted()
     {
         var aufgabe = await ErstelleAufgabe();
-        var todo = await _todoService.CreateTodoAsync(aufgabe.Id, "Zu markierendes Todo");
+        var todo = await _todoService.CreateTodoAsync(aufgabe.Id, "Zu markierendes Todo", TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -128,7 +128,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
 
         sut.TodoList.Todos.Single().IstErledigt.Should().BeTrue();
         sut.TodoList.OffeneTodoCount.Should().Be(0);
-        var alleTodos = await _todoService.GetAllTodosAsync(aufgabe.Id);
+        var alleTodos = await _todoService.GetAllTodosAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         alleTodos.Single().ErledigtAm.Should().NotBeNull();
     }
 
@@ -137,7 +137,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
     public async Task AufgabeAbschliessenCommand_WithOpenTodos_ShowsError()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
-        await _todoService.CreateTodoAsync(aufgabe.Id, "Offenes Todo");
+        await _todoService.CreateTodoAsync(aufgabe.Id, "Offenes Todo", TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -145,7 +145,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
         await ((AsyncRelayCommand)sut.AufgabeAbschliessenCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().Contain("1 offene To-Do(s)");
-        var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         aktualisiert!.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
@@ -154,8 +154,8 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
     public async Task AufgabeAbschliessenCommand_WithoutOpenTodos_Succeeds()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
-        var todo = await _todoService.CreateTodoAsync(aufgabe.Id, "Erledigtes Todo");
-        await _todoService.MarkTodoAsCompletedAsync(todo.Id);
+        var todo = await _todoService.CreateTodoAsync(aufgabe.Id, "Erledigtes Todo", TestContext.Current.CancellationToken);
+        await _todoService.MarkTodoAsCompletedAsync(todo.Id, TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -163,7 +163,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
         await ((AsyncRelayCommand)sut.AufgabeAbschliessenCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNullOrEmpty();
-        var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         aktualisiert!.Status.Should().Be(AufgabeStatus.Beendet);
     }
 }

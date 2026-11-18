@@ -31,7 +31,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         var missingPath = Path.Combine(CreateTempDirectory(), "missing");
         var service = CreateService(missingPath, string.Empty);
 
-        var snapshot = await service.LoadSnapshotAsync(missingPath);
+        var snapshot = await service.LoadSnapshotAsync(missingPath, TestContext.Current.CancellationToken);
 
         snapshot.HasError.Should().BeTrue();
         snapshot.ErrorMessage.Should().Contain("existiert nicht");
@@ -44,7 +44,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, string.Empty, repoCheckStdOut: "false");
 
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath, TestContext.Current.CancellationToken);
 
         snapshot.HasError.Should().BeTrue();
         snapshot.ErrorMessage.Should().Contain("kein Git-Repository");
@@ -57,7 +57,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, "?? src/file.cs", commitCountSuccess: false, commitCountStdErr: "fatal");
 
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath, TestContext.Current.CancellationToken);
 
         snapshot.CommitCount.Should().Be(0);
     }
@@ -75,7 +75,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             commitCountStdOut: "3",
             branchLogStdOut: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\0aaaaaaa\0fix: branch commit");
 
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath, TestContext.Current.CancellationToken);
 
         snapshot.CommitCount.Should().Be(3);
         snapshot.BranchCommits.Should().ContainSingle();
@@ -95,7 +95,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             commitCountStdOut: "5",
             branchLogStdOut: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\0aaaaaaa\0fix: branch commit");
 
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath, TestContext.Current.CancellationToken);
 
         snapshot.CommitCount.Should().Be(5);
         snapshot.BranchCommits.Should().ContainSingle();
@@ -115,7 +115,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             commitCountStdOut: "6",
             branchLogStdOut: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\0bbbbbbb\0feat: branch commit");
 
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath, TestContext.Current.CancellationToken);
 
         snapshot.CommitCount.Should().Be(6);
         snapshot.BranchCommits.Should().ContainSingle();
@@ -135,7 +135,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             commitCountStdOut: "4",
             branchLogStdOut: "cccccccccccccccccccccccccccccccccccccccc\0ccccccc\0feat: fallback");
 
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath, TestContext.Current.CancellationToken);
 
         snapshot.CommitCount.Should().Be(4);
         snapshot.BranchCommits.Should().ContainSingle();
@@ -153,7 +153,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             resolveBaseRefSuccess: false,
             fallbackBaseRef: null);
 
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath, TestContext.Current.CancellationToken);
 
         snapshot.CommitCount.Should().Be(0);
         snapshot.BranchCommits.Should().BeEmpty();
@@ -171,7 +171,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             commitCountStdOut: "2",
             branchLogStdOut: "dddddddddddddddddddddddddddddddddddddddd\0ddddddd\0feat: staging commit");
 
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath, "staging");
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath, "staging", TestContext.Current.CancellationToken);
 
         snapshot.CommitCount.Should().Be(2);
         snapshot.BranchCommits.Should().ContainSingle();
@@ -186,7 +186,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         var service = CreateService(repositoryPath, string.Empty);
         var commitSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
-        var files = await service.LoadCommitFilesAsync(repositoryPath, commitSha);
+        var files = await service.LoadCommitFilesAsync(repositoryPath, commitSha, TestContext.Current.CancellationToken);
 
         files.Should().Contain(node => node.IsDirectory && node.RelativePath == "src");
         var fileNode = FindNode(files, Path.Combine("src", "Changed.cs"));
@@ -205,7 +205,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             string.Empty,
             commitDiffTreeStdOut: "M\0src/Changed.cs\0R100\0src/Old.cs\0");
 
-        var files = await service.LoadCommitFilesAsync(repositoryPath, commitSha);
+        var files = await service.LoadCommitFilesAsync(repositoryPath, commitSha, TestContext.Current.CancellationToken);
 
         var changed = FindNode(files, Path.Combine("src", "Changed.cs"));
         changed.Should().NotBeNull();
@@ -233,7 +233,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             Name = "feature.cs",
             RelativePath = Path.Combine("src", "feature.cs"),
             CommitSha = commitSha,
-        });
+        }, TestContext.Current.CancellationToken);
 
         preview.CurrentContent.Should().Be("new-content");
         preview.OriginalContent.Should().Be("old-content");
@@ -252,7 +252,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             RelativePath = "src",
             IsDirectory = true,
             CommitSha = "cccccccccccccccccccccccccccccccccccccccc",
-        });
+        }, TestContext.Current.CancellationToken);
 
         preview.Hint.Should().Contain("Verzeichnisse");
         preview.CurrentContent.Should().BeNull();
@@ -279,7 +279,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             Name = "feature.cs",
             RelativePath = Path.Combine("src", "feature.cs"),
             CommitSha = commitSha,
-        });
+        }, TestContext.Current.CancellationToken);
 
         preview.IsBinary.Should().BeTrue();
         preview.Hint.Should().Contain("Binärdatei");
@@ -308,7 +308,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             Name = "feature.cs",
             RelativePath = Path.Combine("src", "feature.cs"),
             CommitSha = commitSha,
-        });
+        }, TestContext.Current.CancellationToken);
 
         preview.IsTooBig.Should().BeTrue();
         preview.CurrentContent.Should().BeNull();
@@ -336,7 +336,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             Name = "feature.cs",
             RelativePath = Path.Combine("src", "feature.cs"),
             CommitSha = commitSha,
-        });
+        }, TestContext.Current.CancellationToken);
 
         preview.CurrentContent.Should().BeNull();
         preview.OriginalContent.Should().BeNull();
@@ -360,7 +360,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             Status = new WorkspaceFileStatus('D', ' '),
         };
 
-        var deletedPreview = await deletedService.LoadPreviewAsync(repositoryPath, deletedNode);
+        var deletedPreview = await deletedService.LoadPreviewAsync(repositoryPath, deletedNode, TestContext.Current.CancellationToken);
 
         deletedPreview.IsDeleted.Should().BeTrue();
         deletedPreview.OriginalContent.Should().Be("old content");
@@ -368,7 +368,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         deletedPreview.IsBinary.Should().BeFalse();
 
         var binaryPath = Path.Combine(repositoryPath, "binary.dat");
-        await File.WriteAllBytesAsync(binaryPath, [1, 2, 0, 4, 5]);
+        await File.WriteAllBytesAsync(binaryPath, [1, 2, 0, 4, 5], TestContext.Current.CancellationToken);
 
         var binaryService = CreateService(repositoryPath, string.Empty);
         var binaryNode = new WorkspaceFileNode
@@ -379,7 +379,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             Status = new WorkspaceFileStatus(' ', 'M'),
         };
 
-        var binaryPreview = await binaryService.LoadPreviewAsync(repositoryPath, binaryNode);
+        var binaryPreview = await binaryService.LoadPreviewAsync(repositoryPath, binaryNode, TestContext.Current.CancellationToken);
 
         binaryPreview.IsBinary.Should().BeTrue();
         binaryPreview.Hint.Should().Contain("Binärdatei");
@@ -405,7 +405,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             RelativePath = Path.Combine("docs", "requirements", "missing.md"),
             IsDirectory = false,
             Status = new WorkspaceFileStatus('M', ' '),
-        });
+        }, TestContext.Current.CancellationToken);
 
         preview.CurrentContent.Should().BeNull();
         preview.OriginalContent.Should().Be("head-content");
@@ -420,7 +420,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         var relativePath = Path.Combine("src", "changed.cs");
         var filePath = Path.Combine(repositoryPath, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-        await File.WriteAllTextAsync(filePath, "current-content");
+        await File.WriteAllTextAsync(filePath, "current-content", TestContext.Current.CancellationToken);
 
         var service = CreateService(
             repositoryPath,
@@ -436,7 +436,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             RelativePath = relativePath,
             IsDirectory = false,
             Status = new WorkspaceFileStatus('M', ' '),
-        });
+        }, TestContext.Current.CancellationToken);
 
         preview.CurrentContent.Should().Be("current-content");
         preview.OriginalContent.Should().Be("original-content");
@@ -450,7 +450,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         var relativePath = Path.Combine("src", "changed.cs");
         var filePath = Path.Combine(repositoryPath, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-        await File.WriteAllTextAsync(filePath, "current-content");
+        await File.WriteAllTextAsync(filePath, "current-content", TestContext.Current.CancellationToken);
 
         var service = CreateService(
             repositoryPath,
@@ -466,7 +466,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             RelativePath = relativePath,
             IsDirectory = false,
             Status = new WorkspaceFileStatus('M', ' '),
-        });
+        }, TestContext.Current.CancellationToken);
 
         preview.CurrentContent.Should().Be("current-content");
         preview.OriginalContent.Should().BeNull();
@@ -484,7 +484,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             Name = "src",
             RelativePath = "src",
             IsDirectory = true,
-        });
+        }, TestContext.Current.CancellationToken);
 
         preview.Hint.Should().Contain("Verzeichnisse");
         preview.CurrentContent.Should().BeNull();
@@ -497,7 +497,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
     {
         var repositoryPath = CreateTempDirectory();
         var largeFilePath = Path.Combine(repositoryPath, "large.txt");
-        await File.WriteAllTextAsync(largeFilePath, new string('a', 1_048_577));
+        await File.WriteAllTextAsync(largeFilePath, new string('a', 1_048_577), TestContext.Current.CancellationToken);
         var service = CreateService(repositoryPath, string.Empty);
 
         var preview = await service.LoadPreviewAsync(repositoryPath, new WorkspaceFileNode
@@ -505,7 +505,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
             Name = "large.txt",
             RelativePath = "large.txt",
             IsDirectory = false,
-        });
+        }, TestContext.Current.CancellationToken);
 
         preview.IsTooBig.Should().BeTrue();
         preview.CurrentContent.Should().BeNull();

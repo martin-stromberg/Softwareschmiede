@@ -25,13 +25,13 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
         var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(sourcePath, targetPath);
-        await sut.CreateBranchAsync(targetPath, "feature/integration");
-        await File.AppendAllTextAsync(Path.Combine(targetPath, "readme.txt"), "\nchange");
-        await sut.CommitAsync(targetPath, "feat: local change");
+        await sut.CloneRepositoryAsync(sourcePath, targetPath, TestContext.Current.CancellationToken);
+        await sut.CreateBranchAsync(targetPath, "feature/integration", ct: TestContext.Current.CancellationToken);
+        await File.AppendAllTextAsync(Path.Combine(targetPath, "readme.txt"), "\nchange", TestContext.Current.CancellationToken);
+        await sut.CommitAsync(targetPath, "feat: local change", TestContext.Current.CancellationToken);
 
         var countBeforeReset = await ReadCommitCountAsync(cliRunner, targetPath);
-        await sut.ResetAsync(targetPath, "hard", "HEAD~1");
+        await sut.ResetAsync(targetPath, "hard", "HEAD~1", TestContext.Current.CancellationToken);
         var countAfterReset = await ReadCommitCountAsync(cliRunner, targetPath);
 
         Directory.Exists(Path.Combine(targetPath, ".git")).Should().BeTrue();
@@ -44,7 +44,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
     {
         var cliRunner = new CliRunner(NullLogger<CliRunner>.Instance);
         var sourcePath = CreateTempDirectory();
-        await File.WriteAllTextAsync(Path.Combine(sourcePath, "readme.txt"), "demo");
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "readme.txt"), "demo", TestContext.Current.CancellationToken);
         var pointerPath = Path.Combine(Path.GetTempPath(), $"local-plugin-pointer-{Guid.NewGuid():N}");
         _tempPaths.Add(pointerPath);
 
@@ -53,8 +53,8 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         credentials.SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
         var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(sourcePath, pointerPath);
-        await sut.CreateBranchAsync(pointerPath, "feature/from-source");
+        await sut.CloneRepositoryAsync(sourcePath, pointerPath, TestContext.Current.CancellationToken);
+        await sut.CreateBranchAsync(pointerPath, "feature/from-source", ct: TestContext.Current.CancellationToken);
 
         var currentBranch = await ReadCurrentBranchAsync(cliRunner, sourcePath);
         Directory.Exists(Path.Combine(sourcePath, ".git")).Should().BeTrue();
@@ -70,7 +70,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         var targetPath = Path.Combine(Path.GetTempPath(), $"local-plugin-dirty-{Guid.NewGuid():N}");
         _tempPaths.Add(targetPath);
         await InitializeRepositoryAsync(cliRunner, sourcePath);
-        await File.AppendAllTextAsync(Path.Combine(sourcePath, "readme.txt"), "\ndirty");
+        await File.AppendAllTextAsync(Path.Combine(sourcePath, "readme.txt"), "\ndirty", TestContext.Current.CancellationToken);
 
         var credentials = new InMemoryCredentialStore();
         credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "InSourceDirectory");
@@ -106,7 +106,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         var cliRunner = new CliRunner(NullLogger<CliRunner>.Instance);
         var sourcePath = CreateTempDirectory();
         var targetPath = CreateTempDirectory();
-        await File.WriteAllTextAsync(Path.Combine(targetPath, "existing.txt"), "x");
+        await File.WriteAllTextAsync(Path.Combine(targetPath, "existing.txt"), "x", TestContext.Current.CancellationToken);
 
         var credentials = new InMemoryCredentialStore();
         credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
@@ -133,7 +133,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         credentials.SetCredential("LocalDirectoryPlugin.SourceDirectory", sourcePath);
         var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(string.Empty, targetPath);
+        await sut.CloneRepositoryAsync(string.Empty, targetPath, TestContext.Current.CancellationToken);
 
         Directory.Exists(Path.Combine(targetPath, ".git")).Should().BeTrue();
         File.Exists(Path.Combine(targetPath, "readme.txt")).Should().BeTrue();
@@ -147,13 +147,13 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         var sourcePath = CreateTempDirectory();
         var targetPath = Path.Combine(Path.GetTempPath(), $"local-plugin-copy-fallback-{Guid.NewGuid():N}");
         _tempPaths.Add(targetPath);
-        await File.WriteAllTextAsync(Path.Combine(sourcePath, "copy-source.txt"), "copy-me");
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "copy-source.txt"), "copy-me", TestContext.Current.CancellationToken);
 
         var credentials = new InMemoryCredentialStore();
         credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
         var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(sourcePath, targetPath);
+        await sut.CloneRepositoryAsync(sourcePath, targetPath, TestContext.Current.CancellationToken);
 
         File.Exists(Path.Combine(targetPath, "copy-source.txt")).Should().BeTrue();
         Directory.Exists(Path.Combine(targetPath, ".git")).Should().BeTrue();
@@ -174,7 +174,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
         var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(sourcePath, targetPath);
+        await sut.CloneRepositoryAsync(sourcePath, targetPath, TestContext.Current.CancellationToken);
 
         Directory.Exists(Path.Combine(sourcePath, ".git")).Should().BeTrue();
         Directory.Exists(Path.Combine(targetPath, ".git")).Should().BeTrue();
@@ -189,8 +189,8 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         var targetPath = Path.Combine(Path.GetTempPath(), $"local-plugin-push-sync-{Guid.NewGuid():N}");
         _tempPaths.Add(targetPath);
         await InitializeRepositoryAsync(cliRunner, sourcePath);
-        await File.WriteAllTextAsync(Path.Combine(sourcePath, "delete-me.txt"), "delete");
-        await File.WriteAllTextAsync(Path.Combine(sourcePath, "old-name.txt"), "old");
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "delete-me.txt"), "delete", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "old-name.txt"), "old", TestContext.Current.CancellationToken);
         await RunGitAsync(cliRunner, sourcePath, "add", ".");
         await RunGitAsync(cliRunner, sourcePath, "commit", "-m", "add files");
 
@@ -198,14 +198,14 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
         var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(sourcePath, targetPath);
-        await File.WriteAllTextAsync(Path.Combine(targetPath, "readme.txt"), "updated");
+        await sut.CloneRepositoryAsync(sourcePath, targetPath, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(targetPath, "readme.txt"), "updated", TestContext.Current.CancellationToken);
         File.Delete(Path.Combine(targetPath, "delete-me.txt"));
         await RunGitAsync(cliRunner, targetPath, "mv", "old-name.txt", "new-name.txt");
 
-        await sut.PushBranchAsync(targetPath, "feature/sync");
+        await sut.PushBranchAsync(targetPath, "feature/sync", TestContext.Current.CancellationToken);
 
-        (await File.ReadAllTextAsync(Path.Combine(sourcePath, "readme.txt"))).Should().Be("updated");
+        (await File.ReadAllTextAsync(Path.Combine(sourcePath, "readme.txt"), TestContext.Current.CancellationToken)).Should().Be("updated");
         File.Exists(Path.Combine(sourcePath, "delete-me.txt")).Should().BeFalse();
         File.Exists(Path.Combine(sourcePath, "old-name.txt")).Should().BeFalse();
         File.Exists(Path.Combine(sourcePath, "new-name.txt")).Should().BeTrue();
@@ -225,13 +225,13 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
         var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(sourcePath, targetPath);
-        await File.WriteAllTextAsync(Path.Combine(sourcePath, "readme.txt"), "source-new");
-        await File.WriteAllTextAsync(Path.Combine(sourcePath, "from-source.txt"), "new");
+        await sut.CloneRepositoryAsync(sourcePath, targetPath, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "readme.txt"), "source-new", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "from-source.txt"), "new", TestContext.Current.CancellationToken);
 
-        await sut.PullAsync(targetPath);
+        await sut.PullAsync(targetPath, TestContext.Current.CancellationToken);
 
-        (await File.ReadAllTextAsync(Path.Combine(targetPath, "readme.txt"))).Should().Be("source-new");
+        (await File.ReadAllTextAsync(Path.Combine(targetPath, "readme.txt"), TestContext.Current.CancellationToken)).Should().Be("source-new");
         File.Exists(Path.Combine(targetPath, "from-source.txt")).Should().BeTrue();
     }
 
@@ -244,7 +244,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         var targetPath = Path.Combine(Path.GetTempPath(), $"local-plugin-merge-sync-{Guid.NewGuid():N}");
         _tempPaths.Add(targetPath);
         await InitializeRepositoryAsync(cliRunner, sourcePath);
-        await File.WriteAllTextAsync(Path.Combine(sourcePath, "remove-me.txt"), "remove");
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "remove-me.txt"), "remove", TestContext.Current.CancellationToken);
         await RunGitAsync(cliRunner, sourcePath, "add", ".");
         await RunGitAsync(cliRunner, sourcePath, "commit", "-m", "add removable");
 
@@ -252,13 +252,13 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
         var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(sourcePath, targetPath);
-        await File.WriteAllTextAsync(Path.Combine(targetPath, "readme.txt"), "merged-content");
+        await sut.CloneRepositoryAsync(sourcePath, targetPath, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(targetPath, "readme.txt"), "merged-content", TestContext.Current.CancellationToken);
         File.Delete(Path.Combine(targetPath, "remove-me.txt"));
 
-        await sut.MergeToSourceAsync(targetPath);
+        await sut.MergeToSourceAsync(targetPath, TestContext.Current.CancellationToken);
 
-        (await File.ReadAllTextAsync(Path.Combine(sourcePath, "readme.txt"))).Should().Be("merged-content");
+        (await File.ReadAllTextAsync(Path.Combine(sourcePath, "readme.txt"), TestContext.Current.CancellationToken)).Should().Be("merged-content");
         File.Exists(Path.Combine(sourcePath, "remove-me.txt")).Should().BeFalse();
     }
 
@@ -277,10 +277,10 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         credentials.SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
         var firstInstance = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await firstInstance.CloneRepositoryAsync(sourcePath, pointerPath);
+        await firstInstance.CloneRepositoryAsync(sourcePath, pointerPath, TestContext.Current.CancellationToken);
 
         var secondInstance = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
-        await secondInstance.CreateBranchAsync(pointerPath, "feature/recreated");
+        await secondInstance.CreateBranchAsync(pointerPath, "feature/recreated", ct: TestContext.Current.CancellationToken);
 
         var currentBranch = await ReadCurrentBranchAsync(cliRunner, sourcePath);
         currentBranch.Should().Be("feature/recreated");

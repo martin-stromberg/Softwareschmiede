@@ -44,7 +44,7 @@ public sealed class DiffServiceTests : IDisposable
         var aufgabeId = await SeedAufgabeAsync();
 
         // Act
-        var result = await _sut.GenerateDiffAsync(aufgabeId, "src/file.cs", "a\nb\nc", "a\nx\nc");
+        var result = await _sut.GenerateDiffAsync(aufgabeId, "src/file.cs", "a\nb\nc", "a\nx\nc", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Status.Should().Be(DiffResultStatus.Generated);
@@ -65,7 +65,7 @@ public sealed class DiffServiceTests : IDisposable
         var largeTarget = new string('b', 102401);
 
         // Act
-        var result = await _sut.GenerateDiffAsync(aufgabeId, "src/huge.txt", largeSource, largeTarget);
+        var result = await _sut.GenerateDiffAsync(aufgabeId, "src/huge.txt", largeSource, largeTarget, ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.SourceContent.Should().BeNull();
@@ -122,10 +122,10 @@ public sealed class DiffServiceTests : IDisposable
                 GeneratedBy = "test",
                 GeneratedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
             });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
-        var stats = await _sut.GetStatisticsAsync(aufgabeId);
+        var stats = await _sut.GetStatisticsAsync(aufgabeId, TestContext.Current.CancellationToken);
 
         // Assert
         stats.TotalDiffCount.Should().Be(2);
@@ -142,10 +142,10 @@ public sealed class DiffServiceTests : IDisposable
     {
         // Arrange
         var aufgabeId = await SeedAufgabeAsync();
-        var diff = await _sut.GenerateDiffAsync(aufgabeId, "src/file.cs", "a", "b");
+        var diff = await _sut.GenerateDiffAsync(aufgabeId, "src/file.cs", "a", "b", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var deleted = await _sut.DeleteDiffAsync(diff.Id);
+        var deleted = await _sut.DeleteDiffAsync(diff.Id, TestContext.Current.CancellationToken);
 
         // Assert
         deleted.Should().BeTrue();

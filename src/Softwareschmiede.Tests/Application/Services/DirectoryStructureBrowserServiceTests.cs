@@ -43,7 +43,7 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
         ]);
         var sut = CreateSut();
 
-        var result = await sut.GetDirectoriesAsync(pluginMock.Object, "https://example.com/repo.git");
+        var result = await sut.GetDirectoriesAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
 
         result.Should().BeEquivalentTo(["backend", "frontend"]);
     }
@@ -55,7 +55,7 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
         var pluginMock = CreatePluginMock([new RepositoryDirectoryEntry("src", IsDirectory: true)]);
         var sut = CreateSut(new DirectoryStructureOptions { MaxDepth = 3 });
 
-        await sut.GetDirectoriesAsync(pluginMock.Object, "https://example.com/repo.git");
+        await sut.GetDirectoriesAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
 
         pluginMock.Verify(
             p => p.GetRepositoryStructureLoadResultAsync("https://example.com/repo.git", 3, It.IsAny<CancellationToken>()),
@@ -69,8 +69,8 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
         var pluginMock = CreatePluginMock([new RepositoryDirectoryEntry("src", IsDirectory: true)]);
         var sut = CreateSut();
 
-        var first = await sut.GetDirectoriesAsync(pluginMock.Object, "https://example.com/repo.git");
-        var second = await sut.GetDirectoriesAsync(pluginMock.Object, "https://example.com/repo.git");
+        var first = await sut.GetDirectoriesAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
+        var second = await sut.GetDirectoriesAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
 
         first.Should().BeEquivalentTo(second);
         pluginMock.Verify(
@@ -100,7 +100,7 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
         var pluginMock = CreatePluginMock([]);
         var sut = CreateSut();
 
-        var result = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+        var result = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(RepositoryStructureLoadStatus.Success);
         result.Entries.Should().BeEmpty();
@@ -116,7 +116,7 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
             .ThrowsAsync(new InvalidOperationException("Verbindungsfehler"));
         var sut = CreateSut();
 
-        var result = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+        var result = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(RepositoryStructureLoadStatus.Failed);
     }
@@ -131,8 +131,8 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
         pluginB.Setup(p => p.PluginPrefix).Returns("B");
         var sut = CreateSut(new DirectoryStructureOptions { MaxDepth = 3 });
 
-        var first = await sut.GetDirectoriesAsync(pluginA.Object, "https://example.com/repo.git");
-        var second = await sut.GetDirectoriesAsync(pluginB.Object, "https://example.com/repo.git");
+        var first = await sut.GetDirectoriesAsync(pluginA.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
+        var second = await sut.GetDirectoriesAsync(pluginB.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
 
         first.Should().Equal("a");
         second.Should().Equal("b");
@@ -150,7 +150,7 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
         ]);
         var sut = CreateSut();
 
-        var result = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+        var result = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(RepositoryStructureLoadStatus.Success);
         result.Entries.Select(entry => entry.Path).Should().BeEquivalentTo(["README.md", "init.sh"]);
@@ -166,7 +166,7 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
             .ThrowsAsync(new InvalidOperationException("Verbindungsfehler"));
         var sut = CreateSut();
 
-        var result = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+        var result = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(RepositoryStructureLoadStatus.Failed);
     }
@@ -182,10 +182,10 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
         ]);
         var sut = CreateSut();
 
-        var dirsFirst = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
-        var filesFirst = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
-        var dirsSecond = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
-        var filesSecond = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+        var dirsFirst = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
+        var filesFirst = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
+        var dirsSecond = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
+        var filesSecond = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", TestContext.Current.CancellationToken);
 
         dirsFirst.Entries.Select(entry => entry.Path).Should().BeEquivalentTo(["backend"]);
         filesFirst.Entries.Select(entry => entry.Path).Should().BeEquivalentTo(["README.md"]);
@@ -203,7 +203,7 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
         var pluginMock = CreatePluginMock([new RepositoryDirectoryEntry("init.sh", IsDirectory: false)]);
         var sut = CreateSut();
 
-        await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", ct: default, branchName: "develop");
+        await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", ct: TestContext.Current.CancellationToken, branchName: "develop");
 
         pluginMock.Verify(
             p => p.GetRepositoryStructureLoadResultAsync("https://example.com/repo.git", It.IsAny<int>(), It.IsAny<CancellationToken>(), "develop"),
@@ -222,8 +222,8 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
             .ReturnsAsync(RepositoryStructureLoadResult.Success([new RepositoryDirectoryEntry("develop.sh", IsDirectory: false)]));
         var sut = CreateSut();
 
-        var main = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", ct: default, branchName: "main");
-        var develop = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", ct: default, branchName: "develop");
+        var main = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", ct: TestContext.Current.CancellationToken, branchName: "main");
+        var develop = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", ct: TestContext.Current.CancellationToken, branchName: "develop");
 
         main.Entries.Select(entry => entry.Path).Should().BeEquivalentTo(["main.sh"]);
         develop.Entries.Select(entry => entry.Path).Should().BeEquivalentTo(["develop.sh"]);

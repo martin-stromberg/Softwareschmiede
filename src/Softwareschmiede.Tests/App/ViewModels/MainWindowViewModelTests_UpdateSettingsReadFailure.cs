@@ -65,7 +65,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         if (einstieg == UpdateEinstieg.ManuellInstallieren)
         {
             // Zuvor ein sichtbares Angebot herstellen, damit der Installationspfad getestet wird
-            await sut.InitializeUpdatesAfterWindowReadyAsync();
+            await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
             sut.UpdateVerfuegbar.Should().BeTrue();
             erwartetePruefungen = 1;
         }
@@ -76,7 +76,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         switch (einstieg)
         {
             case UpdateEinstieg.Startautomatik:
-                await sut.InitializeUpdatesAfterWindowReadyAsync();
+                await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
                 break;
             case UpdateEinstieg.ManuellPruefen:
                 await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
@@ -162,7 +162,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
             .Callback<UpdateProgressViewModel>(vm => progressViewModel = vm);
 
         var sut = CreateSut();
-        await sut.InitializeUpdatesAfterWindowReadyAsync();
+        await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
         if (!automatisch)
         {
             sut.UpdateVerfuegbar.Should().BeTrue();
@@ -230,7 +230,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
             .Callback<UpdateProgressViewModel>(vm => progressViewModel = vm);
 
         var sut = CreateSut();
-        await sut.InitializeUpdatesAfterWindowReadyAsync();
+        await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
         if (!automatisch)
         {
             sut.UpdateVerfuegbar.Should().BeTrue();

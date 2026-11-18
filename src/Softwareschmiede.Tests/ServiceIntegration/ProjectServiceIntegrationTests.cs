@@ -28,11 +28,11 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
     [Fact]
     public async Task ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu()
     {
-        var projekt = await _projektService.CreateAsync("Neues Projekt", null);
+        var projekt = await _projektService.CreateAsync("Neues Projekt", null, TestContext.Current.CancellationToken);
         projekt.Id.Should().NotBeEmpty();
         projekt.Name.Should().Be("Neues Projekt");
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Erste Aufgabe", "Beschreibung");
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Erste Aufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
         aufgabe.Id.Should().NotBeEmpty();
         aufgabe.ProjektId.Should().Be(projekt.Id);
         aufgabe.Status.Should().Be(AufgabeStatus.Neu);
@@ -42,10 +42,10 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
     [Fact]
     public async Task MehrereProjekte_KoennenErstellt_UndGeladen_Werden()
     {
-        await _projektService.CreateAsync("Projekt A", null);
-        await _projektService.CreateAsync("Projekt B", null);
+        await _projektService.CreateAsync("Projekt A", null, TestContext.Current.CancellationToken);
+        await _projektService.CreateAsync("Projekt B", null, TestContext.Current.CancellationToken);
 
-        var alle = await _projektService.GetAllAsync();
+        var alle = await _projektService.GetAllAsync(TestContext.Current.CancellationToken);
         alle.Count.Should().BeGreaterThanOrEqualTo(2);
     }
 
@@ -53,11 +53,11 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
     [Fact]
     public async Task Aufgabe_KannInProjektGeladen_Werden()
     {
-        var projekt = await _projektService.CreateAsync("Test Projekt", null);
-        await _aufgabeService.CreateAsync(projekt.Id, "Aufgabe 1", null);
-        await _aufgabeService.CreateAsync(projekt.Id, "Aufgabe 2", null);
+        var projekt = await _projektService.CreateAsync("Test Projekt", null, TestContext.Current.CancellationToken);
+        await _aufgabeService.CreateAsync(projekt.Id, "Aufgabe 1", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.CreateAsync(projekt.Id, "Aufgabe 2", null, ct: TestContext.Current.CancellationToken);
 
-        var aufgaben = await _aufgabeService.GetByProjektAsync(projekt.Id);
+        var aufgaben = await _aufgabeService.GetByProjektAsync(projekt.Id, TestContext.Current.CancellationToken);
         aufgaben.Should().HaveCount(2);
         aufgaben.All(a => a.ProjektId == projekt.Id).Should().BeTrue();
     }

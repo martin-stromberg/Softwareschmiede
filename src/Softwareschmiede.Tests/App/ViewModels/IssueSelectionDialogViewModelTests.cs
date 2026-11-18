@@ -36,7 +36,7 @@ public sealed class IssueSelectionDialogViewModelTests
         var sut = CreateSut();
 
         // Act
-        await sut.LoadAsync("owner/repo");
+        await sut.LoadAsync("owner/repo", TestContext.Current.CancellationToken);
 
         // Assert
         sut.VerfuegbareIssues.Should().HaveCount(2);
@@ -54,7 +54,7 @@ public sealed class IssueSelectionDialogViewModelTests
         var sut = CreateSut();
 
         // Act
-        await sut.LoadAsync("owner/repo");
+        await sut.LoadAsync("owner/repo", TestContext.Current.CancellationToken);
 
         // Assert
         sut.IsLoading.Should().BeFalse();
@@ -86,7 +86,7 @@ public sealed class IssueSelectionDialogViewModelTests
             .ReturnsAsync(issues);
 
         var sut = CreateSut();
-        await sut.LoadAsync("owner/repo");
+        await sut.LoadAsync("owner/repo", TestContext.Current.CancellationToken);
         sut.SelectedIssue = sut.VerfuegbareIssues[0];
 
         bool? closedWith = null;

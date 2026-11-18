@@ -31,7 +31,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         ScmRestrictedProcessAccess.ValidateRestrictingSid(sid);
         RestrictDirectory(workspace, sid);
         RestrictDirectory(appData);
-        await File.WriteAllTextAsync(Path.Combine(appData, "host-secret.txt"), "host-only");
+        await File.WriteAllTextAsync(Path.Combine(appData, "host-secret.txt"), "host-only", TestContext.Current.CancellationToken);
         await GitInit(workspace);
 
         var request = new ScmExchangeRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
@@ -132,16 +132,16 @@ public sealed partial class ScmEventCliExchangeAccessTests
                     File.Move(promptPath + ".tmp", promptPath);
                 });
             using var adapter = new ScmPromptSessionAdapter(request.AufgabeId, request.CliRunId, prefix, spec, session.Object, [], () => !process.HasExited);
-            var access = await adapter.CheckExchangeAccessAsync(directory);
+            var access = await adapter.CheckExchangeAccessAsync(directory, TestContext.Current.CancellationToken);
             access.Status.Should().Be(ScmExchangeAccessStatus.Unknown, "only the real file tool may complete the probe");
             var probeDeadline = DateTime.UtcNow.AddSeconds(30);
             while (access.Status == ScmExchangeAccessStatus.Unknown && !process.HasExited && DateTime.UtcNow < probeDeadline)
             {
-                await Task.Delay(25);
-                access = await adapter.CheckExchangeAccessAsync(directory);
+                await Task.Delay(25, TestContext.Current.CancellationToken);
+                access = await adapter.CheckExchangeAccessAsync(directory, TestContext.Current.CancellationToken);
             }
-            var phase = File.Exists(progress) ? await File.ReadAllTextAsync(progress) : "child script has not started";
-            var childError = File.Exists(diagnostic) ? await File.ReadAllTextAsync(diagnostic) : "no child error reported";
+            var phase = File.Exists(progress) ? await File.ReadAllTextAsync(progress, TestContext.Current.CancellationToken) : "child script has not started";
+            var childError = File.Exists(diagnostic) ? await File.ReadAllTextAsync(diagnostic, TestContext.Current.CancellationToken) : "no child error reported";
             access.Status.Should().Be(ScmExchangeAccessStatus.Supported,
                 "{0}; child phase: {1}; child state: {2}; {3}", access.Reason, phase,
                 process.HasExited ? $"exited ({process.ExitCode})" : "running", childError);
@@ -149,13 +149,13 @@ public sealed partial class ScmEventCliExchangeAccessTests
             session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
             adapter.ReadyStatus.Should().Be(ScmPromptReadyStatus.Ready);
             var protocol = new ScmEventExchangeProtocol();
-            var attempt = await protocol.PrepareAsync(request, workspace, restrictedWriteSids: access.RestrictedWriteSids);
-            await File.WriteAllTextAsync(Path.Combine(workspace, "go"), "go");
+            var attempt = await protocol.PrepareAsync(request, workspace, TestContext.Current.CancellationToken, restrictedWriteSids: access.RestrictedWriteSids);
+            await File.WriteAllTextAsync(Path.Combine(workspace, "go"), "go", TestContext.Current.CancellationToken);
             var deadline = DateTime.UtcNow.AddSeconds(30);
             ScmExchangeMessages messages;
             do
             {
-                messages = await protocol.ReadAsync(attempt);
+                messages = await protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
                 // The child publishes accepted.json and the action in immediate succession, but
                 // ReadAsync reports a file only after observing it unchanged twice. A snapshot in
                 // which the action is already stable while accepted.json was not yet seen in the
@@ -163,25 +163,25 @@ public sealed partial class ScmEventCliExchangeAccessTests
                 // instead of breaking on the first action sighting.
                 if (messages.Accepted is not null && messages.Actions.Count == 1) break;
                 if (process.HasExited) break;
-                await Task.Delay(25);
+                await Task.Delay(25, TestContext.Current.CancellationToken);
             } while (DateTime.UtcNow < deadline);
-            var error = File.Exists(diagnostic) ? await File.ReadAllTextAsync(diagnostic) : messages.Diagnostic;
+            var error = File.Exists(diagnostic) ? await File.ReadAllTextAsync(diagnostic, TestContext.Current.CancellationToken) : messages.Diagnostic;
             messages.Actions.Should().ContainSingle(error);
             messages.Complete.Should().BeNull("completion must wait for host acknowledgement");
             messages.Accepted.Should().NotBeNull();
             messages.Actions[0].Body.Should().Be("Restricted process reply");
             // The host responder uses the stored origin; child documents cannot select another remote target.
             request.OriginUrl.Should().Be("https://github.com/owner/repo/issues/7#issuecomment-9");
-            await protocol.WriteResultAsync(attempt, new ScmExchangeActionResult(1, request.EventId, request.AttemptId, request.CliRunId, actionId, true, "comment-1"));
-            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(15));
-            process.ExitCode.Should().Be(0, File.Exists(diagnostic) ? await File.ReadAllTextAsync(diagnostic) : "restricted child must finish");
-            await protocol.ReadAsync(attempt);
-            (await protocol.ReadAsync(attempt)).Complete!.ActionIds.Should().Equal(actionId);
+            await protocol.WriteResultAsync(attempt, new ScmExchangeActionResult(1, request.EventId, request.AttemptId, request.CliRunId, actionId, true, "comment-1"), TestContext.Current.CancellationToken);
+            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
+            process.ExitCode.Should().Be(0, File.Exists(diagnostic) ? await File.ReadAllTextAsync(diagnostic, TestContext.Current.CancellationToken) : "restricted child must finish");
+            await protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
+            (await protocol.ReadAsync(attempt, TestContext.Current.CancellationToken)).Complete!.ActionIds.Should().Equal(actionId);
             File.Exists(Path.Combine(appData, "forbidden.txt")).Should().BeFalse();
         }
         finally
         {
-            if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(); }
+            if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(TestContext.Current.CancellationToken); }
         }
     }
 
@@ -217,7 +217,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         var session = Session(Banner(provider), PromptGlyph(provider));
         using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), Guid.NewGuid(), prefix, spec, session.Object, [], () => true);
         var channel = Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName);
-        (await adapter.CheckExchangeAccessAsync(channel)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
+        (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         var sent = (string)session.Invocations.Single(call => call.Method.Name == nameof(ITerminalSession.WritePromptAsync)).Arguments[0]!;
         using var document = JsonDocument.Parse(sent);
         static string Quote(string text) => "'" + text.Replace("'", "''", StringComparison.Ordinal) + "'";
@@ -235,11 +235,11 @@ public sealed partial class ScmEventCliExchangeAccessTests
         using var process = ScmRestrictedWindowsProcess.Start(_root, command, sid);
         try
         {
-            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(15));
+            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
             process.ExitCode.Should().Be(5, File.Exists(Path.Combine(_root, "denial-error.txt"))
-                ? await File.ReadAllTextAsync(Path.Combine(_root, "denial-error.txt")) : "the actual file tool is denied despite a normal CLI parent");
+                ? await File.ReadAllTextAsync(Path.Combine(_root, "denial-error.txt"), TestContext.Current.CancellationToken) : "the actual file tool is denied despite a normal CLI parent");
             File.Exists(temporary).Should().BeFalse();
-            var access = await adapter.CheckExchangeAccessAsync(channel);
+            var access = await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken);
             access.Status.Should().Be(ScmExchangeAccessStatus.Unknown);
             access.RestrictedWriteSids.Should().BeEmpty();
             session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once,
@@ -247,7 +247,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         }
         finally
         {
-            if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(); }
+            if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(TestContext.Current.CancellationToken); }
         }
     }
 

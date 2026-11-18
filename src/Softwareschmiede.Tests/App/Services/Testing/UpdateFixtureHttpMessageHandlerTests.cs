@@ -66,10 +66,10 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
             ],
         });
 
-        using var antwort = await _client.GetAsync(ReleaseUrl);
+        using var antwort = await _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
-        Assert.Equal("[{\"tag_name\":\"v1.3.0\"}]", await antwort.Content.ReadAsStringAsync());
+        Assert.Equal("[{\"tag_name\":\"v1.3.0\"}]", await antwort.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.Equal("<https://api.github.test/page2>; rel=\"next\"",
             antwort.Headers.GetValues("Link").Single());
         Assert.Equal("application/json", antwort.Content.Headers.ContentType?.MediaType);
@@ -82,7 +82,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
     public async Task SendAsync_UnbekannteUrl_ScheitertOhneNetzwerkfallback()
     {
         var ex = await Assert.ThrowsAsync<HttpRequestException>(
-            () => _client.GetAsync("https://api.github.test/andere/ressource"));
+            () => _client.GetAsync("https://api.github.test/andere/ressource", TestContext.Current.CancellationToken));
 
         Assert.Contains("Unbekannte Update-E2E-Anfrage", ex.Message);
         AssertProtokollEnthaelt(UpdateE2EEreignisse.UnknownHttpRequest);
@@ -98,7 +98,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
             Antworten = [new UpdateE2EAntwort { Url = assetApiUrl, Inhalt = "ok" }],
         });
 
-        using var antwort = await _client.GetAsync(assetApiUrl);
+        using var antwort = await _client.GetAsync(assetApiUrl, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
         var zeilen = File.ReadAllLines(_kontext.Konfiguration.ProtokollDateiPfad);
@@ -116,7 +116,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
             Antworten = [new UpdateE2EAntwort { Url = manifestUrl, Inhalt = "{}" }],
         });
 
-        using var antwort = await _client.GetAsync(manifestUrl);
+        using var antwort = await _client.GetAsync(manifestUrl, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
         var zeilen = File.ReadAllLines(_kontext.Konfiguration.ProtokollDateiPfad);
@@ -134,7 +134,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
             Antworten = [new UpdateE2EAntwort { Url = manifestApiUrl, Inhalt = "{}", Art = "manifest" }],
         });
 
-        using var antwort = await _client.GetAsync(manifestApiUrl);
+        using var antwort = await _client.GetAsync(manifestApiUrl, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
         var zeilen = File.ReadAllLines(_kontext.Konfiguration.ProtokollDateiPfad);
@@ -151,7 +151,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
             Antworten = [new UpdateE2EAntwort { Url = ReleaseUrl, Fehler = true }],
         });
 
-        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _client.GetAsync(ReleaseUrl));
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken));
         Assert.Contains("Transportfehler", ex.Message);
     }
 
@@ -164,8 +164,8 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
             Antworten = [new UpdateE2EAntwort { Url = ReleaseUrl, Inhalt = "ok", Gate = "releaseApi" }],
         });
 
-        var anfrage = _client.GetAsync(ReleaseUrl);
-        await Task.Delay(400);
+        var anfrage = _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken);
+        await Task.Delay(400, TestContext.Current.CancellationToken);
         Assert.False(anfrage.IsCompleted, "Die Anfrage lieferte ohne Gate-Freigabe eine Antwort.");
         AssertProtokollEnthaelt(UpdateE2EEreignisse.HttpRequestBlocked);
 
@@ -195,27 +195,27 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
             ],
         });
 
-        await using var stream = await _client.GetStreamAsync(ReleaseUrl);
+        await using var stream = await _client.GetStreamAsync(ReleaseUrl, TestContext.Current.CancellationToken);
         var puffer = new byte[1000];
         var gelesen = 0;
 
         // Erste Reads liefern genau die freien Bytes.
         while (gelesen < 400)
         {
-            var n = await stream.ReadAsync(puffer.AsMemory(gelesen));
+            var n = await stream.ReadAsync(puffer.AsMemory(gelesen), TestContext.Current.CancellationToken);
             Assert.True(n > 0);
             gelesen += n;
         }
 
         // Der nächste Read blockiert bis zur Gate-Freigabe.
-        var blockierterRead = stream.ReadAsync(puffer.AsMemory(gelesen)).AsTask();
-        await Task.Delay(400);
+        var blockierterRead = stream.ReadAsync(puffer.AsMemory(gelesen), TestContext.Current.CancellationToken).AsTask();
+        await Task.Delay(400, TestContext.Current.CancellationToken);
         Assert.False(blockierterRead.IsCompleted, "Der Stream lieferte ohne Gate-Freigabe weitere Bytes.");
 
         File.WriteAllText(Path.Combine(_wurzel, "gates", "download.release"), string.Empty);
         var restGelesen = gelesen + await blockierterRead;
         while (restGelesen < 1000)
-            restGelesen += await stream.ReadAsync(puffer.AsMemory(restGelesen));
+            restGelesen += await stream.ReadAsync(puffer.AsMemory(restGelesen), TestContext.Current.CancellationToken);
 
         Assert.Equal(inhalt, System.Text.Encoding.UTF8.GetString(puffer));
     }
@@ -225,7 +225,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
     public async Task SendAsync_AntwortdateiAusserhalbDerTestwurzel_WirdAbgelehnt()
     {
         var ausserhalb = Path.Combine(Path.GetTempPath(), $"ausserhalb-{Guid.NewGuid():N}.json");
-        await File.WriteAllTextAsync(ausserhalb, "{}");
+        await File.WriteAllTextAsync(ausserhalb, "{}", TestContext.Current.CancellationToken);
         try
         {
             SchreibeSzenario(new UpdateE2ESzenario
@@ -240,7 +240,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
                 ],
             });
 
-            var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _client.GetAsync(ReleaseUrl));
+            var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken));
             Assert.Contains("außerhalb der Testwurzel", ex.Message);
         }
         finally
@@ -255,16 +255,16 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
     {
         var inhaltPfad = Path.Combine(_wurzel, "payloads", "release.zip");
         Directory.CreateDirectory(Path.GetDirectoryName(inhaltPfad)!);
-        await File.WriteAllBytesAsync(inhaltPfad, [0x50, 0x4B, 0x03, 0x04]);
+        await File.WriteAllBytesAsync(inhaltPfad, [0x50, 0x4B, 0x03, 0x04], TestContext.Current.CancellationToken);
         SchreibeSzenario(new UpdateE2ESzenario
         {
             Antworten = [new UpdateE2EAntwort { Url = ReleaseUrl, BodyDatei = "payloads/release.zip" }],
         });
 
-        using var antwort = await _client.GetAsync(ReleaseUrl);
+        using var antwort = await _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken);
 
         Assert.Equal("application/zip", antwort.Content.Headers.ContentType?.MediaType);
-        Assert.Equal([0x50, 0x4B, 0x03, 0x04], await antwort.Content.ReadAsByteArrayAsync());
+        Assert.Equal([0x50, 0x4B, 0x03, 0x04], await antwort.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
     }
 
     private void SchreibeSzenario(UpdateE2ESzenario szenario)

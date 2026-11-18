@@ -139,7 +139,7 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
         _runningStatusSourceMock.Setup(s => s.GetLiveLaufStatus(wartende.Id)).Returns(AufgabeLaufStatus.WartetAufEingabe);
         var sut = CreateSut();
 
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         sut.LaufendeAutomatisierungenAnzahl.Should().Be(1);
         sut.AutoShutdownUiSichtbar.Should().BeTrue();
@@ -152,7 +152,7 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     public async Task AutoShutdownUiSichtbar_IstFalse_OhneLaufendeAufgabenUndAktivierung()
     {
         var sut = CreateSut();
-        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
         sut.LaufendeAutomatisierungenAnzahl.Should().Be(0);
         sut.AutoShutdownUiSichtbar.Should().BeFalse();
@@ -202,13 +202,13 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     [Fact]
     public async Task AutoShutdownEinstellungenLaden_LaedtPersistierteWerteOhneAktivierung()
     {
-        await _einstellungenService.SpeichereErzwingenAsync(true);
-        await _einstellungenService.SpeichereToleranzMinutenAsync(12);
+        await _einstellungenService.SpeichereErzwingenAsync(true, TestContext.Current.CancellationToken);
+        await _einstellungenService.SpeichereToleranzMinutenAsync(12, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && sut.AutoShutdownToleranzMinuten != "12")
-            await Task.Delay(25);
+            await Task.Delay(25, TestContext.Current.CancellationToken);
 
         sut.AutoShutdownErzwingen.Should().BeTrue();
         sut.AutoShutdownToleranzMinuten.Should().Be("12");
@@ -221,7 +221,7 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     [Fact]
     public async Task AutoShutdownEinstellungenLaden_LaedtNachFehlschlagErneut()
     {
-        await _einstellungenService.SpeichereToleranzMinutenAsync(9);
+        await _einstellungenService.SpeichereToleranzMinutenAsync(9, TestContext.Current.CancellationToken);
         var einmaligFehlschlagenderService = new AutoShutdownEinstellungenService(
             new EinmaligFehlschlagendeScopeFactory(_einstellungenProvider.GetRequiredService<IServiceScopeFactory>()),
             NullLogger<AutoShutdownEinstellungenService>.Instance);
@@ -229,11 +229,11 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
 
         // Der Konstruktor-Lauf scheitert am simulierten Scope-Fehler; der Guard darf ihn
         // nicht als "bereits geladen" verbuchen — der nachfolgende Aufruf muss liefern.
-        await sut.AutoShutdownEinstellungenLadenAsync();
+        await sut.AutoShutdownEinstellungenLadenAsync(TestContext.Current.CancellationToken);
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline && sut.AutoShutdownToleranzMinuten != "9")
-            await Task.Delay(25);
+            await Task.Delay(25, TestContext.Current.CancellationToken);
 
         sut.AutoShutdownToleranzMinuten.Should().Be("9");
     }
@@ -290,7 +290,7 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
             einstellungen = await LeseEinstellungenAsync();
             if (einstellungen.Erzwingen)
                 break;
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
         }
         while (DateTime.UtcNow < deadline);
 

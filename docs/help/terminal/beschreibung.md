@@ -95,7 +95,7 @@ Zur Diagnose von Rendering- und Streaming-Fehlern wurde das Terminal-System um e
 
 ## Einschränkungen
 
-- `CreatePseudoConsole` ist erst ab Windows 10 Build 17763 verfügbar. Das Projekt zielt auf `net10.0-windows10.0.17763.0`, daher ist das kein praktisches Risiko; auf älteren Builds läuft der diagnostizierte Pipe-Fallback (eingeschränkter Modus), `RequiresPty`-CLIs schlagen mit Fehlermeldung fehl.
+- `CreatePseudoConsole` ist erst ab Windows 10 Build 17763 verfügbar. Das Projekt zielt auf `net11.0-windows10.0.17763.0`, daher ist das kein praktisches Risiko; auf älteren Builds läuft der diagnostizierte Pipe-Fallback (eingeschränkter Modus), `RequiresPty`-CLIs schlagen mit Fehlermeldung fehl.
 - Scrollback-Puffer ist auf 1000 Zeilen begrenzt; ältere Zeilen gehen verloren. Im Alternate Screen (Vollbild-TUIs) gibt es keinen Scrollback — dort ist das Scrollen bewusst deaktiviert.
 - Der Replay-Puffer für die Neuanbindung ist auf `Terminal:ReplayBufferByteBudget` (Standard 512 KiB) begrenzt; bei darüber hinausgehender Ausgabe fehlen die ältesten Chunks im wiederhergestellten Bild.
 - Executables, die weder `.exe`/endungsloses PE-Image noch `.cmd`/`.bat` sind (z. B. `.ps1`-Skripte), können nicht gestartet werden — der Start schlägt mit einer verständlichen Fehlermeldung fehl.

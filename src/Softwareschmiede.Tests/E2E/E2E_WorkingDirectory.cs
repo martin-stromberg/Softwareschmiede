@@ -31,7 +31,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// Fallback-Pfad ohne Strukturabruf prüft, ist kein echtes Git-Repository nötig.
 ///
 /// <see cref="AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E"/> bleibt
-/// als eigenständiger <c>[SkippableFact]</c> mit eigenem App-Lifecycle bestehen, da er als einziges
+/// als eigenständiger <c>[Fact]</c> mit eigenem App-Lifecycle bestehen, da er als einziges
 /// Szenario einen erfolgreich laufenden CLI-Prozess (Status "CliStoppen") hinterlässt und daher vor
 /// einer Konsolidierung mit den übrigen Phasen zusätzliches Stoppen des Prozesses vor dem Aufräumen
 /// erfordern würde.

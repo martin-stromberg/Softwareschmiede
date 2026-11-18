@@ -39,7 +39,7 @@ public sealed class RepositoryAssignViewModelTests
             .Returns([plugin1, plugin2, plugin3]);
         var sut = CreateSut();
 
-        await sut.LadenAsync();
+        await sut.LadenAsync(TestContext.Current.CancellationToken);
 
         sut.AvailableScmPlugins.Should().HaveCount(3);
         sut.AvailableScmPlugins.Should().Contain(plugin1);
@@ -55,7 +55,7 @@ public sealed class RepositoryAssignViewModelTests
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
         var sut = CreateSut();
 
-        await sut.LadenAsync();
+        await sut.LadenAsync(TestContext.Current.CancellationToken);
 
         sut.HasScmPlugins.Should().BeTrue();
     }
@@ -67,7 +67,7 @@ public sealed class RepositoryAssignViewModelTests
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         var sut = CreateSut();
 
-        await sut.LadenAsync();
+        await sut.LadenAsync(TestContext.Current.CancellationToken);
 
         sut.HasScmPlugins.Should().BeFalse();
         sut.AvailableScmPlugins.Should().BeEmpty();
@@ -82,7 +82,7 @@ public sealed class RepositoryAssignViewModelTests
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin1, plugin2]);
         var sut = CreateSut();
 
-        await sut.LadenAsync();
+        await sut.LadenAsync(TestContext.Current.CancellationToken);
 
         sut.SelectedScmPlugin.Should().Be(plugin1);
     }
@@ -100,7 +100,7 @@ public sealed class RepositoryAssignViewModelTests
             ]);
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([pluginMock.Object]);
         var sut = CreateSut();
-        await sut.LadenAsync();
+        await sut.LadenAsync(TestContext.Current.CancellationToken);
         await sut.CurrentReloadTask!;
 
         sut.VerfuegbareRepositories.Should().HaveCount(3);
@@ -116,7 +116,7 @@ public sealed class RepositoryAssignViewModelTests
             .ReturnsAsync([new AvailableRepository("repo1", DateTime.UtcNow, "owner/repo1", "https://github.com/owner/repo1")]);
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([pluginMock.Object]);
         var sut = CreateSut();
-        await sut.LadenAsync();
+        await sut.LadenAsync(TestContext.Current.CancellationToken);
         await sut.CurrentReloadTask!;
 
         sut.SelectedScmPlugin = null;
@@ -143,7 +143,7 @@ public sealed class RepositoryAssignViewModelTests
                 loadingWasTrue = true;
         };
 
-        var ladenTask = sut.LadenAsync();
+        var ladenTask = sut.LadenAsync(TestContext.Current.CancellationToken);
         tcs.SetResult([]);
         await ladenTask;
 
@@ -160,7 +160,7 @@ public sealed class RepositoryAssignViewModelTests
             .ThrowsAsync(new InvalidOperationException("Verbindungsfehler"));
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([pluginMock.Object]);
         var sut = CreateSut();
-        await sut.LadenAsync();
+        await sut.LadenAsync(TestContext.Current.CancellationToken);
         await sut.CurrentReloadTask!;
 
         sut.VerfuegbareRepositories.Should().BeEmpty();

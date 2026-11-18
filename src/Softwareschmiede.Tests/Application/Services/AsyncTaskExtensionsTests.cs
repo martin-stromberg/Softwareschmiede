@@ -28,7 +28,7 @@ public sealed class AsyncTaskExtensionsTests
 
         FailingTask().SafeFireAndForget(loggerMock.Object, "TestOperation");
 
-        var finished = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(tcs.Task, "SafeFireAndForget muss die Exception des fehlgeschlagenen Tasks loggen");
 
         loggerMock.Verify(
@@ -62,7 +62,7 @@ public sealed class AsyncTaskExtensionsTests
 
         CanceledTask().SafeFireAndForget(loggerMock.Object, "AbgebrocheneOperation");
 
-        var finished = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(tcs.Task, "SafeFireAndForget muss den Abbruch des Tasks loggen");
     }
 
@@ -74,7 +74,7 @@ public sealed class AsyncTaskExtensionsTests
 
         Task.CompletedTask.SafeFireAndForget(loggerMock.Object, "ErfolgreicheOperation");
 
-        await Task.Delay(TimeSpan.FromMilliseconds(200));
+        await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
 
         loggerMock.Verify(
             l => l.Log(

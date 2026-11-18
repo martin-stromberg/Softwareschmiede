@@ -57,7 +57,7 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
             File.WriteAllText(Path.Combine(root, "backend", "src", "too-deep", "ignored.txt"), "hello");
             var sut = CreateSut();
 
-            var result = (await sut.GetRepositoryStructureAsync(root, maxDepth: 2)).ToList();
+            var result = (await sut.GetRepositoryStructureAsync(root, maxDepth: 2, ct: TestContext.Current.CancellationToken)).ToList();
 
             var paths = result.Select(e => e.Path).ToList();
             paths.Should().Contain(["backend", "frontend", "backend/src", "backend/README.md"]);
@@ -84,7 +84,7 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
             Directory.CreateDirectory(Path.Combine(root, "src"));
             var sut = CreateSut();
 
-            var result = await sut.GetRepositoryStructureAsync(root, maxDepth: 2);
+            var result = await sut.GetRepositoryStructureAsync(root, maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
             result.Select(e => e.Path).Should().NotContain(p => p == ".git" || p.StartsWith(".git/", StringComparison.Ordinal));
         }
@@ -100,7 +100,7 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
     {
         var sut = CreateSut();
 
-        var result = await sut.GetRepositoryStructureAsync(@"C:\this-path-does-not-exist-12345", maxDepth: 2);
+        var result = await sut.GetRepositoryStructureAsync(@"C:\this-path-does-not-exist-12345", maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -111,7 +111,7 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
     {
         var sut = CreateSut();
 
-        var result = await sut.GetRepositoryStructureAsync(string.Empty, maxDepth: 2);
+        var result = await sut.GetRepositoryStructureAsync(string.Empty, maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
         result.Should().BeEmpty();
     }
@@ -187,7 +187,7 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
             File.WriteAllText(Path.Combine(root, "root-file.txt"), "hello");
             var sut = CreateSutWithThrowingFileEnumerator(badDir);
 
-            var result = (await sut.GetRepositoryStructureAsync(root, maxDepth: 2)).ToList();
+            var result = (await sut.GetRepositoryStructureAsync(root, maxDepth: 2, ct: TestContext.Current.CancellationToken)).ToList();
 
             var paths = result.Select(e => e.Path).ToList();
             paths.Should().Contain(["ok", "bad", "ok/keep.txt", "root-file.txt"]);
@@ -208,7 +208,7 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
         {
             var sut = CreateSut();
 
-            var result = await sut.GetRepositoryStructureAsync(root, maxDepth: 2);
+            var result = await sut.GetRepositoryStructureAsync(root, maxDepth: 2, ct: TestContext.Current.CancellationToken);
 
             result.Should().BeEmpty();
         }

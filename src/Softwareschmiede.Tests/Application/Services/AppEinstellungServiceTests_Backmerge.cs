@@ -23,7 +23,7 @@ public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
     /// <summary>Ohne gespeicherten Eintrag ist der Backmerge-Modus deaktiviert.</summary>
     [Fact]
     public async Task GetScmBackmergeModusAsync_WithoutEntry_DefaultsToDeaktiviert()
-        => (await _sut.GetScmBackmergeModusAsync()).Should().Be(ScmBackmergeModus.Deaktiviert);
+        => (await _sut.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeModus.Deaktiviert);
 
     /// <summary>Ungültige gespeicherte Werte fallen auf „Deaktiviert“ zurück.</summary>
     [Theory]
@@ -31,8 +31,8 @@ public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
     [InlineData("99")]
     public async Task GetScmBackmergeModusAsync_InvalidStoredValue_FallsBackToDeaktiviert(string stored)
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmBackmergeModeKey, stored);
-        (await _sut.GetScmBackmergeModusAsync()).Should().Be(ScmBackmergeModus.Deaktiviert);
+        await _sut.SetSettingAsync(AppEinstellungService.ScmBackmergeModeKey, stored, TestContext.Current.CancellationToken);
+        (await _sut.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeModus.Deaktiviert);
     }
 
     /// <summary>Der persistierte Modus gilt zur Laufzeit.</summary>
@@ -41,8 +41,8 @@ public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
     [InlineData(ScmBackmergeModus.Projektbezogen)]
     public async Task SetScmBackmergeModusAsync_PersistedValue_IsHonored(ScmBackmergeModus modus)
     {
-        await _sut.SetScmBackmergeModusAsync(modus);
-        (await _sut.GetScmBackmergeModusAsync()).Should().Be(modus);
+        await _sut.SetScmBackmergeModusAsync(modus, TestContext.Current.CancellationToken);
+        (await _sut.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(modus);
     }
 
     /// <summary>Ein nicht definierter Modus wird abgelehnt.</summary>
@@ -56,12 +56,12 @@ public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
     public async Task BackmergeProjektFlag_WithoutEntry_DefaultsFalseAndIsPerProject()
     {
         var projektId = Guid.NewGuid();
-        (await _sut.GetBackmergeProjektAktivAsync(projektId)).Should().BeFalse();
+        (await _sut.GetBackmergeProjektAktivAsync(projektId, TestContext.Current.CancellationToken)).Should().BeFalse();
 
-        await _sut.SetBackmergeProjektAktivAsync(projektId, true);
+        await _sut.SetBackmergeProjektAktivAsync(projektId, true, TestContext.Current.CancellationToken);
 
-        (await _sut.GetBackmergeProjektAktivAsync(projektId)).Should().BeTrue();
-        (await _sut.GetBackmergeProjektAktivAsync(Guid.NewGuid())).Should().BeFalse("die Freigabe gilt je Projekt");
-        (await _sut.GetSettingAsync(AppEinstellungService.BackmergeProjektKey(projektId))).Should().Be("True");
+        (await _sut.GetBackmergeProjektAktivAsync(projektId, TestContext.Current.CancellationToken)).Should().BeTrue();
+        (await _sut.GetBackmergeProjektAktivAsync(Guid.NewGuid(), TestContext.Current.CancellationToken)).Should().BeFalse("die Freigabe gilt je Projekt");
+        (await _sut.GetSettingAsync(AppEinstellungService.BackmergeProjektKey(projektId), TestContext.Current.CancellationToken)).Should().Be("True");
     }
 }

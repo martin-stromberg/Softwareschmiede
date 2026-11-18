@@ -24,8 +24,8 @@ public sealed class UpdateServiceTests_Options
             .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(stable));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var rcKanal = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
-        var produktivKanal = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
+        var rcKanal = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad), TestContext.Current.CancellationToken);
+        var produktivKanal = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
 
         rcKanal.Status.Should().Be(UpdateCheckStatus.UpdateVerfuegbar);
         rcKanal.Update.Should().Be(prerelease);
@@ -54,7 +54,7 @@ public sealed class UpdateServiceTests_Options
             .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(gefundenes));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(updatePfad));
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(updatePfad), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(UpdateCheckStatus.NichtPruefbar);
         result.Update.Should().BeNull();

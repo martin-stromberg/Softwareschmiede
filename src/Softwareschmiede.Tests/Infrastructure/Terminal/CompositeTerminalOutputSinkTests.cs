@@ -56,7 +56,7 @@ public sealed class CompositeTerminalOutputSinkTests
         var sinkC = new CollectingSink();
         var sinkD = new CollectingDiagnoseSink();
         var sut2 = new CompositeTerminalOutputSink(sinkC, sinkD);
-        await sut2.CompleteAsync(TimeSpan.FromSeconds(1));
+        await sut2.CompleteAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
         sinkC.IsCompleted.Should().BeTrue();
         sinkD.IsCompleted.Should().BeTrue();
     }

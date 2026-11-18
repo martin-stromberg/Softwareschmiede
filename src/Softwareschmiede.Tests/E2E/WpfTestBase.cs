@@ -19,7 +19,9 @@ public abstract class WpfTestBase : IDisposable
 {
     private const string BuildConfigDebug = "Debug";
     private const string BuildConfigRelease = "Release";
-    private const string TargetFramework = "net10.0-windows10.0.17763.0";
+
+    // Fallback, falls der TFM nicht aus dem Test-Ausgabeverzeichnis abgeleitet werden kann.
+    private const string TargetFramework = "net11.0-windows10.0.17763.0";
 
     /// <summary>
     /// Kurzes Timeout (20s) für schnell erscheinende UI-Elemente. Siehe <see cref="ElementWaitHelper.Short"/>
@@ -219,10 +221,9 @@ public abstract class WpfTestBase : IDisposable
     /// indirekt über <see cref="LaunchAppAndGetMainWindow"/>, <see cref="RestartAppPreservingDatabase"/>
     /// oder die Fixture-basierten Pfade - läuft durch diese Methode. Ist
     /// <c>SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1</c> gesetzt (<see cref="WpfE2EEnvironmentProbe"/>),
-    /// wirft der Aufruf eine <c>Xunit.SkipException</c>, bevor der Prozess überhaupt startet.
-    /// Damit das als "Skipped" statt als Fehler zählt, müssen die aufrufenden Testmethoden mit
-    /// <c>[SkippableFact]</c>/<c>[SkippableTheory]</c> annotiert sein - das gilt für sämtliche
-    /// Testmethoden in <see cref="WpfTestBase"/>-Ableitungen.
+    /// wirft der Aufruf eine <c>Xunit.Sdk.SkipException</c> (via <c>Assert.SkipWhen</c>),
+    /// bevor der Prozess überhaupt startet. xUnit.v3 wertet das für jede Testmethode
+    /// als "Skipped" statt als Fehler - ohne zusätzliches Attribut.
     /// </remarks>
     /// <param name="ensureDatabaseDeleted">Gibt an, ob die Testdatenbank vor dem Start gelöscht werden soll. Sollte normalerweise auf true gesetzt werden, um sicherzustellen, dass jeder Test mit einer frischen Datenbank beginnt.</param>
     /// <param name="umgebungsVariablen">
@@ -976,38 +977,33 @@ public abstract class WpfTestBase : IDisposable
 
 
     /// <summary>
-    /// Überspringt den aufrufenden Test (via <c>Skip.If</c>), wenn die Umgebungsvariable
+    /// Überspringt den aufrufenden Test (via <c>Assert.SkipWhen</c>), wenn die Umgebungsvariable
     /// <c>SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1</c> gesetzt ist (siehe
     /// <see cref="ConPtyEnvironmentProbe"/> und CLAUDE.md, Abschnitt Testing). Betrifft alle Tests,
     /// die über einen CLI-Prozess (ConPTY, z. B. via <see cref="StartenUndPluginWaehlen"/>)
     /// sichtbare Terminal-Ausgabe erwarten - ohne funktionierende Konsolen-Isolation scheitern sie
     /// sonst mit einem nichtssagenden <see cref="TimeoutException"/> statt mit einer erklärenden
     /// Meldung. Muss als erste Zeile des jeweiligen Testkörpers aufgerufen werden, vor jedem
-    /// App-Start. Erfordert, dass die aufrufende Testmethode mit <c>[SkippableFact]</c> (statt
-    /// <c>[Fact]</c>) annotiert ist (Paket <c>Xunit.SkippableFact</c>) - nur damit erzeugt
-    /// <c>Skip.If</c> ein echtes "Skipped"-Ergebnis statt eines fehlschlagenden Tests.
+    /// App-Start.
     /// </summary>
     protected static void SkipWennConPtyNichtVerfuegbar()
     {
-        Skip.If(!ConPtyEnvironmentProbe.IsAvailable, ConPtyEnvironmentProbe.UnavailableReason);
+        Assert.SkipWhen(!ConPtyEnvironmentProbe.IsAvailable, ConPtyEnvironmentProbe.UnavailableReason);
     }
 
     /// <summary>
-    /// Überspringt den aufrufenden Test (via <c>Skip.If</c>), wenn die Umgebungsvariable
+    /// Überspringt den aufrufenden Test (via <c>Assert.SkipWhen</c>), wenn die Umgebungsvariable
     /// <c>SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1</c> gesetzt ist (siehe
     /// <see cref="WpfE2EEnvironmentProbe"/>). Betrifft alle Tests, die ein echtes
     /// WPF-Hauptfenster via FlaUI fahren - ohne interaktive Desktop-Session scheitern sie
     /// sonst erst nach dem Fenster-Timeout mit einer nichtssagenden <see cref="TimeoutException"/>.
     /// Dieselbe Prüfung läuft zusätzlich zentral in <see cref="LaunchApp"/>, sodass jeder
     /// App-Start abgedeckt ist; ein direkter Aufruf als erste Zeile des Testkörpers lohnt sich
-    /// nur bei teurem Vorab-Setup (z. B. Fixture-Aufbau vor dem ersten App-Start). Erfordert,
-    /// dass die aufrufende Testmethode mit <c>[SkippableFact]</c> (statt <c>[Fact]</c>)
-    /// annotiert ist (Paket <c>Xunit.SkippableFact</c>) - nur damit erzeugt <c>Skip.If</c> ein
-    /// echtes "Skipped"-Ergebnis statt eines fehlschlagenden Tests.
+    /// nur bei teurem Vorab-Setup (z. B. Fixture-Aufbau vor dem ersten App-Start).
     /// </summary>
     protected static void SkipWennWpfE2ENichtVerfuegbar()
     {
-        Skip.If(!WpfE2EEnvironmentProbe.IsAvailable, WpfE2EEnvironmentProbe.UnavailableReason);
+        Assert.SkipWhen(!WpfE2EEnvironmentProbe.IsAvailable, WpfE2EEnvironmentProbe.UnavailableReason);
     }
 
     /// <summary>
@@ -1041,21 +1037,29 @@ public abstract class WpfTestBase : IDisposable
 
         var baseDir = AppContext.BaseDirectory;
 
-        // Bei Tests läuft das Test-Binary in src\Softwareschmiede.Tests\bin\Debug\net10.0-windows10.0.17763.0\;
-        // das App-Binary liegt im selben src-Verzeichnis unter Softwareschmiede.App\bin\<Config>\net10.0-windows10.0.17763.0\
+        // TFM aus dem eigenen Ausgabeverzeichnis ableiten (…\bin\<Config>\<tfm>\), damit der
+        // gesuchte App-Pfad bei TargetFramework-Updates automatisch mitwandert.
+        var tfm = new DirectoryInfo(baseDir.TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)).Name;
+        var targetFramework = tfm.StartsWith("net", StringComparison.OrdinalIgnoreCase)
+            ? tfm
+            : TargetFramework;
+
+        // Bei Tests läuft das Test-Binary in src\Softwareschmiede.Tests\bin\<Config>\<tfm>\;
+        // das App-Binary liegt im selben src-Verzeichnis unter Softwareschmiede.App\bin\<Config>\<tfm>\
         var candidates = new[]
         {
             Path.GetFullPath(Path.Combine(
                 baseDir,
                 "..", "..", "..", "..",
                 "Softwareschmiede.App", "bin", BuildConfigDebug,
-                TargetFramework,
+                targetFramework,
                 "Softwareschmiede.App.exe")),
             Path.GetFullPath(Path.Combine(
                 baseDir,
                 "..", "..", "..", "..",
                 "Softwareschmiede.App", "bin", BuildConfigRelease,
-                TargetFramework,
+                targetFramework,
                 "Softwareschmiede.App.exe")),
         };
 

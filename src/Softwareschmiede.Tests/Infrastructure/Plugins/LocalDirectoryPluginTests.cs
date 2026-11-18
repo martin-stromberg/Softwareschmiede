@@ -19,8 +19,8 @@ public sealed class LocalDirectoryPluginTests
         var store = new Mock<ICredentialStore>();
         var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        var canCreate = await sut.CanCreateIssueAsync("local");
-        var result = await sut.CreateIssueAsync("local", new IssueCreateRequest("Titel", "Body"));
+        var canCreate = await sut.CanCreateIssueAsync("local", TestContext.Current.CancellationToken);
+        var result = await sut.CreateIssueAsync("local", new IssueCreateRequest("Titel", "Body"), TestContext.Current.CancellationToken);
 
         canCreate.Should().BeFalse();
         result.Status.Should().Be(IssueCreateResultStatus.NotSupported);
@@ -94,8 +94,8 @@ public sealed class LocalDirectoryPluginTests
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var targetDir = Directory.CreateTempSubdirectory().FullName;
         Directory.Delete(targetDir, recursive: true);
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "a.txt"), "a");
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "b.txt"), "b");
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "a.txt"), "a", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "b.txt"), "b", TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.Setup(c => c.RunAsync(
@@ -124,7 +124,7 @@ public sealed class LocalDirectoryPluginTests
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var targetDir = Directory.CreateTempSubdirectory().FullName;
         Directory.Delete(targetDir, recursive: true);
-        await File.WriteAllBytesAsync(Path.Combine(sourceDir, "huge.bin"), new byte[2 * 1024 * 1024]);
+        await File.WriteAllBytesAsync(Path.Combine(sourceDir, "huge.bin"), new byte[2 * 1024 * 1024], TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.Setup(c => c.RunAsync(
@@ -168,7 +168,7 @@ public sealed class LocalDirectoryPluginTests
     {
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var targetDir = Directory.CreateTempSubdirectory().FullName;
-        await File.WriteAllTextAsync(Path.Combine(targetDir, "existing.txt"), "x");
+        await File.WriteAllTextAsync(Path.Combine(targetDir, "existing.txt"), "x", TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         var store = new Mock<ICredentialStore>();
@@ -188,7 +188,7 @@ public sealed class LocalDirectoryPluginTests
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var targetDir = Directory.CreateTempSubdirectory().FullName;
         Directory.Delete(targetDir, recursive: true);
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "readme.txt"), "base");
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "readme.txt"), "base", TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.SetupSequence(c => c.RunAsync(
@@ -240,7 +240,7 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.SourceDirectory")).Returns(sourceDir);
         var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(string.Empty, targetDir);
+        await sut.CloneRepositoryAsync(string.Empty, targetDir, TestContext.Current.CancellationToken);
 
         File.Exists(Path.Combine(targetDir, "readme.txt")).Should().BeTrue();
         cli.VerifyAll();
@@ -260,7 +260,7 @@ public sealed class LocalDirectoryPluginTests
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var targetDir = Directory.CreateTempSubdirectory().FullName;
         Directory.Delete(targetDir, recursive: true);
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "readme.txt"), "base");
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "readme.txt"), "base", TestContext.Current.CancellationToken);
         Directory.CreateDirectory(Path.Combine(sourceDir, "backend"));
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
@@ -313,7 +313,7 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.SourceDirectory")).Returns(sourceDir);
         var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(string.Empty, targetDir);
+        await sut.CloneRepositoryAsync(string.Empty, targetDir, TestContext.Current.CancellationToken);
 
         File.Exists(Path.Combine(targetDir, "readme.txt")).Should().BeTrue();
         Directory.Exists(Path.Combine(targetDir, "backend")).Should().BeTrue(
@@ -328,7 +328,7 @@ public sealed class LocalDirectoryPluginTests
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var requestedTarget = Directory.CreateTempSubdirectory().FullName;
         Directory.Delete(requestedTarget, recursive: true);
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "readme.txt"), "base");
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "readme.txt"), "base", TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.SetupSequence(c => c.RunAsync(
@@ -380,7 +380,7 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkingDirectory")).Returns(@"C:\configured-should-be-ignored");
         var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(sourceDir, requestedTarget);
+        await sut.CloneRepositoryAsync(sourceDir, requestedTarget, TestContext.Current.CancellationToken);
 
         File.Exists(Path.Combine(requestedTarget, "readme.txt")).Should().BeTrue();
         cli.VerifyAll();
@@ -517,12 +517,12 @@ public sealed class LocalDirectoryPluginTests
     {
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var workspaceDir = Directory.CreateTempSubdirectory().FullName;
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "keep.txt"), "source-old");
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "removed.txt"), "to-be-removed");
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "old-name.txt"), "old-name");
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "keep.txt"), "workspace-new");
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "new-name.txt"), "new-name");
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), sourceDir);
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "keep.txt"), "source-old", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "removed.txt"), "to-be-removed", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "old-name.txt"), "old-name", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "keep.txt"), "workspace-new", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "new-name.txt"), "new-name", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), sourceDir, TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.Setup(c => c.RunAsync(
@@ -544,9 +544,9 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("SeparateWorkingDirectory");
         var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.PushBranchAsync(workspaceDir, "feature/local-sync");
+        await sut.PushBranchAsync(workspaceDir, "feature/local-sync", TestContext.Current.CancellationToken);
 
-        (await File.ReadAllTextAsync(Path.Combine(sourceDir, "keep.txt"))).Should().Be("workspace-new");
+        (await File.ReadAllTextAsync(Path.Combine(sourceDir, "keep.txt"), TestContext.Current.CancellationToken)).Should().Be("workspace-new");
         File.Exists(Path.Combine(sourceDir, "new-name.txt")).Should().BeTrue();
         File.Exists(Path.Combine(sourceDir, "removed.txt")).Should().BeFalse();
         File.Exists(Path.Combine(sourceDir, "old-name.txt")).Should().BeFalse();
@@ -559,9 +559,9 @@ public sealed class LocalDirectoryPluginTests
     {
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var workspaceDir = Directory.CreateTempSubdirectory().FullName;
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "source.txt"), "source-version");
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "source.txt"), "workspace-version");
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), sourceDir);
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "source.txt"), "source-version", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "source.txt"), "workspace-version", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), sourceDir, TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.Setup(c => c.RunAsync(
@@ -583,9 +583,9 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("SeparateWorkingDirectory");
         var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.PullAsync(workspaceDir);
+        await sut.PullAsync(workspaceDir, TestContext.Current.CancellationToken);
 
-        (await File.ReadAllTextAsync(Path.Combine(workspaceDir, "source.txt"))).Should().Be("source-version");
+        (await File.ReadAllTextAsync(Path.Combine(workspaceDir, "source.txt"), TestContext.Current.CancellationToken)).Should().Be("source-version");
         cli.VerifyAll();
     }
 
@@ -597,7 +597,7 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("SeparateWorkingDirectory");
         var sut = new LocalDirectoryPlugin(new Mock<ICliRunner>(MockBehavior.Strict).Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        var result = await sut.GetGitActionCapabilitiesAsync();
+        var result = await sut.GetGitActionCapabilitiesAsync(ct: TestContext.Current.CancellationToken);
 
         result.RepositoryKind.Should().Be(RepositoryKind.LocalDirectory);
         result.IsWorkingDirectoryCopy.Should().BeTrue();
@@ -615,7 +615,7 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("InSourceDirectory");
         var sut = new LocalDirectoryPlugin(new Mock<ICliRunner>(MockBehavior.Strict).Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        var result = await sut.GetGitActionCapabilitiesAsync();
+        var result = await sut.GetGitActionCapabilitiesAsync(ct: TestContext.Current.CancellationToken);
 
         result.RepositoryKind.Should().Be(RepositoryKind.LocalDirectory);
         result.IsWorkingDirectoryCopy.Should().BeFalse();
@@ -633,7 +633,7 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns((string?)null);
         var sut = new LocalDirectoryPlugin(new Mock<ICliRunner>(MockBehavior.Strict).Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        var result = await sut.GetGitActionCapabilitiesAsync();
+        var result = await sut.GetGitActionCapabilitiesAsync(ct: TestContext.Current.CancellationToken);
 
         result.IsWorkingDirectoryCopy.Should().BeTrue();
         result.CanPush.Should().BeFalse();
@@ -650,7 +650,7 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("invalid-value");
         var sut = new LocalDirectoryPlugin(new Mock<ICliRunner>(MockBehavior.Strict).Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        var result = await sut.GetGitActionCapabilitiesAsync();
+        var result = await sut.GetGitActionCapabilitiesAsync(ct: TestContext.Current.CancellationToken);
 
         result.IsWorkingDirectoryCopy.Should().BeTrue();
         result.CanPush.Should().BeFalse();
@@ -707,12 +707,12 @@ public sealed class LocalDirectoryPluginTests
     {
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var workspaceDir = Directory.CreateTempSubdirectory().FullName;
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "keep.txt"), "source-old");
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "removed.txt"), "to-be-removed");
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "old-name.txt"), "old-name");
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "keep.txt"), "workspace-new");
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "new-name.txt"), "new-name");
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), sourceDir);
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "keep.txt"), "source-old", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "removed.txt"), "to-be-removed", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "old-name.txt"), "old-name", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "keep.txt"), "workspace-new", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "new-name.txt"), "new-name", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), sourceDir, TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.Setup(c => c.RunAsync(
@@ -734,9 +734,9 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("SeparateWorkingDirectory");
         var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.MergeToSourceAsync(workspaceDir);
+        await sut.MergeToSourceAsync(workspaceDir, TestContext.Current.CancellationToken);
 
-        (await File.ReadAllTextAsync(Path.Combine(sourceDir, "keep.txt"))).Should().Be("workspace-new");
+        (await File.ReadAllTextAsync(Path.Combine(sourceDir, "keep.txt"), TestContext.Current.CancellationToken)).Should().Be("workspace-new");
         File.Exists(Path.Combine(sourceDir, "new-name.txt")).Should().BeTrue();
         File.Exists(Path.Combine(sourceDir, "removed.txt")).Should().BeFalse();
         File.Exists(Path.Combine(sourceDir, "old-name.txt")).Should().BeFalse();
@@ -749,7 +749,7 @@ public sealed class LocalDirectoryPluginTests
     {
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var workspaceDir = Directory.CreateTempSubdirectory().FullName;
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), sourceDir);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), sourceDir, TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.Setup(c => c.RunAsync(
@@ -783,7 +783,7 @@ public sealed class LocalDirectoryPluginTests
     public async Task PushBranchAsync_ShouldThrowInvalidOperationException_WhenWorkspaceEqualsSource()
     {
         var workspaceDir = Directory.CreateTempSubdirectory().FullName;
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), workspaceDir);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), workspaceDir, TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.Setup(c => c.RunAsync(
@@ -811,8 +811,8 @@ public sealed class LocalDirectoryPluginTests
     {
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var workspaceDir = Directory.CreateTempSubdirectory().FullName;
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), sourceDir);
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "keep.txt"), "workspace-new");
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, ".softwareschmiede-local-source"), sourceDir, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "keep.txt"), "workspace-new", TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.Setup(c => c.RunAsync(
@@ -848,7 +848,7 @@ public sealed class LocalDirectoryPluginTests
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var targetDir = Directory.CreateTempSubdirectory().FullName;
         Directory.Delete(targetDir, recursive: true);
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "copy.txt"), "copied");
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "copy.txt"), "copied", TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.SetupSequence(c => c.RunAsync(
@@ -900,7 +900,7 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory")).Returns("false");
         var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.CloneRepositoryAsync(sourceDir, targetDir);
+        await sut.CloneRepositoryAsync(sourceDir, targetDir, TestContext.Current.CancellationToken);
 
         File.Exists(Path.Combine(targetDir, "copy.txt")).Should().BeTrue();
         cli.VerifyAll();
@@ -927,8 +927,8 @@ public sealed class LocalDirectoryPluginTests
     {
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
         var workspaceDir = Directory.CreateTempSubdirectory().FullName;
-        await File.WriteAllTextAsync(Path.Combine(sourceDir, "source.txt"), "source-version");
-        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "source.txt"), "workspace-version");
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "source.txt"), "source-version", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(workspaceDir, "source.txt"), "workspace-version", TestContext.Current.CancellationToken);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
         cli.Setup(c => c.RunAsync(
@@ -958,9 +958,9 @@ public sealed class LocalDirectoryPluginTests
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.SourceDirectory")).Returns(sourceDir);
         var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await sut.PullAsync(workspaceDir);
+        await sut.PullAsync(workspaceDir, TestContext.Current.CancellationToken);
 
-        (await File.ReadAllTextAsync(Path.Combine(workspaceDir, "source.txt"))).Should().Be("source-version");
+        (await File.ReadAllTextAsync(Path.Combine(workspaceDir, "source.txt"), TestContext.Current.CancellationToken)).Should().Be("source-version");
         cli.VerifyAll();
     }
 
@@ -973,10 +973,10 @@ public sealed class LocalDirectoryPluginTests
             new Mock<ICredentialStore>().Object,
             NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await Assert.ThrowsAsync<NotSupportedException>(() => sut.CreatePullRequestAsync("repo", "branch", null, title: "title", body: "body"));
-        await Assert.ThrowsAsync<NotSupportedException>(() => sut.GetRemoteBranchesAsync("repo"));
-        await Assert.ThrowsAsync<NotSupportedException>(() => sut.GetDefaultBranchAsync("repo"));
-        await Assert.ThrowsAsync<NotSupportedException>(() => sut.CheckoutRemoteBranchAsync("/repo", "feature/a"));
-        await Assert.ThrowsAsync<NotSupportedException>(() => sut.GetIssuesAsync("repo"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => sut.CreatePullRequestAsync("repo", "branch", null, title: "title", body: "body", ct: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<NotSupportedException>(() => sut.GetRemoteBranchesAsync("repo", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<NotSupportedException>(() => sut.GetDefaultBranchAsync("repo", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<NotSupportedException>(() => sut.CheckoutRemoteBranchAsync("/repo", "feature/a", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<NotSupportedException>(() => sut.GetIssuesAsync("repo", TestContext.Current.CancellationToken));
     }
 }

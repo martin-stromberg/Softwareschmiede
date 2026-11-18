@@ -11,10 +11,10 @@ namespace Softwareschmiede.Tests.Infrastructure.Services;
 public sealed class SystemShutdownServiceTests
 {
     /// <summary>Auf Windows liefert das Erzwingen-Flag das Forced-Shutdown-Kommando.</summary>
-    [SkippableFact]
+    [Fact]
     public void ResolveShutdownCommand_WindowsMitErzwingen_LiefertForcedShutdown()
     {
-        Skip.IfNot(OperatingSystem.IsWindows(), "Windows-spezifisches Mapping.");
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows-spezifisches Mapping.");
 
         var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: true);
 
@@ -23,10 +23,10 @@ public sealed class SystemShutdownServiceTests
     }
 
     /// <summary>Auf Windows liefert der Shutdown ohne Erzwingen das reguläre Kommando.</summary>
-    [SkippableFact]
+    [Fact]
     public void ResolveShutdownCommand_WindowsOhneErzwingen_LiefertRegulaeresShutdown()
     {
-        Skip.IfNot(OperatingSystem.IsWindows(), "Windows-spezifisches Mapping.");
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows-spezifisches Mapping.");
 
         var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: false);
 
@@ -35,10 +35,10 @@ public sealed class SystemShutdownServiceTests
     }
 
     /// <summary>Unter Linux bleibt das Shutdown-Kommando unverändert <c>shutdown -h now</c>.</summary>
-    [SkippableFact]
+    [Fact]
     public void ResolveShutdownCommand_Linux_BleibtUnveraendert()
     {
-        Skip.IfNot(OperatingSystem.IsLinux(), "Linux-spezifisches Mapping.");
+        Assert.SkipUnless(OperatingSystem.IsLinux(), "Linux-spezifisches Mapping.");
 
         var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: true);
 
@@ -47,10 +47,10 @@ public sealed class SystemShutdownServiceTests
     }
 
     /// <summary>Unter macOS bleibt das AppleScript-Kommando unverändert.</summary>
-    [SkippableFact]
+    [Fact]
     public void ResolveShutdownCommand_MacOS_BleibtUnveraendert()
     {
-        Skip.IfNot(OperatingSystem.IsMacOS(), "macOS-spezifisches Mapping.");
+        Assert.SkipUnless(OperatingSystem.IsMacOS(), "macOS-spezifisches Mapping.");
 
         var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: true);
 

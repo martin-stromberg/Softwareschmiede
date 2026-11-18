@@ -110,7 +110,7 @@ public partial class End2EndTest
         // "jetzt - 10 min" noch am Vortag; die App interpretiert die eingegebene Uhrzeit aber immer
         // als heutiges Datum — eine Zukunftszeit würde geplant statt gesendet.
         var jetzt = DateTime.Now;
-        Skip.If(jetzt.Hour == 0 && jetzt.Minute < 10, "Kurz nach Mitternacht: 'jetzt - 10 min' wäre als heutige Uhrzeit eine Zukunftszeit.");
+        Assert.SkipWhen(jetzt.Hour == 0 && jetzt.Minute < 10, "Kurz nach Mitternacht: 'jetzt - 10 min' wäre als heutige Uhrzeit eine Zukunftszeit.");
         var vergangen = jetzt.AddMinutes(-10);
 
         taskB.SetScheduledPromptTime(vergangen.Hour, vergangen.Minute);

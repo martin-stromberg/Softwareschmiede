@@ -30,31 +30,31 @@ public sealed class UpdateServiceTests_PrereleaseChain
   "version": "v1.3.0-rc.1",
   "tagName": "v1.3.0-rc.1"
 }
-""");
+""", TestContext.Current.CancellationToken);
         var versionProvider = new ApplicationVersionProvider(temp.Path, NullLogger<ApplicationVersionProvider>.Instance);
 
         var releasesWithRc2 = ReleasesJson("v1.3.0-rc.1", "v1.3.0-beta.2", "v1.2.9", "v1.3.0-rc.2");
         var serviceWithRc2 = CreateService(versionProvider, releasesWithRc2);
 
-        var rcKanal = await serviceWithRc2.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
+        var rcKanal = await serviceWithRc2.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad), TestContext.Current.CancellationToken);
         rcKanal.Status.Should().Be(UpdateCheckStatus.UpdateVerfuegbar);
         rcKanal.Update!.Version.Should().Be("1.3.0-rc.2");
         rcKanal.Update.IsPrerelease.Should().BeTrue();
         rcKanal.Message.Should().BeNull("RC-Installation und RC-Kanal passen zusammen");
 
-        var produktivKanal = await serviceWithRc2.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
+        var produktivKanal = await serviceWithRc2.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
         produktivKanal.Status.Should().Be(UpdateCheckStatus.KeinUpdate);
         produktivKanal.Update.Should().BeNull();
 
         var serviceWithStable = CreateService(versionProvider, ReleasesJson("v1.3.0-rc.1", "v1.3.0-beta.2", "v1.2.9", "v1.3.0"));
 
         // RC-Kanal: das stabile 1.3.0 ist kanalfremd und gilt nicht als Update.
-        var rcKanalMitStable = await serviceWithStable.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
+        var rcKanalMitStable = await serviceWithStable.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad), TestContext.Current.CancellationToken);
         rcKanalMitStable.Status.Should().Be(UpdateCheckStatus.KeinUpdate);
         rcKanalMitStable.Update.Should().BeNull();
 
         // Produktiv-Kanal: das stabile 1.3.0 wird angeboten — mit Konfliktwarnung (RC-Installation).
-        var produktivKanalMitStable = await serviceWithStable.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad));
+        var produktivKanalMitStable = await serviceWithStable.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
         produktivKanalMitStable.Status.Should().Be(UpdateCheckStatus.UpdateVerfuegbar);
         produktivKanalMitStable.Update!.Version.Should().Be("1.3.0");
         produktivKanalMitStable.Update.IsPrerelease.Should().BeFalse();
@@ -62,7 +62,7 @@ public sealed class UpdateServiceTests_PrereleaseChain
             "eine RC-Installation im Produktiv-Kanal muss die nicht-blockierende Konfliktwarnung tragen");
 
         var serviceWithoutNewer = CreateService(versionProvider, ReleasesJson("v1.3.0-rc.1", "v1.3.0-beta.2", "v1.2.9"));
-        var noUpdate = await serviceWithoutNewer.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
+        var noUpdate = await serviceWithoutNewer.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad), TestContext.Current.CancellationToken);
         noUpdate.Status.Should().Be(UpdateCheckStatus.KeinUpdate);
         noUpdate.Update.Should().BeNull();
     }
@@ -72,14 +72,14 @@ public sealed class UpdateServiceTests_PrereleaseChain
     public async Task GetLatestReleaseAsync_LaterPageFailureDiscardsCandidate()
     {
         using var temp = new TempDirectory();
-        await File.WriteAllTextAsync(Path.Combine(temp.Path, "version.json"), "{ \"version\": \"v1.2.0\" }");
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "version.json"), "{ \"version\": \"v1.2.0\" }", TestContext.Current.CancellationToken);
         var versionProvider = new ApplicationVersionProvider(temp.Path, NullLogger<ApplicationVersionProvider>.Instance);
         var handler = new RoutingHttpHandler();
         handler.AddPage(Page1Url, ReleasesJson("v1.3.0"), Page2Url);
         handler.AddPage(Page2Url, "[]", statusCode: HttpStatusCode.InternalServerError);
         var service = CreateService(versionProvider, new HttpClient(handler));
 
-        var result = await service.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad));
+        var result = await service.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.VorabversionenPfad), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(UpdateCheckStatus.NichtPruefbar);
         result.Update.Should().BeNull();

@@ -82,7 +82,7 @@ public sealed class CodexPluginTests
     {
         _credentialStoreMock.Setup(store => store.GetCredential(It.IsAny<string>())).Returns((string?)null);
 
-        var psi = await _sut.StartCliAsync("/repo/path");
+        var psi = await _sut.StartCliAsync("/repo/path", ct: TestContext.Current.CancellationToken);
 
         psi.FileName.Should().Be("codex");
         psi.WorkingDirectory.Should().Be("/repo/path");
@@ -95,7 +95,7 @@ public sealed class CodexPluginTests
         _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Codex.ExecutablePath"))
             .Returns(@"C:\tools\codex.exe");
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.FileName.Should().Be(@"C:\tools\codex.exe");
     }
@@ -107,7 +107,7 @@ public sealed class CodexPluginTests
         _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Codex.ExecutablePath"))
             .Returns("\"C:\\tools\\codex.exe\"");
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.FileName.Should().Be(@"C:\tools\codex.exe");
     }
@@ -116,7 +116,7 @@ public sealed class CodexPluginTests
     [Fact]
     public async Task StartCliAsync_ShouldPassParameters_AsArguments()
     {
-        var psi = await _sut.StartCliAsync("/repo", "--some-flag");
+        var psi = await _sut.StartCliAsync("/repo", "--some-flag", TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Be("--some-flag");
     }
@@ -125,7 +125,7 @@ public sealed class CodexPluginTests
     [Fact]
     public async Task StartCliAsync_ShouldNotSetAuthEnvironmentVariable()
     {
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.EnvironmentVariables.ContainsKey("OPENAI_API_KEY").Should().BeFalse();
         psi.EnvironmentVariables.ContainsKey("CODEX_API_KEY").Should().BeFalse();
@@ -138,7 +138,7 @@ public sealed class CodexPluginTests
         _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Codex.CommandLineParameters"))
             .Returns("--verbose --model gpt-4");
 
-        var psi = await _sut.StartCliAsync("/repo");
+        var psi = await _sut.StartCliAsync("/repo", ct: TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Contain("--verbose --model gpt-4");
     }

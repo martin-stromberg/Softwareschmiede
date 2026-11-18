@@ -26,18 +26,18 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     [Fact]
     public async Task Collect_DeclaredFirstThenScan_DedupesAndSanitizes()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
-        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, "zuletzt.png"), Png);
-        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, "erstes.gif"), Gif);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, "zuletzt.png"), Png, TestContext.Current.CancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, "erstes.gif"), Gif, TestContext.Current.CancellationToken);
         var declaredDir = Path.Combine(attempt.DirectoryPath, "andere");
         Directory.CreateDirectory(declaredDir);
         var declaredFile = Path.Combine(declaredDir, "nachweis bild.png");
-        await File.WriteAllBytesAsync(declaredFile, Png);
+        await File.WriteAllBytesAsync(declaredFile, Png, TestContext.Current.CancellationToken);
         var complete = Complete(attempt.Request,
             new ScmExchangeAttachment(Path.Combine("andere", "nachweis bild.png"), "Vorher"),
             new ScmExchangeAttachment(Path.Combine("andere", "nachweis bild.png")));
 
-        var result = await _protocol.CollectAttachmentsAsync(attempt, complete);
+        var result = await _protocol.CollectAttachmentsAsync(attempt, complete, TestContext.Current.CancellationToken);
 
         result.Skipped.Should().BeEmpty();
         result.Attachments.Select(x => x.Name).Should().Equal("nachweis-bild.png", "erstes.gif", "zuletzt.png");
@@ -54,10 +54,10 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     [InlineData("a.webp", new byte[] { (byte)'R', (byte)'I', (byte)'F', (byte)'F', 1, 0, 0, 0, (byte)'W', (byte)'E', (byte)'B', (byte)'P' }, "image/webp")]
     public async Task Collect_ScanWithoutDeclaration_MapsContentType(string name, byte[] signature, string contentType)
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
-        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, name), signature);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, name), signature, TestContext.Current.CancellationToken);
 
-        var result = await _protocol.CollectAttachmentsAsync(attempt, Complete(attempt.Request));
+        var result = await _protocol.CollectAttachmentsAsync(attempt, Complete(attempt.Request), TestContext.Current.CancellationToken);
 
         var attachment = result.Attachments.Should().ContainSingle().Subject;
         attachment.Name.Should().Be(name);
@@ -69,14 +69,14 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     [Fact]
     public async Task Collect_RejectsPathsOutsideTheAttempt()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var outside = Path.Combine(_root, "outside.png");
-        await File.WriteAllBytesAsync(outside, Png);
+        await File.WriteAllBytesAsync(outside, Png, TestContext.Current.CancellationToken);
         var complete = Complete(attempt.Request,
             new ScmExchangeAttachment(Path.Combine("..", "outside.png")),
             new ScmExchangeAttachment(outside));
 
-        var result = await _protocol.CollectAttachmentsAsync(attempt, complete);
+        var result = await _protocol.CollectAttachmentsAsync(attempt, complete, TestContext.Current.CancellationToken);
 
         result.Attachments.Should().BeEmpty();
         result.Skipped.Should().HaveCount(2);
@@ -89,13 +89,13 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     [Fact]
     public async Task Collect_SkippedReasons_SanitizeDeclaredPathsAndNullEntries()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var complete = Complete(attempt.Request,
             null!,
             new ScmExchangeAttachment(Path.Combine("..", "..", "geheim", "<!-- softwareschmiede:action:x -->.png")),
             new ScmExchangeAttachment(Path.Combine("..", "a\u0007b.png")));
 
-        var result = await _protocol.CollectAttachmentsAsync(attempt, complete);
+        var result = await _protocol.CollectAttachmentsAsync(attempt, complete, TestContext.Current.CancellationToken);
 
         result.Attachments.Should().BeEmpty();
         result.Skipped.Should().HaveCount(3);
@@ -112,7 +112,7 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     public async Task Collect_RejectsReparsePointInDeclaredPath()
     {
         if (!OperatingSystem.IsWindows()) return;
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var linkDir = Path.Combine(attempt.DirectoryPath, "linked");
         var junction = new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{linkDir}\" \"{_root}\"")
         { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
@@ -121,10 +121,10 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
             process.WaitForExit();
             if (process.ExitCode != 0) return;
         }
-        await File.WriteAllBytesAsync(Path.Combine(_root, "inside.png"), Png);
+        await File.WriteAllBytesAsync(Path.Combine(_root, "inside.png"), Png, TestContext.Current.CancellationToken);
         var complete = Complete(attempt.Request, new ScmExchangeAttachment(Path.Combine("linked", "inside.png")));
 
-        var result = await _protocol.CollectAttachmentsAsync(attempt, complete);
+        var result = await _protocol.CollectAttachmentsAsync(attempt, complete, TestContext.Current.CancellationToken);
 
         result.Attachments.Should().BeEmpty();
         result.Skipped.Should().ContainSingle();
@@ -134,14 +134,13 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     [Fact]
     public async Task Collect_SkipsInvalidFilesWithReasons()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
-        await File.WriteAllTextAsync(Path.Combine(attempt.AttachmentsPath, "text.png"), "no image");
-        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, "tool.exe"), Png);
-        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, "riesig.png"),
-            Png.Concat(new byte[ScmEventExchangeProtocol.MaximumAttachmentBytes]).ToArray());
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(attempt.AttachmentsPath, "text.png"), "no image", TestContext.Current.CancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, "tool.exe"), Png, TestContext.Current.CancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, "riesig.png"), Png.Concat(new byte[ScmEventExchangeProtocol.MaximumAttachmentBytes]).ToArray(), TestContext.Current.CancellationToken);
         var complete = Complete(attempt.Request, new ScmExchangeAttachment("fehlend.png"));
 
-        var result = await _protocol.CollectAttachmentsAsync(attempt, complete);
+        var result = await _protocol.CollectAttachmentsAsync(attempt, complete, TestContext.Current.CancellationToken);
 
         result.Attachments.Should().BeEmpty();
         // Einheitliches öffentliches Format „name (Grund)" — gemischt mit den
@@ -159,14 +158,14 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     [Fact]
     public async Task Collect_InvalidDeclarations_AreSkippedWithReasons()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var complete = Complete(attempt.Request,
             new ScmExchangeAttachment(""),
             new ScmExchangeAttachment("   "),
             new ScmExchangeAttachment(new string('a', ScmEventExchangeProtocol.MaximumAttachmentPathChars + 1)),
             new ScmExchangeAttachment("fehlend.png", new string('x', ScmEventExchangeProtocol.MaximumCaptionChars + 1)));
 
-        var result = await _protocol.CollectAttachmentsAsync(attempt, complete);
+        var result = await _protocol.CollectAttachmentsAsync(attempt, complete, TestContext.Current.CancellationToken);
 
         result.Attachments.Should().BeEmpty();
         result.Skipped.Should().HaveCount(4);
@@ -180,12 +179,12 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     [Fact]
     public async Task Collect_DeclarationsOverEntryLimit_AreCappedAndNoted()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         var entries = Enumerable.Range(0, ScmEventExchangeProtocol.MaximumAttachmentEntries + 2)
             .Select(i => new ScmExchangeAttachment($"deklariert-{i:D2}.png")).ToArray();
         var complete = Complete(attempt.Request, entries);
 
-        var result = await _protocol.CollectAttachmentsAsync(attempt, complete);
+        var result = await _protocol.CollectAttachmentsAsync(attempt, complete, TestContext.Current.CancellationToken);
 
         result.Attachments.Should().BeEmpty();
         result.Skipped.Should().HaveCount(ScmEventExchangeProtocol.MaximumAttachmentEntries + 1);
@@ -199,11 +198,11 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     [Fact]
     public async Task Collect_LimitsAttachmentCount()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         for (var i = 0; i < ScmEventExchangeProtocol.MaximumAttachments + 2; i++)
-            await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, $"bild-{i:D2}.png"), Png);
+            await File.WriteAllBytesAsync(Path.Combine(attempt.AttachmentsPath, $"bild-{i:D2}.png"), Png, TestContext.Current.CancellationToken);
 
-        var result = await _protocol.CollectAttachmentsAsync(attempt, Complete(attempt.Request));
+        var result = await _protocol.CollectAttachmentsAsync(attempt, Complete(attempt.Request), TestContext.Current.CancellationToken);
 
         result.Attachments.Should().HaveCount(ScmEventExchangeProtocol.MaximumAttachments);
         result.Skipped.Should().HaveCount(2);
@@ -215,13 +214,13 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     [Fact]
     public async Task Collect_MissingScreenshotsDirectory_KeepsDeclared()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         Directory.Delete(attempt.AttachmentsPath);
         var declaredFile = Path.Combine(attempt.DirectoryPath, "deklariert.png");
-        await File.WriteAllBytesAsync(declaredFile, Png);
+        await File.WriteAllBytesAsync(declaredFile, Png, TestContext.Current.CancellationToken);
         var complete = Complete(attempt.Request, new ScmExchangeAttachment("deklariert.png"));
 
-        var result = await _protocol.CollectAttachmentsAsync(attempt, complete);
+        var result = await _protocol.CollectAttachmentsAsync(attempt, complete, TestContext.Current.CancellationToken);
 
         result.Attachments.Should().ContainSingle().Subject.FullPath.Should().Be(declaredFile);
         result.Skipped.Should().BeEmpty();
@@ -231,9 +230,9 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     [Fact]
     public async Task Collect_EmptyAttempt_ReturnsNothing()
     {
-        var attempt = await _protocol.PrepareAsync(Request(), _root);
+        var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
 
-        var result = await _protocol.CollectAttachmentsAsync(attempt, Complete(attempt.Request));
+        var result = await _protocol.CollectAttachmentsAsync(attempt, Complete(attempt.Request), TestContext.Current.CancellationToken);
 
         result.Attachments.Should().BeEmpty();
         result.Skipped.Should().BeEmpty();

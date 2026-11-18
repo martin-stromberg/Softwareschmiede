@@ -786,11 +786,11 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         };
         _sut.CliLaufAktiv += _ => laufAktivCount++;
 
-        var handle = await _sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle = await _sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         gestartetCount.Should().Be(1);
 
-        var handle2 = await _sut.StartCliAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
-        var handle3 = await _sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle2 = await _sut.StartCliAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        var handle3 = await _sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         handle2.Should().BeSameAs(handle, "der zweite Start liefert das bereits laufende Handle zurück");
         handle3.Should().BeSameAs(handle);
@@ -809,7 +809,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         _sut.NotifyLaufAktiv(aufgabeId);
         laufAktivCount.Should().Be(0, "ohne laufendes Handle ist NotifyLaufAktiv ein No-Op");
 
-        await _sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+        await _sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         _sut.NotifyLaufAktiv(aufgabeId);
 
         laufAktivCount.Should().Be(1);

@@ -68,8 +68,8 @@ public sealed class DashboardViewModelTests : IDisposable
     public async Task LadenAsync_ShouldNotModifyAktiveAufgabenListe_WhenCalled()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Zu startende Aufgabe", null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Zu startende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         var geteilteListe = new ObservableCollection<AktiveAufgabePanelItem>();
         sut.Initialize(geteilteListe, _ => { });
@@ -147,13 +147,13 @@ public sealed class DashboardViewModelTests : IDisposable
             using (var scope = provider.CreateScope())
             {
                 var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-                await einstellungen.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey, "Ki");
+                await einstellungen.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey, "Ki", TestContext.Current.CancellationToken);
             }
 
             var sut = CreateSut(modusService);
 
             // Act
-            await sut.GespeichertenAufgabenListenModusLadenAsync();
+            await sut.GespeichertenAufgabenListenModusLadenAsync(TestContext.Current.CancellationToken);
 
             // Assert
             sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Ki);
@@ -181,10 +181,10 @@ public sealed class DashboardViewModelTests : IDisposable
             {
                 using var scope = provider.CreateScope();
                 var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-                wert = await einstellungen.GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey);
-                menueWert = await einstellungen.GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey);
+                wert = await einstellungen.GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey, TestContext.Current.CancellationToken);
+                menueWert = await einstellungen.GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey, TestContext.Current.CancellationToken);
                 if (wert != "Repository")
-                    await Task.Delay(50);
+                    await Task.Delay(50, TestContext.Current.CancellationToken);
             }
             wert.Should().Be("Repository");
             menueWert.Should().BeNull("der Dashboard-Moduswechsel darf den Menü-Schlüssel nicht schreiben");

@@ -203,7 +203,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
 
         await _sut.SchedulePromptAsync(aufgabeId, "Testprompt", _timeProvider.GetUtcNow().AddMinutes(-1));
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task, "eine Zielzeit in der Vergangenheit muss sofort versendet werden");
         _sut.GetScheduledPromptStatus(aufgabeId).Should().BeNull("ein sofort versendeter Prompt darf keinen Eintrag in der Warteschlange hinterlassen");
     }
@@ -235,7 +235,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
 
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task, "der Timer muss beim Erreichen der Zielzeit automatisch feuern");
         _sut.GetScheduledPromptStatus(aufgabeId).Should().BeNull("nach dem Versand darf kein Eintrag mehr in der Warteschlange sein");
     }
@@ -253,7 +253,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         await _sut.CancelScheduledPromptAsync(aufgabeId);
         _timeProvider.Advance(TimeSpan.FromMinutes(10));
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromMilliseconds(500)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken));
         finished.Should().NotBe(versendet.Task, "ein stornierter Prompt darf auch nach Ablauf der Zielzeit nicht versendet werden");
         _sut.GetScheduledPromptStatus(aufgabeId).Should().BeNull();
     }
@@ -279,7 +279,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
             "der Eintrag muss weiterhin der zweite, ersetzende Prompt sein");
 
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
         _sut.GetScheduledPromptStatus(aufgabeId).Should().NotBeNull(
             "ohne zustellfähige Session bleibt der Plan des zweiten Prompts im Zustand „wartet auf Session“ bestehen");
     }
@@ -303,7 +303,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var act = () => _timeProvider.Advance(TimeSpan.FromMinutes(5));
         act.Should().NotThrow();
 
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
 
         versendet.Should().BeFalse("ohne aktive CLI-Session darf kein PromptSent-Event gefeuert werden");
         var status = sut.GetScheduledPromptStatus(aufgabeId);
@@ -356,12 +356,12 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         using (var scope = provider.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
-            (await db.Aufgaben.FindAsync(aufgabeId))!.PausiertBisUtc = pausiertBis;
-            await db.SaveChangesAsync();
+            (await db.Aufgaben.FindAsync(new object?[] { aufgabeId }, TestContext.Current.CancellationToken))!.PausiertBisUtc = pausiertBis;
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         _timeProvider.Advance(TimeSpan.FromMinutes(6));
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
 
         versendet.Task.IsCompleted.Should().BeFalse("während einer aktiven Pause darf der Prompt nicht versendet werden");
         var status = sut.GetScheduledPromptStatus(aufgabeId);
@@ -373,7 +373,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
 
         _timeProvider.Advance(TimeSpan.FromHours(1));
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task, "nach dem Pausenende muss der gepufferte Prompt versendet werden");
         sut.GetScheduledPromptStatus(aufgabeId).Should().BeNull();
     }
@@ -444,7 +444,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
 
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task);
         (await LeseDatensaetzeAsync(provider, aufgabeId)).Should().BeEmpty("der Datensatz muss nach erfolgreichem Versand gelöscht sein");
         sut.GetScheduledPromptStatus(aufgabeId).Should().BeNull();
@@ -494,7 +494,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
 
         await sut.SchedulePromptAsync(aufgabeId, "Testprompt", _timeProvider.GetUtcNow().AddMinutes(5));
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
 
         versendet.Task.IsCompleted.Should().BeFalse("ein Sendefehler darf kein PromptSent-Event auslösen");
         sut.GetScheduledPromptStatus(aufgabeId).Should().NotBeNull("der Plan muss im Zustand „wartet auf Session“ erhalten bleiben");
@@ -504,7 +504,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         RegisterSession(aufgabeId);
         RaiseCliProcessStatusChanged(aufgabeId, CliProcessStatus.Gestartet);
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task, "beim nächsten Session-Start muss der wartende Plan zugestellt werden");
         (await LeseDatensaetzeAsync(provider, aufgabeId)).Should().BeEmpty();
     }
@@ -526,13 +526,13 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         // Ohne Session fällig werden lassen → Eintrag wartet auf Session.
         await sut.SchedulePromptAsync(aufgabeId, "Testprompt", _timeProvider.GetUtcNow().AddMinutes(5));
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
         sut.GetScheduledPromptStatus(aufgabeId).Should().NotBeNull();
 
         RegisterSession(aufgabeId);
         RaiseCliProcessStatusChanged(aufgabeId, CliProcessStatus.Gestartet);
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task, "der Session-Start muss den wartenden Plan zustellen");
         (await LeseDatensaetzeAsync(provider, aufgabeId)).Should().BeEmpty();
         sut.GetScheduledPromptStatus(aufgabeId).Should().BeNull();
@@ -554,12 +554,12 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
 
         await sut.SchedulePromptAsync(aufgabeId, "Testprompt", _timeProvider.GetUtcNow().AddMinutes(5));
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
 
         RegisterSession(aufgabeId);
         RaiseCliProcessStatusChanged(aufgabeId, CliProcessStatus.Gestartet);
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task);
         await WaitUntilAsync(async () => (await LeseProtokollAsync(provider, aufgabeId)).Count > 0);
         (await LeseProtokollAsync(provider, aufgabeId))
@@ -608,9 +608,9 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         await sut.SchedulePromptAsync(aufgabeId, "Testprompt", _timeProvider.GetUtcNow().AddMinutes(5));
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task);
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
         (await LeseProtokollAsync(provider, aufgabeId)).Should().BeEmpty(
             "bei beobachtetem Versand (Detailansicht offen) darf kein Protokolleintrag entstehen");
     }
@@ -635,7 +635,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         await sut.SchedulePromptAsync(aufgabeId, "Testprompt", _timeProvider.GetUtcNow().AddMinutes(5));
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task, "ein fehlschlagender Protokolleintrag darf den Versand nicht brechen");
         (await LeseDatensaetzeAsync(provider, aufgabeId)).Should().BeEmpty();
         sut.GetScheduledPromptStatus(aufgabeId).Should().BeNull();
@@ -661,13 +661,13 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         using (var scope = provider.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
-            (await db.Aufgaben.FindAsync(aufgabeId))!.PausiertBisUtc = pausiertBis;
-            await db.SaveChangesAsync();
+            (await db.Aufgaben.FindAsync(new object?[] { aufgabeId }, TestContext.Current.CancellationToken))!.PausiertBisUtc = pausiertBis;
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         _timeProvider.Advance(TimeSpan.FromMinutes(6));
 
-        var finished = await Task.WhenAny(umgeplant.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(umgeplant.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(umgeplant.Task, "die Pause-Umplanung muss ScheduledPromptChanged auslösen");
         await WaitUntilAsync(async () => (await LeseDatensaetzeAsync(provider, aufgabeId))
             .Any(z => z.ZielZeitpunktUtc > _timeProvider.GetUtcNow().AddMinutes(30)));
@@ -688,7 +688,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         using (var scope = provider.CreateScope())
         {
             var store = scope.ServiceProvider.GetRequiredService<ZeitgesteuerterPromptStore>();
-            await store.UpsertAsync(aufgabeId, "PersistierterPrompt", zielzeit);
+            await store.UpsertAsync(aufgabeId, "PersistierterPrompt", zielzeit, TestContext.Current.CancellationToken);
         }
 
         var sut = new PromptZeitVersandService(
@@ -708,7 +708,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
 
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task, "der wiederhergestellte Timer muss zur Zielzeit versenden");
         (await LeseDatensaetzeAsync(provider, aufgabeId)).Should().BeEmpty();
     }
@@ -722,7 +722,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         using (var scope = provider.CreateScope())
         {
             var store = scope.ServiceProvider.GetRequiredService<ZeitgesteuerterPromptStore>();
-            await store.UpsertAsync(aufgabeId, "UeberfaelligerPrompt", _timeProvider.GetUtcNow().AddMinutes(-5));
+            await store.UpsertAsync(aufgabeId, "UeberfaelligerPrompt", _timeProvider.GetUtcNow().AddMinutes(-5), TestContext.Current.CancellationToken);
         }
 
         var sut = new PromptZeitVersandService(
@@ -734,7 +734,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         sut.PromptSent += id => versendet.TrySetResult(id);
 
         await sut.RestoreScheduledPromptsAsync();
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
 
         versendet.Task.IsCompleted.Should().BeFalse("ohne Session darf der überfällige Plan nicht sofort versendet werden");
         sut.GetScheduledPromptStatus(aufgabeId).Should().NotBeNull("der überfällige Plan muss gemeldet bleiben");
@@ -742,7 +742,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         RegisterSession(aufgabeId);
         RaiseCliProcessStatusChanged(aufgabeId, CliProcessStatus.Gestartet);
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task, "beim nächsten Session-Start muss der überfällige Plan zugestellt werden");
     }
 
@@ -756,7 +756,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         using (var scope = provider.CreateScope())
         {
             var store = scope.ServiceProvider.GetRequiredService<ZeitgesteuerterPromptStore>();
-            await store.UpsertAsync(verwaisteAufgabeId, "VerwaisterPrompt", _timeProvider.GetUtcNow().AddMinutes(5));
+            await store.UpsertAsync(verwaisteAufgabeId, "VerwaisterPrompt", _timeProvider.GetUtcNow().AddMinutes(5), TestContext.Current.CancellationToken);
         }
 
         var sut = new PromptZeitVersandService(
@@ -800,7 +800,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         zweiterService.PromptSent += id => versendet.TrySetResult(id);
 
         await zweiterService.RestoreScheduledPromptsAsync();
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
 
         versendet.Task.IsCompleted.Should().BeFalse("ohne Session darf nach dem Neustart nicht versendet werden");
         zweiterService.GetScheduledPromptStatus(aufgabeId).Should().NotBeNull(
@@ -817,7 +817,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         RegisterSession(aufgabeId, sessionMock.Object);
         RaiseCliProcessStatusChanged(aufgabeId, CliProcessStatus.Gestartet);
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task, "der Plan muss nach dem Neustart beim ersten Session-Start zugestellt werden");
         (await LeseDatensaetzeAsync(provider, aufgabeId)).Should().BeEmpty();
         sessionMock.Verify(
@@ -884,7 +884,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         await sut.SchedulePromptAsync(aufgabeId, "AlterPlan", _timeProvider.GetUtcNow().AddMinutes(5));
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
 
-        var angekommen = await Task.WhenAny(schreibBegonnen.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var angekommen = await Task.WhenAny(schreibBegonnen.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         angekommen.Should().Be(schreibBegonnen.Task, "der Timer-Versand muss in-flight sein, bevor neu geplant wird");
 
         // Während der Versand an der Session hängt: neuen Plan derselben Aufgabe planen und persistieren.
@@ -892,7 +892,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         await sut.SchedulePromptAsync(aufgabeId, "NeuerPlan", neueZielzeit);
 
         schreibBlockade.SetResult();
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
 
         var datensaetze = await LeseDatensaetzeAsync(provider, aufgabeId);
         datensaetze.Should().HaveCount(1);
@@ -925,7 +925,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         await _sut.SchedulePromptAsync(aufgabeId, "AlterPlan", _timeProvider.GetUtcNow().AddMinutes(5));
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
 
-        var angekommen = await Task.WhenAny(schreibBegonnen.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var angekommen = await Task.WhenAny(schreibBegonnen.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         angekommen.Should().Be(schreibBegonnen.Task, "der Timer-Versand muss in-flight sein, bevor neu geplant wird");
 
         // Während der Versand hängt: neuen Plan mit eigenem Timer eintragen.
@@ -935,7 +935,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         // Jetzt fehlschlagen lassen: Die Wartestellungs-Markierung des alten Versands darf den
         // neuen Eintrag nicht zurückschreiben (Guard wie bei der Pausen-Umplanung).
         schreibBlockade.SetResult();
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
 
         _sut.GetScheduledPromptStatus(aufgabeId)!.PromptText.Should().Be(
             "NeuerPlan",
@@ -946,7 +946,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
             .Setup(s => s.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         _timeProvider.Advance(TimeSpan.FromMinutes(10));
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
 
         sessionMock.Verify(
             s => s.WritePromptAsync("NeuerPlan", It.IsAny<CancellationToken>()),
@@ -968,7 +968,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         using (var scope = provider.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
-            var projektId = (await db.Aufgaben.FindAsync(aufgabeId))!.ProjektId;
+            var projektId = (await db.Aufgaben.FindAsync(new object?[] { aufgabeId }, TestContext.Current.CancellationToken))!.ProjektId;
             db.Aufgaben.Add(new Softwareschmiede.Domain.Entities.Aufgabe
             {
                 Id = defekteAufgabeId,
@@ -977,13 +977,13 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
                 Status = Softwareschmiede.Domain.Enums.AufgabeStatus.Gestartet,
                 ErstellungsDatum = DateTimeOffset.UtcNow
             });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
             var store = scope.ServiceProvider.GetRequiredService<ZeitgesteuerterPromptStore>();
             // Defekter Plan zuerst (Insertionsreihenfolge): Die Zielzeit liegt über dem maximalen
             // Timer-Intervall (~49,7 Tage), sodass das Armiieren des Timers beim Re-Arm wirft.
-            await store.UpsertAsync(defekteAufgabeId, "DefekterPlan", _timeProvider.GetUtcNow().AddYears(1));
-            await store.UpsertAsync(aufgabeId, "GuterPlan", _timeProvider.GetUtcNow().AddMinutes(5));
+            await store.UpsertAsync(defekteAufgabeId, "DefekterPlan", _timeProvider.GetUtcNow().AddYears(1), TestContext.Current.CancellationToken);
+            await store.UpsertAsync(aufgabeId, "GuterPlan", _timeProvider.GetUtcNow().AddMinutes(5), TestContext.Current.CancellationToken);
         }
 
         var sut = new PromptZeitVersandService(
@@ -1031,7 +1031,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
 
         // Zielzeit in der Vergangenheit → Sofortversand, der in WritePromptAsync hängt.
         var sofortPlanung = sut.SchedulePromptAsync(aufgabeId, "AlterPlan", _timeProvider.GetUtcNow().AddMinutes(-1));
-        var angekommen = await Task.WhenAny(schreibBegonnen.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var angekommen = await Task.WhenAny(schreibBegonnen.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         angekommen.Should().Be(schreibBegonnen.Task, "der Sofortversand muss in-flight sein, bevor neu geplant wird");
 
         // Während der Versand hängt: neuen Plan derselben Aufgabe planen und persistieren.
@@ -1074,13 +1074,13 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         using (var scope = provider.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
-            (await db.ZeitgesteuertePrompts.SingleAsync()).PromptText = "AbgedrifteterText";
-            await db.SaveChangesAsync();
+            (await db.ZeitgesteuertePrompts.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).PromptText = "AbgedrifteterText";
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
 
-        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(versendet.Task);
         (await LeseDatensaetzeAsync(provider, aufgabeId)).Should().BeEmpty(
             "ein vom versendeten Plan abweichender Datensatz ohne lebenden In-Memory-Plan ist eine Leiche und darf nicht überleben");
@@ -1109,7 +1109,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
 
         sut.Dispose();
         _timeProvider.Advance(TimeSpan.FromMinutes(10));
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
 
         sessionMock.Verify(
             s => s.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),

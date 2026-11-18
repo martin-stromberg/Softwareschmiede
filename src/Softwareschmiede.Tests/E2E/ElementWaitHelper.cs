@@ -150,7 +150,16 @@ internal static class ElementWaitHelper
             catch (Exception) { continue; }
             if (window is null) continue;
 
-            var hit = window.FindFirst(FlaUI.Core.Definitions.TreeScope.Subtree, conditionFunc(window.Automation.ConditionFactory));
+            // Ein Fenster, dessen UIA-Abfrage fehlschlägt (z. B. Zombie-HWND während des
+            // Teardowns eines nativen Dialogs: noch in EnumWindows sichtbar, aber Provider
+            // bereits tot → FindFirst hängt bis zum UIA-Transaktions-Timeout), kann die
+            // Bedingung nicht erfüllen — überspringen statt den Poll abzubrechen.
+            AutomationElement? hit;
+            try
+            {
+                hit = window.FindFirst(FlaUI.Core.Definitions.TreeScope.Subtree, conditionFunc(window.Automation.ConditionFactory));
+            }
+            catch (Exception) { continue; }
             if (hit is not null)
                 return hit;
         }

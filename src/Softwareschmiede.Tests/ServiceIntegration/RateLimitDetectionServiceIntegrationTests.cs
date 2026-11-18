@@ -30,13 +30,13 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
     [Fact]
     public async Task MarkerInAusgabe_WirdErkannt_UndRateLimitEintragErstellt()
     {
-        var projekt = await _projektService.CreateAsync("RateLimit-Projekt", null);
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "RateLimit-Aufgabe", null);
+        var projekt = await _projektService.CreateAsync("RateLimit-Projekt", null, TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "RateLimit-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         var markerZeile = "[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-15T10:00:00Z]]";
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, markerZeile);
+        await _protokollService.AddCliOutputAsync(aufgabe.Id, markerZeile, TestContext.Current.CancellationToken);
 
-        var eintraege = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        var eintraege = await _protokollService.GetByAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         eintraege.Should().HaveCount(2);
         eintraege.Should().Contain(e => e.Typ == ProtokollTyp.RateLimit);
     }
@@ -58,19 +58,16 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
     [Fact]
     public async Task VorschlagPrompt_WirdGespeichert_UndStatusWirdWartend()
     {
-        var projekt = await _projektService.CreateAsync("Vorschlag-Projekt", null);
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Vorschlag-Aufgabe", null);
+        var projekt = await _projektService.CreateAsync("Vorschlag-Projekt", null, TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Vorschlag-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
-        await _aufgabeService.StartenAsync(aufgabe.Id, "main", "/tmp/repo");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "main", "/tmp/repo", ct: TestContext.Current.CancellationToken);
 
-        await _aufgabeService.SavePromptVorschlagAsync(
-            aufgabe.Id,
-            "Fortsetze mit Analyse der Fehler",
-            DateTimeOffset.UtcNow.AddHours(1));
+        await _aufgabeService.SavePromptVorschlagAsync(aufgabe.Id, "Fortsetze mit Analyse der Fehler", DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
 
-        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend);
+        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend, TestContext.Current.CancellationToken);
 
-        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         geladen!.Status.Should().Be(AufgabeStatus.Wartend);
         geladen.VorschlagPrompt.Should().Be("Fortsetze mit Analyse der Fehler");
         geladen.VorschlagAusfuehrenAbUtc.Should().NotBeNull();
@@ -80,13 +77,13 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
     [Fact]
     public async Task ClearPromptVorschlag_EntferntVorschlagUndZeitstempel()
     {
-        var projekt = await _projektService.CreateAsync("Clear-Projekt", null);
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Clear-Aufgabe", null);
+        var projekt = await _projektService.CreateAsync("Clear-Projekt", null, TestContext.Current.CancellationToken);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Clear-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
-        await _aufgabeService.SavePromptVorschlagAsync(aufgabe.Id, "Ein Vorschlag", DateTimeOffset.UtcNow.AddHours(2));
-        await _aufgabeService.ClearPromptVorschlagAsync(aufgabe.Id);
+        await _aufgabeService.SavePromptVorschlagAsync(aufgabe.Id, "Ein Vorschlag", DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
+        await _aufgabeService.ClearPromptVorschlagAsync(aufgabe.Id, TestContext.Current.CancellationToken);
 
-        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
         geladen!.VorschlagPrompt.Should().BeNull();
         geladen.VorschlagAusfuehrenAbUtc.Should().BeNull();
     }

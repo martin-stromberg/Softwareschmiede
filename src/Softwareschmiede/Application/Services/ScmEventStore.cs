@@ -170,7 +170,7 @@ public sealed class ScmEventStore(SoftwareschmiededDbContext db, ScmEventChangeN
     {
         var now = time.GetUtcNow().ToUnixTimeMilliseconds();
         var until = now + 60_000;
-        var changed = await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO ScmTaskLeases (AufgabeId, Owner, ExpiresUtc) VALUES ({taskId}, {owner}, {until}) ON CONFLICT(AufgabeId) DO UPDATE SET Owner = {owner}, ExpiresUtc = {until} WHERE ExpiresUtc < {now} OR Owner = {owner}", ct);
+        var changed = await db.Database.ExecuteSqlAsync($"INSERT INTO ScmTaskLeases (AufgabeId, Owner, ExpiresUtc) VALUES ({taskId}, {owner}, {until}) ON CONFLICT(AufgabeId) DO UPDATE SET Owner = {owner}, ExpiresUtc = {until} WHERE ExpiresUtc < {now} OR Owner = {owner}", ct);
         return changed == 1;
     }
     /// <summary>Verlängert ausschließlich die eigene Lease.</summary>

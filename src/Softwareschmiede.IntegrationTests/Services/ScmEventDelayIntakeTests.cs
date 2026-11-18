@@ -21,9 +21,9 @@ public sealed class ScmEventDelayIntakeTests
         var before = DateTimeOffset.UtcNow;
         var store = new ScmEventStore(db, new(), TimeProvider.System);
 
-        await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede bitte #verzögert 2h")));
+        await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede bitte #verzögert 2h")), ct: TestContext.Current.CancellationToken);
 
-        var item = await db.ScmIncomingEvents.SingleAsync();
+        var item = await db.ScmIncomingEvents.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("Verzögert", item.Status);
         Assert.NotNull(item.NextAttemptUtc);
         Assert.InRange(item.NextAttemptUtc.Value,
@@ -31,17 +31,17 @@ public sealed class ScmEventDelayIntakeTests
             DateTimeOffset.UtcNow.AddHours(2).ToUnixTimeMilliseconds());
         Assert.Contains("verzögert", item.Reason, StringComparison.OrdinalIgnoreCase);
 
-        var action = await db.ScmOutgoingActions.SingleAsync();
+        var action = await db.ScmOutgoingActions.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("waiting", action.Purpose);
         Assert.Equal(item.Id, action.EventId);
         Assert.Equal(ScmEventStore.ActionId(item.Id, "waiting"), action.Id);
         var request = System.Text.Json.JsonSerializer.Deserialize<ScmResponseRequest>(action.RequestJson, ScmEventStore.JsonOptions)!;
         Assert.Contains("verzögert", request.Body, StringComparison.OrdinalIgnoreCase);
 
-        var task = await db.Aufgaben.SingleAsync(x => x.Id == taskId);
+        var task = await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(task.PausiertBisUtc);
         Assert.Equal(item.NextAttemptUtc.Value, task.PausiertBisUtc.Value.ToUnixTimeMilliseconds());
-        Assert.Contains(await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(),
+        Assert.Contains(await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             x => x.Inhalt.Contains("verzögerte SCM-Ausführung"));
     }
 
@@ -53,13 +53,13 @@ public sealed class ScmEventDelayIntakeTests
         var taskId = await SeedTaskAsync(db);
         var store = new ScmEventStore(db, new(), TimeProvider.System);
 
-        await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede #verzögert 99t")));
+        await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede #verzögert 99t")), ct: TestContext.Current.CancellationToken);
 
-        var item = await db.ScmIncomingEvents.SingleAsync();
+        var item = await db.ScmIncomingEvents.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("Aufgenommen", item.Status);
         Assert.Null(item.NextAttemptUtc);
-        Assert.Null((await db.Aufgaben.SingleAsync(x => x.Id == taskId)).PausiertBisUtc);
-        var action = await db.ScmOutgoingActions.SingleAsync();
+        Assert.Null((await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausiertBisUtc);
+        var action = await db.ScmOutgoingActions.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         var request = System.Text.Json.JsonSerializer.Deserialize<ScmResponseRequest>(action.RequestJson, ScmEventStore.JsonOptions)!;
         Assert.Contains("ignoriert", request.Body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("32 Tagen", request.Body, StringComparison.OrdinalIgnoreCase);
@@ -73,13 +73,13 @@ public sealed class ScmEventDelayIntakeTests
         var taskId = await SeedTaskAsync(db);
         var store = new ScmEventStore(db, new(), TimeProvider.System);
 
-        await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede bitte übernehmen")));
+        await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede bitte übernehmen")), ct: TestContext.Current.CancellationToken);
 
-        var item = await db.ScmIncomingEvents.SingleAsync();
+        var item = await db.ScmIncomingEvents.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("Aufgenommen", item.Status);
         Assert.Null(item.NextAttemptUtc);
-        Assert.Empty(await db.ScmOutgoingActions.ToListAsync());
-        Assert.Null((await db.Aufgaben.SingleAsync(x => x.Id == taskId)).PausiertBisUtc);
+        Assert.Empty(await db.ScmOutgoingActions.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Null((await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausiertBisUtc);
     }
 
     /// <summary>Ein konfiguriertes Keyword ersetzt den Standard bei der Aufnahme.</summary>
@@ -90,11 +90,11 @@ public sealed class ScmEventDelayIntakeTests
         var taskId = await SeedTaskAsync(db);
         var store = new ScmEventStore(db, new(), TimeProvider.System);
 
-        await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede #verzögert 2h")), delayKeyword: "#warte");
-        Assert.Equal("Aufgenommen", (await db.ScmIncomingEvents.SingleAsync()).Status);
+        await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede #verzögert 2h")), delayKeyword: "#warte", ct: TestContext.Current.CancellationToken);
+        Assert.Equal("Aufgenommen", (await db.ScmIncomingEvents.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Status);
 
-        await store.AcceptBatchAsync(taskId, "source2", Batch(Observe("$Softwareschmiede #warte 30min", node: "node2")), delayKeyword: "#warte");
-        Assert.Equal("Verzögert", (await db.ScmIncomingEvents.SingleAsync(x => x.EventKey.Contains("node2"))).Status);
+        await store.AcceptBatchAsync(taskId, "source2", Batch(Observe("$Softwareschmiede #warte 30min", node: "node2")), delayKeyword: "#warte", ct: TestContext.Current.CancellationToken);
+        Assert.Equal("Verzögert", (await db.ScmIncomingEvents.SingleAsync(x => x.EventKey.Contains("node2"), cancellationToken: TestContext.Current.CancellationToken)).Status);
     }
 
     /// <summary>Eine bestehende längere Pause wird nicht verkürzt.</summary>
@@ -104,15 +104,15 @@ public sealed class ScmEventDelayIntakeTests
         await using var db = await CreateDbAsync();
         var taskId = await SeedTaskAsync(db);
         var existing = DateTimeOffset.UtcNow.AddDays(10);
-        await db.Aufgaben.Where(x => x.Id == taskId).ExecuteUpdateAsync(x => x.SetProperty(p => p.PausiertBisUtc, existing));
+        await db.Aufgaben.Where(x => x.Id == taskId).ExecuteUpdateAsync(x => x.SetProperty(p => p.PausiertBisUtc, existing), cancellationToken: TestContext.Current.CancellationToken);
         db.ChangeTracker.Clear();
         var store = new ScmEventStore(db, new(), TimeProvider.System);
 
-        await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede #verzögert 2h")));
+        await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede #verzögert 2h")), ct: TestContext.Current.CancellationToken);
 
-        Assert.Equal("Verzögert", (await db.ScmIncomingEvents.SingleAsync()).Status);
+        Assert.Equal("Verzögert", (await db.ScmIncomingEvents.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Status);
         Assert.Equal(existing.ToUnixTimeMilliseconds(),
-            (await db.Aufgaben.SingleAsync(x => x.Id == taskId)).PausiertBisUtc!.Value.ToUnixTimeMilliseconds());
+            (await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausiertBisUtc!.Value.ToUnixTimeMilliseconds());
     }
 
     /// <summary>Die Zurückstellung übersteht einen Neustart, weil Zielzeitpunkt und
@@ -131,14 +131,14 @@ public sealed class ScmEventDelayIntakeTests
             await using (var db = await CreateFileDbAsync(path))
             {
                 var store = new ScmEventStore(db, new(), TimeProvider.System);
-                await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede #verzögert 2h")));
+                await store.AcceptBatchAsync(taskId, "source", Batch(Observe("$Softwareschmiede #verzögert 2h")), ct: TestContext.Current.CancellationToken);
             }
             await using (var db = await CreateFileDbAsync(path))
             {
-                var item = await db.ScmIncomingEvents.SingleAsync();
+                var item = await db.ScmIncomingEvents.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
                 Assert.Equal("Verzögert", item.Status);
                 nextAttempt = item.NextAttemptUtc!.Value;
-                pause = (await db.Aufgaben.SingleAsync(x => x.Id == taskId)).PausiertBisUtc!.Value;
+                pause = (await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausiertBisUtc!.Value;
             }
             Assert.True(nextAttempt > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             Assert.True(pause > DateTimeOffset.UtcNow);

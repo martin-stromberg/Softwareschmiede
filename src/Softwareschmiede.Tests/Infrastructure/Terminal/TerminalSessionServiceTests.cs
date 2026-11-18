@@ -73,7 +73,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
     public async Task StartAsync_ExecutableNichtAusfuehrbar_WirftMitMarkerUndDiagnose()
     {
         var script = Path.Combine(Path.GetTempPath(), $"nicht-ausfuehrbar-{Guid.NewGuid():N}.ps1");
-        await File.WriteAllTextAsync(script, "Write-Host x");
+        await File.WriteAllTextAsync(script, "Write-Host x", TestContext.Current.CancellationToken);
         try
         {
             var act = () => _sut.StartAsync(Guid.NewGuid(), CreateSpec(fileName: script), _sink, null, CancellationToken.None);
@@ -94,7 +94,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
     public async Task StartAsync_CmdShimSpec_LauncherErhaeltNormalisierteSpec()
     {
         var shim = Path.Combine(Path.GetTempPath(), $"shim-{Guid.NewGuid():N}.cmd");
-        await File.WriteAllTextAsync(shim, "@echo off");
+        await File.WriteAllTextAsync(shim, "@echo off", TestContext.Current.CancellationToken);
         try
         {
             var result = await _sut.StartAsync(Guid.NewGuid(), CreateSpec(fileName: shim), _sink, null, CancellationToken.None);
@@ -153,7 +153,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
         await using (var scope = _provider.CreateAsyncScope())
         {
             var settings = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            await settings.SetSettingAsync(TerminalSessionService.ForcePtyUnavailableKey, "true");
+            await settings.SetSettingAsync(TerminalSessionService.ForcePtyUnavailableKey, "true", TestContext.Current.CancellationToken);
         }
 
         var result = await _sut.StartAsync(Guid.NewGuid(), CreateSpec(), _sink, null, CancellationToken.None);
@@ -172,7 +172,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
         await using (var scope = _provider.CreateAsyncScope())
         {
             var settings = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            await settings.SetSettingAsync(TerminalSessionService.ForcePtyUnavailableKey, "true");
+            await settings.SetSettingAsync(TerminalSessionService.ForcePtyUnavailableKey, "true", TestContext.Current.CancellationToken);
         }
         var spec = CreateSpec() with { Capabilities = TerminalProviderCapabilities.RequiresPty | TerminalProviderCapabilities.SupportsPty };
 

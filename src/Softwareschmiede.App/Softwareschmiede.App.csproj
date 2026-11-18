@@ -7,7 +7,7 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
+    <TargetFramework>net11.0-windows10.0.17763.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <OutputType>WinExe</OutputType>
     <Nullable>enable</Nullable>
@@ -50,71 +50,70 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.15" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.15" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.15" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.15" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.15" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="11.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="11.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="11.0.0" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.15" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.14" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="11.0.0" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
   </ItemGroup>
 
   <Target Name="CopyPluginsToOutput" AfterTargets="Build">
     <!-- GitHub Plugin -->
     <ItemGroup>
-      <GitHubPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\net10.0\*.dll" />
+      <GitHubPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\net11.0\*.dll" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.GitHub" />
     <Copy SourceFiles="@(GitHubPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.GitHub" SkipUnchangedFiles="true" />
 
 	  <!-- BitBucket Plugin -->
 	  <ItemGroup>
-		  <BitBucketPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.BitBucket\bin\$(Configuration)\net10.0\*.dll" />
+		  <BitBucketPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.BitBucket\bin\$(Configuration)\net11.0\*.dll" />
 	  </ItemGroup>
 	  <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.BitBucket" />
 	  <Copy SourceFiles="@(BitBucketPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.BitBucket" SkipUnchangedFiles="true" />
 
     <!-- LocalDirectory Plugin -->
     <ItemGroup>
-      <LocalDirectoryPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\bin\$(Configuration)\net10.0\*.dll" />
+      <LocalDirectoryPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\bin\$(Configuration)\net11.0\*.dll" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.LocalDirectory" />
     <Copy SourceFiles="@(LocalDirectoryPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.LocalDirectory" SkipUnchangedFiles="true" />
 
     <!-- GitHubCopilot Plugin -->
     <ItemGroup>
-      <GitHubCopilotPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\net10.0\*.dll" />
+      <GitHubCopilotPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\net11.0\*.dll" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.GitHubCopilot" />
     <Copy SourceFiles="@(GitHubCopilotPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.GitHubCopilot" SkipUnchangedFiles="true" />
 
     <!-- ClaudeCli Plugin -->
     <ItemGroup>
-      <ClaudeCliPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\$(Configuration)\net10.0\*.dll" />
+      <ClaudeCliPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\$(Configuration)\net11.0\*.dll" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.ClaudeCli" />
     <Copy SourceFiles="@(ClaudeCliPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.ClaudeCli" SkipUnchangedFiles="true" />
 
     <!-- Codex Plugin -->
     <ItemGroup>
-      <CodexPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.Codex\bin\$(Configuration)\net10.0\*.dll" />
+      <CodexPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.Codex\bin\$(Configuration)\net11.0\*.dll" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.Codex" />
     <Copy SourceFiles="@(CodexPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.Codex" SkipUnchangedFiles="true" />
 
     <!-- Devin Plugin -->
     <ItemGroup>
-      <DevinPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.Devin\bin\$(Configuration)\net10.0\*.dll" />
+      <DevinPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.Devin\bin\$(Configuration)\net11.0\*.dll" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.Devin" />
     <Copy SourceFiles="@(DevinPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.Devin" SkipUnchangedFiles="true" />
 
     <!-- KiSimulator Plugin -->
     <ItemGroup>
-      <KiSimulatorPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.KiSimulator\bin\$(Configuration)\net10.0\*.dll" />
+      <KiSimulatorPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.KiSimulator\bin\$(Configuration)\net11.0\*.dll" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.KiSimulator" />
     <Copy SourceFiles="@(KiSimulatorPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.KiSimulator" SkipUnchangedFiles="true" />

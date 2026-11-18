@@ -17,9 +17,9 @@ public sealed class PromptVorlagenServiceTests
         using var db = TestDbContextFactory.Create();
         var sut = new PromptVorlagenService(db, NullLogger<PromptVorlagenService>.Instance);
 
-        await sut.EnsureInitialPromptVorlagenAsync();
+        await sut.EnsureInitialPromptVorlagenAsync(TestContext.Current.CancellationToken);
 
-        var vorlagen = await sut.GetAllAsync();
+        var vorlagen = await sut.GetAllAsync(TestContext.Current.CancellationToken);
         vorlagen.Should().HaveCount(3);
         vorlagen.Select(v => v.Name).Should().ContainInOrder(
             "Initialanforderung senden",
@@ -39,12 +39,12 @@ public sealed class PromptVorlagenServiceTests
             Prompttext = "Eigener Prompt",
             Sortierung = 0
         });
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         var sut = new PromptVorlagenService(db, NullLogger<PromptVorlagenService>.Instance);
 
-        await sut.EnsureInitialPromptVorlagenAsync();
+        await sut.EnsureInitialPromptVorlagenAsync(TestContext.Current.CancellationToken);
 
-        var vorlagen = await sut.GetAllAsync();
+        var vorlagen = await sut.GetAllAsync(TestContext.Current.CancellationToken);
         vorlagen.Should().ContainSingle();
         vorlagen[0].Name.Should().Be("Benutzerdefiniert");
     }

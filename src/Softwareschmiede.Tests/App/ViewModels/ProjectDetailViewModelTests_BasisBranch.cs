@@ -96,7 +96,7 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
 
         sut.IsEditingSourceBranch.Should().BeFalse();
         sut.SelectedRepositorySourceBranchName.Should().Be("staging");
-        var persisted = await _projektService.GetDetailAsync(projekt.Id);
+        var persisted = await _projektService.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
         persisted!.Repositories.Single(r => r.Id == repository.Id).DefaultSourceBranchName.Should().Be("staging");
     }
 
@@ -121,7 +121,7 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
 
         sut.IsEditingSourceBranch.Should().BeTrue();
         sut.SourceBranchInputError.Should().NotBeNullOrEmpty();
-        var persisted = await _projektService.GetDetailAsync(projekt.Id);
+        var persisted = await _projektService.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
         persisted!.Repositories.Single(r => r.Id == repository.Id).DefaultSourceBranchName.Should().Be("main");
     }
 
@@ -161,7 +161,7 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
 
         sut.IsEditingSourceBranch.Should().BeFalse();
         sut.SelectedRepositorySourceBranchName.Should().Be("main");
-        var persisted = await _projektService.GetDetailAsync(projekt.Id);
+        var persisted = await _projektService.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
         persisted!.Repositories.Single(r => r.Id == repository.Id).DefaultSourceBranchName.Should().Be("main");
     }
 }

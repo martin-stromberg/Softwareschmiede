@@ -36,15 +36,15 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
         fixture.AddNotification(new ScmNotification("T_1", "R_1", "github.com", "owner", "repo",
             ScmReferenceKind.Issue, 27, "mention", DateTimeOffset.UtcNow));
 
-        await fixture.Monitor.RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync());
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(27, ScmEventStore.Observation(item).Reference.Number);
-        var inbox = await db.ScmObservationCheckpoints.SingleAsync(x => x.SourceKey == "notifications/test-scm/github.com");
+        var inbox = await db.ScmObservationCheckpoints.SingleAsync(x => x.SourceKey == "notifications/test-scm/github.com", cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(inbox.WatermarkUtc);
-        var failure = await db.ScmObservationCheckpoints.SingleAsync(x => x.SourceKey.StartsWith("repository/"));
+        var failure = await db.ScmObservationCheckpoints.SingleAsync(x => x.SourceKey.StartsWith("repository/"), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("Permanent", failure.ErrorCode);
         Assert.Contains("separate Konto", failure.Diagnostic);
         Assert.DoesNotContain("keine neuen Anfragen dieses Providers", failure.Diagnostic);
@@ -63,11 +63,11 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
         ConfigureResolutionWithInaccessibleRepository(fixture);
         var before = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        await fixture.Monitor.RunOnceAsync();
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var failure = await db.ScmObservationCheckpoints.SingleAsync(x => x.SourceKey.StartsWith("repository/"));
+        var failure = await db.ScmObservationCheckpoints.SingleAsync(x => x.SourceKey.StartsWith("repository/"), cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(failure.NextAttemptUtc);
         Assert.NotEqual(long.MaxValue, failure.NextAttemptUtc);
         Assert.True(failure.NextAttemptUtc <= before + (long)TimeSpan.FromHours(1).TotalMilliseconds,

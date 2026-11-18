@@ -37,7 +37,7 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
         var configuration = CreateConfig();
         configuration.Aktiv = false;
 
-        await sut.RunAsync(_repositoryRootPath, configuration);
+        await sut.RunAsync(_repositoryRootPath, configuration, TestContext.Current.CancellationToken);
 
         _cliRunnerMock.Verify(
             runner => runner.RunAsync(
@@ -93,7 +93,7 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
             .ReturnsAsync(new CliResult(0, "ok", string.Empty));
 
         var sut = CreateSut();
-        await sut.RunAsync(_repositoryRootPath, configuration);
+        await sut.RunAsync(_repositoryRootPath, configuration, TestContext.Current.CancellationToken);
 
         capturedCommand.Should().Be("powershell.exe");
         capturedWorkingDirectory.Should().Be(_repositoryRootPath);
