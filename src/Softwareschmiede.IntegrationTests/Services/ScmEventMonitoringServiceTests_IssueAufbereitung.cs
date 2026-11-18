@@ -45,7 +45,8 @@ public sealed class ScmEventMonitoringServiceTests_IssueAufbereitung
     /// <summary>Happy Path: Nach der Baseline meldet die Enumeration ein neu angelegtes Issue
     /// (<see cref="ScmEventObservation.CreatedAt"/> nach dem Beobachtungsbeginn). Es entsteht genau
     /// eine Zweck-markierte Aufgabe mit eigenem SourceKey-Namensraum und ein internes, trigger-freies
-    /// Ereignis — eingereiht (AufgabeId gesetzt, in der Übersicht sichtbar), aber geparkt.</summary>
+    /// Ereignis — sofort fällig: Der Ausführungspfad aus Schritt 6 wird im selben Zyklus geprüft
+    /// und wartet hier mit ehrlichem Grund, weil das konfigurierte Plugin nicht ausführbar ist.</summary>
     [Fact]
     public async Task Monitor_NewIssueAfterBaseline_CreatesPreparationTaskAndInternalEvent()
     {
@@ -84,10 +85,12 @@ public sealed class ScmEventMonitoringServiceTests_IssueAufbereitung
         Assert.Equal(task.Id, item.AufgabeId);
         Assert.Equal(ScmIssueAufbereitungsService.Zweck, item.Zweck);
         Assert.EndsWith("/IssueAufbereitung", item.EventKey);
-        Assert.Equal("Aufgenommen", item.Status);
-        Assert.Equal(long.MaxValue, item.NextAttemptUtc);
-        Assert.Contains("Issue #9", item.Reason);
-        Assert.Contains("Issue-Kommentar", item.Reason); // Kommentar-Schalter wurde gelesen (Standard: an).
+        // Sofort fällig (nicht mehr geparkt): Der Dispatch im selben Zyklus scheitert hier
+        // ehrlich an der nicht ausführbaren Plugin-Zuordnung "custom.auf".
+        Assert.Equal("Wartend", item.Status);
+        Assert.Null(item.NextAttemptUtc);
+        Assert.Contains("custom.auf", item.Reason);
+        Assert.Contains("Issue-Aufbereitung", item.Reason);
         var observation = ScmEventStore.Observation(item);
         Assert.Equal(ScmContentKind.Description, observation.ContentKind);
         Assert.DoesNotContain("$Softwareschmiede", observation.Body); // Trigger-Validierung umgangen.
@@ -316,10 +319,10 @@ public sealed class ScmEventMonitoringServiceTests_IssueAufbereitung
         Assert.Equal(aufbereitung.Id, Assert.Single(events, x => x.Zweck != null).AufgabeId);
     }
 
-    /// <summary>Der interne Auftrag bleibt bis zum eigenen Ausführungspfad geparkt: Ein expliziter
-    /// Dispatch endet ehrlich wartend ohne CLI-Start, Prompt oder Hostaktion.</summary>
+    /// <summary>Der interne Auftrag nutzt den eigenen Ausführungspfad: Ein expliziter
+    /// Dispatch ohne ausführbare CLI endet ehrlich wartend ohne Start, Prompt oder Hostaktion.</summary>
     [Fact]
-    public async Task Monitor_InternalEvent_ExplicitDispatch_WaitsWithoutDelivery()
+    public async Task Monitor_InternalEvent_ExplicitDispatch_WaitsWithHonestReason()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -348,7 +351,7 @@ public sealed class ScmEventMonitoringServiceTests_IssueAufbereitung
 
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);
-        Assert.Equal(long.MaxValue, item.NextAttemptUtc);
+        Assert.Null(item.NextAttemptUtc);
         Assert.Contains("Aufbereitung", item.Reason);
         Assert.Empty(fixture.Prompts);
         Assert.Empty(fixture.Sessions);
