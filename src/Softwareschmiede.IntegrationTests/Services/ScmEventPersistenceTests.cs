@@ -30,7 +30,7 @@ public sealed class ScmEventPersistenceTests
                 await db.SaveChangesAsync();
                 // Der Altbestand wird roh eingefügt: Das aktuelle Modell enthält neuere
                 // Aufgaben-Spalten, die es zu diesem Migrationsstand noch nicht gibt.
-                await db.Database.ExecuteSqlInterpolatedAsync(
+                await db.Database.ExecuteSqlAsync(
                     $"INSERT INTO Aufgaben (Id, ProjektId, Titel, Status, AusfuehrungsStatus, ErstellungsDatum, RecoveryVersion) VALUES ({taskId}, {project.Id}, 'Bestehende Aufgabe', 0, 0, {DateTimeOffset.UtcNow}, 0)");
                 await db.Database.MigrateAsync();
                 var observation = Observe();
