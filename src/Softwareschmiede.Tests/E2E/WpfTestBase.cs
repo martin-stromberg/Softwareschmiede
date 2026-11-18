@@ -19,7 +19,9 @@ public abstract class WpfTestBase : IDisposable
 {
     private const string BuildConfigDebug = "Debug";
     private const string BuildConfigRelease = "Release";
-    private const string TargetFramework = "net10.0-windows10.0.17763.0";
+
+    // Fallback, falls der TFM nicht aus dem Test-Ausgabeverzeichnis abgeleitet werden kann.
+    private const string TargetFramework = "net11.0-windows10.0.17763.0";
 
     /// <summary>
     /// Kurzes Timeout (20s) für schnell erscheinende UI-Elemente. Siehe <see cref="ElementWaitHelper.Short"/>
@@ -1035,21 +1037,29 @@ public abstract class WpfTestBase : IDisposable
 
         var baseDir = AppContext.BaseDirectory;
 
-        // Bei Tests läuft das Test-Binary in src\Softwareschmiede.Tests\bin\Debug\net10.0-windows10.0.17763.0\;
-        // das App-Binary liegt im selben src-Verzeichnis unter Softwareschmiede.App\bin\<Config>\net10.0-windows10.0.17763.0\
+        // TFM aus dem eigenen Ausgabeverzeichnis ableiten (…\bin\<Config>\<tfm>\), damit der
+        // gesuchte App-Pfad bei TargetFramework-Updates automatisch mitwandert.
+        var tfm = new DirectoryInfo(baseDir.TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)).Name;
+        var targetFramework = tfm.StartsWith("net", StringComparison.OrdinalIgnoreCase)
+            ? tfm
+            : TargetFramework;
+
+        // Bei Tests läuft das Test-Binary in src\Softwareschmiede.Tests\bin\<Config>\<tfm>\;
+        // das App-Binary liegt im selben src-Verzeichnis unter Softwareschmiede.App\bin\<Config>\<tfm>\
         var candidates = new[]
         {
             Path.GetFullPath(Path.Combine(
                 baseDir,
                 "..", "..", "..", "..",
                 "Softwareschmiede.App", "bin", BuildConfigDebug,
-                TargetFramework,
+                targetFramework,
                 "Softwareschmiede.App.exe")),
             Path.GetFullPath(Path.Combine(
                 baseDir,
                 "..", "..", "..", "..",
                 "Softwareschmiede.App", "bin", BuildConfigRelease,
-                TargetFramework,
+                targetFramework,
                 "Softwareschmiede.App.exe")),
         };
 
