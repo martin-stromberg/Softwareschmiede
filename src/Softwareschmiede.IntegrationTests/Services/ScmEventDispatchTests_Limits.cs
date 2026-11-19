@@ -344,4 +344,85 @@ public sealed class ScmEventDispatchTests_Limits
         Assert.True(fixture.Responses.Count > responsesBefore);
         Assert.Single(fixture.Sessions);
     }
+
+    /// <summary>Eine pausierte Aufgabe gibt ihren globalen Ausführungsplatz frei: Der
+    /// laufende Prozess bleibt erhalten, aber das wartende Ereignis startet sofort.</summary>
+    [Fact]
+    public async Task Dispatch_TaskPaused_SlotFreed_WaitingEventStarts()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+        var (firstTask, firstId) = await fixture.AddAsync(configured: true);
+        var (_, secondId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(firstId);
+        await fixture.DispatchAsync(secondId);
+        Assert.Equal("Wartend", (await fixture.EventAsync(secondId)).Status);
+
+        using (var scope = fixture.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<AufgabeService>()
+                .SetPauseAsync(firstTask, DateTimeOffset.UtcNow.AddMinutes(30), TestContext.Current.CancellationToken);
+        }
+        await fixture.DispatchAsync(secondId);
+
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(secondId)).Status);
+        Assert.Equal(2, fixture.Sessions.Count);
+        Assert.True(fixture.Cli.IsRunning(firstTask));
+    }
+
+    /// <summary>Eine pausierte Aufgabe gibt auch den Plugin-Platz frei: Das wartende
+    /// Ereignis desselben Plugins startet, obwohl der Prozess weiterläuft.</summary>
+    [Fact]
+    public async Task Dispatch_TaskPaused_PluginSlotFreed_WaitingEventStarts()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(ScmDispatchFixture.KiPrefix), "1");
+        var (firstTask, firstId) = await fixture.AddAsync(configured: true);
+        var (_, secondId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(firstId);
+        await fixture.DispatchAsync(secondId);
+        var second = await fixture.EventAsync(secondId);
+        Assert.Equal("Wartend", second.Status);
+        Assert.Contains($"'{ScmDispatchFixture.KiPrefix}'", second.Reason);
+
+        using (var scope = fixture.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<AufgabeService>()
+                .SetPauseAsync(firstTask, DateTimeOffset.UtcNow.AddMinutes(30), TestContext.Current.CancellationToken);
+        }
+        await fixture.DispatchAsync(secondId);
+
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(secondId)).Status);
+        Assert.Equal(2, fixture.Sessions.Count);
+    }
+
+    /// <summary>Eine abgelaufene, aber noch gesetzte Pausenzeit belegt den Platz weiterhin —
+    /// bei weiterlaufendem Prozess wartet das zweite Ereignis mit Limit-Grund.</summary>
+    [Fact]
+    public async Task Dispatch_TaskPauseExpired_SlotStillOccupied()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+        var (firstTask, firstId) = await fixture.AddAsync(configured: true);
+        var (_, secondId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(firstId);
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(firstId)).Status);
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            await db.Aufgaben.Where(x => x.Id == firstTask)
+                .ExecuteUpdateAsync(x => x.SetProperty(p => p.PausiertBisUtc, DateTimeOffset.UtcNow.AddMinutes(-5)),
+                    cancellationToken: TestContext.Current.CancellationToken);
+        }
+
+        await fixture.DispatchAsync(secondId);
+
+        var second = await fixture.EventAsync(secondId);
+        Assert.Equal("Wartend", second.Status);
+        Assert.Contains("globale Limit", second.Reason);
+        Assert.Single(fixture.Sessions);
+    }
 }

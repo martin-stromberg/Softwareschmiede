@@ -3,9 +3,12 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Application.Services;
 
-/// <summary>Belegung laufender CLI-Ausführungen für die Ausführungsbegrenzung.</summary>
-/// <param name="Global">Anzahl aller Aufgaben mit laufender CLI-Ausführung.</param>
-/// <param name="ProPlugin">Anzahl laufender Ausführungen je zugeordnetem KI-Plugin-Prefix.</param>
+/// <summary>Belegung laufender CLI-Ausführungen für die Ausführungsbegrenzung.
+/// Pausierte Aufgaben (<c>Aufgabe.PausiertBisUtc</c> in der Zukunft) belegen trotz
+/// weiterlaufendem Prozess keinen Platz und fehlen in beiden Zählern.</summary>
+/// <param name="Global">Anzahl aller Aufgaben mit laufender, nicht pausierter CLI-Ausführung
+/// (inklusive laufender Handles ohne auflösbare Aufgabenzeile).</param>
+/// <param name="ProPlugin">Anzahl laufender, nicht pausierter Ausführungen je zugeordnetem KI-Plugin-Prefix.</param>
 public sealed record CliAusfuehrungsBelegung(int Global, IReadOnlyDictionary<string, int> ProPlugin)
 {
     /// <summary>Anzahl laufender Ausführungen, die dem angegebenen Plugin-Prefix zugeordnet sind.</summary>
@@ -38,13 +41,15 @@ public sealed record CliStartPlatzZulassung(string? Wartegrund, IDisposable? Res
 /// Reservierung wird nach erfolgreicher Handle-Registrierung von der echten Laufzählung
 /// abgelöst, bei jedem Fehlschlag vor dem Start freigegeben und verfällt spätestens nach
 /// <see cref="ReservierungsLebensdauer"/>, falls der Start hängenbleibt. Reservierungen liegen
-/// prozessweit (der Service selbst ist scoped), damit alle Dispatch-Pfade denselben Bestand sehen.
+/// im <see cref="ScmStartPlatzReservierungsPool"/> (DI-Singleton; der Service selbst ist scoped),
+/// damit alle Dispatch-Pfade desselben Providers denselben Bestand sehen.
 /// </remarks>
 public sealed class ScmEventExecutionLimitService(
     SoftwareschmiededDbContext db,
     AppEinstellungService einstellungen,
     ICliExecutionLimitSource cli,
-    TimeProvider time)
+    TimeProvider time,
+    ScmStartPlatzReservierungsPool reservierungsPool)
 {
     /// <summary>Einstellungsschlüssel des globalen Limits paralleler CLI-Ausführungen.</summary>
     public const string GlobalLimitKey = "scm.execution.maxparallel";
@@ -55,15 +60,6 @@ public sealed class ScmEventExecutionLimitService(
     /// <summary>Lebensdauer einer Startplatz-Reservierung; danach verfällt der Platz,
     /// falls der Start zwischen Reservierung und Handle-Registrierung hängenbleibt.</summary>
     internal static readonly TimeSpan ReservierungsLebensdauer = TimeSpan.FromMinutes(5);
-
-    // Prozessweiter Bestand und Sperren: Der Service ist scoped, die Zulassung muss aber
-    // über alle DI-Scopes und Dispatch-Pfade hinweg denselben Platzbestand sehen.
-    // ZulassungsGate serialisiert den gesamten Check-und-Claim-Abschnitt über die
-    // Belegungsabfrage hinweg; ReservierungenSync schützt die Map selbst, damit die
-    // Freigabe in Dispose non-blocking bleibt (kein Warten auf dem UI-Kontext).
-    private static readonly SemaphoreSlim ZulassungsGate = new(1, 1);
-    private static readonly object ReservierungenSync = new();
-    private static readonly Dictionary<Guid, StartPlatzReservierung> Reservierungen = new();
 
     /// <summary>Einstellungsschlüssel des Parallel-Limits eines konkreten KI-Plugins.</summary>
     /// <param name="pluginPrefix">KI-Plugin-Prefix.</param>
@@ -87,7 +83,7 @@ public sealed class ScmEventExecutionLimitService(
         var (globalLimit, pluginLimit) = await GetLimitsAsync(pluginPrefix, ct);
         if (globalLimit is null && pluginLimit is null)
             return new CliStartPlatzZulassung(null, null);
-        await ZulassungsGate.WaitAsync(ct);
+        await reservierungsPool.ZulassungsGate.WaitAsync(ct);
         try
         {
             // Check + Claim unter derselben Sperre: Auch die Handle-Belegung wird erst hier
@@ -97,15 +93,13 @@ public sealed class ScmEventExecutionLimitService(
             var wartegrund = GetStartBlockReason(pluginPrefix, globalLimit, pluginLimit, await WirksameBelegungAsync(ct));
             if (wartegrund is not null)
                 return new CliStartPlatzZulassung(wartegrund, null);
-            var reservierung = new StartPlatzReservierung(pluginPrefix,
+            var reservierung = reservierungsPool.Reservieren(pluginPrefix,
                 time.GetUtcNow().ToUnixTimeMilliseconds() + (long)ReservierungsLebensdauer.TotalMilliseconds);
-            lock (ReservierungenSync)
-                Reservierungen[reservierung.Id] = reservierung;
             return new CliStartPlatzZulassung(null, reservierung);
         }
         finally
         {
-            ZulassungsGate.Release();
+            reservierungsPool.ZulassungsGate.Release();
         }
     }
 
@@ -125,14 +119,14 @@ public sealed class ScmEventExecutionLimitService(
         var (globalLimit, pluginLimit) = await GetLimitsAsync(pluginPrefix, ct);
         if (globalLimit is null && pluginLimit is null)
             return null;
-        await ZulassungsGate.WaitAsync(ct);
+        await reservierungsPool.ZulassungsGate.WaitAsync(ct);
         try
         {
             return GetStartBlockReason(pluginPrefix, globalLimit, pluginLimit, await WirksameBelegungAsync(ct));
         }
         finally
         {
-            ZulassungsGate.Release();
+            reservierungsPool.ZulassungsGate.Release();
         }
     }
 
@@ -152,13 +146,6 @@ public sealed class ScmEventExecutionLimitService(
         return null;
     }
 
-    /// <summary>Test-Hilfsmittel: Gibt alle offenen Reservierungen prozessweit frei.</summary>
-    internal static void ReservierungenZuruecksetzen()
-    {
-        lock (ReservierungenSync)
-            Reservierungen.Clear();
-    }
-
     /// <summary>Liest beide wirksamen Grenzen für einen Prefix in einem einzigen Einstellungszugriff.</summary>
     private async Task<(int? Global, int? Plugin)> GetLimitsAsync(string? pluginPrefix, CancellationToken ct)
     {
@@ -174,18 +161,12 @@ public sealed class ScmEventExecutionLimitService(
     }
 
     /// <summary>Handle-Belegung plus offene Reservierungen; verfallene Reservierungen werden
-    /// vor der Zählung entfernt. Muss unter <see cref="ZulassungsGate"/> aufgerufen werden.</summary>
+    /// vor der Zählung entfernt. Muss unter <see cref="ScmStartPlatzReservierungsPool.ZulassungsGate"/>
+    /// aufgerufen werden.</summary>
     private async Task<CliAusfuehrungsBelegung> WirksameBelegungAsync(CancellationToken ct)
     {
         var belegung = await GetBelegungAsync(ct);
-        List<StartPlatzReservierung> aktive;
-        lock (ReservierungenSync)
-        {
-            var jetzt = time.GetUtcNow().ToUnixTimeMilliseconds();
-            foreach (var id in Reservierungen.Where(x => x.Value.GueltigBisUtcMs <= jetzt).Select(x => x.Key).ToList())
-                Reservierungen.Remove(id);
-            aktive = Reservierungen.Values.ToList();
-        }
+        var aktive = reservierungsPool.AktiveReservierungen(time.GetUtcNow().ToUnixTimeMilliseconds());
         if (aktive.Count == 0)
             return belegung;
         var proPlugin = new Dictionary<string, int>(belegung.ProPlugin, StringComparer.OrdinalIgnoreCase);
@@ -201,17 +182,23 @@ public sealed class ScmEventExecutionLimitService(
     private static int? ParseLimit(string? wert)
         => int.TryParse(wert, out var limit) && limit >= 1 ? limit : null;
 
+    /// <summary>Zählt die laufenden CLI-Handles global und je Plugin. Pausierte Aufgaben
+    /// (<c>PausiertBisUtc</c> in der Zukunft — ihr Prozess läuft bewusst weiter) belegen keinen
+    /// Platz und werden vor der globalen Zählung und der Plugin-Attribution herausgefiltert;
+    /// abgelaufene oder fehlende Pausenzeiten sowie Handles ohne Aufgabenzeile zählen voll.</summary>
     private async Task<CliAusfuehrungsBelegung> GetBelegungAsync(CancellationToken ct)
     {
         var laufendeIds = cli.GetLaufendeAufgabenIds();
         if (laufendeIds.Count == 0)
             return new(0, new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
-        var prefixes = await db.Aufgaben.AsNoTracking()
+        var aufgaben = await db.Aufgaben.AsNoTracking()
             .Where(x => laufendeIds.Contains(x.Id))
-            .Select(x => new { x.Id, x.KiPluginPrefix })
+            .Select(x => new { x.Id, x.KiPluginPrefix, x.PausiertBisUtc })
             .ToListAsync(ct);
+        var jetzt = time.GetUtcNow();
+        var aktive = aufgaben.Where(x => !x.PausiertBisUtc.IstAktuellPausiert(jetzt)).ToList();
         var proPlugin = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var aufgabe in prefixes)
+        foreach (var aufgabe in aktive)
         {
             var session = cli.GetScmPromptSession(aufgabe.Id);
             var prefix = session?.IsAlive == true && !string.IsNullOrWhiteSpace(session.PluginPrefix)
@@ -221,22 +208,8 @@ public sealed class ScmEventExecutionLimitService(
             proPlugin.TryGetValue(prefix, out var anzahl);
             proPlugin[prefix] = anzahl + 1;
         }
-        return new(laufendeIds.Count, proPlugin);
-    }
-
-    /// <summary>Reservierter Startplatz; die Freigabe über <see cref="Dispose"/> entfernt den
-    /// Platz aus der Zählung, sobald die echte Laufzählung ihn übernommen hat oder der Start
-    /// fehlgeschlagen ist. Die Freigabe ist bewusst non-blocking (kurzer Lock, kein Warten).</summary>
-    private sealed class StartPlatzReservierung(string pluginPrefix, long gueltigBisUtcMs) : IDisposable
-    {
-        public Guid Id { get; } = Guid.NewGuid();
-        public string PluginPrefix { get; } = pluginPrefix;
-        public long GueltigBisUtcMs { get; } = gueltigBisUtcMs;
-
-        public void Dispose()
-        {
-            lock (ReservierungenSync)
-                Reservierungen.Remove(Id);
-        }
+        // Global = aktive Aufgaben plus laufende Handles ohne auflösbare Aufgabenzeile
+        // (letztere haben kein PausiertBisUtc und zählen bewusst weiterhin voll).
+        return new(aktive.Count + (laufendeIds.Count - aufgaben.Count), proPlugin);
     }
 }

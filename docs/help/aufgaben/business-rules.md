@@ -251,14 +251,15 @@
 - Beim Setzen muss der gewählte Zeitpunkt in der Zukunft liegen; `null` hebt die Pause auf.
 
 **Verhalten:**
-- Eine Aufgabe gilt als pausiert, solange `PausiertBisUtc > UtcNow` gilt; abgelaufene Werte wirken nicht mehr (passives Ablaufen, kein Status-Übergang, kein automatischer Restart).
+- Eine Aufgabe gilt als pausiert, solange `PausiertBisUtc > UtcNow` gilt; abgelaufene Werte wirken nicht mehr (passives Ablaufen, kein Status-Übergang, kein automatischer Restart). Das Kriterium ist in der Extension `KiAusfuehrungsStatusKlassifikation.IstAktuellPausiert` als Referenzdefinition gebündelt — alle Pausen-Auswertungen (Kachel-Klassifikation, Start-/Neustart-Guards, Recovery, SCM-Limit-Belegung, SCM-Dispatch-`BlockReason`) verwenden dieselbe Prüfung `pausiertBisUtc > jetzt` (striktes Größer-als; `null` und abgelaufene Zeitpunkte gelten als nicht pausiert).
 - Während einer aktiven Pause sind blockiert: Prozessstart, CLI-Neustart (inkl. Plugin-Wechsel-Pfad), automatische und manuelle Recovery, Senden und Planen von Prompts über die Detailansicht.
 - Ein bereits geplanter Prompt wird auf das Pausenende verschoben statt verworfen.
 - Ein laufender CLI-Prozess wird niemals durch die Pause unterbrochen.
+- Eine pausierte Aufgabe belegt keinen Platz in der SCM-Ausführungsbegrenzung — weder im globalen Zähler noch im Plugin-Zähler: `ScmEventExecutionLimitService.GetBelegungAsync` filtert sie trotz weiterlaufendem Prozess heraus; das nächste wartende SCM-Ereignis kann den frei werdenden Platz über die ereignisgesteuerte Startprüfung sofort übernehmen (Details: [GitHub-Ereignisüberwachung — Business Rules](../plugins/github-ereignisse/business-rules.md)). Nach Ablauf der Pause zählt die Aufgabe wieder als belegt.
 - UI: Buttons werden deaktiviert (`KannPausieren`, `!IstPausiert` in den CanExecute-Prüfungen); die Seitenleisten-Kachel zeigt das `⏸`-Glyph mit `Opacity = 0.55` (Countdown-Volltext im Tooltip/`HelpText`); im Ribbon steht `⏸ Pausiert bis …`.
-- Jede Setzen-/Aufheben-Operation schreibt einen `ProtokollTyp.SystemMeldung`-Eintrag.
+- Jede Setzen-/Aufheben-Operation schreibt einen `ProtokollTyp.SystemMeldung`-Eintrag und fordert anschließend die ereignisgesteuerte SCM-Startprüfung an (`ScmStartPruefungsAusloeser`), damit ein frei werdender Ausführungsplatz ohne Poll-Durchlauf nachgefüllt wird.
 
-**Umsetzung:** `AufgabeService.SetPauseAsync`, `EntwicklungsprozessService.WirfWennPausiert`, `AufgabeRecoveryService`, `PromptZeitVersandService`, `TaskDetailViewModel.PauseEinstellenAsync`, `AufgabePausierenDialogViewModel`, `KiAusfuehrungsStatusConverter`.
+**Umsetzung:** `AufgabeService.SetPauseAsync`, `EntwicklungsprozessService.WirfWennPausiert`, `AufgabeRecoveryService`, `PromptZeitVersandService`, `TaskDetailViewModel.PauseEinstellenAsync`, `AufgabePausierenDialogViewModel`, `KiAusfuehrungsStatusConverter`, `KiAusfuehrungsStatusKlassifikation.IstAktuellPausiert` (Referenz-Pausenkriterium), `ScmStartPruefungsAusloeser`.
 
 ---
 

@@ -182,6 +182,9 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddScoped<ScmEventStore>();
         services.AddScoped<ScmEventOutbox>();
         services.AddScoped<ScmEventOrchestrator>();
+        // Jede Fixture erhält einen eigenen Reservierungsbestand — dadurch sind die
+        // Reservierungen der Fixture vollständig von parallel laufenden Tests isoliert.
+        services.AddSingleton<ScmStartPlatzReservierungsPool>();
         services.AddScoped<ScmEventExecutionLimitService>();
         services.AddScoped<ScmEventTaskResolver>();
         services.AddScoped<ScmIssueAufbereitungsService>();

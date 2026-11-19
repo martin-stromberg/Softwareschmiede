@@ -22,6 +22,9 @@ public partial class End2EndTest
     private Task ReplayText_MarkAndCopyViaMouse(Window mainWindow)
         => ReplayText_MitFrischerAufzeichnung(mainWindow, "E2E-Textauswahl-Maus", dialog =>
         {
+            // Die Kopier-Geste läuft in der gestarteten App — das Lock deckt die komplette
+            // Region ab, damit keine parallele Test-Collection die Zwischenablage belegt.
+            using var _ = ClipboardTestLock.Halten();
             // UIA kann den Custom-Renderer nicht lesen. Daher wird das gleiche Zellrechteck
             // vor und nach dem echten Mausdrag aufgenommen; genügend abweichende Pixel belegen
             // das vom TerminalControl gezeichnete Auswahl-Overlay statt nur dessen Zustand.
@@ -41,6 +44,9 @@ public partial class End2EndTest
     private Task ReplayText_CopyShortcutWithFocusedSelection(Window mainWindow)
         => ReplayText_MitFrischerAufzeichnung(mainWindow, "E2E-Textauswahl-Tastatur", dialog =>
         {
+            // Die Kopier-Geste läuft in der gestarteten App — das Lock deckt die komplette
+            // Region ab, damit keine parallele Test-Collection die Zwischenablage belegt.
+            using var _ = ClipboardTestLock.Halten();
             // Der Sentinel belegt, dass Ctrl+Shift+C den Clipboard-Inhalt wirklich ersetzt.
             SetClipboardText("E2E-Clipboard-vor-Tastaturkopie");
             dialog.MarkiereReplayZellen(0, 0, 0, "erste Zeile".Length - 1, 80, 24);
@@ -110,27 +116,19 @@ public partial class End2EndTest
     {
         // Die Windows-Zwischenablage kann kurz nach Ctrl+Shift+C noch belegt sein.
         // Begrenzte Wiederholungen halten den E2E-Test robust, ohne Fehler zu verstecken.
-        Exception? lastError = null;
-        for (var attempt = 0; attempt < 5; attempt++)
+        string? text = null;
+        Exception? error = null;
+        var thread = new Thread(() =>
         {
-            string? text = null;
-            Exception? error = null;
-            var thread = new Thread(() =>
-            {
-                try { text = System.Windows.Clipboard.GetText(); }
-                catch (Exception ex) { error = ex; }
-            });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
-            if (error is null)
-                return text ?? string.Empty;
-
-            lastError = error;
-            Thread.Sleep(100);
-        }
-
-        throw new InvalidOperationException("Die Zwischenablage konnte nach 5 Versuchen nicht gelesen werden.", lastError);
+            try { text = ClipboardTestHelfer.GetTextMitRetry(); }
+            catch (Exception ex) { error = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null)
+            throw error;
+        return text ?? string.Empty;
     }
 
     /// <summary>

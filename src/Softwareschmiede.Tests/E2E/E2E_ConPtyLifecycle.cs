@@ -228,18 +228,23 @@ public partial class End2EndTest
         // Vergleich des berechneten Zellrechtecks belegt daher das echte Auswahl-Overlay, ohne
         // eine helle Textzeile im Screenshot suchen zu müssen.
         var vorAuswahl = taskDetail.ErfasseLiveZellPixel(geometry, markerViewportRow, 0, markerEndCol);
-        SetClipboardText("E2E-Live-Clipboard-vor-Kopie");
-        taskDetail.MarkiereLiveTerminalZeile(geometry, markerViewportRow, 0, markerEndCol);
-        var nachAuswahl = taskDetail.ErfasseLiveZellPixel(geometry, markerViewportRow, 0, markerEndCol);
-        Assert.True(KonsolenTestDialogView.ZaehleAbweichendeReplayPixel(vorAuswahl, nachAuswahl) > 100,
-            "der Mausdrag muss im echten Live-Terminal ein sichtbares Auswahl-Overlay zeichnen");
+        // Das Lock deckt Setzen, die in der App laufende Kopier-Geste und den Read-back ab —
+        // eine parallele Test-Collection darf die systemweite Zwischenablage nicht dazwischen belegen.
+        using (ClipboardTestLock.Halten())
+        {
+            SetClipboardText("E2E-Live-Clipboard-vor-Kopie");
+            taskDetail.MarkiereLiveTerminalZeile(geometry, markerViewportRow, 0, markerEndCol);
+            var nachAuswahl = taskDetail.ErfasseLiveZellPixel(geometry, markerViewportRow, 0, markerEndCol);
+            Assert.True(KonsolenTestDialogView.ZaehleAbweichendeReplayPixel(vorAuswahl, nachAuswahl) > 100,
+                "der Mausdrag muss im echten Live-Terminal ein sichtbares Auswahl-Overlay zeichnen");
 
-        taskDetail.KopiereLiveAuswahl();
-        var copiedMarker = GetClipboardText();
-        Assert.True(string.Equals(marker, copiedMarker, StringComparison.Ordinal),
-            $"die Auswahl muss den Marker kopieren (tatsächlich '{copiedMarker}'). "
-            + $"Viewport: Start={geometry.StartRow}, Rows={geometry.Rows}, Cursor={geometry.CursorRow}:{geometry.CursorColumn}, "
-            + $"MarkerViewportRow={markerViewportRow}, Cell={geometry.CellWidth:F3}x{geometry.CellHeight:F3}, Bounds={geometry.Rect}.");
+            taskDetail.KopiereLiveAuswahl();
+            var copiedMarker = GetClipboardText();
+            Assert.True(string.Equals(marker, copiedMarker, StringComparison.Ordinal),
+                $"die Auswahl muss den Marker kopieren (tatsächlich '{copiedMarker}'). "
+                + $"Viewport: Start={geometry.StartRow}, Rows={geometry.Rows}, Cursor={geometry.CursorRow}:{geometry.CursorColumn}, "
+                + $"MarkerViewportRow={markerViewportRow}, Cell={geometry.CellWidth:F3}x{geometry.CellHeight:F3}, Bounds={geometry.Rect}.");
+        }
 
         // Ausgabe auf einer anderen, aktuellen Promptzeile darf eine gültige Auswahl nicht
         // verwerfen. Der erneute Clipboard-Nachweis vermeidet eine Prüfung bloßer UI-Zustände.
@@ -304,13 +309,19 @@ public partial class End2EndTest
     private async Task ConPtyPaste_CtrlVFuegtEchoBefehlEin_E2E(Window mainWindow, TaskDetailView taskDetail)
     {
         var marker = $"E2E_PASTE_{Guid.NewGuid():N}";
-        SetClipboardText($"echo {marker}");
+        // Das Lock wird bis zum Nachweis des eingefügten Befehls gehalten: ein paralleler
+        // Clipboard-Write einer anderen Test-Collection zwischen Setzen und dem Paste-Read
+        // der App würde sonst fremden Text einfügen.
+        using (ClipboardTestLock.Halten())
+        {
+            SetClipboardText($"echo {marker}");
 
-        mainWindow.ClickInForeground();
-        Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_V);
-        Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
+            mainWindow.ClickInForeground();
+            Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_V);
+            Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
 
-        await WarteAufCliOutputAsync(marker);
+            await WarteAufCliOutputAsync(marker);
+        }
 
         Assert.False(new ErrorView(mainWindow).IsVisible);
         Assert.True(taskDetail.IsCliRunning());
@@ -422,19 +433,16 @@ public partial class End2EndTest
             // Clipboard kann unmittelbar nach dem Schließen einer UIA-/Screenshot-Operation
             // noch kurz einem anderen Prozess gehören. Die begrenzte Wiederholung ist Teil
             // der E2E-Infrastruktur und verhindert, dass ein echter Produktnachweis daran
-            // scheitert.
-            for (var attempt = 0; attempt < 5; attempt++)
+            // scheitert. Externe Halter (Clipboard-Manager, rdpclip, Sync-Tools) hält das
+            // großzügigere Budget von SetTextMitRetry aus — bei Erschöpfung nennt die
+            // Exception den haltenden Prozess.
+            try
             {
-                try
-                {
-                    System.Windows.Clipboard.SetText(text);
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    fehler = ex;
-                    Thread.Sleep(50);
-                }
+                ClipboardTestHelfer.SetTextMitRetry(text);
+            }
+            catch (Exception ex)
+            {
+                fehler = ex;
             }
         });
         thread.SetApartmentState(ApartmentState.STA);

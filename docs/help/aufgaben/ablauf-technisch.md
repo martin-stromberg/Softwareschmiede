@@ -478,7 +478,7 @@ Beteiligte Komponenten:
 - `AufgabePausierenDialogViewModel` — Dialog-Zustand: `PausiertDatum`/`PausiertStunde`/`PausiertMinute` (Vorbelegung: `GetLocalNow().AddMinutes(1)`, da die laufende Minute durch den Sekundenabschnitt bereits in der Vergangenheit läge), `AktuellePauseAnzeige`, `IstAktuellPausiert`, `ValidierungsFehler`/`KannBestaetigen`; `Initialize(aktuellePauseUtc)` übernimmt eine bestehende Pause als Vorbelegung
 - `AufgabePausierenErgebnis` — Record mit `PausiertBisUtc` und `Aufheben`
 - `IDialogService.ShowAufgabePausierenDialogAsync` / `WpfDialogService` — zeigt `AufgabePausierenDialog` modal über `ShowDialogAsync`
-- `AufgabeService.SetPauseAsync` — persistiert `Aufgabe.PausiertBisUtc` (oder `null` zum Aufheben) mit Validierung und `ProtokollTyp.SystemMeldung`-Eintrag
+- `AufgabeService.SetPauseAsync` — persistiert `Aufgabe.PausiertBisUtc` (oder `null` zum Aufheben) mit Validierung und `ProtokollTyp.SystemMeldung`-Eintrag; fordert anschließend über `ScmStartPruefungsAusloeser` die SCM-Startprüfung an (frei werdender Ausführungsplatz)
 - `AufgabeLaufdatenChangedNotifier` — löst die sofortige Aktualisierung der Seitenleisten-Kachel aus
 
 Ablauf:
@@ -512,12 +512,13 @@ Ablauf:
 
 ### 5.7. Blockade-Pfade bei aktiver Pause
 
-Eine aktive Pause (`PausiertBisUtc > UtcNow`) blockiert neu ausgelöste Aktionen an mehreren Stellen; laufende Prozesse werden nie angefasst:
+Eine aktive Pause (`PausiertBisUtc > UtcNow`, Referenzkriterium `KiAusfuehrungsStatusKlassifikation.IstAktuellPausiert`) blockiert neu ausgelöste Aktionen an mehreren Stellen; laufende Prozesse werden nie angefasst:
 
 - **Manueller Start / Neustart:** `EntwicklungsprozessService.ProzessStartenAsync`, `ProzessStartenUndCliStartenAsync` und `CliNeustartenAsync` rufen nach dem Laden der Aufgabe `WirfWennPausiert` auf → `InvalidOperationException` („Die Aufgabe ist bis … pausiert."). Der Guard in `ProzessStartenUndCliStartenAsync` steht bewusst vor dem `try`-Block, damit die Pause nicht den Rollback-Pfad (Klon löschen, Status-Reset) auslöst. `CliNeustartenAsync` deckt auch den Plugin-Wechsel-Pfad (`PluginWechselAsync`) ab. In der UI verhindern `StartenCommand`, `KannCliNeuStarten`, `KannPromptVorlageSenden` und `KannPromptPlanen` die Aktionen bereits über `!IstPausiert`.
 - **Recovery:** `AufgabeRecoveryService.ScanForRecoveryCandidatesAsync` filtert Aufgaben mit zukünftigem `PausiertBisUtc` aus; `RecoverManuellAsync` lehnt mit `TaskRecoveryRejected ReasonCode=Paused` und `InvalidOperationException` ab.
 - **Zeitgesteuerte Prompts:** `PromptZeitVersandService` lädt über die optionale `IServiceScopeFactory` + `AufgabeService` den aktuellen `PausiertBisUtc`-Wert — sowohl in `SchedulePromptAsync` (Verschiebung der Zielzeit auf das Pausenende, falls später) als auch in `HandleTimerElapsedAsync` (Timer wird mit `timer.Change(pausiertBis - now)` neu auf das Pausenende scharf gemacht statt zu senden; die `TargetTime` in `ScheduledPromptInfo` und der persistierte `ZielZeitpunktUtc` via `ZeitgesteuerterPromptStore.UpdateZielZeitpunktAsync` werden mitaktualisiert). Beim Re-Arm (`RestoreScheduledPromptsAsync`) wird eine aktive Pause jenseits der Zielzeit ebenfalls vorverlegt. Zwischenzeitlich neu geplante Prompts gewinnen (`_scheduledPrompts.ContainsKey`-Prüfung). Ohne Scope-Factory (Unit-Tests) entfällt die Prüfung.
 - **Pausen-Ende:** Rein zeitbasiert — `PausiertBisUtc <= UtcNow` macht alle Guards wirkungslos; der Zeitstempel verbleibt inert in der Datenbank. Es gibt keinen automatischen Restart.
+- **Gegenläufige Wirkung auf die SCM-Ausführungsbegrenzung:** Dieselbe Pausenprüfung wirkt freigebend in `ScmEventExecutionLimitService.GetBelegungAsync` — eine pausierte Aufgabe zählt weder in den globalen noch in den Plugin-Zähler, obwohl ihr Prozess weiterläuft; `ICliExecutionLimitSource`/`GetLaufendeAufgabenIds` bleiben davon bewusst unberührt (geteilter „laufender Prozess"-Vertrag für `CliProcessManager.AbgleichAsync`, `IsRunning`, Statusanzeige und Auto-Shutdown). Da `SetPauseAsync` die Startprüfung anfordert, füllt ein wartendes SCM-Ereignis den Platz ohne Poll-Durchlauf nach (Details: [GitHub-Ereignisüberwachung — Technischer Ablauf](../plugins/github-ereignisse/ablauf-technisch.md)).
 
 ### 5.1. Aktiver CLI-Name in der Fußzeile
 

@@ -986,7 +986,7 @@ public sealed class EntwicklungsprozessService
 
     private static void WirfWennPausiert(Aufgabe aufgabe)
     {
-        if (aufgabe.PausiertBisUtc is { } pausiertBis && pausiertBis > DateTimeOffset.UtcNow)
+        if (aufgabe.PausiertBisUtc is { } pausiertBis && aufgabe.PausiertBisUtc.IstAktuellPausiert(DateTimeOffset.UtcNow))
         {
             throw new InvalidOperationException(
                 $"Die Aufgabe ist bis {pausiertBis.ToLocalTime():dd.MM.yyyy HH:mm:ss} pausiert.");
