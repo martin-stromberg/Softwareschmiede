@@ -19,17 +19,17 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     private readonly AppEinstellungService _einstellungen;
     private readonly Mock<ICliExecutionLimitSource> _cli;
     private readonly ScmEventExecutionLimitService _sut;
+    private readonly ScmStartPlatzReservierungsPool _pool = new();
     private readonly Guid _projektId = new Guid("77777777-7777-7777-7777-777777777777");
 
     /// <summary>ScmEventExecutionLimitServiceTests.</summary>
     public ScmEventExecutionLimitServiceTests()
     {
-        ScmEventExecutionLimitService.ReservierungenZuruecksetzen();
         _db = TestDbContextFactory.Create();
         _einstellungen = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
         _cli = new Mock<ICliExecutionLimitSource>();
         _cli.Setup(x => x.GetLaufendeAufgabenIds()).Returns([]);
-        _sut = new ScmEventExecutionLimitService(_db, _einstellungen, _cli.Object, TimeProvider.System);
+        _sut = new ScmEventExecutionLimitService(_db, _einstellungen, _cli.Object, TimeProvider.System, _pool);
 
         _db.Projekte.Add(new Projekt
         {
@@ -44,7 +44,6 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        ScmEventExecutionLimitService.ReservierungenZuruecksetzen();
         _db.Dispose();
     }
 
@@ -291,7 +290,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
             var db = TestDbContextFactory.Create();
             var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
             einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1").GetAwaiter().GetResult();
-            return (Dienst: new ScmEventExecutionLimitService(db, einstellungen, _cli.Object, TimeProvider.System), Db: db);
+            return (Dienst: new ScmEventExecutionLimitService(db, einstellungen, _cli.Object, TimeProvider.System, _pool), Db: db);
         }).ToList();
         try
         {
@@ -319,7 +318,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     public async Task PruefeUndReserviereStartPlatzAsync_Reservierung_VerfaelltNachLebensdauer()
     {
         var zeit = new FakeTimeProvider();
-        var sut = new ScmEventExecutionLimitService(_db, _einstellungen, _cli.Object, zeit);
+        var sut = new ScmEventExecutionLimitService(_db, _einstellungen, _cli.Object, zeit, _pool);
         await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
 
         var hängende = await sut.PruefeUndReserviereStartPlatzAsync(PrefixA, TestContext.Current.CancellationToken);

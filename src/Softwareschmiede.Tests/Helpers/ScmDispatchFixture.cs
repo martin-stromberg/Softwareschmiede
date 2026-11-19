@@ -182,6 +182,9 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddScoped<ScmEventStore>();
         services.AddScoped<ScmEventOutbox>();
         services.AddScoped<ScmEventOrchestrator>();
+        // Jede Fixture erhält einen eigenen Reservierungsbestand — dadurch sind die
+        // Reservierungen der Fixture vollständig von parallel laufenden Tests isoliert.
+        services.AddSingleton<ScmStartPlatzReservierungsPool>();
         services.AddScoped<ScmEventExecutionLimitService>();
         services.AddScoped<ScmEventTaskResolver>();
         services.AddScoped<ScmIssueAufbereitungsService>();
@@ -195,10 +198,6 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
 
     internal async Task InitializeAsync()
     {
-        // Der Reservierungsbestand des ScmEventExecutionLimitService ist prozessweit statisch:
-        // zurückgelassene Reservierungen parallel laufender oder abgebrochener Tests dürfen die
-        // Belegungszählung dieses Laufs nicht verfälschen.
-        ScmEventExecutionLimitService.ReservierungenZuruecksetzen();
         using var scope = Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Database.EnsureCreatedAsync();
         Services.GetRequiredService<ScmEventStartupGate>().Ready();
