@@ -52,11 +52,88 @@ public sealed class ScmIssueAufbereitungsService(
     public static string AufbereitungsEventKey(ScmEventObservation observation)
         => $"{observation.ContentKey}/{Zweck}";
 
+    /// <summary>Checkpoint-Schlüssel der abgeschlossenen Aufbereitungs-Auswertung einer Issue-Referenz
+    /// (<c>issueaufbereitung-issue/{provider}/{host}/{repoId}/{number}</c>) — das authoritative
+    /// „bereits ausgewertet"-Kriterium beider Erkennungspfade (Muster: der
+    /// <c>backmerge/{provider}/{host}/{repoId}/{nummer}</c>-Präzedenzfall). Der Endzustand ist
+    /// <see cref="ScmObservationCheckpoint.NextAttemptUtc"/> = <see cref="long.MaxValue"/> ohne
+    /// offenen Fehler.</summary>
+    /// <param name="reference">Die Issue-Referenz.</param>
+    public static string AuswertungsCheckpointKey(ScmEventReference reference)
+        => string.Join('/', new[] { "issueaufbereitung-issue", reference.Repository.ProviderPrefix.ToLowerInvariant(),
+            reference.Repository.Host.ToLowerInvariant(), reference.Repository.RepositoryId,
+            reference.Number.ToString(System.Globalization.CultureInfo.InvariantCulture) }
+            .Select(Uri.EscapeDataString));
+
+    /// <summary>Prüft das „bereits ausgewertet"-Kriterium beider Erkennungspfade: Der
+    /// je-Issue-Checkpoint (<see cref="AuswertungsCheckpointKey"/>) ist vorhanden ohne offenen
+    /// Fehler, oder sein Fehler-Backoff ist noch nicht erreicht — in beiden Fällen entfällt der
+    /// Beschreibungs-Read (Rate-Limit-Schonung).</summary>
+    /// <param name="reference">Die Issue-Referenz.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    internal async Task<bool> AuswertungUeberspringenAsync(ScmEventReference reference, CancellationToken ct)
+    {
+        var checkpoint = await db.ScmObservationCheckpoints.FindAsync([AuswertungsCheckpointKey(reference)], ct);
+        return checkpoint is not null
+            && (checkpoint.ErrorCode is null || checkpoint.NextAttemptUtc > time.GetUtcNow().ToUnixTimeMilliseconds());
+    }
+
+    /// <summary>Legt die Erstbeobachtungs-Baseline eines Ereignis-Repositorys an (Watermark =
+    /// jetzt) und markiert die zum Beobachtungsbeginn bereits bekannten Issue-Referenzen ohne
+    /// Beschreibungs-Read als ausgewertet (Endzustand) — kein retroaktiver Scan des Bestands.</summary>
+    /// <param name="repository">Die kanonische Ereignis-Identität des Repositorys.</param>
+    /// <param name="ausgewertet">Bereits zum Beobachtungsbeginn bekannte Issue-Referenzen
+    /// (leer, wenn nur die Baseline angelegt wird).</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    internal async Task BaselineAnlegenAsync(ScmEventRepository repository,
+        IReadOnlyList<ScmEventReference> ausgewertet, CancellationToken ct)
+    {
+        var baselineKey = BaselineKey(repository);
+        db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
+        {
+            SourceKey = baselineKey,
+            WatermarkUtc = time.GetUtcNow().ToUnixTimeMilliseconds()
+        });
+        foreach (var issue in ausgewertet)
+            db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
+            {
+                SourceKey = AuswertungsCheckpointKey(issue),
+                NextAttemptUtc = long.MaxValue
+            });
+        await db.SaveChangesAsync(ct);
+        notifier.Notify();
+        logger.LogInformation("Issue-Aufbereitung: Beobachtungsbeginn für {Key} festgelegt.", baselineKey);
+    }
+
+    /// <summary>Schreibt den Auswertungs-Checkpoint einer Issue-Referenz in den Endzustand
+    /// (<see cref="ScmObservationCheckpoint.NextAttemptUtc"/> = <see cref="long.MaxValue"/>, kein
+    /// offener Fehler): abgeschlossene Auswertung — Einreihung oder begründeter Skip. Fehlt der
+    /// Checkpoint (z. B. frühe Rückkehr ohne Auswertung), wird er angelegt.</summary>
+    /// <param name="reference">Die ausgewertete Issue-Referenz.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    internal async Task AuswertungAbschliessenAsync(ScmEventReference reference, CancellationToken ct)
+    {
+        var auswertungsKey = AuswertungsCheckpointKey(reference);
+        var auswertung = await db.ScmObservationCheckpoints.FindAsync([auswertungsKey], ct);
+        if (auswertung is null)
+        {
+            auswertung = new ScmObservationCheckpoint { SourceKey = auswertungsKey };
+            db.ScmObservationCheckpoints.Add(auswertung);
+        }
+        auswertung.Failures = 0;
+        auswertung.NextAttemptUtc = long.MaxValue;
+        auswertung.ErrorCode = null;
+        auswertung.Diagnostic = null;
+        await db.SaveChangesAsync(ct);
+        notifier.Notify();
+    }
+
     /// <summary>Wertet einen gelesenen Issue-Beschreibungs-Batch auf „Issue erstellt" aus.
-    /// Voraussetzung: Der Aufruf läuft vor <see cref="ScmEventStore.AcceptBatchAsync"/> desselben
-    /// Batches, solange noch kein <see cref="ScmContentSnapshot"/> zum ContentKey existiert —
-    /// die Erstbeobachtung ist der Auslöser. Die erste Beobachtung des Repositorys legt nur die
-    /// Baseline an (kein retroaktiver Scan); danach lösen Beschreibungen aus, deren
+    /// „Bereits ausgewertet" gilt über den je-Issue-Checkpoint (<see cref="AuswertungsCheckpointKey"/>):
+    /// vorhanden ohne offenen Fehler ⇒ überspringen; nach jeder abgeschlossenen Auswertung
+    /// (Einreihung oder begründeter Skip) wird er mit Endzustand geschrieben, damit Folgezyklen
+    /// die Referenz ohne Beschreibungs-Read überspringen. Die erste Beobachtung des Repositorys
+    /// legt nur die Baseline an (kein retroaktiver Scan); danach lösen Beschreibungen aus, deren
     /// <see cref="ScmEventObservation.CreatedAt"/> nach dem Beobachtungsbeginn liegt.</summary>
     /// <param name="source">Die ereignisfähige SCM-Quelle des aktuellen Plugin-Durchlaufs.</param>
     /// <param name="reference">Die beobachtete Issue-Referenz.</param>
@@ -72,29 +149,22 @@ public sealed class ScmIssueAufbereitungsService(
             .OrderBy(x => x.RepositoryUrl, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Id).ToList();
         if (freigeschaltet.Count == 0 || batch.Observations.Count == 0)
             return;
-        var baselineKey = BaselineKey(reference.Repository);
-        var baseline = await db.ScmObservationCheckpoints.FindAsync([baselineKey], ct);
+        var baseline = await db.ScmObservationCheckpoints.FindAsync([BaselineKey(reference.Repository)], ct);
         if (baseline is null)
         {
             // Erstbeobachtung der Quelle: Baseline ohne Auslösung — kein retroaktiver Scan des
             // Bestands. Jede beobachtete Beobachtung hat zwangsläufig CreatedAt <= jetzt.
-            db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
-            {
-                SourceKey = baselineKey,
-                WatermarkUtc = time.GetUtcNow().ToUnixTimeMilliseconds()
-            });
-            await db.SaveChangesAsync(ct);
-            logger.LogInformation("Issue-Aufbereitung: Beobachtungsbeginn für {Key} festgelegt.", baselineKey);
+            await BaselineAnlegenAsync(reference.Repository, [], ct);
             return;
         }
         var baselineUtc = baseline.WatermarkUtc ?? 0;
         var repository = freigeschaltet[0];
+        if (await AuswertungUeberspringenAsync(reference, ct))
+            return; // Bereits ausgewertet bzw. Fehler-Backoff noch nicht erreicht.
         foreach (var observation in batch.Observations)
         {
             if (observation.CreatedAt.ToUnixTimeMilliseconds() <= baselineUtc)
                 continue; // Altbestand: vor dem Beobachtungsbeginn angelegt.
-            if (await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey == observation.ContentKey, ct))
-                continue; // Keine Erstbeobachtung (u. a. spätere oder selbst verursachte Beschreibungsänderungen).
             var eventKey = AufbereitungsEventKey(observation);
             if (await db.ScmIncomingEvents.AnyAsync(x => x.EventKey == eventKey, ct))
                 continue; // Aufbereitungsauftrag bereits eingereiht.
@@ -140,5 +210,9 @@ public sealed class ScmIssueAufbereitungsService(
             notifier.Notify();
             logger.LogInformation("Issue-Aufbereitung: interner Auftrag {EventKey} auf Aufgabe {AufgabeId} eingereiht.", eventKey, task.Id);
         }
+        // Abgeschlossene Auswertung (Einreihung oder begründeter Skip wie Altbestand,
+        // bereits eingereihter Auftrag oder fehlende Anlagedaten): Die Referenz gilt für
+        // beide Erkennungspfade als ausgewertet (Endzustand).
+        await AuswertungAbschliessenAsync(reference, ct);
     }
 }
