@@ -227,6 +227,8 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ScmEventStore>();
         services.AddScoped<ScmEventOutbox>();
         services.AddScoped<ScmEventOrchestrator>();
+        // Prozessweiter Reservierungsbestand der SCM-Ausführungsbegrenzung (geteilt über alle Scopes).
+        services.AddSingleton<ScmStartPlatzReservierungsPool>();
         services.AddScoped<ScmEventExecutionLimitService>();
         services.AddScoped<ScmEventTaskResolver>();
         services.AddScoped<ScmIssueAufbereitungsService>();

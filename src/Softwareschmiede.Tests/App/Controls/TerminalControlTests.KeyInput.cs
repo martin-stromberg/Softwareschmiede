@@ -22,6 +22,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var input = new MemoryStream();
             using var session = CreateSession(input, new ImmediateEofStream());
@@ -33,7 +34,7 @@ public sealed partial class TerminalControlTests
 
             InvokePreviewKeyDown(control, Key.C, Key.LeftCtrl, Key.LeftShift);
 
-            System.Windows.Clipboard.GetText().Should().Be("copy");
+            ClipboardTestHelfer.GetTextMitRetry().Should().Be("copy");
             input.ToArray().Should().BeEmpty("Ctrl+Shift+C muss exklusiv kopieren und darf keinen Pastepfad auslösen");
         });
     }
@@ -45,6 +46,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var input = new MemoryStream();
             using var session = CreateSession(input, new ImmediateEofStream());
@@ -53,7 +55,7 @@ public sealed partial class TerminalControlTests
 
             InvokePreviewKeyDown(control, Key.C, Key.LeftCtrl, Key.LeftShift);
 
-            System.Windows.Clipboard.GetText().Should().Be("unverändert");
+            ClipboardTestHelfer.GetTextMitRetry().Should().Be("unverändert");
             input.ToArray().Should().BeEmpty();
         });
     }
@@ -108,6 +110,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var buffer = new Softwareschmiede.Domain.Terminal.TerminalBuffer(12, 1);
             buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("erste Zeile"));
@@ -131,7 +134,7 @@ public sealed partial class TerminalControlTests
             SetClipboardTextWithRetry("vorher");
             var copyArgs = InvokePreviewKeyDown(control, Key.C, Key.LeftCtrl, Key.LeftShift);
             copyArgs.Handled.Should().BeTrue();
-            System.Windows.Clipboard.GetText().Should().Be("er");
+            ClipboardTestHelfer.GetTextMitRetry().Should().Be("er");
         });
     }
 
@@ -142,6 +145,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var buffer = new Softwareschmiede.Domain.Terminal.TerminalBuffer(12, 2);
             // Tatsächliche Terminal-Zeilenumbrüche sind nötig: Ein literales "\\n"
@@ -161,7 +165,7 @@ public sealed partial class TerminalControlTests
             SetClipboardTextWithRetry("vorher");
             typeof(TerminalControl).GetMethod("CopySelectionToClipboard", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(control, null);
-            System.Windows.Clipboard.GetText().Should().Be("zweite");
+            ClipboardTestHelfer.GetTextMitRetry().Should().Be("zweite");
         });
     }
 
@@ -172,6 +176,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var buffer = new Softwareschmiede.Domain.Terminal.TerminalBuffer(12, 2);
             buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("ausgewaehlt\n"));
@@ -194,7 +199,7 @@ public sealed partial class TerminalControlTests
             SetClipboardTextWithRetry("vorher");
             typeof(TerminalControl).GetMethod("CopySelectionToClipboard", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(control, null);
-            System.Windows.Clipboard.GetText().Should().Be("ausgewaehlt");
+            ClipboardTestHelfer.GetTextMitRetry().Should().Be("ausgewaehlt");
         });
     }
     /// <summary>Bei einer Session ohne Eingabekanal (Replay: <c>InputStream == Stream.Null</c>)

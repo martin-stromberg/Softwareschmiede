@@ -71,7 +71,28 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 - Erlaubte Stati: `Neu`, `Gestartet`, `Wartend` — andere Stati werden mit `InvalidOperationException` abgelehnt.
 - Beim Setzen muss `pausiertBisUtc` in der Zukunft liegen; andernfalls `InvalidOperationException`.
 - Schreibt pro Aufruf einen `ProtokollTyp.SystemMeldung`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben").
+- Fordert nach dem Speichern die ereignisgesteuerte SCM-Startprüfung an (`ScmStartPruefungsAusloeser.StartpruefungAnfordern`), sofern der optionale Auslöser injiziert ist — ein durch die Pause frei werdender Ausführungsplatz wird ohne Poll-Durchlauf nachgefüllt.
 - Wirft `InvalidOperationException`, wenn die Aufgabe nicht gefunden wird.
+
+## KiAusfuehrungsStatusKlassifikation — Pausenkriterium
+
+### `IstAktuellPausiert(this DateTimeOffset? pausiertBisUtc, DateTimeOffset jetzt) : bool` (Extension, statisch)
+
+**Beschreibung:** Referenzdefinition des Pausenkriteriums für alle Pausen-Auswertungen der Anwendung.
+
+**Parameter:**
+
+| Name | Typ | Beschreibung |
+|------|-----|--------------|
+| `pausiertBisUtc` | `DateTimeOffset?` | UTC-Pausenende der Aufgabe (`Aufgabe.PausiertBisUtc`). |
+| `jetzt` | `DateTimeOffset` | Der als „jetzt" zu verwendende UTC-Zeitpunkt. |
+
+**Rückgabe:** `true`, wenn `pausiertBisUtc` gesetzt ist und strikt in der Zukunft liegt (`pausiertBisUtc > jetzt`); `null` oder ein abgelaufener bzw. exakt aktueller Zeitpunkt gelten als nicht pausiert.
+
+**Verhalten:**
+
+- Kapselt den früher an mehreren Stellen duplizierten Direktvergleich, damit das Pausenkriterium nicht divergiert.
+- Verwendet u. a. von `Klassifiziere` (Kachel-Zustand `KiAusfuehrungsZustand.Pausiert`), `ScmEventExecutionLimitService.GetBelegungAsync` (Limit-Belegung), `ScmEventOrchestrator.BlockReason` (Start-Sperrgrund), `AufgabeRecoveryService` und `EntwicklungsprozessService.WirfWennPausiert`.
 
 ## AufgabeService — KI-Laufdaten
 

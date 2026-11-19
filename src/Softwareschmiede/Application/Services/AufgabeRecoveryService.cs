@@ -83,7 +83,7 @@ public sealed class AufgabeRecoveryService
             throw new InvalidOperationException("Wiederherstellung für aktuellen Status nicht verfügbar.");
         }
 
-        if (aufgabe.PausiertBisUtc is { } pausiertBis && pausiertBis > DateTimeOffset.UtcNow)
+        if (aufgabe.PausiertBisUtc is { } pausiertBis && aufgabe.PausiertBisUtc.IstAktuellPausiert(DateTimeOffset.UtcNow))
         {
             LogRejected(correlationId, aufgabeId, "Paused");
             throw new InvalidOperationException(

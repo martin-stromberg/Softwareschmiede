@@ -618,8 +618,12 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var zweiteSession = (TerminalReplaySession)sut.Session!;
         zweiteSession.Should().NotBeSameAs(ersteSession,
             "der Neustart verwirft die geschrittene Session zugunsten einer frischen ab Position 0");
-        sut.IstWiedergabeAktiv.Should().BeTrue();
-        sut.StatusText.Should().Be("Wiedergabe läuft.");
+        // Der Neustart löst die Wiedergabe aus; mit ZeitrafferSchwelle 0 und nur drei
+        // Ein-Byte-Chunks kann sie den Assert aber schon überholt haben — OnReplayExited
+        // setzt dann bereits IstWiedergabeAktiv=false und StatusText="Wiedergabe beendet.".
+        (sut.IstWiedergabeAktiv || sut.StatusText == "Wiedergabe beendet.").Should().BeTrue(
+            "der Neustart muss die Wiedergabe auslösen — laufend oder bereits durchgelaufen");
+        sut.StatusText.Should().BeOneOf("Wiedergabe läuft.", "Wiedergabe beendet.");
 
         await WarteBisAsync(() => sut.StatusText == "Wiedergabe beendet.");
         zweiteSession.AktuellerChunkIndex.Should().Be(3,

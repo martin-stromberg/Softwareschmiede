@@ -28,50 +28,12 @@ public sealed partial class TerminalControlTests
     /// weitergereicht.
     /// </summary>
     /// <param name="text">Der in die Zwischenablage zu schreibende Text.</param>
-    /// <param name="maxAttempts">Maximale Anzahl an Versuchen, bevor eine Exception weitergereicht wird.</param>
-    private static void SetClipboardTextWithRetry(string text, int maxAttempts = 10)
-    {
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            try
-            {
-                System.Windows.Clipboard.SetText(text);
-
-                // Ein erfolgreiches SetText bedeutet noch nicht, dass die systemweite
-                // Zwischenablage für den unmittelbar folgenden Produktaufruf wieder
-                // lesbar ist. Erst der Read-back bestätigt eine stabile Testvorbedingung.
-                if (System.Windows.Clipboard.ContainsText()
-                    && System.Windows.Clipboard.GetText() == text)
-                    return;
-            }
-            catch (COMException) when (attempt < maxAttempts)
-            {
-            }
-
-            if (attempt < maxAttempts)
-                Thread.Sleep(100 * attempt);
-        }
-
-        throw new InvalidOperationException("Die Windows-Zwischenablage konnte nicht stabil mit dem erwarteten Text vorbereitet werden.");
-    }
+    private static void SetClipboardTextWithRetry(string text)
+        => ClipboardTestHelfer.SetTextMitRetry(text);
 
     /// <summary>Leert die Windows-Zwischenablage mit Retry - Begründung siehe <see cref="SetClipboardTextWithRetry"/>.</summary>
-    /// <param name="maxAttempts">Maximale Anzahl an Versuchen, bevor eine Exception weitergereicht wird.</param>
-    private static void ClearClipboardWithRetry(int maxAttempts = 10)
-    {
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            try
-            {
-                System.Windows.Clipboard.Clear();
-                return;
-            }
-            catch (COMException) when (attempt < maxAttempts)
-            {
-                Thread.Sleep(100 * attempt);
-            }
-        }
-    }
+    private static void ClearClipboardWithRetry()
+        => ClipboardTestHelfer.LeerenMitRetry();
 
     /// <summary>Drückt der Anwender <c>Ctrl+V</c>, muss das Tastaturereignis als behandelt markiert werden,
     /// damit es nicht an den bestehenden Tastatur-Encoder weitergereicht wird.</summary>
@@ -80,6 +42,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             using var session = CreateSession(new ImmediateEofStream());
             control.Session = session;
@@ -98,6 +61,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStream = new MemoryStream();
             using var session = CreateSession(inputStream, new ImmediateEofStream());
@@ -123,6 +87,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             using var session = CreateSession(new ImmediateEofStream());
             control.Session = session;
@@ -139,6 +104,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStream = new MemoryStream();
             using var session = CreateSession(inputStream, new ImmediateEofStream());
@@ -162,6 +128,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStream = new MemoryStream();
             using var session = CreateSession(inputStream, new ImmediateEofStream());
@@ -183,6 +150,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStream = new MemoryStream();
             using var session = CreateSession(inputStream, new ImmediateEofStream());
@@ -206,6 +174,7 @@ public sealed partial class TerminalControlTests
 
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             SetLogger(control, loggerMock.Object);
             using var session = CreateSession(new WriteThrowingStream(), new ImmediateEofStream());
@@ -237,6 +206,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             using var session = CreateSession(new MemoryStream(), new ImmediateEofStream());
             control.Session = session;
@@ -256,6 +226,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStream = new MemoryStream();
             using var session = CreateSession(inputStream, new ImmediateEofStream());
@@ -278,6 +249,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStreamA = new MemoryStream();
             var inputStreamB = new MemoryStream();
@@ -300,6 +272,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             SetClipboardTextWithRetry("Zwischenablage-Inhalt");
 
@@ -317,6 +290,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
 
             string? result = null;

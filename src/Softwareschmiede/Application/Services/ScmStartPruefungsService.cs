@@ -8,7 +8,8 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>
 /// Fordert eine SCM-Startprüfung außerhalb des Poll-Zyklus an. Wird von den Pausen-Setzpfaden
 /// (<see cref="AufgabeService.SetPauseAsync"/>, <see cref="ScmEventStore"/> für die
-/// Verzögerungsdirektive, <see cref="KiPluginLimitService.VerarbeiteRateLimitAsync"/>)
+/// Verzögerungsdirektive, <see cref="KiPluginLimitService.VerarbeiteRateLimitAsync"/>,
+/// <see cref="ScmEventOrchestrator.CancelAsync"/>)
 /// benachrichtigt; der <see cref="ScmStartPruefungsService"/> fasst Häufungen zusammen und
 /// führt die Prüfung serialisiert aus. Ohne Abonnenten verfällt eine Anforderung wirkungslos —
 /// der Poll des <see cref="ScmEventMonitoringService"/> bleibt als Fallback bestehen.
