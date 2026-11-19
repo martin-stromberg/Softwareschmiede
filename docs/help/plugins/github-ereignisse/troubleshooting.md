@@ -62,7 +62,7 @@
 
 **Lösung:** Erwähne das separate Konto als Repository-Owner frei stehend als `@Kontoname` in einer Beschreibung oder einem Kommentar — aus einem Repository-Workflow heraus funktioniert das auch über das `github-actions`-Konto. Prüfe die **Integrationshinweise** in der SCM-Ereignisübersicht: Verworfene Benachrichtigungen zu nicht registrierten Repositories werden dort gezählt. Stelle außerdem sicher, dass das Bot-Konto als Collaborator mit Schreibrecht auf dem Repository eingeladen ist.
 
-> **Hinweis:** Im Modus „Separates Konto" wertet die Ereignisüberwachung ausschließlich Benachrichtigungen aus — weder die repository-weite Enumeration noch verknüpfte Referenzen vorhandener Aufgaben laufen in diesem Modus. Die Backmerge-Prüfung ist davon unberührt: Sie läuft in einem eigenen Zyklus immer unter dem Benutzerkonto.
+> **Hinweis:** Im Modus „Separates Konto" wertet die Ereignisüberwachung ausschließlich Benachrichtigungen aus — weder die repository-weite Enumeration noch verknüpfte Referenzen vorhandener Aufgaben laufen in diesem Modus. Die Backmerge-Prüfung und die Entdeckung der Issue-Aufbereitung sind davon unberührt: Sie laufen in eigenen Zyklen immer unter dem Benutzerkonto — eine aktivierte Aufbereitung funktioniert daher auch in diesem Modus.
 
 ## Ein vom Workflow erzeugtes Review-Issue löst kein Ereignis aus
 

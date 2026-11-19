@@ -423,8 +423,48 @@ public sealed class ScmEventQueueViewModelTests
         Assert.Contains("deaktiviert", view.Message);
     }
 
+    /// <summary>„Quellen erneut prüfen" stößt auch den Aufbereitungs-Entdeckungszyklus an —
+    /// unabhängig vom Ereignisüberwachungs-Schalter; der Dienst prüft seinen eigenen Schalter.</summary>
+    [Fact]
+    public async Task RetrySourcesCommand_StillRunsAufbereitungCycle()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.SetSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, "false");
+        await fixture.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungEnabledKey, "true");
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var project = new Projekt { Id = Guid.NewGuid(), Name = "Aufbereitung" };
+            var repository = new GitRepository
+            {
+                Id = Guid.NewGuid(),
+                Projekt = project,
+                RepositoryUrl = "https://github.com/owner/repo",
+                RepositoryName = "repo",
+                PluginTyp = fixture.Repository.ProviderPrefix,
+                Aktiv = true,
+                IssueAufbereitungAktiv = true
+            };
+            db.AddRange(project, repository);
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
+
+        await view.RetrySourcesCommand.ExecuteAsync();
+
+        // Der Aufbereitungs-Entdeckungszyklus lief: Repository-Auflösung und repository-weite Enumeration.
+        fixture.Git.As<IScmEventSource>().Verify(x => x.EnumerateReferencesAsync(
+            It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Once);
+        // Die Ereignisüberwachung blieb dagegen abgeschaltet: kein Quellen-Read.
+        fixture.Git.As<IScmEventSource>().Verify(x => x.ReadEventsAsync(
+            It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains("deaktiviert", view.Message);
+    }
+
     private static ScmEventQueueViewModel View(IServiceScopeFactory scopes, ScmDispatchFixture fixture)
-        => new(scopes, fixture.Services.GetRequiredService<ScmEventChangeNotifier>(), Mock.Of<IDialogService>(), NullLogger<ScmEventQueueViewModel>.Instance);
+        => new(scopes, fixture.Services.GetRequiredService<ScmEventChangeNotifier>(), Mock.Of<IDialogService>(),
+            NullLogger<ScmEventQueueViewModel>.Instance);
 
     private sealed class FailingScopes(IServiceScopeFactory inner) : IServiceScopeFactory
     {
