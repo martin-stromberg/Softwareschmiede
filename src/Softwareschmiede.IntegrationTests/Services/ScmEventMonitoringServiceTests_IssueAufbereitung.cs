@@ -102,7 +102,7 @@ public sealed class ScmEventMonitoringServiceTests_IssueAufbereitung
     }
 
     /// <summary>Wiederholte Beobachtungszyklen über demselben Issue erzeugen keinen zweiten
-    /// Aufbereitungsvorgang (Snapshot- und EventKey-Dedup).</summary>
+    /// Aufbereitungsvorgang (Auswertungs-Checkpoint- und EventKey-Dedup).</summary>
     [Fact]
     public async Task Monitor_RepeatedPolls_CreateNoSecondPreparation()
     {

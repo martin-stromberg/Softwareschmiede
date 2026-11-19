@@ -195,9 +195,10 @@ public sealed class ScmEventMonitoringService(
                             aufgabeId = resolution.AufgabeId;
                             unassigned = resolution.Kind == ScmTaskResolutionKind.Unassigned;
                         }
-                        // „Issue erstellt"-Erkennung läuft vor der Inbox-Aufnahme, solange für den
-                        // ContentKey noch kein Snapshot existiert (Erstbeobachtung). Nur der
-                        // repository-weite Enumerationskanal (kein Inbox-Modus) meldet neue Issues.
+                        // „Issue erstellt"-Erkennung läuft vor der Inbox-Aufnahme; der
+                        // Auswertungs-Checkpoint je Issue dedupliziert Erst- und
+                        // Folgebeobachtungen. Nur der repository-weite Enumerationskanal
+                        // (kein Inbox-Modus) meldet neue Issues.
                         if (!inboxMode && issueAufbereitungAktiv && reference.Kind == ScmReferenceKind.Issue
                             && kind == ScmContentKind.Description && batch.Observations.Count > 0
                             && localRepositories.TryGetValue(reference.Repository, out var aufbereitungRepositories))

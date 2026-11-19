@@ -62,6 +62,10 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             // Der Backmerge-Prüfzyklus ist unabhängig vom Ereignisüberwachungs-Schalter;
             // er prüft seinen eigenen Modus (Einstellungen → Automatisierung → Prozessabläufe).
             await scope.ServiceProvider.GetRequiredService<ScmBackmergeMonitoringService>().RunOnceAsync(ct);
+            // Der Aufbereitungs-Entdeckungszyklus ist ebenfalls unabhängig vom
+            // Ereignisüberwachungs-Schalter; er prüft seinen eigenen Schalter
+            // (Einstellungen → Automatisierung → Issue-Aufbereitung).
+            await scope.ServiceProvider.GetRequiredService<ScmIssueAufbereitungMonitoringService>().RunOnceAsync(ct);
         });
         OpenEventCommand = Command(OpenAsync, () => SelectedEvent is { IsFinal: false, IsBlocked: false, AttemptId: null });
         // Eine nach „Verarbeitet" permanent gescheiterte Outbox-Aktion (z. B. Screenshot-Nachweis)

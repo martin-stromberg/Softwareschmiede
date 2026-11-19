@@ -237,6 +237,8 @@ public sealed partial class App : System.Windows.Application
         services.AddHostedService(sp => sp.GetRequiredService<ScmEventMonitoringService>());
         services.AddSingleton<ScmBackmergeMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmBackmergeMonitoringService>());
+        services.AddSingleton<ScmIssueAufbereitungMonitoringService>();
+        services.AddHostedService(sp => sp.GetRequiredService<ScmIssueAufbereitungMonitoringService>());
         services.AddSingleton<ScmEventExchangeService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmEventExchangeService>());
         services.AddScoped<EntwicklungsprozessService>(sp => new EntwicklungsprozessService(
