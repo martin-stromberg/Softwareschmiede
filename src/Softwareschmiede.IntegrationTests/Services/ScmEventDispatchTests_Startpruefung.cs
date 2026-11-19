@@ -50,6 +50,45 @@ public sealed class ScmEventDispatchTests_Startpruefung
         }
     }
 
+    /// <summary>Das Setzen einer Pause auf eine laufende Aufgabe gibt ihren Platz frei und
+    /// löst den Folgestart des wartenden Ereignisses ereignisgesteuert aus — ohne Poll.</summary>
+    [Fact]
+    public async Task StartPruefung_PauseGesetzt_WartendesEreignisStartetOhnePoll()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+        var (firstTask, firstId) = await fixture.AddAsync(configured: true);
+        var (_, secondId) = await fixture.AddAsync(configured: true);
+
+        await fixture.DispatchAsync(firstId);
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(firstId)).Status);
+        await fixture.DispatchAsync(secondId);
+        var second = await fixture.EventAsync(secondId);
+        Assert.Equal("Wartend", second.Status);
+        Assert.Contains("globale Limit", second.Reason);
+        Assert.Single(fixture.Sessions);
+
+        await fixture.StartPruefung.StartAsync(CancellationToken.None);
+        try
+        {
+            using (var scope = fixture.Services.CreateScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<AufgabeService>()
+                    .SetPauseAsync(firstTask, DateTimeOffset.UtcNow.AddMinutes(30), TestContext.Current.CancellationToken);
+            }
+
+            await WaitForAsync(async () => fixture.Sessions.Count == 2
+                    && (await fixture.EventAsync(secondId)).Status == "Zugestellt",
+                "Das wartende Ereignis wurde nach dem Setzen der Pause nicht ereignisgesteuert gestartet.");
+            Assert.True(fixture.Cli.IsRunning(firstTask));
+        }
+        finally
+        {
+            await fixture.StartPruefung.StopAsync(CancellationToken.None);
+        }
+    }
+
     /// <summary>Nach dem Aufheben einer Pause startet ein wartendes Ereignis sofort —
     /// die Prüfung wird durch den Pausen-Setzpfad ausgelöst, nicht durch den Poll.</summary>
     [Fact]

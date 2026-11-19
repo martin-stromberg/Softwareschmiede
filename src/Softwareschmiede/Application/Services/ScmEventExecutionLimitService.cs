@@ -3,9 +3,12 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Application.Services;
 
-/// <summary>Belegung laufender CLI-Ausführungen für die Ausführungsbegrenzung.</summary>
-/// <param name="Global">Anzahl aller Aufgaben mit laufender CLI-Ausführung.</param>
-/// <param name="ProPlugin">Anzahl laufender Ausführungen je zugeordnetem KI-Plugin-Prefix.</param>
+/// <summary>Belegung laufender CLI-Ausführungen für die Ausführungsbegrenzung.
+/// Pausierte Aufgaben (<c>Aufgabe.PausiertBisUtc</c> in der Zukunft) belegen trotz
+/// weiterlaufendem Prozess keinen Platz und fehlen in beiden Zählern.</summary>
+/// <param name="Global">Anzahl aller Aufgaben mit laufender, nicht pausierter CLI-Ausführung
+/// (inklusive laufender Handles ohne auflösbare Aufgabenzeile).</param>
+/// <param name="ProPlugin">Anzahl laufender, nicht pausierter Ausführungen je zugeordnetem KI-Plugin-Prefix.</param>
 public sealed record CliAusfuehrungsBelegung(int Global, IReadOnlyDictionary<string, int> ProPlugin)
 {
     /// <summary>Anzahl laufender Ausführungen, die dem angegebenen Plugin-Prefix zugeordnet sind.</summary>
@@ -201,17 +204,23 @@ public sealed class ScmEventExecutionLimitService(
     private static int? ParseLimit(string? wert)
         => int.TryParse(wert, out var limit) && limit >= 1 ? limit : null;
 
+    /// <summary>Zählt die laufenden CLI-Handles global und je Plugin. Pausierte Aufgaben
+    /// (<c>PausiertBisUtc</c> in der Zukunft — ihr Prozess läuft bewusst weiter) belegen keinen
+    /// Platz und werden vor der globalen Zählung und der Plugin-Attribution herausgefiltert;
+    /// abgelaufene oder fehlende Pausenzeiten sowie Handles ohne Aufgabenzeile zählen voll.</summary>
     private async Task<CliAusfuehrungsBelegung> GetBelegungAsync(CancellationToken ct)
     {
         var laufendeIds = cli.GetLaufendeAufgabenIds();
         if (laufendeIds.Count == 0)
             return new(0, new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
-        var prefixes = await db.Aufgaben.AsNoTracking()
+        var aufgaben = await db.Aufgaben.AsNoTracking()
             .Where(x => laufendeIds.Contains(x.Id))
-            .Select(x => new { x.Id, x.KiPluginPrefix })
+            .Select(x => new { x.Id, x.KiPluginPrefix, x.PausiertBisUtc })
             .ToListAsync(ct);
+        var jetzt = time.GetUtcNow();
+        var aktive = aufgaben.Where(x => !x.PausiertBisUtc.IstAktuellPausiert(jetzt)).ToList();
         var proPlugin = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var aufgabe in prefixes)
+        foreach (var aufgabe in aktive)
         {
             var session = cli.GetScmPromptSession(aufgabe.Id);
             var prefix = session?.IsAlive == true && !string.IsNullOrWhiteSpace(session.PluginPrefix)
@@ -221,7 +230,9 @@ public sealed class ScmEventExecutionLimitService(
             proPlugin.TryGetValue(prefix, out var anzahl);
             proPlugin[prefix] = anzahl + 1;
         }
-        return new(laufendeIds.Count, proPlugin);
+        // Global = aktive Aufgaben plus laufende Handles ohne auflösbare Aufgabenzeile
+        // (letztere haben kein PausiertBisUtc und zählen bewusst weiterhin voll).
+        return new(aktive.Count + (laufendeIds.Count - aufgaben.Count), proPlugin);
     }
 
     /// <summary>Reservierter Startplatz; die Freigabe über <see cref="Dispose"/> entfernt den

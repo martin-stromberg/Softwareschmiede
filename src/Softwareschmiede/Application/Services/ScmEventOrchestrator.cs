@@ -19,7 +19,7 @@ public sealed class ScmEventOrchestrator(
     ScmEventChangeNotifier notifier, IServiceScopeFactory scopes, TimeProvider time, IOptions<ScmEventOptions> options,
     AppEinstellungService einstellungen, PullRequestReferenzService pullRequestReferenzen,
     ProtokollService protokoll, ScmEventExecutionLimitService executionLimits,
-    ILogger<ScmEventOrchestrator> logger)
+    ILogger<ScmEventOrchestrator> logger, ScmStartPruefungsAusloeser? startPruefungsAusloeser = null)
 {
     /// <summary>
     /// Startprüfung: Dispatcht alle fälligen, nicht abgeschlossenen Ereignisse in der priorisierten
@@ -442,7 +442,14 @@ public sealed class ScmEventOrchestrator(
             await db.Aufgaben.Where(a => a.Id == prior.AufgabeId && a.PausiertBisUtc == deferredUntil)
                 .ExecuteUpdateAsync(a => a.SetProperty(p => p.PausiertBisUtc, nextUntil), ct);
         }
-        if (changed != 0) notifier.Notify();
+        if (changed != 0)
+        {
+            notifier.Notify();
+            // Ein Abbruch kann einen Ausführungsplatz freigeben (zurückgestufte Pause) oder
+            // spätere Ereignisse derselben Aufgabe entsperren — die Startprüfung soll das
+            // nicht erst beim nächsten Poll sehen.
+            startPruefungsAusloeser?.StartpruefungAnfordern();
+        }
         return changed != 0;
     }
 
@@ -988,9 +995,9 @@ public sealed class ScmEventOrchestrator(
     private async Task<bool> IsCancelledAsync(Guid eventId, CancellationToken ct)
         => await db.ScmIncomingEvents.Where(x => x.Id == eventId).Select(x => x.Status).SingleOrDefaultAsync(ct) == "Abgebrochen";
 
-    private static string? BlockReason(Aufgabe task)
+    private string? BlockReason(Aufgabe task)
         => task.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert ? "Aufgabe beendet/archiviert; Start gesperrt."
-            : task.PausiertBisUtc > DateTimeOffset.UtcNow ? "Aufgabe pausiert; Start gesperrt." : null;
+            : task.PausiertBisUtc.IstAktuellPausiert(time.GetUtcNow()) ? "Aufgabe pausiert; Start gesperrt." : null;
 
     private async Task WaitAsync(ScmIncomingEvent item, string reason, CancellationToken ct)
     {

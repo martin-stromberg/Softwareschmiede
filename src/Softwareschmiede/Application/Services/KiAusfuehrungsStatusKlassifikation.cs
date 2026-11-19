@@ -5,9 +5,22 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>
 /// Gemeinsame Statusklassifikation der KI-Ausführung (Anzeige-Konverter der App und
 /// fachliche Lauf-Zählung des Auto-Shutdown), damit beide Auswertungen nicht divergieren.
+/// Stellt außerdem mit <see cref="IstAktuellPausiert"/> die Referenzdefinition des
+/// Pausenkriteriums für alle Pausen-Auswertungen bereit.
 /// </summary>
 public static class KiAusfuehrungsStatusKlassifikation
 {
+    /// <summary>
+    /// Referenzdefinition des Pausenkriteriums: <c>true</c>, wenn <paramref name="pausiertBisUtc"/>
+    /// gesetzt ist und in der Zukunft liegt. <c>null</c> oder ein abgelaufener Zeitpunkt gelten
+    /// als nicht pausiert.
+    /// </summary>
+    /// <param name="pausiertBisUtc">UTC-Pausenende der Aufgabe (<see cref="Domain.Entities.Aufgabe.PausiertBisUtc"/>).</param>
+    /// <param name="jetzt">Der als „jetzt" zu verwendende Zeitpunkt in UTC.</param>
+    /// <returns><c>true</c>, wenn die Aufgabe aktuell pausiert ist, sonst <c>false</c>.</returns>
+    public static bool IstAktuellPausiert(this DateTimeOffset? pausiertBisUtc, DateTimeOffset jetzt)
+        => pausiertBisUtc > jetzt;
+
     /// <summary>
     /// Klassifiziert die in <paramref name="status"/> gebündelten Aufgabendaten in einen
     /// <see cref="KiAusfuehrungsZustand"/>. Im Zustand <see cref="KiAusfuehrungsZustand.Pausiert"/>
@@ -22,9 +35,10 @@ public static class KiAusfuehrungsStatusKlassifikation
 
         // Der Pausiert-Zweig steht bewusst vor allen übrigen Anzeigen: Eine aktive Pause überlagert
         // den Laufzeitstatus (die Kachel zeigt den Countdown statt "Läuft"/"Prompt in Wartestellung").
-        if (status.PausiertBisUtc is { } pausiertBis && pausiertBis > DateTimeOffset.UtcNow)
+        var jetzt = DateTimeOffset.UtcNow;
+        if (status.PausiertBisUtc is { } pausiertBis && status.PausiertBisUtc.IstAktuellPausiert(jetzt))
         {
-            pausiertRestzeit = pausiertBis - DateTimeOffset.UtcNow;
+            pausiertRestzeit = pausiertBis - jetzt;
             return KiAusfuehrungsZustand.Pausiert;
         }
 
@@ -49,7 +63,7 @@ public static class KiAusfuehrungsStatusKlassifikation
             return KiAusfuehrungsZustand.Bereit;
         }
 
-        if (AufgabeLaufAktivitaet.IstAktiv(status.AktiveRunId, status.LastHeartbeatUtc, DateTimeOffset.UtcNow))
+        if (AufgabeLaufAktivitaet.IstAktiv(status.AktiveRunId, status.LastHeartbeatUtc, jetzt))
         {
             // LaufStatus bildet den Laufzeit-Substatus der CLI ab (siehe PseudoConsoleSession.RuntimeStatus,
             // persistiert über CliProcessManager/AufgabeService.AktivenLaufSicherstellenAsync). Ohne diesen
