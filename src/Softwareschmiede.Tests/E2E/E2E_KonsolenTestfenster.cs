@@ -116,27 +116,19 @@ public partial class End2EndTest
     {
         // Die Windows-Zwischenablage kann kurz nach Ctrl+Shift+C noch belegt sein.
         // Begrenzte Wiederholungen halten den E2E-Test robust, ohne Fehler zu verstecken.
-        Exception? lastError = null;
-        for (var attempt = 0; attempt < 5; attempt++)
+        string? text = null;
+        Exception? error = null;
+        var thread = new Thread(() =>
         {
-            string? text = null;
-            Exception? error = null;
-            var thread = new Thread(() =>
-            {
-                try { text = System.Windows.Clipboard.GetText(); }
-                catch (Exception ex) { error = ex; }
-            });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
-            if (error is null)
-                return text ?? string.Empty;
-
-            lastError = error;
-            Thread.Sleep(100);
-        }
-
-        throw new InvalidOperationException("Die Zwischenablage konnte nach 5 Versuchen nicht gelesen werden.", lastError);
+            try { text = ClipboardTestHelfer.GetTextMitRetry(); }
+            catch (Exception ex) { error = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null)
+            throw error;
+        return text ?? string.Empty;
     }
 
     /// <summary>

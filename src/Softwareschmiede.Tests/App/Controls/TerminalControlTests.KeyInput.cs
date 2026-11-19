@@ -34,7 +34,7 @@ public sealed partial class TerminalControlTests
 
             InvokePreviewKeyDown(control, Key.C, Key.LeftCtrl, Key.LeftShift);
 
-            System.Windows.Clipboard.GetText().Should().Be("copy");
+            ClipboardTestHelfer.GetTextMitRetry().Should().Be("copy");
             input.ToArray().Should().BeEmpty("Ctrl+Shift+C muss exklusiv kopieren und darf keinen Pastepfad auslösen");
         });
     }
@@ -55,7 +55,7 @@ public sealed partial class TerminalControlTests
 
             InvokePreviewKeyDown(control, Key.C, Key.LeftCtrl, Key.LeftShift);
 
-            System.Windows.Clipboard.GetText().Should().Be("unverändert");
+            ClipboardTestHelfer.GetTextMitRetry().Should().Be("unverändert");
             input.ToArray().Should().BeEmpty();
         });
     }
@@ -134,7 +134,7 @@ public sealed partial class TerminalControlTests
             SetClipboardTextWithRetry("vorher");
             var copyArgs = InvokePreviewKeyDown(control, Key.C, Key.LeftCtrl, Key.LeftShift);
             copyArgs.Handled.Should().BeTrue();
-            System.Windows.Clipboard.GetText().Should().Be("er");
+            ClipboardTestHelfer.GetTextMitRetry().Should().Be("er");
         });
     }
 
@@ -165,7 +165,7 @@ public sealed partial class TerminalControlTests
             SetClipboardTextWithRetry("vorher");
             typeof(TerminalControl).GetMethod("CopySelectionToClipboard", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(control, null);
-            System.Windows.Clipboard.GetText().Should().Be("zweite");
+            ClipboardTestHelfer.GetTextMitRetry().Should().Be("zweite");
         });
     }
 
@@ -199,7 +199,7 @@ public sealed partial class TerminalControlTests
             SetClipboardTextWithRetry("vorher");
             typeof(TerminalControl).GetMethod("CopySelectionToClipboard", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(control, null);
-            System.Windows.Clipboard.GetText().Should().Be("ausgewaehlt");
+            ClipboardTestHelfer.GetTextMitRetry().Should().Be("ausgewaehlt");
         });
     }
     /// <summary>Bei einer Session ohne Eingabekanal (Replay: <c>InputStream == Stream.Null</c>)

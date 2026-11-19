@@ -433,19 +433,16 @@ public partial class End2EndTest
             // Clipboard kann unmittelbar nach dem Schließen einer UIA-/Screenshot-Operation
             // noch kurz einem anderen Prozess gehören. Die begrenzte Wiederholung ist Teil
             // der E2E-Infrastruktur und verhindert, dass ein echter Produktnachweis daran
-            // scheitert.
-            for (var attempt = 0; attempt < 5; attempt++)
+            // scheitert. Externe Halter (Clipboard-Manager, rdpclip, Sync-Tools) hält das
+            // großzügigere Budget von SetTextMitRetry aus — bei Erschöpfung nennt die
+            // Exception den haltenden Prozess.
+            try
             {
-                try
-                {
-                    System.Windows.Clipboard.SetText(text);
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    fehler = ex;
-                    Thread.Sleep(50);
-                }
+                ClipboardTestHelfer.SetTextMitRetry(text);
+            }
+            catch (Exception ex)
+            {
+                fehler = ex;
             }
         });
         thread.SetApartmentState(ApartmentState.STA);
