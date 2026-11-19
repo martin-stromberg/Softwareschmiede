@@ -80,6 +80,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             using var session = CreateSession(new ImmediateEofStream());
             control.Session = session;
@@ -98,6 +99,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStream = new MemoryStream();
             using var session = CreateSession(inputStream, new ImmediateEofStream());
@@ -123,6 +125,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             using var session = CreateSession(new ImmediateEofStream());
             control.Session = session;
@@ -139,6 +142,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStream = new MemoryStream();
             using var session = CreateSession(inputStream, new ImmediateEofStream());
@@ -162,6 +166,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStream = new MemoryStream();
             using var session = CreateSession(inputStream, new ImmediateEofStream());
@@ -183,6 +188,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStream = new MemoryStream();
             using var session = CreateSession(inputStream, new ImmediateEofStream());
@@ -206,6 +212,7 @@ public sealed partial class TerminalControlTests
 
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             SetLogger(control, loggerMock.Object);
             using var session = CreateSession(new WriteThrowingStream(), new ImmediateEofStream());
@@ -237,6 +244,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             using var session = CreateSession(new MemoryStream(), new ImmediateEofStream());
             control.Session = session;
@@ -256,6 +264,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStream = new MemoryStream();
             using var session = CreateSession(inputStream, new ImmediateEofStream());
@@ -278,6 +287,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var inputStreamA = new MemoryStream();
             var inputStreamB = new MemoryStream();
@@ -300,6 +310,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             SetClipboardTextWithRetry("Zwischenablage-Inhalt");
 
@@ -317,6 +328,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
 
             string? result = null;

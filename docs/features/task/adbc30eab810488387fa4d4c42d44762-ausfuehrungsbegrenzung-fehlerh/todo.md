@@ -21,5 +21,5 @@ Branch: `task/adbc30eab810488387fa4d4c42d44762-ausfuehrungsbegrenzung-fehlerh`
 | [x] | 9 | Dokumentation erstellen (Unteragent) | `docs/help/` |
 | [x] | 9b | README aktualisieren (Unteragent) | `README.md` |
 | [ ] | – | Feature-Verzeichnis löschen | – |
-| [ ] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
+| [x] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
 | [x] | – | Commit durchführen | – |

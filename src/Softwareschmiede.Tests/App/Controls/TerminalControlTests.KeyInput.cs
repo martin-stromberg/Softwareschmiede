@@ -22,6 +22,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var input = new MemoryStream();
             using var session = CreateSession(input, new ImmediateEofStream());
@@ -45,6 +46,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var input = new MemoryStream();
             using var session = CreateSession(input, new ImmediateEofStream());
@@ -108,6 +110,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var buffer = new Softwareschmiede.Domain.Terminal.TerminalBuffer(12, 1);
             buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("erste Zeile"));
@@ -142,6 +145,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var buffer = new Softwareschmiede.Domain.Terminal.TerminalBuffer(12, 2);
             // Tatsächliche Terminal-Zeilenumbrüche sind nötig: Ein literales "\\n"
@@ -172,6 +176,7 @@ public sealed partial class TerminalControlTests
     {
         RunOnSta(() =>
         {
+            using var _ = ClipboardTestLock.Halten();
             var control = new TerminalControl();
             var buffer = new Softwareschmiede.Domain.Terminal.TerminalBuffer(12, 2);
             buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent("ausgewaehlt\n"));
