@@ -7,7 +7,9 @@ using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Plugins;
+using Softwareschmiede.TestSupport;
 using Softwareschmiede.Tests.Helpers;
+using Softwareschmiede.Tests.Infrastructure.Testing;
 
 namespace Softwareschmiede.Tests.Infrastructure.Plugins;
 
@@ -634,7 +636,7 @@ public sealed class GitHubEventSourceTests
     /// <summary>Eine nach dem Einsammeln eingefügte Junction im Upload-Pfad wird bei der
     /// erneuten Pfadprüfung unmittelbar vor dem Lesen abgelehnt — die Datei wird mit
     /// „Datei nicht lesbar" übersprungen statt fremde Inhalte hochzuladen (TOCTOU).</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task CommentAttachments_ReparsePath_PostsSkippedNote()
     {
         if (!OperatingSystem.IsWindows()) return;
@@ -670,8 +672,8 @@ public sealed class GitHubEventSourceTests
         finally
         {
             // Die Junction selbst wird gelöscht, ohne dem Ziel zu folgen.
-            if (Directory.Exists(link)) Directory.Delete(link);
-            if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
+            TempDirectoryCleanup.DeleteBestEffort(link);
+            TempDirectoryCleanup.DeleteBestEffort(target);
         }
     }
 

@@ -217,14 +217,36 @@ jobs:
         run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-integration.trx" --logger "console;verbosity=normal"
         shell: pwsh
 
+      - name: Retry flaky tests once
+        # if: failure() is deliberately broad: on a build failure or missing TRX the script
+        # reports "keine Flaky-Fehlschlaege" and exits 0, so the original failing step stays
+        # the leading signal. Persistent flaky failures make this step fail - the job still
+        # stays non-blocking via job-level continue-on-error.
+        if: failure()
+        run: |
+          $exitCode = 0
+          & scripts/Retry-FlakyTests.ps1 -TestProject src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj -PrimaryTrx src/Softwareschmiede.Tests/TestResults/test-results-os-interface-tests.trx
+          if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
+          & scripts/Retry-FlakyTests.ps1 -TestProject src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj -PrimaryTrx src/Softwareschmiede.IntegrationTests/TestResults/test-results-os-interface-integration.trx
+          if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
+          exit $exitCode
+        shell: pwsh
+
+      - name: Analyze flaky test results
+        # Pure visibility report over this run's TestResults directories (always exit 0).
+        if: always()
+        run: |
+          & scripts/Analyze-FlakyTestResults.ps1 -Path src/Softwareschmiede.Tests/TestResults, src/Softwareschmiede.IntegrationTests/TestResults
+        shell: pwsh
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-results-os-interface-staging
           path: |
-            src/Softwareschmiede.Tests/TestResults/test-results-os-interface-tests.trx
-            src/Softwareschmiede.IntegrationTests/TestResults/test-results-os-interface-integration.trx
+            src/Softwareschmiede.Tests/TestResults/test-results-os-interface*.trx
+            src/Softwareschmiede.IntegrationTests/TestResults/test-results-os-interface*.trx
           retention-days: 14
 
   version:

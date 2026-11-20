@@ -18,8 +18,8 @@ Beide Jobs bauen und veröffentlichen dieselbe Anwendung, unterscheiden sich abe
 Die Testauswertung ist auf `.github/workflows/staging-ci.yml` („Pre-Release", Pushes auf `staging`), `.github/workflows/pr-staging-ci.yml` („PR CI for Staging", Pull Requests nach `staging`) und — als Release-Gate — `.github/workflows/release.yml` verteilt. Alle bauen `src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj` und `src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj` auf `windows-latest` und trennen die Testauswertung:
 
 - `Test regular` ist blockierend und fuehrt `Category!=OsInterface` aus (in `staging-ci.yml`/`pr-staging-ci.yml` inklusive Coverage-Schwelle von 70 % Zeilenabdeckung).
-- `Test OS interfaces` fuehrt `Category=OsInterface` best-effort als eigenen Job mit `continue-on-error: true` aus.
-- TRX-Dateien werden getrennt hochgeladen (`test-results-staging` bzw. `test-results-os-interface-staging`; in `pr-staging-ci.yml` `test-results-pr` bzw. `test-results-os-interface-pr`, im Release-Gate `test-results-release`).
+- `Test OS interfaces` fuehrt `Category=OsInterface` best-effort als eigenen Job mit `continue-on-error: true` aus. Schlaegt ein OS-Test fehl, wiederholt der Folgeschritt `Retry flaky tests once` (`if: failure()`, `scripts/Retry-FlakyTests.ps1`) ausschliesslich `Category=Flaky`-markierte Fehlschlaege genau einmal; der Report-Schritt `Analyze flaky test results` (`if: always()`, `scripts/Analyze-FlakyTestResults.ps1`) wertet die TRX-Ergebnisse auf Flake-Ereignisse aus (Details: `docs/help/stabilitaet/os-interface-tests.md`).
+- TRX-Dateien werden getrennt hochgeladen (`test-results-staging` bzw. `test-results-os-interface-staging`; in `pr-staging-ci.yml` `test-results-pr` bzw. `test-results-os-interface-pr`, im Release-Gate `test-results-release`; das OS-Lane-Artefakt enthaelt ueber das Glob `test-results-os-interface*.trx` auch die `*-flaky-retry.trx`-Dateien).
 
 Die Trennung ersetzt den frueheren Ausschluss ueber `Category!=E2E&Category!=ConPTY`. E2E- und ConPTY-Tests behalten diese Kategorien, tragen aber zusaetzlich `OsInterface`.
 

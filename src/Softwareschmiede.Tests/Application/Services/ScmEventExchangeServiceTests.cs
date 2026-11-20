@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using FluentAssertions;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.TestSupport;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
@@ -494,8 +495,6 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     public void Dispose()
     {
         // Git object files are read-only on Windows, including objects created by the tracked-content case.
-        foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
-            File.SetAttributes(file, FileAttributes.Normal);
-        Directory.Delete(_root, recursive: true);
+        TempDirectoryCleanup.DeleteBestEffort(_root, normalizeAttributes: true);
     }
 }

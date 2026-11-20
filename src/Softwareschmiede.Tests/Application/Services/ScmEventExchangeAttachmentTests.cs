@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using FluentAssertions;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.TestSupport;
+using Softwareschmiede.Tests.Infrastructure.Testing;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
@@ -108,7 +110,7 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
 
     /// <summary>Reparse-Punkte im deklarierten Pfad werden abgelehnt — der Inhalt fremder
     /// Verzeichnisse darf nie in den Upload gelangen.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task Collect_RejectsReparsePointInDeclaredPath()
     {
         if (!OperatingSystem.IsWindows()) return;
@@ -262,9 +264,7 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     public void Dispose()
     {
         RemoveReparsePoints(_root);
-        foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
-            File.SetAttributes(file, FileAttributes.Normal);
-        Directory.Delete(_root, recursive: true);
+        TempDirectoryCleanup.DeleteBestEffort(_root, normalizeAttributes: true);
     }
 
     private static void RemoveReparsePoints(string directory)

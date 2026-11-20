@@ -337,6 +337,6 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         }
         await Services.DisposeAsync();
         foreach (var process in _processes) process.Dispose();
-        if (_ownsRoot) Directory.Delete(Root, true);
+        if (_ownsRoot) TempDirectoryCleanup.DeleteBestEffort(Root);
     }
 }
