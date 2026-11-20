@@ -74,7 +74,7 @@ public sealed class GitHubCopilotPluginTests
         psi.Arguments.Should().Be("--continue");
     }
 
-    /// <summary>StartCliAsync sets GH_TOKEN when credential is stored.</summary>
+    /// <summary>StartCliAsync setzt GH_TOKEN, wenn Anmeldedaten gespeichert sind.</summary>
     [Fact]
     public async Task StartCliAsync_ShouldSetGhTokenEnvironmentVariable_WhenTokenIsStored()
     {

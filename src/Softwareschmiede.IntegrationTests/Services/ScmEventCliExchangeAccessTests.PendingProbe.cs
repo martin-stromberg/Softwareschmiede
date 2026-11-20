@@ -18,7 +18,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         public override DateTimeOffset GetUtcNow() => Now;
     }
 
-    /// <summary>An unanswered probe is re-sent only after the resend delay at a visible prompt, up to the cap.</summary>
+    /// <summary>Eine unbeantwortete Probe wird erst nach der Wiederholungsverzögerung an einer sichtbaren Eingabeaufforderung erneut gesendet, bis zum Limit.</summary>
     [Theory]
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.114.0)", "›")]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.1.0", "❯")]
@@ -34,7 +34,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), run, prefix, spec, session.Object, [], () => true, time);
         var channel = Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName);
         (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
-        // The resend delay has not elapsed: re-checks only re-read the pending probe.
+        // Die Wiederholungsverzögerung ist noch nicht abgelaufen: Re-Checks lesen die ausstehende Probe nur erneut.
         (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         for (var sends = 1; sends < 3; sends++)
@@ -44,7 +44,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
             (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
             session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(sends + 1));
         }
-        // The cap prevents endless prompts into a dead session; the remaining path is a regular restart.
+        // Das Limit verhindert endlose Prompts in eine tote Sitzung; der verbleibende Pfad ist eine reguläre erneute
         time.Now = time.Now.AddSeconds(61);
         session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
         var exhausted = await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken);
@@ -53,8 +53,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
     }
 
-    /// <summary>The session name of the first check is kept for the re-sent probe, even when a later
-    /// check passes no name.</summary>
+    /// <summary>Der Sitzungsname der ersten Prüfung wird für die erneut gesendete Probe beibehalten, auch wenn eine spätere Prüfung keinen Namen übergibt.</summary>
     [Fact]
     public async Task PendingProbe_ResendKeepsSessionName()
     {
@@ -78,7 +77,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         }
     }
 
-    /// <summary>A probe swallowed by the trust dialog is re-delivered after the user answers and the prompt is ready.</summary>
+    /// <summary>Eine vom Vertrauensdialog verschluckte Probe wird erneut zugestellt, nachdem der Benutzer geantwortet hat und die Eingabeaufforderung bereit ist.</summary>
     [Theory]
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.114.0)", "›", "Do you trust the contents of this directory?")]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.1.0", "❯", "Do you trust the files in this folder?")]
@@ -94,13 +93,13 @@ public sealed partial class ScmEventCliExchangeAccessTests
         var channel = Path.Combine(_root, ScmEventExchangeProtocol.DirectoryName);
         (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
-        // The dialog swallows the already sent probe and is a distinct, non-confirmable wait state.
+        // Der Dialog verschluckt die bereits gesendete Probe und ist ein eigener, nicht bestätigbarer Wartezustand.
         SetScreen(session, banner, trust);
         adapter.ReadyStatus.Should().Be(ScmPromptReadyStatus.TrustPrompt);
         adapter.ConfirmReady(run).Should().BeFalse();
         (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
-        // After the user answers, the pending probe still waits for the resend delay.
+        // Nach der Benutzerantwort wartet die ausstehende Probe noch auf die Wiederholungsverzögerung.
         SetScreen(session, banner, prompt);
         adapter.ReadyStatus.Should().Be(ScmPromptReadyStatus.Ready);
         (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
@@ -109,14 +108,14 @@ public sealed partial class ScmEventCliExchangeAccessTests
         session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
         (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Unknown);
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
-        // The file tool completes the re-delivered challenge on the second attempt.
+        // Das Datei-Tool beantwortet die erneut zugestellte Challenge beim zweiten Versuch.
         var sent = (string)session.Invocations.Last(call => call.Method.Name == nameof(ITerminalSession.WritePromptAsync)).Arguments[0]!;
         await ScmDispatchFixture.CompleteProbeAsync(sent, TestContext.Current.CancellationToken);
         session.Raise(value => value.BufferChanged += null, EventArgs.Empty);
         (await adapter.CheckExchangeAccessAsync(channel, TestContext.Current.CancellationToken)).Status.Should().Be(ScmExchangeAccessStatus.Supported);
     }
 
-    /// <summary>A trust screen while a probe is pending never receives input and never resets the probe.</summary>
+    /// <summary>Ein Vertrauensbildschirm erhält bei ausstehender Probe niemals Eingaben und setzt die Probe nie zurück.</summary>
     [Theory]
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.114.0)", "Do you trust the contents of this directory?")]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.1.0", "Is this a project you created or one you trust?")]
@@ -136,7 +135,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         session.Verify(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary>Replaces the visible screen like the real buffer would and reports the change.</summary>
+    /// <summary>Ersetzt den sichtbaren Bildschirm wie der echte Puffer und meldet die Änderung.</summary>
     private static void SetScreen(Mock<ITerminalSession> session, string banner, string prompt)
     {
         var buffer = new TerminalBuffer(120, 10);

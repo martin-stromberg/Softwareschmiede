@@ -77,7 +77,7 @@ public sealed class ScmEventCancelTests
         Assert.Single(fixture.Prompts);
     }
 
-    /// <summary>A cancellation landing during the prompt write wins over the tracked delivery outcome.</summary>
+    /// <summary>Ein während des Prompt-Schreibens eintreffender Abbruch gewinnt gegen das verfolgte Zustellungsergebnis.</summary>
     [Fact]
     public async Task Cancel_DuringPromptWrite_ClosesEventWithoutDeliveredStatus()
     {
@@ -106,7 +106,7 @@ public sealed class ScmEventCancelTests
         }
     }
 
-    /// <summary>A delivered event that is cancelled while the CLI works is closed without reconciliation.</summary>
+    /// <summary>Ein zugestelltes Ereignis, das während der CLI-Arbeit abgebrochen wird, wird ohne Abgleich geschlossen.</summary>
     [Fact]
     public async Task Cancel_DeliveredEvent_StopsReconciliation()
     {

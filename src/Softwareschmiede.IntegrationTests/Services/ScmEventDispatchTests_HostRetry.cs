@@ -12,7 +12,7 @@ namespace Softwareschmiede.IntegrationTests.Services;
 /// <summary>Host response retries must not reopen a separately blocked event dispatch.</summary>
 public sealed class ScmEventDispatchTests_HostRetry
 {
-    /// <summary>Only an explicit retry or the event deadline may release the dispatch delay.</summary>
+    /// <summary>Nur eine explizite Wiederholung oder die Ereignis-Frist darf die Dispatch-Verzögerung aufheben.</summary>
     [Theory]
     [InlineData(ScmResponseKind.Reaction, true)]
     [InlineData(ScmResponseKind.Comment, true)]

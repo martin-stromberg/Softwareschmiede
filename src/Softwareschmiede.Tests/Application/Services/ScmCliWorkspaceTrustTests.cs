@@ -26,7 +26,7 @@ public sealed class ScmCliWorkspaceTrustTests : IDisposable
         document.RootElement.GetProperty("projects").GetProperty(directory).GetProperty("hasTrustDialogAccepted").GetBoolean().Should().BeTrue();
     }
 
-    /// <summary>An explicit stored decision — including a refusal — is never overridden.</summary>
+    /// <summary>Eine explizit gespeicherte Entscheidung – auch eine Ablehnung – wird niemals überschrieben.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -42,7 +42,7 @@ public sealed class ScmCliWorkspaceTrustTests : IDisposable
         project.GetProperty("otherField").GetInt32().Should().Be(1);
     }
 
-    /// <summary>A directory with its own .claude configuration keeps the manual dialog.</summary>
+    /// <summary>Ein Verzeichnis mit eigener .claude-Konfiguration behält den manuellen Dialog.</summary>
     [Fact]
     public void EnsureClaudeTrusted_SkipsDirectoriesWithOwnClaudeConfiguration()
     {
@@ -52,7 +52,7 @@ public sealed class ScmCliWorkspaceTrustTests : IDisposable
         File.Exists(config).Should().BeFalse();
     }
 
-    /// <summary>An unreadable user configuration is left byte-for-byte intact.</summary>
+    /// <summary>Eine unlesbare Benutzerkonfiguration bleibt Byte für Byte unverändert.</summary>
     [Fact]
     public void EnsureClaudeTrusted_LeavesInvalidJsonUntouched()
     {
@@ -78,7 +78,7 @@ public sealed class ScmCliWorkspaceTrustTests : IDisposable
         File.ReadAllText(config).Should().Be(content);
     }
 
-    /// <summary>A stored project entry — including a deliberate untrusted decision — is respected.</summary>
+    /// <summary>Ein gespeicherter Projekteintrag – auch eine bewusste Untrusted-Entscheidung – wird respektiert.</summary>
     [Theory]
     [InlineData("untrusted")]
     [InlineData("trusted")]
@@ -94,7 +94,7 @@ public sealed class ScmCliWorkspaceTrustTests : IDisposable
         File.ReadAllText(config).Should().Be(original);
     }
 
-    /// <summary>A directory with its own .codex configuration keeps the manual dialog.</summary>
+    /// <summary>Ein Verzeichnis mit eigener .codex-Konfiguration behält den manuellen Dialog.</summary>
     [Fact]
     public void EnsureCodexTrusted_SkipsDirectoriesWithOwnCodexConfiguration()
     {

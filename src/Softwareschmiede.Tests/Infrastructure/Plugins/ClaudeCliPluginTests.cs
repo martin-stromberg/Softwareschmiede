@@ -62,7 +62,7 @@ public sealed class ClaudeCliPluginTests
         invocation.StandardInput.Should().Contain(originalRequirement);
     }
 
-    /// <summary>StartCliAsync returns ProcessStartInfo with claude as filename (absolute path from PATH or fallback).</summary>
+    /// <summary>StartCliAsync gibt ProcessStartInfo mit claude als Dateiname zurück (absoluter Pfad aus PATH oder Fallback).</summary>
     [Fact]
     public async Task StartCliAsync_ShouldReturnProcessStartInfo_WithClaudeCommand()
     {
@@ -81,7 +81,7 @@ public sealed class ClaudeCliPluginTests
         psi.Arguments.Should().Be("--continue session-123");
     }
 
-    /// <summary>StartCliAsync sets ANTHROPIC_API_KEY when credential is stored.</summary>
+    /// <summary>StartCliAsync setzt ANTHROPIC_API_KEY, wenn Anmeldedaten gespeichert sind.</summary>
     [Fact]
     public async Task StartCliAsync_ShouldSetApiKeyEnvironmentVariable_WhenTokenIsStored()
     {

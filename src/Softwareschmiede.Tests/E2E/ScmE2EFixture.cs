@@ -244,7 +244,7 @@ internal sealed class ScmE2EFixture
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var reader = new StreamReader(stream);
         var text = reader.ReadToEnd();
-        // Writer publishes one JSONL record at a time; a trailing partial record is not yet evidence.
+        // Der Writer veröffentlicht einen JSONL-Datensatz pro Vorgang; ein anhängender Teildatensatz ist noch kein Beleg
         return text.Split('\n').SkipLast(1).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
     }
 

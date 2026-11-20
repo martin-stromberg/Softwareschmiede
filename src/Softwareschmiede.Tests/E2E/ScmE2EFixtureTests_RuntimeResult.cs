@@ -5,7 +5,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// <summary>Runtime fixture results are only consumed after their writer releases the file.</summary>
 public sealed class ScmE2EFixtureTests_RuntimeResult
 {
-    /// <summary>A visible but exclusively locked result is retried before returning the complete run identifier.</summary>
+    /// <summary>Ein sichtbares, aber exklusiv gesperrtes Ergebnis wird wiederholt, bevor die vollständige Lauf-ID zurückgegeben wird.</summary>
     [Fact]
     public async Task RuntimeResultAsync_WriterStillOwnsResult_WaitsForCompletePublication()
     {

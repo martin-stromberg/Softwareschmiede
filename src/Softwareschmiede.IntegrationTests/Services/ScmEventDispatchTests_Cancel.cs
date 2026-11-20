@@ -7,7 +7,7 @@ using Softwareschmiede.TestSupport;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>Cancelled events are final for the poll: no dispatch and no remote outbox flush.</summary>
+/// <summary>Abgebrochene Ereignisse sind für den Poll endgültig: kein Dispatch und kein Remote-Outbox-Flush.</summary>
 public sealed class ScmEventDispatchTests_Cancel
 {
     /// <summary>A cancelled event is never delivered and never answers remotely.</summary>
@@ -26,7 +26,7 @@ public sealed class ScmEventDispatchTests_Cancel
         Assert.Empty(fixture.Responses);
     }
 
-    /// <summary>A still pending host response of a cancelled event is not retried remotely.</summary>
+    /// <summary>Eine noch ausstehende Host-Antwort eines abgebrochenen Ereignisses wird remote nicht wiederholt.</summary>
     [Fact]
     public async Task Monitor_CancelledEvent_DoesNotFlushPendingOutbox()
     {

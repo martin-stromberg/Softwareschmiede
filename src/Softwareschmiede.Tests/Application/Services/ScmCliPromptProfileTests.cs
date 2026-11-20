@@ -5,8 +5,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Range boundaries, token strictness and catalog honesty of the prompt-format profiles.</summary>
 public sealed class ScmCliPromptProfileTests
 {
-    /// <summary>Codex and Claude support the same Major.Minor with any patch; Devin tolerates
-    /// any Minor and Patch within Major 3000. Other Major releases are not supported.</summary>
+    /// <summary>Codex und Claude unterstützen dasselbe Major.Minor mit beliebigem Patch; Devin toleriert beliebiges Minor und Patch innerhalb von Major 3000. Andere Major-Releases werden nicht unterstützt.</summary>
     [Theory]
     [InlineData("Softwareschmiede.Codex", "OpenAI Codex (v0.114.0)", true)]
     [InlineData("Softwareschmiede.Codex", "OpenAI Codex (v0.114.7)", true)]
@@ -29,9 +28,8 @@ public sealed class ScmCliPromptProfileTests
         Assert.NotNull(match.Version);
     }
 
-    /// <summary>The real Devin banner draws its braille logo between name and version; the raw
-    /// startup transcript additionally carries ANSI color/erase sequences around the version.</summary>
-    /// <param name="text">Rendered screen or raw startup transcript of Devin CLI v3000.11.228.</param>
+    /// <summary>Das echte Devin-Banner zeichnet sein Braille-Logo zwischen Name und Version; das rohe Start-Transkript enthält zusätzlich ANSI-Farb-/Löschsequenzen um die Version.</summary>
+    /// <param name="text">Gerenderter Bildschirm oder rohes Start-Transkript der Devin-CLI v3000.11.228.</param>
     [Theory]
     [InlineData("⠀⣴⣾⣶⡄⠀⠀⠀⠀\n⠀⠛⠿⠟⠻⣶⣾⣶⡄  Devin CLI\n⠀⣤⣶⣦⣴⠿⢿⠿⠃  v3000.11.228\n⠀⠻⢿⠿⠃⠀⠀⠀⠀")]
     [InlineData("⠀⠛⠿⠟⠻⣶⣾⣶⡄  Devin CLI⠀⣤⣶⣦⣴⠿⢿⠿⠃  \u001b[38;5;244mv3000.11.228\u001b[m⠀⠻⢿⠿⠃⠀⠀⠀⠀\u001b[9;1H")]
@@ -98,8 +96,7 @@ public sealed class ScmCliPromptProfileTests
         Assert.True(ScmCliWaitReason.IsConfirmable(reason));
     }
 
-    /// <summary>A recognized anchor without a bound channel reports the start-contract reason,
-    /// never a missing banner, and stays non-confirmable.</summary>
+    /// <summary>Ein erkannter Anker ohne gebundenen Kanal meldet den Startvertrags-Grund, niemals ein fehlendes Banner, und bleibt nicht bestätigbar.</summary>
     [Fact]
     public void Describe_AnchorWithoutChannel_ReportsAccessReason()
     {
@@ -111,7 +108,7 @@ public sealed class ScmCliPromptProfileTests
         Assert.False(ScmCliWaitReason.IsConfirmable(reason));
     }
 
-    /// <summary>An unknown format never offers confirmation, with and without a known CLI name.</summary>
+    /// <summary>Ein unbekanntes Format bietet niemals eine Bestätigung an, mit und ohne bekannten CLI-Namen.</summary>
     [Fact]
     public void Describe_Unknown_NeverConfirmable()
     {

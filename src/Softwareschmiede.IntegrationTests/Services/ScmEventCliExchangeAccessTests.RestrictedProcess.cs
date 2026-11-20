@@ -169,9 +169,9 @@ public sealed partial class ScmEventCliExchangeAccessTests
             {
                 messages = await protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
                 // The child publishes accepted.json and the action in immediate succession, but
-                // ReadAsync reports a file only after observing it unchanged twice. A snapshot in
-                // which the action is already stable while accepted.json was not yet seen in the
-                // previous pass is a legal transient state — wait for the complete expected state
+                // ReadAsync meldet eine Datei erst, nachdem sie zweimal unverändert beobachtet wurde. Ein Snapshot,
+                // in dem die Aktion bereits stabil ist, während accepted.json im vorherigen Durchlauf noch nicht
+                // gesehen wurde, ist ein legaler Übergangszustand – auf den vollständigen erwarteten Zustand warten,
                 // instead of breaking on the first action sighting.
                 if (messages.Accepted is not null && messages.Actions.Count == 1) break;
                 if (process.HasExited) break;
@@ -224,8 +224,8 @@ public sealed partial class ScmEventCliExchangeAccessTests
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("The restricted process proof requires Windows.");
         await GitInit(_root);
         var sid = "S-1-5-21-" + string.Join('-', Enumerable.Range(0, 4).Select(_ => BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(4))));
-        // The child may initialize in this workspace, but its non-inheritable right must never
-        // be promoted into an explicit grant on the private channel's descendants.
+        // Das Kind darf in diesem Workspace initialisieren, aber sein nicht vererbbares Recht darf niemals
+        // in ein explizites Grant auf die Nachkommen des privaten Kanals überführt werden.
         RestrictDirectory(_root, sid, inheritCapability: false);
         var (prefix, spec) = await Spec(provider, GrantingArguments(provider));
         var session = Session(Banner(provider), PromptGlyph(provider));

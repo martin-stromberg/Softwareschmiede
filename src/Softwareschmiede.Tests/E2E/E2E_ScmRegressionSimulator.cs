@@ -2,7 +2,7 @@ namespace Softwareschmiede.Tests.E2E;
 
 public partial class End2EndTest
 {
-    /// <summary>Exercises SCM-adjacent UI workflows through the explicit test-database pipe backend; this is not ConPTY coverage.</summary>
+    /// <summary>Übt SCM-nahe UI-Abläufe über das explizite Test-Datenbank-Pipe-Backend; dies ist keine ConPTY-Abdeckung.</summary>
     [Fact]
     [Trait("Scenario", "ScmRegressionSimulator")]
     public async Task Simulator_PluginswitchProjectdefaultWorkitemstartAndNavigation_E2E()

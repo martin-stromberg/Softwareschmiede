@@ -30,7 +30,7 @@ public sealed class AiExecutionServiceTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _sut.Dispose();
 
-    /// <summary>IsRunning returns false for unknown task.</summary>
+    /// <summary>IsRunning gibt für eine unbekannte Aufgabe false zurück.</summary>
     [Fact]
     public void IsRunning_ShouldReturnFalse_WhenNoProcessStarted()
     {
@@ -44,7 +44,7 @@ public sealed class AiExecutionServiceTests : IDisposable
         _sut.GetRunningCount().Should().Be(0);
     }
 
-    /// <summary>GetLastExitCode returns null for unknown task.</summary>
+    /// <summary>GetLastExitCode gibt für eine unbekannte Aufgabe null zurück.</summary>
     [Fact]
     public void GetLastExitCode_ShouldReturnNull_WhenNoProcessStarted()
     {

@@ -106,7 +106,7 @@ public sealed class TerminalBufferTests
         // Writing on the last row and advancing should scroll
         sut.Apply(new TextWrittenEvent("C\n"));
 
-        // After scroll the buffer still has 2 rows, content shifted
+        // Nach dem Scroll hat der Puffer weiterhin 2 Zeilen, Inhalt verschoben
         sut.Rows.Should().Be(2);
     }
 

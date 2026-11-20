@@ -131,8 +131,7 @@ public sealed class ScmEventDispatchTests
         Assert.Equal(101, fixture.Responses.Count(x => x.Kind == Domain.ValueObjects.ScmResponseKind.Reaction));
     }
 
-    /// <summary>A stored github-actions observation passes dispatch revalidation via the trust
-    /// list and is delivered like an owner-authored event.</summary>
+    /// <summary>Eine gespeicherte github-actions-Beobachtung besteht die Dispatch-Revalidierung über die Vertrauensliste und wird wie ein vom Besitzer verfasstes Ereignis zugestellt.</summary>
     [Fact]
     public async Task Dispatch_GitHubActionsAuthoredObservation_Delivers()
     {

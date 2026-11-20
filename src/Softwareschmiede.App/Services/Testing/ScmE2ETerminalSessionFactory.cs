@@ -6,7 +6,7 @@ using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.App.Services.Testing;
 
-// Installed only after validation of the isolated SCM scenario and database root.
+// Wird erst nach Validierung des isolierten SCM-Szenarios und Datenbank-Roots installiert.
 internal sealed class ScmE2ETerminalSessionFactory(TerminalSessionService inner, ScmE2ETestConfiguration configuration) : ITerminalSessionFactory
 {
     public async Task<TerminalSessionStartResult> StartAsync(Guid workItemId, TerminalSessionStartSpec spec,

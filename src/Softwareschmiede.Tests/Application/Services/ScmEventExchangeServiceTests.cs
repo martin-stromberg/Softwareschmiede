@@ -13,7 +13,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     private readonly ScmEventExchangeProtocol _protocol = new();
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Creates an isolated repository, without credentials or a remote.</summary>
+    /// <summary>Erstellt ein isoliertes Repository, ohne Anmeldedaten oder Remote.</summary>
     public ScmEventExchangeServiceTests()
     {
         Directory.CreateDirectory(_root);
@@ -174,7 +174,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         (await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken)).Diagnostic.Should().Contain("verändert");
     }
 
-    /// <summary>A correlated result may transition failure to success, but success is immutable.</summary>
+    /// <summary>Ein korreliertes Ergebnis darf Fehlschlag in Erfolg überführen, Erfolg ist jedoch unveränderlich.</summary>
     [Fact]
     public async Task Result_AllowsRetryButNeverChangesSuccess()
     {
@@ -494,7 +494,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     /// <summary>Removes only the newly created isolated test repository.</summary>
     public void Dispose()
     {
-        // Git object files are read-only on Windows, including objects created by the tracked-content case.
+        // Git-Objektdateien sind unter Windows schreibgeschützt, einschließlich Objekten, die vom Tracked-Content-
         TempDirectoryCleanup.DeleteBestEffort(_root, normalizeAttributes: true);
     }
 }

@@ -51,7 +51,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         SelectEvent(window, 1);
         output.WriteLine("E1: real reception, original body/origin, one receipt/waiting comment, replay and back navigation passed.");
 
-        // E5 uses the sole second app start, before any simulator is launched.
+        // E5 nutzt den einzigen zweiten App-Start, bevor ein Simulator gestartet wird.
         window = RestartAppPreservingDatabase();
         NavigateQueue(window);
         SelectEvent(window, 1);
@@ -182,7 +182,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Equal(promptCount, fixture.Prompts().Count);
         output.WriteLine("E6-Wiederaufnahme (403 after acceptance): pending remote reply retried without new event prompt/attempt.");
 
-        // A living, identified CLI can be explicitly confirmed without inventing readiness from I/O silence.
+        // Eine lebende, identifizierte CLI kann explizit bestätigt werden, ohne Bereitschaft aus I/O
         fixture.Control("unknown-ready", true);
         fixture.AddText(10, 1001, "$Softwareschmiede Bereitschaft ausdrücklich bestätigen");
         await fixture.WaitEventAsync(10, "Wartend");
@@ -282,7 +282,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.AddText(1, 105, "$Softwareschmiede Verspäteten aktuellen Versuch prüfen");
         var current = await fixture.WaitEventAsync(1, "ZustellungUngewiss", 105);
         await WaitPromptCountAsync(fixture, promptCount + 2, current.DeliveryAttemptId);
-        // Prove the explicit status action while the current attempt is still uncertain.
+        // Beweist die explizite Status-Aktion, solange der aktuelle Versuch noch unsicher ist.
         // Once completion is released, background reconciliation may finish it and hide the action.
         SelectEvent(window, 1);
         Click(window, "ScmEventCheckStatus");
@@ -314,7 +314,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         }
         output.WriteLine("E7-Anlage: qualified event on unassigned reference creates exactly one task with issue reference and inbox entry.");
 
-        // The auto-created task has no default CLI, so its event waits with an actionable reason.
+        // Die automatisch erstellte Aufgabe hat keine Standard-CLI, ihr Ereignis wartet also mit umsetzbarem Grund.
         var waiting = await fixture.WaitEventForTaskAsync(created.Id, "Wartend");
         Assert.Contains("Keine Standard-CLI", waiting.Reason);
         promptCount = fixture.Prompts().Count;
@@ -526,7 +526,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.AddText(15, 1501, "$Softwareschmiede Neue Sitzung ausdrücklich bestätigen");
         await fixture.WaitEventAsync(15, "Wartend");
         SelectEvent(window, 15);
-        // A real double click is followed by a monitor cycle while the dialog is open.
+        // Auf einen echten Doppelklick folgt ein Monitor-Zyklus, während der Dialog offen ist.
         EventRow(window, 15).DoubleClick();
         ChoosePlugin(window);
         await WaitReasonAsync(fixture, 15, "Eingabebereitschaft unbekannt");
@@ -584,8 +584,8 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var readOnly = await fixture.WaitEventAsync(17, "Wartend");
         Assert.NotNull(readOnly.CliRunId);
         Assert.Equal(count + 4, fixture.Prompts().Count);
-        // Keep dispatch blocked at the remote boundary while proving the manual stop/restart.
-        // Otherwise normal polling may restart the stopped task before the UI click reaches it.
+        // Hält den Dispatch an der Remote-Grenze blockiert, während der manuelle Stopp/Neustart bewiesen wird.
+        // Sonst kann normales Polling die gestoppte Aufgabe neu starten, bevor der UI-Klick sie erreicht.
         fixture.Scenario.CanWrite = false;
         fixture.SaveScenario();
         SelectEvent(window, 17);
@@ -611,7 +611,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
 
         // A simulator started without its protocol banner stays honestly unrecognized: the wait
         // reason names the missing banner instead of unknown readiness, no confirm button is
-        // offered, and a regular restart with the banner delivers the same event.
+        // angeboten, und ein regulärer Neustart mit Banner liefert dasselbe Ereignis.
         fixture.Control("unknown-banner", true);
         SelectEvent(window, 2);
         StartSelected(window);
@@ -624,7 +624,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var unrecognized = await fixture.WaitEventAsync(2, "Wartend");
         Assert.NotNull(unrecognized.CliRunId);
         Assert.Equal(count + 5, fixture.Prompts().Count);
-        // Keep dispatch blocked at the remote boundary while proving the manual stop/restart.
+        // Hält den Dispatch an der Remote-Grenze blockiert, während der manuelle Stopp/Neustart bewiesen wird.
         fixture.Scenario.CanWrite = false;
         fixture.SaveScenario();
         SelectEvent(window, 2);
@@ -725,7 +725,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var dialog = WaitForElement(window, cf => cf.ByName("KI-Plugin auswählen")
             .And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Window)), Long);
         var choices = WaitForElement(dialog, cf => cf.ByName("PluginSelection"), Long).AsComboBox();
-        // The dialog is published to UIA before WPF has necessarily realized its items.
+        // Der Dialog wird an UIA veröffentlicht, bevor WPF seine Items zwingend realisiert hat.
         var deadline = DateTime.UtcNow + Long;
         while (choices.Items.Length == 0 && DateTime.UtcNow < deadline) Thread.Sleep(100);
         Assert.Single(choices.Items);

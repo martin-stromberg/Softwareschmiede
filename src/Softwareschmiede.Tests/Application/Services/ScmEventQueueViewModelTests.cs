@@ -48,7 +48,7 @@ public sealed class ScmEventQueueViewModelTests
         Assert.Empty(view.Events);
     }
 
-    /// <summary>CLI selection is enabled only while a real selection or handoff can still take place.</summary>
+    /// <summary>Die CLI-Auswahl ist nur aktiviert, solange eine echte Auswahl oder Übergabe noch stattfinden kann.</summary>
     [Theory]
     [InlineData("Wartend", false, true)]
     [InlineData("Zugestellt", true, false)]
@@ -293,7 +293,7 @@ public sealed class ScmEventQueueViewModelTests
         Assert.Single(view.Events);
     }
 
-    /// <summary>A halted source is visible even with no event; correcting the source clears the notice.</summary>
+    /// <summary>Eine angehaltene Quelle ist auch ohne Ereignis sichtbar; das Korrigieren der Quelle räumt den Hinweis ab.</summary>
     [Fact]
     public async Task SourceAuthenticationFailure_IsVisibleWithoutEvents_AndClearsAfterRecovery()
     {
@@ -327,8 +327,7 @@ public sealed class ScmEventQueueViewModelTests
         Assert.Null(view.MonitoringNotice);
     }
 
-    /// <summary>Unassigned references are the expected repo-wide state: no interruption banner and no
-    /// diagnostics entry, while real observation errors on other sources still alarm.</summary>
+    /// <summary>Unzugeordnete Referenzen sind der erwartete repo-weite Zustand: kein Unterbrechungsbanner und kein Diagnoseeintrag, während echte Beobachtungsfehler anderer Quellen weiterhin alarmieren.</summary>
     [Fact]
     public async Task UnassignedSources_NeitherBannerNorDiagnostics_RealErrorsStillAlert()
     {

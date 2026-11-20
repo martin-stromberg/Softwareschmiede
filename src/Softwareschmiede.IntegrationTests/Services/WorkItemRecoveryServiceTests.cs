@@ -103,7 +103,7 @@ public sealed class WorkItemRecoveryServiceTests
 
         // The barrier ensures both tasks complete their initial entity read (RecoveryVersion=0)
         // before either proceeds to the transaction and update. Without it, one task may finish
-        // entirely before the other reads, giving the second task a different starting RecoveryVersion
+        // vollständig vor den anderen liest, sodass die zweite Aufgabe eine andere RecoveryVersion als Ausgang erhält.
         // and allowing both to succeed.
         var runningStatus = new BarrieredNotRunningStatusSource(participantCount: 2);
         var recovery1 = new WorkItemRecoveryService(context1, runningStatus, NullLogger<WorkItemRecoveryService>.Instance);

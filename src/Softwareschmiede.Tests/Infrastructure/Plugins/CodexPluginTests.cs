@@ -43,7 +43,7 @@ public sealed class CodexPluginTests
         commandLineParameterField.IsRequired.Should().BeFalse();
     }
 
-    /// <summary>SupportsSessionContinuation returns false until a stable local CLI pattern exists.</summary>
+    /// <summary>SupportsSessionContinuation gibt false zurück, bis ein stabiles lokales CLI-Muster existiert.</summary>
     [Fact]
     public void SupportsSessionContinuation_ShouldReturnFalse()
     {

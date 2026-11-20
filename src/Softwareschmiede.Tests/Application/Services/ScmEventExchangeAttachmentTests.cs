@@ -16,7 +16,7 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
     private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
     private static readonly byte[] Gif = [(byte)'G', (byte)'I', (byte)'F', (byte)'8', (byte)'9', (byte)'a', 1, 2];
 
-    /// <summary>Creates an isolated repository, without credentials or a remote.</summary>
+    /// <summary>Erstellt ein isoliertes Repository, ohne Anmeldedaten oder Remote.</summary>
     public ScmEventExchangeAttachmentTests()
     {
         Directory.CreateDirectory(_root);

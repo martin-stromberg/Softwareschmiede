@@ -23,8 +23,8 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
         }
     }
 
-    // The E2E suite never creates screenshots; the stub stays dormant but keeps an
-    // unexpected upload call diagnosable in scm-calls.jsonl like every remote call.
+    // Die E2E-Suite erstellt niemals Screenshots; der Stub bleibt ruhend, hält aber einen
+    // unerwarteten Upload-Aufruf in scm-calls.jsonl wie jeden Remote-Aufruf diagnostizierbar.
     public Task<GitHubEventApiResponse> UploadAsync(GitHubAssetUploadRequest request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
