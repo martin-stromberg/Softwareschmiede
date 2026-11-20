@@ -30,7 +30,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary><summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit.</summary>.</summary>
+    /// <summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit.</summary>
     [Fact]
     public async Task ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit()
     {
@@ -45,7 +45,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         candidates.Should().Contain(workItem.Id);
     }
 
-    /// <summary><summary>ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat.</summary>.</summary>
+    /// <summary>ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat.</summary>
     [Fact]
     public async Task ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat()
     {
@@ -60,7 +60,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         candidates.Should().NotContain(workItem.Id);
     }
 
-    /// <summary><summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend.</summary>.</summary>
+    /// <summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend.</summary>
     [Fact]
     public async Task ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend()
     {
@@ -75,7 +75,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         candidates.Should().Contain(workItem.Id);
     }
 
-    /// <summary><summary>ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben.</summary>.</summary>
+    /// <summary>ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben.</summary>
     [Fact]
     public async Task ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben()
     {
@@ -90,7 +90,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         candidates.Should().NotContain(workItem.Id);
     }
 
-    /// <summary><summary>RecoverManuellAsync_Setzt_StatusAufGestartet.</summary>.</summary>
+    /// <summary>RecoverManuellAsync_Setzt_StatusAufGestartet.</summary>
     [Fact]
     public async Task RecoverManuellAsync_Setzt_StatusAufGestartet()
     {
@@ -100,7 +100,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        await sut.RecoverManuellAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await sut.RecoverManuallyAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         var geladen = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         geladen!.Status.Should().Be(WorkItemStatus.Started);

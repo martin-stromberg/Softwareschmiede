@@ -14,15 +14,15 @@ namespace Softwareschmiede.Tests.App.Services;
 /// <summary>Unit-Tests für <see cref="CliReplayExportService"/>.</summary>
 public sealed class CliReplayExportServiceTests : IDisposable
 {
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly CliReplayRecordingStore _store = new();
     private readonly CliReplayExportService _sut;
 
     /// <summary>CliReplayExportServiceTests.</summary>
     public CliReplayExportServiceTests()
     {
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
-        _sut = new CliReplayExportService(_kiService, _store, NullLogger<CliReplayExportService>.Instance);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
+        _sut = new CliReplayExportService(_aiService, _store, NullLogger<CliReplayExportService>.Instance);
     }
 
     /// <summary>Dispose — die KiAusfuehrungsService-Instanzen werden bewusst nicht disposed, weil der

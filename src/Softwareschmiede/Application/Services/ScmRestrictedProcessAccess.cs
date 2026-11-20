@@ -8,13 +8,13 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Softwareschmiede.Application.Services;
 
-/// <summary>Reads restrictive capability identities from a same-user process, without changing its token.</summary>
+/// <summary>Liest restriktive Capability-Identitäten aus einem Prozess desselben Benutzers, ohne dessen Token zu verändern.</summary>
 public static class ScmRestrictedProcessAccess
 {
     /// <summary>
-    /// Carries only already-inheritable dedicated workspace write capabilities into the private
-    /// channel. These are candidates, not access evidence: the actual CLI file tool must still
-    /// complete a challenge in that channel. Parent process tokens are deliberately irrelevant.
+    /// Überträgt nur bereits vererbbare dedizierte Arbeitsbereich-Schreib-Capabilities in den privaten
+    /// Kanal. Sie sind Kandidaten, kein Zugriffsnachweis: Das eigentliche CLI-Dateitool muss in
+    /// diesem Kanal weiterhin eine Challenge bestehen. Elternprozess-Tokens sind bewusst irrelevant.
     /// </summary>
     public static IReadOnlyList<string> CaptureWorkspaceCapabilities(string workingDirectory)
     {
@@ -28,7 +28,7 @@ public static class ScmRestrictedProcessAccess
         ScmEventExchangeProtocol.EnsureSafePath(workingDirectory);
         var rules = new DirectoryInfo(workingDirectory).GetAccessControl()
             .GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>().ToArray();
-        // Replacing a deny-bearing inherited DACL could otherwise weaken the effective sandbox.
+        // Das Ersetzen einer vererbten DACL mit Deny-Einträgen könnte die effektive Sandbox sonst abschwächen.
         if (rules.Any(rule => rule.AccessControlType == AccessControlType.Deny))
             throw new UnauthorizedAccessException("Arbeitsbereich enthält nicht übertragbare Zugriffsverweigerungen.");
         const InheritanceFlags inheritance = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
@@ -40,7 +40,7 @@ public static class ScmRestrictedProcessAccess
             .Select(rule => rule.IdentityReference.Value).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
     }
 
-    /// <summary>General users, groups, well-known principals and broad capabilities are never channel grants.</summary>
+    /// <summary>Allgemeine Benutzer, Gruppen, bekannte Prinzipale und breite Capabilities sind niemals Kanal-Freigaben.</summary>
     public static void ValidateRestrictingSid(string sid)
     {
         if (!OperatingSystem.IsWindows())
@@ -53,9 +53,9 @@ public static class ScmRestrictedProcessAccess
     [SupportedOSPlatform("windows")]
     private static bool IsDedicatedRestriction(SecurityIdentifier identity)
     {
-        // Workspace sandbox capabilities use random account-shaped SIDs. AppContainer capability
-        // SIDs (S-1-15-3-...) cannot be passed to CreateRestrictedToken. Never grant a real account,
-        // a local-domain principal, or broad helper entries such as Everyone and the logon SID.
+        // Arbeitsbereich-Sandbox-Capabilities nutzen zufällige kontoähnliche SIDs. AppContainer-Capability-
+        // SIDs (S-1-15-3-...) können nicht an CreateRestrictedToken übergeben werden. Niemals ein
+        // echtes Konto, einen lokalen Domänenprinzipal oder breite Hilfseinträge wie Jeder gewähren.
         if (!identity.Value.StartsWith("S-1-5-21-", StringComparison.Ordinal) || identity.Value.Split('-').Length != 8)
             return false;
         using var current = WindowsIdentity.GetCurrent();
@@ -73,7 +73,7 @@ public static class ScmRestrictedProcessAccess
         }
     }
 
-    /// <summary>Returns actual restricting SIDs; inability to inspect a token must fail the access contract.</summary>
+    /// <summary>Gibt die tatsächlich einschränkenden SIDs zurück; kann ein Token nicht geprüft werden, muss der Zugriffsvertrag scheitern.</summary>
     public static IReadOnlyList<string> Capture(Process process)
     {
         if (!OperatingSystem.IsWindows()) return [];

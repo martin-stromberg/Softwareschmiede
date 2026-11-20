@@ -29,7 +29,7 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
         }
     }
 
-    /// <summary><summary>RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive.</summary>.</summary>
+    /// <summary>RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive.</summary>
     [Fact]
     public async Task RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive()
     {
@@ -49,7 +49,7 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
             Times.Never);
     }
 
-    /// <summary><summary>RunAsync_ShouldThrow_WhenScriptPathEscapesRepositoryRoot.</summary>.</summary>
+    /// <summary>RunAsync_ShouldThrow_WhenScriptPathEscapesRepositoryRoot.</summary>
     [Fact]
     public async Task RunAsync_ShouldThrow_WhenScriptPathEscapesRepositoryRoot()
     {
@@ -63,7 +63,7 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
             .WithMessage("*innerhalb des Repositorys*");
     }
 
-    /// <summary><summary>RunAsync_ShouldPassOnlyScriptArgumentsWithoutPortContract_WhenScriptExecutionSucceeds.</summary>.</summary>
+    /// <summary>RunAsync_ShouldPassOnlyScriptArgumentsWithoutPortContract_WhenScriptExecutionSucceeds.</summary>
     [Fact]
     public async Task RunAsync_ShouldPassOnlyScriptArgumentsWithoutPortContract_WhenScriptExecutionSucceeds()
     {
@@ -103,7 +103,7 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
         capturedArgs.Should().NotContain("-RepositoryPath");
     }
 
-    /// <summary><summary>RunAsync_ShouldThrow_WhenCliExecutionFails.</summary>.</summary>
+    /// <summary>RunAsync_ShouldThrow_WhenCliExecutionFails.</summary>
     [Fact]
     public async Task RunAsync_ShouldThrow_WhenCliExecutionFails()
     {

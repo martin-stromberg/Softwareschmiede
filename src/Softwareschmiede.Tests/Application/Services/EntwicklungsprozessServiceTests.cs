@@ -599,7 +599,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         var workItem = await _workItemService.CreateAsync(_projektId, "Commit ohne Klon", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        var act = () => _sut.CommitDurchfuehrenAsync(workItem.Id, "Commit message");
+        var act = () => _sut.ExecuteCommitAsync(workItem.Id, "Commit message");
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -614,7 +614,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         var workItem = await _workItemService.CreateAsync(_projektId, "Push ohne Klon", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        var act = () => _sut.PushDurchfuehrenAsync(workItem.Id);
+        var act = () => _sut.ExecutePushAsync(workItem.Id);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>();

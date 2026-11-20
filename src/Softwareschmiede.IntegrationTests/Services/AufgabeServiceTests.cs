@@ -323,7 +323,7 @@ public sealed class AufgabeServiceTests
         await service.CreateAsync(projectId, "Dritte Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        var result = await service.GetByProjektAsync(projectId, TestContext.Current.CancellationToken);
+        var result = await service.GetByProjectAsync(projectId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(3);

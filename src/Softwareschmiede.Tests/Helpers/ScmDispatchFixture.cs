@@ -270,10 +270,10 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     }
 
     /// <summary>Schreibt eine generische Anwendungseinstellung (z. B. Ausführungslimits).</summary>
-    internal async Task SetSettingAsync(string schluessel, string? value)
+    internal async Task SetSettingAsync(string key, string? value)
     {
         using var scope = Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppSettingService>().SetSettingAsync(schluessel, value);
+        await scope.ServiceProvider.GetRequiredService<AppSettingService>().SetSettingAsync(key, value);
     }
 
     /// <summary>Der Singleton-Prozessverwalter der Fixture (für Start/Stop-Prüfungen).</summary>

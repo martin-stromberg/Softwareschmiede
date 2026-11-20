@@ -24,7 +24,7 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary><summary>ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu.</summary>.</summary>
+    /// <summary>ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu.</summary>
     [Fact]
     public async Task ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu()
     {
@@ -38,7 +38,7 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
         workItem.Status.Should().Be(WorkItemStatus.New);
     }
 
-    /// <summary><summary>MehrereProjekte_KoennenErstellt_UndGeladen_Werden.</summary>.</summary>
+    /// <summary>MehrereProjekte_KoennenErstellt_UndGeladen_Werden.</summary>
     [Fact]
     public async Task MehrereProjekte_KoennenErstellt_UndGeladen_Werden()
     {
@@ -49,7 +49,7 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
         alle.Count.Should().BeGreaterThanOrEqualTo(2);
     }
 
-    /// <summary><summary>Aufgabe_KannInProjektGeladen_Werden.</summary>.</summary>
+    /// <summary>Aufgabe_KannInProjektGeladen_Werden.</summary>
     [Fact]
     public async Task Aufgabe_KannInProjektGeladen_Werden()
     {
@@ -57,7 +57,7 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
         await _workItemService.CreateAsync(project.Id, "Aufgabe 1", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.CreateAsync(project.Id, "Aufgabe 2", null, ct: TestContext.Current.CancellationToken);
 
-        var workItems = await _workItemService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().HaveCount(2);
         workItems.All(a => a.ProjectId == project.Id).Should().BeTrue();
     }

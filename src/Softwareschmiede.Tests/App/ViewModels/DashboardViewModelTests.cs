@@ -127,13 +127,13 @@ public sealed class DashboardViewModelTests : IDisposable
     public void AufgabenListenModus_ShouldBeSettableAndRaisePropertyChanged()
     {
         var sut = CreateSut();
-        var geaendert = new List<string?>();
-        sut.PropertyChanged += (_, e) => geaendert.Add(e.PropertyName);
+        var changed = new List<string?>();
+        sut.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
         sut.AufgabenListenModus = AufgabenListenModus.Repository;
 
         sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Repository);
-        geaendert.Should().Contain(nameof(DashboardViewModel.AufgabenListenModus));
+        changed.Should().Contain(nameof(DashboardViewModel.AufgabenListenModus));
     }
 
     /// <summary>Ein persistierter Dashboard-Modus wird über GespeichertenAufgabenListenModusLadenAsync wiederhergestellt.</summary>

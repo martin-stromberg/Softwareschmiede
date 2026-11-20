@@ -120,10 +120,10 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
     /// </summary>
     public void ApplyGespeicherteUpdateSettings(UpdateSettings settings)
     {
-        var geaendert = _aktuelleUpdateEinstellungen != settings;
+        var changed = _aktuelleUpdateEinstellungen != settings;
         _aktuelleUpdateEinstellungen = settings;
 
-        if (geaendert)
+        if (changed)
         {
             Interlocked.Increment(ref _updateSettingsGeneration);
             CancelLaufendenUpdateAblauf();

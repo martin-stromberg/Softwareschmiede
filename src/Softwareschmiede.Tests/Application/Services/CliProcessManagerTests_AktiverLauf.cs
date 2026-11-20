@@ -24,7 +24,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
 {
     private readonly string _dbName = Guid.NewGuid().ToString();
     private readonly ServiceProvider _provider;
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly CliProcessManager _sut;
     private readonly WorkItemRunDataChangedNotifier _runDataChangedNotifier = new();
     private readonly Guid _projektId = Guid.NewGuid();
@@ -65,9 +65,9 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
 
         var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
         var kiScopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = TestKiAusfuehrungsServiceFactory.Create(kiScopeFactoryMock.Object);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create(kiScopeFactoryMock.Object);
         _sut = new CliProcessManager(
-            _kiService,
+            _aiService,
             scopeFactory,
             NullLogger<CliProcessManager>.Instance,
             _runDataChangedNotifier);
@@ -77,7 +77,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     public void Dispose()
     {
         _sut.Dispose();
-        _kiService.Dispose();
+        _aiService.Dispose();
         _provider.Dispose();
     }
 
@@ -166,7 +166,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     private void PlantLaufendesHandle(Guid workItemId)
     {
         var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
+        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_aiService)!;
         handles[workItemId] = new CliProcessHandle(workItemId, System.Diagnostics.Process.GetCurrentProcess());
     }
 
@@ -184,7 +184,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         var notifierFired = new ManualResetEventSlim(false);
         _runDataChangedNotifier.RunDataChanged += _ => notifierFired.Set();
 
-        _kiService.NotifyRunActive(_aufgabeId);
+        _aiService.NotifyRunActive(_aufgabeId);
 
         await PollUntilAsync(() => LadeAufgabe().ActiveRunId is not null);
         var workItem = LadeAufgabe();

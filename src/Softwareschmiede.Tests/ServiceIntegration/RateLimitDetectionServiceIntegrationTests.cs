@@ -26,7 +26,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary><summary>MarkerInAusgabe_WirdErkannt_UndRateLimitEintragErstellt.</summary>.</summary>
+    /// <summary>MarkerInAusgabe_WirdErkannt_UndRateLimitEintragErstellt.</summary>
     [Fact]
     public async Task MarkerInAusgabe_WirdErkannt_UndRateLimitEintragErstellt()
     {
@@ -41,7 +41,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
         entries.Should().Contain(e => e.Type == LogEntryType.RateLimit);
     }
 
-    /// <summary><summary>ParseRateLimitMarker_ExtrahiertZeitstempel_Korrekt.</summary>.</summary>
+    /// <summary>ParseRateLimitMarker_ExtrahiertZeitstempel_Korrekt.</summary>
     [Fact]
     public void ParseRateLimitMarker_ExtrahiertZeitstempel_Korrekt()
     {
@@ -54,7 +54,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
         resetUtc.Value.Day.Should().Be(15);
     }
 
-    /// <summary><summary>VorschlagPrompt_WirdGespeichert_UndStatusWirdWartend.</summary>.</summary>
+    /// <summary>VorschlagPrompt_WirdGespeichert_UndStatusWirdWartend.</summary>
     [Fact]
     public async Task VorschlagPrompt_WirdGespeichert_UndStatusWirdWartend()
     {
@@ -63,7 +63,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
 
         await _workItemService.StartAsync(workItem.Id, "main", "/tmp/repo", ct: TestContext.Current.CancellationToken);
 
-        await _workItemService.SavePromptVorschlagAsync(workItem.Id, "Fortsetze mit Analyse der Fehler", DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
+        await _workItemService.SavePromptSuggestionAsync(workItem.Id, "Fortsetze mit Analyse der Fehler", DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
 
         await _workItemService.SetStatusAsync(workItem.Id, WorkItemStatus.Waiting, TestContext.Current.CancellationToken);
 
@@ -73,15 +73,15 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
         geladen.SuggestedExecuteAfterUtc.Should().NotBeNull();
     }
 
-    /// <summary><summary>ClearPromptVorschlag_EntferntVorschlagUndZeitstempel.</summary>.</summary>
+    /// <summary>ClearPromptVorschlag_EntferntVorschlagUndZeitstempel.</summary>
     [Fact]
     public async Task ClearPromptVorschlag_EntferntVorschlagUndZeitstempel()
     {
         var project = await _projektService.CreateAsync("Clear-Projekt", null, TestContext.Current.CancellationToken);
         var workItem = await _workItemService.CreateAsync(project.Id, "Clear-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
-        await _workItemService.SavePromptVorschlagAsync(workItem.Id, "Ein Vorschlag", DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
-        await _workItemService.ClearPromptVorschlagAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await _workItemService.SavePromptSuggestionAsync(workItem.Id, "Ein Vorschlag", DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
+        await _workItemService.ClearPromptSuggestionAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         var geladen = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         geladen!.SuggestedPrompt.Should().BeNull();

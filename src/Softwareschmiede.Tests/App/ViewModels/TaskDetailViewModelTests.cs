@@ -22,7 +22,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     private readonly WorkItemService _workItemService;
     private readonly LogService _logService;
     private readonly TodoService _todoService;
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly DevelopmentProcessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly PromptTemplateService _promptVorlagenService;
@@ -44,7 +44,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
 
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
 
         _kiPluginMock = new Mock<IKiPlugin>();
         _kiPluginMock.SetupGet(p => p.PluginName).Returns("Test KI");
@@ -103,7 +103,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var pluginActivationService = new PluginActivationService(new AppSettingService(_db, NullLogger<AppSettingService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
         _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
-        _promptScheduleDispatchService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
@@ -120,7 +120,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             gitPluginMock.Object,
             _pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            new DevelopmentProcessServiceOptions(AiExecutionService: _kiService),
+            new DevelopmentProcessServiceOptions(AiExecutionService: _aiService),
             NullLogger<DevelopmentProcessService>.Instance);
 
         _dialogServiceMock = new Mock<IDialogService>();
@@ -138,7 +138,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
         _tempDirectoryFixture.Dispose();
     }
@@ -180,7 +180,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var vm = new TaskDetailViewModel(
             _workItemService,
             _logService,
-            _kiService,
+            _aiService,
             _entwicklungsprozessService,
             _pluginSelectionService,
             _promptVorlagenService,
@@ -1162,7 +1162,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var stopTask = ((AsyncRelayCommand)sut.CliStoppenCommand).ExecuteAsync();
         await Task.Delay(200);
         var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
+        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_aiService)!;
         handles.TryRemove(workItemId, out _);
         await stopTask;
     }
@@ -1510,7 +1510,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
 
-        _kiService.Dispose();
+        _aiService.Dispose();
 
         await ((AsyncRelayCommand)sut.PluginAendernCommand).ExecuteAsync();
 

@@ -202,7 +202,7 @@ public sealed class AufgabeServiceTests : IDisposable
         var second = await _sut.CreateFromAlertAsync(_projektId, alert, secondIssue, ct: TestContext.Current.CancellationToken);
 
         second.Id.Should().Be(first.Id);
-        var workItems = await _sut.GetByProjektAsync(_projektId, TestContext.Current.CancellationToken);
+        var workItems = await _sut.GetByProjectAsync(_projektId, TestContext.Current.CancellationToken);
         workItems.Count(a => a.AlertReference != null && a.AlertReference.SourceKey == alert.SourceKey).Should().Be(1);
     }
 
@@ -326,7 +326,7 @@ public sealed class AufgabeServiceTests : IDisposable
         await _sut.CreateAsync(_projektId, "Aufgabe 2", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetByProjektAsync(_projektId, TestContext.Current.CancellationToken);
+        var result = await _sut.GetByProjectAsync(_projektId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(2);
@@ -472,7 +472,7 @@ public sealed class AufgabeServiceTests : IDisposable
         var executeAfterUtc = new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero);
 
         // Act
-        await _sut.SavePromptVorschlagAsync(workItem.Id, "Mach nun bitte weiter.", executeAfterUtc, TestContext.Current.CancellationToken);
+        await _sut.SavePromptSuggestionAsync(workItem.Id, "Mach nun bitte weiter.", executeAfterUtc, TestContext.Current.CancellationToken);
 
         // Assert
         var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -486,10 +486,10 @@ public sealed class AufgabeServiceTests : IDisposable
     {
         // Arrange
         var workItem = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag löschen", null, ct: TestContext.Current.CancellationToken);
-        await _sut.SavePromptVorschlagAsync(workItem.Id, "Mach nun bitte weiter.", new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
+        await _sut.SavePromptSuggestionAsync(workItem.Id, "Mach nun bitte weiter.", new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.SavePromptVorschlagAsync(workItem.Id, "  ", new DateTimeOffset(2026, 06, 01, 12, 0, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
+        await _sut.SavePromptSuggestionAsync(workItem.Id, "  ", new DateTimeOffset(2026, 06, 01, 12, 0, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
 
         // Assert
         var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -503,10 +503,10 @@ public sealed class AufgabeServiceTests : IDisposable
     {
         // Arrange
         var workItem = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag entfernen", null, ct: TestContext.Current.CancellationToken);
-        await _sut.SavePromptVorschlagAsync(workItem.Id, "Mach nun bitte weiter.", new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
+        await _sut.SavePromptSuggestionAsync(workItem.Id, "Mach nun bitte weiter.", new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.ClearPromptVorschlagAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await _sut.ClearPromptSuggestionAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
         var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);

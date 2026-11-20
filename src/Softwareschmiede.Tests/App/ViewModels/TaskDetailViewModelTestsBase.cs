@@ -28,7 +28,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     protected readonly TodoService _todoService;
 
     /// <summary>_kiService.</summary>
-    protected readonly AiExecutionService _kiService;
+    protected readonly AiExecutionService _aiService;
 
     /// <summary>_promptVorlagenService.</summary>
     protected readonly PromptTemplateService _promptVorlagenService;
@@ -58,9 +58,9 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
         _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
-        _promptScheduleDispatchService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
         _dialogServiceMock = new Mock<IDialogService>();
 
@@ -77,7 +77,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
         _tempDirectoryFixture.Dispose();
     }
@@ -127,7 +127,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             gitPluginMock.Object,
             pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            new DevelopmentProcessServiceOptions(AiExecutionService: _kiService),
+            new DevelopmentProcessServiceOptions(AiExecutionService: _aiService),
             NullLogger<DevelopmentProcessService>.Instance);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
@@ -137,7 +137,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         return new TaskDetailViewModel(
             _workItemService,
             _logService,
-            _kiService,
+            _aiService,
             entwicklungsprozessService,
             pluginSelectionService,
             _promptVorlagenService,

@@ -161,7 +161,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
 
     /// <summary>Startet einen CLI-Prozess für eine Aufgabe und gibt das Handle zurück.</summary>
     /// <param name="workItemId">ID der Aufgabe.</param>
-    /// <param name="kiPlugin">Das zu verwendende KI-Plugin.</param>
+    /// <param name="aiPlugin">Das zu verwendende KI-Plugin.</param>
     /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis.</param>
     /// <param name="optionalParameters">Optionale zusätzliche Parameter für den CLI-Start.</param>
     /// <param name="ct">Abbruch-Token.</param>
@@ -173,16 +173,16 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public Task<CliProcessHandle> StartCliAsync(
         Guid workItemId,
-        IKiPlugin kiPlugin,
+        IKiPlugin aiPlugin,
         string localRepoPath,
         string? optionalParameters = null,
         CancellationToken ct = default,
         RepositoryStartConfiguration? startConfig = null,
         IGitPlugin? gitPlugin = null)
         => ScmTaskCoordinator.Shared.RunAsync(workItemId,
-            () => StartCliCoreAsync(workItemId, kiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin), ct);
+            () => StartCliCoreAsync(workItemId, aiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin), ct);
 
-    private async Task<CliProcessHandle> StartCliCoreAsync(Guid workItemId, IKiPlugin kiPlugin, string localRepoPath,
+    private async Task<CliProcessHandle> StartCliCoreAsync(Guid workItemId, IKiPlugin aiPlugin, string localRepoPath,
         string? optionalParameters, CancellationToken ct, RepositoryStartConfiguration? startConfig, IGitPlugin? gitPlugin)
     {
         await _startLock.WaitAsync(ct).ConfigureAwait(false);
@@ -204,7 +204,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
 
             var effectiveWorkdir = await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(localRepoPath, startConfig, gitPlugin, ct).ConfigureAwait(false);
 
-            var psi = await kiPlugin.StartCliAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
+            var psi = await aiPlugin.StartCliAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
 
             // Sicherstellen, dass der vollständige PATH des aktuellen Prozesses übergeben wird.
             // Bei UseShellExecute=false wird nur der Prozess-PATH genutzt — der kann bei WPF-Apps
@@ -257,7 +257,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     /// <summary>Startet einen CLI-Prozess für eine Aufgabe über eine interaktive Terminal-Session
     /// (PTY-Backend oder diagnostizierter Pipe-Fallback, gewählt durch <see cref="ITerminalSessionFactory"/>).</summary>
     /// <param name="workItemId">ID der Aufgabe.</param>
-    /// <param name="kiPlugin">Das zu verwendende KI-Plugin.</param>
+    /// <param name="aiPlugin">Das zu verwendende KI-Plugin.</param>
     /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis.</param>
     /// <param name="optionalParameters">Optionale zusätzliche Parameter für den CLI-Start.</param>
     /// <param name="ct">Abbruch-Token.</param>
@@ -271,7 +271,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public Task<CliProcessHandle> StartTerminalSessionAsync(
         Guid workItemId,
-        IKiPlugin kiPlugin,
+        IKiPlugin aiPlugin,
         string localRepoPath,
         string? optionalParameters = null,
         CancellationToken ct = default,
@@ -279,9 +279,9 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
         IGitPlugin? gitPlugin = null,
         string? repositoryUrl = null)
         => ScmTaskCoordinator.Shared.RunAsync(workItemId,
-            () => StartTerminalSessionCoreAsync(workItemId, kiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin, repositoryUrl), ct);
+            () => StartTerminalSessionCoreAsync(workItemId, aiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin, repositoryUrl), ct);
 
-    private async Task<CliProcessHandle> StartTerminalSessionCoreAsync(Guid workItemId, IKiPlugin kiPlugin, string localRepoPath,
+    private async Task<CliProcessHandle> StartTerminalSessionCoreAsync(Guid workItemId, IKiPlugin aiPlugin, string localRepoPath,
         string? optionalParameters, CancellationToken ct, RepositoryStartConfiguration? startConfig, IGitPlugin? gitPlugin,
         string? repositoryUrl)
     {
@@ -304,9 +304,9 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
 
             var effectiveWorkdir = await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(localRepoPath, startConfig, gitPlugin, ct).ConfigureAwait(false);
 
-            var spec = await kiPlugin.GetTerminalStartSpecAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
+            var spec = await aiPlugin.GetTerminalStartSpecAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
             spec = await WithScmAgentEnvironmentAsync(spec, gitPlugin, repositoryUrl, ct).ConfigureAwait(false);
-            try { ScmCliWorkspaceTrust.EnsureTrusted(kiPlugin.PluginPrefix, spec); }
+            try { ScmCliWorkspaceTrust.EnsureTrusted(aiPlugin.PluginPrefix, spec); }
             catch (Exception ex)
             {
                 // Eine nicht vorbereitete Vertrauensentscheidung darf den CLI-Start nie blockieren;
@@ -314,7 +314,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
                 _logger.LogWarning(ex, "Vertrauensstatus des CLI-Arbeitsverzeichnisses konnte nicht vorbereitet werden.");
             }
             IReadOnlyList<ScmCliConfigurationFile> scmConfiguration;
-            try { scmConfiguration = ScmCliAccessEvaluator.Capture(kiPlugin.PluginPrefix, spec); }
+            try { scmConfiguration = ScmCliAccessEvaluator.Capture(aiPlugin.PluginPrefix, spec); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
                 // An unavailable SCM channel must never break a regular manual CLI start.
@@ -347,7 +347,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
             TerminalSessionStartResult startResult;
             try
             {
-                startResult = await _sessionFactory.StartAsync(workItemId, spec, outputSink, kiPlugin.CheckHealthAsync, ct).ConfigureAwait(false);
+                startResult = await _sessionFactory.StartAsync(workItemId, spec, outputSink, aiPlugin.CheckHealthAsync, ct).ConfigureAwait(false);
             }
             catch
             {
@@ -374,7 +374,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
             // Handle vorfindet (sonst würde HandleExitedCoreAsync es stillschweigend verwerfen).
             _handles[workItemId] = handle;
 
-            handle.ScmPromptSession = new ScmPromptSessionAdapter(workItemId, handle.CliRunId, kiPlugin.PluginPrefix,
+            handle.ScmPromptSession = new ScmPromptSessionAdapter(workItemId, handle.CliRunId, aiPlugin.PluginPrefix,
                 spec, session, scmConfiguration, () => _handles.TryGetValue(workItemId, out var active) && ReferenceEquals(active, handle), _timeProvider);
             session.InputStarted = handle.ScmPromptSession.MarkInputStarted;
 

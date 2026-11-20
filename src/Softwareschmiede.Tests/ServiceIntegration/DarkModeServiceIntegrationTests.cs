@@ -21,7 +21,7 @@ public sealed class DarkModeServiceIntegrationTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary><summary>DarkMode_WirdGespeichert_UndBeimLadenWiederhergestellt.</summary>.</summary>
+    /// <summary>DarkMode_WirdGespeichert_UndBeimLadenWiederhergestellt.</summary>
     [Fact]
     public async Task DarkMode_WirdGespeichert_UndBeimLadenWiederhergestellt()
     {
@@ -31,7 +31,7 @@ public sealed class DarkModeServiceIntegrationTests : IDisposable
         geladen.Should().Be("Dark");
     }
 
-    /// <summary><summary>DarkMode_KannAufLightUmgestellt_Werden.</summary>.</summary>
+    /// <summary>DarkMode_KannAufLightUmgestellt_Werden.</summary>
     [Fact]
     public async Task DarkMode_KannAufLightUmgestellt_Werden()
     {
@@ -42,7 +42,7 @@ public sealed class DarkModeServiceIntegrationTests : IDisposable
         geladen.Should().Be("Light");
     }
 
-    /// <summary><summary>DarkMode_Standardwert_IstNull_OhneGespeicherteEinstellung.</summary>.</summary>
+    /// <summary>DarkMode_Standardwert_IstNull_OhneGespeicherteEinstellung.</summary>
     [Fact]
     public async Task DarkMode_Standardwert_IstNull_OhneGespeicherteEinstellung()
     {
@@ -50,7 +50,7 @@ public sealed class DarkModeServiceIntegrationTests : IDisposable
         geladen.Should().BeNull();
     }
 
-    /// <summary><summary>DarkMode_WirdBeimNeustart_Wiederhergestellt.</summary>.</summary>
+    /// <summary>DarkMode_WirdBeimNeustart_Wiederhergestellt.</summary>
     [Fact]
     public async Task DarkMode_WirdBeimNeustart_Wiederhergestellt()
     {

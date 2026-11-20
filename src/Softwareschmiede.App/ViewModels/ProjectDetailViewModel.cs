@@ -405,7 +405,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         try
         {
             Project = await _projektService.GetDetailAsync(_projektId, ct);
-            var workItems = await _workItemService.GetByProjektAsync(_projektId, ct);
+            var workItems = await _workItemService.GetByProjectAsync(_projektId, ct);
             WorkItems.Clear();
             foreach (var workItem in workItems)
                 WorkItems.Add(workItem);

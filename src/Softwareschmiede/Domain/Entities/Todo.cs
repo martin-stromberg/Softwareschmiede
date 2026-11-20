@@ -16,7 +16,7 @@ public sealed class Todo
     public DateTimeOffset? CompletedAt { get; set; }
 
     /// <summary>Gibt an, ob das To-Do offen ist (noch nicht erledigt).</summary>
-    public bool IstOffen => CompletedAt is null;
+    public bool IsOpen => CompletedAt is null;
 
     /// <summary>Erstellungszeitstempel des To-Dos.</summary>
     public DateTimeOffset CreatedAt { get; set; }

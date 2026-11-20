@@ -175,12 +175,12 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [Fact]
     public async Task KiPluginSelected_ZeigtParallelLimitFeld()
     {
-        var kiPlugin = CreateKiPlugin();
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = CreateKiPlugin();
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
 
         var group = sut.SelectedPluginSettings.SingleOrDefault(g => g.GroupName == "Ausführungsbegrenzung");
         group.Should().NotBeNull();
@@ -212,11 +212,11 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [Fact]
     public async Task SpeichernAsync_PluginLimit_PersistiertInAppEinstellung()
     {
-        var kiPlugin = CreateKiPlugin();
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = CreateKiPlugin();
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
         var entry = sut.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0];
 
         entry.Value = "2";
@@ -229,7 +229,7 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
 
         var neu = CreateSut();
         await ((AsyncRelayCommand)neu.LadenCommand).ExecuteAsync();
-        neu.KiPluginSelectedCommand.Execute(kiPlugin);
+        neu.KiPluginSelectedCommand.Execute(aiPlugin);
         neu.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0].Value
             .Should().Be("2");
     }
@@ -238,12 +238,12 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [Fact]
     public async Task SpeichernAsync_PluginLimitLeer_PersistiertNull()
     {
-        var kiPlugin = CreateKiPlugin();
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = CreateKiPlugin();
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _settingService.SetIntSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(KiPrefix), 3, TestContext.Current.CancellationToken);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
         var entry = sut.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0];
         entry.Value.Should().Be("3");
 
@@ -262,11 +262,11 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [InlineData("text")]
     public async Task SpeichernAsync_PluginLimitUngueltig_Validierungsfehler(string value)
     {
-        var kiPlugin = CreateKiPlugin();
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = CreateKiPlugin();
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
         var entry = sut.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0];
 
         entry.Value = value;

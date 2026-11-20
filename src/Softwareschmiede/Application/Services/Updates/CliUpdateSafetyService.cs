@@ -48,7 +48,7 @@ public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
                     return false;
                 }
 
-                return WorkItemRunActivity.IstAktiv(a.ActiveRunId, a.LastHeartbeatUtc, now);
+                return WorkItemRunActivity.IsActive(a.ActiveRunId, a.LastHeartbeatUtc, now);
             })
             .Select(a => $"{a.Title} ({a.Id})")
             .ToList();

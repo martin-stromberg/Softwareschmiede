@@ -42,7 +42,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     private readonly WorkItemService _workItemService;
     private readonly LogService _logService;
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly DevelopmentProcessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly PromptTemplateService _promptVorlagenService;
@@ -284,10 +284,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         get => _selectedPromptVorlage;
         set
         {
-            var geaendert = SetProperty(ref _selectedPromptVorlage, value);
+            var changed = SetProperty(ref _selectedPromptVorlage, value);
             OnPropertyChanged(nameof(KannPromptPlanen));
 
-            if (!geaendert || value is null)
+            if (!changed || value is null)
                 return;
 
             PromptVorlageAuswaehlenCommand.Execute(value);
@@ -625,7 +625,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// aufruft — der zurückgegebene Prozess kann also bereits vor dem Öffnen dieser Aufgabenseite gestartet
     /// worden sein und weiterlaufen, nachdem die Seite wieder verlassen wird.</summary>
     /// <returns>Die aktive <see cref="ITerminalSession"/>, oder null wenn keine Session läuft.</returns>
-    public ITerminalSession? GetTerminalSession() => _kiService.GetTerminalSession(_aufgabeId);
+    public ITerminalSession? GetTerminalSession() => _aiService.GetTerminalSession(_aufgabeId);
 
     /// <inheritdoc cref="TaskDetailViewModel"/>
     public TaskDetailViewModel(
@@ -652,7 +652,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     {
         _workItemService = workItemService;
         _logService = logService;
-        _kiService = kiService;
+        _aiService = kiService;
         _entwicklungsprozessService = entwicklungsprozessService;
         _pluginSelectionService = pluginSelectionService;
         _promptVorlagenService = promptVorlagenService;
@@ -671,7 +671,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _runDataChangedNotifier = runDataChangedNotifier;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
-        _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
+        _aiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
         _promptScheduleDispatchService.PromptSent += OnPromptSent;
         _promptScheduleDispatchService.ScheduledPromptChanged += OnScheduledPromptChanged;
         _todoListViewModel.AnsichtAktivierenCallback = () => WaehleAnsicht(DetailAnsicht.Todos);
@@ -731,9 +731,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             WorkItem = await _workItemService.GetDetailAsync(_aufgabeId, ct);
             var darfCliAnzeigen = WorkItem?.ExecutionStatus.ShouldShowCli(WorkItem.Status) == true;
-            IsCliRunning = darfCliAnzeigen && _kiService.IsRunning(_aufgabeId);
+            IsCliRunning = darfCliAnzeigen && _aiService.IsRunning(_aufgabeId);
 
-            var session = darfCliAnzeigen ? _kiService.GetTerminalSession(_aufgabeId) : null;
+            var session = darfCliAnzeigen ? _aiService.GetTerminalSession(_aufgabeId) : null;
             AttachCliStatusSession(session);
             // Explizit erneut auslösen (nicht nur AttachCliStatusSession): Wechselt CurrentView in
             // MainWindowViewModel/ProjectDetailViewModel zwischen zwei TaskDetailViewModel-Instanzen
@@ -892,7 +892,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (_scheduledPromptTargetHours.HasValue || _scheduledPromptTargetMinutes.HasValue)
             return;
 
-        var session = _kiService.GetTerminalSession(_aufgabeId);
+        var session = _aiService.GetTerminalSession(_aufgabeId);
         if (session is null || !_isCliRunning)
             return;
 
@@ -916,9 +916,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            await _kiService.StopCliAsync(_aufgabeId, ct);
+            await _aiService.StopCliAsync(_aufgabeId, ct);
 
-            if (_kiService.IsRunning(_aufgabeId))
+            if (_aiService.IsRunning(_aufgabeId))
             {
                 // Der Prozess konnte nicht beendet werden (Beendigungsfehler werden in StopCliAsync
                 // nur geloggt): Laufdaten und Session-Anbindung bleiben bestehen, damit Fußzeile
@@ -1524,7 +1524,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             try
             {
-                var isRunning = _kiService.IsRunning(_aufgabeId);
+                var isRunning = _aiService.IsRunning(_aufgabeId);
                 IsCliRunning = isRunning;
                 if (_aufgabe is not null)
                 {
@@ -1540,7 +1540,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 if (status == CliProcessStatus.Started)
                 {
                     SetAktiverCliName(_aufgabe?.AiPluginPrefix);
-                    CliStatusText = _kiService.GetTerminalSession(_aufgabeId) is { IsPseudoTerminal: false }
+                    CliStatusText = _aiService.GetTerminalSession(_aufgabeId) is { IsPseudoTerminal: false }
                         ? "Gestartet" + EingeschraenkterModusHinweis
                         : "Gestartet";
                 }
@@ -1574,7 +1574,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             return;
         _disposed = true;
 
-        _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
+        _aiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
         _promptScheduleDispatchService.PromptSent -= OnPromptSent;
         _promptScheduleDispatchService.ScheduledPromptChanged -= OnScheduledPromptChanged;
         // Kein CancelScheduledPrompt mehr: Ein persistierter Plan überlebt das Verlassen der Ansicht.
@@ -1629,7 +1629,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             await LadenAsync(ct);
             SetAktiverCliName(pluginPrefix);
 
-            var session = _kiService.GetTerminalSession(_aufgabeId);
+            var session = _aiService.GetTerminalSession(_aufgabeId);
             if (session != null)
             {
                 AttachCliStatusSession(session);
@@ -1663,7 +1663,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            await _kiService.StopCliAsync(_aufgabeId, ct);
+            await _aiService.StopCliAsync(_aufgabeId, ct);
         }
         catch (OperationCanceledException)
         {
@@ -1712,7 +1712,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             await _entwicklungsprozessService.RestartCliAsync(_aufgabeId, pluginPrefix, optionalParameters, ct);
 
             SelectedKiPluginPrefix = pluginPrefix;
-            if (!_kiService.IsRunning(_aufgabeId))
+            if (!_aiService.IsRunning(_aufgabeId))
             {
                 await _workItemService.EndActiveRunAsync(_aufgabeId, ct);
                 IsCliRunning = false;
@@ -1729,12 +1729,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             // geschriebene Substatus ist der frischeste Session-Stand (TOCTOU-/Stale-Write-Fix).
             await _workItemService.EnsureActiveRunAsync(
                 _aufgabeId,
-                runStatusProvider: () => _kiService.GetTerminalSession(_aufgabeId)?.RuntimeStatus.ToWorkItemRunStatus(),
+                runStatusProvider: () => _aiService.GetTerminalSession(_aufgabeId)?.RuntimeStatus.ToWorkItemRunStatus(),
                 ct,
-                runningGuard: () => _kiService.IsRunning(_aufgabeId));
+                runningGuard: () => _aiService.IsRunning(_aufgabeId));
             _runDataChangedNotifier?.NotifyRunDataChanged(_aufgabeId);
 
-            var session = _kiService.GetTerminalSession(_aufgabeId);
+            var session = _aiService.GetTerminalSession(_aufgabeId);
             if (session != null)
             {
                 AttachCliStatusSession(session);

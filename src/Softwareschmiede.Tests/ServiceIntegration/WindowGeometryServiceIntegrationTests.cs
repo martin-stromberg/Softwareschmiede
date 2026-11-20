@@ -21,7 +21,7 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary><summary>Fenstergeometrie_WirdGespeichert_UndWiederhergestellt.</summary>.</summary>
+    /// <summary>Fenstergeometrie_WirdGespeichert_UndWiederhergestellt.</summary>
     [Fact]
     public async Task Fenstergeometrie_WirdGespeichert_UndWiederhergestellt()
     {
@@ -36,7 +36,7 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
         geladen.Height.Should().Be(900);
     }
 
-    /// <summary><summary>Fenstergeometrie_OhneGespeicherteWerte_GibtNull_Zurueck.</summary>.</summary>
+    /// <summary>Fenstergeometrie_OhneGespeicherteWerte_GibtNull_Zurueck.</summary>
     [Fact]
     public async Task Fenstergeometrie_OhneGespeicherteWerte_GibtNull_Zurueck()
     {
@@ -48,7 +48,7 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
         geladen.Height.Should().BeNull();
     }
 
-    /// <summary><summary>Fenstergeometrie_KannMehrmalsAktualisiert_Werden.</summary>.</summary>
+    /// <summary>Fenstergeometrie_KannMehrmalsAktualisiert_Werden.</summary>
     [Fact]
     public async Task Fenstergeometrie_KannMehrmalsAktualisiert_Werden()
     {
@@ -63,7 +63,7 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
         geladen.Height.Should().Be(1000);
     }
 
-    /// <summary><summary>Fenstergeometrie_BeimNeustart_WirdWiederhergestellt.</summary>.</summary>
+    /// <summary>Fenstergeometrie_BeimNeustart_WirdWiederhergestellt.</summary>
     [Fact]
     public async Task Fenstergeometrie_BeimNeustart_WirdWiederhergestellt()
     {

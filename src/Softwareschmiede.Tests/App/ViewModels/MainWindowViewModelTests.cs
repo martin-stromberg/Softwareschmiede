@@ -486,12 +486,12 @@ public sealed class MainWindowViewModelTests : IDisposable
         scmPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
         scmPlugin.SetupGet(p => p.PluginName).Returns("GitHub");
         scmPlugin.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
-        var kiPlugin = new Mock<IKiPlugin>();
-        kiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
-        kiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
-        kiPlugin.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
+        var aiPlugin = new Mock<IKiPlugin>();
+        aiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
+        aiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
+        aiPlugin.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin.Object]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin.Object]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin.Object]);
 
         var repositoryId = Guid.NewGuid();
         _db.GitRepositories.Add(new Softwareschmiede.Domain.Entities.GitRepository
@@ -544,12 +544,12 @@ public sealed class MainWindowViewModelTests : IDisposable
         scmPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
         scmPlugin.SetupGet(p => p.PluginName).Returns("GitHub");
         scmPlugin.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
-        var kiPlugin = new Mock<IKiPlugin>();
-        kiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
-        kiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
-        kiPlugin.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
+        var aiPlugin = new Mock<IKiPlugin>();
+        aiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
+        aiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
+        aiPlugin.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin.Object]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin.Object]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin.Object]);
 
         var workItem = await _workItemService.CreateAsync(_projektId, "Ohne Prefix", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/ohne-prefix", "/tmp/ohne-prefix", ct: TestContext.Current.CancellationToken);
@@ -837,12 +837,12 @@ public sealed class MainWindowViewModelTests : IDisposable
         scmPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
         scmPlugin.SetupGet(p => p.PluginName).Returns("GitHub");
         scmPlugin.SetupGet(p => p.PluginSymbol).Returns("🐙");
-        var kiPlugin = new Mock<IKiPlugin>();
-        kiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
-        kiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
+        var aiPlugin = new Mock<IKiPlugin>();
+        aiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
+        aiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
         // PluginSymbol absichtlich nicht aufgesetzt: Moq liefert null statt des Interface-Defaults.
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin.Object]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin.Object]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin.Object]);
 
         var repositoryId = Guid.NewGuid();
         _db.GitRepositories.Add(new Softwareschmiede.Domain.Entities.GitRepository
@@ -882,10 +882,10 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldMapKiGruppenName()
     {
         // Arrange
-        var kiPlugin = new Mock<IKiPlugin>();
-        kiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
-        kiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin.Object]);
+        var aiPlugin = new Mock<IKiPlugin>();
+        aiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
+        aiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin.Object]);
 
         var mitKi = await _workItemService.CreateAsync(_projektId, "KI-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.UpdateAsync(mitKi.Id, mitKi.Title, mitKi.RequirementDescription, "Softwareschmiede.Codex", TestContext.Current.CancellationToken);
@@ -986,13 +986,13 @@ public sealed class MainWindowViewModelTests : IDisposable
     public void AufgabenListenModus_ShouldBeSettableAndRaisePropertyChanged()
     {
         var sut = CreateSut();
-        var geaendert = new List<string?>();
-        sut.PropertyChanged += (_, e) => geaendert.Add(e.PropertyName);
+        var changed = new List<string?>();
+        sut.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
         sut.AufgabenListenModus = AufgabenListenModus.Repository;
 
         sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Repository);
-        geaendert.Should().Contain(nameof(MainWindowViewModel.AufgabenListenModus));
+        changed.Should().Contain(nameof(MainWindowViewModel.AufgabenListenModus));
     }
 
     /// <summary>Ein persistierter Modus wird über GespeichertenAufgabenListenModusLadenAsync wiederhergestellt.</summary>

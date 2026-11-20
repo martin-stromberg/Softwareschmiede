@@ -14,16 +14,16 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Tests für den Concurrency-Schutz von CliProcessManager.AktualisierungAsync.</summary>
 public sealed class CliProcessManagerTests : IDisposable
 {
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly CliProcessManager _sut;
 
     /// <summary>CliProcessManagerTests.</summary>
     public CliProcessManagerTests()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
         _sut = new CliProcessManager(
-            _kiService,
+            _aiService,
             scopeFactoryMock.Object,
             NullLogger<CliProcessManager>.Instance,
             new WorkItemRunDataChangedNotifier());
@@ -33,7 +33,7 @@ public sealed class CliProcessManagerTests : IDisposable
     public void Dispose()
     {
         _sut.Dispose();
-        _kiService.Dispose();
+        _aiService.Dispose();
     }
 
     /// <summary>
@@ -148,7 +148,7 @@ public sealed class CliProcessManagerTests : IDisposable
         // Laufendes Handle mit Session pflanzen, damit LaufdatenSicherstellenAsync den
         // IsRunning-Check passiert und beide Anlagepfade (Timer + Subscription) erreicht würden.
         var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var handles = (ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
+        var handles = (ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_aiService)!;
         var sessionMock = new Mock<ITerminalSession>();
         handles[workItemId] = new CliProcessHandle(workItemId, System.Diagnostics.Process.GetCurrentProcess())
         {

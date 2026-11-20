@@ -732,7 +732,7 @@ public sealed class GitHubPluginTests
         result.Should().BeFalse();
     }
 
-    /// <summary><summary>PluginMetadata_ShouldExposeExpectedValues.</summary>.</summary>
+    /// <summary>PluginMetadata_ShouldExposeExpectedValues.</summary>
     [Fact]
     public void PluginMetadata_ShouldExposeExpectedValues()
     {
@@ -1088,7 +1088,7 @@ public sealed class GitHubPluginTests
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary><summary>PushBranchAsync_ShouldThrow_WhenPushFails.</summary>.</summary>
+    /// <summary>PushBranchAsync_ShouldThrow_WhenPushFails.</summary>
     [Fact]
     public async Task PushBranchAsync_ShouldThrow_WhenPushFails()
     {
@@ -1239,7 +1239,7 @@ public sealed class GitHubPluginTests
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary><summary>PullAsync_ShouldThrow_WhenGitPullFails.</summary>.</summary>
+    /// <summary>PullAsync_ShouldThrow_WhenGitPullFails.</summary>
     [Fact]
     public async Task PullAsync_ShouldThrow_WhenGitPullFails()
     {
@@ -1327,7 +1327,7 @@ public sealed class GitHubPluginTests
         exception.Which.Message.Should().Contain("oauth2:***@");
     }
 
-    /// <summary><summary>ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided.</summary>.</summary>
+    /// <summary>ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided.</summary>
     [Fact]
     public async Task ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided()
     {
@@ -1344,7 +1344,7 @@ public sealed class GitHubPluginTests
         _cliRunnerMock.VerifyAll();
     }
 
-    /// <summary><summary>ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided.</summary>.</summary>
+    /// <summary>ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided.</summary>
     [Fact]
     public async Task ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided()
     {
@@ -1361,7 +1361,7 @@ public sealed class GitHubPluginTests
         _cliRunnerMock.VerifyAll();
     }
 
-    /// <summary><summary>GetRemoteBranchesAsync_ShouldParseAndSortBranches.</summary>.</summary>
+    /// <summary>GetRemoteBranchesAsync_ShouldParseAndSortBranches.</summary>
     [Fact]
     public async Task GetRemoteBranchesAsync_ShouldParseAndSortBranches()
     {
@@ -1384,7 +1384,7 @@ public sealed class GitHubPluginTests
         result.Should().Equal("feature/a", "feature/z", "main");
     }
 
-    /// <summary><summary>GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails.</summary>.</summary>
+    /// <summary>GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails.</summary>
     [Fact]
     public async Task GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails()
     {
@@ -1401,7 +1401,7 @@ public sealed class GitHubPluginTests
         result.Should().BeEmpty();
     }
 
-    /// <summary><summary>GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed.</summary>.</summary>
+    /// <summary>GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed.</summary>
     [Fact]
     public async Task GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed()
     {
@@ -1418,7 +1418,7 @@ public sealed class GitHubPluginTests
         result.Should().Be("master");
     }
 
-    /// <summary><summary>GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails.</summary>.</summary>
+    /// <summary>GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails.</summary>
     [Fact]
     public async Task GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails()
     {
@@ -1435,7 +1435,7 @@ public sealed class GitHubPluginTests
         result.Should().Be("main");
     }
 
-    /// <summary><summary>CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails.</summary>.</summary>
+    /// <summary>CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails.</summary>
     [Fact]
     public async Task CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails()
     {

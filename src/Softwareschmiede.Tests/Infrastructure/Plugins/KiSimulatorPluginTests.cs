@@ -17,7 +17,7 @@ public sealed class KiSimulatorPluginTests
             new Mock<ILogger<KiSimulatorPlugin>>().Object);
     }
 
-    /// <summary><summary>PluginMetadata_ShouldExposeExpectedValues.</summary>.</summary>
+    /// <summary>PluginMetadata_ShouldExposeExpectedValues.</summary>
     [Fact]
     public void PluginMetadata_ShouldExposeExpectedValues()
     {
@@ -27,14 +27,14 @@ public sealed class KiSimulatorPluginTests
         _sut.GetSettingGroups().Should().BeEmpty();
     }
 
-    /// <summary><summary>SupportsSessionContinuation_ShouldReturnFalse.</summary>.</summary>
+    /// <summary>SupportsSessionContinuation_ShouldReturnFalse.</summary>
     [Fact]
     public void SupportsSessionContinuation_ShouldReturnFalse()
     {
         _sut.SupportsSessionContinuation().Should().BeFalse();
     }
 
-    /// <summary><summary>CheckHealthAsync_ShouldReturnTrue.</summary>.</summary>
+    /// <summary>CheckHealthAsync_ShouldReturnTrue.</summary>
     [Fact]
     public async Task CheckHealthAsync_ShouldReturnTrue()
     {
@@ -42,7 +42,7 @@ public sealed class KiSimulatorPluginTests
         result.Should().BeTrue();
     }
 
-    /// <summary><summary>StartCliAsync_ShouldReturnProcessStartInfoWithCmdExe.</summary>.</summary>
+    /// <summary>StartCliAsync_ShouldReturnProcessStartInfoWithCmdExe.</summary>
     [Fact]
     public async Task StartCliAsync_ShouldReturnProcessStartInfoWithCmdExe()
     {

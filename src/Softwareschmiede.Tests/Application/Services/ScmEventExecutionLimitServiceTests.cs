@@ -107,9 +107,9 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
         SetzeLaufende(await LaufendeAufgabeAsync("A", PrefixA));
 
-        var grund = await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken);
+        var reason = await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken);
 
-        grund.Should().Contain("globale Limit").And.Contain("1");
+        reason.Should().Contain("globale Limit").And.Contain("1");
     }
 
     /// <summary>Unter dem globalen Limit bleibt der Start frei.</summary>

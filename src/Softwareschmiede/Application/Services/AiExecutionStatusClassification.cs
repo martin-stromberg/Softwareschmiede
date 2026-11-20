@@ -63,7 +63,7 @@ public static class AiExecutionStatusClassification
             return AiExecutionState.Ready;
         }
 
-        if (WorkItemRunActivity.IstAktiv(status.ActiveRunId, status.LastHeartbeatUtc, now))
+        if (WorkItemRunActivity.IsActive(status.ActiveRunId, status.LastHeartbeatUtc, now))
         {
             // LaufStatus bildet den Laufzeit-Substatus der CLI ab (siehe PseudoConsoleSession.RuntimeStatus,
             // persistiert über CliProcessManager/AufgabeService.AktivenLaufSicherstellenAsync). Ohne diesen

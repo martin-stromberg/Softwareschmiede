@@ -22,7 +22,7 @@ public sealed class CompositeTerminalOutputSinkTests
         sinkB.Chunks.Should().Equal("abc");
     }
 
-    /// <summary>Diagnose-Chunks erreichen nur innere Senken, die <see cref="ITerminalDiagnoseSink"/>
+    /// <summary>Diagnose-Chunks erreichen nur innere Senken, die <see cref="ITerminalDiagnosticsSink"/>
     /// implementieren — byte-exakte Mitschnitt-Senken bleiben frei von Markerzeilen.</summary>
     [Fact]
     public void OnDiagnoseChunk_GehtNurAnDiagnoseSenken()
@@ -31,7 +31,7 @@ public sealed class CompositeTerminalOutputSinkTests
         var protokollAehnlich = new CollectingDiagnoseSink();  // implementiert ITerminalDiagnoseSink
         var sut = new CompositeTerminalOutputSink(recorderAehnlich, protokollAehnlich);
 
-        sut.OnDiagnoseChunk(Encoding.UTF8.GetBytes("[Terminal-Diagnose] test"));
+        sut.OnDiagnosticsChunk(Encoding.UTF8.GetBytes("[Terminal-Diagnose] test"));
 
         protokollAehnlich.DiagnoseChunks.Should().Equal("[Terminal-Diagnose] test");
         protokollAehnlich.Chunks.Should().BeEmpty(
@@ -79,12 +79,12 @@ public sealed class CompositeTerminalOutputSinkTests
         }
     }
 
-    private sealed class CollectingDiagnoseSink : CollectingSink, ITerminalDiagnoseSink
+    private sealed class CollectingDiagnoseSink : CollectingSink, ITerminalDiagnosticsSink
     {
         private readonly List<string> _diagnoseChunks = [];
         public IReadOnlyList<string> DiagnoseChunks => _diagnoseChunks;
 
-        public void OnDiagnoseChunk(ReadOnlySpan<byte> bytes)
+        public void OnDiagnosticsChunk(ReadOnlySpan<byte> bytes)
             => _diagnoseChunks.Add(Encoding.UTF8.GetString(bytes));
     }
 }

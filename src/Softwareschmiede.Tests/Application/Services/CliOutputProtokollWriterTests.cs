@@ -41,7 +41,7 @@ public sealed class CliOutputProtokollWriterTests
         entries.Should().Equal("erste", "zweite ohne ende");
     }
 
-    /// <summary><see cref="CliOutputLogWriter"/> implementiert <see cref="Softwareschmiede.Infrastructure.Terminal.ITerminalDiagnoseSink"/>:
+    /// <summary><see cref="CliOutputLogWriter"/> implementiert <see cref="Softwareschmiede.Infrastructure.Terminal.ITerminalDiagnosticsSink"/>:
     /// Diagnose-Marker laufen denselben Accumulator-Pfad wie normale CLI-Ausgabe und landen als
     /// Protokollzeilen im Aufgabenprotokoll.</summary>
     [Fact]
@@ -54,8 +54,8 @@ public sealed class CliOutputProtokollWriterTests
             provider.GetRequiredService<IServiceScopeFactory>(),
             NullLogger<CliOutputLogWriter>.Instance);
 
-        sut.Should().BeAssignableTo<Softwareschmiede.Infrastructure.Terminal.ITerminalDiagnoseSink>();
-        sut.OnDiagnoseChunk(System.Text.Encoding.UTF8.GetBytes("[Terminal-Diagnose] Markerzeile\r\n"));
+        sut.Should().BeAssignableTo<Softwareschmiede.Infrastructure.Terminal.ITerminalDiagnosticsSink>();
+        sut.OnDiagnosticsChunk(System.Text.Encoding.UTF8.GetBytes("[Terminal-Diagnose] Markerzeile\r\n"));
         await sut.CompleteAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();

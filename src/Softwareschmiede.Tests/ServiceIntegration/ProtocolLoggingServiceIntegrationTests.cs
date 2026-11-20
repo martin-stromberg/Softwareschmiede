@@ -34,7 +34,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
         _aufgabeId = workItem.Id;
     }
 
-    /// <summary><summary>AddCliOutputAsync_StreichtAusgabeInProtokoll.</summary>.</summary>
+    /// <summary>AddCliOutputAsync_StreichtAusgabeInProtokoll.</summary>
     [Fact]
     public async Task AddCliOutputAsync_StreichtAusgabeInProtokoll()
     {
@@ -48,7 +48,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
         entries.All(e => e.Type == LogEntryType.CliOutput).Should().BeTrue();
     }
 
-    /// <summary><summary>AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert.</summary>.</summary>
+    /// <summary>AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert.</summary>
     [Fact]
     public async Task AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert()
     {
@@ -64,7 +64,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
             entries[i].Content.Should().Be(lines[i]);
     }
 
-    /// <summary><summary>AddStatusUebergangAsync_ErstelltEintragImProtokoll.</summary>.</summary>
+    /// <summary>AddStatusUebergangAsync_ErstelltEintragImProtokoll.</summary>
     [Fact]
     public async Task AddStatusUebergangAsync_ErstelltEintragImProtokoll()
     {

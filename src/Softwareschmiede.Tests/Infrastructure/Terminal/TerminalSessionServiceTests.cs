@@ -184,7 +184,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
         _pipeLauncher.Calls.Should().Be(0);
     }
 
-    /// <summary>Diagnose-Marker gehen an <see cref="ITerminalDiagnoseSink"/>-Senken über
+    /// <summary>Diagnose-Marker gehen an <see cref="ITerminalDiagnosticsSink"/>-Senken über
     /// <c>OnDiagnoseChunk</c> — nicht über <c>OnOutputChunk</c> — damit byte-exakte
     /// Mitschnitt-Pfade frei von Artefakt-Zeilen bleiben.</summary>
     [Fact]
@@ -316,9 +316,9 @@ public sealed class TerminalSessionServiceTests : IDisposable
         }
     }
 
-    /// <summary>Output-Senke mit <see cref="ITerminalDiagnoseSink"/>: sammelt normale Chunks und
+    /// <summary>Output-Senke mit <see cref="ITerminalDiagnosticsSink"/>: sammelt normale Chunks und
     /// Diagnose-Marker getrennt voneinander.</summary>
-    private sealed class CollectingDiagnoseSink : ITerminalOutputSink, ITerminalDiagnoseSink
+    private sealed class CollectingDiagnoseSink : ITerminalOutputSink, ITerminalDiagnosticsSink
     {
         private readonly StringBuilder _text = new();
         private readonly StringBuilder _diagnoseText = new();
@@ -340,7 +340,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
                 _text.Append(Encoding.UTF8.GetString(data));
         }
 
-        public void OnDiagnoseChunk(ReadOnlySpan<byte> bytes)
+        public void OnDiagnosticsChunk(ReadOnlySpan<byte> bytes)
         {
             lock (_lock)
                 _diagnoseText.Append(Encoding.UTF8.GetString(bytes));

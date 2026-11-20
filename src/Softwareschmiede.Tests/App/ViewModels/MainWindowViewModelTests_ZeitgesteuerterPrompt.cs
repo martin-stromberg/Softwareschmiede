@@ -18,7 +18,7 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly TodoService _todoService;
     private readonly WorkItemService _workItemService;
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IRunningAutomationStatusSource> _runningStatusSourceMock;
@@ -30,8 +30,8 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
         _db = TestDbContextFactory.Create();
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, _todoService);
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
-        _promptScheduleDispatchService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _serviceProviderMock = new Mock<IServiceProvider>();
         _runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
 
@@ -58,7 +58,7 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
     }
 

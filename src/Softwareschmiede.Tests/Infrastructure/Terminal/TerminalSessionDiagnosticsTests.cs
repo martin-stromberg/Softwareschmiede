@@ -31,7 +31,7 @@ public sealed class TerminalSessionDiagnosticsTests
 
         healthCheckCalled.Should().BeTrue();
         result.BackendRecommendation.Should().Be(TerminalBackendRecommendation.Pty);
-        result.PtyVerfuegbar.Should().BeTrue();
+        result.PtyAvailable.Should().BeTrue();
         result.Checks.Should().Contain(c => c.Name == "Executable" && c.Ok);
     }
 
@@ -46,7 +46,7 @@ public sealed class TerminalSessionDiagnosticsTests
             forcePtyUnavailable: true,
             CancellationToken.None);
 
-        result.PtyVerfuegbar.Should().BeFalse();
+        result.PtyAvailable.Should().BeFalse();
         result.Checks.Should().Contain(c => c.Name == "ConPTY-Verfügbarkeit" && !c.Ok);
         result.BackendRecommendation.Should().Be(TerminalBackendRecommendation.Pipe);
     }
@@ -106,7 +106,7 @@ public sealed class TerminalSessionDiagnosticsTests
             forcePtyUnavailable: false,
             CancellationToken.None);
 
-        result.PtyVerfuegbar.Should().BeTrue();
+        result.PtyAvailable.Should().BeTrue();
         result.BackendRecommendation.Should().Be(TerminalBackendRecommendation.Pipe);
     }
 

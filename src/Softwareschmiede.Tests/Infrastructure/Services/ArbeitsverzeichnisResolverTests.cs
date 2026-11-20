@@ -10,7 +10,7 @@ namespace Softwareschmiede.Tests.Infrastructure.Services;
 /// <summary>ArbeitsverzeichnisResolverTests.</summary>
 public sealed class ArbeitsverzeichnisResolverTests
 {
-    /// <summary><summary>ResolveAsync_ShouldReturnConfiguredPath_WhenPathIsWritable.</summary>.</summary>
+    /// <summary>ResolveAsync_ShouldReturnConfiguredPath_WhenPathIsWritable.</summary>
     [Fact]
     public async Task ResolveAsync_ShouldReturnConfiguredPath_WhenPathIsWritable()
     {
@@ -32,7 +32,7 @@ public sealed class ArbeitsverzeichnisResolverTests
         }
     }
 
-    /// <summary><summary>ResolveAsync_ShouldFallbackToTemp_WhenNoConfigExists.</summary>.</summary>
+    /// <summary>ResolveAsync_ShouldFallbackToTemp_WhenNoConfigExists.</summary>
     [Fact]
     public async Task ResolveAsync_ShouldFallbackToTemp_WhenNoConfigExists()
     {
@@ -47,7 +47,7 @@ public sealed class ArbeitsverzeichnisResolverTests
         result.ResolvedPath.Should().Be(Path.GetTempPath());
     }
 
-    /// <summary><summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsFile.</summary>.</summary>
+    /// <summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsFile.</summary>
     [Fact]
     public async Task ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsFile()
     {
@@ -78,7 +78,7 @@ public sealed class ArbeitsverzeichnisResolverTests
         }
     }
 
-    /// <summary><summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsInvalid.</summary>.</summary>
+    /// <summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsInvalid.</summary>
     [Fact]
     public async Task ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsInvalid()
     {

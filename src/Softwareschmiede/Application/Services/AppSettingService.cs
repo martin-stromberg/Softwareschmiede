@@ -84,8 +84,8 @@ public sealed class AppSettingService
     /// <summary>Schlüssel für den Update-Modus (<see cref="UpdateMode"/>-Wert als Zahl gespeichert).</summary>
     public const string UpdateModeKey = "updates.mode";
 
-    /// <summary>Schlüssel für den Update-Pfad (Kanalselektor; siehe <c>UpdatePfadKanalResolver</c>).</summary>
-    public const string UpdatePfadKey = "updates.pfad";
+    /// <summary>Schlüssel für den Update-Pfad (Kanalselektor; siehe <c>UpdatePathChannelResolver</c>).</summary>
+    public const string UpdatePathKey = "updates.pfad";
 
     /// <summary>Fester EF-Abfragetag der gemeinsamen Update-Einstellungs-Leseabfrage für gezielte Testinterception.</summary>
     public const string UpdateSettingsReadTag = "UpdateSettings.Read";
@@ -115,7 +115,7 @@ public sealed class AppSettingService
     public const string BackmergeProjectKeyPrefix = "plugins.backmerge.project.";
 
     /// <summary>Schlüssel für den Schalter "Herunterfahren erzwingen" des automatischen OS-Shutdowns.</summary>
-    public const string AutoShutdownErzwingenKey = "autoshutdown.force";
+    public const string AutoShutdownForceKey = "autoshutdown.force";
 
     /// <summary>Schlüssel für die Toleranzzeit (Minuten) des Auto-Shutdown-Countdowns.</summary>
     public const string AutoShutdownToleranceMinutesKey = "autoshutdown.toleranz.minuten";
@@ -139,45 +139,45 @@ public sealed class AppSettingService
     }
 
     /// <summary>Liest den Wert einer Einstellung. Gibt <c>null</c> zurück, wenn kein Wert gespeichert ist.</summary>
-    public async Task<string?> GetSettingAsync(string schluessel, CancellationToken ct = default)
+    public async Task<string?> GetSettingAsync(string key, CancellationToken ct = default)
     {
         var setting = await _db.AppSettings
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Key == schluessel, ct);
+            .FirstOrDefaultAsync(s => s.Key == key, ct);
 
         return setting?.Value;
     }
 
     /// <summary>Liest den Wert einer Einstellung als <see cref="int"/>. Gibt <c>null</c> zurück, wenn kein Wert gespeichert ist oder der Wert kein gültiger Integer ist.</summary>
-    public async Task<int?> GetIntSettingAsync(string schluessel, CancellationToken ct = default)
+    public async Task<int?> GetIntSettingAsync(string key, CancellationToken ct = default)
     {
-        var value = await GetSettingAsync(schluessel, ct);
+        var value = await GetSettingAsync(key, ct);
         if (int.TryParse(value, out var result))
             return result;
         return null;
     }
 
     /// <summary>Liest den Wert einer Einstellung als <see cref="bool"/>. Gibt <c>null</c> zurück, wenn kein Wert gespeichert ist oder der Wert kein gültiger Boolean ist.</summary>
-    public async Task<bool?> GetBoolSettingAsync(string schluessel, CancellationToken ct = default)
+    public async Task<bool?> GetBoolSettingAsync(string key, CancellationToken ct = default)
     {
-        var value = await GetSettingAsync(schluessel, ct);
+        var value = await GetSettingAsync(key, ct);
         if (bool.TryParse(value, out var result))
             return result;
         return null;
     }
 
     /// <summary>Speichert oder überschreibt eine Einstellung. Übergibt man <c>null</c>, wird der Wert auf null gesetzt (nicht gelöscht).</summary>
-    public async Task SetSettingAsync(string schluessel, string? value, CancellationToken ct = default)
+    public async Task SetSettingAsync(string key, string? value, CancellationToken ct = default)
     {
         var setting = await _db.AppSettings
-            .FirstOrDefaultAsync(s => s.Key == schluessel, ct);
+            .FirstOrDefaultAsync(s => s.Key == key, ct);
 
         if (setting is null)
         {
             setting = new AppSetting
             {
                 Id = Guid.NewGuid(),
-                Key = schluessel
+                Key = key
             };
             _db.AppSettings.Add(setting);
         }
@@ -186,16 +186,16 @@ public sealed class AppSettingService
         setting.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);
-        _logger.LogDebug("Einstellung '{Schluessel}' gespeichert.", schluessel);
+        _logger.LogDebug("Einstellung '{Schluessel}' gespeichert.", key);
     }
 
     /// <summary>Speichert eine Ganzzahl-Einstellung.</summary>
-    public Task SetIntSettingAsync(string schluessel, int value, CancellationToken ct = default)
-        => SetSettingAsync(schluessel, value.ToString(), ct);
+    public Task SetIntSettingAsync(string key, int value, CancellationToken ct = default)
+        => SetSettingAsync(key, value.ToString(), ct);
 
     /// <summary>Speichert eine Boolean-Einstellung.</summary>
-    public Task SetBoolSettingAsync(string schluessel, bool value, CancellationToken ct = default)
-        => SetSettingAsync(schluessel, value.ToString(), ct);
+    public Task SetBoolSettingAsync(string key, bool value, CancellationToken ct = default)
+        => SetSettingAsync(key, value.ToString(), ct);
 
     /// <summary>
     /// Ermittelt, ob die SCM-Ereignisüberwachung aktuell aktiv ist. Der über
@@ -431,17 +431,17 @@ public sealed class AppSettingService
         => await GetSettingsAsync(ScmPromptAppendix.SettingKeys, ct);
 
     /// <summary>Liest die Werte mehrerer Einstellungen anhand ihrer Schlüssel in einer einzigen Datenbankabfrage.</summary>
-    /// <param name="schluessel">Die zu lesenden Schlüssel.</param>
+    /// <param name="key">Die zu lesenden Schlüssel.</param>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Eine Zuordnung von Schlüssel zu Wert; Schlüssel ohne gespeicherten Eintrag fehlen im Ergebnis.</returns>
-    public async Task<IReadOnlyDictionary<string, string?>> GetSettingsAsync(IReadOnlyCollection<string> schluessel, CancellationToken ct = default)
+    public async Task<IReadOnlyDictionary<string, string?>> GetSettingsAsync(IReadOnlyCollection<string> key, CancellationToken ct = default)
     {
-        if (schluessel.Count == 0)
+        if (key.Count == 0)
             return new Dictionary<string, string?>();
 
         return await _db.AppSettings
             .AsNoTracking()
-            .Where(s => schluessel.Contains(s.Key))
+            .Where(s => key.Contains(s.Key))
             .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
     }
 
@@ -484,13 +484,13 @@ public sealed class AppSettingService
 
         var keys = updates.Select(u => u.Item1).ToArray();
 
-        var bestehende = await _db.AppSettings
+        var existing = await _db.AppSettings
             .Where(s => keys.Contains(s.Key))
             .ToDictionaryAsync(s => s.Key, ct);
 
-        foreach (var (schluessel, value) in updates)
+        foreach (var (key, value) in updates)
         {
-            if (bestehende.TryGetValue(schluessel, out var setting))
+            if (existing.TryGetValue(key, out var setting))
             {
                 setting.Value = value;
                 setting.UpdatedAt = DateTimeOffset.UtcNow;
@@ -500,7 +500,7 @@ public sealed class AppSettingService
                 _db.AppSettings.Add(new AppSetting
                 {
                     Id = Guid.NewGuid(),
-                    Key = schluessel,
+                    Key = key,
                     Value = value,
                     UpdatedAt = DateTimeOffset.UtcNow
                 });
@@ -522,7 +522,7 @@ public sealed class AppSettingService
     /// <returns>Die gelesenen Update-Einstellungen.</returns>
     public async Task<UpdateSettings> GetUpdateSettingsAsync(CancellationToken ct = default)
     {
-        var keys = new[] { UpdateModeKey, UpdatePfadKey };
+        var keys = new[] { UpdateModeKey, UpdatePathKey };
 
         var values = await _db.AppSettings
             .AsNoTracking()
@@ -538,7 +538,7 @@ public sealed class AppSettingService
             mode = (UpdateMode)modeNumber;
         }
 
-        values.TryGetValue(UpdatePfadKey, out var pathValue);
+        values.TryGetValue(UpdatePathKey, out var pathValue);
         var updatePath = UpdatePathChannelResolver.NormalizePath(pathValue);
 
         return new UpdateSettings(mode, updatePath);
@@ -562,18 +562,18 @@ public sealed class AppSettingService
         var updates = new[]
         {
             (UpdateModeKey, ((int)settings.Mode).ToString()),
-            (UpdatePfadKey, UpdatePathChannelResolver.NormalizePath(settings.UpdatePath)),
+            (UpdatePathKey, UpdatePathChannelResolver.NormalizePath(settings.UpdatePath)),
         };
 
         var keys = updates.Select(u => u.Item1).ToArray();
 
-        var bestehende = await _db.AppSettings
+        var existing = await _db.AppSettings
             .Where(s => keys.Contains(s.Key))
             .ToDictionaryAsync(s => s.Key, ct);
 
-        foreach (var (schluessel, value) in updates)
+        foreach (var (key, value) in updates)
         {
-            if (bestehende.TryGetValue(schluessel, out var setting))
+            if (existing.TryGetValue(key, out var setting))
             {
                 setting.Value = value;
                 setting.UpdatedAt = DateTimeOffset.UtcNow;
@@ -583,7 +583,7 @@ public sealed class AppSettingService
                 _db.AppSettings.Add(new AppSetting
                 {
                     Id = Guid.NewGuid(),
-                    Key = schluessel,
+                    Key = key,
                     Value = value,
                     UpdatedAt = DateTimeOffset.UtcNow
                 });
@@ -596,18 +596,18 @@ public sealed class AppSettingService
 
     /// <summary>
     /// Ermittelt, ob das Herunterfahren beim Auto-Shutdown erzwungen werden soll
-    /// (<see cref="AutoShutdownErzwingenKey"/>). Standard: <see langword="false"/>.
+    /// (<see cref="AutoShutdownForceKey"/>). Standard: <see langword="false"/>.
     /// </summary>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns><see langword="true"/>, wenn der Shutdown erzwungen werden soll.</returns>
     public async Task<bool> GetAutoShutdownErzwingenAsync(CancellationToken ct = default)
-        => await GetBoolSettingAsync(AutoShutdownErzwingenKey, ct) ?? false;
+        => await GetBoolSettingAsync(AutoShutdownForceKey, ct) ?? false;
 
-    /// <summary>Setzt den Schalter "Herunterfahren erzwingen" des Auto-Shutdowns (<see cref="AutoShutdownErzwingenKey"/>).</summary>
+    /// <summary>Setzt den Schalter "Herunterfahren erzwingen" des Auto-Shutdowns (<see cref="AutoShutdownForceKey"/>).</summary>
     /// <param name="force">Der zu speichernde Schalter.</param>
     /// <param name="ct">Abbruchtoken.</param>
     public Task SetAutoShutdownErzwingenAsync(bool force, CancellationToken ct = default)
-        => SetBoolSettingAsync(AutoShutdownErzwingenKey, force, ct);
+        => SetBoolSettingAsync(AutoShutdownForceKey, force, ct);
 
     /// <summary>
     /// Liest die Toleranzzeit in Minuten des Auto-Shutdown-Countdowns

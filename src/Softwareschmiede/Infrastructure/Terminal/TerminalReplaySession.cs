@@ -8,7 +8,7 @@ namespace Softwareschmiede.Infrastructure.Terminal;
 /// <summary><see cref="ITerminalSession"/>-Implementierung, die eine <see cref="CliOutputRecording"/>
 /// zeitreal durch denselben Renderpfad wie <see cref="PseudoConsoleSession"/> abspielt
 /// (<see cref="AnsiSequenceParser"/> → <see cref="TerminalBuffer"/> → <see cref="BufferChanged"/>).
-/// Zusätzlich zur Schnittstelle steuert sie die Wiedergabe (Start, Pause/Fortsetzen, Zeitraffer).
+/// Zusätzlich zur Schnittstelle steuert sie die Wiedergabe (Start, Pause/Resume, Zeitraffer).
 /// Die im Header der Aufzeichnung gespeicherte Geometrie ist die anfängliche Buffer-Geometrie.
 /// Während der Wiedergabe werden aufgezeichnete xterm-Textflächen-Resizes (CSI 8;Zeilen;Spalten t)
 /// auf den Buffer angewendet. <see cref="SupportsResize"/> bleibt dennoch <c>false</c>: Das
@@ -28,23 +28,23 @@ public sealed class TerminalReplaySession : ITerminalSession
     // Async-Pause-Gate (kein synchrones Wait): Task.Delay-Fortsetzungen dürfen zeitprovider-bedingt
     // synchron auf fremden Threads laufen (z. B. FakeTimeProvider.Advance) — ein blockierendes Wait
     // würde dort den fremden Thread parken (Deadlock). RunContinuationsAsynchronously sorgt
-    // zusätzlich dafür, dass Fortsetzen() keine Schleifen-Fortsetzung inline ausführt.
+    // zusätzlich dafür, dass Resume() keine Schleifen-Fortsetzung inline ausführt.
     private TaskCompletionSource _pauseGate = CreateCompletedPauseGate();
     private readonly Process _process = new();
     private Task? _playbackTask;
     private long _timeLapseTicks = TimeSpan.MaxValue.Ticks;
     private volatile bool _isPaused;
-    // Terminations-Flag für die Wiedergabe-Schleife: SchrittVor setzt es beim Erreichen des
+    // Terminations-Flag für die Wiedergabe-Schleife: StepForward setzt es beim Erreichen des
     // Endes, damit eine aufgeweckte parkende Schleife deterministisch endet — auch wenn ein
-    // SchrittZurueck die Position zwischen Gate-Öffnung und Positions-Lesen wieder senkt
+    // StepBackward die Position zwischen Gate-Öffnung und Positions-Lesen wieder senkt
     // (rein positionsbasierte Termination würde dann eine zeitgesteuerte „Geister-Wiedergabe"
     // starten, obwohl Exited bereits gefeuert hat). Zugriff nur unter _renderLock; Reset in
-    // WiedergabeStarten, bewusst NICHT in SchrittZurueck — das Fortsetzen ist Aufgabe eines
+    // StartPlayback, bewusst NICHT in StepBackward — das Resume ist Aufgabe eines
     // neuen Durchlaufs, nicht des Rückwärtsschritts.
     private bool _loopExitRequested;
-    // Konsum-Merkmal zu _schleifeBeendenAngefordert: die Schleife setzt es unter _renderLock
+    // Konsum-Merkmal zu _loopExitRequested: die Schleife setzt es unter _renderLock
     // in dem Moment, in dem sie das Flag gelesen und sich zum Abbruch entschieden hat (sie
-    // liest das Flag danach nicht erneut). Ein CAS-fehlschlagendes WiedergabeStarten kann so
+    // liest das Flag danach nicht erneut). Ein CAS-fehlschlagendes StartPlayback kann so
     // „Flag noch ungelesen — Termination widerrufbar" von „Schleife rettungslos im Sterben —
     // Neustart an ihren Task-Abschluss hängen" unterscheiden. Zugriff nur unter _renderLock.
     private bool _loopExitConsumed;
@@ -149,14 +149,14 @@ public sealed class TerminalReplaySession : ITerminalSession
         if (Interlocked.CompareExchange(ref _playbackLoopActive, 1, 0) != 0)
         {
             // CAS-Fail: eine Schleife lebt noch — sie kann aber bereits zum Abbruch
-            // verurteilt sein (_schleifeBeendenAngefordert aus dem SchrittVor-Endpfad).
+            // verurteilt sein (_loopExitRequested aus dem StepForward-Endpfad).
             // Ein blinder Return würde die angeforderte Wiedergabe dann lautlos verwerfen:
             // die sterbende Schleife feuert bei Position < Count kein Exited mehr und der
             // Aufrufer bliebe im Glauben einer laufenden Wiedergabe. Da Flag-Setzen
-            // (SchrittVor), Flag-Konsum (Schleife) und dieser Pfad unter _renderLock
+            // (StepForward), Flag-Konsum (Schleife) und dieser Pfad unter _renderLock
             // serialisiert sind, ist dort eine atomare Drei-Wege-Entscheidung möglich.
-            Task? sterbendeSchleife = null;
-            var terminationWiderrufen = false;
+            Task? dyingLoop = null;
+            var terminationCancelled = false;
             lock (_renderLock)
             {
                 if (_loopExitConsumed)
@@ -169,7 +169,7 @@ public sealed class TerminalReplaySession : ITerminalSession
                     // zur sterbenden Schleife, nicht zum neuen Durchlauf.
                     _loopExitConsumed = false;
                     _loopExitRequested = false;
-                    sterbendeSchleife = _playbackTask;
+                    dyingLoop = _playbackTask;
                 }
                 else if (_loopExitRequested)
                 {
@@ -178,14 +178,14 @@ public sealed class TerminalReplaySession : ITerminalSession
                     // Das Ende dieses fortgesetzten Durchlaufs darf erneut Exited feuern.
                     _loopExitRequested = false;
                     Interlocked.Exchange(ref _exitedSignaled, 0);
-                    terminationWiderrufen = true;
+                    terminationCancelled = true;
                 }
                 // Sonst: gesunde laufende Wiedergabe — der Aufruf bleibt idempotent.
             }
 
-            if (terminationWiderrufen)
+            if (terminationCancelled)
                 SetRuntimeStatus(CliRuntimeStatus.Running);
-            sterbendeSchleife?.ContinueWith(
+            dyingLoop?.ContinueWith(
                 // Der Retry prüft den Disposed-Zustand erneut; ein zwischenzeitliches
                 // Dispose() kann dennoch das CTS schon entsorgt haben — dann ist der
                 // Start obsolet und die Continuation darf nicht fehlschlagen.
@@ -207,9 +207,9 @@ public sealed class TerminalReplaySession : ITerminalSession
 
         // Neuer Durchlauf: das Ende-Signal darf am Schleifenende erneut feuern. Der Reset
         // läuft unter _renderLock, damit er gegen die Positions-Prüfung + das CAS in
-        // RaiseExited(nurAmEnde: true) und den Reset in SchrittZurueck serialisiert ist —
+        // RaiseExited(onlyAtEnd: true) und den Reset in StepBackward serialisiert ist —
         // lock-frei könnte er ein gerade gesetztes Signal eines nebenläufigen
-        // SchrittVor-End-RaiseExited wieder löschen (doppeltes Exited).
+        // StepForward-End-RaiseExited wieder löschen (doppeltes Exited).
         lock (_renderLock)
         {
             Interlocked.Exchange(ref _exitedSignaled, 0);
@@ -223,8 +223,8 @@ public sealed class TerminalReplaySession : ITerminalSession
     /// <summary>Hält die Wiedergabe an (kein weiterer Chunk wird angewendet, bis <see cref="Resume"/>).</summary>
     public void Pause()
     {
-        // Flag und Gate unter demselben Lock ändern wie Fortsetzen: nur so gilt die Invariante
-        // „_istPausiert ⇒ Gate geschlossen" auch bei nebenläufigem Fortsetzen atomar.
+        // Flag und Gate unter demselben Lock ändern wie Resume: nur so gilt die Invariante
+        // „_isPaused ⇒ Gate geschlossen" auch bei nebenläufigem Resume atomar.
         lock (_pauseLock)
         {
             _isPaused = true;
@@ -260,7 +260,7 @@ public sealed class TerminalReplaySession : ITerminalSession
         if (Volatile.Read(ref _disposed) != 0)
             return false;
 
-        bool endeErreicht;
+        bool endReached;
         lock (_renderLock)
         {
             var position = _playedChunks.Count;
@@ -268,19 +268,19 @@ public sealed class TerminalReplaySession : ITerminalSession
                 return false;
 
             ApplyChunkUnderLock(position);
-            endeErreicht = _playedChunks.Count >= _recording.Chunks.Count;
-            if (endeErreicht)
+            endReached = _playedChunks.Count >= _recording.Chunks.Count;
+            if (endReached)
                 _loopExitRequested = true;
         }
 
         BufferChanged?.Invoke(this, EventArgs.Empty);
 
-        if (endeErreicht)
+        if (endReached)
         {
             RaiseExited(onlyAtEnd: true);
-            // Volle Fortsetzen-Semantik (Flag + Gate): eine evtl. pausiert parkende
+            // Volle Resume-Semantik (Flag + Gate): eine evtl. pausiert parkende
             // Wiedergabe-Schleife wacht auf und terminiert am gesetzten
-            // _schleifeBeendenAngefordert deterministisch — selbst wenn ein SchrittZurueck
+            // _loopExitRequested deterministisch — selbst wenn ein StepBackward
             // die Position zwischen Gate-Öffnung und Positions-Lesen wieder senkt —
             // statt bis zum Dispose geparkt zu bleiben oder zeitgesteuert weiterzuspielen.
             Resume();
@@ -385,8 +385,8 @@ public sealed class TerminalReplaySession : ITerminalSession
         try
         {
             var chunks = _recording.Chunks;
-            // Die Position ist _abgespielteChunks.Count — dieselbe Quelle, die SchrittVor/
-            // SchrittZurueck mutieren: Einzelschritte verändern damit auch die Fortsetzposition
+            // Die Position ist _playedChunks.Count — dieselbe Quelle, die StepForward/
+            // StepBackward mutieren: Einzelschritte verändern damit auch die Fortsetzposition
             // dieser Schleife.
             while (true)
             {
@@ -401,39 +401,39 @@ public sealed class TerminalReplaySession : ITerminalSession
                 bool exitRequested;
                 lock (_renderLock)
                 {
-                    // Flag atomar mit der Position prüfen: ein SchrittVor-Endpfad hat diese
+                    // Flag atomar mit der Position prüfen: ein StepForward-Endpfad hat diese
                     // Schleife aufgeweckt — die Position kann seitdem wieder unter Count
-                    // liegen (SchrittZurueck), trotzdem muss die Schleife enden.
+                    // liegen (StepBackward), trotzdem muss die Schleife enden.
                     i = _playedChunks.Count;
                     exitRequested = _loopExitRequested;
                     if (exitRequested)
                         // Konsum unter demselben Lock vermerken: ab hier ist die
                         // Termination unwiderruflich beschlossen — ein CAS-fehlschlagendes
-                        // WiedergabeStarten erkennt das und hängt einen Neustart an den
+                        // StartPlayback erkennt das und hängt einen Neustart an den
                         // Task-Abschluss statt wirkungslos zu returnen.
                         _loopExitConsumed = true;
                 }
                 if (exitRequested || i >= chunks.Count)
                     break;
 
-                var realePause = chunks[i].Offset - (i > 0 ? chunks[i - 1].Offset : TimeSpan.Zero);
-                var delay = realePause <= TimeSpan.Zero
+                var realPause = chunks[i].Offset - (i > 0 ? chunks[i - 1].Offset : TimeSpan.Zero);
+                var delay = realPause <= TimeSpan.Zero
                     ? TimeSpan.Zero
-                    : realePause < TimeLapseThreshold ? realePause : TimeLapseThreshold;
+                    : realPause < TimeLapseThreshold ? realPause : TimeLapseThreshold;
 
                 if (delay > TimeSpan.Zero)
                     await Task.Delay(delay, _timeProvider, ct).ConfigureAwait(false);
 
                 // Das Pausiert-Flag wird hier zusätzlich unter dem Render-Lock geprüft:
-                // Pausieren() setzt es unter _pauseLock und nimmt danach den Render-Lock als
+                // Pause() setzt es unter _pauseLock und nimmt danach den Render-Lock als
                 // Fence — trifft das Pausieren zwischen Gate-Prüfung und Apply ein (relevant bei
-                // ZeitrafferSchwelle = 0, wo alle Delays 0 sind), wird der in-flight Chunk
+                // FastForwardThreshold = 0, wo alle Delays 0 sind), wird der in-flight Chunk
                 // zurückgehalten statt trotz Pausierung noch angewendet.
-                var angewendet = false;
-                while (!angewendet)
+                var applied = false;
+                while (!applied)
                 {
                     await WaitPauseGateAsync(ct).ConfigureAwait(false);
-                    // Öffnet Dispose() das Gate (Fortsetzen) während hier gewartet wird, würde der
+                    // Öffnet Dispose() das Gate (Resume) während hier gewartet wird, würde der
                     // in-flight Chunk sonst noch auf der disposed Session angewendet.
                     ct.ThrowIfCancellationRequested();
                     lock (_renderLock)
@@ -446,17 +446,17 @@ public sealed class TerminalReplaySession : ITerminalSession
                         // neu begonnen — das Delay für die neue Position wird frisch berechnet
                         // (die aufgezeichnete Pause des zurückgenommenen Chunks gilt erneut).
                         // Das Beenden-Flag wird hier ebenfalls geprüft, damit kein Chunk mehr
-                        // angewendet wird, nachdem der SchrittVor-Endpfad die Termination
+                        // angewendet wird, nachdem der StepForward-Endpfad die Termination
                         // angefordert hat.
                         if (_loopExitRequested || _playedChunks.Count != i)
                             break;
 
                         ApplyChunkUnderLock(i);
-                        angewendet = true;
+                        applied = true;
                     }
                 }
 
-                if (!angewendet)
+                if (!applied)
                     continue;
 
                 BufferChanged?.Invoke(this, EventArgs.Empty);
@@ -477,8 +477,8 @@ public sealed class TerminalReplaySession : ITerminalSession
             // der Schleife und diesem finally bereits wieder verlassen haben.
             if (!ct.IsCancellationRequested)
                 RaiseExited(onlyAtEnd: !error);
-            // Lauf-Flag zurücksetzen — WiedergabeStarten ist danach wieder armiert
-            // (Re-Armierung für „beendet → SchrittZurueck → ab Position fortsetzen").
+            // Lauf-Flag zurücksetzen — StartPlayback ist danach wieder armiert
+            // (Re-Armierung für „beendet → StepBackward → ab Position fortsetzen").
             Interlocked.Exchange(ref _playbackLoopActive, 0);
         }
     }
@@ -515,10 +515,10 @@ public sealed class TerminalReplaySession : ITerminalSession
     /// <summary>Wartet asynchron auf das Ende einer Pausierung (sofort erfüllt, wenn nicht pausiert).</summary>
     private Task WaitPauseGateAsync(CancellationToken ct)
     {
-        Task warteTask;
+        Task waitTask;
         lock (_pauseLock)
-            warteTask = _pauseGate.Task;
-        return warteTask.WaitAsync(ct);
+            waitTask = _pauseGate.Task;
+        return waitTask.WaitAsync(ct);
     }
 
     private static TaskCompletionSource CreateCompletedPauseGate()

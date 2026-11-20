@@ -7,12 +7,12 @@ public sealed class StatusAenderungsErkennung
 
     /// <summary>Prüft, ob sich der Status einer Aufgabe gegenüber der letzten Beobachtung geändert hat, und merkt den neuen Status.</summary>
     /// <param name="workItemId">Die ID der Aufgabe.</param>
-    /// <param name="neuerStatus">Der aktuell beobachtete Status.</param>
+    /// <param name="newStatus">Der aktuell beobachtete Status.</param>
     /// <returns><c>false</c> bei Erstbeobachtung oder unverändertem Status, <c>true</c> bei einem echten Wechsel.</returns>
-    public bool HatSichGeaendert(Guid workItemId, string? neuerStatus)
+    public bool HatSichGeaendert(Guid workItemId, string? newStatus)
     {
-        var hatSichGeaendert = _letzterStatus.TryGetValue(workItemId, out var bisherigerStatus) && bisherigerStatus != neuerStatus;
-        _letzterStatus[workItemId] = neuerStatus;
+        var hatSichGeaendert = _letzterStatus.TryGetValue(workItemId, out var bisherigerStatus) && bisherigerStatus != newStatus;
+        _letzterStatus[workItemId] = newStatus;
         return hatSichGeaendert;
     }
 

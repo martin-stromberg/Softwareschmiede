@@ -7,7 +7,7 @@ using Softwareschmiede.Infrastructure.Terminal;
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>Schreibt Terminal-Ausgabe einer Aufgabe nicht blockierend in das bestehende Aufgabenprotokoll.</summary>
-public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnoseSink
+public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosticsSink
 {
     internal const int QueueCapacity = 4096;
     private const int QueueWarningThreshold = 1000;
@@ -56,7 +56,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnoseS
     }
 
     /// <inheritdoc/>
-    public void OnDiagnoseChunk(ReadOnlySpan<byte> bytes) => OnOutputChunk(bytes);
+    public void OnDiagnosticsChunk(ReadOnlySpan<byte> bytes) => OnOutputChunk(bytes);
 
     /// <inheritdoc/>
     public void Complete()

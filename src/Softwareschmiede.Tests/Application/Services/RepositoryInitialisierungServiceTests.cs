@@ -29,7 +29,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
         }
     }
 
-    /// <summary><summary>RunAsync_ShouldSucceed_WhenInitializationScriptExecutes.</summary>.</summary>
+    /// <summary>RunAsync_ShouldSucceed_WhenInitializationScriptExecutes.</summary>
     [Fact]
     public async Task RunAsync_ShouldSucceed_WhenInitializationScriptExecutes()
     {
@@ -60,7 +60,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
             Times.Once);
     }
 
-    /// <summary><summary>RunAsync_ShouldLogWarning_WhenInitializationScriptFails.</summary>.</summary>
+    /// <summary>RunAsync_ShouldLogWarning_WhenInitializationScriptFails.</summary>
     [Fact]
     public async Task RunAsync_ShouldLogWarning_WhenInitializationScriptFails()
     {
@@ -88,7 +88,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
             .WithMessage("*fehlgeschlagen*");
     }
 
-    /// <summary><summary>RunAsync_ShouldThrow_WhenPathTraversalAttempted.</summary>.</summary>
+    /// <summary>RunAsync_ShouldThrow_WhenPathTraversalAttempted.</summary>
     [Fact]
     public async Task RunAsync_ShouldThrow_WhenPathTraversalAttempted()
     {
@@ -102,7 +102,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
             .WithMessage("*innerhalb des Repositorys*");
     }
 
-    /// <summary><summary>RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive.</summary>.</summary>
+    /// <summary>RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive.</summary>
     [Fact]
     public async Task RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive()
     {
@@ -122,7 +122,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
             Times.Never);
     }
 
-    /// <summary><summary>RunAsync_ShouldThrow_WhenScriptFileNotFound.</summary>.</summary>
+    /// <summary>RunAsync_ShouldThrow_WhenScriptFileNotFound.</summary>
     [Fact]
     public async Task RunAsync_ShouldThrow_WhenScriptFileNotFound()
     {
@@ -136,7 +136,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
             .WithMessage("*nicht gefunden*");
     }
 
-    /// <summary><summary>ResolveScriptPath_ShouldValidatePathBoundary.</summary>.</summary>
+    /// <summary>ResolveScriptPath_ShouldValidatePathBoundary.</summary>
     [Fact]
     public async Task ResolveScriptPath_ShouldValidatePathBoundary()
     {
@@ -163,7 +163,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
         _cliRunnerMock.VerifyAll();
     }
 
-    /// <summary><summary>RunAsync_ShouldUseCmdExe_WhenScriptIsCmdOrBatFile.</summary>.</summary>
+    /// <summary>RunAsync_ShouldUseCmdExe_WhenScriptIsCmdOrBatFile.</summary>
     /// <param name="relativeScriptPath">Repository-relativer Pfad zum .cmd- bzw. .bat-Testskript.</param>
     [Theory]
     [InlineData("scripts/init.cmd")]
@@ -183,7 +183,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
         capture.Args.Should().ContainInOrder("/c", scriptPath);
     }
 
-    /// <summary><summary>RunAsync_ShouldExecuteExeDirectly_WhenScriptIsExeFile.</summary>.</summary>
+    /// <summary>RunAsync_ShouldExecuteExeDirectly_WhenScriptIsExeFile.</summary>
     [Fact]
     public async Task RunAsync_ShouldExecuteExeDirectly_WhenScriptIsExeFile()
     {
@@ -200,7 +200,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
         capture.Args.Should().BeEmpty();
     }
 
-    /// <summary><summary>RunAsync_ShouldUseBashExe_WhenScriptIsShFile.</summary>.</summary>
+    /// <summary>RunAsync_ShouldUseBashExe_WhenScriptIsShFile.</summary>
     [Fact]
     public async Task RunAsync_ShouldUseBashExe_WhenScriptIsShFile()
     {
@@ -227,7 +227,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
         capture.Args.Should().ContainSingle().Which.Should().Be(scriptPath);
     }
 
-    /// <summary><summary>RunAsync_ShouldThrow_WhenBashExecutableNotFoundInPath.</summary>.</summary>
+    /// <summary>RunAsync_ShouldThrow_WhenBashExecutableNotFoundInPath.</summary>
     [Fact]
     public async Task RunAsync_ShouldThrow_WhenBashExecutableNotFoundInPath()
     {
@@ -256,7 +256,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
             Times.Never);
     }
 
-    /// <summary><summary>RunAsync_ShouldThrow_WhenScriptExtensionIsUnsupported.</summary>.</summary>
+    /// <summary>RunAsync_ShouldThrow_WhenScriptExtensionIsUnsupported.</summary>
     [Fact]
     public async Task RunAsync_ShouldThrow_WhenScriptExtensionIsUnsupported()
     {

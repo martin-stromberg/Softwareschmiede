@@ -68,10 +68,10 @@ public sealed class TodoService
         _logger.LogInformation("To-Do {TodoId} gelöscht.", todoId);
     }
 
-    /// <summary>Gibt die offenen To-Dos (<see cref="Todo.IstOffen"/>) einer Aufgabe zurück.</summary>
+    /// <summary>Gibt die offenen To-Dos (<see cref="Todo.IsOpen"/>) einer Aufgabe zurück.</summary>
     public async Task<IReadOnlyList<Todo>> GetOpenTodosAsync(Guid workItemId, CancellationToken ct = default)
-        // t.ErledigtAm == null statt t.IstOffen: EF Core kann die berechnete Eigenschaft nicht in SQL
-        // übersetzen ("Translation of member 'IstOffen' ... failed") - siehe TodoService.GetTodoCountAsync.
+        // t.CompletedAt == null statt t.IsOpen: EF Core kann die berechnete Eigenschaft nicht in SQL
+        // übersetzen ("Translation of member 'IsOpen' ... failed") - siehe TodoService.GetTodoCountAsync.
         => await _db.Todos
             .AsNoTracking()
             .Where(t => t.WorkItemId == workItemId && t.CompletedAt == null)
@@ -88,8 +88,8 @@ public sealed class TodoService
 
     /// <summary>Gibt die Anzahl offener To-Dos einer Aufgabe zurück.</summary>
     public async Task<int> GetTodoCountAsync(Guid workItemId, CancellationToken ct = default)
-        // t.ErledigtAm == null statt t.IstOffen: EF Core kann die berechnete Eigenschaft Todo.IstOffen
-        // nicht in SQL übersetzen (InvalidOperationException "Translation of member 'IstOffen' ...
+        // t.CompletedAt == null statt t.IsOpen: EF Core kann die berechnete Eigenschaft Todo.IsOpen
+        // nicht in SQL übersetzen (InvalidOperationException "Translation of member 'IsOpen' ...
         // failed"), da sie kein gemapptes Modellmitglied ist. Die Eigenschaft bleibt für In-Memory-
         // LINQ-Ausdrücke (z. B. EntwicklungsprozessService.AbschliessenAsync) nutzbar.
         => await _db.Todos
@@ -98,10 +98,10 @@ public sealed class TodoService
 
     /// <summary>Gibt die Anzahl offener To-Dos für mehrere Aufgaben zurück.</summary>
     public async Task<IReadOnlyDictionary<Guid, int>> GetOpenTodoCountsAsync(
-        IEnumerable<Guid> aufgabeIds,
+        IEnumerable<Guid> workItemIds,
         CancellationToken ct = default)
     {
-        var ids = aufgabeIds.Distinct().ToArray();
+        var ids = workItemIds.Distinct().ToArray();
         if (ids.Length == 0)
             return new Dictionary<Guid, int>();
 

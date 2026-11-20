@@ -18,7 +18,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         return new SoftwareschmiedeDbContext(options);
     }
 
-    /// <summary><summary>SaveAsync_ShouldPersistModesPerUser.</summary>.</summary>
+    /// <summary>SaveAsync_ShouldPersistModesPerUser.</summary>
     [Fact]
     public async Task SaveAsync_ShouldPersistModesPerUser()
     {
@@ -32,7 +32,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         loaded.SoundMode.Should().Be(NotificationMode.Sound);
     }
 
-    /// <summary><summary>GetAsync_ShouldReturnDefaults_WhenNoSettingsExist.</summary>.</summary>
+    /// <summary>GetAsync_ShouldReturnDefaults_WhenNoSettingsExist.</summary>
     [Fact]
     public async Task GetAsync_ShouldReturnDefaults_WhenNoSettingsExist()
     {
@@ -45,7 +45,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         loaded.SoundMode.Should().Be(NotificationMode.Disabled);
     }
 
-    /// <summary><summary>SaveAsync_ShouldUpsertExistingUserSettings.</summary>.</summary>
+    /// <summary>SaveAsync_ShouldUpsertExistingUserSettings.</summary>
     [Fact]
     public async Task SaveAsync_ShouldUpsertExistingUserSettings()
     {
@@ -61,7 +61,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         loaded.SoundMode.Should().Be(NotificationMode.Disabled);
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldRejectOversizedFiles.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldRejectOversizedFiles.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldRejectOversizedFiles()
     {
@@ -75,7 +75,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
             .WithMessage("*10 MB*");
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldRejectEmptyPayload.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldRejectEmptyPayload.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldRejectEmptyPayload()
     {
@@ -88,7 +88,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
             .WithMessage("*leer*");
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldRejectInvalidExtension.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldRejectInvalidExtension.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldRejectInvalidExtension()
     {
@@ -101,7 +101,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
             .WithMessage("*Audioformat*");
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldRejectInvalidMimeType.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldRejectInvalidMimeType.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldRejectInvalidMimeType()
     {
@@ -114,7 +114,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
             .WithMessage("*MIME-Typ*");
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldRejectWhenSignatureDoesNotMatchExtension.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldRejectWhenSignatureDoesNotMatchExtension.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldRejectWhenSignatureDoesNotMatchExtension()
     {
@@ -128,7 +128,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
             .WithMessage("*Signatur*");
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldStoreAndResolveAudioPayload.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldStoreAndResolveAudioPayload.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldStoreAndResolveAudioPayload()
     {
@@ -144,7 +144,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         payload.Base64Content.Should().Be(Convert.ToBase64String(mp3Bytes));
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldSanitizeFilenameAndInferMimeType_WhenMimeIsMissing.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldSanitizeFilenameAndInferMimeType_WhenMimeIsMissing.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldSanitizeFilenameAndInferMimeType_WhenMimeIsMissing()
     {
@@ -164,7 +164,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         info.MimeType.Should().Be("audio/wav");
     }
 
-    /// <summary><summary>RemoveAudioAsync_ShouldDoNothing_WhenNoAudioExists.</summary>.</summary>
+    /// <summary>RemoveAudioAsync_ShouldDoNothing_WhenNoAudioExists.</summary>
     [Fact]
     public async Task RemoveAudioAsync_ShouldDoNothing_WhenNoAudioExists()
     {
@@ -176,7 +176,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         await act.Should().NotThrowAsync();
     }
 
-    /// <summary><summary>RemoveAudioAsync_ShouldDeleteStoredAudio.</summary>.</summary>
+    /// <summary>RemoveAudioAsync_ShouldDeleteStoredAudio.</summary>
     [Fact]
     public async Task RemoveAudioAsync_ShouldDeleteStoredAudio()
     {
@@ -193,7 +193,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         payload.Should().BeNull();
     }
 
-    /// <summary><summary>GetAudioPayloadAsync_ShouldReturnNull_WhenStoredAudioContentIsEmpty.</summary>.</summary>
+    /// <summary>GetAudioPayloadAsync_ShouldReturnNull_WhenStoredAudioContentIsEmpty.</summary>
     [Fact]
     public async Task GetAudioPayloadAsync_ShouldReturnNull_WhenStoredAudioContentIsEmpty()
     {

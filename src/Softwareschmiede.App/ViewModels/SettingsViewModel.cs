@@ -624,8 +624,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             var aufbereitungsPrefix = await _settingService.GetScmIssuePreparationPluginPrefixAsync(ct);
             IssueAufbereitungKiPluginOptionen.Clear();
             IssueAufbereitungKiPluginOptionen.Add(IssueAufbereitungKiPluginOption.Default);
-            foreach (var kiPlugin in KiPlugins)
-                IssueAufbereitungKiPluginOptionen.Add(new IssueAufbereitungKiPluginOption(kiPlugin.PluginPrefix, kiPlugin.PluginName));
+            foreach (var aiPlugin in KiPlugins)
+                IssueAufbereitungKiPluginOptionen.Add(new IssueAufbereitungKiPluginOption(aiPlugin.PluginPrefix, aiPlugin.PluginName));
             SelectedIssueAufbereitungKiPlugin = IssueAufbereitungKiPluginOptionen
                 .FirstOrDefault(x => string.Equals(x.PluginPrefix, aufbereitungsPrefix, StringComparison.Ordinal))
                 ?? IssueAufbereitungKiPluginOption.Default;
@@ -636,9 +636,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             _kiPluginParallelLimits.Clear();
             var pluginLimitWerte = await _settingService.GetSettingsAsync(
                 KiPlugins.Select(x => ScmEventExecutionLimitService.PluginLimitKey(x.PluginPrefix)).ToList(), ct);
-            foreach (var kiPlugin in KiPlugins)
-                _kiPluginParallelLimits[kiPlugin.PluginPrefix] =
-                    pluginLimitWerte.GetValueOrDefault(ScmEventExecutionLimitService.PluginLimitKey(kiPlugin.PluginPrefix));
+            foreach (var aiPlugin in KiPlugins)
+                _kiPluginParallelLimits[aiPlugin.PluginPrefix] =
+                    pluginLimitWerte.GetValueOrDefault(ScmEventExecutionLimitService.PluginLimitKey(aiPlugin.PluginPrefix));
 
             var promptAnhaenge = await _settingService.GetScmPromptAppendicesAsync(ct);
             ScmPromptAppendixGeneral = promptAnhaenge.GetValueOrDefault(AppSettingService.ScmPromptAppendGeneralKey) ?? string.Empty;

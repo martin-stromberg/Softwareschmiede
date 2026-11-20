@@ -85,7 +85,7 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
                 $"Die CLI-Executable '{spec.FileName}' (Plugin '{spec.PluginName}') kann nicht gestartet werden: {resolution.Detail}");
         }
 
-        if (spec.Capabilities.HasFlag(TerminalProviderCapabilities.RequiresPty) && !preflight.PtyVerfuegbar)
+        if (spec.Capabilities.HasFlag(TerminalProviderCapabilities.RequiresPty) && !preflight.PtyAvailable)
         {
             WriteDiagnosis(outputSink, "Das Plugin erfordert ein Pseudo-Terminal (RequiresPty), das nicht verfügbar ist", preflight);
             throw new InvalidOperationException(
@@ -128,10 +128,10 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
 
     /// <summary>Schreibt eine <c>[Terminal-Diagnose]</c>-Markerzeile ausschließlich in die Protokoll-Senke
     /// (CliOutput-Protokoll — nicht in <c>TerminalReplayBuffer</c>/Terminal-Anzeige) und ins Log.</summary>
-    private void WriteDiagnosis(ITerminalOutputSink? outputSink, string grund, TerminalPreflightResult preflight)
+    private void WriteDiagnosis(ITerminalOutputSink? outputSink, string reason, TerminalPreflightResult preflight)
     {
         var checks = string.Join(", ", preflight.Checks.Select(c => $"{c.Name}={(c.Ok ? "OK" : "Fehler")}{(c.Detail is null ? string.Empty : $" [{c.Detail}]")}"));
-        var message = $"[Terminal-Diagnose] {grund} | PtyVerfuegbar={preflight.PtyVerfuegbar} | Checks: {checks}";
+        var message = $"[Terminal-Diagnose] {reason} | PtyVerfuegbar={preflight.PtyAvailable} | Checks: {checks}";
 
         if (preflight.Checks.Any(c => !c.Ok))
             _logger.LogWarning("{Message}", message);
@@ -143,8 +143,8 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
             var markerBytes = Encoding.UTF8.GetBytes(message + "\r\n");
             // Diagnose-Marker gehen über den eigenen Kanal an Senken, die ihn explizit verstehen —
             // byte-exakte Mitschnitt-Senken (CliOutputRecorder) bleiben frei von Artefakt-Zeilen.
-            if (outputSink is ITerminalDiagnoseSink diagnoseSink)
-                diagnoseSink.OnDiagnoseChunk(markerBytes);
+            if (outputSink is ITerminalDiagnosticsSink diagnosticsSink)
+                diagnosticsSink.OnDiagnosticsChunk(markerBytes);
             else
                 outputSink?.OnOutputChunk(markerBytes);
         }

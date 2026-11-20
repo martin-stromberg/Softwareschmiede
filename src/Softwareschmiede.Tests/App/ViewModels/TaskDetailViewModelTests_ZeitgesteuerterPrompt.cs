@@ -21,7 +21,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     private readonly WorkItemService _workItemService;
     private readonly LogService _logService;
     private readonly TodoService _todoService;
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly DevelopmentProcessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly PromptTemplateService _promptVorlagenService;
@@ -41,8 +41,8 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
 
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
-        _promptScheduleDispatchService = new PromptScheduleDispatchService(_kiService, _timeProvider, NullLogger<PromptScheduleDispatchService>.Instance);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, _timeProvider, NullLogger<PromptScheduleDispatchService>.Instance);
 
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -61,7 +61,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
             gitPluginMock.Object,
             _pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            new DevelopmentProcessServiceOptions(AiExecutionService: _kiService),
+            new DevelopmentProcessServiceOptions(AiExecutionService: _aiService),
             NullLogger<DevelopmentProcessService>.Instance);
 
         _dialogServiceMock = new Mock<IDialogService>();
@@ -79,7 +79,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
     }
 
@@ -97,7 +97,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         return new TaskDetailViewModel(
             _workItemService,
             _logService,
-            _kiService,
+            _aiService,
             _entwicklungsprozessService,
             _pluginSelectionService,
             _promptVorlagenService,

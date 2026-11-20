@@ -19,7 +19,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
     private readonly WorkItemService _workItemService;
     private readonly LogService _logService;
     private readonly TodoService _todoService;
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly DevelopmentProcessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly PromptTemplateService _promptVorlagenService;
@@ -38,8 +38,8 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
-        _promptScheduleDispatchService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _appSettingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
 
         var pluginManagerMock = new Mock<IPluginManager>();
@@ -59,7 +59,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
             gitPluginMock.Object,
             _pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            new DevelopmentProcessServiceOptions(AiExecutionService: _kiService),
+            new DevelopmentProcessServiceOptions(AiExecutionService: _aiService),
             NullLogger<DevelopmentProcessService>.Instance);
 
         _dialogServiceMock = new Mock<IDialogService>();
@@ -82,7 +82,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
     }
 
@@ -96,7 +96,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         return new TaskDetailViewModel(
             _workItemService,
             _logService,
-            _kiService,
+            _aiService,
             _entwicklungsprozessService,
             _pluginSelectionService,
             _promptVorlagenService,

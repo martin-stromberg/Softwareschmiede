@@ -103,13 +103,13 @@ public sealed class CliOutputRecorderTests
         sut.GetRecording().Chunks.Should().BeEmpty();
     }
 
-    /// <summary>Der Recorder implementiert bewusst nicht <see cref="ITerminalDiagnoseSink"/>, damit
+    /// <summary>Der Recorder implementiert bewusst nicht <see cref="ITerminalDiagnosticsSink"/>, damit
     /// Diagnose-Markerzeilen nicht in den byte-exakten Mitschnitt gelangen.</summary>
     [Fact]
     public void Recorder_ImplementiertNichtITerminalDiagnoseSink()
     {
         ITerminalOutputSink sut = new CliOutputRecorder(Guid.NewGuid(), "P", 80, 24, 1024, new FakeTimeProvider());
 
-        (sut is ITerminalDiagnoseSink).Should().BeFalse();
+        (sut is ITerminalDiagnosticsSink).Should().BeFalse();
     }
 }

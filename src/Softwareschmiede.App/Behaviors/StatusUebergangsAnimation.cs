@@ -55,8 +55,8 @@ public static class StatusUebergangsAnimation
 
         RegistriereUnloadedBereinigung(element, workItemId.Value);
 
-        var neuerStatus = (string?)e.NewValue;
-        if (!AenderungsErkennung.HatSichGeaendert(workItemId.Value, neuerStatus))
+        var newStatus = (string?)e.NewValue;
+        if (!AenderungsErkennung.HatSichGeaendert(workItemId.Value, newStatus))
             return;
 
         var animation = new DoubleAnimation

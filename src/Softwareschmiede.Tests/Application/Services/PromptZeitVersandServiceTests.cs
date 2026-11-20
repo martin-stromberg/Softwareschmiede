@@ -15,20 +15,20 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Unit-Tests für PromptZeitVersandService.</summary>
 public sealed class PromptZeitVersandServiceTests : IDisposable
 {
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly FakeTimeProvider _timeProvider;
     private readonly PromptScheduleDispatchService _sut;
 
     /// <summary>PromptZeitVersandServiceTests.</summary>
     public PromptZeitVersandServiceTests()
     {
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
         _timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
-        _sut = new PromptScheduleDispatchService(_kiService, _timeProvider, NullLogger<PromptScheduleDispatchService>.Instance);
+        _sut = new PromptScheduleDispatchService(_aiService, _timeProvider, NullLogger<PromptScheduleDispatchService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
-    public void Dispose() => _kiService.Dispose();
+    public void Dispose() => _aiService.Dispose();
 
     /// <summary>
     /// Registriert für eine neue Aufgabe eine gültige <see cref="PseudoConsoleSession"/> beim
@@ -62,7 +62,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         };
 
         var handlesField = typeof(AiExecutionService).GetField("_handles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
+        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_aiService)!;
         handles[workItemId] = handle;
     }
 
@@ -70,7 +70,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
     private void RaiseCliProcessStatusChanged(Guid workItemId, CliProcessStatus status)
     {
         var eventField = typeof(AiExecutionService).GetField("CliProcessStatusChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-        ((Action<Guid, CliProcessStatus>?)eventField.GetValue(_kiService))?.Invoke(workItemId, status);
+        ((Action<Guid, CliProcessStatus>?)eventField.GetValue(_aiService))?.Invoke(workItemId, status);
     }
 
     /// <summary>Wartet aktiv, bis die Bedingung erfüllt ist (für Fire-and-forget-Abläufe ohne Event-Signal).</summary>
@@ -291,7 +291,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -320,7 +320,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var pausedUntil = _timeProvider.GetUtcNow().AddHours(2);
         await using var provider = await CreatePausedTaskProviderAsync(pausedUntil, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -341,7 +341,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreatePausedTaskProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -385,7 +385,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -409,7 +409,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -431,7 +431,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -457,7 +457,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -478,7 +478,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -516,7 +516,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -545,7 +545,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -574,7 +574,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -597,7 +597,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -624,7 +624,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         // Versandpfad darf dadurch nicht brechen (gleicher Schutzpfad wie eine gelöschte Aufgabe).
         await using var provider = await CreateStoreProviderAsync(null, workItemId, mitProtokollService: false);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -648,7 +648,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -692,7 +692,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         }
 
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -726,7 +726,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         }
 
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -760,7 +760,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         }
 
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -781,7 +781,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
 
         var ersterService = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             scopeFactory);
@@ -792,7 +792,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         // die Zielzeit ist beim „Neustart“ bereits verstrichen.
         _timeProvider.Advance(TimeSpan.FromMinutes(6));
         var zweiterService = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             scopeFactory);
@@ -833,7 +833,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -863,7 +863,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -987,7 +987,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         }
 
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -1010,7 +1010,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -1059,7 +1059,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());
@@ -1094,7 +1094,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var workItemId = Guid.NewGuid();
         await using var provider = await CreateStoreProviderAsync(null, workItemId);
         var sut = new PromptScheduleDispatchService(
-            _kiService,
+            _aiService,
             _timeProvider,
             NullLogger<PromptScheduleDispatchService>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>());

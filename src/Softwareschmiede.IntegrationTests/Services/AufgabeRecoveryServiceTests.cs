@@ -19,7 +19,7 @@ public sealed class AufgabeRecoveryServiceTests
         var workItem = await CreateTaskAsync(db, WorkItemStatus.Started);
         var sut = new WorkItemRecoveryService(db.Context, new AlwaysNotRunningAutomationStatusSource(), NullLogger<WorkItemRecoveryService>.Instance);
 
-        await sut.RecoverManuellAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await sut.RecoverManuallyAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         await using var assertContext = db.CreateNewContext();
         var loaded = await assertContext.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
@@ -38,7 +38,7 @@ public sealed class AufgabeRecoveryServiceTests
         var workItem = await CreateTaskAsync(db, WorkItemStatus.Started);
         var sut = new WorkItemRecoveryService(db.Context, new AlwaysRunningAutomationStatusSource(), NullLogger<WorkItemRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(workItem.Id);
+        var act = () => sut.RecoverManuallyAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Wiederherstellung nicht möglich, Verarbeitung läuft noch.");
@@ -65,7 +65,7 @@ public sealed class AufgabeRecoveryServiceTests
         });
         var sut = new WorkItemRecoveryService(db.Context, runningStatus, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(workItem.Id);
+        var act = () => sut.RecoverManuallyAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Status wurde bereits geändert. Ansicht wurde aktualisiert.");
@@ -85,7 +85,7 @@ public sealed class AufgabeRecoveryServiceTests
         var workItem = await CreateTaskAsync(db, WorkItemStatus.New);
         var sut = new WorkItemRecoveryService(db.Context, new AlwaysNotRunningAutomationStatusSource(), NullLogger<WorkItemRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(workItem.Id);
+        var act = () => sut.RecoverManuallyAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Wiederherstellung für aktuellen Status nicht verfügbar.");
@@ -127,7 +127,7 @@ public sealed class AufgabeRecoveryServiceTests
     {
         try
         {
-            await service.RecoverManuellAsync(workItemId);
+            await service.RecoverManuallyAsync(workItemId);
             return true;
         }
         catch (InvalidOperationException)

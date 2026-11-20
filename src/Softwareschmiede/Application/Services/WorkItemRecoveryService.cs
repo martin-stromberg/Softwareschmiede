@@ -59,7 +59,7 @@ public sealed class WorkItemRecoveryService
     /// Führt eine manuelle Recovery durch.
     /// Erlaubt nur Recovery aus <see cref="WorkItemStatus.Started"/> oder <see cref="WorkItemStatus.Waiting"/>.
     /// </summary>
-    public async Task RecoverManuellAsync(Guid workItemId, CancellationToken ct = default)
+    public async Task RecoverManuallyAsync(Guid workItemId, CancellationToken ct = default)
     {
         var correlationId = Guid.NewGuid().ToString("N");
         _logger.LogInformation(
@@ -77,7 +77,7 @@ public sealed class WorkItemRecoveryService
             throw new InvalidOperationException("Aufgabe wurde nicht gefunden.");
         }
 
-        if (!IstRecoveryStatus(workItem.Status, workItem.ExecutionStatus))
+        if (!IsRecoveryStatus(workItem.Status, workItem.ExecutionStatus))
         {
             LogRejected(correlationId, workItemId, "InvalidState");
             throw new InvalidOperationException("Wiederherstellung für aktuellen Status nicht verfügbar.");
@@ -221,7 +221,7 @@ public sealed class WorkItemRecoveryService
     /// <param name="status">Der Aufgabenstatus.</param>
     /// <param name="executionStatus">Der persistierte KI-Ausführungsstatus.</param>
     /// <returns><c>true</c>, wenn die Aufgabe ein Recovery-Kandidat ist; andernfalls <c>false</c>.</returns>
-    internal static bool IstRecoveryStatus(WorkItemStatus status, WorkItemExecutionStatus executionStatus)
+    internal static bool IsRecoveryStatus(WorkItemStatus status, WorkItemExecutionStatus executionStatus)
         => status.IsActiveOrWaiting()
             && executionStatus == WorkItemExecutionStatus.Active;
 }

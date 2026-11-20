@@ -252,8 +252,8 @@ public sealed class ScmEventOrchestrator(
                     }
                     using (admission.Reservation)
                     {
-                        var kiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);
-                        if (!await kiPlugin.CheckHealthAsync(ct)) throw new InvalidOperationException("Die ausgewählte CLI ist nicht startbereit.");
+                        var aiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);
+                        if (!await aiPlugin.CheckHealthAsync(ct)) throw new InvalidOperationException("Die ausgewählte CLI ist nicht startbereit.");
                         var parameters = prefix.Contains("KiSimulator", StringComparison.OrdinalIgnoreCase) ? "--scm-exchange" : null;
                         if (string.IsNullOrWhiteSpace(task.LocalClonePath))
                             await development.StartProcessAndCliAsync(task.Id, task.GitRepository!.RepositoryUrl,
@@ -382,8 +382,8 @@ public sealed class ScmEventOrchestrator(
         var session = cli.GetScmPromptSession(item.WorkItemId);
         if (session is null || !session.IsAlive || session.CliRunId.ToString("D") != displayedRunId)
             throw new InvalidOperationException("CLI-Sitzung hat sich geändert. Bitte die neue Sitzung ausdrücklich bestätigen.");
-        // The live adapter owns this one-input confirmation and invalidates it at every input.
-        // Persisting only a run id would authorize later, unrelated input phases in that same run.
+        // Der Live-Adapter besitzt diese Ein-Eingabe-Bestätigung und invalidiert sie bei jeder Eingabe.
+        // Nur eine Run-ID zu persistieren würde spätere, fremde Eingabephasen desselben Laufs autorisieren.
         if (!session.ConfirmReady(session.CliRunId))
         {
             var recognition = session.CliRecognition;
@@ -391,8 +391,8 @@ public sealed class ScmEventOrchestrator(
                 ? ScmCliWaitReason.Describe(recognition)
                 : "CLI ist beschäftigt oder kann noch nicht bestätigt werden. Bitte erneut prüfen.");
         }
-        // A deliberate confirmation is an explicit retry, so an earlier hard stop must not
-        // swallow it like the other queue actions already prevent.
+        // Eine bewusste Bestätigung ist ein expliziter Wiederholungsversuch; ein früherer harter Stopp
+        // darf sie daher nicht verschlucken, wie es die übrigen Queue-Aktionen bereits verhindern.
         item.NextAttemptUtc = null;
         item.ReadyConfirmedRunId = null;
         return Task.FromResult(true);
@@ -712,8 +712,8 @@ public sealed class ScmEventOrchestrator(
                 }
                 using (admission.Reservation)
                 {
-                    var kiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);
-                    if (!await kiPlugin.CheckHealthAsync(ct)) throw new InvalidOperationException("Die ausgewählte CLI ist nicht startbereit.");
+                    var aiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);
+                    if (!await aiPlugin.CheckHealthAsync(ct)) throw new InvalidOperationException("Die ausgewählte CLI ist nicht startbereit.");
                     var parameters = prefix.Contains("KiSimulator", StringComparison.OrdinalIgnoreCase) ? "--scm-exchange" : null;
                     if (string.IsNullOrWhiteSpace(task.LocalClonePath))
                         await development.StartProcessAndCliAsync(task.Id, task.GitRepository!.RepositoryUrl,

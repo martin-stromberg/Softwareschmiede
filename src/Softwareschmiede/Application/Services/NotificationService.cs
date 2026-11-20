@@ -39,29 +39,29 @@ public sealed class NotificationService
     /// </summary>
     public async Task DispatchAsync(
         Guid workItemId,
-        WorkItemStatus neuerStatus,
+        WorkItemStatus newStatus,
         CancellationToken ct = default)
     {
-        var benutzerId = _userContextService.GetUserId();
-        var settings = await _settingsService.GetAsync(benutzerId, ct);
+        var userId = _userContextService.GetUserId();
+        var settings = await _settingsService.GetAsync(userId, ct);
         var eventId = Guid.NewGuid();
 
         await DispatchForChannelAsync(
             eventId,
             workItemId,
-            benutzerId,
+            userId,
             NotificationChannel.Banner,
             settings.BannerMode,
-            neuerStatus,
+            newStatus,
             ct);
 
         await DispatchForChannelAsync(
             eventId,
             workItemId,
-            benutzerId,
+            userId,
             NotificationChannel.Sound,
             settings.SoundMode,
-            neuerStatus,
+            newStatus,
             ct);
     }
 
@@ -118,10 +118,10 @@ public sealed class NotificationService
     private async Task DispatchForChannelAsync(
         Guid eventId,
         Guid workItemId,
-        string benutzerId,
+        string userId,
         NotificationChannel channel,
         NotificationMode mode,
-        WorkItemStatus neuerStatus,
+        WorkItemStatus newStatus,
         CancellationToken ct)
     {
         if (mode == NotificationMode.Disabled)
@@ -129,7 +129,7 @@ public sealed class NotificationService
             await _auditService.LogAsync(
                 eventId,
                 workItemId,
-                benutzerId,
+                userId,
                 channel,
                 mode,
                 NotificationDecision.Suppressed,
@@ -145,11 +145,11 @@ public sealed class NotificationService
                 case NotificationChannel.Banner:
                     await ShowBannerAsync(
                         workItemId,
-                        $"Aufgabe: Status geändert zu {neuerStatus.ToDisplayText()}",
+                        $"Aufgabe: Status geändert zu {newStatus.ToDisplayText()}",
                         ct);
                     break;
                 case NotificationChannel.Sound:
-                    var audio = await _settingsService.GetAudioPayloadAsync(benutzerId, ct);
+                    var audio = await _settingsService.GetAudioPayloadAsync(userId, ct);
                     if (audio is not null)
                     {
                         var tempPath = await WriteTemporaryAudioFileAsync(audio.Base64Content, audio.MimeType, ct);
@@ -176,11 +176,11 @@ public sealed class NotificationService
             await _auditService.LogAsync(
                 eventId,
                 workItemId,
-                benutzerId,
+                userId,
                 channel,
                 mode,
                 NotificationDecision.Sent,
-                $"Status: {neuerStatus.ToDisplayText()}",
+                $"Status: {newStatus.ToDisplayText()}",
                 ct);
         }
         catch (OperationCanceledException)
@@ -198,7 +198,7 @@ public sealed class NotificationService
             await _auditService.LogAsync(
                 eventId,
                 workItemId,
-                benutzerId,
+                userId,
                 channel,
                 mode,
                 NotificationDecision.Failed,

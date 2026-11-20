@@ -304,18 +304,18 @@ public sealed class GitOrchestrationService
         var project = await _projektService.GetDetailAsync(workItem.ProjectId, ct)
             ?? throw new InvalidOperationException($"Projekt {workItem.ProjectId} nicht gefunden.");
 
-        var aktiveRepositories = project.Repositories
+        var activeRepositories = project.Repositories
             .Where(repository => repository.Active)
             .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(repository => repository.Id)
             .ToList();
 
-        if (aktiveRepositories.Count == 1)
+        if (activeRepositories.Count == 1)
         {
-            return ExtractRepositoryIdFromUrl(aktiveRepositories[0].RepositoryUrl);
+            return ExtractRepositoryIdFromUrl(activeRepositories[0].RepositoryUrl);
         }
 
-        if (aktiveRepositories.Count == 0)
+        if (activeRepositories.Count == 0)
         {
             throw new InvalidOperationException(
                 $"Aufgabe {workItem.Id} kann keinen Pull Request erstellen, weil im Projekt '{project.Name}' kein aktives Repository vorhanden ist.");
@@ -349,23 +349,23 @@ public sealed class GitOrchestrationService
         var project = await _projektService.GetDetailAsync(workItem.ProjectId, ct)
             ?? throw new InvalidOperationException($"Projekt {workItem.ProjectId} nicht gefunden.");
 
-        var aktiveRepositories = project.Repositories
+        var activeRepositories = project.Repositories
             .Where(repository => repository.Active)
             .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(repository => repository.Id)
             .ToList();
 
-        if (aktiveRepositories.Count == 1 && !string.IsNullOrWhiteSpace(aktiveRepositories[0].PluginType))
+        if (activeRepositories.Count == 1 && !string.IsNullOrWhiteSpace(activeRepositories[0].PluginType))
         {
-            return aktiveRepositories[0].PluginType.Trim();
+            return activeRepositories[0].PluginType.Trim();
         }
 
-        if (aktiveRepositories.Count > 1)
+        if (activeRepositories.Count > 1)
         {
             _logger.LogWarning(
                 "Aufgabe {AufgabeId}: Mehrdeutige Plugin-Auflösung ({RepositoryCount} aktive Repositories). Es wird der konfigurierte Standard genutzt.",
                 workItem.Id,
-                aktiveRepositories.Count);
+                activeRepositories.Count);
         }
 
         return null;
@@ -382,21 +382,21 @@ public sealed class GitOrchestrationService
         var project = await _projektService.GetDetailAsync(workItem.ProjectId, ct)
             ?? throw new InvalidOperationException($"Projekt {workItem.ProjectId} nicht gefunden.");
 
-        var aktiveRepositories = project.Repositories
+        var activeRepositories = project.Repositories
             .Where(repository => repository.Active)
             .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(repository => repository.Id)
             .ToList();
 
-        if (aktiveRepositories.Count > 1)
+        if (activeRepositories.Count > 1)
         {
             _logger.LogWarning(
                 "Aufgabe {AufgabeId}: Mehrdeutige Basis-Branch-Auflösung ({RepositoryCount} aktive Repositories). Es wird kein Basis-Branch aufgelöst.",
                 workItem.Id,
-                aktiveRepositories.Count);
+                activeRepositories.Count);
         }
 
-        return aktiveRepositories.Count == 1 ? aktiveRepositories[0].DefaultSourceBranchName : null;
+        return activeRepositories.Count == 1 ? activeRepositories[0].DefaultSourceBranchName : null;
     }
 
     /// <summary>Extrahiert die Repository-ID (owner/repo) aus einer Repository-URL.</summary>

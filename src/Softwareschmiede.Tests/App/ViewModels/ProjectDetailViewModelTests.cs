@@ -394,7 +394,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         // Assert
         navigiertesViewModel.Should().NotBeNull();
-        var workItems = await _workItemService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().ContainSingle(a => a.Status == WorkItemStatus.New);
     }
 
@@ -418,7 +418,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.AufgabeErstellenCommand).ExecuteAsync();
 
         // Assert
-        var workItems = await _workItemService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().ContainSingle(a => a.GitRepositoryId == repository.Id);
     }
 
@@ -696,7 +696,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         // Assert
         sut.IssueVorschlaege.Should().BeEmpty();
         sut.WorkItems.Should().Contain(a => a.Title == "Mein Issue");
-        var workItem = await _workItemService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItem.Should().Contain(a => a.Title == "Mein Issue");
     }
 
@@ -723,7 +723,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         // Assert: Keine Aufgabe erstellt, Vorschlage unverändert
         sut.IssueVorschlaege.Should().HaveCount(vorschlaegVorher);
-        var workItems = await _workItemService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().BeEmpty();
     }
 
@@ -786,7 +786,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         plugin.CreateIssueCalls.Should().Be(1);
         sut.OffeneAnforderungen.Should().BeEmpty();
-        var workItem = (await _workItemService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken)).Single();
+        var workItem = (await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken)).Single();
         workItem.Title.Should().Be("Unsichere Abfrage");
         workItem.RequirementDescription.Should().Be(issueBody);
         workItem.IssueReference!.IssueNumber.Should().Be(200);
@@ -813,7 +813,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         plugin.CreateIssueCalls.Should().Be(0);
         sut.WorkItems.Count(a => a.AlertReference?.SourceKey == alert.SourceKey).Should().Be(1);
-        var workItems = await _workItemService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Count(a => a.AlertReference?.SourceKey == alert.SourceKey).Should().Be(1);
     }
 
@@ -839,7 +839,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         plugin.CreateIssueCalls.Should().Be(1);
         sut.FehlerMeldung.Should().Contain("permission denied");
-        var workItems = await _workItemService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().BeEmpty();
     }
 
@@ -860,7 +860,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         await sut.AufgabeAusAnforderungErstellenCommand.ExecuteAsync(sut.OffeneAnforderungen.Single());
 
         plugin.CreateIssueCalls.Should().Be(0);
-        var workItems = await _workItemService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().BeEmpty();
     }
 

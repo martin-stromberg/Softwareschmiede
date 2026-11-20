@@ -12,7 +12,7 @@ namespace Softwareschmiede.Application.Services;
 /// </summary>
 public sealed class CliProcessManager : IDisposable
 {
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<CliProcessManager> _logger;
     private readonly WorkItemRunDataChangedNotifier _runDataChangedNotifier;
@@ -65,13 +65,13 @@ public sealed class CliProcessManager : IDisposable
         ILogger<CliProcessManager> logger,
         WorkItemRunDataChangedNotifier runDataChangedNotifier)
     {
-        _kiService = kiService;
+        _aiService = kiService;
         _scopeFactory = scopeFactory;
         _logger = logger;
         _runDataChangedNotifier = runDataChangedNotifier;
 
-        _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
-        _kiService.CliRunActive += OnCliRunActive;
+        _aiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
+        _aiService.CliRunActive += OnCliRunActive;
 
         _reconcileTimer = new Timer(
             _ => ReconcileTickAsync().SafeFireAndForget(_logger, "CliProcessManager.ReconcileTickAsync"),
@@ -147,13 +147,13 @@ public sealed class CliProcessManager : IDisposable
         await semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (!_kiService.IsRunning(workItemId))
+            if (!_aiService.IsRunning(workItemId))
             {
                 StopHeartbeat(workItemId);
                 return;
             }
 
-            _kiService.UpdateHeartbeat(workItemId);
+            _aiService.UpdateHeartbeat(workItemId);
             await EnsureRunDataAsync(workItemId).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -218,7 +218,7 @@ public sealed class CliProcessManager : IDisposable
             workItemService => workItemService.SetActiveRunAsync(
                 workItemId,
                 Guid.NewGuid().ToString("N"),
-                runningGuard: () => _kiService.IsRunning(workItemId))).ConfigureAwait(false);
+                runningGuard: () => _aiService.IsRunning(workItemId))).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -249,7 +249,7 @@ public sealed class CliProcessManager : IDisposable
     /// <param name="workItemId">ID der Aufgabe, für deren laufenden Prozess der Substatus beobachtet werden soll.</param>
     private void SubscribeRuntimeStatus(Guid workItemId)
     {
-        var session = _kiService.GetTerminalSession(workItemId);
+        var session = _aiService.GetTerminalSession(workItemId);
         if (session is null)
         {
             // Klassischer Start ohne ConPTY: keine Sitzung, also kein Laufzeit-Substatus verfügbar.
@@ -356,7 +356,7 @@ public sealed class CliProcessManager : IDisposable
     /// <param name="workItemId">ID der Aufgabe, deren Laufdaten sichergestellt werden sollen.</param>
     private async Task EnsureRunDataAsync(Guid workItemId)
     {
-        if (!_kiService.IsRunning(workItemId))
+        if (!_aiService.IsRunning(workItemId))
         {
             return;
         }
@@ -381,8 +381,8 @@ public sealed class CliProcessManager : IDisposable
             "Sicherstellen der Laufdaten",
             workItemService => workItemService.EnsureActiveRunAsync(
                 workItemId,
-                runStatusProvider: () => _kiService.GetTerminalSession(workItemId)?.RuntimeStatus.ToWorkItemRunStatus(),
-                runningGuard: () => _kiService.IsRunning(workItemId))).ConfigureAwait(false);
+                runStatusProvider: () => _aiService.GetTerminalSession(workItemId)?.RuntimeStatus.ToWorkItemRunStatus(),
+                runningGuard: () => _aiService.IsRunning(workItemId))).ConfigureAwait(false);
     }
 
     /// <summary>Tick-Wrapper des <c>_abgleichTimer</c>: stellt sicher, dass sich bei einem
@@ -409,7 +409,7 @@ public sealed class CliProcessManager : IDisposable
     /// Laufdaten sicher (fehlerisoliert — einzelne Fehlschläge werden nur geloggt).</summary>
     private async Task ReconcileAsync()
     {
-        foreach (var workItemId in _kiService.GetRunningWorkItemIds())
+        foreach (var workItemId in _aiService.GetRunningWorkItemIds())
         {
             try
             {
@@ -457,8 +457,8 @@ public sealed class CliProcessManager : IDisposable
     {
         _reconcileTimer.Dispose();
 
-        _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
-        _kiService.CliRunActive -= OnCliRunActive;
+        _aiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
+        _aiService.CliRunActive -= OnCliRunActive;
 
         lock (_lifecycleLock)
         {

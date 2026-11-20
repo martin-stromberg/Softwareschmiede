@@ -24,7 +24,7 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary><summary>StartenAsync_Setzt_Status_AufGestartet.</summary>.</summary>
+    /// <summary>StartenAsync_Setzt_Status_AufGestartet.</summary>
     [Fact]
     public async Task StartenAsync_Setzt_Status_AufGestartet()
     {
@@ -41,7 +41,7 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
         geladen.LocalClonePath.Should().Be("/tmp/repo");
     }
 
-    /// <summary><summary>StatusUebergang_Gestartet_NachWartend_IstErlaubt.</summary>.</summary>
+    /// <summary>StatusUebergang_Gestartet_NachWartend_IstErlaubt.</summary>
     [Fact]
     public async Task StatusUebergang_Gestartet_NachWartend_IstErlaubt()
     {
@@ -55,7 +55,7 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
         geladen!.Status.Should().Be(WorkItemStatus.Waiting);
     }
 
-    /// <summary><summary>StatusUebergang_Wartend_NachGestartet_IstErlaubt.</summary>.</summary>
+    /// <summary>StatusUebergang_Wartend_NachGestartet_IstErlaubt.</summary>
     [Fact]
     public async Task StatusUebergang_Wartend_NachGestartet_IstErlaubt()
     {

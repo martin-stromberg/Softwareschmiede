@@ -168,9 +168,9 @@ public sealed class SettingsViewModelTests : IDisposable
         var field = new PluginSettingField("token", "Token", PluginSettingFieldType.Secret);
         var group = new PluginSettingGroup("Auth", [field]);
         var scmPlugin = CreateScmPluginMock("GitHub", [group]).Object;
-        var kiPlugin = CreateKiPluginMock("Claude").Object;
+        var aiPlugin = CreateKiPluginMock("Claude").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _settingService.SetSettingAsync(AppSettingService.DefaultScmPluginKey, "GitHub", TestContext.Current.CancellationToken);
         await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Claude", TestContext.Current.CancellationToken);
         var sut = CreateSut();
@@ -225,18 +225,18 @@ public sealed class SettingsViewModelTests : IDisposable
     {
         var field = new PluginSettingField("model", "Modell", PluginSettingFieldType.Text);
         var group = new PluginSettingGroup("Konfiguration", [field]);
-        var kiPlugin = CreateKiPluginMock("Claude", [group]).Object;
+        var aiPlugin = CreateKiPluginMock("Claude", [group]).Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Claude", TestContext.Current.CancellationToken);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
 
         sut.SelectedPluginSettings[0].Entries[0].Value = "claude-opus";
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
-        var gespeicherterWert = _pluginSettingsService.GetValue(kiPlugin, field);
+        var gespeicherterWert = _pluginSettingsService.GetValue(aiPlugin, field);
         gespeicherterWert.Should().Be("claude-opus");
     }
 
@@ -250,14 +250,14 @@ public sealed class SettingsViewModelTests : IDisposable
             PluginSettingFieldType.CommandLineParameters,
             DefaultValue: "--auto-default");
         var group = new PluginSettingGroup("CLI-Konfiguration", [field]);
-        var kiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
+        var aiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
 
         sut.SelectedPluginSettings[0].Entries[0].Value.Should().BeEmpty();
 
@@ -276,18 +276,18 @@ public sealed class SettingsViewModelTests : IDisposable
             PluginSettingFieldType.CommandLineParameters,
             DefaultValue: "--auto-default");
         var group = new PluginSettingGroup("CLI-Konfiguration", [field]);
-        var kiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
+        var aiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
         sut.SelectedPluginSettings[0].Entries[0].Value = "--user-choice --model custom";
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
 
         _credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters")
             .Should().Be("--user-choice --model custom");
@@ -304,19 +304,19 @@ public sealed class SettingsViewModelTests : IDisposable
             PluginSettingFieldType.CommandLineParameters,
             DefaultValue: "--auto-default");
         var group = new PluginSettingGroup("CLI-Konfiguration", [field]);
-        var kiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
+        var aiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
         _credentialStore.SetCredential("Softwareschmiede.Codex.CommandLineParameters", "--auto-old");
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
         sut.SelectedPluginSettings[0].Entries[0].Value = string.Empty;
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
 
         _credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters").Should().BeEmpty();
         sut.SelectedPluginSettings[0].Entries[0].Value.Should().BeEmpty();
@@ -443,9 +443,9 @@ public sealed class SettingsViewModelTests : IDisposable
     public async Task Laden_BefuelltAktivierungsCollections_MitStatus()
     {
         var scmPlugin = CreateScmPluginMock("GitHub").Object;
-        var kiPlugin = CreateKiPluginMock("Claude").Object;
+        var aiPlugin = CreateKiPluginMock("Claude").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _pluginActivationService.SetPluginEnabledAsync("github", false, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
@@ -512,7 +512,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
         // Unbekannte gespeicherte Werte -> Defaults
         await _settingService.SetSettingAsync(AppSettingService.UpdateModeKey, "unbekannt", TestContext.Current.CancellationToken);
-        await _settingService.SetSettingAsync(AppSettingService.UpdatePfadKey, "kein-pfad", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(AppSettingService.UpdatePathKey, "kein-pfad", TestContext.Current.CancellationToken);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(UpdateMode.CheckOnly));

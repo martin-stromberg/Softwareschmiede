@@ -142,20 +142,20 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
 
     private void WarteUndWirf(Fehlerfall fehlerfall, CancellationToken cancellationToken)
     {
-        var grund = "sofort";
+        var reason = "sofort";
         if (fehlerfall.Lesefehler.AufFreigabeWarten)
         {
             var freigegeben = _kontext!.WarteAufGate(
                 UpdateE2ETestKontext.LesefehlerGateName, cancellationToken, WarteTimeout(fehlerfall));
-            grund = ErmittleWarteGrund(freigegeben);
+            reason = ErmittleWarteGrund(freigegeben);
         }
 
-        ProtokolliereFehlerUndWirf(fehlerfall, grund);
+        ProtokolliereFehlerUndWirf(fehlerfall, reason);
     }
 
     private async Task WarteUndWirfAsync(Fehlerfall fehlerfall, CancellationToken cancellationToken)
     {
-        var grund = "sofort";
+        var reason = "sofort";
         if (fehlerfall.Lesefehler.AufFreigabeWarten)
         {
             bool freigegeben;
@@ -168,10 +168,10 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
             {
                 freigegeben = false;
             }
-            grund = ErmittleWarteGrund(freigegeben);
+            reason = ErmittleWarteGrund(freigegeben);
         }
 
-        ProtokolliereFehlerUndWirf(fehlerfall, grund);
+        ProtokolliereFehlerUndWirf(fehlerfall, reason);
     }
 
     /// <summary>Die konfigurierte Wartezeit des Lesefehlers, mindestens eine Sekunde.</summary>
@@ -189,7 +189,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
                 ? "abgebrochen"
                 : "timeout";
 
-    private void ProtokolliereFehlerUndWirf(Fehlerfall fehlerfall, string grund)
+    private void ProtokolliereFehlerUndWirf(Fehlerfall fehlerfall, string reason)
     {
         _kontext!.Protokoll.Schreibe(
             UpdateE2EEreignisse.UpdateSettingsReadFailed,
@@ -199,7 +199,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
                 versuchIndex = fehlerfall.VersuchIndex,
                 ordinal = fehlerfall.Ordinal,
                 limit = fehlerfall.Lesefehler.Limit,
-                grund
+                reason
             });
 
         throw FailureException;

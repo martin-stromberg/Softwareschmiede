@@ -38,11 +38,11 @@ public sealed class NotificationSettingsService
     }
 
     /// <summary>Gibt die gespeicherten Benachrichtigungseinstellungen des Benutzers zurück.</summary>
-    public async Task<NotificationSettingsDto> GetAsync(string benutzerId, CancellationToken ct = default)
+    public async Task<NotificationSettingsDto> GetAsync(string userId, CancellationToken ct = default)
     {
         var setting = await _db.NotificationSettings
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
+            .FirstOrDefaultAsync(s => s.UserId == userId, ct);
 
         if (setting is null)
         {
@@ -55,17 +55,17 @@ public sealed class NotificationSettingsService
     }
 
     /// <summary>Speichert die Benachrichtigungseinstellungen des Benutzers.</summary>
-    public async Task SaveAsync(string benutzerId, NotificationSettingsDto dto, CancellationToken ct = default)
+    public async Task SaveAsync(string userId, NotificationSettingsDto dto, CancellationToken ct = default)
     {
         var setting = await _db.NotificationSettings
-            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
+            .FirstOrDefaultAsync(s => s.UserId == userId, ct);
 
         if (setting is null)
         {
             setting = new NotificationSetting
             {
                 Id = Guid.NewGuid(),
-                UserId = benutzerId
+                UserId = userId
             };
             _db.NotificationSettings.Add(setting);
         }
@@ -77,11 +77,11 @@ public sealed class NotificationSettingsService
     }
 
     /// <summary>Gibt Metadaten der hochgeladenen Audio-Datei des Benutzers zurück.</summary>
-    public async Task<NotificationAudioInfoDto> GetAudioInfoAsync(string benutzerId, CancellationToken ct = default)
+    public async Task<NotificationAudioInfoDto> GetAudioInfoAsync(string userId, CancellationToken ct = default)
     {
         var audio = await _db.NotificationAudioFiles
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
+            .FirstOrDefaultAsync(s => s.UserId == userId, ct);
 
         if (audio is null)
         {
@@ -92,11 +92,11 @@ public sealed class NotificationSettingsService
     }
 
     /// <summary>Gibt den Base64-kodierten Audio-Payload des Benutzers zurück.</summary>
-    public async Task<NotificationAudioPayload?> GetAudioPayloadAsync(string benutzerId, CancellationToken ct = default)
+    public async Task<NotificationAudioPayload?> GetAudioPayloadAsync(string userId, CancellationToken ct = default)
     {
         var audio = await _db.NotificationAudioFiles
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
+            .FirstOrDefaultAsync(s => s.UserId == userId, ct);
 
         if (audio is null || audio.Content.Length == 0)
         {
@@ -108,7 +108,7 @@ public sealed class NotificationSettingsService
 
     /// <summary>Speichert eine neue Audio-Datei für den Benutzer.</summary>
     public async Task UploadAudioAsync(
-        string benutzerId,
+        string userId,
         string fileName,
         string? mimeType,
         byte[] content,
@@ -117,14 +117,14 @@ public sealed class NotificationSettingsService
         ValidateAudioFile(fileName, mimeType, content);
 
         var existing = await _db.NotificationAudioFiles
-            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
+            .FirstOrDefaultAsync(s => s.UserId == userId, ct);
 
         if (existing is null)
         {
             existing = new NotificationAudioFile
             {
                 Id = Guid.NewGuid(),
-                UserId = benutzerId
+                UserId = userId
             };
             _db.NotificationAudioFiles.Add(existing);
         }
@@ -138,10 +138,10 @@ public sealed class NotificationSettingsService
     }
 
     /// <summary>Löscht die benutzerdefinierte Audio-Datei des Benutzers.</summary>
-    public async Task RemoveAudioAsync(string benutzerId, CancellationToken ct = default)
+    public async Task RemoveAudioAsync(string userId, CancellationToken ct = default)
     {
         var existing = await _db.NotificationAudioFiles
-            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
+            .FirstOrDefaultAsync(s => s.UserId == userId, ct);
         if (existing is null)
         {
             return;

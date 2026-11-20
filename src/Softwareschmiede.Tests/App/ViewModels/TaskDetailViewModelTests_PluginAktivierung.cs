@@ -18,7 +18,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     private readonly WorkItemService _workItemService;
     private readonly LogService _logService;
     private readonly TodoService _todoService;
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly PromptTemplateService _promptVorlagenService;
     private readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService = new();
     private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
@@ -32,9 +32,9 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
         _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
-        _promptScheduleDispatchService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _dialogServiceMock = new Mock<IDialogService>();
 
         _db.Projects.Add(new Project
@@ -50,7 +50,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
     }
 
@@ -73,7 +73,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
             gitPluginMock.Object,
             pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            new DevelopmentProcessServiceOptions(AiExecutionService: _kiService),
+            new DevelopmentProcessServiceOptions(AiExecutionService: _aiService),
             NullLogger<DevelopmentProcessService>.Instance);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
@@ -83,7 +83,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         return new TaskDetailViewModel(
             _workItemService,
             _logService,
-            _kiService,
+            _aiService,
             entwicklungsprozessService,
             pluginSelectionService,
             _promptVorlagenService,

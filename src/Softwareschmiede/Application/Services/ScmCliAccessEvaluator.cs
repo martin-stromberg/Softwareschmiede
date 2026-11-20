@@ -243,8 +243,8 @@ public static class ScmCliAccessEvaluator
                     }
                     if (key == "--respect-workspace-trust")
                     {
-                        // The documented optional value is accepted only explicitly; a bare flag
-                        // leaves the effective trust handling unresolvable.
+                        // Der dokumentierte optionale Wert wird nur explizit akzeptiert; ein nacktes Flag
+                        // lässt die effektive Trust-Behandlung unauflösbar.
                         if (++index >= tokens.Count || tokens[index] is not ("true" or "false"))
                             return Result(ScmExchangeAccessStatus.Unknown, "Devin-Workspace-Trust-Parameter ist unvollständig.");
                         continue;
@@ -267,9 +267,9 @@ public static class ScmCliAccessEvaluator
             var supported = prefix switch
             {
                 "Softwareschmiede.Codex" => mode == "workspace-write",
-                // The classification only allows sending the content-free probe; the file tool
-                // must still prove actual channel I/O. accept-edits auto-approves workspace edits,
-                // dangerous/bypass additionally auto-approve other tools.
+                // Die Klassifikation erlaubt nur das Senden der inhaltsfreien Probe; das Dateitool
+                // muss weiterhin tatsächliche Kanal-I/O nachweisen. accept-edits bestätigt
+                // Arbeitsbereich-Edits automatisch, dangerous/bypass zusätzlich andere Tools.
                 "Softwareschmiede.Devin" => mode is "accept-edits" or "dangerous" or "bypass",
                 _ => mode == "acceptEdits",
             };

@@ -23,7 +23,7 @@ public sealed class DiffCachingServiceTests : IDisposable
         _sut = new DiffCachingService(_db, _memoryCache, NullLogger<DiffCachingService>.Instance);
     }
 
-    /// <summary><summary>SetInCacheAsync_AndGetFromCacheAsync_ShouldReturnResultFromCache.</summary>.</summary>
+    /// <summary>SetInCacheAsync_AndGetFromCacheAsync_ShouldReturnResultFromCache.</summary>
     [Fact]
     public async Task SetInCacheAsync_AndGetFromCacheAsync_ShouldReturnResultFromCache()
     {
@@ -40,7 +40,7 @@ public sealed class DiffCachingServiceTests : IDisposable
         loaded.FilePath.Should().Be(seeded.FilePath);
     }
 
-    /// <summary><summary>GetFromCacheAsync_ShouldReturnNull_WhenCacheExpired.</summary>.</summary>
+    /// <summary>GetFromCacheAsync_ShouldReturnNull_WhenCacheExpired.</summary>
     [Fact]
     public async Task GetFromCacheAsync_ShouldReturnNull_WhenCacheExpired()
     {
@@ -66,7 +66,7 @@ public sealed class DiffCachingServiceTests : IDisposable
         loaded.Should().BeNull();
     }
 
-    /// <summary><summary>InvalidateCacheAsync_ShouldMarkPersistentEntryInvalid_AndRemoveMemoryCache.</summary>.</summary>
+    /// <summary>InvalidateCacheAsync_ShouldMarkPersistentEntryInvalid_AndRemoveMemoryCache.</summary>
     [Fact]
     public async Task InvalidateCacheAsync_ShouldMarkPersistentEntryInvalid_AndRemoveMemoryCache()
     {
@@ -84,7 +84,7 @@ public sealed class DiffCachingServiceTests : IDisposable
         loaded.Should().BeNull();
     }
 
-    /// <summary><summary>CleanupExpiredCachesAsync_ShouldDeleteOnlyExpiredEntries.</summary>.</summary>
+    /// <summary>CleanupExpiredCachesAsync_ShouldDeleteOnlyExpiredEntries.</summary>
     [Fact]
     public async Task CleanupExpiredCachesAsync_ShouldDeleteOnlyExpiredEntries()
     {

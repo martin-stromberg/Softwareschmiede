@@ -25,11 +25,11 @@ public sealed class NotificationAuditService
     public async Task LogAsync(
         Guid eventId,
         Guid workItemId,
-        string benutzerId,
+        string userId,
         NotificationChannel channel,
         NotificationMode mode,
-        NotificationDecision entscheidung,
-        string grund,
+        NotificationDecision decision,
+        string reason,
         CancellationToken ct = default)
     {
         var entry = new NotificationDispatchLog
@@ -37,11 +37,11 @@ public sealed class NotificationAuditService
             Id = Guid.NewGuid(),
             EventId = eventId,
             WorkItemId = workItemId,
-            UserId = benutzerId,
+            UserId = userId,
             Channel = channel,
             Mode = mode,
-            Decision = entscheidung,
-            Reason = grund,
+            Decision = decision,
+            Reason = reason,
             CreatedAt = DateTimeOffset.UtcNow
         };
 

@@ -4,15 +4,15 @@ namespace Softwareschmiede.Application.Services;
 public static class WorkItemRunActivity
 {
     /// <summary>
-    /// Liefert <c>true</c>, wenn <paramref name="aktiveRunId"/> gesetzt ist und
+    /// Liefert <c>true</c>, wenn <paramref name="activeRunId"/> gesetzt ist und
     /// <paramref name="lastHeartbeatUtc"/> jünger als <see cref="WorkItemRecoveryService.HeartbeatTimeoutMinutes"/> ist.
     /// </summary>
-    /// <param name="aktiveRunId">Die aktive Lauf-ID der Aufgabe, sofern vorhanden.</param>
+    /// <param name="activeRunId">Die aktive Lauf-ID der Aufgabe, sofern vorhanden.</param>
     /// <param name="lastHeartbeatUtc">Zeitpunkt des letzten Heartbeats in UTC, sofern vorhanden.</param>
     /// <param name="nowUtc">Der als "jetzt" zu verwendende Zeitpunkt in UTC.</param>
     /// <returns><c>true</c>, wenn der Lauf als aktiv gilt, sonst <c>false</c>.</returns>
-    public static bool IstAktiv(string? aktiveRunId, DateTimeOffset? lastHeartbeatUtc, DateTimeOffset nowUtc)
-        => aktiveRunId != null
+    public static bool IsActive(string? activeRunId, DateTimeOffset? lastHeartbeatUtc, DateTimeOffset nowUtc)
+        => activeRunId != null
             && lastHeartbeatUtc != null
             && nowUtc - lastHeartbeatUtc.Value < TimeSpan.FromMinutes(WorkItemRecoveryService.HeartbeatTimeoutMinutes);
 }

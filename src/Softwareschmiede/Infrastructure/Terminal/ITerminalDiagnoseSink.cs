@@ -5,9 +5,9 @@ namespace Softwareschmiede.Infrastructure.Terminal;
 /// (z. B. <see cref="CliOutputRecorder"/>), implementieren dieses Interface bewusst nicht, damit die
 /// artefaktischen Markerzeilen nicht in den byte-exakten Mitschnitt gelangen. Senken ohne das
 /// Interface erhalten Marker weiter über <see cref="ITerminalOutputSink.OnOutputChunk"/>.</summary>
-public interface ITerminalDiagnoseSink
+public interface ITerminalDiagnosticsSink
 {
     /// <summary>Meldet eine Diagnose-Markerzeile (keine echte CLI-Ausgabe).</summary>
     /// <param name="bytes">Die UTF-8-kodierte Markerzeile.</param>
-    void OnDiagnoseChunk(ReadOnlySpan<byte> bytes);
+    void OnDiagnosticsChunk(ReadOnlySpan<byte> bytes);
 }

@@ -186,9 +186,9 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
                     access = access with { Status = ScmExchangeAccessStatus.Unknown, Reason = ScmCliWaitReason.Describe(recognition) };
                 else if (access.Status == ScmExchangeAccessStatus.Supported)
                 {
-                    // A normal CLI parent says nothing about the token/sandbox of its file tools.
-                    // The simulator has an explicit in-process transport contract; real CLIs must
-                    // demonstrate actual I/O under the identical private channel ACL first.
+                    // Ein normaler CLI-Elternprozess sagt nichts über Token/Sandbox seiner Dateitools aus.
+                    // Der Simulator hat einen expliziten In-Process-Transportvertrag; echte CLIs müssen
+                    // zuerst tatsächliche I/O unter der identischen privaten Kanal-ACL nachweisen.
                     if (PluginPrefix != "Softwareschmiede.KiSimulator")
                     {
                         var capabilities = ScmRestrictedProcessAccess.CaptureWorkspaceCapabilities(WorkingDirectory);
@@ -306,8 +306,8 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
         if (match is null || _cliRecognition.State == ScmCliRecognitionState.Supported) return;
         if (match.Profile.VersionPattern is null)
         {
-            // The simulator contract is unversioned; only a run the start contract already granted
-            // or denied counts as an identified channel, never a plain shell.
+            // Der Simulatorvertrag ist versionslos; nur ein Lauf, dem der Startvertrag bereits gewährt
+            // oder verweigert hat, gilt als identifizierter Kanal, niemals eine einfache Shell.
             if (_access.Status is ScmExchangeAccessStatus.Supported or ScmExchangeAccessStatus.Denied)
                 _cliRecognition = new(ScmCliRecognitionState.Supported, match.Profile.DisplayName, null, match.Profile.SupportedVersionsText);
             else if (_cliRecognition.ChannelReason is null)

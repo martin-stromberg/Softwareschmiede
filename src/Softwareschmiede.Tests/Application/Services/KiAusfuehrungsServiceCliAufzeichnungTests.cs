@@ -137,16 +137,16 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
             new Mock<IServiceScopeFactory>().Object,
             launcher: launcher);
         var pluginMock = CreatePlugin();
-        var aufgabeIds = Enumerable.Range(0, AiExecutionService.MaxRecordingCount + 1)
+        var workItemIds = Enumerable.Range(0, AiExecutionService.MaxRecordingCount + 1)
             .Select(_ => Guid.NewGuid())
             .ToList();
 
-        foreach (var id in aufgabeIds)
+        foreach (var id in workItemIds)
             await sut.StartTerminalSessionAsync(id, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        sut.GetCliRecording(aufgabeIds[0]).Should().BeNull(
+        sut.GetCliRecording(workItemIds[0]).Should().BeNull(
             "der älteste Mitschnitt wird über der Retention-Grenze verworfen");
-        foreach (var id in aufgabeIds.Skip(1))
+        foreach (var id in workItemIds.Skip(1))
             sut.GetCliRecording(id).Should().NotBeNull(
                 "die letzten {0} Mitschnitte bleiben vorgehalten", AiExecutionService.MaxRecordingCount);
     }

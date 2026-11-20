@@ -45,11 +45,11 @@ public sealed class AufgabenListenModusService
     public Task SpeichereDashboardModusAsync(AufgabenListenModus mode, CancellationToken ct = default)
         => SpeichereModusAsync(AppSettingService.ActiveWorkItemsListModeDashboardKey, mode, ct);
 
-    private async Task<AufgabenListenModus> LadeModusAsync(string schluessel, CancellationToken ct)
+    private async Task<AufgabenListenModus> LadeModusAsync(string key, CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
         var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
-        var value = await settingService.GetSettingAsync(schluessel, ct);
+        var value = await settingService.GetSettingAsync(key, ct);
 
         if (Enum.TryParse<AufgabenListenModus>(value, ignoreCase: true, out var mode)
             && Enum.IsDefined(mode))
@@ -60,11 +60,11 @@ public sealed class AufgabenListenModusService
         return AufgabenListenModus.Datum;
     }
 
-    private async Task SpeichereModusAsync(string schluessel, AufgabenListenModus mode, CancellationToken ct)
+    private async Task SpeichereModusAsync(string key, AufgabenListenModus mode, CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
         var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
-        await settingService.SetSettingAsync(schluessel, mode.ToString(), ct);
-        _logger.LogDebug("Aufgabenlisten-Modus '{Modus}' unter '{Schluessel}' gespeichert.", mode, schluessel);
+        await settingService.SetSettingAsync(key, mode.ToString(), ct);
+        _logger.LogDebug("Aufgabenlisten-Modus '{Modus}' unter '{Schluessel}' gespeichert.", mode, key);
     }
 }

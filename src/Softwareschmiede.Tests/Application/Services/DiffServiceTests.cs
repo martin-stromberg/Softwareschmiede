@@ -25,7 +25,7 @@ public sealed class DiffServiceTests : IDisposable
         _sut = new DiffService(_db, algorithm, caching, NullLogger<DiffService>.Instance);
     }
 
-    /// <summary><summary>GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist.</summary>.</summary>
+    /// <summary>GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist.</summary>
     [Fact]
     public async Task GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist()
     {
@@ -36,7 +36,7 @@ public sealed class DiffServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    /// <summary><summary>GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists.</summary>.</summary>
+    /// <summary>GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists.</summary>
     [Fact]
     public async Task GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists()
     {
@@ -55,7 +55,7 @@ public sealed class DiffServiceTests : IDisposable
         _db.DiffResults.Should().ContainSingle(dr => dr.Id == result.Id && dr.Status == DiffResultStatus.Generated);
     }
 
-    /// <summary><summary>GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit.</summary>.</summary>
+    /// <summary>GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit.</summary>
     [Fact]
     public async Task GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit()
     {
@@ -72,7 +72,7 @@ public sealed class DiffServiceTests : IDisposable
         result.TargetContent.Should().BeNull();
     }
 
-    /// <summary><summary>GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows.</summary>.</summary>
+    /// <summary>GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows.</summary>
     [Fact]
     public async Task GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows()
     {
@@ -87,7 +87,7 @@ public sealed class DiffServiceTests : IDisposable
         _db.DiffResults.Should().ContainSingle(dr => dr.WorkItemId == workItemId && dr.Status == DiffResultStatus.Error);
     }
 
-    /// <summary><summary>GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe.</summary>.</summary>
+    /// <summary>GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe.</summary>
     [Fact]
     public async Task GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe()
     {
@@ -136,7 +136,7 @@ public sealed class DiffServiceTests : IDisposable
         stats.StatusBreakdown[DiffResultStatus.Error].Should().Be(1);
     }
 
-    /// <summary><summary>DeleteDiffAsync_ShouldDeleteDiff_WhenExisting.</summary>.</summary>
+    /// <summary>DeleteDiffAsync_ShouldDeleteDiff_WhenExisting.</summary>
     [Fact]
     public async Task DeleteDiffAsync_ShouldDeleteDiff_WhenExisting()
     {

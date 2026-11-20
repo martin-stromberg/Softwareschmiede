@@ -17,7 +17,7 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
         return new SoftwareschmiedeDbContext(options);
     }
 
-    /// <summary><summary>SaveArbeitsverzeichnisAsync_ShouldPersistValueInAppEinstellung.</summary>.</summary>
+    /// <summary>SaveArbeitsverzeichnisAsync_ShouldPersistValueInAppEinstellung.</summary>
     [Fact]
     public async Task SaveArbeitsverzeichnisAsync_ShouldPersistValueInAppEinstellung()
     {
@@ -35,7 +35,7 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
         persisted!.Value.Should().Be(Path.GetFullPath(configuredPath));
     }
 
-    /// <summary><summary>SaveArbeitsverzeichnisAsync_ShouldAllowEmptyValue_ForFallbackUsage.</summary>.</summary>
+    /// <summary>SaveArbeitsverzeichnisAsync_ShouldAllowEmptyValue_ForFallbackUsage.</summary>
     [Fact]
     public async Task SaveArbeitsverzeichnisAsync_ShouldAllowEmptyValue_ForFallbackUsage()
     {
@@ -48,7 +48,7 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
         reloaded.Should().BeNull();
     }
 
-    /// <summary><summary>SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenPathIsNotAbsolute.</summary>.</summary>
+    /// <summary>SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenPathIsNotAbsolute.</summary>
     [Fact]
     public async Task SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenPathIsNotAbsolute()
     {
@@ -60,7 +60,7 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
         await act.Should().ThrowAsync<ArgumentException>();
     }
 
-    /// <summary><summary>ValidatePathForConfiguration_ShouldThrowArgumentException_WhenPathContainsInvalidCharacter.</summary>.</summary>
+    /// <summary>ValidatePathForConfiguration_ShouldThrowArgumentException_WhenPathContainsInvalidCharacter.</summary>
     [Fact]
     public void ValidatePathForConfiguration_ShouldThrowArgumentException_WhenPathContainsInvalidCharacter()
     {
@@ -72,7 +72,7 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
             .WithMessage("*ungültige Zeichen*");
     }
 
-    /// <summary><summary>SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenDirectoryCannotBeCreated.</summary>.</summary>
+    /// <summary>SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenDirectoryCannotBeCreated.</summary>
     [Fact]
     public async Task SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenDirectoryCannotBeCreated()
     {

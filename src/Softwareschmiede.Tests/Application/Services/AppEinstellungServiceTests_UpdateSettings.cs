@@ -136,20 +136,20 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
             .Should().Be(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
 
         await service.SetSettingAsync(AppSettingService.UpdateModeKey, "kein-modus", TestContext.Current.CancellationToken);
-        await service.SetSettingAsync(AppSettingService.UpdatePfadKey, "vielleicht", TestContext.Current.CancellationToken);
+        await service.SetSettingAsync(AppSettingService.UpdatePathKey, "vielleicht", TestContext.Current.CancellationToken);
 
         (await service.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
             .Should().Be(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
 
         await service.SetSettingAsync(AppSettingService.UpdateModeKey, "7", TestContext.Current.CancellationToken);
-        await service.SetSettingAsync(AppSettingService.UpdatePfadKey, "Vorabversionen", TestContext.Current.CancellationToken);
+        await service.SetSettingAsync(AppSettingService.UpdatePathKey, "Vorabversionen", TestContext.Current.CancellationToken);
 
         (await service.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
             .Should().Be(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.PrereleaseVersionsPath));
 
         // Altbestand des entfernten Schlüssels updates.includePrereleases verfällt still.
         await service.SetSettingAsync(AppSettingService.UpdateModeKey, "1", TestContext.Current.CancellationToken);
-        await service.SetSettingAsync(AppSettingService.UpdatePfadKey, "Produktivversionen", TestContext.Current.CancellationToken);
+        await service.SetSettingAsync(AppSettingService.UpdatePathKey, "Produktivversionen", TestContext.Current.CancellationToken);
         await service.SetSettingAsync("updates.includePrereleases", "True", TestContext.Current.CancellationToken);
 
         (await service.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))

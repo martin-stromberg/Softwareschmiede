@@ -14,7 +14,7 @@ namespace Softwareschmiede.Application.Services;
 /// </summary>
 public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDisposable
 {
-    private static readonly TimeSpan SicherheitsTickIntervall = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan SafetyTickInterval = TimeSpan.FromSeconds(5);
 
     private readonly IRunningAutomationStatusSource _runningAutomationStatusSource;
     private readonly WorkItemRunDataChangedNotifier _runDataChangedNotifier;
@@ -24,15 +24,15 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     private readonly ILogger<AutoShutdownOrchestrator> _logger;
     private readonly Lock _syncLock = new();
     private readonly ITimer _countdownTimer;
-    private readonly ITimer _sicherheitsTimer;
+    private readonly ITimer _safetyTimer;
     private readonly SemaphoreSlim _evalSemaphore = new(1, 1);
 
     private bool _enabled;
-    private bool _erzwingen;
+    private bool _force;
     private int _toleranceMinutes = AppSettingService.AutoShutdownDefaultToleranceMinutes;
-    private DateTimeOffset? _countdownEndeUtc;
-    private bool _shutdownAusgeloest;
-    private bool _evalErneutAngefordert;
+    private DateTimeOffset? _countdownEndUtc;
+    private bool _shutdownTriggered;
+    private bool _reEvaluationRequested;
     private bool _disposed;
 
     /// <summary>Erstellt eine neue Instanz von <see cref="AutoShutdownOrchestrator"/>.</summary>
@@ -52,12 +52,12 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
         _logger = logger;
 
         _countdownTimer = _timeProvider.CreateTimer(
-            _ => OnCountdownElapsedAsync().SafeFireAndForget(_logger, "AutoShutdownOrchestrator.OnCountdownAbgelaufenAsync"),
+            _ => OnCountdownElapsedAsync().SafeFireAndForget(_logger, "AutoShutdownOrchestrator.OnCountdownElapsedAsync"),
             null,
             Timeout.InfiniteTimeSpan,
             Timeout.InfiniteTimeSpan);
-        _sicherheitsTimer = _timeProvider.CreateTimer(
-            _ => OnSicherheitsTick(),
+        _safetyTimer = _timeProvider.CreateTimer(
+            _ => OnSafetyTick(),
             null,
             Timeout.InfiniteTimeSpan,
             Timeout.InfiniteTimeSpan);
@@ -76,7 +76,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
         {
             lock (_syncLock)
             {
-                return _countdownEndeUtc;
+                return _countdownEndUtc;
             }
         }
     }
@@ -96,7 +96,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     /// <inheritdoc/>
     public void SetEnabled(bool enabled)
     {
-        var geaendert = false;
+        var changed = false;
         lock (_syncLock)
         {
             // Nach Dispose keine Mutationen/Timer-Zugriffe mehr: Der Guard muss unter
@@ -111,22 +111,22 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
             if (_enabled != enabled)
             {
                 _enabled = enabled;
-                geaendert = true;
+                changed = true;
 
                 if (enabled)
                 {
-                    _sicherheitsTimer.Change(SicherheitsTickIntervall, SicherheitsTickIntervall);
+                    _safetyTimer.Change(SafetyTickInterval, SafetyTickInterval);
                 }
                 else
                 {
-                    _countdownEndeUtc = null;
+                    _countdownEndUtc = null;
                     _countdownTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-                    _sicherheitsTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                    _safetyTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                 }
             }
         }
 
-        if (geaendert)
+        if (changed)
         {
             StateChanged?.Invoke();
         }
@@ -155,17 +155,17 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
                 _toleranceMinutes = newTolerance;
                 stateChanged = true;
 
-                if (_countdownEndeUtc is not null)
+                if (_countdownEndUtc is not null)
                 {
                     var end = _timeProvider.GetUtcNow() + TimeSpan.FromMinutes(newTolerance);
-                    _countdownEndeUtc = end;
-                    ArmiereCountdownTimerUnterLock(end);
+                    _countdownEndUtc = end;
+                    ArmCountdownTimerUnderLock(end);
                 }
             }
 
-            if (_erzwingen != force)
+            if (_force != force)
             {
-                _erzwingen = force;
+                _force = force;
                 stateChanged = true;
             }
         }
@@ -182,20 +182,20 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     private void OnRunDataChanged(Guid workItemId)
         => TriggerEvaluation();
 
-    private void OnSicherheitsTick()
+    private void OnSafetyTick()
         => TriggerEvaluation();
 
     private void TriggerEvaluation()
-        => EvaluiereAsync().SafeFireAndForget(_logger, "AutoShutdownOrchestrator.EvaluiereAsync");
+        => EvaluateAsync().SafeFireAndForget(_logger, "AutoShutdownOrchestrator.EvaluateAsync");
 
     /// <summary>
     /// Koaleszierte Auswertung: Parallel eintreffende Trigger erzeugen während einer laufenden
-    /// Auswertung höchstens einen Nachlauf (<see cref="_evalErneutAngefordert"/>). Das Flag wird
+    /// Auswertung höchstens einen Nachlauf (<see cref="_reEvaluationRequested"/>). Das Flag wird
     /// vor dem Semaphorversuch unter <see cref="_syncLock"/> gesetzt; die letzte Prüfung und die
     /// Semaphorfreigabe erfolgen im selben Lock — ein Trigger, der dazwischen ankommt, erwirbt
     /// das freigegebene Semaphor danach garantiert selbst (kein verlorener Auswertungsauftrag).
     /// </summary>
-    private async Task EvaluiereAsync()
+    private async Task EvaluateAsync()
     {
         lock (_syncLock)
         {
@@ -204,7 +204,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
                 return;
             }
 
-            _evalErneutAngefordert = true;
+            _reEvaluationRequested = true;
         }
 
         if (!await _evalSemaphore.WaitAsync(0))
@@ -220,14 +220,14 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
             {
                 lock (_syncLock)
                 {
-                    _evalErneutAngefordert = false;
+                    _reEvaluationRequested = false;
                 }
 
-                await EvaluiereEinmalAsync();
+                await EvaluateOnceAsync();
 
                 lock (_syncLock)
                 {
-                    if (!_evalErneutAngefordert)
+                    if (!_reEvaluationRequested)
                     {
                         _evalSemaphore.Release();
                         return;
@@ -242,7 +242,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
         }
     }
 
-    private async Task EvaluiereEinmalAsync()
+    private async Task EvaluateOnceAsync()
     {
         lock (_syncLock)
         {
@@ -254,7 +254,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
             // im deaktivierten Ruhezustand damit. Nach einem ausgelösten Shutdown
             // (_shutdownAusgeloest) bleibt die Zählung weiter aktiv, damit ein
             // count > 0-Übergang das Flag zurücksetzen kann.
-            if (_disposed || (!_enabled && _countdownEndeUtc is null && !_shutdownAusgeloest))
+            if (_disposed || (!_enabled && _countdownEndUtc is null && !_shutdownTriggered))
             {
                 return;
             }
@@ -284,19 +284,19 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
 
             if (count > 0)
             {
-                _shutdownAusgeloest = false;
-                if (_countdownEndeUtc is not null)
+                _shutdownTriggered = false;
+                if (_countdownEndUtc is not null)
                 {
-                    _countdownEndeUtc = null;
+                    _countdownEndUtc = null;
                     _countdownTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                     stateChanged = true;
                 }
             }
-            else if (_enabled && !_shutdownAusgeloest && _countdownEndeUtc is null)
+            else if (_enabled && !_shutdownTriggered && _countdownEndUtc is null)
             {
                 var end = _timeProvider.GetUtcNow() + TimeSpan.FromMinutes(_toleranceMinutes);
-                _countdownEndeUtc = end;
-                ArmiereCountdownTimerUnterLock(end);
+                _countdownEndUtc = end;
+                ArmCountdownTimerUnderLock(end);
                 stateChanged = true;
             }
         }
@@ -307,7 +307,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
         }
     }
 
-    private void ArmiereCountdownTimerUnterLock(DateTimeOffset end)
+    private void ArmCountdownTimerUnderLock(DateTimeOffset end)
     {
         var rest = end - _timeProvider.GetUtcNow();
         _countdownTimer.Change(rest > TimeSpan.Zero ? rest : TimeSpan.Zero, Timeout.InfiniteTimeSpan);
@@ -335,29 +335,29 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
                 // mit totem Countdown dauerhaft hängen.
                 lock (_syncLock)
                 {
-                    _countdownEndeUtc = null;
+                    _countdownEndUtc = null;
                 }
 
                 StateChanged?.Invoke();
-                await EvaluiereAsync();
+                await EvaluateAsync();
                 return;
             }
 
-            var ausgeloest = false;
+            var triggered = false;
             lock (_syncLock)
             {
-                if (_enabled && !_disposed && !_shutdownAusgeloest && count <= 0)
+                if (_enabled && !_disposed && !_shutdownTriggered && count <= 0)
                 {
-                    _shutdownAusgeloest = true;
-                    _countdownEndeUtc = null;
-                    ausgeloest = true;
+                    _shutdownTriggered = true;
+                    _countdownEndUtc = null;
+                    triggered = true;
                 }
             }
 
-            if (!ausgeloest)
+            if (!triggered)
             {
                 // Recheck negativ: über die reguläre Auswertung disarmieren/neu bewerten.
-                await EvaluiereAsync();
+                await EvaluateAsync();
                 return;
             }
 
@@ -366,7 +366,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
             bool force;
             lock (_syncLock)
             {
-                force = _erzwingen;
+                force = _force;
             }
 
             _logger.LogWarning(
@@ -385,11 +385,11 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
                 // Re-Arm/Retry still funktionslos (analog zum Zählfehler-Fall oben).
                 lock (_syncLock)
                 {
-                    _shutdownAusgeloest = false;
+                    _shutdownTriggered = false;
                 }
 
                 StateChanged?.Invoke();
-                await EvaluiereAsync();
+                await EvaluateAsync();
             }
         }
         catch (Exception ex)
@@ -414,6 +414,6 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
         _runningAutomationStatusSource.RunningCountChanged -= OnRunningCountChanged;
         _runDataChangedNotifier.RunDataChanged -= OnRunDataChanged;
         _countdownTimer.Dispose();
-        _sicherheitsTimer.Dispose();
+        _safetyTimer.Dispose();
     }
 }

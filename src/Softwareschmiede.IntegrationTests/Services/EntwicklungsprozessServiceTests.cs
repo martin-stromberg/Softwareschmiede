@@ -56,13 +56,13 @@ public sealed class EntwicklungsprozessServiceTests
     private static PluginSelectionService CreatePluginSelectionService(
         DatabaseFixture db,
         IGitPlugin gitPlugin,
-        IKiPlugin kiPlugin)
+        IKiPlugin aiPlugin)
     {
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([gitPlugin]);
         pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(gitPlugin);
-        pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
-        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(kiPlugin);
+        pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
+        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(aiPlugin);
 
         var defaultService = new PluginDefaultSettingsService(db.Context, NullLogger<PluginDefaultSettingsService>.Instance);
         var settingService = new AppSettingService(db.Context, NullLogger<AppSettingService>.Instance);

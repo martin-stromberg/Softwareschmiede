@@ -28,7 +28,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
 {
     private readonly string _dbName = Guid.NewGuid().ToString();
     private readonly ServiceProvider _provider;
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly CliProcessManager _sut;
     private readonly Guid _projektId = Guid.NewGuid();
     private readonly Guid _aufgabeId = Guid.NewGuid();
@@ -68,9 +68,9 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
         }
 
         var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
         _sut = new CliProcessManager(
-            _kiService,
+            _aiService,
             scopeFactory,
             NullLogger<CliProcessManager>.Instance,
             new WorkItemRunDataChangedNotifier());
@@ -85,7 +85,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
         }
 
         _sut.Dispose();
-        _kiService.Dispose();
+        _aiService.Dispose();
         _provider.Dispose();
     }
 
@@ -118,7 +118,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
         _sessions.Add(session);
 
         var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var handles = (ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
+        var handles = (ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_aiService)!;
         handles[workItemId] = new CliProcessHandle(workItemId, process) { Session = session };
 
         return session;

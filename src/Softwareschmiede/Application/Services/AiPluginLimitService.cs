@@ -169,11 +169,11 @@ public sealed class AiPluginLimitService
         var settings = await _appSettingService.GetSettingsAsync(keys, ct);
         var now = DateTimeOffset.UtcNow;
 
-        foreach (var (schluessel, value) in settings)
+        foreach (var (key, value) in settings)
         {
             if (TryParseLimitValue(value, now, out var limit))
             {
-                result[schluessel[SessionLimitKeyPrefix.Length..]] = limit;
+                result[key[SessionLimitKeyPrefix.Length..]] = limit;
             }
         }
 

@@ -14,10 +14,10 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Service für Aufgabenverwaltung (CRUD + Lebenszyklus).</summary>
 public sealed class WorkItemService : IActiveWorkItemsService
 {
-    // AktivOderWartendStatus ist die einzige Quelle der Wahrheit für die Regel "Aufgabe ist aktiv oder
-    // wartend" (siehe AufgabeStatusExtensions.IstAktivOderWartend). Für EF-Core-Queries wird die Array-
+    // ActiveOrWaitingStatuses ist die einzige Quelle der Wahrheit für die Regel "Aufgabe ist aktiv oder
+    // wartend" (siehe WorkItemStatusExtensions.IsActiveOrWaiting). Für EF-Core-Queries wird die Array-
     // Variante referenziert (Contains wird nach SQL IN übersetzt); außerhalb von Queries wird direkt
-    // AufgabeStatus.IstAktivOderWartend() verwendet (z. B. in DeleteAsync).
+    // WorkItemStatus.IsActiveOrWaiting() verwendet (z. B. in DeleteAsync).
     private static readonly Expression<Func<WorkItem, bool>> IsActiveOrWaitingPredicate =
         a => WorkItemStatusExtensions.ActiveOrWaitingStatuses.Contains(a.Status);
 
@@ -57,7 +57,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
     }
 
     /// <summary>Gibt alle aktiven (nicht archivierten) Aufgaben eines Projekts zurück.</summary>
-    public async Task<IReadOnlyList<WorkItem>> GetByProjektAsync(Guid projectId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<WorkItem>> GetByProjectAsync(Guid projectId, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgaben für Projekt {ProjektId} abrufen.", projectId);
         return await _db.WorkItems
@@ -829,7 +829,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
     }
 
     /// <summary>Speichert einen Vorschlagsprompt und optionalen Ausführungszeitpunkt für die Aufgabe.</summary>
-    public async Task SavePromptVorschlagAsync(Guid id, string? prompt, DateTimeOffset? executeAfterUtc, CancellationToken ct = default)
+    public async Task SavePromptSuggestionAsync(Guid id, string? prompt, DateTimeOffset? executeAfterUtc, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId}: Vorschlagsprompt speichern.", id);
 
@@ -849,7 +849,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
     }
 
     /// <summary>Entfernt den gespeicherten Vorschlagsprompt und den geplanten Ausführungszeitpunkt.</summary>
-    public async Task ClearPromptVorschlagAsync(Guid id, CancellationToken ct = default)
+    public async Task ClearPromptSuggestionAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId}: Vorschlagsprompt löschen.", id);
 
@@ -1218,8 +1218,8 @@ public sealed class WorkItemService : IActiveWorkItemsService
     /// <summary>Validiert, ob eine Aufgabe beendet werden kann: gibt false zurück, wenn offene To-Dos existieren.</summary>
     public async Task<bool> CanCompleteTaskAsync(Guid workItemId, CancellationToken ct = default)
     {
-        var offeneTodoCount = await _todoService.GetTodoCountAsync(workItemId, ct);
-        return offeneTodoCount == 0;
+        var openTodoCount = await _todoService.GetTodoCountAsync(workItemId, ct);
+        return openTodoCount == 0;
     }
 
     private static void ValidateStatusTransition(WorkItemStatus current, WorkItemStatus next)

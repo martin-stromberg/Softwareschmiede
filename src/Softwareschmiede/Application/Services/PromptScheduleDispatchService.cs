@@ -21,7 +21,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
         public bool WaitingForSession { get; init; }
     }
 
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<PromptScheduleDispatchService> _logger;
     private readonly IServiceScopeFactory? _scopeFactory;
@@ -35,11 +35,11 @@ public sealed class PromptScheduleDispatchService : IDisposable
     /// <param name="scopeFactory">Optionale Scope-Factory zum Laden des aktuellen <c>PausiertBisUtc</c>-Werts der Aufgabe vor dem Versand sowie für die Persistenz der geplanten Prompts. Ohne Registrierung (z. B. Unit-Tests) entfallen Pausenprüfung und Persistenz.</param>
     public PromptScheduleDispatchService(AiExecutionService kiService, TimeProvider timeProvider, ILogger<PromptScheduleDispatchService> logger, IServiceScopeFactory? scopeFactory = null)
     {
-        _kiService = kiService;
+        _aiService = kiService;
         _timeProvider = timeProvider;
         _logger = logger;
         _scopeFactory = scopeFactory;
-        _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
+        _aiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
     }
 
     /// <summary>Wird ausgelöst, nachdem ein zeitgesteuerter Prompt erfolgreich an die CLI-Session versendet wurde.</summary>
@@ -57,7 +57,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
     /// </summary>
     public void Dispose()
     {
-        _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
+        _aiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
 
         // Timer erst unter _lock einsammeln und außerhalb des Locks disposen: Ihre Callbacks
         // (HandleTimerElapsedAsync) greifen selbst auf _lock zu.
@@ -128,7 +128,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
         // feuern, bevor die nachfolgende Zeile den Eintrag unter _lock einfügt — HandleTimerElapsedAsync fände
         // dann keinen Eintrag und würde den Prompt kommentarlos nie versenden.
         var timer = _timeProvider.CreateTimer(
-            _ => HandleTimerElapsedAsync(workItemId).SafeFireAndForget(_logger, "PromptZeitVersandService.HandleTimerElapsedAsync"),
+            _ => HandleTimerElapsedAsync(workItemId).SafeFireAndForget(_logger, "PromptScheduleDispatchService.HandleTimerElapsedAsync"),
             null,
             Timeout.InfiniteTimeSpan,
             Timeout.InfiniteTimeSpan);
@@ -223,7 +223,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
 
                     var workItemId = plan.WorkItemId;
                     var timer = _timeProvider.CreateTimer(
-                        _ => HandleTimerElapsedAsync(workItemId).SafeFireAndForget(_logger, "PromptZeitVersandService.HandleTimerElapsedAsync"),
+                        _ => HandleTimerElapsedAsync(workItemId).SafeFireAndForget(_logger, "PromptScheduleDispatchService.HandleTimerElapsedAsync"),
                         null,
                         Timeout.InfiniteTimeSpan,
                         Timeout.InfiniteTimeSpan);
@@ -305,7 +305,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
         if (status != CliProcessStatus.Started)
             return;
 
-        DeliverAfterSessionStartAsync(workItemId).SafeFireAndForget(_logger, "PromptZeitVersandService.ZustellungNachSessionStart");
+        DeliverAfterSessionStartAsync(workItemId).SafeFireAndForget(_logger, "PromptScheduleDispatchService.DeliverAfterSessionStartAsync");
     }
 
     /// <summary>Stellt wartende bzw. fällige Pläne beim Start einer CLI-Session der Aufgabe zu.</summary>
@@ -420,7 +420,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
     /// <returns><c>true</c>, wenn der Prompt zugestellt wurde; <c>false</c>, wenn der Plan auf eine Session wartet.</returns>
     private async Task<bool> SendPromptAsync(Guid workItemId, string promptText, bool redelivery, ScheduledPromptInfo recordReference)
     {
-        var session = _kiService.GetTerminalSession(workItemId);
+        var session = _aiService.GetTerminalSession(workItemId);
         if (session is null)
         {
             _logger.LogWarning(
@@ -490,7 +490,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
     }
 
     private Task UpsertRecordAsync(Guid workItemId, string promptText, DateTimeOffset targetTimeUtc)
-        => MitStoreAsync(
+        => WithStoreAsync(
             store => store.UpsertAsync(workItemId, promptText, targetTimeUtc),
             "Zeitgesteuerter Prompt für Aufgabe {AufgabeId} konnte nicht persistiert werden — der Plan bleibt sitzungsgebunden.",
             workItemId);
@@ -502,13 +502,13 @@ public sealed class PromptScheduleDispatchService : IDisposable
     /// persistierten neueren Plan überschreibt.
     /// </summary>
     private Task UpsertRecordIfCurrentAsync(Guid workItemId, ScheduledPromptInfo plan, ScheduledPromptInfo? expectedPredecessor)
-        => MitStoreAsync(
+        => WithStoreAsync(
             store => store.UpsertIfMatchingAsync(workItemId, plan.PromptText, plan.TargetTime, expectedPredecessor),
             "Zeitgesteuerter Prompt für Aufgabe {AufgabeId} konnte nicht persistiert werden — der Plan bleibt sitzungsgebunden.",
             workItemId);
 
     private Task DeleteRecordAsync(Guid workItemId)
-        => MitStoreAsync(
+        => WithStoreAsync(
             store => store.DeleteAsync(workItemId),
             "Persistierter zeitgesteuerter Prompt für Aufgabe {AufgabeId} konnte nicht gelöscht werden.",
             workItemId);
@@ -530,20 +530,20 @@ public sealed class PromptScheduleDispatchService : IDisposable
             newerScheduleActive = _scheduledPrompts.ContainsKey(workItemId);
         }
 
-        return MitStoreAsync(
+        return WithStoreAsync(
             store => store.DeleteAfterDispatchAsync(workItemId, recordReference.PromptText, recordReference.TargetTime, newerScheduleActive),
             "Persistierter zeitgesteuerter Prompt für Aufgabe {AufgabeId} konnte nach dem Versand nicht gelöscht werden.",
             workItemId);
     }
 
     private Task UpdateTargetTimeRecordAsync(Guid workItemId, DateTimeOffset targetTimeUtc)
-        => MitStoreAsync(
+        => WithStoreAsync(
             store => store.UpdateTargetTimeAsync(workItemId, targetTimeUtc),
             "Zielzeitpunkt des persistierten zeitgesteuerten Prompts für Aufgabe {AufgabeId} konnte nicht aktualisiert werden.",
             workItemId);
 
     /// <summary>Führt eine Store-Aktion in einem eigenen Scope aus; Fehler werden geloggt statt den Aufrufer zu brechen.</summary>
-    private async Task MitStoreAsync(Func<ScheduledPromptStore, Task> action, string fehlerText, params object[] arguments)
+    private async Task WithStoreAsync(Func<ScheduledPromptStore, Task> action, string errorText, params object[] arguments)
     {
         if (_scopeFactory is null)
             return;
@@ -558,7 +558,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, fehlerText, arguments);
+            _logger.LogWarning(ex, errorText, arguments);
         }
     }
 }

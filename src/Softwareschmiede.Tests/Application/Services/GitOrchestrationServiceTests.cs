@@ -110,7 +110,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Commit: feat: add tests"));
     }
 
-    /// <summary><summary>CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType.</summary>.</summary>
+    /// <summary>CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType.</summary>
     [Fact]
     public async Task CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType()
     {
@@ -173,7 +173,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.PushBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary><summary>PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed.</summary>.</summary>
+    /// <summary>PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed.</summary>
     [Fact]
     public async Task PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed()
     {
@@ -188,7 +188,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Kein Merge"));
     }
 
-    /// <summary><summary>PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin.</summary>.</summary>
+    /// <summary>PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin.</summary>
     [Fact]
     public async Task PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin()
     {
@@ -204,7 +204,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         log.Should().NotContain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Kein Merge"));
     }
 
-    /// <summary><summary>PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository.</summary>.</summary>
+    /// <summary>PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository.</summary>
     [Fact]
     public async Task PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository()
     {
@@ -230,7 +230,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Kein Merge"));
     }
 
-    /// <summary><summary>CommitAsync_ShouldFallbackToDefaultPlugin_WhenSelectedPluginTypeCannotBeResolved.</summary>.</summary>
+    /// <summary>CommitAsync_ShouldFallbackToDefaultPlugin_WhenSelectedPluginTypeCannotBeResolved.</summary>
     [Fact]
     public async Task CommitAsync_ShouldFallbackToDefaultPlugin_WhenSelectedPluginTypeCannotBeResolved()
     {
@@ -254,7 +254,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Times.Never);
     }
 
-    /// <summary><summary>CommitAsync_ShouldUseDefaultPlugin_WhenProjectRepositorySelectionIsAmbiguous.</summary>.</summary>
+    /// <summary>CommitAsync_ShouldUseDefaultPlugin_WhenProjectRepositorySelectionIsAmbiguous.</summary>
     [Fact]
     public async Task CommitAsync_ShouldUseDefaultPlugin_WhenProjectRepositorySelectionIsAmbiguous()
     {
@@ -279,7 +279,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Times.Never);
     }
 
-    /// <summary><summary>MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry.</summary>.</summary>
+    /// <summary>MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry.</summary>
     [Fact]
     public async Task MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry()
     {
@@ -306,7 +306,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.MergeToSourceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary><summary>GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities.</summary>.</summary>
+    /// <summary>GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities.</summary>
     [Fact]
     public async Task GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities()
     {

@@ -13,7 +13,7 @@ public sealed class AufgabeLaufAktivitaetTests
         var nowUtc = DateTimeOffset.UtcNow;
         var lastHeartbeatUtc = nowUtc.AddSeconds(-5);
 
-        var result = WorkItemRunActivity.IstAktiv("run-1", lastHeartbeatUtc, nowUtc);
+        var result = WorkItemRunActivity.IsActive("run-1", lastHeartbeatUtc, nowUtc);
 
         result.Should().BeTrue();
     }
@@ -25,7 +25,7 @@ public sealed class AufgabeLaufAktivitaetTests
         var nowUtc = DateTimeOffset.UtcNow;
         var lastHeartbeatUtc = nowUtc.AddMinutes(-(WorkItemRecoveryService.HeartbeatTimeoutMinutes + 1));
 
-        var result = WorkItemRunActivity.IstAktiv("run-1", lastHeartbeatUtc, nowUtc);
+        var result = WorkItemRunActivity.IsActive("run-1", lastHeartbeatUtc, nowUtc);
 
         result.Should().BeFalse();
     }
@@ -37,7 +37,7 @@ public sealed class AufgabeLaufAktivitaetTests
         var nowUtc = DateTimeOffset.UtcNow;
         var lastHeartbeatUtc = nowUtc.AddMinutes(-WorkItemRecoveryService.HeartbeatTimeoutMinutes);
 
-        var result = WorkItemRunActivity.IstAktiv("run-1", lastHeartbeatUtc, nowUtc);
+        var result = WorkItemRunActivity.IsActive("run-1", lastHeartbeatUtc, nowUtc);
 
         result.Should().BeFalse();
     }
@@ -46,7 +46,7 @@ public sealed class AufgabeLaufAktivitaetTests
     [Fact]
     public void IstAktiv_ShouldReturnFalse_WhenHeartbeatNull()
     {
-        var result = WorkItemRunActivity.IstAktiv("run-1", null, DateTimeOffset.UtcNow);
+        var result = WorkItemRunActivity.IsActive("run-1", null, DateTimeOffset.UtcNow);
 
         result.Should().BeFalse();
     }
@@ -58,7 +58,7 @@ public sealed class AufgabeLaufAktivitaetTests
         var nowUtc = DateTimeOffset.UtcNow;
         var lastHeartbeatUtc = nowUtc.AddSeconds(-5);
 
-        var result = WorkItemRunActivity.IstAktiv(null, lastHeartbeatUtc, nowUtc);
+        var result = WorkItemRunActivity.IsActive(null, lastHeartbeatUtc, nowUtc);
 
         result.Should().BeFalse();
     }

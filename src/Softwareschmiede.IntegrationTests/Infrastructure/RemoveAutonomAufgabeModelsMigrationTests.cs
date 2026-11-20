@@ -205,20 +205,20 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
         return id;
     }
 
-    private static async Task ErstelleEinstellungAsync(DatabaseFixture db, string schluessel, string value)
+    private static async Task ErstelleEinstellungAsync(DatabaseFixture db, string key, string value)
         => await ExecuteNonQueryAsync(
             db,
             "INSERT INTO AppEinstellungen (Id, Schluessel, Wert, AktualisiertAm) VALUES ($id, $schluessel, $wert, $aktualisiert);",
             ("$id", NeueId()),
-            ("$schluessel", schluessel),
+            ("$schluessel", key),
             ("$wert", value),
             ("$aktualisiert", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
 
-    private static async Task<bool> EinstellungExistiertAsync(DatabaseFixture db, string schluessel)
+    private static async Task<bool> EinstellungExistiertAsync(DatabaseFixture db, string key)
         => await ExecuteScalarAsync(
             db,
             "SELECT 1 FROM AppEinstellungen WHERE Schluessel = $schluessel LIMIT 1;",
-            ("$schluessel", schluessel)) is not null;
+            ("$schluessel", key)) is not null;
 
     private static async Task<AufgabeZeile?> LeseAufgabeAsync(DatabaseFixture db, string workItemId)
     {

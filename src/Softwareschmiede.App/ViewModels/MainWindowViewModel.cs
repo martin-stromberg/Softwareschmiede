@@ -465,7 +465,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         WorkItem workItem,
         IReadOnlyDictionary<Guid, int> offeneTodoCounts)
     {
-        var offeneTodoCount = offeneTodoCounts.GetValueOrDefault(workItem.Id);
+        var openTodoCount = offeneTodoCounts.GetValueOrDefault(workItem.Id);
         var offeneTodosCommand = new AsyncRelayCommand(
             ct => OffeneTodosDialogOeffnenAsync(workItem.Id, workItem.Title, ct));
         offeneTodosCommand.OnError = ex =>
@@ -503,7 +503,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             PausedUntilUtc = workItem.PausedUntilUtc,
             IsAktiv = GetAktiveAufgabeId() == workItem.Id,
             HasScheduledPrompt = _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id) is not null,
-            OffeneTodoCount = offeneTodoCount,
+            OffeneTodoCount = openTodoCount,
             OffeneTodosAnzeigenCommand = offeneTodosCommand
         };
     }

@@ -12,20 +12,20 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AiExecutionService _kiService;
+    private readonly AiExecutionService _aiService;
 
     /// <summary>CliEmbeddingServiceIntegrationTests.</summary>
     public CliEmbeddingServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
     }
 
@@ -34,7 +34,7 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     public void IsRunning_GibtFalse_WennKeinProzessGestartet()
     {
         var workItemId = Guid.NewGuid();
-        _kiService.IsRunning(workItemId).Should().BeFalse();
+        _aiService.IsRunning(workItemId).Should().BeFalse();
     }
 
     /// <summary>GetLastExitCode gibt null zurück wenn kein Prozess gestartet wurde.</summary>
@@ -42,7 +42,7 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     public void GetLastExitCode_GibtNull_WennKeinProzessGestartet()
     {
         var workItemId = Guid.NewGuid();
-        _kiService.GetLastExitCode(workItemId).Should().BeNull();
+        _aiService.GetLastExitCode(workItemId).Should().BeNull();
     }
 
     /// <summary>StartCliAsync startet einen Prozess und setzt IsRunning auf true.</summary>
@@ -52,12 +52,12 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
         var workItemId = Guid.NewGuid();
         var pluginMock = new FakeKiPlugin();
 
-        var handle = await _kiService.StartCliAsync(workItemId, pluginMock, Path.GetTempPath());
+        var handle = await _aiService.StartCliAsync(workItemId, pluginMock, Path.GetTempPath());
 
         handle.Should().NotBeNull();
         handle.WorkItemId.Should().Be(workItemId);
 
-        await _kiService.StopCliAsync(workItemId);
+        await _aiService.StopCliAsync(workItemId);
     }
 
     /// <summary>StartTerminalSessionAsync startet einen Prozess via ConPTY und liefert eine PseudoConsoleSession.</summary>
@@ -68,13 +68,13 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
         var workItemId = Guid.NewGuid();
         var pluginMock = new FakeKiPlugin();
 
-        var handle = await _kiService.StartTerminalSessionAsync(workItemId, pluginMock, Path.GetTempPath());
+        var handle = await _aiService.StartTerminalSessionAsync(workItemId, pluginMock, Path.GetTempPath());
 
         handle.Should().NotBeNull();
         handle.WorkItemId.Should().Be(workItemId);
         handle.Session.Should().NotBeNull("StartTerminalSessionAsync muss eine ITerminalSession liefern");
 
-        await _kiService.StopCliAsync(workItemId);
+        await _aiService.StopCliAsync(workItemId);
     }
 }
 

@@ -26,11 +26,11 @@ public enum TerminalBackendRecommendation
 
 /// <summary>Aggregiertes Ergebnis der Preflight-Diagnose eines Terminal-Session-Starts.</summary>
 /// <param name="Checks">Die durchgeführten Einzelprüfungen.</param>
-/// <param name="PtyVerfuegbar">Gibt an, ob ein Pseudo-Terminal (ConPTY) verfügbar ist.</param>
+/// <param name="PtyAvailable">Gibt an, ob ein Pseudo-Terminal (ConPTY) verfügbar ist.</param>
 /// <param name="BackendRecommendation">Die abgeleitete Backend-Empfehlung.</param>
 public sealed record TerminalPreflightResult(
     IReadOnlyList<TerminalPreflightCheck> Checks,
-    bool PtyVerfuegbar,
+    bool PtyAvailable,
     TerminalBackendRecommendation BackendRecommendation);
 
 /// <summary>Führt die Preflight-Diagnose vor einem Terminal-Session-Start aus und protokolliert jeden
@@ -69,12 +69,12 @@ public sealed class TerminalSessionDiagnostics
     {
         var checks = new List<TerminalPreflightCheck>();
 
-        var ptyVerfuegbar = !forcePtyUnavailable
+        var ptyAvailable = !forcePtyUnavailable
             && OperatingSystem.IsWindows()
             && Environment.OSVersion.Version >= MinimumConPtyBuild;
         checks.Add(new TerminalPreflightCheck(
             "ConPTY-Verfügbarkeit",
-            ptyVerfuegbar,
+            ptyAvailable,
             forcePtyUnavailable
                 ? "Fehlschlag durch Test-Override erzwungen (Terminal.ForcePtyUnavailable)"
                 : $"OS-Build {Environment.OSVersion.Version} (Minimum: {MinimumConPtyBuild})"));
@@ -129,12 +129,12 @@ public sealed class TerminalSessionDiagnostics
         // Plugin keine PTY-Unterstützung deklariert oder keine PTY verfügbar ist; sonst Pty.
         var backendRecommendation = !executableCheck.Ok
             ? TerminalBackendRecommendation.Error
-            : spec.Capabilities.HasFlag(TerminalProviderCapabilities.RequiresPty) && !ptyVerfuegbar
+            : spec.Capabilities.HasFlag(TerminalProviderCapabilities.RequiresPty) && !ptyAvailable
                 ? TerminalBackendRecommendation.Error
-                : ptyVerfuegbar && spec.Capabilities.HasFlag(TerminalProviderCapabilities.SupportsPty)
+                : ptyAvailable && spec.Capabilities.HasFlag(TerminalProviderCapabilities.SupportsPty)
                     ? TerminalBackendRecommendation.Pty
                     : TerminalBackendRecommendation.Pipe;
 
-        return new TerminalPreflightResult(checks, ptyVerfuegbar, backendRecommendation);
+        return new TerminalPreflightResult(checks, ptyAvailable, backendRecommendation);
     }
 }
