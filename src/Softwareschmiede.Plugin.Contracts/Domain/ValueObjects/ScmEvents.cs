@@ -14,7 +14,7 @@ public enum ScmContentKind { Description, IssueComment, ReviewComment, PullReque
 /// <summary>Vom Provider geladene Repository- und Authentifizierungsdaten, ohne Credentials.</summary>
 public sealed record ScmEventRepository(string ProviderPrefix, string Host, string RepositoryId,
     string Owner, string Name, string? OwnerId, string ViewerId, string ViewerLogin, bool CanWrite,
-    ScmKontoModus Account = ScmKontoModus.Benutzerkonto, string? NumericRepositoryId = null);
+    ScmAccountMode Account = ScmAccountMode.UserAccount, string? NumericRepositoryId = null);
 
 /// <summary>Validierter Ursprung einer Beobachtung oder Antwort.</summary>
 public sealed record ScmEventReference(ScmEventRepository Repository, ScmReferenceKind Kind, int Number);

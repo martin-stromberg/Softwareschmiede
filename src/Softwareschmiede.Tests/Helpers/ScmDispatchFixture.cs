@@ -40,9 +40,9 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal readonly ScmKiProfile KiProfile;
     internal readonly string Root;
     internal readonly Mock<IGitPlugin> Git = new();
-    internal readonly Mock<IKiPlugin> Ki = new();
+    internal readonly Mock<IAiPlugin> Ki = new();
     /// <summary>Optionales zweites KI-Plugin (z. B. für Fallback-Tests mit deaktiviertem Prefix).</summary>
-    internal readonly Mock<IKiPlugin>? Ki2;
+    internal readonly Mock<IAiPlugin>? Ki2;
     internal readonly ScmKiProfile? Ki2Profile;
     internal readonly Dictionary<Guid, Mock<ITerminalSession>> Sessions = new();
     internal readonly List<TerminalSessionStartSpec> StartSpecs = [];
@@ -51,9 +51,9 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal readonly List<ScmNotification> Notifications = [];
     internal readonly ScmEventRepository Repository = new("test-scm", "github.com", "R_1", "owner", "repo", "U_1", "U_1", "owner", true);
     /// <summary>Repository-Darstellung des dedizierten Bot-Kontos, wie die Quelle sie im Modus
-    /// <see cref="ScmKontoModus.SeparatesKonto"/> nach der Auflösung liefert.</summary>
+    /// <see cref="ScmAccountMode.SeparateAccount"/> nach der Auflösung liefert.</summary>
     internal static readonly ScmEventRepository BotRepository = new("test-scm", "github.com", "R_1",
-        "owner", "repo", "U_1", "BOT", "scm-bot", true, ScmKontoModus.SeparatesKonto);
+        "owner", "repo", "U_1", "BOT", "scm-bot", true, ScmAccountMode.SeparateAccount);
     internal ServiceProvider Services { get; }
     internal Func<Task>? CloneGate { get; set; }
     internal string Prompt { get; set; }
@@ -83,7 +83,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
             .Returns((ScmResponseRequest request, CancellationToken _) => { Responses.Add(request); return Task.FromResult(new ScmResponseResult("remote", null, false)); });
         // As<> muss vor dem ersten Git.Object-Zugriff erfolgen; Tests können die leere
         // Standard-Anbindung mit eigenem Setup überschreiben.
-        Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmKontoModus>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmAccountMode>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, string?>());
         Git.As<IScmNotificationSource>().Setup(x => x.EnumerateNotificationsAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .Returns((string _, DateTimeOffset? _, CancellationToken _) => Task.FromResult<IReadOnlyList<ScmNotification>>(Notifications.ToArray()));
@@ -105,10 +105,10 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 WorkingDirectory = directory,
                 EnvironmentVariables = KiProfile.EnvironmentVariables
             }));
-        var kiPlugins = new List<IKiPlugin> { Ki.Object };
+        var kiPlugins = new List<IAiPlugin> { Ki.Object };
         if (ki2 is not null)
         {
-            Ki2 = new Mock<IKiPlugin>();
+            Ki2 = new Mock<IAiPlugin>();
             Ki2.SetupGet(x => x.PluginPrefix).Returns(ki2.Prefix);
             Ki2.SetupGet(x => x.PluginName).Returns(ki2.Prefix);
             Ki2.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
@@ -263,7 +263,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal ScmStartCheckService StartPruefung => Services.GetRequiredService<ScmStartCheckService>();
 
     /// <summary>Setzt den Konto-Modus über den <see cref="AppSettingService"/>.</summary>
-    internal async Task SetKontoModusAsync(ScmKontoModus mode)
+    internal async Task SetKontoModusAsync(ScmAccountMode mode)
     {
         using var scope = Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AppSettingService>().SetScmAccountModeAsync(mode);

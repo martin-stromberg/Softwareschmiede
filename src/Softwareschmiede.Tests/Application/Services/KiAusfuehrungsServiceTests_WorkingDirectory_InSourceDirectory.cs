@@ -89,7 +89,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
         var startConfig = new RepositoryStartConfiguration { WorkingDirectoryRelativePath = "backend" };
 
         string? usedPath = null;
-        var kiPluginMock = new Mock<IKiPlugin>();
+        var kiPluginMock = new Mock<IAiPlugin>();
         kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Callback<string, string?, CancellationToken>((path, _, _) => usedPath = path)
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
@@ -126,7 +126,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
 
         var startConfig = new RepositoryStartConfiguration { WorkingDirectoryRelativePath = "backend" };
 
-        var kiPluginMock = new Mock<IKiPlugin>();
+        var kiPluginMock = new Mock<IAiPlugin>();
         kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
             {

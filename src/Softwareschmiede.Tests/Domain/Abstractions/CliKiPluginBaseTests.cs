@@ -205,7 +205,7 @@ public sealed class CliKiPluginBaseTests
             => new() { FileName = "test-cli", WorkingDirectory = localRepoPath };
     }
 
-    private abstract class BaseTestPlugin(string providerPraefix = "test") : CliKiPluginBase
+    private abstract class BaseTestPlugin(string providerPraefix = "test") : CliAiPluginBase
     {
         public override string ProviderFilePrefix => providerPraefix;
         public override string PluginName => "Test";

@@ -78,7 +78,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private UpdateModusOption? _selectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.CheckOnly);
     private UpdatePfadOption? _selectedUpdatePfad = UpdatePfadOption.FuerPfad(null);
     private ScmBackmergeModusOption? _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.Disabled);
-    private ScmKontoModusOption? _selectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.Benutzerkonto);
+    private ScmKontoModusOption? _selectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.UserAccount);
     private ScmTaskCompletionPruefmodusOption? _selectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionCheckMode.EventDriven);
     private bool _isScmBackmergeDraftAktivierung;
     private bool _isScmBackmergeAdminMerge;
@@ -198,7 +198,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<IGitPlugin> ScmPlugins { get; private set; } = [];
 
     /// <summary>Alle verfügbaren KI-Plugins.</summary>
-    public IReadOnlyList<IKiPlugin> KiPlugins { get; private set; } = [];
+    public IReadOnlyList<IAiPlugin> KiPlugins { get; private set; } = [];
 
     /// <summary>Aktuell gewähltes Standard-SCM-Plugin.</summary>
     public IGitPlugin? DefaultScmPlugin
@@ -330,7 +330,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public bool IsUeberwachungsmodusEnabled => IsScmMonitoringEnabled;
 
     /// <summary>Das Trigger-Keyword wird nur bei aktivierter Ereignisüberwachung im Benutzerkonto-Modus benötigt.</summary>
-    public bool IsTriggerKeywordSichtbar => IsScmMonitoringEnabled && SelectedKontoModus?.Mode == ScmKontoModus.Benutzerkonto;
+    public bool IsTriggerKeywordSichtbar => IsScmMonitoringEnabled && SelectedKontoModus?.Mode == ScmAccountMode.UserAccount;
 
     /// <summary>Das Verzögerungs-Keyword ist in beiden Kontomodi wirksam, weil es aus dem
     /// jeweils akzeptierten Triggertext gelesen wird; sichtbar bei aktiver Überwachung.</summary>
@@ -533,7 +533,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         SpeichernCommand = new AsyncRelayCommand(SaveAsync);
         VerwerfenCommand = new AsyncRelayCommand(DiscardAsync);
         ScmPluginSelectedCommand = new RelayCommand<IGitPlugin>(SelectPluginByReference);
-        KiPluginSelectedCommand = new RelayCommand<IKiPlugin>(SelectPluginByReference);
+        KiPluginSelectedCommand = new RelayCommand<IAiPlugin>(SelectPluginByReference);
         PluginSelectedCommand = new RelayCommand<PluginActivationEntry>(entry =>
         {
             if (entry is not null)
@@ -971,7 +971,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             .ToList();
         // Das Plugin-Parallel-Limit ist eine Host-Einstellung (AppEinstellung), kein
         // plugindeklariertes Credential-Store-Feld — daher wird es hier eingespeist.
-        if (plugin is IKiPlugin)
+        if (plugin is IAiPlugin)
             groups.Add(new PluginSettingGroupEntry(ParallelLimitGruppenName,
                 [new PluginSettingEntry(HostParallelLimitField,
                     _kiPluginParallelLimits.GetValueOrDefault(plugin.PluginPrefix),
@@ -1022,7 +1022,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private bool ValidiereScmKontoModus()
     {
         // Der Überwachungsmodus ist nur bei aktivierter Ereignisüberwachung wirksam.
-        if (!IsScmMonitoringEnabled || SelectedKontoModus?.Mode != ScmKontoModus.SeparatesKonto)
+        if (!IsScmMonitoringEnabled || SelectedKontoModus?.Mode != ScmAccountMode.SeparateAccount)
             return true;
 
         var github = SourceCodeManagementPlugins.FirstOrDefault(x =>

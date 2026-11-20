@@ -55,7 +55,7 @@ public sealed class TerminalSessionDiagnostics
     /// <summary>Führt alle Preflight-Prüfungen aus.</summary>
     /// <param name="spec">Die vom Plugin gelieferte (bereits normalisierte) Startbeschreibung.</param>
     /// <param name="resolution">Das Ergebnis der Executable-Auflösung.</param>
-    /// <param name="healthCheck">Optionale Plugin-Health-Probe (<c>IKiPlugin.CheckHealthAsync</c> als
+    /// <param name="healthCheck">Optionale Plugin-Health-Probe (<c>IAiPlugin.CheckHealthAsync</c> als
     /// Delegate); wird nur bei erfolgreicher Executable-Auflösung aufgerufen und ist nicht fatal.</param>
     /// <param name="forcePtyUnavailable">Erzwingt einen Fehlschlag des PTY-Verfügbarkeits-Checks (Debug-/Test-Hook).</param>
     /// <param name="ct">Abbruch-Token.</param>

@@ -23,7 +23,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         fixture.ConfigureMentionObservations();
         fixture.ConfigureIssue();
@@ -37,7 +37,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         var observation = ScmEventStore.Observation(item);
         Assert.Equal(7, observation.Reference.Number);
-        Assert.Equal(ScmKontoModus.SeparatesKonto, observation.Reference.Repository.Account);
+        Assert.Equal(ScmAccountMode.SeparateAccount, observation.Reference.Repository.Account);
         Assert.NotEqual(Guid.Empty, item.WorkItemId);
         fixture.Git.As<IScmEventSource>().Verify(x => x.EnumerateReferencesAsync(
             It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -57,7 +57,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         fixture.ConfigureMentionObservations(authorId: "U_gha", authorLogin: "github-actions[bot]");
         fixture.ConfigureIssue();
@@ -87,7 +87,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         fixture.AddNotification(new ScmNotification("T_9", "R_FOREIGN", "github.com", "other", "other-repo",
             ScmReferenceKind.Issue, 5, "mention", DateTimeOffset.UtcNow));
@@ -112,7 +112,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         fixture.ConfigureMentionObservations();
         fixture.AddNotification(new ScmNotification("T_1", "R_1", "github.com", "owner", "repo",
@@ -137,7 +137,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         fixture.ConfigureMentionObservations();
         fixture.Git.As<IScmNotificationSource>().Setup(x => x.EnumerateNotificationsAsync(
@@ -190,7 +190,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         using (var scope = fixture.Services.CreateScope())
         {
@@ -217,11 +217,11 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, "https://ghe-a.example.com/owner/repo-a", "repo-a");
         await AddRepositoryAsync(fixture, "https://ghe-b.example.com/owner/repo-b", "repo-b");
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         var repositoryA = new ScmEventRepository("test-scm", "ghe-a.example.com", "R_SAME",
-            "owner", "repo-a", "U_1", "BOT", "scm-bot", true, ScmKontoModus.SeparatesKonto);
+            "owner", "repo-a", "U_1", "BOT", "scm-bot", true, ScmAccountMode.SeparateAccount);
         var repositoryB = new ScmEventRepository("test-scm", "ghe-b.example.com", "R_B",
-            "owner", "repo-b", "U_1", "BOT", "scm-bot", true, ScmKontoModus.SeparatesKonto);
+            "owner", "repo-b", "U_1", "BOT", "scm-bot", true, ScmAccountMode.SeparateAccount);
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
             .Returns((ScmRepositoryContext context, CancellationToken _) => Task.FromResult(
@@ -254,7 +254,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         var monitor = fixture.Monitor;
 
@@ -262,7 +262,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         fixture.Git.As<IScmNotificationSource>().Verify(x => x.EnumerateNotificationsAsync(
             It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Once);
 
-        await fixture.SetKontoModusAsync(ScmKontoModus.Benutzerkonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.UserAccount);
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
             .Returns((ScmRepositoryContext context, CancellationToken _) =>

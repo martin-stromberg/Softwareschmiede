@@ -136,7 +136,7 @@ public sealed class AufgabeServiceTests : IDisposable
         result.GitRepositoryId.Should().Be(repository.Id);
         result.PullRequests.Should().ContainSingle();
         var reference = result.PullRequests.Single();
-        reference.Role.Should().Be(PullRequestReferenzRolle.ReviewSource);
+        reference.Role.Should().Be(PullRequestReferenceRole.ReviewSource);
         reference.RepositoryId.Should().Be("owner/repo");
         reference.SourceRepositoryId.Should().Be("fork/repo");
         reference.SourceRepositoryUrl.Should().Be("https://github.com/fork/repo.git");

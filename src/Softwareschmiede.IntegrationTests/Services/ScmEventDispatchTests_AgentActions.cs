@@ -25,7 +25,7 @@ public sealed class ScmEventDispatchTests_AgentActions
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmKontoModus>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmAccountMode>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, string?>
             {
                 ["GH_TOKEN"] = "agent-secret-token",
@@ -54,7 +54,7 @@ public sealed class ScmEventDispatchTests_AgentActions
         await fixture.InitializeAsync();
         var botRepository = fixture.Repository with
         {
-            Account = ScmKontoModus.SeparatesKonto,
+            Account = ScmAccountMode.SeparateAccount,
             ViewerId = "BOT",
             ViewerLogin = "scm-bot"
         };
@@ -73,7 +73,7 @@ public sealed class ScmEventDispatchTests_AgentActions
 
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
         var context = Assert.Single(contexts);
-        Assert.Equal(ScmKontoModus.SeparatesKonto, context.Account);
+        Assert.Equal(ScmAccountMode.SeparateAccount, context.Account);
     }
 
     /// <summary>Ein Fehler beim Auflösen der Agenten-Anbindung blockiert den regulären CLI-Start
@@ -83,7 +83,7 @@ public sealed class ScmEventDispatchTests_AgentActions
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmKontoModus>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmAccountMode>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Credential-Store nicht erreichbar."));
         var (_, eventId) = await fixture.AddAsync(configured: true);
 
@@ -108,7 +108,7 @@ public sealed class ScmEventDispatchTests_AgentActions
 
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
         fixture.Git.As<IScmAgentAccess>().Verify(x => x.GetAgentEnvironmentAsync(
-            It.IsAny<ScmKontoModus>(), "https://github.com/owner/repo", It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<ScmAccountMode>(), "https://github.com/owner/repo", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>Der Agent meldet Annahme und schließt mit einem Bericht selbst ausgeführter

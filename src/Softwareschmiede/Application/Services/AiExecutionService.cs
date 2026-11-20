@@ -173,7 +173,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public Task<CliProcessHandle> StartCliAsync(
         Guid workItemId,
-        IKiPlugin aiPlugin,
+        IAiPlugin aiPlugin,
         string localRepoPath,
         string? optionalParameters = null,
         CancellationToken ct = default,
@@ -182,7 +182,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
         => ScmTaskCoordinator.Shared.RunAsync(workItemId,
             () => StartCliCoreAsync(workItemId, aiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin), ct);
 
-    private async Task<CliProcessHandle> StartCliCoreAsync(Guid workItemId, IKiPlugin aiPlugin, string localRepoPath,
+    private async Task<CliProcessHandle> StartCliCoreAsync(Guid workItemId, IAiPlugin aiPlugin, string localRepoPath,
         string? optionalParameters, CancellationToken ct, RepositoryStartConfiguration? startConfig, IGitPlugin? gitPlugin)
     {
         await _startLock.WaitAsync(ct).ConfigureAwait(false);
@@ -271,7 +271,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public Task<CliProcessHandle> StartTerminalSessionAsync(
         Guid workItemId,
-        IKiPlugin aiPlugin,
+        IAiPlugin aiPlugin,
         string localRepoPath,
         string? optionalParameters = null,
         CancellationToken ct = default,
@@ -281,7 +281,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
         => ScmTaskCoordinator.Shared.RunAsync(workItemId,
             () => StartTerminalSessionCoreAsync(workItemId, aiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin, repositoryUrl), ct);
 
-    private async Task<CliProcessHandle> StartTerminalSessionCoreAsync(Guid workItemId, IKiPlugin aiPlugin, string localRepoPath,
+    private async Task<CliProcessHandle> StartTerminalSessionCoreAsync(Guid workItemId, IAiPlugin aiPlugin, string localRepoPath,
         string? optionalParameters, CancellationToken ct, RepositoryStartConfiguration? startConfig, IGitPlugin? gitPlugin,
         string? repositoryUrl)
     {

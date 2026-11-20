@@ -37,7 +37,7 @@ public sealed class PluginManager : IPluginManager
     private readonly bool _applyTestModeFilter;
     private readonly object _sync = new();
     private readonly List<IGitPlugin> _gitPlugins = [];
-    private readonly List<IKiPlugin> _aiPlugins = [];
+    private readonly List<IAiPlugin> _aiPlugins = [];
     private readonly List<IIdePlugin> _idePlugins = [];
     private bool _initialized;
 
@@ -63,7 +63,7 @@ public sealed class PluginManager : IPluginManager
     }
 
     /// <inheritdoc/>
-    public IReadOnlyList<IKiPlugin> GetDevelopmentAutomationPlugins()
+    public IReadOnlyList<IAiPlugin> GetDevelopmentAutomationPlugins()
     {
         EnsureInitialized();
         return _aiPlugins;
@@ -78,7 +78,7 @@ public sealed class PluginManager : IPluginManager
     }
 
     /// <inheritdoc/>
-    public IKiPlugin GetDefaultDevelopmentAutomationPlugin()
+    public IAiPlugin GetDefaultDevelopmentAutomationPlugin()
     {
         EnsureInitialized();
         return _aiPlugins
@@ -88,8 +88,8 @@ public sealed class PluginManager : IPluginManager
                ?? throw new InvalidOperationException("Kein Development-Automation-Plugin verfügbar.");
     }
 
-    private static int GetAiPluginPriority(IKiPlugin plugin)
-        => plugin is CliKiPluginBase cliPlugin
+    private static int GetAiPluginPriority(IAiPlugin plugin)
+        => plugin is CliAiPluginBase cliPlugin
            && string.Equals(cliPlugin.ProviderFilePrefix, "copilot", StringComparison.OrdinalIgnoreCase)
             ? 0
             : 1;
@@ -260,7 +260,7 @@ public sealed class PluginManager : IPluginManager
             var pluginTypes = assembly
                 .GetExportedTypes()
                 .Where(t => !t.IsAbstract && !t.IsInterface &&
-                            (typeof(IGitPlugin).IsAssignableFrom(t) || typeof(IKiPlugin).IsAssignableFrom(t) || typeof(IIdePlugin).IsAssignableFrom(t)))
+                            (typeof(IGitPlugin).IsAssignableFrom(t) || typeof(IAiPlugin).IsAssignableFrom(t) || typeof(IIdePlugin).IsAssignableFrom(t)))
                 .ToList();
 
             foreach (var pluginType in pluginTypes)
@@ -300,7 +300,7 @@ public sealed class PluginManager : IPluginManager
                     _logger.LogInformation("SCM-Plugin geladen: {PluginName} ({Type})", gitPlugin.PluginName, pluginType.FullName);
                     break;
 
-                case PluginType.DevelopmentAutomation when instance is IKiPlugin aiPlugin:
+                case PluginType.DevelopmentAutomation when instance is IAiPlugin aiPlugin:
                     _aiPlugins.Add(aiPlugin);
                     _logger.LogInformation("Development-Automation-Plugin geladen: {PluginName} ({Type})", aiPlugin.PluginName, pluginType.FullName);
                     break;

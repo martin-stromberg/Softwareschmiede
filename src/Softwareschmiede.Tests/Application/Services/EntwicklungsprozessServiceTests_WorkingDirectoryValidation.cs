@@ -47,7 +47,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
         pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
+        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IAiPlugin>().Object);
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
         var pluginActivationService = new PluginActivationService(new AppSettingService(_db, new Mock<ILogger<AppSettingService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
@@ -247,7 +247,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
         pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
+        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IAiPlugin>().Object);
         return pluginManagerMock.Object;
     }
 }

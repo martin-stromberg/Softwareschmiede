@@ -7,13 +7,13 @@ public interface IPluginManager
     IReadOnlyList<IGitPlugin> GetSourceCodeManagementPlugins();
 
     /// <summary>Gibt alle geladenen Development-Automation-Plugins zurück.</summary>
-    IReadOnlyList<IKiPlugin> GetDevelopmentAutomationPlugins();
+    IReadOnlyList<IAiPlugin> GetDevelopmentAutomationPlugins();
 
     /// <summary>Gibt das erste verfügbare SCM-Plugin zurück.</summary>
     IGitPlugin GetDefaultSourceCodeManagementPlugin();
 
     /// <summary>Gibt das priorisierte Development-Automation-Plugin zurück.</summary>
-    IKiPlugin GetDefaultDevelopmentAutomationPlugin();
+    IAiPlugin GetDefaultDevelopmentAutomationPlugin();
 
     /// <summary>Gibt alle geladenen IDE-Plugins zurück.</summary>
     IReadOnlyList<IIdePlugin> GetIdePlugins();

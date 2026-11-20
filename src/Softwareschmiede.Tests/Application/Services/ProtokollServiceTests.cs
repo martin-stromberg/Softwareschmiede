@@ -91,8 +91,8 @@ public sealed class ProtokollServiceTests : IDisposable
             Passed: true,
             Results: new[]
             {
-                new TestErgebnisInfo("Test1", TestStatus.Passed, null, TimeSpan.FromMilliseconds(100)),
-                new TestErgebnisInfo("Test2", TestStatus.Passed, null, TimeSpan.FromMilliseconds(200))
+                new TestResultInfo("Test1", TestStatus.Passed, null, TimeSpan.FromMilliseconds(100)),
+                new TestResultInfo("Test2", TestStatus.Passed, null, TimeSpan.FromMilliseconds(200))
             });
 
         // Act
@@ -113,8 +113,8 @@ public sealed class ProtokollServiceTests : IDisposable
             Passed: false,
             Results: new[]
             {
-                new TestErgebnisInfo("Test1", TestStatus.Passed, null, TimeSpan.FromMilliseconds(100)),
-                new TestErgebnisInfo("Test2", TestStatus.Failed, "Assert failed", TimeSpan.FromMilliseconds(50))
+                new TestResultInfo("Test1", TestStatus.Passed, null, TimeSpan.FromMilliseconds(100)),
+                new TestResultInfo("Test2", TestStatus.Failed, "Assert failed", TimeSpan.FromMilliseconds(50))
             });
 
         // Act

@@ -19,10 +19,10 @@ public sealed class PullRequestReference
     public string ProviderText => PullRequestProviderDescriptor.GetDisplayName(Provider);
 
     /// <summary>Fachliche Rolle dieser Referenz an der Aufgabe.</summary>
-    public PullRequestReferenzRolle Role { get; set; } = PullRequestReferenzRolle.CreatedByTask;
+    public PullRequestReferenceRole Role { get; set; } = PullRequestReferenceRole.CreatedByTask;
 
     /// <summary>Sichtbare Rollenbezeichnung.</summary>
-    public string RoleText => Role == PullRequestReferenzRolle.ReviewSource
+    public string RoleText => Role == PullRequestReferenceRole.ReviewSource
         ? "Review-Quelle"
         : "Aus Aufgabe erstellt";
 

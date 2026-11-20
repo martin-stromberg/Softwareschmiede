@@ -940,14 +940,14 @@ public sealed class GitHubEventSourceTests
     /// <summary>Die Beschreibungsaktualisierung folgt dem Konto der gespeicherten Referenz —
     /// inklusive Identitätsprüfung, Abgleichs-Read und eigentlichem PATCH.</summary>
     [Theory]
-    [InlineData(ScmKontoModus.Benutzerkonto)]
-    [InlineData(ScmKontoModus.SeparatesKonto)]
-    public async Task IssueBodyUpdate_RoutesByReferenceKonto(ScmKontoModus account)
+    [InlineData(ScmAccountMode.UserAccount)]
+    [InlineData(ScmAccountMode.SeparateAccount)]
+    public async Task IssueBodyUpdate_RoutesByReferenceKonto(ScmAccountMode account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();
-        var routed = account == ScmKontoModus.SeparatesKonto ? agent : user;
-        var idle = account == ScmKontoModus.SeparatesKonto ? user : agent;
+        var routed = account == ScmAccountMode.SeparateAccount ? agent : user;
+        var idle = account == ScmAccountMode.SeparateAccount ? user : agent;
         var request = new ScmResponseRequest(Issue with { Repository = Repository with { Account = account } },
             "action-1", ScmResponseKind.IssueBodyUpdate, "Neue Beschreibung.");
         Identity(routed);
@@ -1127,9 +1127,9 @@ public sealed class GitHubEventSourceTests
         Identity(agent);
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
 
-        var result = await plugin.GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo", ScmKontoModus.SeparatesKonto), TestContext.Current.CancellationToken);
+        var result = await plugin.GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo", ScmAccountMode.SeparateAccount), TestContext.Current.CancellationToken);
 
-        Assert.Equal(Repository with { Account = ScmKontoModus.SeparatesKonto }, result);
+        Assert.Equal(Repository with { Account = ScmAccountMode.SeparateAccount }, result);
         Assert.Empty(user.Requests);
         Assert.Equal(2, agent.Requests.Count);
     }
@@ -1137,14 +1137,14 @@ public sealed class GitHubEventSourceTests
     /// <summary>Reads folgen dem Konto der Referenz: SeparatesKonto → Agent-Client,
     /// Benutzerkonto → Benutzer-Client.</summary>
     [Theory]
-    [InlineData(ScmKontoModus.Benutzerkonto)]
-    [InlineData(ScmKontoModus.SeparatesKonto)]
-    public async Task ReadEventsAsync_RoutesByReferenceKonto(ScmKontoModus account)
+    [InlineData(ScmAccountMode.UserAccount)]
+    [InlineData(ScmAccountMode.SeparateAccount)]
+    public async Task ReadEventsAsync_RoutesByReferenceKonto(ScmAccountMode account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();
-        var routed = account == ScmKontoModus.SeparatesKonto ? agent : user;
-        var idle = account == ScmKontoModus.SeparatesKonto ? user : agent;
+        var routed = account == ScmAccountMode.SeparateAccount ? agent : user;
+        var idle = account == ScmAccountMode.SeparateAccount ? user : agent;
         routed.AddGraph(new { repository = new { issue = Node("I_7", "text") } });
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
         var reference = Issue with { Repository = Repository with { Account = account } };
@@ -1159,14 +1159,14 @@ public sealed class GitHubEventSourceTests
     /// <summary>Antworten folgen dem Konto der gespeicherten Referenz — inklusive
     /// Identitätsprüfung, Abgleichs-Reads und dem eigentlichen POST.</summary>
     [Theory]
-    [InlineData(ScmKontoModus.Benutzerkonto)]
-    [InlineData(ScmKontoModus.SeparatesKonto)]
-    public async Task Response_RoutesByReferenceKonto(ScmKontoModus account)
+    [InlineData(ScmAccountMode.UserAccount)]
+    [InlineData(ScmAccountMode.SeparateAccount)]
+    public async Task Response_RoutesByReferenceKonto(ScmAccountMode account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();
-        var routed = account == ScmKontoModus.SeparatesKonto ? agent : user;
-        var idle = account == ScmKontoModus.SeparatesKonto ? user : agent;
+        var routed = account == ScmAccountMode.SeparateAccount ? agent : user;
+        var idle = account == ScmAccountMode.SeparateAccount ? user : agent;
         Identity(routed);
         routed.Add("comments?", Array.Empty<object>());
         routed.Add("issues/7/comments", new { id = 99, html_url = "https://github.com/owner/repo/issues/7#issuecomment-99" });

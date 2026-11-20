@@ -5,7 +5,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Domain.Interfaces;
 
 /// <summary>KI-Plugin Interface. Startet den CLI-Prozess und gibt ihn zurück.</summary>
-public interface IKiPlugin : IPlugin
+public interface IAiPlugin : IPlugin
 {
     /// <summary>Startet den CLI-Prozess mit optionalen Parametern und gibt ProcessStartInfo zurück.</summary>
     /// <param name="localRepoPath">Lokaler Pfad des Arbeitsverzeichnisses.</param>

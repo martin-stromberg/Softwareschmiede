@@ -108,7 +108,7 @@ internal sealed class ScmE2EFixture
         SaveScenario();
     }
 
-    public async Task SetKontoModus(ScmKontoModus mode)
+    public async Task SetKontoModus(ScmAccountMode mode)
     {
         await using var db = OpenDatabase();
         var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);

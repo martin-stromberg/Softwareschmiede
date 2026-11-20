@@ -21,7 +21,7 @@ public sealed class PluginSettingsService
     }
 
     /// <summary>Gibt alle konfigurierten Plugins zurück (Git- und KI-Plugins).</summary>
-    public IReadOnlyList<IPlugin> GetAllPlugins(IEnumerable<IGitPlugin> gitPlugins, IEnumerable<IKiPlugin> kiPlugins)
+    public IReadOnlyList<IPlugin> GetAllPlugins(IEnumerable<IGitPlugin> gitPlugins, IEnumerable<IAiPlugin> kiPlugins)
     {
         return [.. gitPlugins.Cast<IPlugin>(), .. kiPlugins.Cast<IPlugin>()];
     }

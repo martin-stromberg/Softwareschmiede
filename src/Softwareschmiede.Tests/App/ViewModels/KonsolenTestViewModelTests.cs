@@ -95,7 +95,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
 
         sut.Session.Should().NotBeNull();
         sut.Session.Should().BeOfType<TerminalReplaySession>();
-        sut.DateiPfad.Should().Be(path);
+        sut.FilePath.Should().Be(path);
         sut.QuellEintraege.Should().HaveCount(2);
         sut.QuellEintraege[0].Index.Should().Be(1, "die #-Spalte zählt 1-basiert wie der PositionsText");
         sut.QuellEintraege[1].Index.Should().Be(2);

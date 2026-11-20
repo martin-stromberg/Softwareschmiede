@@ -80,12 +80,12 @@ public sealed class SettingsViewModelTests : IDisposable
         return mock;
     }
 
-    private static Mock<IKiPlugin> CreateKiPluginMock(
+    private static Mock<IAiPlugin> CreateKiPluginMock(
         string pluginName,
         IReadOnlyList<PluginSettingGroup>? groups = null,
         string? pluginPrefix = null)
     {
-        var mock = new Mock<IKiPlugin>();
+        var mock = new Mock<IAiPlugin>();
         mock.Setup(p => p.PluginName).Returns(pluginName);
         mock.Setup(p => p.PluginPrefix).Returns(pluginPrefix ?? pluginName.ToLowerInvariant());
         mock.Setup(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
@@ -719,12 +719,12 @@ public sealed class SettingsViewModelTests : IDisposable
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
         sut.ScmTriggerKeyword = "   ";
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmKontoModus.SeparatesKonto);
+        (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmAccountMode.SeparateAccount);
     }
 
     /// <summary>Eine ungültige Wartezeit blockiert das Speichern nicht, solange die
@@ -761,7 +761,7 @@ public sealed class SettingsViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         // Probehalber vom gespeicherten Standard abweichende Werte setzen.
         sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.Global);
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
         sut.IsScmMonitoringEnabled = false;
         sut.IsScmTaskCompletionEnabled = false;
 
@@ -770,7 +770,7 @@ public sealed class SettingsViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.VerwerfenCommand).ExecuteAsync();
 
         sut.SelectedBackmergeModus?.Mode.Should().Be(ScmBackmergeMode.Disabled);
-        sut.SelectedKontoModus?.Mode.Should().Be(ScmKontoModus.Benutzerkonto);
+        sut.SelectedKontoModus?.Mode.Should().Be(ScmAccountMode.UserAccount);
         sut.IsProzessablaeufeFelderEnabled.Should().BeFalse();
         sut.ProzessablaeufeStatusText.Should().Be("deaktiviert");
         sut.IsTriggerKeywordSichtbar.Should().BeTrue();
@@ -921,7 +921,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SelectedKontoModus.Should().Be(ScmKontoModusOption.FuerModus(ScmKontoModus.Benutzerkonto));
+        sut.SelectedKontoModus.Should().Be(ScmKontoModusOption.FuerModus(ScmAccountMode.UserAccount));
         sut.KontoModusOptionen.Should().HaveCount(2);
     }
 
@@ -936,14 +936,14 @@ public sealed class SettingsViewModelTests : IDisposable
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmKontoModus.SeparatesKonto);
+        (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmAccountMode.SeparateAccount);
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.SelectedKontoModus.Should().Be(ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto));
+        sut.SelectedKontoModus.Should().Be(ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount));
     }
 
     /// <summary>Eine fehlende Konto-Modus-Auswahl wird nicht gespeichert.</summary>
@@ -959,7 +959,7 @@ public sealed class SettingsViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().NotBeNullOrEmpty();
-        (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmKontoModus.Benutzerkonto);
+        (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmAccountMode.UserAccount);
     }
 
     /// <summary>SeparatesKonto ohne AgentToken wird abgelehnt — der Modus bleibt unpersistiert.</summary>
@@ -972,12 +972,12 @@ public sealed class SettingsViewModelTests : IDisposable
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().Contain("separaten Kontos").And.Contain("Authentifizierung");
         sut.ErfolgsMeldung.Should().BeNull();
-        (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmKontoModus.Benutzerkonto);
+        (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmAccountMode.UserAccount);
     }
 
     /// <summary>Ein gerade im Formular eingetragener AgentToken-Wert zählt bereits bei der Pflichtprüfung —
@@ -994,11 +994,11 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.SelectedPluginSettings.SelectMany(g => g.Entries).Single(e => e.Field.Key == "Token").Value = "user-token";
         sut.SelectedPluginSettings.SelectMany(g => g.Entries).Single(e => e.Field.Key == "AgentToken").Value = "bot-token";
 
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmKontoModus.SeparatesKonto);
+        (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmAccountMode.SeparateAccount);
         _credentialStore.GetCredential("Softwareschmiede.GitHub.AgentToken").Should().Be("bot-token");
     }
 
@@ -1102,7 +1102,7 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.IsPromptAnhaengeSichtbar.Should().BeTrue();
         sut.AufgabenAusfuehrenStatusText.Should().Be("aktiviert");
 
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
+        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
         sut.IsTriggerKeywordSichtbar.Should().BeFalse("im SeparatesKonto gilt die Erwähnung statt des Keywords");
         sut.IsPromptAnhaengeSichtbar.Should().BeTrue();
 
@@ -1164,7 +1164,7 @@ internal sealed class InMemoryCredentialStoreForSettings : ICredentialStore
     public void DeleteCredential(string key) => _store.Remove(key);
 }
 
-internal sealed class TestCliPlugin : CliKiPluginBase
+internal sealed class TestCliPlugin : CliAiPluginBase
 {
     public TestCliPlugin(string pluginName, string pluginPrefix)
     {

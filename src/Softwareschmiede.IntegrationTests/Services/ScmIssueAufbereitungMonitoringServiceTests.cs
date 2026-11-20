@@ -28,7 +28,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         await fixture.SetSettingAsync(AppSettingService.ScmIssuePreparationPluginKey, "custom.auf");
         var repositoryId = await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
@@ -212,7 +212,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
         await AddRepositoryAsync(fixture, preparation: true);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         var contexts = new List<ScmRepositoryContext>();
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
@@ -225,7 +225,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await AufbereitungMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
         var context = Assert.Single(contexts);
-        Assert.Equal(ScmKontoModus.Benutzerkonto, context.Account);
+        Assert.Equal(ScmAccountMode.UserAccount, context.Account);
     }
 
     /// <summary>Die persistierte Referenz des internen Aufbereitungsereignisses trägt den
@@ -236,7 +236,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         fixture.ConfigureIssue();
@@ -255,7 +255,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(ScmKontoModus.SeparatesKonto, ScmEventStore.Observation(item).Reference.Repository.Account);
+        Assert.Equal(ScmAccountMode.SeparateAccount, ScmEventStore.Observation(item).Reference.Repository.Account);
     }
 
     /// <summary>Lückenschluss: Wurde die Beschreibung eines neu angelegten Issues zuvor schon
@@ -267,7 +267,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         fixture.ConfigureIssue();
@@ -417,11 +417,11 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
             : DescriptionObservation(request, DateTimeOffset.UtcNow.AddDays(-1)));
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         await AufbereitungMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
         fixture.Git.As<IScmEventSource>().Verify(x => x.ReadEventsAsync(
-            It.Is<ScmEventReadRequest>(r => r.Reference.Repository.Account == ScmKontoModus.SeparatesKonto),
+            It.Is<ScmEventReadRequest>(r => r.Reference.Repository.Account == ScmAccountMode.SeparateAccount),
             It.IsAny<CancellationToken>()), Times.Never);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();

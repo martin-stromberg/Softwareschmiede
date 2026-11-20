@@ -595,7 +595,7 @@ public sealed class DevelopmentProcessService
         CancellationToken ct)
     {
         var reviewSources = workItem.PullRequests
-            .Where(p => p.Role == PullRequestReferenzRolle.ReviewSource)
+            .Where(p => p.Role == PullRequestReferenceRole.ReviewSource)
             .ToList();
         if (reviewSources.Count > 1)
         {

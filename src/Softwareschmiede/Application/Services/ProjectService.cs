@@ -581,9 +581,9 @@ public sealed class ProjectService
         public static readonly NullPluginManager Instance = new();
 
         public IReadOnlyList<IGitPlugin> GetSourceCodeManagementPlugins() => [];
-        public IReadOnlyList<IKiPlugin> GetDevelopmentAutomationPlugins() => [];
+        public IReadOnlyList<IAiPlugin> GetDevelopmentAutomationPlugins() => [];
         public IGitPlugin GetDefaultSourceCodeManagementPlugin() => throw new InvalidOperationException("Kein SCM-Plugin verfügbar.");
-        public IKiPlugin GetDefaultDevelopmentAutomationPlugin() => throw new InvalidOperationException("Kein KI-Plugin verfügbar.");
+        public IAiPlugin GetDefaultDevelopmentAutomationPlugin() => throw new InvalidOperationException("Kein KI-Plugin verfügbar.");
         public IReadOnlyList<IIdePlugin> GetIdePlugins() => [];
         public IIdePlugin GetDefaultIdePlugin() => throw new InvalidOperationException("Kein IDE-Plugin verfügbar.");
     }

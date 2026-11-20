@@ -70,7 +70,7 @@ public sealed class PluginSelectionService
     }
 
     /// <summary>Löst das KI-Plugin auf.</summary>
-    public async Task<IKiPlugin> ResolveDevelopmentAutomationPluginAsync(string? selectedPluginPrefix, CancellationToken ct = default)
+    public async Task<IAiPlugin> ResolveDevelopmentAutomationPluginAsync(string? selectedPluginPrefix, CancellationToken ct = default)
     {
         var available = _pluginManager.GetDevelopmentAutomationPlugins();
         var resolved = await ResolvePluginAsync(
@@ -85,7 +85,7 @@ public sealed class PluginSelectionService
     }
 
     /// <summary>Löst ausschließlich ein explizites, weiterhin aktiviertes KI-Plugin auf.</summary>
-    public async Task<IKiPlugin> ResolveDevelopmentAutomationPluginStrictAsync(string pluginPrefix, CancellationToken ct = default)
+    public async Task<IAiPlugin> ResolveDevelopmentAutomationPluginStrictAsync(string pluginPrefix, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(pluginPrefix);
         var plugins = await _pluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync(ct);
@@ -241,7 +241,7 @@ public sealed class PluginSelectionService
 
     /// <summary>Findet das KI-Plugin, dessen <see cref="IPlugin.PluginName"/> oder
     /// <see cref="IPlugin.PluginPrefix"/> dem konfigurierten Wert entspricht.</summary>
-    private static IKiPlugin? FindKiPlugin(IReadOnlyList<IKiPlugin> plugins, string nameOrPrefix)
+    private static IAiPlugin? FindKiPlugin(IReadOnlyList<IAiPlugin> plugins, string nameOrPrefix)
         => plugins.FirstOrDefault(plugin =>
             string.Equals(plugin.PluginName, nameOrPrefix, StringComparison.OrdinalIgnoreCase)
             || string.Equals(plugin.PluginPrefix, nameOrPrefix, StringComparison.OrdinalIgnoreCase));
@@ -407,9 +407,9 @@ public sealed class PluginSelectionService
             string.Equals(plugin.PluginPrefix, pluginPrefix.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string GetAiFallbackSortKey(IKiPlugin plugin)
+    private static string GetAiFallbackSortKey(IAiPlugin plugin)
     {
-        if (plugin is CliKiPluginBase cliPlugin
+        if (plugin is CliAiPluginBase cliPlugin
             && string.Equals(cliPlugin.ProviderFilePrefix, "copilot", StringComparison.OrdinalIgnoreCase))
         {
             return $"0-{plugin.PluginName}";

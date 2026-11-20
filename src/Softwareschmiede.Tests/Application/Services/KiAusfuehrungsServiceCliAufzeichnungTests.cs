@@ -17,9 +17,9 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <see cref="IDisposable.Dispose"/> würde den Testhost selbst beenden.</summary>
 public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
 {
-    private static Mock<IKiPlugin> CreatePlugin()
+    private static Mock<IAiPlugin> CreatePlugin()
     {
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec();
         return pluginMock;
     }

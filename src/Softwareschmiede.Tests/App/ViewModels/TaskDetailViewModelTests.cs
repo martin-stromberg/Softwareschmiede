@@ -30,7 +30,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
     private readonly AppSettingService _settingService;
     private readonly Mock<IDialogService> _dialogServiceMock;
-    private readonly Mock<IKiPlugin> _kiPluginMock;
+    private readonly Mock<IAiPlugin> _kiPluginMock;
     private readonly Mock<IGitPlugin> _gitPluginForResolutionMock;
     private readonly Mock<IPluginManager> _pluginManagerMockFuerPluginSelection;
     private readonly Guid _projektId = Guid.NewGuid();
@@ -46,7 +46,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         _aiService = TestKiAusfuehrungsServiceFactory.Create();
 
-        _kiPluginMock = new Mock<IKiPlugin>();
+        _kiPluginMock = new Mock<IAiPlugin>();
         _kiPluginMock.SetupGet(p => p.PluginName).Returns("Test KI");
         _kiPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestKi");
         _kiPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation);
@@ -74,7 +74,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         // Zweites KI-Plugin: Damit VerfuegbareKiPlugins mehr als ein aktives Plugin enthält und das
         // Single-Plugin-Verhalten (Selector/Dialog entfällt bei genau einem aktiven Plugin) den
         // Plugin-Auswahl-Dialog in den bestehenden dialogbasierten Tests dieser Klasse nicht überspringt.
-        var zweitesKiPluginMock = new Mock<IKiPlugin>();
+        var zweitesKiPluginMock = new Mock<IAiPlugin>();
         zweitesKiPluginMock.SetupGet(p => p.PluginName).Returns("Zweites KI");
         zweitesKiPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.ZweitesKi");
         zweitesKiPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation);

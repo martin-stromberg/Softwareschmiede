@@ -79,7 +79,7 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
 }
 
 /// <summary>Fake-KI-Plugin für Tests.</summary>
-internal sealed class FakeKiPlugin : IKiPlugin
+internal sealed class FakeKiPlugin : IAiPlugin
 {
     public string PluginName => "FakeKi";
     public string PluginPrefix => "fake";

@@ -53,7 +53,7 @@ public sealed class PullRequestReferenceService
                 Id = Guid.NewGuid(),
                 WorkItemId = workItemId,
                 Provider = provider,
-                Role = PullRequestReferenzRolle.CreatedByTask,
+                Role = PullRequestReferenceRole.CreatedByTask,
                 RepositoryId = normalizedRepositoryId,
                 PullRequestNumber = pullRequest.Number,
                 CreatedUtc = now,
@@ -62,7 +62,7 @@ public sealed class PullRequestReferenceService
             };
             _db.PullRequestReferences.Add(entity);
         }
-        else if (entity.WorkItemId != workItemId || entity.Role != PullRequestReferenzRolle.CreatedByTask)
+        else if (entity.WorkItemId != workItemId || entity.Role != PullRequestReferenceRole.CreatedByTask)
         {
             throw new InvalidOperationException("Dieser Pull Request ist bereits einer Aufgabe zugeordnet.");
         }
@@ -122,7 +122,7 @@ public sealed class PullRequestReferenceService
                 Id = Guid.NewGuid(),
                 WorkItemId = workItemId,
                 Provider = provider,
-                Role = PullRequestReferenzRolle.CreatedByTask,
+                Role = PullRequestReferenceRole.CreatedByTask,
                 RepositoryId = normalizedRepositoryId,
                 PullRequestNumber = pullRequestNumber,
                 CreatedUtc = now,

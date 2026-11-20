@@ -5,11 +5,11 @@ namespace Softwareschmiede.Domain.Enums;
 /// Ereignis-Antworten). Nicht-Ereignis-APIs — Repository-/Issue-/PR-Listen, PR-Status,
 /// Workflow-Runs, Alerts, Templates sowie alle gh-/git-Schreib- und Arbeitskopien-Operationen —
 /// laufen bewusst weiter unter dem Benutzerkonto (Token-Grenze).</remarks>
-public enum ScmKontoModus
+public enum ScmAccountMode
 {
     /// <summary>Überwachung und Antworten laufen unter dem Benutzer-Token (bisheriges Verhalten).</summary>
-    Benutzerkonto = 0,
+    UserAccount = 0,
 
     /// <summary>Überwachung und Antworten laufen unter dem Token eines separaten Kontos (Notifications-Inbox).</summary>
-    SeparatesKonto = 1
+    SeparateAccount = 1
 }

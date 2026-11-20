@@ -7,7 +7,7 @@ namespace Softwareschmiede.Domain.ValueObjects;
 /// <param name="Results">Liste der einzelnen Testergebnisse.</param>
 public sealed record TestRunResult(
     bool Passed,
-    IReadOnlyList<TestErgebnisInfo> Results
+    IReadOnlyList<TestResultInfo> Results
 );
 
 /// <summary>Ergebnis eines einzelnen Tests.</summary>
@@ -15,7 +15,7 @@ public sealed record TestRunResult(
 /// <param name="Status">Status des Tests.</param>
 /// <param name="ErrorMessage">Optionale Fehlermeldung bei fehlgeschlagenem Test.</param>
 /// <param name="Duration">Dauer des Tests.</param>
-public sealed record TestErgebnisInfo(
+public sealed record TestResultInfo(
     string TestName,
     TestStatus Status,
     string? ErrorMessage,

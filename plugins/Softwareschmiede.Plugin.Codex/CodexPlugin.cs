@@ -9,7 +9,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>Codex CLI plugin for AI-assisted development.</summary>
-public sealed class CodexPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
+public sealed class CodexPlugin : CliAiPluginBase, IIssueTemplateTextGenerator
 {
     private const string ExecutablePathSettingKey = "ExecutablePath";
 

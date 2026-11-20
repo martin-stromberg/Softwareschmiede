@@ -116,7 +116,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         ConfigureBackmerge(fixture);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppSettingService>()
-                .SetScmAccountModeAsync(ScmKontoModus.SeparatesKonto, TestContext.Current.CancellationToken);
+                .SetScmAccountModeAsync(ScmAccountMode.SeparateAccount, TestContext.Current.CancellationToken);
         var contexts = new List<ScmRepositoryContext>();
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
@@ -129,7 +129,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         await Monitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
         var context = Assert.Single(contexts);
-        Assert.Equal(ScmKontoModus.Benutzerkonto, context.Account);
+        Assert.Equal(ScmAccountMode.UserAccount, context.Account);
     }
 
     /// <summary>Projektbezogener Modus mit gesetzter Projekt-Freigabe: Merge läuft durch.</summary>

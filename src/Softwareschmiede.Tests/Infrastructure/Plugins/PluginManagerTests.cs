@@ -63,7 +63,7 @@ public sealed class PluginManagerTests : IDisposable
         File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
         File.Copy(typeof(CodexPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.Codex.dll"), overwrite: true);
         File.Copy(typeof(DevinPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.Devin.dll"), overwrite: true);
-        File.Copy(typeof(KiSimulatorPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.KiSimulator.dll"), overwrite: true);
+        File.Copy(typeof(AiSimulatorPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.KiSimulator.dll"), overwrite: true);
 
         var sut = CreateSut(_tempDirectory);
 
@@ -146,7 +146,7 @@ public sealed class PluginManagerTests : IDisposable
         File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
         File.Copy(typeof(CodexPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.Codex.dll"), overwrite: true);
         File.Copy(typeof(DevinPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.Devin.dll"), overwrite: true);
-        File.Copy(typeof(KiSimulatorPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.KiSimulator.dll"), overwrite: true);
+        File.Copy(typeof(AiSimulatorPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.KiSimulator.dll"), overwrite: true);
 
         var sut = CreateSut(_tempDirectory);
 

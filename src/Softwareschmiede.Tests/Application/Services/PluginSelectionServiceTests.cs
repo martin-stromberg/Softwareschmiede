@@ -542,7 +542,7 @@ public sealed class PluginSelectionServiceTests
     }
 
     private static Mock<IPluginManager> CreatePluginManager(
-        IReadOnlyList<IKiPlugin> kiPlugins,
+        IReadOnlyList<IAiPlugin> kiPlugins,
         IReadOnlyList<IGitPlugin>? gitPlugins = null)
     {
         var effectiveGitPlugins = gitPlugins ?? [CreateGitPlugin("Git", "Softwareschmiede.Git")];
@@ -567,9 +567,9 @@ public sealed class PluginSelectionServiceTests
         return plugin.Object;
     }
 
-    private static IKiPlugin CreateKiPlugin(string name, string prefix)
+    private static IAiPlugin CreateKiPlugin(string name, string prefix)
     {
-        var plugin = new Mock<IKiPlugin>();
+        var plugin = new Mock<IAiPlugin>();
         plugin.SetupGet(p => p.PluginName).Returns(name);
         plugin.SetupGet(p => p.PluginPrefix).Returns(prefix);
         plugin.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
@@ -577,7 +577,7 @@ public sealed class PluginSelectionServiceTests
         return plugin.Object;
     }
 
-    private sealed class TestCliKiPlugin(string name, string prefix, string providerPrefix) : CliKiPluginBase
+    private sealed class TestCliKiPlugin(string name, string prefix, string providerPrefix) : CliAiPluginBase
     {
         public override string ProviderFilePrefix => providerPrefix;
         public override string PluginName => name;

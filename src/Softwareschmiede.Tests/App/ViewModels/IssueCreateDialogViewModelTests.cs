@@ -451,7 +451,7 @@ public sealed class IssueCreateDialogViewModelTests
                 : Task.FromResult(Result);
     }
 
-    private sealed class FakeKiPlugin(string? generatedBody = null) : IKiPlugin, IIssueTemplateTextGenerator
+    private sealed class FakeKiPlugin(string? generatedBody = null) : IAiPlugin, IIssueTemplateTextGenerator
     {
         public string? ReceivedTemplateBody { get; private set; }
         public string? ReceivedOriginalRequirement { get; private set; }
@@ -475,7 +475,7 @@ public sealed class IssueCreateDialogViewModelTests
         }
     }
 
-    private sealed class FakeFailingKiPlugin : IKiPlugin, IIssueTemplateTextGenerator
+    private sealed class FakeFailingKiPlugin : IAiPlugin, IIssueTemplateTextGenerator
     {
         public string PluginName => "Fail KI";
         public string PluginPrefix => "FailKi";
@@ -492,7 +492,7 @@ public sealed class IssueCreateDialogViewModelTests
             => throw new InvalidOperationException("Providerfehler");
     }
 
-    private sealed class FakeCancellingKiPlugin : IKiPlugin, IIssueTemplateTextGenerator
+    private sealed class FakeCancellingKiPlugin : IAiPlugin, IIssueTemplateTextGenerator
     {
         public string PluginName => "Cancel KI";
         public string PluginPrefix => "CancelKi";
@@ -509,7 +509,7 @@ public sealed class IssueCreateDialogViewModelTests
             => throw new OperationCanceledException(ct);
     }
 
-    private sealed class FakePlainKiPlugin : IKiPlugin
+    private sealed class FakePlainKiPlugin : IAiPlugin
     {
         public string PluginName => "Plain KI";
         public string PluginPrefix => "PlainKi";

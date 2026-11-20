@@ -53,7 +53,7 @@ public sealed class CliReplayExportServiceTests : IDisposable
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher([Encoding.UTF8.GetBytes("x")]));
         var sut = new CliReplayExportService(kiService, _store, NullLogger<CliReplayExportService>.Instance);
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec();
         await kiService.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
@@ -75,7 +75,7 @@ public sealed class CliReplayExportServiceTests : IDisposable
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher(chunks));
         var sut = new CliReplayExportService(kiService, _store, NullLogger<CliReplayExportService>.Instance);
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec();
 
         await kiService.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);

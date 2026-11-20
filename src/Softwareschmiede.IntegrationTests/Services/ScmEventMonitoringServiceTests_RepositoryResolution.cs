@@ -29,7 +29,7 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, AccessibleUrl, "repo");
         await AddRepositoryAsync(fixture, InaccessibleUrl, "private-repo");
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         ConfigureResolutionWithInaccessibleRepository(fixture);
         fixture.ConfigureMentionObservations();
         fixture.ConfigureIssue();
@@ -59,7 +59,7 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, AccessibleUrl, "repo");
         await AddRepositoryAsync(fixture, InaccessibleUrl, "private-repo");
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
         ConfigureResolutionWithInaccessibleRepository(fixture);
         var before = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 

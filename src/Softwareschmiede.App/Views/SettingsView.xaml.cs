@@ -39,7 +39,7 @@ public sealed partial class SettingsView : UserControl
             case IGitPlugin gitPlugin:
                 vm.ScmPluginSelectedCommand.Execute(gitPlugin);
                 break;
-            case IKiPlugin aiPlugin:
+            case IAiPlugin aiPlugin:
                 vm.KiPluginSelectedCommand.Execute(aiPlugin);
                 break;
             case PluginActivationEntry entry:
@@ -118,10 +118,10 @@ public sealed partial class SettingsView : UserControl
         }
     }
 
-    internal static CliKiPluginBase? ResolveCliPluginForHelp(SettingsViewModel vm)
+    internal static CliAiPluginBase? ResolveCliPluginForHelp(SettingsViewModel vm)
     {
-        var plugin = vm.SelectedPlugin?.Plugin as IKiPlugin
+        var plugin = vm.SelectedPlugin?.Plugin as IAiPlugin
             ?? vm.KiPlugins.FirstOrDefault(p => p.PluginName == vm.DefaultKiPlugin);
-        return plugin as CliKiPluginBase;
+        return plugin as CliAiPluginBase;
     }
 }

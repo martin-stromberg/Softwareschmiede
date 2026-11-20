@@ -411,7 +411,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
             Id = Guid.NewGuid(),
             WorkItemId = workItem.Id,
             Provider = provider,
-            Role = PullRequestReferenzRolle.ReviewSource,
+            Role = PullRequestReferenceRole.ReviewSource,
             RepositoryId = repositoryId,
             PullRequestNumber = pullRequest.Number,
             ProviderPullRequestId = pullRequest.ProviderPullRequestId,

@@ -659,7 +659,7 @@ public sealed class ScmEventOrchestrator(
             var issue = await source.ReadIssueAsync(observation.Reference, ct);
             if (issue is null)
             { await WaitAsync(item, "Das Issue konnte nicht gelesen werden. Erneut prüfen.", ct); return; }
-            if (issue.IstGeschlossen)
+            if (issue.IsClosed)
             {
                 // Analyse eines bereits geschlossenen Issues wäre unredlich als Erfolg gemeldet;
                 // ohne Änderung am Issue wird der Auftrag mit Begründung abgeschlossen.

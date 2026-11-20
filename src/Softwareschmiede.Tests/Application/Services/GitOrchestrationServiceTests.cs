@@ -39,7 +39,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         pluginManagerMock.Setup(manager => manager.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
         pluginManagerMock.Setup(manager => manager.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
         pluginManagerMock.Setup(manager => manager.GetDevelopmentAutomationPlugins()).Returns([]);
-        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
+        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IAiPlugin>().Object);
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
         var pluginActivationService = new PluginActivationService(new AppSettingService(_db, new Mock<ILogger<AppSettingService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
@@ -425,7 +425,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         pluginManagerMock.Setup(manager => manager.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
         pluginManagerMock.Setup(manager => manager.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
         pluginManagerMock.Setup(manager => manager.GetDevelopmentAutomationPlugins()).Returns([]);
-        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
+        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IAiPlugin>().Object);
 
         var sut = new GitOrchestrationService(
             _workItemService,
@@ -501,7 +501,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         pluginManagerMock.Setup(manager => manager.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
         pluginManagerMock.Setup(manager => manager.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
         pluginManagerMock.Setup(manager => manager.GetDevelopmentAutomationPlugins()).Returns([]);
-        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
+        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IAiPlugin>().Object);
 
         var sut = new GitOrchestrationService(
             _workItemService,
@@ -1106,7 +1106,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         pluginManagerMock.Setup(manager => manager.GetSourceCodeManagementPlugins()).Returns(plugins);
         pluginManagerMock.Setup(manager => manager.GetDefaultSourceCodeManagementPlugin()).Returns(defaultPlugin.Object);
         pluginManagerMock.Setup(manager => manager.GetDevelopmentAutomationPlugins()).Returns([]);
-        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
+        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IAiPlugin>().Object);
 
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
         var pluginActivationService = new PluginActivationService(new AppSettingService(_db, new Mock<ILogger<AppSettingService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);

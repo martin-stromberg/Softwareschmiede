@@ -71,9 +71,9 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
             new Mock<IDialogService>().Object,
             new Mock<IServiceProvider>().Object);
 
-    private static IKiPlugin CreateKiPlugin()
+    private static IAiPlugin CreateKiPlugin()
     {
-        var mock = new Mock<IKiPlugin>();
+        var mock = new Mock<IAiPlugin>();
         mock.Setup(p => p.PluginName).Returns("TestKI");
         mock.Setup(p => p.PluginPrefix).Returns(KiPrefix);
         mock.Setup(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);

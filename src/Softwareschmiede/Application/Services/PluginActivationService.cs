@@ -56,7 +56,7 @@ public sealed class PluginActivationService
     /// <summary>Gibt alle aktiven KI-Plugins zurück.</summary>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Die Liste der aktiven KI-Plugins.</returns>
-    public async Task<IReadOnlyList<IKiPlugin>> GetEnabledDevelopmentAutomationPluginsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<IAiPlugin>> GetEnabledDevelopmentAutomationPluginsAsync(CancellationToken ct = default)
         => await FilterEnabledAsync(_pluginManager.GetDevelopmentAutomationPlugins(), ct);
 
     /// <summary>Gibt alle aktiven IDE-Plugins zurück.</summary>

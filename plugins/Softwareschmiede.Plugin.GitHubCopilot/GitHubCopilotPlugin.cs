@@ -11,7 +11,7 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// <summary>
 /// GitHub Copilot Plugin – nutzt das <c>copilot</c>-CLI für KI-gestützte Entwicklung.
 /// </summary>
-public sealed class GitHubCopilotPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
+public sealed class GitHubCopilotPlugin : CliAiPluginBase, IIssueTemplateTextGenerator
 {
     private const string ExecutablePathSettingKey = "ExecutablePath";
 
