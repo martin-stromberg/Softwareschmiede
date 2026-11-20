@@ -17,8 +17,8 @@ public sealed class UpdatePfadKanalResolverTests
     [InlineData("", UpdateKanal.Produktiv)]
     [InlineData("   ", UpdateKanal.Produktiv)]
     [InlineData("unbekannter-pfad", UpdateKanal.Produktiv)]
-    public void ErmittleKanal_LeitetKanalAusPfadAb(string? pfad, UpdateKanal erwartet)
-        => UpdatePfadKanalResolver.ErmittleKanal(pfad).Should().Be(erwartet);
+    public void ErmittleKanal_LeitetKanalAusPfadAb(string? path, UpdateKanal erwartet)
+        => UpdatePfadKanalResolver.ErmittleKanal(path).Should().Be(erwartet);
 
     /// <summary>Unbekannte, leere oder fehlende Pfadwerte werden auf Produktivversionen normalisiert; bekannte Werte auf ihre kanonische Form.</summary>
     [Theory]
@@ -29,8 +29,8 @@ public sealed class UpdatePfadKanalResolverTests
     [InlineData(null, UpdatePfadKanalResolver.ProduktivversionenPfad)]
     [InlineData("", UpdatePfadKanalResolver.ProduktivversionenPfad)]
     [InlineData("unbekannter-pfad", UpdatePfadKanalResolver.ProduktivversionenPfad)]
-    public void NormalisierePfad_FaelltAufProduktivversionenZurueck(string? pfad, string erwartet)
-        => UpdatePfadKanalResolver.NormalisierePfad(pfad).Should().Be(erwartet);
+    public void NormalisierePfad_FaelltAufProduktivversionenZurueck(string? path, string erwartet)
+        => UpdatePfadKanalResolver.NormalisierePfad(path).Should().Be(erwartet);
 
     /// <summary>Nur die zwei bekannten Pfadwerte gelten als gültig.</summary>
     [Theory]
@@ -42,8 +42,8 @@ public sealed class UpdatePfadKanalResolverTests
     [InlineData("", false)]
     [InlineData("   ", false)]
     [InlineData("unbekannter-pfad", false)]
-    public void IstGueltigerPfad_AkzeptiertNurBekanntePfade(string? pfad, bool erwartet)
-        => UpdatePfadKanalResolver.IstGueltigerPfad(pfad).Should().Be(erwartet);
+    public void IstGueltigerPfad_AkzeptiertNurBekanntePfade(string? path, bool erwartet)
+        => UpdatePfadKanalResolver.IstGueltigerPfad(path).Should().Be(erwartet);
 
     /// <summary>Ein -rc-Infix im Tag ergibt den RC-Kanal; stabile Tags den Produktiv-Kanal; fehlende Tags konservativ den RC-Kanal.</summary>
     [Theory]

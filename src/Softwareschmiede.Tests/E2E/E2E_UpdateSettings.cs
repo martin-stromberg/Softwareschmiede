@@ -1439,11 +1439,11 @@ public partial class End2EndTest
     /// bereits teilweise entsorgtes Fixture oder eine beendete App die restliche
     /// Aufräumsequenz nicht maskieren.
     /// </summary>
-    private static void BestEffort(Action aktion)
+    private static void BestEffort(Action action)
     {
         try
         {
-            aktion();
+            action();
         }
         catch
         {

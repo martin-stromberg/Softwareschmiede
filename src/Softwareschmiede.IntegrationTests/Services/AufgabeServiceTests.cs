@@ -181,7 +181,7 @@ public sealed class AufgabeServiceTests
         var workItem = await service.CreateAsync(projectId, "Offene Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await service.VerwerfenAsync(workItem.Id, VerwerfenAktion.Archive, TestContext.Current.CancellationToken);
+        await service.VerwerfenAsync(workItem.Id, DiscardAction.Archive, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
@@ -206,7 +206,7 @@ public sealed class AufgabeServiceTests
         await protokollService.AddEintragAsync(workItem.Id, LogEntryType.Prompt, "Ein Prompt", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await aufgabeService.VerwerfenAsync(workItem.Id, VerwerfenAktion.Delete, TestContext.Current.CancellationToken);
+        await aufgabeService.VerwerfenAsync(workItem.Id, DiscardAction.Delete, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
@@ -221,9 +221,9 @@ public sealed class AufgabeServiceTests
     /// Testet, dass VerwerfenAsync eine bereits gestartete Aufgabe für beide Verwerfungsaktionen ablehnt.
     /// </summary>
     [Theory]
-    [InlineData(VerwerfenAktion.Archive)]
-    [InlineData(VerwerfenAktion.Delete)]
-    public async Task VerwerfenAsync_ShouldThrowWhenAufgabeIsNotOffen(VerwerfenAktion aktion)
+    [InlineData(DiscardAction.Archive)]
+    [InlineData(DiscardAction.Delete)]
+    public async Task VerwerfenAsync_ShouldThrowWhenAufgabeIsNotOffen(DiscardAction action)
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
@@ -233,7 +233,7 @@ public sealed class AufgabeServiceTests
         await service.StartenAsync(workItem.Id, "task/test", @"C:\klone\test", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var act = () => service.VerwerfenAsync(workItem.Id, aktion);
+        var act = () => service.VerwerfenAsync(workItem.Id, action);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()

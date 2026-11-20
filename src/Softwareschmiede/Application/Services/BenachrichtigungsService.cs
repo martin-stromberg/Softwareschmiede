@@ -207,15 +207,15 @@ public sealed class BenachrichtigungsService
         }
     }
 
-    private void LöscheDateiSicher(string pfad)
+    private void LöscheDateiSicher(string path)
     {
         try
         {
-            File.Delete(pfad);
+            File.Delete(path);
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Temporäre Audiodatei konnte nicht gelöscht werden: {Pfad}", pfad);
+            _logger.LogDebug(ex, "Temporäre Audiodatei konnte nicht gelöscht werden: {Pfad}", path);
         }
     }
 

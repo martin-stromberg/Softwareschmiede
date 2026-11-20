@@ -112,7 +112,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Schreibgeschützter Anzeigetext des aus der Pfad-Auswahl resultierenden exklusiven Update-Kanals.</summary>
     public string AbgeleiteterUpdateKanal
-        => UpdatePfadKanalResolver.ErmittleKanal(SelectedUpdatePfad?.Pfad) == UpdateKanal.ReleaseCandidate
+        => UpdatePfadKanalResolver.ErmittleKanal(SelectedUpdatePfad?.Path) == UpdateKanal.ReleaseCandidate
             ? UpdatePfadTexte.KanalReleaseCandidate
             : UpdatePfadTexte.KanalProduktiv;
 
@@ -693,7 +693,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            if (SelectedUpdatePfad is not { Pfad: var updatePfad })
+            if (SelectedUpdatePfad is not { Path: var updatePfad })
             {
                 FehlerMeldung = "Der ausgewählte Update-Pfad ist ungültig.";
                 return;

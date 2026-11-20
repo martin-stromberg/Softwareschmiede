@@ -669,7 +669,8 @@ public sealed class SoftwareschmiedeDbContext : DbContext
             e.Property(t => t.ErrorMessage).HasColumnName("Fehlermeldung");
             e.Property(t => t.LogEntryId).HasColumnName("ProtokollEintragId");
             e.Property(t => t.Status).HasConversion(EnumLegacyConverter(
-                (TestStatus.Passed, "Bestanden"), (TestStatus.Skipped, "Uebersprungen")));
+                (TestStatus.Passed, "Bestanden"), (TestStatus.Failed, "Fehlgeschlagen"),
+                (TestStatus.Skipped, "Uebersprungen")));
         });
         modelBuilder.Entity<PluginConfiguration>(e =>
         {

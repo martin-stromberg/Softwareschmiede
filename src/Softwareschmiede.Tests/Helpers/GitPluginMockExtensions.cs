@@ -17,7 +17,7 @@ internal static class GitPluginMockExtensions
     {
         gitPluginMock
             .Setup(p => p.ResolveEffectiveRepositoryPathAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns<string, CancellationToken>((pfad, _) => Task.FromResult(pfad));
+            .Returns<string, CancellationToken>((path, _) => Task.FromResult(path));
         return gitPluginMock;
     }
 }

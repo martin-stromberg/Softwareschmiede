@@ -26,18 +26,18 @@ public sealed class AufzeichnenderSystemShutdownServiceTests : IDisposable
     {
         var testDbPath = Path.Combine(_verzeichnis, "test.db");
 
-        var pfad = AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(testDbPath);
+        var path = AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(testDbPath);
 
-        pfad.Should().Be(Path.Combine(_verzeichnis, AufzeichnenderSystemShutdownService.LogDateiName));
+        path.Should().Be(Path.Combine(_verzeichnis, AufzeichnenderSystemShutdownService.LogDateiName));
     }
 
     /// <summary>Ein leerer Test-DB-Pfad fällt auf das temporäre Verzeichnis zurück.</summary>
     [Fact]
     public void ResolveLogDateiPfad_FaelltBeiLeeremPfadAufTempZurueck()
     {
-        var pfad = AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(null);
+        var path = AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(null);
 
-        pfad.Should().Be(Path.Combine(Path.GetTempPath(), AufzeichnenderSystemShutdownService.LogDateiName));
+        path.Should().Be(Path.Combine(Path.GetTempPath(), AufzeichnenderSystemShutdownService.LogDateiName));
     }
 
     /// <summary>Jede Anforderung wird als Zeile mit Force-Flag, UTC-Zeitstempel und PID angehängt — ohne echten Shutdown.</summary>

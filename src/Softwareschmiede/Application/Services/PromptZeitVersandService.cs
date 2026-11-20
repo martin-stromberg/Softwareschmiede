@@ -543,7 +543,7 @@ public sealed class PromptZeitVersandService : IDisposable
             workItemId);
 
     /// <summary>Führt eine Store-Aktion in einem eigenen Scope aus; Fehler werden geloggt statt den Aufrufer zu brechen.</summary>
-    private async Task MitStoreAsync(Func<ZeitgesteuerterPromptStore, Task> aktion, string fehlerText, params object[] argumente)
+    private async Task MitStoreAsync(Func<ZeitgesteuerterPromptStore, Task> action, string fehlerText, params object[] argumente)
     {
         if (_scopeFactory is null)
             return;
@@ -554,7 +554,7 @@ public sealed class PromptZeitVersandService : IDisposable
             var store = scope.ServiceProvider.GetService<ZeitgesteuerterPromptStore>();
             if (store is null)
                 return;
-            await aktion(store);
+            await action(store);
         }
         catch (Exception ex)
         {

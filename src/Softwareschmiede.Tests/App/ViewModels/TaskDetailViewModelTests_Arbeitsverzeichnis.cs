@@ -81,8 +81,8 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         var arbeitsverzeichnis = CreateTempDirectory();
         var unterverzeichnis = Path.Combine(arbeitsverzeichnis, "src", "solutions");
         Directory.CreateDirectory(unterverzeichnis);
-        var solutionPfad = Path.Combine(unterverzeichnis, "MyApp.sln");
-        File.WriteAllText(solutionPfad, string.Empty);
+        var solutionPath = Path.Combine(unterverzeichnis, "MyApp.sln");
+        File.WriteAllText(solutionPath, string.Empty);
 
         var workItem = await ErstelleAufgabeMitRepositoryAsync(Path.Combine("src", "solutions"));
         await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
@@ -98,7 +98,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(
-            p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == solutionPfad && a.UseShellExecute)),
+            p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == solutionPath && a.UseShellExecute)),
             Times.Once);
     }
 }

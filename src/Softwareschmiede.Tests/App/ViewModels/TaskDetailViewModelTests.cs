@@ -2563,8 +2563,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task OeffneIdeCommand_MitSolutionUndAktivemVsCode_OeffnetSolutionStattVsCode()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
-        var solutionPfad = Path.Combine(arbeitsverzeichnis, "Loesung.sln");
-        File.WriteAllText(solutionPfad, string.Empty);
+        var solutionPath = Path.Combine(arbeitsverzeichnis, "Loesung.sln");
+        File.WriteAllText(solutionPath, string.Empty);
         var workItem = await ErstelleAufgabe();
         await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
         var prozessStarterMock = new Mock<IProcessStarter>();
@@ -2576,7 +2576,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(
-            p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == solutionPfad && a.UseShellExecute)),
+            p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == solutionPath && a.UseShellExecute)),
             Times.Once);
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == "code.cmd")),
@@ -2588,8 +2588,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task OeffneIdeCommand_MitEinerSolution_OeffnetOhneDialog()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
-        var solutionPfad = Path.Combine(arbeitsverzeichnis, "Loesung.sln");
-        File.WriteAllText(solutionPfad, string.Empty);
+        var solutionPath = Path.Combine(arbeitsverzeichnis, "Loesung.sln");
+        File.WriteAllText(solutionPath, string.Empty);
 
         var workItem = await ErstelleAufgabe();
         await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
@@ -2602,7 +2602,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(
-            p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == solutionPfad && a.UseShellExecute)),
+            p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == solutionPath && a.UseShellExecute)),
             Times.Once);
         _dialogServiceMock.Verify(
             d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()),

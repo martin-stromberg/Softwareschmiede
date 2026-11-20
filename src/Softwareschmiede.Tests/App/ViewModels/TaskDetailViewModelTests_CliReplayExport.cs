@@ -120,7 +120,7 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
         return await _aufgabeService.GetByIdAsync(workItem.Id) ?? workItem;
     }
 
-    private void SetupSaveDialog(string? pfad)
+    private void SetupSaveDialog(string? path)
     {
         _dialogServiceMock
             .Setup(d => d.ShowSaveFileDialogAsync(
@@ -129,7 +129,7 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(pfad);
+            .ReturnsAsync(path);
     }
 
     /// <summary>Der Replay-Export-Command ist ausführbar, sobald eine Aufgabe geladen wurde.</summary>

@@ -522,7 +522,7 @@ public sealed class AufgabeServiceTests : IDisposable
         var workItem = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.VerwerfenAsync(workItem.Id, VerwerfenAktion.Archive, TestContext.Current.CancellationToken);
+        await _sut.VerwerfenAsync(workItem.Id, DiscardAction.Archive, TestContext.Current.CancellationToken);
 
         // Assert
         var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -537,7 +537,7 @@ public sealed class AufgabeServiceTests : IDisposable
         var workItem = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.VerwerfenAsync(workItem.Id, VerwerfenAktion.Delete, TestContext.Current.CancellationToken);
+        await _sut.VerwerfenAsync(workItem.Id, DiscardAction.Delete, TestContext.Current.CancellationToken);
 
         // Assert
         var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -553,7 +553,7 @@ public sealed class AufgabeServiceTests : IDisposable
         await _sut.StartenAsync(workItem.Id, "feature/test", @"C:\klon", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var act = () => _sut.VerwerfenAsync(workItem.Id, VerwerfenAktion.Archive);
+        var act = () => _sut.VerwerfenAsync(workItem.Id, DiscardAction.Archive);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()

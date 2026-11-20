@@ -193,7 +193,7 @@ public partial class End2EndTest
     /// <returns>Der vollständige aktuelle Inhalt der Logdatei, oder <see cref="string.Empty"/>.</returns>
     private async Task<string> ReadProzessStartLogAsync()
     {
-        var pfad = ResolveProzessStartLogPfad();
-        return File.Exists(pfad) ? await File.ReadAllTextAsync(pfad) : string.Empty;
+        var path = ResolveProzessStartLogPfad();
+        return File.Exists(path) ? await File.ReadAllTextAsync(path) : string.Empty;
     }
 }

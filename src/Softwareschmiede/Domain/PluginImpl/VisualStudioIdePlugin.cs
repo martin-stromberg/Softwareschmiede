@@ -5,8 +5,8 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Domain.PluginImpl;
 
 /// <summary>IDE-Plugin für Visual Studio. Prüft auf <c>.sln</c>/<c>.slnx</c>-Dateien im Repository-Root.</summary>
-/// <param name="prozessStarter">Startet den Öffnen-Befehl für die gefundene Solution-Datei.</param>
-public sealed class VisualStudioIdePlugin(IProcessStarter prozessStarter) : IIdePlugin
+/// <param name="processStarter">Startet den Öffnen-Befehl für die gefundene Solution-Datei.</param>
+public sealed class VisualStudioIdePlugin(IProcessStarter processStarter) : IIdePlugin
 {
     /// <inheritdoc/>
     public string PluginName => "Visual Studio";
@@ -42,15 +42,15 @@ public sealed class VisualStudioIdePlugin(IProcessStarter prozessStarter) : IIde
 
         return Directory.EnumerateFiles(repositoryPath, "*.sln", SearchOption.TopDirectoryOnly)
             .Concat(Directory.EnumerateFiles(repositoryPath, "*.slnx", SearchOption.TopDirectoryOnly))
-            .OrderBy(pfad => pfad, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
     /// <summary>Öffnet die übergebene Solution-Datei mit dem beim Betriebssystem registrierten Standardhandler.</summary>
-    /// <param name="prozessStarter">Startet den Öffnen-Befehl für die Solution-Datei.</param>
+    /// <param name="processStarter">Startet den Öffnen-Befehl für die Solution-Datei.</param>
     /// <param name="solutionPath">Der Pfad der zu öffnenden <c>*.sln</c>-Datei.</param>
-    internal static void OpenSolutionFile(IProcessStarter prozessStarter, string solutionPath)
-        => prozessStarter.Start(new ProcessStartRequest(solutionPath, Arguments: null, UseShellExecute: true));
+    internal static void OpenSolutionFile(IProcessStarter processStarter, string solutionPath)
+        => processStarter.Start(new ProcessStartRequest(solutionPath, Arguments: null, UseShellExecute: true));
 
     /// <inheritdoc/>
     public Task<IReadOnlyList<IdeEntryPoint>> FindEntryPointsAsync(string repositoryPath, CancellationToken ct = default)
@@ -58,7 +58,7 @@ public sealed class VisualStudioIdePlugin(IProcessStarter prozessStarter) : IIde
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
 
         IReadOnlyList<IdeEntryPoint> entryPoints = FindSolutionFiles(repositoryPath)
-            .Select(solutionPfad => new IdeEntryPoint(solutionPfad))
+            .Select(solutionPath => new IdeEntryPoint(solutionPath))
             .ToList();
 
         return Task.FromResult(entryPoints);
@@ -69,7 +69,7 @@ public sealed class VisualStudioIdePlugin(IProcessStarter prozessStarter) : IIde
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
 
-        OpenSolutionFile(prozessStarter, entryPoint.Path);
+        OpenSolutionFile(processStarter, entryPoint.Path);
 
         return Task.CompletedTask;
     }

@@ -750,9 +750,9 @@ public sealed class AufgabeService : IAktiveAufgabenService
     }
 
     /// <summary>Verwirft eine Aufgabe im Status Neu durch Archivieren oder Löschen.</summary>
-    public async Task VerwerfenAsync(Guid id, VerwerfenAktion aktion, CancellationToken ct = default)
+    public async Task VerwerfenAsync(Guid id, DiscardAction action, CancellationToken ct = default)
     {
-        _logger.LogInformation("Aufgabe {AufgabeId} verwerfen (Aktion: {Aktion}).", id, aktion);
+        _logger.LogInformation("Aufgabe {AufgabeId} verwerfen (Aktion: {Aktion}).", id, action);
 
         var workItem = await _db.WorkItems.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
@@ -762,7 +762,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
             throw new InvalidOperationException("Nur neue Aufgaben können verworfen werden.");
         }
 
-        if (aktion == VerwerfenAktion.Archive)
+        if (action == DiscardAction.Archive)
         {
             workItem.Status = WorkItemStatus.Archived;
             await _db.SaveChangesAsync(ct);

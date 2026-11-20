@@ -516,8 +516,8 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <returns>Der Inhalt der Paket-Exe oder <c>null</c>.</returns>
     public static string? LesePaketExeInhalt(string verzeichnis)
     {
-        var pfad = Path.Combine(verzeichnis, StandardOptionen.ExecutableName);
-        return File.Exists(pfad) ? File.ReadAllText(pfad) : null;
+        var path = Path.Combine(verzeichnis, StandardOptionen.ExecutableName);
+        return File.Exists(path) ? File.ReadAllText(path) : null;
     }
 
     /// <inheritdoc/>
@@ -600,6 +600,6 @@ public sealed class UpdateE2EFixture : IDisposable
         return JsonSerializer.Serialize(releases);
     }
 
-    private string RelativZurWurzel(string pfad)
-        => Path.GetRelativePath(Testwurzel, pfad);
+    private string RelativZurWurzel(string path)
+        => Path.GetRelativePath(Testwurzel, path);
 }

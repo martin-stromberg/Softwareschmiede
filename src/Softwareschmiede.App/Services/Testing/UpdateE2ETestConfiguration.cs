@@ -55,8 +55,8 @@ public sealed class UpdateE2ETestConfiguration
     /// <returns>Die geladene und validierte Konfiguration, oder <c>null</c>, wenn die Variable nicht gesetzt ist.</returns>
     public static UpdateE2ETestConfiguration? LadeAusUmgebung(string? testDatenbankPfad)
     {
-        var pfad = Environment.GetEnvironmentVariable(UmgebungsVariable);
-        if (string.IsNullOrWhiteSpace(pfad))
+        var path = Environment.GetEnvironmentVariable(UmgebungsVariable);
+        if (string.IsNullOrWhiteSpace(path))
             return null;
 
         if (string.IsNullOrWhiteSpace(testDatenbankPfad))
@@ -66,47 +66,47 @@ public sealed class UpdateE2ETestConfiguration
                 "Die Update-E2E-Umgebung wird nur mit beiden Variablen aktiviert.");
         }
 
-        var konfiguration = Lade(pfad);
-        Validiere(konfiguration, pfad);
+        var konfiguration = Lade(path);
+        Validiere(konfiguration, path);
         return konfiguration;
     }
 
-    /// <summary>Lädt und parst die Testkonfigurations-JSON aus <paramref name="pfad"/>.</summary>
-    /// <param name="pfad">Pfad der Konfigurationsdatei.</param>
+    /// <summary>Lädt und parst die Testkonfigurations-JSON aus <paramref name="path"/>.</summary>
+    /// <param name="path">Pfad der Konfigurationsdatei.</param>
     /// <returns>Die deserialisierte Konfiguration.</returns>
     /// <exception cref="UpdateE2ETestKonfigurationException">Die Datei fehlt, ist unlesbar oder enthält ungültiges JSON.</exception>
-    public static UpdateE2ETestConfiguration Lade(string pfad)
+    public static UpdateE2ETestConfiguration Lade(string path)
     {
-        if (!File.Exists(pfad))
+        if (!File.Exists(path))
         {
             throw new UpdateE2ETestKonfigurationException(
-                $"Update-E2E-Testkonfiguration wurde nicht gefunden: {pfad}");
+                $"Update-E2E-Testkonfiguration wurde nicht gefunden: {path}");
         }
 
         try
         {
-            var konfiguration = JsonSerializer.Deserialize<UpdateE2ETestConfiguration>(File.ReadAllText(pfad));
+            var konfiguration = JsonSerializer.Deserialize<UpdateE2ETestConfiguration>(File.ReadAllText(path));
             return konfiguration ?? throw new UpdateE2ETestKonfigurationException(
-                $"Update-E2E-Testkonfiguration ist leer: {pfad}");
+                $"Update-E2E-Testkonfiguration ist leer: {path}");
         }
         catch (JsonException ex)
         {
             throw new UpdateE2ETestKonfigurationException(
-                $"Update-E2E-Testkonfiguration enthält ungültiges JSON: {pfad}", ex);
+                $"Update-E2E-Testkonfiguration enthält ungültiges JSON: {path}", ex);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new UpdateE2ETestKonfigurationException(
-                $"Update-E2E-Testkonfiguration konnte nicht gelesen werden: {pfad}", ex);
+                $"Update-E2E-Testkonfiguration konnte nicht gelesen werden: {path}", ex);
         }
     }
 
-    private static void Validiere(UpdateE2ETestConfiguration konfiguration, string pfad)
+    private static void Validiere(UpdateE2ETestConfiguration konfiguration, string path)
     {
         if (string.IsNullOrWhiteSpace(konfiguration.Testwurzel))
         {
             throw new UpdateE2ETestKonfigurationException(
-                $"Update-E2E-Testkonfiguration ohne testRoot: {pfad}");
+                $"Update-E2E-Testkonfiguration ohne testRoot: {path}");
         }
 
         if (!Directory.Exists(konfiguration.Testwurzel))
@@ -132,7 +132,7 @@ public sealed class UpdateE2ETestConfiguration
         if (string.IsNullOrWhiteSpace(konfiguration.ProtokollDateiPfad))
         {
             throw new UpdateE2ETestKonfigurationException(
-                $"Update-E2E-Testkonfiguration ohne protocolFile: {pfad}");
+                $"Update-E2E-Testkonfiguration ohne protocolFile: {path}");
         }
 
         // Sicherstellen, dass kein Pfad aus der Testwurzel ausbricht.
@@ -145,9 +145,9 @@ public sealed class UpdateE2ETestConfiguration
     /// <summary>Pfad der installierten <c>version.json</c> unterhalb der Testwurzel.</summary>
     public string InstallationsVersionsDateiPfad() => Path.Combine(InstallationsVerzeichnis, "version.json");
 
-    private static void PruefeInnerhalbDerWurzel(string pfad, string wurzel, string beschreibung)
+    private static void PruefeInnerhalbDerWurzel(string path, string wurzel, string beschreibung)
     {
-        var full = Path.GetFullPath(pfad);
+        var full = Path.GetFullPath(path);
         var relativ = Path.GetRelativePath(wurzel, full);
         if (relativ == ".."
             || relativ.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)

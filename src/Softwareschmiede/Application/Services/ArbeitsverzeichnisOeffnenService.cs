@@ -5,8 +5,8 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>Löst den plattformabhängigen Öffnen-Befehl auf und startet den OS-Dateiexplorer für ein Verzeichnis.</summary>
-/// <param name="prozessStarter">Startet den plattformabhängigen Öffnen-Befehl.</param>
-public sealed class ArbeitsverzeichnisOeffnenService(IProcessStarter prozessStarter)
+/// <param name="processStarter">Startet den plattformabhängigen Öffnen-Befehl.</param>
+public sealed class ArbeitsverzeichnisOeffnenService(IProcessStarter processStarter)
 {
     /// <summary>Öffnet das übergebene Arbeitsverzeichnis im Standard-Dateiexplorer des Betriebssystems.</summary>
     /// <param name="arbeitsverzeichnis">Der zu öffnende Verzeichnispfad.</param>
@@ -16,7 +16,7 @@ public sealed class ArbeitsverzeichnisOeffnenService(IProcessStarter prozessStar
 
         var (dateiName, argumente) = ResolveOeffnenBefehl(arbeitsverzeichnis);
 
-        prozessStarter.Start(new ProcessStartRequest(dateiName, argumente, UseShellExecute: false));
+        processStarter.Start(new ProcessStartRequest(dateiName, argumente, UseShellExecute: false));
     }
 
     private static (string FileName, string Arguments) ResolveOeffnenBefehl(string arbeitsverzeichnis)

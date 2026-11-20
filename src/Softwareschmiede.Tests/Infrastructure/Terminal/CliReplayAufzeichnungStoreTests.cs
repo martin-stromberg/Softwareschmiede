@@ -251,22 +251,22 @@ public sealed class CliReplayAufzeichnungStoreTests
     public async Task DateiWrapper_SpeichernUndLaden_Roundtrip()
     {
         var store = new CliReplayAufzeichnungStore();
-        var pfad = Path.Combine(Path.GetTempPath(), $"clireplay-test-{Guid.NewGuid():N}.clireplay");
+        var path = Path.Combine(Path.GetTempPath(), $"clireplay-test-{Guid.NewGuid():N}.clireplay");
         try
         {
             var quelle = CreateAufzeichnung();
-            await store.SpeichernAsync(pfad, quelle, TestContext.Current.CancellationToken);
+            await store.SpeichernAsync(path, quelle, TestContext.Current.CancellationToken);
 
-            File.Exists(pfad).Should().BeTrue();
-            var geladen = await store.LadeAsync(pfad, TestContext.Current.CancellationToken);
+            File.Exists(path).Should().BeTrue();
+            var geladen = await store.LadeAsync(path, TestContext.Current.CancellationToken);
             geladen.WorkItemId.Should().Be(quelle.WorkItemId);
             geladen.Chunks.Should().HaveCount(1);
             geladen.Chunks[0].Data.Should().Equal(Encoding.UTF8.GetBytes("payload"));
         }
         finally
         {
-            if (File.Exists(pfad))
-                File.Delete(pfad);
+            if (File.Exists(path))
+                File.Delete(path);
         }
     }
 
