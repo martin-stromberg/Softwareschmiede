@@ -13,7 +13,7 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly WorkItemService _sut;
-    private readonly Guid _projektId = new Guid("22222222-2222-2222-2222-222222222222");
+    private readonly Guid _projectId = new Guid("22222222-2222-2222-2222-222222222222");
 
     /// <summary>AufgabeServiceTests_Pause.</summary>
     public AufgabeServiceTests_Pause()
@@ -23,7 +23,7 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
 
         _db.Projects.Add(new Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Pause-Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -38,7 +38,7 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
     [Fact]
     public async Task SetPauseAsync_ShouldPersistPausiertBisUtc_AndWriteSystemLog()
     {
-        var workItem = await _sut.CreateAsync(_projektId, "Pausierbare Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Pausierbare Aufgabe", null, ct: TestContext.Current.CancellationToken);
         var pausedUntil = DateTimeOffset.UtcNow.AddHours(2);
 
         await _sut.SetPauseAsync(workItem.Id, pausedUntil, TestContext.Current.CancellationToken);
@@ -57,7 +57,7 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
     [Fact]
     public async Task SetPauseAsync_ShouldClearPause_WhenNull()
     {
-        var workItem = await _sut.CreateAsync(_projektId, "Pausierte Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Pausierte Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _sut.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
 
         await _sut.SetPauseAsync(workItem.Id, null, TestContext.Current.CancellationToken);
@@ -78,7 +78,7 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
     [InlineData(WorkItemStatus.Waiting)]
     public async Task SetPauseAsync_ShouldAllowActiveStatuses(WorkItemStatus status)
     {
-        var workItem = await _sut.CreateAsync(_projektId, $"Aufgabe {status}", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, $"Aufgabe {status}", null, ct: TestContext.Current.CancellationToken);
         var tracked = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         tracked!.Status = status;
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -95,7 +95,7 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
     [InlineData(WorkItemStatus.Archived)]
     public async Task SetPauseAsync_ShouldThrow_WhenStatusNotPausable(WorkItemStatus status)
     {
-        var workItem = await _sut.CreateAsync(_projektId, $"Aufgabe {status}", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, $"Aufgabe {status}", null, ct: TestContext.Current.CancellationToken);
         var tracked = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         tracked!.Status = status;
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -110,7 +110,7 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
     [Fact]
     public async Task SetPauseAsync_ShouldThrow_WhenTimestampInPast()
     {
-        var workItem = await _sut.CreateAsync(_projektId, "Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         var act = () => _sut.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddMinutes(-1));
 

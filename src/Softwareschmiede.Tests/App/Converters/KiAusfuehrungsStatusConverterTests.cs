@@ -10,7 +10,7 @@ namespace Softwareschmiede.Tests.App.Converters;
 /// <summary>Tests für KiAusfuehrungsStatusConverter.</summary>
 public sealed class KiAusfuehrungsStatusConverterTests
 {
-    private readonly KiAusfuehrungsStatusConverter _sut = new();
+    private readonly AiExecutionStatusConverter _sut = new();
 
     /// <summary>Convert gibt "▶ Läuft" zurück, wenn AktiveRunId gesetzt und der Heartbeat aktuell ist.</summary>
     [Fact]
@@ -131,7 +131,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnLaeuftString_WhenPanelItemHasActiveRunAndHeartbeatRecent()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Sidebar-Aufgabe",
@@ -151,7 +151,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnWartetString_WhenPanelItemHasActiveRunAndLaufStatusIstWartetAufEingabe()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Wartende Sidebar-Aufgabe",
@@ -168,14 +168,14 @@ public sealed class KiAusfuehrungsStatusConverterTests
     }
 
     /// <summary>
-    /// Live-Zweig (Issue 342): Zeigt <see cref="AktiveAufgabePanelItem.LiveRunStatus"/> einen laufenden
+    /// Live-Zweig (Issue 342): Zeigt <see cref="ActiveWorkItemPanelItem.LiveRunStatus"/> einen laufenden
     /// Prozess an, zeigt die Kachel "▶ Läuft" — selbst ohne persistierte Laufdaten (AktiveRunId null)
     /// und selbst wenn der persistierte Ausführungsstatus noch Beendet lautet.
     /// </summary>
     [Fact]
     public void Convert_ShouldReturnLaeuftString_WhenPanelItemHasLiveLaufStatusOhneLaufdaten()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Aufgabe mit lebendem Prozess ohne Laufdaten",
@@ -195,7 +195,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnWartetString_WhenPanelItemHasLiveLaufStatusWartetAufEingabe()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Aufgabe mit wartender Live-CLI",
@@ -216,7 +216,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldKeepPausiertUndWartestellung_VorLiveLaufStatus()
     {
-        var pausiert = new AktiveAufgabePanelItem
+        var pausiert = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Pausierte Aufgabe mit Live-Prozess",
@@ -225,7 +225,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
             LiveRunStatus = WorkItemRunStatus.Running,
             PausedUntilUtc = DateTimeOffset.UtcNow.AddMinutes(30)
         };
-        var wartestellung = new AktiveAufgabePanelItem
+        var wartestellung = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Aufgabe mit Prompt-Wartestellung",
@@ -242,13 +242,13 @@ public sealed class KiAusfuehrungsStatusConverterTests
     }
 
     /// <summary>
-    /// Live-Zweig (Issue 342): <see cref="AktiveAufgabePanelItem.LiveRunStatus"/> == null darf die
+    /// Live-Zweig (Issue 342): <see cref="ActiveWorkItemPanelItem.LiveRunStatus"/> == null darf die
     /// bisherige persistenzbasierte Bewertung nicht verändern — keine erzwungene Beendigung.
     /// </summary>
     [Fact]
     public void Convert_ShouldReturnBereitString_WhenPanelItemLiveLaufStatusNullUndBeendet()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Beendete Aufgabe ohne Live-Prozess",
@@ -283,7 +283,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnBereitString_WhenPanelItemWartendHasBeendeteAusfuehrung()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Gestoppte Sidebar-Aufgabe",
@@ -321,7 +321,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnPausiertCountdown_WhenPanelItemPausiert()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Pausierte Sidebar-Aufgabe",

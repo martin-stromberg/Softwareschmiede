@@ -45,7 +45,7 @@ public sealed class KonsolenTestDialogView : DialogView
         // werden (sonst wird ggf. ein MRU-Vorschlag statt des getippten Pfads geöffnet) —
         // also erst per ESC schließen und danach den getippten Pfad mit Enter bestätigen.
         // Ein Klick auf "Öffnen" kann in der überlagernden Liste landen, daher Tastatur-only.
-        for (var versuch = 0; versuch < 5; versuch++)
+        for (var attempt = 0; attempt < 5; attempt++)
         {
             Thread.Sleep(300);
             var dropdownOffen = openDialog
@@ -81,12 +81,12 @@ public sealed class KonsolenTestDialogView : DialogView
         return this;
     }
 
-    /// <returns><c>true</c>, wenn das Fehlerbanner (<c>FehlerMeldung</c>) im Dialog sichtbar
+    /// <returns><c>true</c>, wenn das Fehlerbanner (<c>ErrorMessage</c>) im Dialog sichtbar
     /// (nicht <c>IsOffscreen</c>) ist — das Banner-Element bleibt bei <c>Visibility=Collapsed</c>
     /// im Automation-Baum erhalten.</returns>
     public bool IstFehlerSichtbar()
     {
-        var element = GetDialogWindow().FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+        var element = GetDialogWindow().FindFirstDescendant(cf => cf.ByName("ErrorMessage"));
         try
         {
             return element is not null && !element.IsOffscreen;
@@ -102,7 +102,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// oder <c>null</c>, wenn kein Fehler sichtbar ist.</returns>
     public string? GetFehlerMeldung()
     {
-        var element = GetDialogWindow().FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+        var element = GetDialogWindow().FindFirstDescendant(cf => cf.ByName("ErrorMessage"));
         if (element is null || element.IsOffscreen)
             return null;
 
@@ -133,7 +133,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Diese Instanz.</returns>
     public KonsolenTestDialogView SetZeitrafferSchwelle(string text)
     {
-        var field = WaitForElement(GetDialogWindow(), cf => cf.ByName("ZeitrafferSchwelle"), Short);
+        var field = WaitForElement(GetDialogWindow(), cf => cf.ByName("TimeLapseThreshold"), Short);
         field.AsTextBox().Text = text;
         return this;
     }
@@ -144,7 +144,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Diese Instanz.</returns>
     public KonsolenTestDialogView StartWiedergabe()
     {
-        WaitForEnabledElement(GetDialogWindow(), "WiedergabeStarten", Medium).AsButton().ClickInForeground();
+        WaitForEnabledElement(GetDialogWindow(), "StartPlayback", Medium).AsButton().ClickInForeground();
         return this;
     }
 
@@ -154,7 +154,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Diese Instanz.</returns>
     public KonsolenTestDialogView NeustartWiedergabe()
     {
-        WaitForEnabledElement(GetDialogWindow(), "WiedergabeNeustarten", Medium).AsButton().ClickInForeground();
+        WaitForEnabledElement(GetDialogWindow(), "RestartPlayback", Medium).AsButton().ClickInForeground();
         return this;
     }
 
@@ -163,7 +163,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Diese Instanz.</returns>
     public KonsolenTestDialogView PausierenToggle()
     {
-        WaitForEnabledElement(GetDialogWindow(), "WiedergabePausieren", Medium).AsButton().ClickInForeground();
+        WaitForEnabledElement(GetDialogWindow(), "PausePlayback", Medium).AsButton().ClickInForeground();
         return this;
     }
 
@@ -173,7 +173,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Diese Instanz.</returns>
     public KonsolenTestDialogView StepForward()
     {
-        WaitForEnabledElement(GetDialogWindow(), "SchrittVor", Medium).AsButton().ClickInForeground();
+        WaitForEnabledElement(GetDialogWindow(), "StepForward", Medium).AsButton().ClickInForeground();
         return this;
     }
 
@@ -183,12 +183,12 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Diese Instanz.</returns>
     public KonsolenTestDialogView StepBackward()
     {
-        WaitForEnabledElement(GetDialogWindow(), "SchrittZurueck", Medium).AsButton().ClickInForeground();
+        WaitForEnabledElement(GetDialogWindow(), "StepBack", Medium).AsButton().ClickInForeground();
         return this;
     }
 
     /// <returns><c>true</c>, wenn die Schaltfläche mit dem angegebenen Automation-Namen existiert
-    /// und aktiviert ist — Nachweis der Rand-Deaktivierung (z. B. <c>SchrittZurueck</c> an
+    /// und aktiviert ist — Nachweis der Rand-Deaktivierung (z. B. <c>StepBack</c> an
     /// Position 0 oder beide Schritt-Buttons während unpausierter Wiedergabe).</returns>
     /// <param name="automationName">Der Automation-Name der Schaltfläche.</param>
     public bool IstSchaltflaecheAktiviert(string automationName)
@@ -201,7 +201,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// (Selektion = zuletzt angewendeter Chunk), oder <c>-1</c> bei leerer Selektion.</returns>
     public int GetSelektierterQuellEintragIndex()
     {
-        var list = WaitForElement(GetDialogWindow(), cf => cf.ByName("QuellChunkListe"), Short);
+        var list = WaitForElement(GetDialogWindow(), cf => cf.ByName("SourceChunkList"), Short);
         var lines = list.FindAllChildren(cf => cf.ByControlType(ControlType.DataItem)
             .Or(cf.ByControlType(ControlType.ListItem)));
         for (var i = 0; i < lines.Length; i++)
@@ -215,20 +215,20 @@ public sealed class KonsolenTestDialogView : DialogView
     }
 
     /// <returns>Der aktuelle Wiedergabe-Statustext (z. B. "Wiedergabe beendet.") — gelesen aus dem
-    /// HelpText, da der Automation-Name das statische Element-Kennzeichen "WiedergabeStatus" ist.</returns>
+    /// HelpText, da der Automation-Name das statische Element-Kennzeichen "PlaybackStatus" ist.</returns>
     public string GetStatusText()
-        => GetHelpTextOrName(WaitForElement(GetDialogWindow(), cf => cf.ByName("WiedergabeStatus"), Short));
+        => GetHelpTextOrName(WaitForElement(GetDialogWindow(), cf => cf.ByName("PlaybackStatus"), Short));
 
     /// <returns>Der aktuelle Positionstext (z. B. "Chunk 3/3") — gelesen aus dem HelpText,
-    /// da der Automation-Name das statische Element-Kennzeichen "WiedergabePosition" ist.</returns>
+    /// da der Automation-Name das statische Element-Kennzeichen "PlaybackPosition" ist.</returns>
     public string GetPositionsText()
-        => GetHelpTextOrName(WaitForElement(GetDialogWindow(), cf => cf.ByName("WiedergabePosition"), Short));
+        => GetHelpTextOrName(WaitForElement(GetDialogWindow(), cf => cf.ByName("PlaybackPosition"), Short));
 
     /// <returns>Der aktuelle Geometrie-Text der geladenen Aufzeichnung (z. B. "Aufzeichnung: 220×50")
     /// — gelesen aus dem HelpText, da der Automation-Name das statische Element-Kennzeichen
-    /// "AufzeichnungGeometrie" ist.</returns>
+    /// "RecordingGeometry" ist.</returns>
     public string GetGeometrieText()
-        => GetHelpTextOrName(WaitForElement(GetDialogWindow(), cf => cf.ByName("AufzeichnungGeometrie"), Short));
+        => GetHelpTextOrName(WaitForElement(GetDialogWindow(), cf => cf.ByName("RecordingGeometry"), Short));
 
     /// <returns>Das <see cref="IScrollPattern"/> des "ReplayTerminalScrollViewer" (der ScrollViewer
     /// um das Replay-Terminal), oder <c>null</c>, wenn das Element das Pattern nicht unterstützt.</returns>
@@ -477,7 +477,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Die Anzahl der in der Quell-Chunk-Liste dargestellten Einträge (GridView-Zeilen).</returns>
     public int GetQuellEintraegeCount()
     {
-        var list = WaitForElement(GetDialogWindow(), cf => cf.ByName("QuellChunkListe"), Short);
+        var list = WaitForElement(GetDialogWindow(), cf => cf.ByName("SourceChunkList"), Short);
         return list.FindAllChildren(cf => cf.ByControlType(ControlType.DataItem)
             .Or(cf.ByControlType(ControlType.ListItem))).Length;
     }
@@ -487,7 +487,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Der gerenderte Quelltext des Eintrags.</returns>
     public string GetQuellEintragText(int index)
     {
-        var list = WaitForElement(GetDialogWindow(), cf => cf.ByName("QuellChunkListe"), Short);
+        var list = WaitForElement(GetDialogWindow(), cf => cf.ByName("SourceChunkList"), Short);
         var lines = list.FindAllChildren(cf => cf.ByControlType(ControlType.DataItem)
             .Or(cf.ByControlType(ControlType.ListItem)));
         if (index < 0 || index >= lines.Length)
@@ -504,7 +504,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Diese Instanz.</returns>
     public KonsolenTestDialogView Close()
     {
-        WaitForElement(GetDialogWindow(), cf => cf.ByName("KonsolenTestSchliessen"), Short).AsButton().Invoke();
+        WaitForElement(GetDialogWindow(), cf => cf.ByName("CloseConsoleTest"), Short).AsButton().Invoke();
         ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
         return this;
     }
@@ -512,7 +512,7 @@ public sealed class KonsolenTestDialogView : DialogView
     private void KlickAufzeichnungOeffnen()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("AufzeichnungOeffnen"), Short).AsButton().ClickInForeground();
+        WaitForElement(dialog, cf => cf.ByName("OpenRecording"), Short).AsButton().ClickInForeground();
     }
 
     private AutomationElement WaitForOpenDialog()

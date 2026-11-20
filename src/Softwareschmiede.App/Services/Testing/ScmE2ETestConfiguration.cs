@@ -22,12 +22,12 @@ internal sealed class ScmE2ETestConfiguration
         var config = JsonSerializer.Deserialize<ScmE2ETestConfiguration>(File.ReadAllText(path))
             ?? throw new InvalidOperationException("Leere SCM-Testkonfiguration.");
         if (string.IsNullOrWhiteSpace(config.TestRoot) || !Directory.Exists(config.TestRoot))
-            throw new InvalidOperationException("SCM-Testwurzel fehlt.");
+            throw new InvalidOperationException("SCM-TestRoot fehlt.");
         foreach (var candidate in new[] { path, databasePath, config.ScenarioPath, config.ResponsesPath, config.CallsPath, config.SimulatorDirectory })
         {
             var relative = Path.GetRelativePath(config.TestRoot, candidate);
             if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-                throw new InvalidOperationException("SCM-Fixturepfad liegt außerhalb der Testwurzel.");
+                throw new InvalidOperationException("SCM-Fixturepfad liegt außerhalb der TestRoot.");
             for (var current = new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(candidate))!); current is not null; current = current.Parent)
                 if (current.Exists && current.Attributes.HasFlag(FileAttributes.ReparsePoint))
                     throw new InvalidOperationException("SCM-Fixturepfad darf keine Verzeichnisumleitung verwenden.");
@@ -52,7 +52,7 @@ internal sealed class ScmE2EScenario
     public bool CanWrite { get; set; } = true;
     public bool RejectAiResponse { get; set; }
     public bool PluginAvailable { get; set; } = true;
-    public List<ScmE2EText> Texts { get; set; } = [];
+    public List<ScmE2EText> Text { get; set; } = [];
     public List<ScmE2ENotification> Notifications { get; set; } = [];
 }
 

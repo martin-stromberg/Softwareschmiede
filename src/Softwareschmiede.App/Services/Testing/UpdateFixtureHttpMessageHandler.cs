@@ -14,15 +14,15 @@ namespace Softwareschmiede.App.Services.Testing;
 /// </summary>
 public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
 {
-    private static readonly TimeSpan StandardGateTimeout = TimeSpan.FromSeconds(120);
+    private static readonly TimeSpan DefaultGateTimeout = TimeSpan.FromSeconds(120);
 
-    private readonly UpdateE2ETestKontext _kontext;
+    private readonly UpdateE2ETestContext _context;
 
     /// <inheritdoc cref="UpdateFixtureHttpMessageHandler"/>
     /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public UpdateFixtureHttpMessageHandler(UpdateE2ETestKontext context)
+    public UpdateFixtureHttpMessageHandler(UpdateE2ETestContext context)
     {
-        _kontext = context;
+        _context = context;
     }
 
     /// <inheritdoc/>
@@ -30,18 +30,18 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
     {
         var url = request.RequestUri?.AbsoluteUri ?? string.Empty;
 
-        var szenario = _kontext.LeseSzenario()
-            ?? throw new HttpRequestException($"Update-E2E-Szenariodatei ist nicht lesbar: {_kontext.Configuration.SzenarioDateiPfad}");
+        var scenario = _context.ReadScenario()
+            ?? throw new HttpRequestException($"Update-E2E-Szenariodatei ist nicht lesbar: {_context.Configuration.ScenarioFilePath}");
 
-        var e2eResponse = szenario.FindeAntwort(url);
-        var art = e2eResponse?.Art ?? Klassifiziere(url);
-        _kontext.Protokoll.Schreibe(
-            UpdateE2EEreignisse.HttpRequest,
-            new { url, method = request.Method.Method, art });
+        var e2eResponse = scenario.FindResponse(url);
+        var kind = e2eResponse?.Kind ?? Classify(url);
+        _context.Log.Write(
+            UpdateE2EEvents.HttpRequest,
+            new { url, method = request.Method.Method, art = kind });
 
         if (e2eResponse is null)
         {
-            _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.UnknownHttpRequest, new { url });
+            _context.Log.Write(UpdateE2EEvents.UnknownHttpRequest, new { url });
             throw new HttpRequestException($"Unbekannte Update-E2E-Anfrage ohne konfigurierte Antwort: {url}");
         }
 
@@ -50,30 +50,30 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
 
         if (!string.IsNullOrEmpty(e2eResponse.Gate))
         {
-            _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpRequestBlocked, new { url, gate = e2eResponse.Gate });
-            var freigegeben = await _kontext.WarteAufGateAsync(e2eResponse.Gate, cancellationToken, StandardGateTimeout);
-            if (!freigegeben)
+            _context.Log.Write(UpdateE2EEvents.HttpRequestBlocked, new { url, gate = e2eResponse.Gate });
+            var released = await _context.WaitOnGateAsync(e2eResponse.Gate, cancellationToken, DefaultGateTimeout);
+            if (!released)
             {
-                if (_kontext.PruefeGate(e2eResponse.Gate) == false)
+                if (_context.CheckGate(e2eResponse.Gate) == false)
                     throw new OperationCanceledException(cancellationToken);
 
-                throw new HttpRequestException($"Update-E2E-Gate '{e2eResponse.Gate}' wurde nicht innerhalb von {StandardGateTimeout.TotalSeconds}s freigegeben: {url}");
+                throw new HttpRequestException($"Update-E2E-Gate '{e2eResponse.Gate}' wurde nicht innerhalb von {DefaultGateTimeout.TotalSeconds}s freigegeben: {url}");
             }
 
-            _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpRequestReleased, new { url, gate = e2eResponse.Gate });
+            _context.Log.Write(UpdateE2EEvents.HttpRequestReleased, new { url, gate = e2eResponse.Gate });
         }
 
-        var content = LadeAntwortInhalt(e2eResponse);
+        var content = LoadResponseContent(e2eResponse);
         var contentType = e2eResponse.ContentType
-            ?? (e2eResponse.BodyDatei?.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) == true
+            ?? (e2eResponse.BodyFile?.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) == true
                 ? "application/zip"
                 : "application/json");
 
         Stream stream = new MemoryStream(content, writable: false);
         if (!string.IsNullOrEmpty(e2eResponse.StreamGate))
         {
-            var freieBytes = e2eResponse.StreamGateBytes ?? content.Length / 2;
-            stream = new GateBlockierterStream(stream, freieBytes, e2eResponse.StreamGate, _kontext);
+            var freeBytes = e2eResponse.StreamGateBytes ?? content.Length / 2;
+            stream = new GateBlockedStream(stream, freeBytes, e2eResponse.StreamGate, _context);
         }
 
         var response = new HttpResponseMessage((HttpStatusCode)e2eResponse.Status)
@@ -93,25 +93,25 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
             }
         }
 
-        _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpResponse, new { url, status = e2eResponse.Status });
+        _context.Log.Write(UpdateE2EEvents.HttpResponse, new { url, status = e2eResponse.Status });
         return response;
     }
 
-    private byte[] LadeAntwortInhalt(UpdateE2EAntwort e2eResponse)
+    private byte[] LoadResponseContent(UpdateE2EResponse e2eResponse)
     {
         if (e2eResponse.Content is not null)
             return Encoding.UTF8.GetBytes(e2eResponse.Content);
 
-        if (e2eResponse.BodyDatei is not null)
+        if (e2eResponse.BodyFile is not null)
         {
-            var path = Path.GetFullPath(Path.Combine(_kontext.Configuration.Testwurzel, e2eResponse.BodyDatei));
-            var relativ = Path.GetRelativePath(Path.GetFullPath(_kontext.Configuration.Testwurzel), path);
+            var path = Path.GetFullPath(Path.Combine(_context.Configuration.TestRoot, e2eResponse.BodyFile));
+            var relativ = Path.GetRelativePath(Path.GetFullPath(_context.Configuration.TestRoot), path);
             if (relativ == ".."
                 || relativ.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                 || relativ.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal)
                 || Path.IsPathRooted(relativ))
             {
-                throw new HttpRequestException($"Update-E2E-Antwortdatei liegt außerhalb der Testwurzel: {e2eResponse.BodyDatei}");
+                throw new HttpRequestException($"Update-E2E-Antwortdatei liegt außerhalb der TestRoot: {e2eResponse.BodyFile}");
             }
 
             return File.ReadAllBytes(path);
@@ -120,7 +120,7 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
         return [];
     }
 
-    private static string Klassifiziere(string url)
+    private static string Classify(string url)
     {
         if (url.Contains("/releases/assets/", StringComparison.OrdinalIgnoreCase))
             return "asset";
@@ -134,24 +134,24 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
     }
 
     /// <summary>
-    /// Antwortstream, der nach <see cref="_freieBytes"/> gelieferten Bytes blockiert, bis das
+    /// Antwortstream, der nach <see cref="_freeBytes"/> gelieferten Bytes blockiert, bis das
     /// benannte Gate freigegeben (<c>.release</c>) oder abgebrochen (<c>.cancel</c>) wird.
     /// </summary>
-    private sealed class GateBlockierterStream : Stream
+    private sealed class GateBlockedStream : Stream
     {
         private readonly Stream _inner;
-        private readonly long _freieBytes;
+        private readonly long _freeBytes;
         private readonly string _gate;
-        private readonly UpdateE2ETestKontext _kontext;
+        private readonly UpdateE2ETestContext _context;
         private long _position;
-        private bool _gateErfuellt;
+        private bool _gateSatisfied;
 
-        public GateBlockierterStream(Stream inner, long freieBytes, string gate, UpdateE2ETestKontext context)
+        public GateBlockedStream(Stream inner, long freeBytes, string gate, UpdateE2ETestContext context)
         {
             _inner = inner;
-            _freieBytes = freieBytes;
+            _freeBytes = freeBytes;
             _gate = gate;
-            _kontext = context;
+            _context = context;
         }
 
         /// <inheritdoc/>
@@ -176,58 +176,58 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
         /// <inheritdoc/>
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
-            if (!_gateErfuellt && _position < _freieBytes)
+            if (!_gateSatisfied && _position < _freeBytes)
             {
                 // Nur bis zur Schwelle liefern, damit echter Teilfortschritt sichtbar wird;
                 // der nächste Leseaufruf blockiert dann bis zur Gate-Freigabe.
-                var erlaubt = (int)Math.Min(buffer.Length, _freieBytes - _position);
-                var freiGelesen = await _inner.ReadAsync(buffer[..erlaubt], cancellationToken);
-                _position += freiGelesen;
-                return freiGelesen;
+                var allowed = (int)Math.Min(buffer.Length, _freeBytes - _position);
+                var freeRead = await _inner.ReadAsync(buffer[..allowed], cancellationToken);
+                _position += freeRead;
+                return freeRead;
             }
 
-            await WarteFallsBlockiertAsync(cancellationToken);
-            var gelesen = await _inner.ReadAsync(buffer, cancellationToken);
-            _position += gelesen;
-            return gelesen;
+            await WaitCaseBlockedAsync(cancellationToken);
+            var read = await _inner.ReadAsync(buffer, cancellationToken);
+            _position += read;
+            return read;
         }
 
         /// <inheritdoc/>
         public override int Read(byte[] buffer, int offset, int count)
         {
-            if (!_gateErfuellt && _position < _freieBytes)
+            if (!_gateSatisfied && _position < _freeBytes)
             {
-                var erlaubt = (int)Math.Min(count, _freieBytes - _position);
-                var freiGelesen = _inner.Read(buffer, offset, erlaubt);
-                _position += freiGelesen;
-                return freiGelesen;
+                var allowed = (int)Math.Min(count, _freeBytes - _position);
+                var freeRead = _inner.Read(buffer, offset, allowed);
+                _position += freeRead;
+                return freeRead;
             }
 
-            WarteFallsBlockiertAsync(CancellationToken.None).GetAwaiter().GetResult();
-            var gelesen = _inner.Read(buffer, offset, count);
-            _position += gelesen;
-            return gelesen;
+            WaitCaseBlockedAsync(CancellationToken.None).GetAwaiter().GetResult();
+            var read = _inner.Read(buffer, offset, count);
+            _position += read;
+            return read;
         }
 
-        private async Task WarteFallsBlockiertAsync(CancellationToken ct)
+        private async Task WaitCaseBlockedAsync(CancellationToken ct)
         {
-            if (_gateErfuellt)
+            if (_gateSatisfied)
                 return;
 
-            _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpRequestBlocked, new { gate = _gate });
-            var freigegeben = await _kontext.WarteAufGateAsync(_gate, ct, StandardGateTimeout);
-            if (!freigegeben)
+            _context.Log.Write(UpdateE2EEvents.HttpRequestBlocked, new { gate = _gate });
+            var released = await _context.WaitOnGateAsync(_gate, ct, DefaultGateTimeout);
+            if (!released)
             {
                 // Echten Aufrufer-Abbruch von Runner-Abbruch (.cancel-Datei) und Timeout trennen:
                 // Letztere sind keine Benutzer-Cancellation und müssen als Fehler sichtbar bleiben.
                 ct.ThrowIfCancellationRequested();
-                var abgebrochen = _kontext.PruefeGate(_gate) == false;
+                var canceled = _context.CheckGate(_gate) == false;
                 throw new HttpRequestException(
-                    $"Update-E2E-Stream-Gate '{_gate}' wurde {(abgebrochen ? "abgebrochen" : "nicht rechtzeitig freigegeben")}.");
+                    $"Update-E2E-Stream-Gate '{_gate}' wurde {(canceled ? "abgebrochen" : "nicht rechtzeitig freigegeben")}.");
             }
 
-            _gateErfuellt = true;
-            _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpRequestReleased, new { gate = _gate });
+            _gateSatisfied = true;
+            _context.Log.Write(UpdateE2EEvents.HttpRequestReleased, new { gate = _gate });
         }
 
         /// <inheritdoc/>

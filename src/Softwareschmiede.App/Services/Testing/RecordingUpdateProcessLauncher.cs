@@ -11,23 +11,23 @@ namespace Softwareschmiede.App.Services.Testing;
 /// </summary>
 public sealed class RecordingUpdateProcessLauncher : IUpdateProcessLauncher
 {
-    private readonly UpdateE2ETestKontext _kontext;
+    private readonly UpdateE2ETestContext _context;
 
     /// <inheritdoc cref="RecordingUpdateProcessLauncher"/>
     /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public RecordingUpdateProcessLauncher(UpdateE2ETestKontext context)
+    public RecordingUpdateProcessLauncher(UpdateE2ETestContext context)
     {
-        _kontext = context;
+        _context = context;
     }
 
     /// <inheritdoc/>
     public bool Start(string fileName, IEnumerable<string> arguments, string workingDirectory, bool runElevated)
     {
         var args = arguments.ToArray();
-        var result = _kontext.LeseSzenario()?.ProzessStart?.Result ?? "Erfolg";
+        var result = _context.ReadScenario()?.ProcessStart?.Result ?? "Erfolg";
 
-        _kontext.Protokoll.Schreibe(
-            UpdateE2EEreignisse.UpdateProcessStartRecorded,
+        _context.Log.Write(
+            UpdateE2EEvents.UpdateProcessStartRecorded,
             new
             {
                 fileName,

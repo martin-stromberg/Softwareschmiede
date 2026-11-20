@@ -60,7 +60,7 @@ public sealed class OpenTodosDialogViewModelTests : IDisposable
 
         // Assert
         sut.WorkItemId.Should().Be(_workItemId);
-        sut.AufgabenTitel.Should().Be("Aufgabentitel");
+        sut.WorkItemsTitle.Should().Be("Aufgabentitel");
         sut.Todos.Should().ContainSingle();
         sut.Todos[0].Id.Should().Be(offen.Id);
         sut.HasOpenTodos.Should().BeTrue();

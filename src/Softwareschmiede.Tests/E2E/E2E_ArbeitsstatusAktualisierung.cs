@@ -32,7 +32,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// </summary>
 public partial class End2EndTest
 {
-    private const string AufgabenTitel = "Neue Aufgabe";
+    private const string WorkItemsTitle = "Neue Aufgabe";
 
     /// <summary>
     /// Szenario: Eine Aufgabe wird über den echten Produktivpfad gestartet (KiSimulator-CLI-Prozess). Erst
@@ -54,7 +54,7 @@ public partial class End2EndTest
         // manuelles Neuladen der Ansicht (CliProcessManager.OnCliProcessStatusChanged setzt AktiveRunId
         // beim Gestartet-Event; vor dem Fix für Issue 108 wurde AktiveRunId nirgends im Produktivcode
         // gesetzt, sodass die Kachel fälschlich dauerhaft "✓ Bereit" gezeigt hätte).
-        taskDetail.Menu.WaitForTaskStatus(AufgabenTitel, "▶ Läuft", Medium);
+        taskDetail.Menu.WaitForTaskStatus(WorkItemsTitle, "▶ Läuft", Medium);
 
         // Issue 342: Sitzungs-Wiederverwendung — die Detailansicht verlassen und dieselbe Aufgabe
         // erneut öffnen. Die Fußzeile muss den Live-CLI-Status der wiederangebundenen Session zeigen
@@ -62,7 +62,7 @@ public partial class End2EndTest
         taskDetail = taskDetail.Reload();
         taskDetail.WaitForCliRunning();
         WarteAufCliStatusText(taskDetail, "Ausführung läuft");
-        taskDetail.Menu.WaitForTaskStatus(AufgabenTitel, "▶ Läuft", Medium);
+        taskDetail.Menu.WaitForTaskStatus(WorkItemsTitle, "▶ Läuft", Medium);
 
         // Issue 342 (Divergenz-F1/H4-Bild): Fehlende oder veraltete persistierte Laufdaten bei
         // weiterlaufendem Prozess — Laufdaten direkt in der DB löschen. Die Kachel muss über den
@@ -71,7 +71,7 @@ public partial class End2EndTest
         Guid workItemId;
         using (var db = OpenTestDbContext())
         {
-            workItemId = db.WorkItems.AsNoTracking().Single(a => a.Title == AufgabenTitel).Id;
+            workItemId = db.WorkItems.AsNoTracking().Single(a => a.Title == WorkItemsTitle).Id;
         }
         using (var db = OpenTestDbContext())
         {
@@ -83,7 +83,7 @@ public partial class End2EndTest
             db.SaveChanges();
         }
 
-        taskDetail.Menu.WaitForTaskStatus(AufgabenTitel, "▶ Läuft", Medium);
+        taskDetail.Menu.WaitForTaskStatus(WorkItemsTitle, "▶ Läuft", Medium);
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(45);
         var laufdatenGeheilt = false;
@@ -100,7 +100,7 @@ public partial class End2EndTest
 
         // Assert: Kachel wechselt automatisch zurück auf "✓ Bereit", nachdem der CLI-Prozess beendet wurde
         // (CliProcessManager entfernt AktiveRunId beim Gestoppt-Event).
-        taskDetail.Menu.WaitForTaskStatus(AufgabenTitel, "✓ Bereit", Medium);
+        taskDetail.Menu.WaitForTaskStatus(WorkItemsTitle, "✓ Bereit", Medium);
 
         taskDetail.ForceClose(recurseToDashboard: false);
         var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());

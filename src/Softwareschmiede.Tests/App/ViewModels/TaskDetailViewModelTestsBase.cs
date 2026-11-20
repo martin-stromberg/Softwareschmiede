@@ -31,10 +31,10 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     protected readonly AiExecutionService _aiService;
 
     /// <summary>_promptVorlagenService.</summary>
-    protected readonly PromptTemplateService _promptVorlagenService;
+    protected readonly PromptTemplateService _promptTemplatesService;
 
     /// <summary>_promptVorlagenPlatzhalterService.</summary>
-    protected readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService = new();
+    protected readonly PromptTemplatePlaceholderService _promptTemplatesPlaceholderService = new();
 
     /// <summary>_promptZeitVersandService.</summary>
     protected readonly PromptScheduleDispatchService _promptScheduleDispatchService;
@@ -46,7 +46,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     protected readonly Mock<IDialogService> _dialogServiceMock;
 
     /// <summary>_projektId.</summary>
-    protected readonly Guid _projektId = Guid.NewGuid();
+    protected readonly Guid _projectId = Guid.NewGuid();
 
     /// <summary>_tempDirectoryFixture.</summary>
     protected readonly TestTempDirectoryFixture _tempDirectoryFixture = new();
@@ -59,14 +59,14 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
         _aiService = TestKiAusfuehrungsServiceFactory.Create();
-        _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
+        _promptTemplatesService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
         _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
         _dialogServiceMock = new Mock<IDialogService>();
 
         _db.Projects.Add(new Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -121,7 +121,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
 
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
-        var entwicklungsprozessService = new DevelopmentProcessService(
+        var developmentprocessService = new DevelopmentProcessService(
             _workItemService,
             _logService,
             gitPluginMock.Object,
@@ -131,17 +131,17 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             NullLogger<DevelopmentProcessService>.Instance);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
-        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
+        var workingDirectoryOpenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
         var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
 
         return new TaskDetailViewModel(
             _workItemService,
             _logService,
             _aiService,
-            entwicklungsprozessService,
+            developmentprocessService,
             pluginSelectionService,
-            _promptVorlagenService,
-            _promptVorlagenPlatzhalterService,
+            _promptTemplatesService,
+            _promptTemplatesPlaceholderService,
             _promptScheduleDispatchService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
@@ -150,7 +150,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService);
+            workingDirectoryOpenService);
     }
 
     /// <summary>Legt ein GitRepository (optional mit RepositoryStartKonfiguration) sowie eine damit verknüpfte Aufgabe an.</summary>
@@ -161,7 +161,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             PluginType = "Softwareschmiede.TestGit",
             RepositoryUrl = "https://example.test/repo.git",
             RepositoryName = "TestRepo",
@@ -182,7 +182,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
 
         await _db.SaveChangesAsync();
 
-        return await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung", repository.Id);
+        return await _workItemService.CreateAsync(_projectId, "Testaufgabe", "Beschreibung", repository.Id);
     }
 
     /// <summary>Erstellt einen Test-IdeEntryPoint mit gesetztem DisplayName.</summary>

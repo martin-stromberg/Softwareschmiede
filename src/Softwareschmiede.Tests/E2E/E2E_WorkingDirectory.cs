@@ -21,7 +21,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// Start-Fehlerfälle) als aufeinanderfolgende Phasen in einem gemeinsamen App-Lifecycle aus. Jede
 /// Phase räumt ihr Projekt bzw. ihre Aufgabe über <see cref="Views.ProjectDetailView.DeleteProject"/> /
 /// <see cref="Views.TaskDetailView.DeleteTask"/> wieder auf, bevor die nächste Phase beginnt - damit bleiben
-/// DB-Abfragen wie <c>Single()</c>/<c>SingleOrDefault()</c> gültig, obwohl mehrere Projekte/Repositories
+/// DB-Abfragen wie <c>Single()</c>/<c>SingleOrDefault()</c> gültig, obwohl mehrere Projects/Repositories
 /// nacheinander im selben Prozess angelegt werden. Die Fallback-Zuweisung
 /// (<see cref="RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E"/>)
 /// initialisiert ihr lokales Quellverzeichnis bewusst ohne Git (<c>CreateLocalSourceDirectory(..., false)</c>):
@@ -191,7 +191,7 @@ public partial class End2EndTest
     /// </summary>
     /// <remarks>
     /// Regressionsabdeckung für den Fix in <see cref="WpfTestBase.WaitForElement"/>: Dieser Test
-    /// wartet selbst auf das Element "FehlerMeldung" (Zeile unten), das zugleich die proaktive
+    /// wartet selbst auf das Element "ErrorMessage" (Zeile unten), das zugleich die proaktive
     /// Fail-Fast-Diagnose in <c>WaitForElement</c> auslöst. Vor dem Fix führte das dazu, dass der Test
     /// fälschlich mit einer <see cref="InvalidOperationException"/> statt mit dem erwarteten Treffer
     /// abbrach (nicht-atomare UI-Automation-Aufrufe, siehe Doku an <c>WaitForElement</c>). Ein isolierter

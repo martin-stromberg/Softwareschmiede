@@ -15,7 +15,7 @@
         </Border>
 
         <!-- Gruppenname als Label unten am Rahmen -->
-        <TextBlock Text="{Binding GruppenName, ElementName=Root}"
+        <TextBlock Text="{Binding GroupName, ElementName=Root}"
                    FontSize="10"
                    Foreground="{DynamicResource SecondaryTextBrush}"
                    HorizontalAlignment="Center"

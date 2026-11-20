@@ -19,19 +19,19 @@ public sealed class UpdateProgressDialogView : DialogView
     public string GetPhase()
         => WaitForElement(GetDialogWindow(), cf => cf.ByAutomationId("UpdatePhase"), Short).Name;
 
-    /// <summary>Liest die aktuelle Fortschritts-/Fehlermeldung ("UpdateFortschrittMeldung").</summary>
+    /// <summary>Liest die aktuelle Fortschritts-/Fehlermeldung ("UpdateProgressMessage").</summary>
     /// <returns>Der angezeigte Meldungstext.</returns>
     public string GetMessage()
-        => WaitForElement(GetDialogWindow(), cf => cf.ByAutomationId("UpdateFortschrittMeldung"), Short).Name;
+        => WaitForElement(GetDialogWindow(), cf => cf.ByAutomationId("UpdateProgressMessage"), Short).Name;
 
     /// <summary>
-    /// Liest den Prozentwert der Fortschrittsanzeige ("UpdateFortschritt"). Bei nicht verfügbarem
+    /// Liest den Prozentwert der Fortschrittsanzeige ("UpdateProgress"). Bei nicht verfügbarem
     /// Wert (z. B. unbestimmter Fortschritt ohne Range-Value-Pattern) wird <c>null</c> geliefert.
     /// </summary>
     /// <returns>Der Prozentwert von 0 bis 100 oder <c>null</c>.</returns>
     public double? GetProgress()
     {
-        var bar = WaitForElement(GetDialogWindow(), cf => cf.ByName("UpdateFortschritt"), Short).AsProgressBar();
+        var bar = WaitForElement(GetDialogWindow(), cf => cf.ByName("UpdateProgress"), Short).AsProgressBar();
         try
         {
             return bar.Value;
@@ -46,14 +46,14 @@ public sealed class UpdateProgressDialogView : DialogView
         }
     }
 
-    /// <summary>Klickt den "Abbrechen"-Button ("UpdateAbbrechen"), sofern er aktiviert ist.</summary>
+    /// <summary>Klickt den "Cancel"-Button ("CancelUpdate"), sofern er aktiviert ist.</summary>
     /// <returns>Diese Instanz.</returns>
-    /// <exception cref="InvalidOperationException">Der Abbrechen-Button ist aktuell deaktiviert.</exception>
+    /// <exception cref="InvalidOperationException">Der Cancel-Button ist aktuell deaktiviert.</exception>
     public UpdateProgressDialogView Cancel()
     {
-        var button = WaitForElement(GetDialogWindow(), cf => cf.ByName("UpdateAbbrechen"), Short).AsButton();
+        var button = WaitForElement(GetDialogWindow(), cf => cf.ByName("CancelUpdate"), Short).AsButton();
         if (!button.IsEnabled)
-            throw new InvalidOperationException("Der Abbrechen-Button des Update-Dialogs ist deaktiviert.");
+            throw new InvalidOperationException("Der Cancel-Button des Update-Dialogs ist deaktiviert.");
 
         button.ClickInForeground();
         return this;
@@ -62,10 +62,10 @@ public sealed class UpdateProgressDialogView : DialogView
     /// <summary>Gibt an, ob der Abbrechen-Button aktuell aktiviert ist.</summary>
     /// <returns><c>true</c>, wenn abgebrochen werden kann.</returns>
     public bool CanCancel()
-        => WaitForElement(GetDialogWindow(), cf => cf.ByName("UpdateAbbrechen"), Short).AsButton().IsEnabled;
+        => WaitForElement(GetDialogWindow(), cf => cf.ByName("CancelUpdate"), Short).AsButton().IsEnabled;
 
     /// <summary>
-    /// Wartet, bis der Dialog den Fehlerzustand erreicht hat (Abbrechen deaktiviert, Schließen
+    /// Wartet, bis der Dialog den Fehlerzustand erreicht hat (Cancel deaktiviert, Schließen
     /// erlaubt, Fehlermeldung sichtbar) und liefert die angezeigte Meldung.
     /// </summary>
     /// <param name="timeout">Maximale Wartezeit.</param>
@@ -78,10 +78,10 @@ public sealed class UpdateProgressDialogView : DialogView
         string? letzteMeldung = null;
         while (DateTime.UtcNow < deadline)
         {
-            var cancel = dialog.FindFirstDescendant(cf => cf.ByName("UpdateAbbrechen"));
-            var message = dialog.FindFirstDescendant(cf => cf.ByAutomationId("UpdateFortschrittMeldung"))?.Name ?? string.Empty;
+            var cancel = dialog.FindFirstDescendant(cf => cf.ByName("CancelUpdate"));
+            var message = dialog.FindFirstDescendant(cf => cf.ByAutomationId("UpdateProgressMessage"))?.Name ?? string.Empty;
 
-            // Fehlerzustand = Abbrechen deaktiviert + Meldung gesetzt. Die Meldung muss in zwei
+            // Fehlerzustand = Cancel deaktiviert + Meldung gesetzt. Die Meldung muss in zwei
             // aufeinanderfolgenden Reads identisch sein: ViewModel-Setzungen (CanCancel=false vor
             // dem Fehlertext in SetError) können über den Dispatcher zeitversetzt in der UIA
             // sichtbar werden, sonst würde ein veralteter Fortschrittstext als "Fehler" zurückkehren.

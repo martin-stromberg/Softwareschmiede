@@ -9,14 +9,14 @@ namespace Softwareschmiede.Tests.App.Converters;
 /// <summary>Tests für KiAusfuehrungsStatusConverter im Zusammenhang mit zeitgesteuerten Prompts.</summary>
 public sealed class KiAusfuehrungsStatusConverterTests_ZeitgesteuerterPrompt
 {
-    private readonly KiAusfuehrungsStatusConverter _sut = new();
+    private readonly AiExecutionStatusConverter _sut = new();
 
     /// <summary>Steht für eine Aufgabe ein zeitgesteuerter Prompt in der Warteschlange (HasScheduledPrompt), muss
     /// die Seitenleiste "Prompt in Wartestellung" statt des allgemeinen "Wartet"-Status anzeigen.</summary>
     [Fact]
     public void Convert_ShouldReturnPromptInWartestellung_WhenHasScheduledPromptIsTrue()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Aufgabe mit geplantem Prompt",
@@ -33,7 +33,7 @@ public sealed class KiAusfuehrungsStatusConverterTests_ZeitgesteuerterPrompt
     [Fact]
     public void Convert_ShouldReturnPromptInWartestellung_EvenWhenCliIsRunning()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Laufende Aufgabe mit geplantem Prompt",
@@ -54,7 +54,7 @@ public sealed class KiAusfuehrungsStatusConverterTests_ZeitgesteuerterPrompt
     [Fact]
     public void Convert_ShouldReturnWartetString_WhenHasScheduledPromptIsFalse()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Aufgabe ohne geplanten Prompt",

@@ -8,11 +8,11 @@ namespace Softwareschmiede.App.Services.Testing;
 
 /// <summary>
 /// EF-Core-Interceptor, der ausschließlich mit dem Abfragetag <see cref="AppSettingService.UpdateSettingsReadTag"/>
-/// markierte Lesebefehle der Update-Einstellungen gezielt mit einer kontrollierten Exception fehlschlagen lässt.
+/// markierte Lesebefehle der Update--Einstellungen gezielt mit einer kontrollierten Exception fehlschlagen lässt.
 /// Alle anderen Lese- und Schreibbefehle bleiben unberührt.
 /// </summary>
 /// <remarks>
-/// Zwei Steuerungsmodi: Ohne <see cref="UpdateE2ETestKontext"/> (Komponententests) steuern
+/// Zwei Steuerungsmodi: Ohne <see cref="UpdateE2ETestContext"/> (Komponententests) steuern
 /// <see cref="ActivateFailure"/>/<see cref="DeactivateFailure"/> den Fehler global. Mit Kontext
 /// (E2E-App-Prozess) wird die Szenariodatei pro markiertem Read neu gelesen; der Fehler greift nur
 /// auf Reads innerhalb eines laufenden Updateversuchs ab der konfigurierten Lesegrenze
@@ -24,7 +24,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
 {
     private volatile bool _failureEnabled;
     private int _settingsReadCount;
-    private readonly UpdateE2ETestKontext? _kontext;
+    private readonly UpdateE2ETestContext? _context;
 
     /// <inheritdoc cref="UpdateSettingsReadFailureInterceptor"/>
     public UpdateSettingsReadFailureInterceptor()
@@ -33,24 +33,24 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
 
     /// <inheritdoc cref="UpdateSettingsReadFailureInterceptor"/>
     /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public UpdateSettingsReadFailureInterceptor(UpdateE2ETestKontext context)
+    public UpdateSettingsReadFailureInterceptor(UpdateE2ETestContext context)
     {
-        _kontext = context;
+        _context = context;
     }
 
-    /// <summary>Wird ausgelöst, sobald ein markierter Update-Settings-Lesebefehl erreicht wird (vor einem etwaigen Fehler).</summary>
+    /// <summary>Wird ausgelöst, sobald ein markierter Update--Einstellungen-Lesebefehl erreicht wird (vor einem etwaigen Fehler).</summary>
     public event EventHandler? SettingsReadReached;
 
-    /// <summary>Anzahl der bisher beobachteten markierten Update-Settings-Lesebefehle.</summary>
+    /// <summary>Anzahl der bisher beobachteten markierten Update--Einstellungen-Lesebefehle.</summary>
     public int SettingsReadCount => _settingsReadCount;
 
-    /// <summary>Gibt an, ob markierte Update-Settings-Lesebefehle aktuell kontrolliert fehlschlagen.</summary>
+    /// <summary>Gibt an, ob markierte Update--Einstellungen-Lesebefehle aktuell kontrolliert fehlschlagen.</summary>
     public bool FailureEnabled => _failureEnabled;
 
     /// <summary>Die kontrollierte Exception, die bei aktiviertem Fehler für markierte Lesebefehle geworfen wird.</summary>
-    public Exception FailureException { get; init; } = new InvalidOperationException("Kontrollierter Testfehler beim Lesen der Update-Einstellungen.");
+    public Exception FailureException { get; init; } = new InvalidOperationException("Kontrollierter Testfehler beim Lesen der Update--Einstellungen.");
 
-    /// <summary>Aktiviert den kontrollierten Lesefehler für markierte Update-Settings-Abfragen.</summary>
+    /// <summary>Aktiviert den kontrollierten Lesefehler für markierte Update--Einstellungen-Abfragen.</summary>
     public void ActivateFailure() => _failureEnabled = true;
 
     /// <summary>Deaktiviert den kontrollierten Lesefehler wieder; markierte Abfragen laufen danach normal.</summary>
@@ -62,8 +62,8 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
         CommandEventData eventData,
         InterceptionResult<DbDataReader> result)
     {
-        if (PruefeMarkiertenRead(command) is { } fehlerfall)
-            WarteUndWirf(fehlerfall, CancellationToken.None);
+        if (CheckMarkedRead(command) is { } failureCase)
+            WaitAndThrow(failureCase, CancellationToken.None);
 
         return result;
     }
@@ -78,21 +78,21 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
         // Die Gate-Wartezeit muss asynchron ablaufen: Markierte Reads laufen im Update-Flow auf dem
         // UI-Thread, ein synchrones Blockieren würde die Oberfläche (und damit FlaUI-Zugriffe wie
         // GetMainWindow) für die gesamte Gate-Dauer einfrieren.
-        if (PruefeMarkiertenRead(command) is { } fehlerfall)
-            await WarteUndWirfAsync(fehlerfall, cancellationToken);
+        if (CheckMarkedRead(command) is { } failureCase)
+            await WaitAndThrowAsync(failureCase, cancellationToken);
 
         return result;
     }
 
     /// <summary>Ein erkannter, anzuwendender Lesefehler-Fall inklusive des Read-Zeitpunkts im Versuch.</summary>
-    private sealed record Fehlerfall(UpdateE2ELesefehler Lesefehler, string? Versuch, int VersuchIndex, int Ordinal);
+    private sealed record FailureCase(UpdateE2EReadFailure ReadFailure, string? Attempt, int AttemptIndex, int Ordinal);
 
     /// <summary>
     /// Prüft einen Lesebefehl gegen den Abfragetag und die Szenariokonfiguration. Liefert den
     /// anzuwendenden Fehlerfall oder <c>null</c>, wenn der Read ungehindert laufen darf.
-    /// Protokolliert jeden markierten Read als <see cref="UpdateE2EEreignisse.UpdateSettingsReadReached"/>.
+    /// Protokolliert jeden markierten Read als <see cref="UpdateE2EEvents.UpdateSettingsReadReached"/>.
     /// </summary>
-    private Fehlerfall? PruefeMarkiertenRead(DbCommand command)
+    private FailureCase? CheckMarkedRead(DbCommand command)
     {
         if (!command.CommandText.Contains(AppSettingService.UpdateSettingsReadTag, StringComparison.Ordinal))
             return null;
@@ -100,7 +100,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
         Interlocked.Increment(ref _settingsReadCount);
         SettingsReadReached?.Invoke(this, EventArgs.Empty);
 
-        if (_kontext is null)
+        if (_context is null)
         {
             if (_failureEnabled)
                 throw FailureException;
@@ -110,96 +110,96 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
         // Ordinalzählung und Versuchszuordnung liegen im Singleton-Kontext, damit sie
         // unabhängig davon gelten, ob derselbe Interceptor oder eine neue Instanz je
         // Scoped-DbContext läuft - instanzbezogene Zähler könnten Reads verscopen.
-        var ordinal = _kontext.NaechsterMarkierterReadOrdinal();
-        var versuch = _kontext.AktuellerVersuch;
-        var versuchIndex = _kontext.AktuellerVersuchIndex;
-        var lesefehler = _kontext.LeseSzenario()?.Lesefehler;
+        var ordinal = _context.NextMarkedReadOrdinal();
+        var attempt = _context.CurrentAttempt;
+        var attemptIndex = _context.CurrentAttemptIndex;
+        var readFailure = _context.ReadScenario()?.ReadFailure;
 
-        _kontext.Protokoll.Schreibe(
-            UpdateE2EEreignisse.UpdateSettingsReadReached,
+        _context.Log.Write(
+            UpdateE2EEvents.UpdateSettingsReadReached,
             new
             {
-                versuch,
-                versuchIndex,
+                versuch = attempt,
+                versuchIndex = attemptIndex,
                 ordinal,
-                limit = lesefehler?.Limit,
-                fehlerAktiv = lesefehler?.Active == true || _failureEnabled
+                grenze = readFailure?.Limit,
+                fehlerAktiv = readFailure?.Active == true || _failureEnabled
             });
 
         if (_failureEnabled)
             throw FailureException;
 
-        if (lesefehler?.Active != true
-            || versuch is null
-            || !lesefehler.TrifftVersuch(versuch)
-            || ordinal < lesefehler.GrenzOrdinal())
+        if (readFailure?.Active != true
+            || attempt is null
+            || !readFailure.MatchesAttempt(attempt)
+            || ordinal < readFailure.BoundaryOrdinal())
         {
             return null;
         }
 
-        return new Fehlerfall(lesefehler, versuch, versuchIndex, ordinal);
+        return new FailureCase(readFailure, attempt, attemptIndex, ordinal);
     }
 
-    private void WarteUndWirf(Fehlerfall fehlerfall, CancellationToken cancellationToken)
+    private void WaitAndThrow(FailureCase failureCase, CancellationToken cancellationToken)
     {
         var reason = "sofort";
-        if (fehlerfall.Lesefehler.AufFreigabeWarten)
+        if (failureCase.ReadFailure.WaitForRelease)
         {
-            var freigegeben = _kontext!.WarteAufGate(
-                UpdateE2ETestKontext.LesefehlerGateName, cancellationToken, WarteTimeout(fehlerfall));
-            reason = ErmittleWarteGrund(freigegeben);
+            var released = _context!.WaitOnGate(
+                UpdateE2ETestContext.ReadFailureGateName, cancellationToken, WaitTimeout(failureCase));
+            reason = ResolveWaitReason(released);
         }
 
-        ProtokolliereFehlerUndWirf(fehlerfall, reason);
+        ThrowLogErrorAnd(failureCase, reason);
     }
 
-    private async Task WarteUndWirfAsync(Fehlerfall fehlerfall, CancellationToken cancellationToken)
+    private async Task WaitAndThrowAsync(FailureCase failureCase, CancellationToken cancellationToken)
     {
         var reason = "sofort";
-        if (fehlerfall.Lesefehler.AufFreigabeWarten)
+        if (failureCase.ReadFailure.WaitForRelease)
         {
-            bool freigegeben;
+            bool released;
             try
             {
-                freigegeben = await _kontext!.WarteAufGateAsync(
-                    UpdateE2ETestKontext.LesefehlerGateName, cancellationToken, WarteTimeout(fehlerfall));
+                released = await _context!.WaitOnGateAsync(
+                    UpdateE2ETestContext.ReadFailureGateName, cancellationToken, WaitTimeout(failureCase));
             }
             catch (OperationCanceledException)
             {
-                freigegeben = false;
+                released = false;
             }
-            reason = ErmittleWarteGrund(freigegeben);
+            reason = ResolveWaitReason(released);
         }
 
-        ProtokolliereFehlerUndWirf(fehlerfall, reason);
+        ThrowLogErrorAnd(failureCase, reason);
     }
 
     /// <summary>Die konfigurierte Wartezeit des Lesefehlers, mindestens eine Sekunde.</summary>
-    private static TimeSpan WarteTimeout(Fehlerfall fehlerfall)
-        => TimeSpan.FromSeconds(Math.Max(1, fehlerfall.Lesefehler.WartezeitSekunden));
+    private static TimeSpan WaitTimeout(FailureCase failureCase)
+        => TimeSpan.FromSeconds(Math.Max(1, failureCase.ReadFailure.WaitTimeoutSeconds));
 
     /// <summary>
     /// WarteAufGate liefert bei Abbruch und Timeout beide <c>false</c> - die Abbruch-Datei
     /// entscheidet, ob der Aufrufer das Gate explizit abgebrochen hat.
     /// </summary>
-    private string ErmittleWarteGrund(bool freigegeben)
-        => freigegeben
+    private string ResolveWaitReason(bool released)
+        => released
             ? "freigegeben"
-            : _kontext!.PruefeGate(UpdateE2ETestKontext.LesefehlerGateName) == false
+            : _context!.CheckGate(UpdateE2ETestContext.ReadFailureGateName) == false
                 ? "abgebrochen"
                 : "timeout";
 
-    private void ProtokolliereFehlerUndWirf(Fehlerfall fehlerfall, string reason)
+    private void ThrowLogErrorAnd(FailureCase failureCase, string reason)
     {
-        _kontext!.Protokoll.Schreibe(
-            UpdateE2EEreignisse.UpdateSettingsReadFailed,
+        _context!.Log.Write(
+            UpdateE2EEvents.UpdateSettingsReadFailed,
             new
             {
-                versuch = fehlerfall.Versuch,
-                versuchIndex = fehlerfall.VersuchIndex,
-                ordinal = fehlerfall.Ordinal,
-                limit = fehlerfall.Lesefehler.Limit,
-                reason
+                versuch = failureCase.Attempt,
+                versuchIndex = failureCase.AttemptIndex,
+                ordinal = failureCase.Ordinal,
+                grenze = failureCase.ReadFailure.Limit,
+                grund = reason
             });
 
         throw FailureException;

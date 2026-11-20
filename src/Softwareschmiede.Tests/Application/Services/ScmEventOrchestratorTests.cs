@@ -101,7 +101,7 @@ public sealed class ScmEventOrchestratorTests
         var (taskId, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppSettingService>()
-                .SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Simulator", TestContext.Current.CancellationToken);
+                .SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Simulator", TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Zugestellt", item.Status);
@@ -123,7 +123,7 @@ public sealed class ScmEventOrchestratorTests
         var (_, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppSettingService>()
-                .SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Nicht installiert", TestContext.Current.CancellationToken);
+                .SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Nicht installiert", TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);

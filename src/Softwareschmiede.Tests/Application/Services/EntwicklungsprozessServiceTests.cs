@@ -21,9 +21,9 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly Mock<IAiPlugin> _kiPluginMock;
     private readonly Mock<IWorkingDirectoryResolver> _arbeitsverzeichnisResolverMock;
-    private readonly AiExecutionService _kiAusfuehrungsService;
+    private readonly AiExecutionService _aiExecutionService;
     private readonly DevelopmentProcessService _sut;
-    private readonly Guid _projektId = new Guid("44444444-4444-4444-4444-444444444444");
+    private readonly Guid _projectId = new Guid("44444444-4444-4444-4444-444444444444");
     private const string CloneBaseDirectory = DevelopmentProcessService.CloneBaseDirectory;
 
     /// <summary>EntwicklungsprozessServiceTests.</summary>
@@ -42,7 +42,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkingDirectoryResolutionResult(Path.GetTempPath(), false, "configured", null));
 
-        _kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
+        _aiExecutionService = TestKiAusfuehrungsServiceFactory.Create();
 
         _sut = new DevelopmentProcessService(
             _workItemService,
@@ -50,12 +50,12 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _gitPluginMock.Object,
             CreatePluginSelectionService(_kiPluginMock.Object),
             _arbeitsverzeichnisResolverMock.Object,
-            new DevelopmentProcessServiceOptions(AiExecutionService: _kiAusfuehrungsService),
+            new DevelopmentProcessServiceOptions(AiExecutionService: _aiExecutionService),
             new Mock<ILogger<DevelopmentProcessService>>().Object);
 
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Entwicklungsprozess-Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -66,7 +66,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiAusfuehrungsService.Dispose();
+        _aiExecutionService.Dispose();
         _db.Dispose();
     }
 
@@ -136,7 +136,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             PluginType = "Softwareschmiede.GitHub",
             RepositoryUrl = url,
             RepositoryName = name,
@@ -157,7 +157,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldCloneAndCreateBranch_WhenAufgabeExists()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Login Feature implementieren", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Login Feature implementieren", null, ct: TestContext.Current.CancellationToken);
         SetupCloneMocks();
 
         // Act
@@ -177,7 +177,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenUndCliStartenAsync_ShouldStartCliAndSetStatusGestartet_WhenStartSucceeds()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Kombinierter Start", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Kombinierter Start", null, ct: TestContext.Current.CancellationToken);
         SetupCloneMocks();
         _kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
@@ -195,7 +195,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         // Assert
         var updatedAufgabe = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         updatedAufgabe!.Status.Should().Be(WorkItemStatus.Started);
-        _kiAusfuehrungsService.IsRunning(workItem.Id).Should().BeTrue();
+        _aiExecutionService.IsRunning(workItem.Id).Should().BeTrue();
     }
 
     /// <summary>ProzessStartenUndCliStartenAsync setzt Status zurück, wenn das Klonen fehlschlägt.</summary>
@@ -203,7 +203,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenUndCliStartenAsync_ShouldRollbackStatus_WhenRepositoryCloneFails()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Klonen fehlschlägt", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Klonen fehlschlägt", null, ct: TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Klonen fehlgeschlagen"));
 
@@ -221,7 +221,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenUndCliStartenAsync_ShouldRollbackStatus_WhenCliStartFails()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "CLI-Start fehlschlägt", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "CLI-Start fehlschlägt", null, ct: TestContext.Current.CancellationToken);
         SetupCloneMocks();
         _kiPluginMock.Setup(p => p.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("CLI-Start fehlgeschlagen"));
@@ -248,7 +248,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             "repo-workdir",
             new RepositoryStartConfiguration { Id = Guid.NewGuid(), WorkingDirectoryRelativePath = "backend", Active = true });
 
-        var workItem = await _workItemService.CreateAsync(_projektId, "Start mit Arbeitsverzeichnis", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Start mit Arbeitsverzeichnis", null, repository.Id, TestContext.Current.CancellationToken);
 
         var clonePath = SetupCloneWithDirectoryCreation();
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -267,8 +267,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
                 Arguments = "/c exit 0",
             });
 
-        var projektService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
-        var sut = CreateSut(new DevelopmentProcessServiceOptions(ProjectService: projektService, AiExecutionService: _kiAusfuehrungsService));
+        var projectService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
+        var sut = CreateSut(new DevelopmentProcessServiceOptions(ProjectService: projectService, AiExecutionService: _aiExecutionService));
 
         try
         {
@@ -282,7 +282,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         }
         finally
         {
-            await _kiAusfuehrungsService.StopCliAsync(workItem.Id, TestContext.Current.CancellationToken);
+            await _aiExecutionService.StopCliAsync(workItem.Id, TestContext.Current.CancellationToken);
             DeleteDirectoryIfExists(clonePath);
         }
     }
@@ -300,11 +300,11 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             "repo-workdir-missing",
             new RepositoryStartConfiguration { Id = Guid.NewGuid(), WorkingDirectoryRelativePath = "does-not-exist", Active = true });
 
-        var workItem = await _workItemService.CreateAsync(_projektId, "Start mit fehlendem Arbeitsverzeichnis", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Start mit fehlendem Arbeitsverzeichnis", null, repository.Id, TestContext.Current.CancellationToken);
 
         var clonePath = SetupCloneWithDirectoryCreation();
 
-        var projektService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
+        var projectService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
         var pluginSelectionService = CreatePluginSelectionService(_kiPluginMock.Object);
         // GitOrchestrationService wird hier bewusst mitkonfiguriert (wie auch in der echten App-Verdrahtung,
         // siehe App.xaml.cs), damit das fehlende Arbeitsverzeichnis direkt nach dem Klon erkannt wird — und
@@ -312,12 +312,12 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         // spätere CLI-Start es prüfen könnte.
         var gitOrchestrationService = new GitOrchestrationService(
             _workItemService,
-            projektService,
+            projectService,
             _logService,
             _gitPluginMock.Object,
             pluginSelectionService,
             new Mock<ILogger<GitOrchestrationService>>().Object);
-        var sut = CreateSut(new DevelopmentProcessServiceOptions(ProjectService: projektService, AiExecutionService: _kiAusfuehrungsService, GitOrchestrationService: gitOrchestrationService));
+        var sut = CreateSut(new DevelopmentProcessServiceOptions(ProjectService: projectService, AiExecutionService: _aiExecutionService, GitOrchestrationService: gitOrchestrationService));
 
         try
         {
@@ -345,7 +345,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             "repo-start-script",
             new RepositoryStartConfiguration { Id = Guid.NewGuid(), StartScriptRelativePath = "scripts/start.ps1", Active = true });
 
-        var workItem = await _workItemService.CreateAsync(_projektId, "Startskript robust starten", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Startskript robust starten", null, repository.Id, TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
@@ -362,8 +362,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         var repositoryStartskriptService = new RepositoryStartScriptService(
             cliRunnerMock.Object,
             new Mock<ILogger<RepositoryStartScriptService>>().Object);
-        var projektService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
-        var sut = CreateSut(new DevelopmentProcessServiceOptions(ProjectService: projektService, RepositoryStartScriptService: repositoryStartskriptService));
+        var projectService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
+        var sut = CreateSut(new DevelopmentProcessServiceOptions(ProjectService: projectService, RepositoryStartScriptService: repositoryStartskriptService));
 
         // Act
         await sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
@@ -383,7 +383,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldCreateIssueBranch_WhenAufgabeHasIssueReference()
     {
         var issue = new Issue(321, "Issue Branch", "Body", ["enhancement"], null, "https://github.com/test/repo/issues/321");
-        var workItem = await _workItemService.CreateFromIssueAsync(_projektId, issue, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateFromIssueAsync(_projectId, issue, ct: TestContext.Current.CancellationToken);
 
         SetupCloneMocks();
 
@@ -405,7 +405,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     {
         var repository = await CreateTestRepositoryAsync("https://github.com/test/repo-ohne-issue", "repo-ohne-issue");
 
-        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe ohne Issue", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Aufgabe ohne Issue", "Beschreibung", ct: TestContext.Current.CancellationToken);
         var cloneBase = SetupCloneWithDirectoryCreation();
         _kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
@@ -416,8 +416,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
                 CreateNoWindow = true,
             });
         _kiPluginMock.SetupTerminalSpec("cmd.exe", "/c ping 127.0.0.1 -n 5 > nul");
-        var projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
-        var sut = CreateSut(new DevelopmentProcessServiceOptions(ProjectService: projektService, AiExecutionService: _kiAusfuehrungsService));
+        var projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        var sut = CreateSut(new DevelopmentProcessServiceOptions(ProjectService: projectService, AiExecutionService: _aiExecutionService));
 
         try
         {
@@ -431,7 +431,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         }
         finally
         {
-            await _kiAusfuehrungsService.StopCliAsync(workItem.Id, TestContext.Current.CancellationToken);
+            await _aiExecutionService.StopCliAsync(workItem.Id, TestContext.Current.CancellationToken);
             DeleteDirectoryIfExists(cloneBase);
         }
     }
@@ -455,7 +455,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldThrow_WhenAufgabePausiert()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Pausierte Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Pausierte Aufgabe", null, ct: TestContext.Current.CancellationToken);
         var tracked = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         tracked!.PausedUntilUtc = DateTimeOffset.UtcNow.AddHours(1);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -477,7 +477,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenUndCliStartenAsync_ShouldThrowWithoutRollback_WhenAufgabePausiert()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Pausierte Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Pausierte Aufgabe", null, ct: TestContext.Current.CancellationToken);
         var tracked = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         tracked!.PausedUntilUtc = DateTimeOffset.UtcNow.AddHours(1);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -501,7 +501,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task CliNeustartenAsync_ShouldThrow_WhenAufgabePausiert()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Pausierte Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Pausierte Aufgabe", null, ct: TestContext.Current.CancellationToken);
         var tracked = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         tracked!.Status = WorkItemStatus.Started;
         tracked.PausedUntilUtc = DateTimeOffset.UtcNow.AddHours(1);
@@ -521,7 +521,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task AbschliessenAsync_ShouldSetStatusAbgeschlossenAndAddProtokoll_WhenAufgabeExists()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Abzuschließende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Abzuschließende Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
         await _sut.CompleteAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -540,11 +540,11 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task AbschliessenAsync_ShouldCancelScheduledPrompt_WhenPromptGeplant()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe mit geplantem Prompt", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Aufgabe mit geplantem Prompt", null, ct: TestContext.Current.CancellationToken);
         var promptScheduleDispatchService = new PromptScheduleDispatchService(
-            _kiAusfuehrungsService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+            _aiExecutionService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         var sut = CreateSut(new DevelopmentProcessServiceOptions(
-            AiExecutionService: _kiAusfuehrungsService,
+            AiExecutionService: _aiExecutionService,
             PromptScheduleDispatchService: promptScheduleDispatchService));
         await promptScheduleDispatchService.SchedulePromptAsync(workItem.Id, "Test-Prompt", DateTimeOffset.UtcNow.AddHours(1));
         promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull();
@@ -562,7 +562,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task AbschliessenAsync_ShouldStopRunningCli_WhenSessionActive()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe mit laufender CLI", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Aufgabe mit laufender CLI", null, ct: TestContext.Current.CancellationToken);
         var directory = Path.Combine(Path.GetTempPath(), $"sw-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
 
@@ -575,7 +575,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
 
         try
         {
-            var handle = await _kiAusfuehrungsService.StartTerminalSessionAsync(workItem.Id, _kiPluginMock.Object, directory, ct: TestContext.Current.CancellationToken);
+            var handle = await _aiExecutionService.StartTerminalSessionAsync(workItem.Id, _kiPluginMock.Object, directory, ct: TestContext.Current.CancellationToken);
             handle.IntentionallyStopped.Should().BeFalse();
 
             // Act
@@ -586,7 +586,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         }
         finally
         {
-            await _kiAusfuehrungsService.StopCliAsync(workItem.Id, TestContext.Current.CancellationToken);
+            await _aiExecutionService.StopCliAsync(workItem.Id, TestContext.Current.CancellationToken);
             DeleteDirectoryIfExists(directory);
         }
     }
@@ -596,7 +596,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task CommitDurchfuehrenAsync_ShouldThrowInvalidOperationException_WhenNoKlonPfad()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Commit ohne Klon", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Commit ohne Klon", null, ct: TestContext.Current.CancellationToken);
 
         // Act
         var act = () => _sut.ExecuteCommitAsync(workItem.Id, "Commit message");
@@ -611,7 +611,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task PushDurchfuehrenAsync_ShouldThrowInvalidOperationException_WhenNoKlonPfad()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Push ohne Klon", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Push ohne Klon", null, ct: TestContext.Current.CancellationToken);
 
         // Act
         var act = () => _sut.ExecutePushAsync(workItem.Id);
@@ -624,7 +624,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldAppendClosingDirective_WhenLegacyPathHasIssueReference()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Legacy PR mit Issue", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Legacy PR mit Issue", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/legacy-pr", @"C:\repos\task-legacy-pr", ct: TestContext.Current.CancellationToken);
         _db.IssueReferences.Add(new IssueReference
         {
@@ -666,7 +666,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldUseConfiguredWorkdirBase_ForClonePath()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Workdir Konfiguriert", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Workdir Konfiguriert", null, ct: TestContext.Current.CancellationToken);
         var configuredBase = Path.Combine(Path.GetTempPath(), "custom-workdir-base");
         _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkingDirectoryResolutionResult(configuredBase, false, "configured", configuredBase));
@@ -688,7 +688,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldUseFallbackPath_WhenResolverReturnsFallback()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Workdir Fallback", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Workdir Fallback", null, ct: TestContext.Current.CancellationToken);
         var fallbackBase = Path.GetTempPath();
         _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkingDirectoryResolutionResult(fallbackBase, true, "no-configured-path", null));
@@ -710,7 +710,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldCheckoutExistingBranch_WhenBasisBranchIsNotDefault()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Existing Branch", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Existing Branch", null, ct: TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         _gitPluginMock.Setup(g => g.GetDefaultBranchAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -737,7 +737,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldCreateTaskBranch_WhenBasisBranchEqualsDefaultBranch_CaseInsensitive()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Case Insensitive Branch", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Case Insensitive Branch", null, ct: TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         _gitPluginMock.Setup(g => g.GetDefaultBranchAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -767,7 +767,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldDeleteExistingCloneDirectory_BeforeClone()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Delete Existing Clone", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Delete Existing Clone", null, ct: TestContext.Current.CancellationToken);
         var configuredBase = Path.Combine(Path.GetTempPath(), $"workdir-existing-{Guid.NewGuid():N}");
         var expectedClonePath = Path.Combine(configuredBase, CloneBaseDirectory, workItem.Id.ToString());
         Directory.CreateDirectory(expectedClonePath);
@@ -800,9 +800,9 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         await CreateTestRepositoryAsync("https://github.com/test/repo-a", "repo-a");
         await CreateTestRepositoryAsync("https://github.com/test/repo-b", "repo-b");
 
-        var workItem = await _workItemService.CreateAsync(_projektId, "Mehrdeutiger Repository-Kontext", null, ct: TestContext.Current.CancellationToken);
-        var projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
-        var sut = CreateSut(new DevelopmentProcessServiceOptions(ProjectService: projektService));
+        var workItem = await _workItemService.CreateAsync(_projectId, "Mehrdeutiger Repository-Kontext", null, ct: TestContext.Current.CancellationToken);
+        var projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        var sut = CreateSut(new DevelopmentProcessServiceOptions(ProjectService: projectService));
 
         // Act
         var act = () => sut.StartProcessAsync(workItem.Id, "https://github.com/test/unknown");
@@ -818,7 +818,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task CreateIssueFileAsync_ShouldCreateIssueFileWithCorrectContent_WhenAufgabeExists()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Login Feature implementieren", "Benutzer soll sich einloggen können.", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Login Feature implementieren", "Benutzer soll sich einloggen können.", ct: TestContext.Current.CancellationToken);
         var uniqueBase = SetupCloneWithDirectoryCreation();
         var expectedClonePath = Path.Combine(uniqueBase, CloneBaseDirectory, workItem.Id.ToString());
 
@@ -845,7 +845,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task CreateIssueFileAsync_ShouldUseFallbackText_WhenAnforderungsBeschreibungIsNullOrEmpty()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe ohne Beschreibung", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Aufgabe ohne Beschreibung", null, ct: TestContext.Current.CancellationToken);
         var uniqueBase = SetupCloneWithDirectoryCreation();
         var expectedClonePath = Path.Combine(uniqueBase, CloneBaseDirectory, workItem.Id.ToString());
 
@@ -866,7 +866,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task CreateIssueFileAsync_ShouldLogWarning_WhenFileCreationFails()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe Datei-Fehler", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Aufgabe Datei-Fehler", "Beschreibung", ct: TestContext.Current.CancellationToken);
         var loggerMock = new Mock<ILogger<DevelopmentProcessService>>();
         var sut = CreateSut(logger: loggerMock.Object);
 
@@ -911,7 +911,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     {
         // Arrange
         var issue = new Issue(42, "Anmeldung fehlerhaft", "Beschreibung des Issues", [], null, "https://github.com/test/repo/issues/42");
-        var workItem = await _workItemService.CreateFromIssueAsync(_projektId, issue, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateFromIssueAsync(_projectId, issue, ct: TestContext.Current.CancellationToken);
         var uniqueBase = SetupCloneWithDirectoryCreation();
         var expectedClonePath = Path.Combine(uniqueBase, CloneBaseDirectory, workItem.Id.ToString());
 
@@ -939,7 +939,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task CreateIssueFileAsync_ShouldNotIncludeIssueReference_WhenIssueReferenzIsNull()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe ohne Issue", "Normale Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Aufgabe ohne Issue", "Normale Beschreibung", ct: TestContext.Current.CancellationToken);
         var uniqueBase = SetupCloneWithDirectoryCreation();
         var expectedClonePath = Path.Combine(uniqueBase, CloneBaseDirectory, workItem.Id.ToString());
 
@@ -956,12 +956,12 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         DeleteDirectoryIfExists(uniqueBase);
     }
 
-    /// <summary>CreateIssueFileAsync lässt den Issue-Abschnitt weg wenn IssueReferenz gesetzt ist, aber IssueNummer null ist.</summary>
+    /// <summary>CreateIssueFileAsync lässt den Issue-Abschnitt weg wenn IssueReferenz gesetzt ist, aber IssueNumber null ist.</summary>
     [Fact]
-    public async Task CreateIssueFileAsync_ShouldNotIncludeIssueReference_WhenIssueNummerIsNull()
+    public async Task CreateIssueFileAsync_ShouldNotIncludeIssueReference_WhenIssueNumberIsNull()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe ohne Nummer", "Beschreibung ohne Nummer", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Aufgabe ohne Nummer", "Beschreibung ohne Nummer", ct: TestContext.Current.CancellationToken);
         _db.IssueReferences.Add(new IssueReference
         {
             Id = Guid.NewGuid(),
@@ -993,7 +993,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task UpdateGitignoreAsync_ShouldCreateGitignore_WhenFileDoesNotExist()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Gitignore neu", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Gitignore neu", null, ct: TestContext.Current.CancellationToken);
         var uniqueBase = SetupCloneWithDirectoryCreation();
         var expectedClonePath = Path.Combine(uniqueBase, CloneBaseDirectory, workItem.Id.ToString());
 
@@ -1014,7 +1014,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task UpdateGitignoreAsync_ShouldAddIssueEntry_WhenGitignoreExists()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Gitignore erweitern", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Gitignore erweitern", null, ct: TestContext.Current.CancellationToken);
         var uniqueBase = SetupCloneWithDirectoryCreation("*.log\nbin/\n");
         var expectedClonePath = Path.Combine(uniqueBase, CloneBaseDirectory, workItem.Id.ToString());
 
@@ -1035,7 +1035,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task UpdateGitignoreAsync_ShouldNotAddDuplicate_WhenIssueEntryAlreadyExists()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Gitignore kein Duplikat", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Gitignore kein Duplikat", null, ct: TestContext.Current.CancellationToken);
         var uniqueBase = SetupCloneWithDirectoryCreation("*.log\nissue.md\n");
         var expectedClonePath = Path.Combine(uniqueBase, CloneBaseDirectory, workItem.Id.ToString());
 
@@ -1063,7 +1063,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             "repo-issuefile-workdir",
             new RepositoryStartConfiguration { Id = Guid.NewGuid(), WorkingDirectoryRelativePath = "backend", Active = true });
 
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Datei im Arbeitsverzeichnis", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Datei im Arbeitsverzeichnis", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var uniqueBase = SetupCloneWithDirectoryCreation();
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns((string _, string path, CancellationToken _) =>
@@ -1102,7 +1102,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task UpdateGitignoreAsync_ShouldLogWarning_WhenFileOperationFails()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Gitignore schreibgeschützt", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Gitignore schreibgeschützt", null, ct: TestContext.Current.CancellationToken);
         var uniqueBase = Path.Combine(Path.GetTempPath(), $"sw-test-{Guid.NewGuid():N}");
         var loggerMock = new Mock<ILogger<DevelopmentProcessService>>();
         var sut = CreateSut(logger: loggerMock.Object);
@@ -1143,7 +1143,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldContinue_WhenIssueFileCreationFails()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Prozess trotz Datei-Fehler", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Prozess trotz Datei-Fehler", "Beschreibung", ct: TestContext.Current.CancellationToken);
         // CloneRepositoryAsync erstellt das Verzeichnis nicht → Datei-Operationen schlagen fehl
         SetupCloneMocks();
 
@@ -1161,7 +1161,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldContinue_WhenGitignoreUpdateFails()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Prozess trotz Gitignore-Fehler", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Prozess trotz Gitignore-Fehler", "Beschreibung", ct: TestContext.Current.CancellationToken);
         var uniqueBase = Path.Combine(Path.GetTempPath(), $"sw-test-{Guid.NewGuid():N}");
         _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkingDirectoryResolutionResult(uniqueBase, false, "configured", null));
@@ -1248,19 +1248,19 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     [Fact]
     public async Task CliNeustartenAsync_MeldetLaufAktiv_BeiLebenderSession()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Neustart mit lebender Session", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Neustart mit lebender Session", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/live-session", Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         _kiPluginMock.SetupTerminalSpec("cmd.exe", "/k");
-        var handle = await _kiAusfuehrungsService.StartTerminalSessionAsync(workItem.Id, _kiPluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        var handle = await _aiExecutionService.StartTerminalSessionAsync(workItem.Id, _kiPluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         var laufAktivCount = 0;
-        _kiAusfuehrungsService.CliRunActive += _ => laufAktivCount++;
+        _aiExecutionService.CliRunActive += _ => laufAktivCount++;
 
-        var sut = CreateSut(new DevelopmentProcessServiceOptions(AiExecutionService: _kiAusfuehrungsService));
+        var sut = CreateSut(new DevelopmentProcessServiceOptions(AiExecutionService: _aiExecutionService));
         await sut.RestartCliAsync(workItem.Id, "Softwareschmiede.TestKi", null, TestContext.Current.CancellationToken);
 
         laufAktivCount.Should().Be(1, "der Early-Return bei lebender Session meldet den laufenden Prozess");
-        _kiAusfuehrungsService.GetTerminalSession(workItem.Id).Should().BeSameAs(handle.Session);
+        _aiExecutionService.GetTerminalSession(workItem.Id).Should().BeSameAs(handle.Session);
     }
 
 }

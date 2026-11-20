@@ -47,7 +47,7 @@ public sealed class UpdateProgressViewModelTests
         sut.Message.Should().Be("Fehler");
     }
 
-    /// <summary>Der Abbrechen-Command triggert die angebundene Cancellation und deaktiviert sich.</summary>
+    /// <summary>Der Cancel-Command triggert die angebundene Cancellation und deaktiviert sich.</summary>
     [Fact]
     public void CancelCommand_ShouldInvokeCancellationAndDisableCancel()
     {

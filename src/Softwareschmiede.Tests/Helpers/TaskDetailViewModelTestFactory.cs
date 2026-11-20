@@ -24,7 +24,7 @@ public static class TaskDetailViewModelTestFactory
         dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
-        var kiService = TestKiAusfuehrungsServiceFactory.Create();
+        var aiService = TestKiAusfuehrungsServiceFactory.Create();
         var logService = new LogService(db, NullLogger<LogService>.Instance);
         var todoService = new TodoService(db, NullLogger<TodoService>.Instance);
         var pluginManagerMock = new Mock<IPluginManager>();
@@ -35,18 +35,18 @@ public static class TaskDetailViewModelTestFactory
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         var pluginActivationService = new PluginActivationService(appSettingService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
-        var promptVorlagenService = new PromptTemplateService(db, NullLogger<PromptTemplateService>.Instance);
-        var promptVorlagenPlatzhalterService = new PromptTemplatePlaceholderService();
-        var promptScheduleDispatchService = new PromptScheduleDispatchService(kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        var promptTemplatesService = new PromptTemplateService(db, NullLogger<PromptTemplateService>.Instance);
+        var promptTemplatesPlaceholderService = new PromptTemplatePlaceholderService();
+        var promptScheduleDispatchService = new PromptScheduleDispatchService(aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
-        var entwicklungsprozessService = new DevelopmentProcessService(
+        var developmentprocessService = new DevelopmentProcessService(
             workItemService,
             logService,
             gitPluginMock.Object,
             pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            new DevelopmentProcessServiceOptions(AiExecutionService: kiService, PromptScheduleDispatchService: promptScheduleDispatchService),
+            new DevelopmentProcessServiceOptions(AiExecutionService: aiService, PromptScheduleDispatchService: promptScheduleDispatchService),
             NullLogger<DevelopmentProcessService>.Instance);
 
         var serviceProviderMock = new Mock<IServiceProvider>();
@@ -54,16 +54,16 @@ public static class TaskDetailViewModelTestFactory
         var fileExplorerViewModel = CreateStub();
         var todoListViewModel = new TodoListViewModel(todoService, NullLogger<TodoListViewModel>.Instance);
 
-        var arbeitsverzeichnisOeffnenService = CreateArbeitsverzeichnisOeffnenService();
+        var workingDirectoryOpenService = CreateArbeitsverzeichnisOeffnenService();
 
         return new TaskDetailViewModel(
             workItemService,
             logService,
-            kiService,
-            entwicklungsprozessService,
+            aiService,
+            developmentprocessService,
             pluginSelectionService,
-            promptVorlagenService,
-            promptVorlagenPlatzhalterService,
+            promptTemplatesService,
+            promptTemplatesPlaceholderService,
             promptScheduleDispatchService,
             dialogServiceMock.Object,
             pluginManagerMock.Object,
@@ -72,7 +72,7 @@ public static class TaskDetailViewModelTestFactory
             TimeProvider.System,
             fileExplorerViewModel,
             todoListViewModel,
-            arbeitsverzeichnisOeffnenService);
+            workingDirectoryOpenService);
     }
 
     /// <summary>Erstellt ein FileExplorerViewModel mit Mock-Abhängigkeiten für Tests, die kein spezielles Diff-/Browser-Verhalten benötigen.</summary>

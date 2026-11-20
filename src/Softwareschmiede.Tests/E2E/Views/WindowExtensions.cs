@@ -26,7 +26,7 @@ public static class WindowExtensions
     /// Erkennt anhand charakteristischer UI-Marker die aktuell aktive Ansicht des Hauptfensters und gibt
     /// die passende <see cref="BaseWindowView"/>-Subklasse-Instanz zurück. Prüfreihenfolge: modale Dialoge
     /// (eigenes Fenster, höchste Priorität), Fehlerbanner, verschachtelte Aufgaben-Unteransichten
-    /// (Datei-Explorer, To-Dos), Aufgabendetail, Projektdetail, Projektliste, Einstellungen,
+    /// (Datei-Explorer, To-Dos), Aufgabendetail, Projektdetail, Projektliste, Settings,
     /// zuletzt Fallback auf das Dashboard.
     /// </summary>
     /// <param name="window">Das Hauptfenster der Anwendung.</param>
@@ -100,8 +100,8 @@ public static class WindowExtensions
     {
         var expectedMarkers = string.Join(", ",
         [
-            "ProjektName", "AufgabeNeu", "EditTitel", "Neu", "Plugins",
-            "FileExplorerBaum", "TodosList", "FehlerMeldung",
+            "ProjectName", "AufgabeNeu", "EditTitle", "Neu", "Plugins",
+            "FileExplorerTree", "TodosList", "ErrorMessage",
             "Dashboard-Titeltext", "Dialogtitel (z. B. 'Repository zuweisen')"
         ]);
 

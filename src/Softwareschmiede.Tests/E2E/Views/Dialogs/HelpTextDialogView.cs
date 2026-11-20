@@ -17,7 +17,7 @@ public sealed class HelpTextDialogView : DialogView
     public void Close()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("Schließen"), Short).AsButton().ClickInForeground();
+        WaitForElement(dialog, cf => cf.ByName("Close"), Short).AsButton().ClickInForeground();
         ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
     }
 }

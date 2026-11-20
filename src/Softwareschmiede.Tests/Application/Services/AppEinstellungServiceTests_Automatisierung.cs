@@ -7,7 +7,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für die neuen Automatisierungs-Einstellungen in <see cref="AppSettingService"/>:
+/// <summary>Tests für die neuen Automatisierungs--Einstellungen in <see cref="AppSettingService"/>:
 /// Prüfmodus der Abschlussüberwachung sowie die Backmerge-Optionen Draft-Aktivierung und Admin-Merge.</summary>
 public sealed class AppEinstellungServiceTests_Automatisierung : IDisposable
 {

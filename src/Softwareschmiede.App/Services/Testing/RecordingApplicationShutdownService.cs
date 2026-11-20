@@ -4,23 +4,23 @@ namespace Softwareschmiede.App.Services.Testing;
 
 /// <summary>
 /// E2E-Testadapter für <see cref="IApplicationShutdownService"/>: protokolliert den
-/// <see cref="UpdateE2EEreignisse.ShutdownRequested"/>-Aufruf und lässt die Test-App geöffnet,
+/// <see cref="UpdateE2EEvents.ShutdownRequested"/>-Aufruf und lässt die Test-App geöffnet,
 /// damit der Runner das eigene Testfenster danach regulär schließen kann.
 /// </summary>
 public sealed class RecordingApplicationShutdownService : IApplicationShutdownService
 {
-    private readonly UpdateE2ETestKontext _kontext;
+    private readonly UpdateE2ETestContext _context;
 
     /// <inheritdoc cref="RecordingApplicationShutdownService"/>
     /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public RecordingApplicationShutdownService(UpdateE2ETestKontext context)
+    public RecordingApplicationShutdownService(UpdateE2ETestContext context)
     {
-        _kontext = context;
+        _context = context;
     }
 
     /// <inheritdoc/>
     public void Shutdown()
     {
-        _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.ShutdownRequested);
+        _context.Log.Write(UpdateE2EEvents.ShutdownRequested);
     }
 }

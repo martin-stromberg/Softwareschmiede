@@ -23,7 +23,7 @@ namespace Softwareschmiede.Tests.E2E;
 public sealed class WpfE2ETests : WpfTestBase
 {
     /// <summary>
-    /// Führt die einfachen WPF-E2E-Szenarien für Projekt/Aufgabe und Einstellungen in einem App-Lifecycle aus.
+    /// Führt die einfachen WPF-E2E-Szenarien für Projekt/Aufgabe und Settings in einem App-Lifecycle aus.
     /// </summary>
     [Fact]
     public void WpfBasisSzenarien()
@@ -68,7 +68,7 @@ public sealed class WpfE2ETests : WpfTestBase
     /// <summary>
     /// Szenario: Sauberer Start ohne Recovery-Banner; Einstellungsseite öffnen (Speichern sichtbar);
     /// Dark Mode umschalten, speichern und nach Rückkehr Persistenz prüfen; Arbeitsverzeichnis ändern
-    /// und speichern; mehrfache Navigation zwischen Dashboard und Einstellungen bleibt stabil.
+    /// und speichern; mehrfache Navigation zwischen Dashboard und Settings bleibt stabil.
     /// </summary>
     private void Einstellungen_OeffnenAendernUndNavigationBleibtStabil_E2E(Window mainWindow)
     {
@@ -77,7 +77,7 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.True(dashboard.IsVisible);
         Assert.False(dashboard.HasRecoveryBanner());
 
-        // Einstellungen öffnen (Ribbon-"Speichern"-Button bestätigt, dass die Seite geladen ist)
+        // Settings öffnen (Ribbon-"Speichern"-Button bestätigt, dass die Seite geladen ist)
         var settings = dashboard.Menu.NavigateToSettings();
 
         // Dark Mode umschalten
@@ -110,7 +110,7 @@ public sealed class WpfE2ETests : WpfTestBase
         settingsErneut.SetFirstTextBoxValue(@"C:\TestArbeitsverzeichnis");
         settingsErneut.SaveSettings();
 
-        // Mehrfache Navigation bleibt stabil: Dashboard -> Projekte-Kachel sichtbar -> erneut Einstellungen
+        // Mehrfache Navigation bleibt stabil: Dashboard -> Projects-Kachel sichtbar -> erneut Settings
         var dashboardNavigation = settingsErneut.Menu.NavigateToDashboard();
         Assert.True(dashboardNavigation.Menu.IsVisible);
 

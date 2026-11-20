@@ -116,14 +116,14 @@ public sealed class CliProcessManagerTests : IDisposable
             .Setup(f => f.CreateScope())
             .Throws(new ObjectDisposedException("ServiceProvider"));
 
-        using var kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        using var aiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
 
         var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(kiService)!;
+        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(aiService)!;
         handles[workItemId] = new CliProcessHandle(workItemId, System.Diagnostics.Process.GetCurrentProcess());
 
         using var manager = new CliProcessManager(
-            kiService,
+            aiService,
             scopeFactoryMock.Object,
             NullLogger<CliProcessManager>.Instance,
             new WorkItemRunDataChangedNotifier());
@@ -186,9 +186,9 @@ public sealed class CliProcessManagerTests : IDisposable
             .Setup(f => f.CreateScope())
             .Throws(new ObjectDisposedException("ServiceProvider"));
 
-        using var kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        using var aiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
         using var manager = new CliProcessManager(
-            kiService,
+            aiService,
             scopeFactoryMock.Object,
             NullLogger<CliProcessManager>.Instance,
             new WorkItemRunDataChangedNotifier());

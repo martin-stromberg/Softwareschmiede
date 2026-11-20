@@ -2,7 +2,7 @@ using FlaUI.Core.AutomationElements;
 
 namespace Softwareschmiede.Tests.E2E.Views;
 
-/// <summary>View für das Fehlerbanner ("FehlerMeldung"), das in mehreren Haupt-Views inline eingeblendet wird.</summary>
+/// <summary>View für das Fehlerbanner ("ErrorMessage"), das in mehreren Haupt-Views inline eingeblendet wird.</summary>
 public sealed class ErrorView : BaseWindowView
 {
     /// <param name="window">Das Hauptfenster der Anwendung.</param>
@@ -11,7 +11,7 @@ public sealed class ErrorView : BaseWindowView
     }
 
     /// <inheritdoc/>
-    public override bool IsVisible => ElementExists(Window, cf => cf.ByName("FehlerMeldung"));
+    public override bool IsVisible => ElementExists(Window, cf => cf.ByName("ErrorMessage"));
 
     /// <inheritdoc/>
     public override ErrorView ForceShow() => this;
@@ -20,7 +20,7 @@ public sealed class ErrorView : BaseWindowView
     public override ErrorView ForceClose(bool recurseToDashboard) => this;
 
     /// <returns>Der Text der aktuellen Fehlermeldung.</returns>
-    public string GetErrorMessage() => GetHelpTextOrName(WaitForElement(Window, cf => cf.ByName("FehlerMeldung"), Short));
+    public string GetErrorMessage() => GetHelpTextOrName(WaitForElement(Window, cf => cf.ByName("ErrorMessage"), Short));
 
     /// <summary>
     /// Wartet, bis das Fehlerbanner verschwindet. Es gibt keinen dedizierten Schließen-Button - die
@@ -29,7 +29,7 @@ public sealed class ErrorView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public ErrorView DismissError()
     {
-        WaitUntilGone(Window, cf => cf.ByName("FehlerMeldung"), Medium);
+        WaitUntilGone(Window, cf => cf.ByName("ErrorMessage"), Medium);
         return this;
     }
 }

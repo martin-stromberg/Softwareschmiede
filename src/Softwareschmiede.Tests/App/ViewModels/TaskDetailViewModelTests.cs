@@ -23,17 +23,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
     private readonly LogService _logService;
     private readonly TodoService _todoService;
     private readonly AiExecutionService _aiService;
-    private readonly DevelopmentProcessService _entwicklungsprozessService;
+    private readonly DevelopmentProcessService _developmentprocessService;
     private readonly PluginSelectionService _pluginSelectionService;
-    private readonly PromptTemplateService _promptVorlagenService;
-    private readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService = new();
+    private readonly PromptTemplateService _promptTemplatesService;
+    private readonly PromptTemplatePlaceholderService _promptTemplatesPlaceholderService = new();
     private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
     private readonly AppSettingService _settingService;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IAiPlugin> _kiPluginMock;
     private readonly Mock<IGitPlugin> _gitPluginForResolutionMock;
     private readonly Mock<IPluginManager> _pluginManagerMockFuerPluginSelection;
-    private readonly Guid _projektId = Guid.NewGuid();
+    private readonly Guid _projectId = Guid.NewGuid();
     private readonly TestTempDirectoryFixture _tempDirectoryFixture = new();
 
     /// <summary>TaskDetailViewModelTests.</summary>
@@ -102,7 +102,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
         var pluginActivationService = new PluginActivationService(new AppSettingService(_db, NullLogger<AppSettingService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
-        _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
+        _promptTemplatesService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
         _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
 
@@ -114,7 +114,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
         arbeitsverzeichnisMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Softwareschmiede.Domain.ValueObjects.WorkingDirectoryResolutionResult(Path.GetTempPath(), false, "configured", null));
-        _entwicklungsprozessService = new DevelopmentProcessService(
+        _developmentprocessService = new DevelopmentProcessService(
             _workItemService,
             _logService,
             gitPluginMock.Object,
@@ -127,7 +127,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         _db.Projects.Add(new Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -165,7 +165,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
 
-        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
+        var workingDirectoryOpenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
 
         // Die von OeffneIdeCommand über _pluginSelectionService aufgelösten IDE-Plugins (Visual Studio,
         // Visual Studio Code) müssen denselben IProzessStarter/IVisualStudioCodeLocator verwenden wie die
@@ -181,10 +181,10 @@ public sealed class TaskDetailViewModelTests : IDisposable
             _workItemService,
             _logService,
             _aiService,
-            _entwicklungsprozessService,
+            _developmentprocessService,
             _pluginSelectionService,
-            _promptVorlagenService,
-            _promptVorlagenPlatzhalterService,
+            _promptTemplatesService,
+            _promptTemplatesPlaceholderService,
             _promptScheduleDispatchService,
             _dialogServiceMock.Object,
             pluginManager,
@@ -193,14 +193,14 @@ public sealed class TaskDetailViewModelTests : IDisposable
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService);
-        vm.ZurueckAction = zurueckAction;
+            workingDirectoryOpenService);
+        vm.BackAction = zurueckAction;
         return vm;
     }
 
     private async Task<WorkItem> ErstelleAufgabe(WorkItemStatus status = WorkItemStatus.New)
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
+        var workItem = await _workItemService.CreateAsync(_projectId, "Testaufgabe", "Beschreibung");
         if (status != WorkItemStatus.New)
         {
             await _workItemService.SetStatusUncheckedAsync(workItem.Id, status);
@@ -224,20 +224,20 @@ public sealed class TaskDetailViewModelTests : IDisposable
     {
         var sut = CreateSut();
 
-        sut.AufgabeBranchName.Should().BeEmpty();
+        sut.WorkItemBranchName.Should().BeEmpty();
     }
 
     /// <summary>AufgabeBranchName gibt Aufgabe.BranchName zurück wenn Aufgabe einen Branch-Namen hat.</summary>
     [Fact]
     public async Task AufgabeBranchName_WhenAufgabeHasBranchName_ReturnsBranchName()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/login-fix", Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.AufgabeBranchName.Should().Be("feature/login-fix");
+        sut.WorkItemBranchName.Should().Be("feature/login-fix");
     }
 
     // --- AufgabeId-Setter: Fire-and-Forget ---
@@ -272,7 +272,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         typeof(TaskDetailViewModel).GetField("_workItemId", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(sut, workItem.Id);
 
-        var method = typeof(TaskDetailViewModel).GetMethod("LadeProtokolleAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(TaskDetailViewModel).GetMethod("LoadLogAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(sut, new object[] { CancellationToken.None })!;
         await task;
 
@@ -290,7 +290,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         await _db.DisposeAsync();
 
-        var method = typeof(TaskDetailViewModel).GetMethod("LadeProtokolleAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(TaskDetailViewModel).GetMethod("LoadLogAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(sut, new object[] { CancellationToken.None })!;
 
         var act = async () => await task;
@@ -309,7 +309,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var method = typeof(TaskDetailViewModel).GetMethod("LadeProtokolleAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(TaskDetailViewModel).GetMethod("LoadLogAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(sut, new object[] { cts.Token })!;
 
         var act = async () => await task;
@@ -326,7 +326,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.WorkItem.Should().NotBeNull("Aufgabe muss gesetzt sein, sobald LadenAsync abgeschlossen ist, unabhängig vom Stand des Protokoll-Nachladens");
         sut.WorkItem!.Id.Should().Be(workItem.Id);
@@ -347,7 +347,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.ShowEditPanel.Should().BeTrue();
         sut.ShowCliPanel.Should().BeFalse();
@@ -361,7 +361,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.ShowCliPanel.Should().BeTrue();
         sut.ShowEditPanel.Should().BeFalse();
@@ -375,7 +375,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Waiting);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.ShowCliPanel.Should().BeTrue();
     }
@@ -389,13 +389,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.ShowCliPanel.Should().BeTrue();
         sut.ShowEditPanel.Should().BeFalse();
         sut.ShowDiffPanel.Should().BeFalse();
-        sut.StartenCommand.CanExecute(null).Should().BeTrue();
-        sut.AufgabeAbschliessenCommand.CanExecute(null).Should().BeTrue();
+        sut.StartCommand.CanExecute(null).Should().BeTrue();
+        sut.CompleteWorkItemCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>ShowDiffPanel ist true wenn Status=Beendet.</summary>
@@ -405,7 +405,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Completed);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.ShowDiffPanel.Should().BeTrue();
         sut.ShowEditPanel.Should().BeFalse();
@@ -421,13 +421,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var tempDir = Directory.CreateTempSubdirectory().FullName;
         try
         {
-            var workItem = await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+            var workItem = await _workItemService.CreateAsync(_projectId, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
             await _workItemService.StartAsync(workItem.Id, "feature/dateien", tempDir, ct: TestContext.Current.CancellationToken);
             var sut = CreateSut();
             sut.WorkItemId = workItem.Id;
-            await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+            await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-            ((RelayCommand)sut.DateiViewCommand).Execute(null);
+            ((RelayCommand)sut.FileViewCommand).Execute(null);
 
             sut.IsFileExplorerViewSelected.Should().BeTrue();
         }
@@ -444,18 +444,18 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var aufgabeOhnePfad = await ErstelleAufgabe(WorkItemStatus.New);
         var sutOhnePfad = CreateSut();
         sutOhnePfad.WorkItemId = aufgabeOhnePfad.Id;
-        await ((AsyncRelayCommand)sutOhnePfad.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sutOhnePfad.LoadCommand).ExecuteAsync();
 
         sutOhnePfad.ShowFileExplorerPanel.Should().BeFalse();
 
         var tempDir = Directory.CreateTempSubdirectory().FullName;
         try
         {
-            var aufgabeMitPfad = await _workItemService.CreateAsync(_projektId, "MitPfad", "Beschreibung", ct: TestContext.Current.CancellationToken);
+            var aufgabeMitPfad = await _workItemService.CreateAsync(_projectId, "MitPfad", "Beschreibung", ct: TestContext.Current.CancellationToken);
             await _workItemService.StartAsync(aufgabeMitPfad.Id, "feature/mit-pfad", tempDir, ct: TestContext.Current.CancellationToken);
             var sutMitPfad = CreateSut();
             sutMitPfad.WorkItemId = aufgabeMitPfad.Id;
-            await ((AsyncRelayCommand)sutMitPfad.LadenCommand).ExecuteAsync();
+            await ((AsyncRelayCommand)sutMitPfad.LoadCommand).ExecuteAsync();
 
             sutMitPfad.ShowFileExplorerPanel.Should().BeTrue();
         }
@@ -470,11 +470,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task ShowFileExplorerPanel_WertBleibtGecachtNachdemVerzeichnisNachtraeglichGeloeschtWurde()
     {
         var tempDir = Directory.CreateTempSubdirectory().FullName;
-        var workItem = await _workItemService.CreateAsync(_projektId, "MitPfad", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "MitPfad", "Beschreibung", ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/cache", tempDir, ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.ShowFileExplorerPanel.Should().BeTrue();
 
@@ -492,11 +492,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.EditTitel = "Gültiger Titel";
+        sut.EditTitle = "Gültiger Titel";
 
-        sut.KannSpeichern.Should().BeTrue();
+        sut.SaveCan.Should().BeTrue();
     }
 
     /// <summary>KannSpeichern ist false wenn Titel leer ist.</summary>
@@ -506,11 +506,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.EditTitel = string.Empty;
+        sut.EditTitle = string.Empty;
 
-        sut.KannSpeichern.Should().BeFalse();
+        sut.SaveCan.Should().BeFalse();
     }
 
     /// <summary>KannSpeichern ist false wenn Status=Beendet.</summary>
@@ -520,9 +520,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Completed);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannSpeichern.Should().BeFalse();
+        sut.SaveCan.Should().BeFalse();
     }
 
     /// <summary>KannSpeichern ist true wenn Status=Gestartet und Titel gesetzt.</summary>
@@ -532,11 +532,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.EditTitel = "Titel";
+        sut.EditTitle = "Titel";
 
-        sut.KannSpeichern.Should().BeTrue();
+        sut.SaveCan.Should().BeTrue();
     }
 
     // --- KannLoeschen ---
@@ -548,9 +548,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannLoeschen.Should().BeTrue();
+        sut.DeleteCan.Should().BeTrue();
     }
 
     /// <summary>KannLoeschen ist true wenn Status=Beendet (beendete Aufgaben können gelöscht werden).</summary>
@@ -560,9 +560,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Completed);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannLoeschen.Should().BeTrue();
+        sut.DeleteCan.Should().BeTrue();
     }
 
     /// <summary>KannLoeschen ist false wenn Status=Archiviert.</summary>
@@ -572,9 +572,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Archived);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannLoeschen.Should().BeFalse();
+        sut.DeleteCan.Should().BeFalse();
     }
 
     /// <summary>KannLoeschen ist true wenn Status=Gestartet.</summary>
@@ -584,30 +584,30 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannLoeschen.Should().BeTrue();
+        sut.DeleteCan.Should().BeTrue();
     }
 
     // --- SpeichernCommand ---
 
-    /// <summary>SpeichernCommand ruft UpdateAsync auf und aktualisiert EditTitel.</summary>
+    /// <summary>SpeichernCommand ruft UpdateAsync auf und aktualisiert EditTitle.</summary>
     [Fact]
     public async Task SpeichernCommand_RuftUpdateAsyncAuf_UndAktualisiertDaten()
     {
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.EditTitel = "Neuer Titel";
-        sut.EditAnforderungsBeschreibung = "Neue Beschreibung";
+        sut.EditTitle = "Neuer Titel";
+        sut.EditRequirementDescription = "Neue Beschreibung";
 
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        var aktualisiert = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
-        aktualisiert!.Title.Should().Be("Neuer Titel");
-        aktualisiert.RequirementDescription.Should().Be("Neue Beschreibung");
+        var updates = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        updates!.Title.Should().Be("Neuer Titel");
+        updates.RequirementDescription.Should().Be("Neue Beschreibung");
     }
 
     /// <summary>SpeichernCommand aktualisiert die Liste, navigiert aber nicht automatisch zurück.</summary>
@@ -618,21 +618,21 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var zurueckAufgerufen = false;
         var listeAktualisiert = false;
         var sut = CreateSut(() => zurueckAufgerufen = true);
-        sut.AufgabeListeAktualisierenCallback = () =>
+        sut.RefreshWorkItemListCallback = () =>
         {
             listeAktualisiert = true;
             return Task.CompletedTask;
         };
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.EditTitel = "Gespeicherter Titel";
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.EditTitle = "Gespeicherter Titel";
 
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         listeAktualisiert.Should().BeTrue();
         zurueckAufgerufen.Should().BeFalse();
         sut.WorkItemId.Should().Be(workItem.Id);
-        sut.AufgabeTitel.Should().Be("Gespeicherter Titel");
+        sut.WorkItemTitle.Should().Be("Gespeicherter Titel");
     }
 
     /// <summary>SpeichernCommand setzt IsLoading während der Ausführung (und danach wieder false).</summary>
@@ -642,13 +642,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.EditTitel = "Titel";
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.EditTitle = "Titel";
 
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         sut.IsLoading.Should().BeFalse();
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
     }
 
     /// <summary>SpeichernCommand hat CanExecute false wenn KannSpeichern false ist.</summary>
@@ -658,13 +658,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.EditTitel = string.Empty;
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.EditTitle = string.Empty;
 
-        sut.SpeichernCommand.CanExecute(null).Should().BeFalse();
+        sut.SaveCommand.CanExecute(null).Should().BeFalse();
     }
 
-    /// <summary>SpeichernCommand setzt FehlerMeldung bei Exception.</summary>
+    /// <summary>SpeichernCommand setzt ErrorMessage bei Exception.</summary>
     [Fact]
     public async Task SpeichernCommand_SetzFehlerMeldung_BeiException()
     {
@@ -674,9 +674,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         // Bei leerem AufgabeId tut der Command nichts — stattdessen ungültige DB-ID verwenden
         sut.WorkItemId = Guid.NewGuid(); // nicht in DB
 
-        // EditTitel muss gesetzt sein damit CanExecute true ist; aber Aufgabe ist null
+        // EditTitle muss gesetzt sein damit CanExecute true ist; aber Aufgabe ist null
         // → SpeichernCommand ist nicht ausführbar (KannSpeichern = false, weil Aufgabe null)
-        sut.SpeichernCommand.CanExecute(null).Should().BeFalse();
+        sut.SaveCommand.CanExecute(null).Should().BeFalse();
     }
 
     // --- LoeschenCommand ---
@@ -689,11 +689,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var zurueckAufgerufen = false;
         var sut = CreateSut(zurueckAction: () => zurueckAufgerufen = true);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+        _dialogServiceMock.Setup(d => d.ConfirmDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
 
-        await ((AsyncRelayCommand)sut.LoeschenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.DeleteCommand).ExecuteAsync();
 
         zurueckAufgerufen.Should().BeTrue();
         var geloescht = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -708,11 +708,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var zurueckAufgerufen = false;
         var sut = CreateSut(zurueckAction: () => zurueckAufgerufen = true);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
+        _dialogServiceMock.Setup(d => d.ConfirmDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
 
-        await ((AsyncRelayCommand)sut.LoeschenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.DeleteCommand).ExecuteAsync();
 
         zurueckAufgerufen.Should().BeFalse();
         var nochVorhanden = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -726,16 +726,16 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
+        _dialogServiceMock.Setup(d => d.ConfirmDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
 
-        await ((AsyncRelayCommand)sut.LoeschenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.DeleteCommand).ExecuteAsync();
 
-        _dialogServiceMock.Verify(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+        _dialogServiceMock.Verify(d => d.ConfirmDialog(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
     }
 
-    /// <summary>LoeschenCommand setzt FehlerMeldung wenn Service-Fehler auftritt.</summary>
+    /// <summary>LoeschenCommand setzt ErrorMessage wenn Service-Fehler auftritt.</summary>
     [Fact]
     public async Task LoeschenCommand_SetzFehlerMeldung_WennDeleteScheitert()
     {
@@ -743,13 +743,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+        _dialogServiceMock.Setup(d => d.ConfirmDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
 
-        await ((AsyncRelayCommand)sut.LoeschenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.DeleteCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
     }
 
     /// <summary>LoeschenCommand hat CanExecute true wenn Status=Beendet (beendete Aufgaben können gelöscht werden).</summary>
@@ -759,25 +759,25 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Completed);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.LoeschenCommand.CanExecute(null).Should().BeTrue();
+        sut.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
 
-    /// <summary>LoeschenCommand ruft AufgabeListeAktualisierenCallback auf nach erfolgreichem Löschen.</summary>
+    /// <summary>LoeschenCommand ruft RefreshWorkItemListCallback auf nach erfolgreichem Löschen.</summary>
     [Fact]
     public async Task LoeschenCommand_RuftCallbackAuf_NachErfolgreichemLoeschen()
     {
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var callbackAufgerufen = false;
         var sut = CreateSut();
-        sut.AufgabeListeAktualisierenCallback = () => { callbackAufgerufen = true; return Task.CompletedTask; };
+        sut.RefreshWorkItemListCallback = () => { callbackAufgerufen = true; return Task.CompletedTask; };
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+        _dialogServiceMock.Setup(d => d.ConfirmDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
 
-        await ((AsyncRelayCommand)sut.LoeschenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.DeleteCommand).ExecuteAsync();
 
         callbackAufgerufen.Should().BeTrue();
     }
@@ -791,7 +791,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.IsInfoViewVisible.Should().BeFalse();
         sut.InfoCliToggleCommand.Execute(null);
@@ -805,7 +805,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.IsInfoViewVisible = true;
 
         sut.InfoCliToggleCommand.Execute(null);
@@ -820,7 +820,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.InfoCliToggleCommand.Execute(null);
         sut.InfoCliToggleCommand.Execute(null);
@@ -837,7 +837,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut();
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.IsInfoViewSelected.Should().BeTrue();
         sut.IsCliViewSelected.Should().BeFalse();
@@ -852,7 +852,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut();
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.IsCliViewSelected.Should().BeTrue();
 
         sut.InfoViewCommand.Execute(null);
@@ -868,7 +868,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut();
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.IsDiffViewSelected.Should().BeTrue();
 
         sut.InfoViewCommand.Execute(null);
@@ -876,46 +876,46 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.IsInfoViewSelected.Should().BeTrue();
     }
 
-    // --- EditTitel / EditAnforderungsBeschreibung ---
+    // --- EditTitle / EditRequirementDescription ---
 
-    /// <summary>EditTitel wird nach LadenAsync mit Aufgabe.Titel initialisiert.</summary>
+    /// <summary>EditTitle wird nach LadenAsync mit Aufgabe.Titel initialisiert.</summary>
     [Fact]
     public async Task EditTitel_WirdNachLaden_MitAufgabeTitelInitialisiert()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Mein Titel", "Meine Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Mein Titel", "Meine Beschreibung", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.EditTitel.Should().Be("Mein Titel");
+        sut.EditTitle.Should().Be("Mein Titel");
     }
 
-    /// <summary>EditAnforderungsBeschreibung wird nach LadenAsync initialisiert.</summary>
+    /// <summary>EditRequirementDescription wird nach LadenAsync initialisiert.</summary>
     [Fact]
     public async Task EditAnforderungsBeschreibung_WirdNachLaden_Initialisiert()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Titel", "Anforderung XYZ", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Titel", "Anforderung XYZ", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.EditAnforderungsBeschreibung.Should().Be("Anforderung XYZ");
+        sut.EditRequirementDescription.Should().Be("Anforderung XYZ");
     }
 
-    /// <summary>EditTitel ist bindbar und triggert KannSpeichern-Neuberechnung.</summary>
+    /// <summary>EditTitle ist bindbar und triggert KannSpeichern-Neuberechnung.</summary>
     [Fact]
     public async Task EditTitel_AendertKannSpeichern_BeiAenderung()
     {
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.EditTitel = string.Empty;
-        sut.KannSpeichern.Should().BeFalse();
+        sut.EditTitle = string.Empty;
+        sut.SaveCan.Should().BeFalse();
 
-        sut.EditTitel = "Gültiger Titel";
-        sut.KannSpeichern.Should().BeTrue();
+        sut.EditTitle = "Gültiger Titel";
+        sut.SaveCan.Should().BeTrue();
     }
 
     /// <summary>ZurueckCommand ruft ZurueckAction auf.</summary>
@@ -925,7 +925,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var zurueckAufgerufen = false;
         var sut = CreateSut(zurueckAction: () => zurueckAufgerufen = true);
 
-        sut.ZurueckCommand.Execute(null);
+        sut.BackCommand.Execute(null);
 
         zurueckAufgerufen.Should().BeTrue();
     }
@@ -937,17 +937,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.EditTitel = "Titel";
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.EditTitle = "Titel";
 
         // Aufgabe wird zwischen Laden und Speichern entfernt, damit UpdateAsync fehlschlägt
         var entity = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         _db.WorkItems.Remove(entity!);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
     }
 
     /// <summary>SpeichernAsync ruft ZurueckAction nicht auf, wenn das Speichern fehlschlägt.</summary>
@@ -958,15 +958,15 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var zurueckAufgerufen = false;
         var sut = CreateSut(zurueckAction: () => zurueckAufgerufen = true);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.EditTitel = "Titel";
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.EditTitle = "Titel";
 
         // Aufgabe wird zwischen Laden und Speichern entfernt, damit UpdateAsync fehlschlägt
         var entity = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         _db.WorkItems.Remove(entity!);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         zurueckAufgerufen.Should().BeFalse();
     }
@@ -980,9 +980,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.StartenCommand.CanExecute(null).Should().BeTrue();
+        sut.StartCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>StartenCommand.CanExecute ist false wenn Status != Neu.</summary>
@@ -992,9 +992,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.StartenCommand.CanExecute(null).Should().BeFalse();
+        sut.StartCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>StartenAsync zeigt den Plugin-Dialog, falls die Aufgabe kein Plugin hat.</summary>
@@ -1004,13 +1004,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
         _dialogServiceMock.Verify(d => d.ShowPluginSelectionDialogAsync(
             It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -1023,13 +1023,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", true));
 
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
         var gespeichert = await pluginDefaultSettingsService.GetProjectDefaultPluginPrefixAsync(workItem.ProjectId, Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation, TestContext.Current.CancellationToken);
@@ -1043,13 +1043,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
         var gespeichert = await pluginDefaultSettingsService.GetDefaultPluginPrefixAsync(Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation, TestContext.Current.CancellationToken);
@@ -1063,19 +1063,19 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeTrue();
-        sut.AktiverCliName.Should().Be("Test KI");
+        sut.ActiveCliName.Should().Be("Test KI");
         sut.CliStatusText.Should().NotBe("Bereit Repository vor...");
-        var aktualisiert = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
-        aktualisiert!.Status.Should().Be(WorkItemStatus.Started);
+        var updates = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        updates!.Status.Should().Be(WorkItemStatus.Started);
     }
 
     /// <summary>StartenAsync zeigt während eines laufenden Repository-Klons den Vorbereitungsstatus.</summary>
@@ -1092,13 +1092,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
-        var startTask = ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        var startTask = ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
         await cloneStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         sut.CliStatusText.Should().Be("Bereit Repository vor...");
@@ -1118,17 +1118,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
         sut.CliStatusText.Should().NotBe("Bereit Repository vor...");
         sut.CliStatusText.Should().Be("CLI inaktiv");
-        sut.FehlerMeldung.Should().Contain("Aufgabe konnte nicht gestartet werden");
+        sut.ErrorMessage.Should().Contain("Aufgabe konnte nicht gestartet werden");
     }
 
     /// <summary>CliStoppenCommand leert den aktiven CLI-Namen.</summary>
@@ -1138,17 +1138,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
-        sut.AktiverCliName.Should().Be("Test KI");
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
+        sut.ActiveCliName.Should().Be("Test KI");
 
         await FuehreCliStoppenMitProzessendeAusAsync(sut, workItem.Id);
 
-        sut.AktiverCliName.Should().BeNull();
+        sut.ActiveCliName.Should().BeNull();
     }
 
     /// <summary>
@@ -1159,7 +1159,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     /// </summary>
     private async Task FuehreCliStoppenMitProzessendeAusAsync(TaskDetailViewModel sut, Guid workItemId)
     {
-        var stopTask = ((AsyncRelayCommand)sut.CliStoppenCommand).ExecuteAsync();
+        var stopTask = ((AsyncRelayCommand)sut.StopCliCommand).ExecuteAsync();
         await Task.Delay(200);
         var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_aiService)!;
@@ -1179,21 +1179,21 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
         sut.IsCliRunning.Should().BeTrue();
         await _workItemService.SetActiveRunAsync(workItem.Id, "run-lebendig", TestContext.Current.CancellationToken);
 
         // Der deterministische Testlauncher bindet den eigenen (nicht beendbaren) Testprozess —
         // StopCliAsync schlägt damit genau wie bei einem echten, nicht terminierbaren Prozess fehl.
-        await ((AsyncRelayCommand)sut.CliStoppenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StopCliCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeTrue("der Prozess läuft nach dem fehlgeschlagenen Stopp weiter");
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty("der Benutzer erhält eine Fehlermeldung statt eines falschen Bereit-Zustands");
+        sut.ErrorMessage.Should().NotBeNullOrEmpty("der Benutzer erhält eine Fehlermeldung statt eines falschen Bereit-Zustands");
         var geladen = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         geladen!.ActiveRunId.Should().Be("run-lebendig",
             "die Laufdaten dürfen bei einem weiterlaufenden Prozess nicht als beendet geschrieben werden");
@@ -1212,12 +1212,12 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
         sut.IsCliRunning.Should().BeTrue();
 
         (await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken))!.ActiveRunId.Should().BeNull(
@@ -1243,17 +1243,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         Softwareschmiede.Infrastructure.Terminal.ITerminalSession? gemeldetSession = null;
-        sut.TerminalSessionGestartet += s => gemeldetSession = s;
+        sut.TerminalSessionStarted += s => gemeldetSession = s;
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(
                 It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
         gemeldetSession.Should().NotBeNull(
             "TerminalSessionGestartet muss nach StartenCommand feuern, damit das TerminalControl die Session erhält");
@@ -1271,14 +1271,14 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(
                 It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
         // Simuliert: Loaded feuert NACH LadenAsync/TerminalSessionGestartet.
         // Der View ruft GetTerminalSession() im Loaded-Handler auf und setzt TerminalConsole.Session direkt.
@@ -1300,14 +1300,14 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(
                 It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
         sut.CliStatusText.Should().Contain(
             "eingeschränkter Modus",
@@ -1327,13 +1327,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var ersteVm = CreateSut();
         ersteVm.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)ersteVm.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)ersteVm.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(
                 It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
-        await ((AsyncRelayCommand)ersteVm.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)ersteVm.StartCommand).ExecuteAsync();
         ersteVm.IsCliRunning.Should().BeTrue();
 
         // "Zurück" navigieren: View-Unloaded ruft Dispose auf – Prozess bleibt aktiv
@@ -1342,7 +1342,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         // Aufgabe erneut öffnen: neues VM (wie OeffneAufgabe in ProjectDetailViewModel)
         var zweiteVm = CreateSut();
         zweiteVm.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)zweiteVm.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)zweiteVm.LoadCommand).ExecuteAsync();
 
         // CLI muss noch laufen und GetTerminalSession muss die Session liefern
         zweiteVm.IsCliRunning.Should().BeTrue(
@@ -1356,15 +1356,15 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task NachWiederoeffnen_ZeigtAktivenCliName_WhenStartPluginNurAusProjektDefaultKam()
     {
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(_projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
+        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(_projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
 
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var ersteVm = CreateSut();
         ersteVm.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)ersteVm.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)ersteVm.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)ersteVm.StartenCommand).ExecuteAsync();
-        ersteVm.AktiverCliName.Should().Be("Test KI");
+        await ((AsyncRelayCommand)ersteVm.StartCommand).ExecuteAsync();
+        ersteVm.ActiveCliName.Should().Be("Test KI");
         _dialogServiceMock.Verify(d => d.ShowPluginSelectionDialogAsync(
             It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
 
@@ -1375,26 +1375,26 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var zweiteVm = CreateSut();
         zweiteVm.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)zweiteVm.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)zweiteVm.LoadCommand).ExecuteAsync();
 
         zweiteVm.IsCliRunning.Should().BeTrue();
-        zweiteVm.AktiverCliName.Should().Be("Test KI");
+        zweiteVm.ActiveCliName.Should().Be("Test KI");
     }
 
     /// <summary>Bei Wechsel der CLI über das Plugin-Dialog wird der neue Name in der Fußzeile angezeigt, auch wenn zuvor ein Projekt-Default aktiv war.</summary>
     [Fact]
-    public async Task PluginAendernCommand_ZeigtNeuenAktivenCliName_WennVorherProjektDefaultLief()
+    public async Task SwitchPluginCommand_ZeigtNeuenAktivenCliName_WennVorherProjektDefaultLief()
     {
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(_projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
+        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(_projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
 
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut(pluginManager: _pluginManagerMockFuerPluginSelection.Object);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
-        sut.AktiverCliName.Should().Be("Test KI");
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
+        sut.ActiveCliName.Should().Be("Test KI");
 
         _dialogServiceMock
             .SetupSequence(d => d.ShowPluginSelectionDialogAsync(
@@ -1402,10 +1402,10 @@ public sealed class TaskDetailViewModelTests : IDisposable
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.ZweitesKi", false))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
-        await ((AsyncRelayCommand)sut.PluginAendernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SwitchPluginCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeTrue();
-        sut.AktiverCliName.Should().Be("Zweites KI");
+        sut.ActiveCliName.Should().Be("Zweites KI");
 
         var aktualisierteAufgabe = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         aktualisierteAufgabe!.AiPluginPrefix.Should().Be("Softwareschmiede.ZweitesKi");
@@ -1416,12 +1416,12 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task CliNeustartenCommand_NachPluginWechsel_VerwendetGeaendertesPlugin_NichtProjektDefault()
     {
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(_projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
+        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(_projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
 
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut(pluginManager: _pluginManagerMockFuerPluginSelection.Object);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .SetupSequence(d => d.ShowPluginSelectionDialogAsync(
@@ -1429,49 +1429,49 @@ public sealed class TaskDetailViewModelTests : IDisposable
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.ZweitesKi", false))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
-        sut.AktiverCliName.Should().Be("Test KI");
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
+        sut.ActiveCliName.Should().Be("Test KI");
 
-        await ((AsyncRelayCommand)sut.PluginAendernCommand).ExecuteAsync();
-        sut.AktiverCliName.Should().Be("Zweites KI");
+        await ((AsyncRelayCommand)sut.SwitchPluginCommand).ExecuteAsync();
+        sut.ActiveCliName.Should().Be("Zweites KI");
 
         await FuehreCliStoppenMitProzessendeAusAsync(sut, workItem.Id);
         sut.IsCliRunning.Should().BeFalse();
 
-        await ((AsyncRelayCommand)sut.CliNeustartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.RestartCliCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeTrue();
-        sut.AktiverCliName.Should().Be("Zweites KI");
+        sut.ActiveCliName.Should().Be("Zweites KI");
     }
 
-    // --- PluginAendernCommand ---
+    // --- SwitchPluginCommand ---
 
-    /// <summary>PluginAendernCommand.CanExecute ist true wenn CLI läuft.</summary>
+    /// <summary>SwitchPluginCommand.CanExecute ist true wenn CLI läuft.</summary>
     [Fact]
     public async Task TestPluginWechselCommand_CanExecute_CliRunning()
     {
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         typeof(TaskDetailViewModel)
             .GetField("_isCliRunning", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(sut, true);
 
-        sut.PluginAendernCommand.CanExecute(null).Should().BeTrue();
+        sut.SwitchPluginCommand.CanExecute(null).Should().BeTrue();
     }
 
-    /// <summary>PluginAendernCommand.CanExecute ist false wenn CLI nicht läuft.</summary>
+    /// <summary>SwitchPluginCommand.CanExecute ist false wenn CLI nicht läuft.</summary>
     [Fact]
     public async Task TestPluginWechselCommand_CanExecute_CliNotRunning_ReturnsFalse()
     {
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.PluginAendernCommand.CanExecute(null).Should().BeFalse();
+        sut.SwitchPluginCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>PluginWechselAsync stoppt die alte CLI, zeigt den Dialog und startet die neue CLI.</summary>
@@ -1481,15 +1481,15 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
         sut.IsCliRunning.Should().BeTrue();
 
-        await ((AsyncRelayCommand)sut.PluginAendernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SwitchPluginCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeTrue();
         _dialogServiceMock.Verify(d => d.ShowPluginSelectionDialogAsync(
@@ -1503,18 +1503,18 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
         _aiService.Dispose();
 
-        await ((AsyncRelayCommand)sut.PluginAendernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SwitchPluginCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
     }
 
     // --- LadenAsync: Kein impliziter CLI-Neustart ---
@@ -1523,17 +1523,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
     [Fact]
     public async Task TestLoadAsync_StartetCliNichtImplizit_StatusGestartetAktivOhneLaufendenProzess()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Kein-Auto-Restart-Aufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Kein-Auto-Restart-Aufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/test", Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         await _workItemService.UpdateAsync(workItem.Id, workItem.Title, workItem.RequirementDescription, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeFalse();
         sut.ShowCliPanel.Should().BeTrue("der persistiert aktive Status soll sichtbar bleiben");
-        sut.KannCliNeuStarten.Should().BeTrue("der Nutzer soll explizit neu starten können");
+        sut.StartCanCliNew.Should().BeTrue("der Nutzer soll explizit neu starten können");
         _kiPluginMock.Verify(
             p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -1546,15 +1546,15 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
         sut.IsCliRunning.Should().BeTrue();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeTrue();
         _kiPluginMock.Verify(
@@ -1572,13 +1572,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var sut = CreateSut();
         sut.WorkItemId = neueAufgabe.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.IsCliRunning.Should().BeFalse();
 
         sut.WorkItemId = beendeteAusfuehrung.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.IsCliRunning.Should().BeFalse();
-        sut.StartenCommand.CanExecute(null).Should().BeTrue();
+        sut.StartCommand.CanExecute(null).Should().BeTrue();
         _kiPluginMock.Verify(
             p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -1589,18 +1589,18 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task StartenCommand_StartetBeendeteAusfuehrungExplizitNeu()
     {
         var workingDirectory = CreateTempDirectory();
-        var workItem = await _workItemService.CreateAsync(_projektId, "Expliziter Neustart", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Expliziter Neustart", "Beschreibung", ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/explizit", workingDirectory, ct: TestContext.Current.CancellationToken);
         await _workItemService.UpdateAsync(workItem.Id, workItem.Title, workItem.RequirementDescription, "Softwareschmiede.TestKi", TestContext.Current.CancellationToken);
         await _workItemService.EndActiveRunAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.StartenCommand.CanExecute(null).Should().BeTrue();
+        sut.StartCommand.CanExecute(null).Should().BeTrue();
 
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeTrue();
         _kiPluginMock.Verify(
@@ -1615,37 +1615,37 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.Completed);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.StartenCommand.CanExecute(null).Should().BeFalse();
+        sut.StartCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>Abgeschlossene Aufgaben bleiben auch mit AusfuehrungsStatus=Beendet nicht startbar.</summary>
     [Fact]
     public async Task StartenCommand_CanExecuteFalse_WhenAufgabeAbgeschlossenUndAusfuehrungBeendet()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Abgeschlossen", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Abgeschlossen", "Beschreibung", ct: TestContext.Current.CancellationToken);
         await _workItemService.CompleteAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.WorkItemStatus.Should().Be(WorkItemStatus.Completed);
         sut.WorkItem!.ExecutionStatus.Should().Be(WorkItemExecutionStatus.Completed);
-        sut.StartenCommand.CanExecute(null).Should().BeFalse();
+        sut.StartCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>LadenAsync lädt Promptvorlagen für die Ribbon-Auswahl.</summary>
     [Fact]
     public async Task LadenAsync_LaedtPromptVorlagenFuerAuswahl()
     {
-        await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
+        await _promptTemplatesService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.PromptTemplates.Should().ContainSingle();
         sut.PromptTemplates[0].Name.Should().Be("Weitermachen");
@@ -1655,13 +1655,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
     [Fact]
     public async Task PromptVorlageAuswaehlenCommand_OhneLaufendeSession_StuerztNichtAb()
     {
-        var template = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
+        var template = await _promptTemplatesService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        var act = async () => await ((AsyncRelayCommand<PromptTemplate>)sut.PromptVorlageAuswaehlenCommand).ExecuteAsync(template);
+        var act = async () => await ((AsyncRelayCommand<PromptTemplate>)sut.SelectPromptTemplateCommand).ExecuteAsync(template);
 
         await act.Should().NotThrowAsync();
     }
@@ -1697,7 +1697,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut(pluginManager: ErstelleGitPluginManager().Object);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         // Assert
         sut.CanAssignIssue.Should().BeTrue();
@@ -1710,7 +1710,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             PluginType = "Softwareschmiede.TestGit",
             RepositoryUrl = "test/repo",
             RepositoryName = "Test Repository",
@@ -1718,16 +1718,16 @@ public sealed class TaskDetailViewModelTests : IDisposable
         };
         _db.GitRepositories.Add(repository);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
-        var workItem = await _workItemService.CreateAsync(_projektId, "PR-Aufgabe", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "PR-Aufgabe", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/pr-aktionen", Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         var sut = CreateSut(pluginManager: ErstelleGitPluginManager().Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.WorkItemStatus.Should().Be(WorkItemStatus.Started);
-        sut.KannPullRequestErstellen.Should().BeTrue();
-        sut.PullRequestErstellenCommand.CanExecute(null).Should().BeTrue();
+        sut.CreateCanPullRequest.Should().BeTrue();
+        sut.CreatePullRequestCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>PullRequestErstellenCommand nutzt die Git-Orchestrierung und übergibt dem Plugin die aufgelöste Repository-ID.</summary>
@@ -1769,7 +1769,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             PluginType = "Softwareschmiede.TestGit",
             RepositoryUrl = "https://github.com/test/repo.git",
             RepositoryName = "Test Repository",
@@ -1777,13 +1777,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         };
         _db.GitRepositories.Add(repository);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
-        var workItem = await _workItemService.CreateAsync(_projektId, "PR aus UI", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "PR aus UI", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/pr-url", Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
         var pluginActivationServiceForPr = new PluginActivationService(new AppSettingService(_db, NullLogger<AppSettingService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationServiceForPr, NullLogger<PluginSelectionService>.Instance);
-        var projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance, pluginManagerMock.Object);
+        var projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance, pluginManagerMock.Object);
         var workspaceBrowserMock = new Mock<IGitWorkspaceBrowserService>();
         workspaceBrowserMock
             .Setup(browser => browser.LoadSnapshotAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
@@ -1803,7 +1803,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             });
         var gitOrchestrationService = new GitOrchestrationService(
             _workItemService,
-            projektService,
+            projectService,
             _logService,
             gitPluginMock.Object,
             pluginSelectionService,
@@ -1814,11 +1814,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.PullRequestErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreatePullRequestCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         gitPluginMock.Verify(p => p.PushBranchAsync(
                 It.IsAny<string>(),
                 "feature/pr-url",
@@ -1852,7 +1852,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             PluginType = "Softwareschmiede.TestGit",
             RepositoryUrl = "test/repo",
             RepositoryName = "Test Repository",
@@ -1860,15 +1860,15 @@ public sealed class TaskDetailViewModelTests : IDisposable
         };
         _db.GitRepositories.Add(repository);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
-        var workItem = await _workItemService.CreateAsync(_projektId, "PR-Aufgabe ohne Capability", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "PR-Aufgabe ohne Capability", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/pr-ohne-capability", Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         var sut = CreateSut(pluginManager: ErstelleGitPluginManager(canCreatePullRequest: false).Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannPullRequestErstellen.Should().BeFalse();
-        sut.PullRequestErstellenCommand.CanExecute(null).Should().BeFalse();
+        sut.CreateCanPullRequest.Should().BeFalse();
+        sut.CreatePullRequestCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>PullRequestsAktualisierenCommand stoesst einen sofortigen Monitoring-Refresh an und laedt neue Workflow-Runs ohne Aufgabenwechsel.</summary>
@@ -1878,7 +1878,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             PluginType = "Softwareschmiede.GitHub",
             RepositoryUrl = "owner/repo",
             RepositoryName = "owner/repo",
@@ -1887,7 +1887,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _db.GitRepositories.Add(repository);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var workItem = await _workItemService.CreateAsync(_projektId, "PR-Aufgabe", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "PR-Aufgabe", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var pullRequest = new PullRequestReference
         {
             Id = Guid.NewGuid(),
@@ -1968,10 +1968,10 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProvider);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.PullRequests.Single().WorkflowRuns.Should().BeEmpty();
 
-        await ((AsyncRelayCommand)sut.PullRequestsAktualisierenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.RefreshPullRequestsCommand).ExecuteAsync();
 
         sut.PullRequests.Single().WorkflowRuns.Should().ContainSingle(run =>
             run.Name == "Missing Translation for Statement Draft Validation Results"
@@ -1987,12 +1987,12 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut(pluginManager: ErstelleGitPluginManager().Object);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
         // Assert: CLI läuft → CanAssignIssue = false
         sut.IsCliRunning.Should().BeTrue();
@@ -2007,11 +2007,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         // Assert: Aufgabe hat keine IssueReferenz → CanExecute false
-        sut.CurrentIssueReferenz.Should().BeNull();
-        sut.IssueBrowserOeffnenCommand.CanExecute(null).Should().BeFalse();
+        sut.CurrentIssueReference.Should().BeNull();
+        sut.OpenIssueBrowserCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>IssueZuweisenCommand.CanExecute ist false wenn kein Plugin vorhanden.</summary>
@@ -2022,11 +2022,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         // Assert: Standard-Plugin-Manager gibt keine SCM-Plugins zurück
         sut.CanAssignIssue.Should().BeFalse();
-        sut.IssueZuweisenCommand.CanExecute(null).Should().BeFalse();
+        sut.AssignIssueCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>IssueAnlegenCommand ist nur verfügbar, wenn Provider-Capability vorhanden ist und noch keine Referenz existiert.</summary>
@@ -2034,13 +2034,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_CanExecute_WhenProviderSupportsCreateAndNoReferenceExists()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var sut = CreateSut(pluginManager: pluginManagerMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.CanCreateIssue.Should().BeTrue();
         sut.IssueAnlegenCommand.CanExecute(null).Should().BeTrue();
@@ -2051,7 +2051,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_ShouldUseRepositoryUrl_ForProviderCapability()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: false);
         gitPluginMock.As<IIssueCreateProvider>()
             .Setup(p => p.CanCreateIssueAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
@@ -2060,7 +2060,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(pluginManager: pluginManagerMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.CanCreateIssue.Should().BeTrue();
         gitPluginMock.As<IIssueCreateProvider>()
@@ -2072,13 +2072,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_CannotExecute_WhenProviderDoesNotSupportCreate()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: false);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var sut = CreateSut(pluginManager: pluginManagerMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.CanCreateIssue.Should().BeFalse();
         sut.IssueAnlegenCommand.CanExecute(null).Should().BeFalse();
@@ -2089,13 +2089,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_CannotExecute_WhenProviderHasNoCreateCapability()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleGitPluginOhneIssueCreateMock();
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var sut = CreateSut(pluginManager: pluginManagerMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.CanCreateIssue.Should().BeFalse();
         sut.IssueAnlegenCommand.CanExecute(null).Should().BeFalse();
@@ -2106,7 +2106,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_CannotExecute_WhenProviderCapabilityFails()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         gitPluginMock.As<IIssueCreateProvider>()
             .Setup(p => p.CanCreateIssueAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
@@ -2115,7 +2115,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(pluginManager: pluginManagerMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.CanCreateIssue.Should().BeFalse();
         sut.IssueAnlegenCommand.CanExecute(null).Should().BeFalse();
@@ -2126,14 +2126,14 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenCommand_CannotExecute_WhenIssueReferenceExists()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.UpdateIssueReferenceAsync(workItem.Id, new Issue(1, "Vorhanden", "Body", [], null, "https://example.test/1"), TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var sut = CreateSut(pluginManager: pluginManagerMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.CanCreateIssue.Should().BeFalse();
         sut.IssueAnlegenCommand.CanExecute(null).Should().BeFalse();
@@ -2144,7 +2144,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldPersistCreatedIssueAndReloadTask()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://github.com/test/repo/issues/23");
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
@@ -2157,12 +2157,12 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
 
-        sut.CurrentIssueReferenz.Should().NotBeNull();
-        sut.CurrentIssueReferenz!.IssueNumber.Should().Be(23);
-        sut.CurrentIssueReferenz.IssueUrl.Should().Be("https://github.com/test/repo/issues/23");
+        sut.CurrentIssueReference.Should().NotBeNull();
+        sut.CurrentIssueReference!.IssueNumber.Should().Be(23);
+        sut.CurrentIssueReference.IssueUrl.Should().Be("https://github.com/test/repo/issues/23");
         sut.WorkItem!.RequirementDescription.Should().Be("Beschreibung");
         sut.CanCreateIssue.Should().BeFalse();
     }
@@ -2172,7 +2172,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldUpdateTaskDescriptionFromCreatedIssueBody_WhenOptionIsEnabled()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Alte Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var createdIssue = new Issue(23, "Neu", "Provider Body", [], null, "https://github.com/test/repo/issues/23");
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
@@ -2185,11 +2185,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
 
         sut.WorkItem!.RequirementDescription.Should().Be("Provider Body");
-        sut.CurrentIssueReferenz!.IssueNumber.Should().Be(23);
+        sut.CurrentIssueReference!.IssueNumber.Should().Be(23);
     }
 
     /// <summary>IssueAnlegenAsync nutzt den lokalen Dialog-Body, wenn der Provider-Issue-Body leer ist.</summary>
@@ -2197,7 +2197,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldUseLocalBodyFallback_WhenCreatedIssueBodyIsEmpty()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Alte Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var createdIssue = new Issue(23, "Neu", "   ", [], null, "https://github.com/test/repo/issues/23");
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
@@ -2210,11 +2210,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
 
         sut.WorkItem!.RequirementDescription.Should().Be("Lokaler Body");
-        sut.CurrentIssueReferenz!.IssueNumber.Should().Be(23);
+        sut.CurrentIssueReference!.IssueNumber.Should().Be(23);
     }
 
     /// <summary>Nach extern erstelltem Issue nennt ein lokaler Persistenzfehler die externe URL und speichert keine Referenz.</summary>
@@ -2222,7 +2222,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldShowExternalIssueUrl_WhenLocalPersistenceFails()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://github.com/test/repo/issues/23");
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
@@ -2239,11 +2239,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().Contain("die lokale Zuordnung oder Aufgabenbeschreibung konnte aber nicht gespeichert werden");
-        sut.FehlerMeldung.Should().Contain("https://github.com/test/repo/issues/23");
+        sut.ErrorMessage.Should().Contain("die lokale Zuordnung oder Aufgabenbeschreibung konnte aber nicht gespeichert werden");
+        sut.ErrorMessage.Should().Contain("https://github.com/test/repo/issues/23");
         (await _workItemService.GetDetailAsync(workItem.Id, TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
@@ -2252,7 +2252,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldNotPersistReference_WhenDialogIsCancelled()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var dialogVm = new IssueCreateDialogViewModel(pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
@@ -2264,7 +2264,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
 
         var reloaded = await _workItemService.GetDetailAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -2276,7 +2276,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldIgnoreSecondExecution_WhileCreateDialogIsOpen()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var dialogVm = new IssueCreateDialogViewModel(pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
@@ -2296,7 +2296,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         var first = ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
         await dialogStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -2315,7 +2315,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public async Task IssueAnlegenAsync_ShouldNotOverwriteReference_WhenIssueWasAssignedAfterDialog()
     {
         var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Issue-Anlage", "Beschreibung", repository.Id, TestContext.Current.CancellationToken);
         var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://github.com/test/repo/issues/23");
         var parallelIssue = new Issue(99, "Parallel", "Body", [], null, "https://github.com/test/repo/issues/99");
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
@@ -2333,14 +2333,14 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
 
         var reloaded = await _workItemService.GetDetailAsync(workItem.Id, TestContext.Current.CancellationToken);
         reloaded!.IssueReference!.IssueNumber.Should().Be(99);
         reloaded.RequirementDescription.Should().Be("Beschreibung");
-        sut.FehlerMeldung.Should().Contain("extern erstellt");
-        sut.FehlerMeldung.Should().Contain("https://github.com/test/repo/issues/23");
+        sut.ErrorMessage.Should().Contain("extern erstellt");
+        sut.ErrorMessage.Should().Contain("https://github.com/test/repo/issues/23");
     }
 
     /// <summary>IssueZuweisenAsync tut nichts wenn Dialog abgebrochen wird.</summary>
@@ -2367,13 +2367,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         // Act
-        await ((AsyncRelayCommand)sut.IssueZuweisenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.AssignIssueCommand).ExecuteAsync();
 
         // Assert: IssueReferenz unverändert (null)
-        sut.CurrentIssueReferenz.Should().BeNull();
+        sut.CurrentIssueReference.Should().BeNull();
     }
 
     /// <summary>IssueZuweisenAsync aktualisiert CurrentIssueReferenz wenn Dialog bestätigt wird.</summary>
@@ -2402,15 +2402,15 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         // Act
-        await ((AsyncRelayCommand)sut.IssueZuweisenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.AssignIssueCommand).ExecuteAsync();
 
         // Assert
-        sut.CurrentIssueReferenz.Should().NotBeNull();
-        sut.CurrentIssueReferenz!.IssueNumber.Should().Be(42);
-        sut.CurrentIssueReferenz.IssueUrl.Should().Be("https://github.com/test/42");
+        sut.CurrentIssueReference.Should().NotBeNull();
+        sut.CurrentIssueReference!.IssueNumber.Should().Be(42);
+        sut.CurrentIssueReference.IssueUrl.Should().Be("https://github.com/test/42");
     }
 
     // --- OeffneArbeitsverzeichnisCommand ---
@@ -2422,15 +2422,15 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe();
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.OeffneArbeitsverzeichnisCommand.CanExecute(null).Should().BeFalse("die Aufgabe hat noch kein Arbeitsverzeichnis");
+        sut.OpenWorkingDirectoryCommand.CanExecute(null).Should().BeFalse("die Aufgabe hat noch kein Arbeitsverzeichnis");
 
         var workingDirectory = CreateTempDirectory();
         await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.OeffneArbeitsverzeichnisCommand.CanExecute(null).Should().BeTrue("das Arbeitsverzeichnis existiert jetzt");
+        sut.OpenWorkingDirectoryCommand.CanExecute(null).Should().BeTrue("das Arbeitsverzeichnis existiert jetzt");
     }
 
     /// <summary>Ausführung von OeffneArbeitsverzeichnisCommand delegiert an ArbeitsverzeichnisOeffnenService mit dem LokalerKlonPfad der Aufgabe.</summary>
@@ -2444,9 +2444,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock: prozessStarterMock);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.OeffneArbeitsverzeichnisCommand.Execute(null);
+        sut.OpenWorkingDirectoryCommand.Execute(null);
 
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a => a.Arguments == $"\"{workingDirectory}\"")),
@@ -2468,17 +2468,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe();
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannIdeOeffnen.Should().BeFalse("ohne LokalerKlonPfad existiert noch kein Arbeitsverzeichnis");
-        sut.OeffneIdeCommand.CanExecute(null).Should().BeFalse();
+        sut.OpenCanIde.Should().BeFalse("ohne LokalerKlonPfad existiert noch kein Arbeitsverzeichnis");
+        sut.OpenIdeCommand.CanExecute(null).Should().BeFalse();
 
         var workingDirectory = CreateTempDirectory();
         await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannIdeOeffnen.Should().BeTrue("das Arbeitsverzeichnis existiert jetzt, unabhängig von vorhandenen .sln-Dateien");
-        sut.OeffneIdeCommand.CanExecute(null).Should().BeTrue();
+        sut.OpenCanIde.Should().BeTrue("das Arbeitsverzeichnis existiert jetzt, unabhängig von vorhandenen .sln-Dateien");
+        sut.OpenIdeCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>
@@ -2497,12 +2497,12 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(prozessStarterMock: prozessStarterMock, visualStudioCodeLocator: locator);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannIdeOeffnen.Should().BeTrue();
-        sut.OeffneIdeCommand.CanExecute(null).Should().BeTrue();
+        sut.OpenCanIde.Should().BeTrue();
+        sut.OpenIdeCommand.CanExecute(null).Should().BeTrue();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a =>
@@ -2525,10 +2525,10 @@ public sealed class TaskDetailViewModelTests : IDisposable
             visualStudioCodeLocator: new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().Contain("Visual Studio Code");
+        sut.ErrorMessage.Should().Contain("Visual Studio Code");
         prozessStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
@@ -2551,10 +2551,10 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(prozessStarterMock: prozessStarterMock, visualStudioCodeLocator: locator);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty("ohne aktives Fallback-Plugin und ohne .sln kann keine IDE geöffnet werden");
+        sut.ErrorMessage.Should().NotBeNullOrEmpty("ohne aktives Fallback-Plugin und ohne .sln kann keine IDE geöffnet werden");
         prozessStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
@@ -2572,8 +2572,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var sut = CreateSut(prozessStarterMock: prozessStarterMock, visualStudioCodeLocator: locator);
 
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == solutionPath && a.UseShellExecute)),
@@ -2597,9 +2597,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock: prozessStarterMock);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == solutionPath && a.UseShellExecute)),
@@ -2629,9 +2629,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock: prozessStarterMock);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
         _dialogServiceMock.Verify(
             d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()),
@@ -2641,13 +2641,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
             Times.Once);
     }
 
-    private async Task<GitRepository> ErstelleRepositoryAsync(string pluginTyp, string repositoryUrl, string repositoryName)
+    private async Task<GitRepository> ErstelleRepositoryAsync(string pluginType, string repositoryUrl, string repositoryName)
     {
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
-            PluginType = pluginTyp,
+            ProjectId = _projectId,
+            PluginType = pluginType,
             RepositoryUrl = repositoryUrl,
             RepositoryName = repositoryName,
             Active = true

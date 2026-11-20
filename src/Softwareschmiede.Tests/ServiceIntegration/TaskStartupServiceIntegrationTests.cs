@@ -10,14 +10,14 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 public sealed class TaskStartupServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly ProjectService _projektService;
+    private readonly ProjectService _projectService;
     private readonly WorkItemService _workItemService;
 
     /// <summary>TaskStartupServiceIntegrationTests.</summary>
     public TaskStartupServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
-        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        _projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
     }
 
@@ -28,7 +28,7 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
     [Fact]
     public async Task StartenAsync_Setzt_Status_AufGestartet()
     {
-        var project = await _projektService.CreateAsync("Startup-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Startup-Projekt", null, TestContext.Current.CancellationToken);
         var workItem = await _workItemService.CreateAsync(project.Id, "Startup-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         workItem.Status.Should().Be(WorkItemStatus.New);
@@ -45,7 +45,7 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
     [Fact]
     public async Task StatusUebergang_Gestartet_NachWartend_IstErlaubt()
     {
-        var project = await _projektService.CreateAsync("Uebergang-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Uebergang-Projekt", null, TestContext.Current.CancellationToken);
         var workItem = await _workItemService.CreateAsync(project.Id, "Uebergang-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         await _workItemService.StartAsync(workItem.Id, "main", "/tmp/repo", ct: TestContext.Current.CancellationToken);
@@ -59,7 +59,7 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
     [Fact]
     public async Task StatusUebergang_Wartend_NachGestartet_IstErlaubt()
     {
-        var project = await _projektService.CreateAsync("Resume-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Resume-Projekt", null, TestContext.Current.CancellationToken);
         var workItem = await _workItemService.CreateAsync(project.Id, "Resume-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         await _workItemService.StartAsync(workItem.Id, "main", "/tmp/repo", ct: TestContext.Current.CancellationToken);

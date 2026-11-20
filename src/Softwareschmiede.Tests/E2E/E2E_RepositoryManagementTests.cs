@@ -52,7 +52,7 @@ public sealed class E2E_RepositoryManagementTests : WpfTestBase
     {
         const string repoFolderName = "BasisBranch-Assign-Repo";
         const string projektName = "BasisBranch-Assign-Projekt";
-        const string basisBranch = "staging";
+        const string baseBranch = "staging";
 
         var sourceDirectory = CreateLocalSourceDirectory(repoFolderName);
 
@@ -64,12 +64,12 @@ public sealed class E2E_RepositoryManagementTests : WpfTestBase
 
         var dialog = new RepositoryAssignDialogView(mainWindow).ForceShow();
         dialog.SelectFirstRepository();
-        dialog.SetBaseBranch(basisBranch);
+        dialog.SetBaseBranch(baseBranch);
         var projectDetailAfterAssign = dialog.Confirm();
 
-        var saved = await WaitForSavedSourceBranchAsync(repoFolderName, basisBranch);
-        Assert.Equal(basisBranch, saved);
-        Assert.Equal(basisBranch, projectDetailAfterAssign.GetBaseBranch());
+        var saved = await WaitForSavedSourceBranchAsync(repoFolderName, baseBranch);
+        Assert.Equal(baseBranch, saved);
+        Assert.Equal(baseBranch, projectDetailAfterAssign.GetBaseBranch());
 
         projectDetailAfterAssign.Menu.NavigateToDashboard();
     }

@@ -65,7 +65,7 @@ public partial class End2EndTest
         projectDetail = repoDialog.Confirm();
 
         // Promptvorlage mit Marker-Echo VOR dem Öffnen der Detailansichten seeden, damit sie in
-        // der ComboBox „PromptVorlagenAuswahl" der jeweils geladenen Detailansicht enthalten ist.
+        // der ComboBox „PromptTemplateSelection" der jeweils geladenen Detailansicht enthalten ist.
         var resetUtc = DateTimeOffset.UtcNow.AddHours(2);
         var markerZeile = $"echo [[SOFTWARESCHMIEDE_RATE_LIMIT:{resetUtc:O}]]";
         await using (var db = OpenTestDbContext())
@@ -115,7 +115,7 @@ public partial class End2EndTest
 
         taskB.SetScheduledPromptTime(vergangen.Hour, vergangen.Minute);
         taskB.SelectPromptTemplate(MarkerVorlagenName);
-        WaitForElement(mainWindow, cf => cf.ByName("ZeitgesteuertSenden"), Short).AsButton().Click();
+        WaitForElement(mainWindow, cf => cf.ByName("ScheduledSend"), Short).AsButton().Click();
 
         // Warten, bis der Marker auf dem echten Ausgabepfad verarbeitet wurde:
         // RateLimit-Protokolleintrag an Aufgabe B + PausiertBisUtc an beiden Aufgaben.
@@ -161,8 +161,8 @@ public partial class End2EndTest
         // Beide Seitenleisten-Kacheln zeigen den Pausiert-Status mit Countdown und Abblendungs-Marker.
         WarteAufKachelStatus(mainWindow, LimitTitelA, s => s.StartsWith("⏸ Pausiert", StringComparison.Ordinal), Long);
         WarteAufKachelStatus(mainWindow, LimitTitelB, s => s.StartsWith("⏸ Pausiert", StringComparison.Ordinal), Long);
-        WarteAufKachelPausiertMarker(mainWindow, LimitTitelA, "Pausiert:True", Long);
-        WarteAufKachelPausiertMarker(mainWindow, LimitTitelB, "Pausiert:True", Long);
+        WarteAufKachelPausiertMarker(mainWindow, LimitTitelA, "Paused:True", Long);
+        WarteAufKachelPausiertMarker(mainWindow, LimitTitelB, "Paused:True", Long);
 
         // Dritte Aufgabe mit Fremd-Prefix und frischem Heartbeat seeden (kein echter CLI-Start nötig —
         // CliUpdateSafetyService bewertet ausschließlich persistierte Lauf-Indikatoren).

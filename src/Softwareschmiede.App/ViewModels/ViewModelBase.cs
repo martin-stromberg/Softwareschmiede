@@ -38,9 +38,9 @@ public abstract class ViewModelBase : INotifyPropertyChanged
     }
 
     /// <summary>Setzt das übergebene Feld auf den Fehlertext der Exception und löst PropertyChanged für den angegebenen Eigenschaftsnamen aus.</summary>
-    protected void SetFehler(ref string? fehlerMeldungField, string propertyName, Exception ex)
+    protected void SetError(ref string? errorMessageField, string propertyName, Exception ex)
     {
-        fehlerMeldungField = $"Fehler: {ex.Message}";
+        errorMessageField = $"Fehler: {ex.Message}";
         OnPropertyChanged(propertyName);
     }
 }

@@ -318,7 +318,7 @@ public abstract class WpfTestBase : IDisposable
     /// Fenster wird regulär geschlossen, der Prozess-Exit abgewartet, die UI-Automation-Handles neu
     /// aufgebaut und die App mit denselben prozessbezogenen Umgebungsvariablen wie beim letzten
     /// <see cref="LaunchApp"/>-Aufruf erneut gestartet (<c>ensureDatabaseDeleted: false</c>).
-    /// Gespeicherte Einstellungen bleiben erhalten; es werden weder fremde Prozesse berührt noch
+    /// Gespeicherte Settings bleiben erhalten; es werden weder fremde Prozesse berührt noch
     /// Build-Artefakte wie <c>version.json</c> verändert.
     /// </summary>
     /// <param name="umgebungsVariablen">
@@ -481,15 +481,15 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     /// <remarks>
     /// Als Fail-Fast-Diagnose wird bei jeder Polling-Iteration zusätzlich nach einem Fehlerbanner
-    /// ("FehlerMeldung") gesucht: Tests, die auf ein *anderes* Element warten, sollen sofort mit einer
+    /// ("ErrorMessage") gesucht: Tests, die auf ein *anderes* Element warten, sollen sofort mit einer
     /// aussagekräftigen Meldung abbrechen, statt erst nach Ablauf des vollen Timeouts. Da die Suche nach
-    /// <paramref name="conditionFunc"/> und die Suche nach "FehlerMeldung" zwei separate, nicht-atomare
+    /// <paramref name="conditionFunc"/> und die Suche nach "ErrorMessage" zwei separate, nicht-atomare
     /// UI-Automation-Aufrufe sind, kann es vorkommen, dass der erste Aufruf ein gerade erst erscheinendes
     /// Element knapp verpasst, während der zweite (Millisekunden später) es bereits findet. Für Aufrufer,
-    /// deren <paramref name="conditionFunc"/> selbst auf "FehlerMeldung" zielt (z. B. Fehlerfall-Tests, die
+    /// deren <paramref name="conditionFunc"/> selbst auf "ErrorMessage" zielt (z. B. Fehlerfall-Tests, die
     /// genau dieses Element als Erfolgskriterium erwarten), würde das fälschlich als Abbruchgrund statt als
     /// gefundenes Zielelement gewertet. Deshalb wird die Zielsuche unmittelbar vor dem Werfen der Exception
-    /// erneut versucht: Ist "FehlerMeldung" tatsächlich das gesuchte Zielelement, ist es zu diesem Zeitpunkt
+    /// erneut versucht: Ist "ErrorMessage" tatsächlich das gesuchte Zielelement, ist es zu diesem Zeitpunkt
     /// im Automation-Baum bereits vorhanden (der Fehlerbanner-Check hat es ja soeben gefunden) und die
     /// erneute Zielsuche liefert es als regulären Treffer zurück. Zielt <paramref name="conditionFunc"/> auf
     /// ein anderes Element, bleibt die erneute Suche erfolglos und die Fail-Fast-Diagnose greift wie bisher.
@@ -538,7 +538,7 @@ public abstract class WpfTestBase : IDisposable
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     protected void NavigateBackFromProjectCardToProjectsList(AutomationElement mainWindow)
     {
-        var button = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        var button = WaitForElement(mainWindow, cf => cf.ByName("Back"), Short);
         button.AsButton().ClickInForeground();
     }
     /// <summary>
@@ -547,7 +547,7 @@ public abstract class WpfTestBase : IDisposable
     /// <param name="mainWindow">Das Hauptfenster mit geöffneter Aufgabe.</param>
     protected void NavigateBackFromTaskToProject(Window mainWindow)
     {
-        var button = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        var button = WaitForElement(mainWindow, cf => cf.ByName("Back"), Short);
         button.AsButton().ClickInForeground();
     }
 
@@ -561,7 +561,7 @@ public abstract class WpfTestBase : IDisposable
         dashboardButton.AsButton().ClickInForeground();
     }
 
-    /// <summary>Navigiert zur Einstellungsseite und wartet, bis die Settings-Tabs geladen sind.</summary>
+    /// <summary>Navigiert zur Einstellungsseite und wartet, bis die Einstellungen-Tabs geladen sind.</summary>
     protected void NavigateToSettings(AutomationElement mainWindow)
     {
         var deadline = DateTime.UtcNow + Long;
@@ -841,7 +841,7 @@ public abstract class WpfTestBase : IDisposable
 
         // Klickt gezielt auf das Namens-Label (nicht die Aktivierungs-CheckBox selbst), damit nur
         // der Listeneintrag ausgewählt wird, ohne den Aktivierungsstatus des Plugins zu verändern.
-        var localDirectoryPluginEntry = WaitForElement(mainWindow, cf => cf.ByName("LocalDirectoryPlugin.Eintrag"), Short);
+        var localDirectoryPluginEntry = WaitForElement(mainWindow, cf => cf.ByName("LocalDirectoryPlugin.Entry"), Short);
         localDirectoryPluginEntry.ClickInForeground();
 
         var workspaceModeBox = WaitForElement(mainWindow, cf => cf.ByName("WorkspaceMode"), Short);
@@ -851,10 +851,10 @@ public abstract class WpfTestBase : IDisposable
         var sourceDirectoryBox = WaitForElement(mainWindow, cf => cf.ByName("SourceDirectory"), Short);
         sourceDirectoryBox.AsTextBox().Text = sourceDirectory;
 
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Save"), Short);
         speichernButton.AsButton().ClickInForeground();
 
-        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("Settings gespeichert."), Short);
 
         var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
         dashboardButton.AsButton().ClickInForeground();
@@ -866,7 +866,7 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     protected void AssignLocalDirectoryRepository(AutomationElement mainWindow)
     {
-        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
+        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Assign"), Short);
         zuweisenButton.AsButton().ClickInForeground();
 
         var dialog = WaitForWindow("Repository zuweisen", Short);
@@ -890,7 +890,7 @@ public abstract class WpfTestBase : IDisposable
 
         items[0].ClickInForeground();
 
-        var zuweisenBestaetigenButton = WaitForElement(dialog, cf => cf.ByName("Zuweisen"), Short);
+        var zuweisenBestaetigenButton = WaitForElement(dialog, cf => cf.ByName("Assign"), Short);
         zuweisenBestaetigenButton.AsButton().ClickInForeground();
     }
 
@@ -900,7 +900,7 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     protected AutomationElement OpenRepositoryAssignDialog(AutomationElement mainWindow)
     {
-        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
+        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Assign"), Short);
         zuweisenButton.AsButton().ClickInForeground();
         return WaitForWindow("Repository zuweisen", Short);
     }
@@ -1008,14 +1008,14 @@ public abstract class WpfTestBase : IDisposable
 
     /// <summary>
     /// Klickt den "Starten"-Button und bedient den anschließend erscheinenden Plugin-Auswahl-Dialog:
-    /// wählt das angegebene KI-Plugin aus, setzt optional die "FuerProjektVerwenden"-Checkbox
+    /// wählt das angegebene KI-Plugin aus, setzt optional die "UseForProject"-Checkbox
     /// (Projekt-Standard speichern) und bestätigt mit "OK". Delegiert an
     /// <see cref="Views.TaskDetailView.Start"/>.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     /// <param name="pluginName">Der Name des im Dialog auszuwählenden KI-Plugins.</param>
     /// <param name="fuerProjektVerwenden">Wenn <c>true</c>, wird vor dem Bestätigen die
-    /// "FuerProjektVerwenden"-Checkbox gesetzt, damit das gewählte Plugin als Projekt-Standard
+    /// "UseForProject"-Checkbox gesetzt, damit das gewählte Plugin als Projekt-Standard
     /// gespeichert wird.</param>
     protected void StartenUndPluginWaehlen(AutomationElement mainWindow, string pluginName, bool fuerProjektVerwenden = false)
         => new Softwareschmiede.Tests.E2E.Views.TaskDetailView((Window)mainWindow).Start(pluginName, fuerProjektVerwenden);
@@ -1115,44 +1115,44 @@ public abstract class WpfTestBase : IDisposable
 
     /// <summary>
     /// Klickt den "AufgabeNeu"-Button; die App legt die Aufgabe sofort mit Status "Neu" an und
-    /// navigiert in die separate <c>TaskDetailView</c>. Wartet auf das "EditTitel"-Feld und gibt es zurück.
+    /// navigiert in die separate <c>TaskDetailView</c>. Wartet auf das "EditTitle"-Feld und gibt es zurück.
     /// </summary>
     protected AutomationElement NeueAufgabeAnlegen(AutomationElement mainWindow)
     {
-        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
+        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("NewWorkItem"), Short);
         aufgabeNeuButton.AsButton().ClickInForeground();
 
-        return WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
+        return WaitForElement(mainWindow, cf => cf.ByName("EditTitle"), Short);
     }
 
     /// <summary>
-    /// Ersetzt das "EditTitel"-Feld durch <paramref name="title"/> und prüft dessen vollständigen Wert.
+    /// Ersetzt das "EditTitle"-Feld durch <paramref name="title"/> und prüft dessen vollständigen Wert.
     /// Voraussetzung: <c>TaskDetailView</c> im Edit-Modus sichtbar (z. B. nach <see cref="NeueAufgabeAnlegen"/>).
     /// </summary>
     protected void AufgabeTitelSetzen(AutomationElement mainWindow, string title)
     {
-        var titelBox = WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
+        var titelBox = WaitForElement(mainWindow, cf => cf.ByName("EditTitle"), Short);
         FeldInhaltErsetzen(titelBox, title);
     }
 
     /// <summary>
     /// Klickt den "Speichern"-Button in der <c>TaskDetailView</c> und wartet auf das Wiedererscheinen
-    /// von "ProjektName" (Rückkehr zur <c>ProjectDetailView</c>).
+    /// von "ProjectName" (Rückkehr zur <c>ProjectDetailView</c>).
     /// </summary>
     protected void AufgabeDetailSpeichern(AutomationElement mainWindow, bool navigateBackToProject)
     {
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Save"), Short);
         speichernButton.AsButton().ClickInForeground();
         if (navigateBackToProject)
         {
             NavigateBackFromTaskToProject((Window)mainWindow);
-            WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
+            WaitForElement(mainWindow, cf => cf.ByName("ProjectName"), Medium);
         }
     }
 
     /// <summary>
     /// Verwirft die Bearbeitung über den "Zurück"-Button in der <c>TaskDetailView</c> und wartet auf
-    /// das Wiedererscheinen von "ProjektName" (Rückkehr zur <c>ProjectDetailView</c>). Delegiert an
+    /// das Wiedererscheinen von "ProjectName" (Rückkehr zur <c>ProjectDetailView</c>). Delegiert an
     /// <see cref="Views.TaskDetailView.GoBack"/>.
     /// </summary>
     protected void AufgabeDetailZurueck(AutomationElement mainWindow)
@@ -1181,7 +1181,7 @@ public abstract class WpfTestBase : IDisposable
         => new Softwareschmiede.Tests.E2E.Views.TaskDetailView((Window)mainWindow).DeleteTask();
 
     /// <summary>
-    /// Wartet auf die "OffeneAufgabenListe" und gibt deren ListItem-Kinder zurück. Delegiert an
+    /// Wartet auf die "OpenWorkItemsList" und gibt deren ListItem-Kinder zurück. Delegiert an
     /// <see cref="Views.ProjectDetailView.GetTaskElements"/>.
     /// </summary>
     protected AutomationElement[] OffeneAufgabenItems(AutomationElement mainWindow)
@@ -1193,7 +1193,7 @@ public abstract class WpfTestBase : IDisposable
     /// bereits selbst (z. B. für ein eigenes Assert) abgefragt haben, um eine erneute UI-Automation-Abfrage
     /// derselben Liste zu vermeiden. Voraussetzung: <paramref name="items"/> enthält mindestens ein Element.
     /// </summary>
-    /// <param name="items">Die bereits ermittelten Items der "OffeneAufgabenListe".</param>
+    /// <param name="items">Die bereits ermittelten Items der "OpenWorkItemsList".</param>
     /// <exception cref="InvalidOperationException">Wird geworfen, wenn <paramref name="items"/> leer ist.</exception>
     protected static void ErsteOffeneAufgabeOeffnen(AutomationElement[] items)
     {
@@ -1216,15 +1216,15 @@ public abstract class WpfTestBase : IDisposable
             cf => cf.ByName(title).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem)),
             Medium);
         listenEintrag.DoubleClickInForeground();
-        WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("Back"), Short);
     }
 
     /// <summary>
-    /// Ersetzt und prüft das "ProjektName"-Feld mit <paramref name="neuerName"/>
+    /// Ersetzt und prüft das "ProjectName"-Feld mit <paramref name="neuerName"/>
     /// und klickt "Speichern" (UpdateAsync-Pfad, bleibt in der Detailansicht). Der "Speichern"-Button
     /// verschwindet in diesem Pfad nicht (im Gegensatz zur Neuanlage) - als echtes Synchronisationssignal
     /// für den Abschluss von Speichern + anschließendem Reload wird stattdessen gewartet, bis das
-    /// "ProjektName"-Feld den nach dem Reload aus der Datenbank zurückgebundenen (getrimmten) Namen
+    /// "ProjectName"-Feld den nach dem Reload aus der Datenbank zurückgebundenen (getrimmten) Namen
     /// tatsächlich anzeigt.
     /// Voraussetzung: <c>ProjectDetailView</c> im Edit-Modus sichtbar.
     /// </summary>
@@ -1232,13 +1232,13 @@ public abstract class WpfTestBase : IDisposable
     /// <param name="neuerName">Der neue Projektname.</param>
     protected void ProjektNamenAendernUndSpeichern(AutomationElement mainWindow, string neuerName)
     {
-        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
+        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjectName"), Short);
         FeldInhaltErsetzen(nameBox, neuerName);
 
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Save"), Short);
         speichernButton.AsButton().ClickInForeground();
 
-        WaitForTextBoxText(mainWindow, "ProjektName", neuerName.Trim(), Medium);
+        WaitForTextBoxText(mainWindow, "ProjectName", neuerName.Trim(), Medium);
     }
 
     /// <summary>

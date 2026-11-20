@@ -31,9 +31,9 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock, locator);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
         var erwarteterPfad = Path.GetFullPath(Path.Combine(workingDirectory, "backend"));
         prozessStarterMock.Verify(
@@ -55,9 +55,9 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock, locator);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a =>
@@ -66,7 +66,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
             Times.Once);
     }
 
-    /// <summary>Ist Visual Studio Code nicht verfügbar, wird eine aussagekräftige FehlerMeldung gesetzt und kein Prozess gestartet.</summary>
+    /// <summary>Ist Visual Studio Code nicht verfügbar, wird eine aussagekräftige ErrorMessage gesetzt und kein Prozess gestartet.</summary>
     [Fact]
     public async Task OeffneIdeAsync_OhneSolutionOhneVsCode_ZeigtFehlermeldung()
     {
@@ -78,11 +78,11 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
         var locator = new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable);
         var sut = CreateSut(prozessStarterMock, locator);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().Contain("Visual Studio Code");
+        sut.ErrorMessage.Should().Contain("Visual Studio Code");
         prozessStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
@@ -103,9 +103,9 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock, locator);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
         var erwarteterPfad = Path.GetFullPath(unterverzeichnis);
         prozessStarterMock.Verify(

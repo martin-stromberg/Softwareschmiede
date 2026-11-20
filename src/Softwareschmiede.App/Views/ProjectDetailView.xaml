@@ -19,40 +19,40 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
 
                 <!-- Gruppe: Navigation -->
-                <controls:RibbonGroup GruppenName="Navigation">
+                <controls:RibbonGroup GroupName="Navigation">
                     <controls:RibbonGroup.ItemsContent>
                         <controls:RibbonLargeButton ButtonIcon="←"
                                                     ButtonText="Zurück"
-                                                    AutomationName="Zurück"
-                                                    ButtonCommand="{Binding ZurueckCommand}" />
+                                                    AutomationName="Back"
+                                                    ButtonCommand="{Binding BackCommand}" />
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: Projekt -->
-                <controls:RibbonGroup GruppenName="Projekt">
+                <controls:RibbonGroup GroupName="Projekt">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="💾"
                                                         ButtonText="Speichern"
-                                                        AutomationName="Speichern"
-                                                        ButtonCommand="{Binding SpeichernCommand}" />
+                                                        AutomationName="Save"
+                                                        ButtonCommand="{Binding SaveCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="🗑"
                                                         ButtonText="Löschen"
-                                                        AutomationName="Löschen"
-                                                        ButtonCommand="{Binding LoeschenCommand}" />
-                            <controls:RibbonLargeButton ButtonIcon="🔄" ButtonText="Aktualisieren" AutomationName="Aktualisieren" ButtonCommand="{Binding LadenCommand}" />
+                                                        AutomationName="Delete"
+                                                        ButtonCommand="{Binding DeleteCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="🔄" ButtonText="Aktualisieren" AutomationName="Refresh" ButtonCommand="{Binding LoadCommand}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: Aufgaben -->
-                <controls:RibbonGroup GruppenName="Aufgaben">
+                <controls:RibbonGroup GroupName="Aufgaben">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="➕"
                                                         ButtonText="Neue Aufgabe"
-                                                        AutomationName="AufgabeNeu"
-                                                        ButtonCommand="{Binding AufgabeErstellenCommand}" />
+                                                        AutomationName="NewWorkItem"
+                                                        ButtonCommand="{Binding CreateWorkItemCommand}" />
                             <StackPanel VerticalAlignment="Center">
                                 <controls:RibbonSmallButton ButtonIcon="🔽"
                                                             ButtonText="Filter"
@@ -64,21 +64,21 @@
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: Repository -->
-                <controls:RibbonGroup GruppenName="Repository">
+                <controls:RibbonGroup GroupName="Repository">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel>
                             <controls:RibbonSmallButton ButtonIcon="🔗"
                                                         ButtonText="Zuweisen"
-                                                        AutomationName="Zuweisen"
-                                                        ButtonCommand="{Binding RepositoryZuweisenCommand}" />
+                                                        AutomationName="Assign"
+                                                        ButtonCommand="{Binding AssignRepositoryCommand}" />
                             <controls:RibbonSmallButton ButtonIcon="🌐"
                                                         ButtonText="Öffnen"
-                                                        AutomationName="Öffnen"
-                                                        ButtonCommand="{Binding RepositoryOeffnenCommand}" />
+                                                        AutomationName="Open"
+                                                        ButtonCommand="{Binding OpenRepositoryCommand}" />
                             <controls:RibbonSmallButton ButtonIcon="📂"
                                                         ButtonText="Arbeitsverzeichnis"
-                                                        AutomationName="ArbeitsverzeichnisBearbeiten"
-                                                        ButtonCommand="{Binding ArbeitsverzeichnisBearbeitenCommand}" />
+                                                        AutomationName="EditWorkingDirectory"
+                                                        ButtonCommand="{Binding WorkingDirectoryEditCommand}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
@@ -112,16 +112,16 @@
                                    Margin="0,0,0,12" />
                         <StackPanel Orientation="Horizontal">
                             <RadioButton Content="Alle"
-                                         GroupName="AufgabenFilter"
-                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=All}"
+                                         GroupName="WorkItemFilter"
+                                         IsChecked="{Binding WorkItemsFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=All}"
                                          Margin="0,0,16,0" />
                             <RadioButton Content="Aktiv"
-                                         GroupName="AufgabenFilter"
-                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Active}"
+                                         GroupName="WorkItemFilter"
+                                         IsChecked="{Binding WorkItemsFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Active}"
                                          Margin="0,0,16,0" />
                             <RadioButton Content="Archiviert"
-                                         GroupName="AufgabenFilter"
-                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Archived}" />
+                                         GroupName="WorkItemFilter"
+                                         IsChecked="{Binding WorkItemsFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Archived}" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -144,9 +144,9 @@
                                        FontSize="32"
                                        Margin="0,0,12,0"
                                        VerticalAlignment="Center" />
-                            <TextBox x:Name="ProjektNameTextBox"
-                                     Text="{Binding ProjektName, UpdateSourceTrigger=PropertyChanged}"
-                                     AutomationProperties.Name="ProjektName"
+                            <TextBox x:Name="ProjectNameTextBox"
+                                     Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="ProjectName"
                                      FontSize="20"
                                      FontWeight="SemiBold"
                                      Foreground="{DynamicResource PrimaryTextBrush}"
@@ -161,8 +161,8 @@
 
                         <!-- Beschreibung -->
                         <TextBox Grid.Row="1"
-                                 Text="{Binding ProjektBeschreibung, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.Name="ProjektBeschreibung"
+                                 Text="{Binding ProjectDescription, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="ProjectDescription"
                                  FontSize="14"
                                  Foreground="{DynamicResource SecondaryTextBrush}"
                                  Background="Transparent"
@@ -196,13 +196,13 @@
                                        VerticalAlignment="Center"
                                        Margin="0,0,8,0" />
                             <TextBlock Text="{Binding SelectedRepositorySourceBranchName, TargetNullValue=Default, FallbackValue=Default}"
-                                       AutomationProperties.AutomationId="BasisBranchAnzeige"
+                                       AutomationProperties.AutomationId="BaseBranchDisplay"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        VerticalAlignment="Center"
                                        Margin="0,0,12,0" />
                             <Button Content="Bearbeiten"
-                                    AutomationProperties.Name="BasisBranchBearbeiten"
+                                    AutomationProperties.Name="EditBaseBranch"
                                     Command="{Binding EditSourceBranchCommand}"
                                     Padding="10,4" />
                         </StackPanel>
@@ -212,14 +212,14 @@
                             <ComboBox ItemsSource="{Binding AvailableSourceBranchesForEdit}"
                                       SelectedItem="{Binding SelectedRepositorySourceBranchName, Mode=TwoWay}"
                                       Visibility="{Binding IsEditingSourceBranchManualInput, Converter={StaticResource InverseBoolToVisibilityConverter}}"
-                                      AutomationProperties.Name="BasisBranchBearbeitenAuswahlComboBox"
+                                      AutomationProperties.Name="EditBaseBranchSelectionComboBox"
                                       Background="{DynamicResource BackgroundBrush}"
                                       Padding="8,6"
                                       Margin="0,0,0,8" />
 
                             <TextBox Text="{Binding SelectedRepositorySourceBranchName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Visibility="{Binding IsEditingSourceBranchManualInput, Converter={StaticResource BoolToVisibilityConverter}}"
-                                     AutomationProperties.Name="BasisBranchBearbeitenEingabe"
+                                     AutomationProperties.Name="EditBaseBranchInput"
                                      Background="{DynamicResource BackgroundBrush}"
                                      Foreground="{DynamicResource PrimaryTextBrush}"
                                      Padding="8,6"
@@ -237,7 +237,7 @@
 
                             <StackPanel Orientation="Horizontal">
                                 <Button Content="Speichern"
-                                        AutomationProperties.Name="BasisBranchSpeichern"
+                                        AutomationProperties.Name="SaveBaseBranch"
                                         Command="{Binding SaveSourceBranchCommand}"
                                         Background="{DynamicResource AccentBrush}"
                                         Foreground="White"
@@ -245,7 +245,7 @@
                                         Padding="10,4"
                                         Margin="0,0,8,0" />
                                 <Button Content="Abbrechen"
-                                        AutomationProperties.Name="BasisBranchAbbrechen"
+                                        AutomationProperties.Name="CancelBaseBranch"
                                         Command="{Binding CancelSourceBranchEditCommand}"
                                         Padding="10,4" />
                             </StackPanel>
@@ -283,25 +283,25 @@
 
                         <!-- Anzeige-Modus -->
                         <StackPanel Orientation="Horizontal"
-                                    Visibility="{Binding IsEditingInitialisierungsskript, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                            <TextBlock Text="{Binding SelectedInitialisierungsskript, TargetNullValue='(keins)', FallbackValue='(keins)'}"
-                                       AutomationProperties.AutomationId="InitialisierungsskriptAnzeige"
+                                    Visibility="{Binding IsEditingInitializationScript, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                            <TextBlock Text="{Binding SelectedInitializationScript, TargetNullValue='(keins)', FallbackValue='(keins)'}"
+                                       AutomationProperties.AutomationId="InitializationScriptDisplay"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        VerticalAlignment="Center"
                                        Margin="0,0,12,0" />
                             <Button Content="Laden"
-                                    AutomationProperties.Name="InitialisierungsskriptLaden"
-                                    Command="{Binding LoadInitialisierungsskriptSuggestionenCommand}"
+                                    AutomationProperties.Name="LoadInitializationScript"
+                                    Command="{Binding LoadInitializationScriptSuggestionsCommand}"
                                     Padding="10,4" />
                         </StackPanel>
 
                         <!-- Bearbeitungs-Modus -->
-                        <StackPanel Visibility="{Binding IsEditingInitialisierungsskript, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <ComboBox ItemsSource="{Binding InitialisierungsskriptSuggestionenView}"
-                                      Text="{Binding SelectedInitialisierungsskript, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        <StackPanel Visibility="{Binding IsEditingInitializationScript, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <ComboBox ItemsSource="{Binding InitializationScriptSuggestionsView}"
+                                      Text="{Binding SelectedInitializationScript, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       IsEditable="True"
-                                      AutomationProperties.Name="InitialisierungsskriptAuswahlComboBox"
+                                      AutomationProperties.Name="InitializationScriptSelectionComboBox"
                                       Background="{DynamicResource BackgroundBrush}"
                                       Padding="8,6"
                                       Margin="0,0,0,8" />
@@ -310,20 +310,20 @@
                                        Foreground="{DynamicResource ErrorBrush}"
                                        TextWrapping="Wrap"
                                        Margin="0,0,0,8"
-                                       Visibility="{Binding InitialisierungsskriptLoadingFailed, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                       Visibility="{Binding InitializationScriptLoadingFailed, Converter={StaticResource BoolToVisibilityConverter}}" />
 
                             <StackPanel Orientation="Horizontal">
                                 <Button Content="Speichern"
-                                        AutomationProperties.Name="InitialisierungsskriptSpeichern"
-                                        Command="{Binding SaveInitialisierungsskriptCommand}"
+                                        AutomationProperties.Name="SaveInitializationScript"
+                                        Command="{Binding SaveInitializationScriptCommand}"
                                         Background="{DynamicResource AccentBrush}"
                                         Foreground="White"
                                         BorderThickness="0"
                                         Padding="10,4"
                                         Margin="0,0,8,0" />
                                 <Button Content="Abbrechen"
-                                        AutomationProperties.Name="InitialisierungsskriptAbbrechen"
-                                        Command="{Binding CancelInitialisierungsskriptEditCommand}"
+                                        AutomationProperties.Name="CancelInitializationScript"
+                                        Command="{Binding CancelInitializationScriptEditCommand}"
                                         Padding="10,4" />
                             </StackPanel>
                         </StackPanel>
@@ -354,9 +354,9 @@
                                    Margin="0,0,0,12" />
 
                         <!-- Aufgabenliste -->
-                        <Grid Grid.Row="1" AutomationProperties.Name="AufgabenListe">
-                            <ListBox AutomationProperties.Name="OffeneAufgabenListe"
-                                     ItemsSource="{Binding NichtBeendeteAufgaben}"
+                        <Grid Grid.Row="1" AutomationProperties.Name="WorkItemsList">
+                            <ListBox AutomationProperties.Name="OpenWorkItemsList"
+                                     ItemsSource="{Binding NotFinishedWorkItems}"
                                      Background="Transparent"
                                      BorderThickness="0"
                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -383,7 +383,7 @@
                                 <ListBox.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem">
                                         <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
-                                        <EventSetter Event="MouseDoubleClick" Handler="AufgabeDoubleClick" />
+                                        <EventSetter Event="MouseDoubleClick" Handler="WorkItemDoubleClick" />
                                     </Style>
                                 </ListBox.ItemContainerStyle>
                             </ListBox>
@@ -392,11 +392,11 @@
                         <Expander Grid.Row="2"
                                   Header="Beendete Aufgaben"
                                   IsExpanded="False"
-                                  AutomationProperties.Name="BeendeteAufgabenExpander"
+                                  AutomationProperties.Name="CompletedWorkItemsExpander"
                                   Foreground="{DynamicResource PrimaryTextBrush}"
                                   Margin="0,12,0,0">
-                            <ListBox AutomationProperties.Name="BeendeteAufgabenListe"
-                                     ItemsSource="{Binding BeendeteAufgaben}"
+                            <ListBox AutomationProperties.Name="CompletedWorkItemsList"
+                                     ItemsSource="{Binding FinishedWorkItems}"
                                      Background="Transparent"
                                      BorderThickness="0"
                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -424,7 +424,7 @@
                                 <ListBox.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem">
                                         <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
-                                        <EventSetter Event="MouseDoubleClick" Handler="AufgabeDoubleClick" />
+                                        <EventSetter Event="MouseDoubleClick" Handler="WorkItemDoubleClick" />
                                     </Style>
                                 </ListBox.ItemContainerStyle>
                             </ListBox>
@@ -439,7 +439,7 @@
                         CornerRadius="12"
                         Padding="20"
                         Margin="0 10"
-                        Visibility="{Binding KannAnforderungenLaden, Converter={StaticResource BoolToVisibilityConverter}}">
+                        Visibility="{Binding LoadCanRequirement, Converter={StaticResource BoolToVisibilityConverter}}">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -461,8 +461,8 @@
                                    Margin="0,0,0,8" />
 
                         <ListBox Grid.Row="2"
-                                 AutomationProperties.Name="OffeneAnforderungen"
-                                 ItemsSource="{Binding OffeneAnforderungen}"
+                                 AutomationProperties.Name="OpenRequirements"
+                                 ItemsSource="{Binding OpenRequirement}"
                                  Background="Transparent"
                                  BorderThickness="0"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"

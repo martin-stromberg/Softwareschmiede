@@ -272,7 +272,7 @@ public sealed class ScmEventDispatchTests_Limits
         // während der zweite die Zulassungskontrolle vollständig passiert.
         var healthCheckEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseHealthCheck = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()))
+        fixture.Ai.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()))
             .Returns(async (CancellationToken _) =>
             {
                 healthCheckEntered.TrySetResult();
@@ -310,14 +310,14 @@ public sealed class ScmEventDispatchTests_Limits
         var (_, firstId) = await fixture.AddAsync(configured: true);
         var (_, secondId) = await fixture.AddAsync(configured: true);
 
-        fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        fixture.Ai.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
         await fixture.DispatchAsync(firstId);
         var first = await fixture.EventAsync(firstId);
         Assert.Equal("Wartend", first.Status);
         Assert.Contains("nicht startbereit", first.Reason);
         Assert.Empty(fixture.Sessions);
 
-        fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        fixture.Ai.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         await fixture.DispatchAsync(secondId);
 
         Assert.Single(fixture.Sessions);

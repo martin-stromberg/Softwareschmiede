@@ -25,7 +25,7 @@
                    Margin="0,0,0,6" />
 
         <TextBlock Grid.Row="1"
-                   Text="{Binding AufgabenTitel}"
+                   Text="{Binding WorkItemsTitle}"
                    FontSize="13"
                    Foreground="{DynamicResource SecondaryTextBrush}"
                    TextTrimming="CharacterEllipsis"
@@ -33,7 +33,7 @@
 
         <Grid Grid.Row="2"
               Margin="0,0,0,16">
-            <ListBox AutomationProperties.Name="OffeneTodosListe"
+            <ListBox AutomationProperties.Name="OpenTodosList"
                      ItemsSource="{Binding Todos}"
                      Background="{DynamicResource BackgroundBrush}"
                      BorderBrush="{DynamicResource BorderBrush}"
@@ -91,8 +91,8 @@
         </Grid>
 
         <Button Grid.Row="3"
-                Content="Schliessen"
-                AutomationProperties.Name="Schliessen"
+                Content="Schließen"
+                AutomationProperties.Name="Close"
                 IsCancel="True"
                 Padding="12,6"
                 HorizontalAlignment="Right" />

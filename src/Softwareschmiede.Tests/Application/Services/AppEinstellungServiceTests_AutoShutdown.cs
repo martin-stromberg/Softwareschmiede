@@ -9,7 +9,7 @@ using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>
-/// Tests der Auto-Shutdown-Einstellungen in <see cref="AppSettingService"/> mit echter
+/// Tests der Auto-Shutdown--Einstellungen in <see cref="AppSettingService"/> mit echter
 /// SQLite-Datei-Datenbank: Defaults, Bereichsbegrenzung (0–1440 Minuten) und Persistenz
 /// über Scope-/Context-Grenzen.
 /// </summary>

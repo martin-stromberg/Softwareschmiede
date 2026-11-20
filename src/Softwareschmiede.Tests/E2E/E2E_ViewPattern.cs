@@ -75,7 +75,7 @@ public partial class End2EndTest
         Assert.True(dashboardView.IsVisible);
     }
 
-    /// <summary>Prüft, dass <see cref="MenuView"/> zwischen Projektliste, Einstellungen und Dashboard navigiert.</summary>
+    /// <summary>Prüft, dass <see cref="MenuView"/> zwischen Projektliste, Settings und Dashboard navigiert.</summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster.</param>
     protected void MenueNavigation_WechseltZwischenAnsichten_E2E(Window mainWindow)
     {
@@ -163,7 +163,7 @@ public partial class End2EndTest
 
         // Prüft den Abbrechen-Pfad des nativen Löschdialogs: Aufgabe bleibt erhalten, wenn der
         // Bestätigungsdialog über "Nein" (DeleteConfirmationDialogView.Cancel()) verlassen wird.
-        WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short).AsButton().ClickInForeground();
+        WaitForElement(mainWindow, cf => cf.ByName("Delete"), Short).AsButton().ClickInForeground();
         new DeleteConfirmationDialogView(mainWindow).Cancel();
         Assert.IsType<TaskDetailView>(mainWindow.CurrentView());
 

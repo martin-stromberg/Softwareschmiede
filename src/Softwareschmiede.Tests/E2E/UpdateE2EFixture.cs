@@ -16,7 +16,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// SQLite-Datenbank, Szenario- und Konfigurationsdatei, Stable-/RC-ZIP-Paketen mit getrennten
 /// Download-URLs und unterscheidbarem Inhalt, dateibasierten Freigabe-Gates sowie dem
 /// strukturierten JSONL-Protokoll. Alle App-seitig geschriebenen Update-Artefakte bleiben
-/// innerhalb der Testwurzel.
+/// innerhalb der TestRoot.
 /// </summary>
 public sealed class UpdateE2EFixture : IDisposable
 {
@@ -29,7 +29,7 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <summary>Version des simulierten Release-Candidates (neuer als <see cref="StableVersion"/>).</summary>
     public const string RcVersion = "1.4.0-rc.1";
 
-    /// <summary>Release-Listendaten-Dateiname relativ zur Testwurzel.</summary>
+    /// <summary>Release-Listendaten-Dateiname relativ zur TestRoot.</summary>
     public const string ReleaseListDateiName = "releases.json";
 
     private static readonly UpdateOptions StandardOptionen = new();
@@ -66,34 +66,34 @@ public sealed class UpdateE2EFixture : IDisposable
 
     private static readonly JsonSerializerOptions JsonOptionen = new() { WriteIndented = true };
 
-    private readonly UpdateE2ESzenario _szenario = new();
+    private readonly UpdateE2EScenario _szenario = new();
     private readonly object _szenarioLock = new();
     private bool _disposed;
 
     /// <inheritdoc cref="UpdateE2EFixture"/>
     public UpdateE2EFixture()
     {
-        SzenarioId = $"update-e2e-{Guid.NewGuid():N}";
-        Testwurzel = Path.Combine(Path.GetTempPath(), $"softwareschmiede_update_e2e_{Guid.NewGuid():N}");
-        InstalliertesVerzeichnis = Path.Combine(Testwurzel, "installed");
-        GatesVerzeichnis = Path.Combine(Testwurzel, "gates");
-        PaketVerzeichnis = Path.Combine(Testwurzel, "packages");
-        SzenarioDateiPfad = Path.Combine(Testwurzel, "scenario.json");
-        ProtokollDateiPfad = Path.Combine(Testwurzel, "events.jsonl");
-        KonfigurationDateiPfad = Path.Combine(Testwurzel, "testconfig.json");
-        DatenbankPfad = Path.Combine(Testwurzel, "test.db");
+        ScenarioId = $"update-e2e-{Guid.NewGuid():N}";
+        TestRoot = Path.Combine(Path.GetTempPath(), $"softwareschmiede_update_e2e_{Guid.NewGuid():N}");
+        InstalliertesVerzeichnis = Path.Combine(TestRoot, "installed");
+        GatesDirectory = Path.Combine(TestRoot, "gates");
+        PaketVerzeichnis = Path.Combine(TestRoot, "packages");
+        ScenarioFilePath = Path.Combine(TestRoot, "scenario.json");
+        LogFilePath = Path.Combine(TestRoot, "events.jsonl");
+        KonfigurationDateiPfad = Path.Combine(TestRoot, "testconfig.json");
+        DatenbankPfad = Path.Combine(TestRoot, "test.db");
 
         Directory.CreateDirectory(InstalliertesVerzeichnis);
-        Directory.CreateDirectory(GatesVerzeichnis);
+        Directory.CreateDirectory(GatesDirectory);
         Directory.CreateDirectory(PaketVerzeichnis);
 
         SchreibeInstallierteVersion(InstallierteVersion);
 
         // Deutlich unterscheidbare, eindeutige Download-URLs; niemals echte Release-Quellen.
-        StableDownloadUrl = $"https://e2e.invalid/{SzenarioId}/release-{StableVersion}.zip";
-        RcDownloadUrl = $"https://e2e.invalid/{SzenarioId}/release-{RcVersion}.zip";
-        StableManifestDownloadUrl = $"https://e2e.invalid/{SzenarioId}/update-{StableVersion}.json";
-        RcManifestDownloadUrl = $"https://e2e.invalid/{SzenarioId}/update-{RcVersion}.json";
+        StableDownloadUrl = $"https://e2e.invalid/{ScenarioId}/release-{StableVersion}.zip";
+        RcDownloadUrl = $"https://e2e.invalid/{ScenarioId}/release-{RcVersion}.zip";
+        StableManifestDownloadUrl = $"https://e2e.invalid/{ScenarioId}/update-{StableVersion}.json";
+        RcManifestDownloadUrl = $"https://e2e.invalid/{ScenarioId}/update-{RcVersion}.json";
         StableZipPfad = Path.Combine(PaketVerzeichnis, $"release-{StableVersion}.zip");
         RcZipPfad = Path.Combine(PaketVerzeichnis, $"release-{RcVersion}.zip");
 
@@ -106,25 +106,25 @@ public sealed class UpdateE2EFixture : IDisposable
     }
 
     /// <summary>Eindeutige Szenario-/Prozess-Identität für jeden Protokolleintrag.</summary>
-    public string SzenarioId { get; }
+    public string ScenarioId { get; }
 
     /// <summary>Eindeutiges Temp-Wurzelverzeichnis dieser Fixture.</summary>
-    public string Testwurzel { get; }
+    public string TestRoot { get; }
 
     /// <summary>Simuliertes Installationsverzeichnis mit der <c>version.json</c>.</summary>
     public string InstalliertesVerzeichnis { get; }
 
     /// <summary>Verzeichnis der dateibasierten Freigabe-/Abbruch-Gates.</summary>
-    public string GatesVerzeichnis { get; }
+    public string GatesDirectory { get; }
 
     /// <summary>Verzeichnis der erzeugten ZIP-Pakete.</summary>
     public string PaketVerzeichnis { get; }
 
     /// <summary>Pfad der pro Request/Lesebefehl neu gelesenen Szenariodatei.</summary>
-    public string SzenarioDateiPfad { get; }
+    public string ScenarioFilePath { get; }
 
     /// <summary>Pfad der strukturierten JSONL-Protokolldatei.</summary>
-    public string ProtokollDateiPfad { get; }
+    public string LogFilePath { get; }
 
     /// <summary>Pfad der Testkonfigurations-JSON (Wert von <c>SOFTWARESCHMIEDE_UPDATE_TEST_CONFIG</c>).</summary>
     public string KonfigurationDateiPfad { get; }
@@ -158,8 +158,8 @@ public sealed class UpdateE2EFixture : IDisposable
     public IReadOnlyDictionary<string, string?> ErzeugeStartUmgebung()
         => new Dictionary<string, string?>
         {
-            [UpdateE2ETestConfiguration.UmgebungsVariable] = KonfigurationDateiPfad,
-            [UpdateE2ETestConfiguration.TestDatenbankUmgebungsVariable] = DatenbankPfad
+            [UpdateE2ETestConfiguration.EnvironmentVariable] = KonfigurationDateiPfad,
+            [UpdateE2ETestConfiguration.TestDatabaseEnvironmentVariable] = DatenbankPfad
         };
 
     /// <summary>
@@ -170,7 +170,7 @@ public sealed class UpdateE2EFixture : IDisposable
     public void SetzeStandardAntworten(bool mitRcRelease = true)
     {
         _szenario.Answer.Clear();
-        _szenario.Answer.Add(new UpdateE2EAntwort
+        _szenario.Answer.Add(new UpdateE2EResponse
         {
             Url = ReleaseApiUrl,
             Status = 200,
@@ -184,11 +184,11 @@ public sealed class UpdateE2EFixture : IDisposable
             (RcAssetApiUrl, RcZipPfad)
         })
         {
-            _szenario.Answer.Add(new UpdateE2EAntwort
+            _szenario.Answer.Add(new UpdateE2EResponse
             {
                 Url = url,
                 Status = 200,
-                BodyDatei = RelativZurWurzel(zipPfad)
+                BodyFile = RelativZurWurzel(zipPfad)
             });
         }
 
@@ -200,19 +200,19 @@ public sealed class UpdateE2EFixture : IDisposable
             (RcManifestAssetApiUrl, RcVersion, RcDownloadUrl, RcZipPfad)
         })
         {
-            _szenario.Answer.Add(new UpdateE2EAntwort
+            _szenario.Answer.Add(new UpdateE2EResponse
             {
                 Url = manifestUrl,
                 Status = 200,
                 Content = ErzeugeManifestJson(version, downloadUrl, zipPfad),
-                Art = "manifest"
+                Kind = "manifest"
             });
         }
     }
 
     /// <summary>Mutiert das Szenario thread-sicher und schreibt die Szenariodatei anschließend neu.</summary>
     /// <param name="mutation">Die Änderung am Szenario.</param>
-    public void AktualisiereSzenario(Action<UpdateE2ESzenario> mutation)
+    public void AktualisiereSzenario(Action<UpdateE2EScenario> mutation)
     {
         lock (_szenarioLock)
         {
@@ -226,7 +226,7 @@ public sealed class UpdateE2EFixture : IDisposable
     {
         lock (_szenarioLock)
         {
-            File.WriteAllText(SzenarioDateiPfad, JsonSerializer.Serialize(_szenario, JsonOptionen));
+            File.WriteAllText(ScenarioFilePath, JsonSerializer.Serialize(_szenario, JsonOptionen));
         }
     }
 
@@ -234,52 +234,52 @@ public sealed class UpdateE2EFixture : IDisposable
     /// Aktiviert den kontrollierten Settings-Lesefehler für die gewählte Lesegrenze.
     /// </summary>
     /// <param name="limit"><c>Initial</c>, <c>BeforePreparation</c> oder <c>BeforeUpdaterStart</c>.</param>
-    /// <param name="versuch">Versuchsauswahl (<c>any</c>, <c>startup</c>, <c>manuell</c>, <c>pruefen</c>, <c>starten</c>).</param>
+    /// <param name="attempt">Versuchsauswahl (<c>any</c>, <c>startup</c>, <c>manuell</c>, <c>pruefen</c>, <c>starten</c>).</param>
     /// <param name="aufFreigabeWarten">Bei <c>true</c> blockiert der betroffene Read bis zur Gate-Freigabe.</param>
     /// <param name="wartezeitSekunden">Maximale Gate-Wartezeit in Sekunden.</param>
     public void AktiviereLesefehler(
         string limit,
-        string versuch = "any",
+        string attempt = "any",
         bool aufFreigabeWarten = true,
         int wartezeitSekunden = 30)
     {
-        AktualisiereSzenario(s => s.Lesefehler = new UpdateE2ELesefehler
+        AktualisiereSzenario(s => s.ReadFailure = new UpdateE2EReadFailure
         {
             Active = true,
-            Versuch = versuch,
+            Attempt = attempt,
             Limit = limit,
-            AufFreigabeWarten = aufFreigabeWarten,
-            WartezeitSekunden = wartezeitSekunden
+            WaitForRelease = aufFreigabeWarten,
+            WaitTimeoutSeconds = wartezeitSekunden
         });
     }
 
     /// <summary>
     /// Deaktiviert den kontrollierten Settings-Lesefehler ausdrücklich und protokolliert
-    /// <see cref="UpdateE2EEreignisse.UpdateSettingsReadFailureDisabled"/> als Runner-Ereignis.
+    /// <see cref="UpdateE2EEvents.UpdateSettingsReadFailureDisabled"/> als Runner-Ereignis.
     /// </summary>
     public void DeaktiviereLesefehler()
     {
-        AktualisiereSzenario(s => s.Lesefehler = new UpdateE2ELesefehler { Active = false });
-        UpdateE2EProtokoll.Anfuegen(
-            ProtokollDateiPfad, SzenarioId, UpdateE2EEreignisse.UpdateSettingsReadFailureDisabled);
+        AktualisiereSzenario(s => s.ReadFailure = new UpdateE2EReadFailure { Active = false });
+        UpdateE2ELog.Append(
+            LogFilePath, ScenarioId, UpdateE2EEvents.UpdateSettingsReadFailureDisabled);
     }
 
     /// <summary>Schreibt die Freigabe-Datei <c>{gate}.release</c> für ein blockiertes Gate.</summary>
     /// <param name="gate">Der Gate-Name.</param>
     public void OeffneGate(string gate)
-        => File.WriteAllText(Path.Combine(GatesVerzeichnis, $"{gate}.release"), "release");
+        => File.WriteAllText(Path.Combine(GatesDirectory, $"{gate}.release"), "release");
 
     /// <summary>Schreibt die Abbruch-Datei <c>{gate}.cancel</c> für ein blockiertes Gate.</summary>
     /// <param name="gate">Der Gate-Name.</param>
     public void BrecheGateAb(string gate)
-        => File.WriteAllText(Path.Combine(GatesVerzeichnis, $"{gate}.cancel"), "cancel");
+        => File.WriteAllText(Path.Combine(GatesDirectory, $"{gate}.cancel"), "cancel");
 
     /// <summary>Entfernt beide Gate-Dateien eines Gates wieder.</summary>
     /// <param name="gate">Der Gate-Name.</param>
     public void SetzeGateZurueck(string gate)
     {
-        var release = Path.Combine(GatesVerzeichnis, $"{gate}.release");
-        var cancel = Path.Combine(GatesVerzeichnis, $"{gate}.cancel");
+        var release = Path.Combine(GatesDirectory, $"{gate}.release");
+        var cancel = Path.Combine(GatesDirectory, $"{gate}.cancel");
         if (File.Exists(release))
             File.Delete(release);
         if (File.Exists(cancel))
@@ -287,7 +287,7 @@ public sealed class UpdateE2EFixture : IDisposable
     }
 
     /// <summary>
-    /// Erstellt die Fixture-Datenbank (EF-Migration) und persistiert die Update-Einstellungen
+    /// Erstellt die Fixture-Datenbank (EF-Migration) und persistiert die Update--Einstellungen
     /// darin. Für Vorbedingungen vor dem ersten App-Start.
     /// </summary>
     /// <param name="mode">Der zu speichernde Update-Modus.</param>
@@ -296,7 +296,7 @@ public sealed class UpdateE2EFixture : IDisposable
         => await SchreibeUpdateEinstellungenAsync(mode, updatePath, migriere: true);
 
     /// <summary>
-    /// Persistiert Update-Einstellungen in der bereits bestehenden Fixture-Datenbank
+    /// Persistiert Update--Einstellungen in der bereits bestehenden Fixture-Datenbank
     /// (für Änderungen zwischen zwei App-Läufen bei erhaltener Datenbank).
     /// </summary>
     /// <param name="mode">Der zu speichernde Update-Modus.</param>
@@ -305,7 +305,7 @@ public sealed class UpdateE2EFixture : IDisposable
         => await SchreibeUpdateEinstellungenAsync(mode, updatePath, migriere: false);
 
     /// <summary>
-    /// Persistiert die Update-Einstellungen über einen eigenen DbContext auf der
+    /// Persistiert die Update--Einstellungen über einen eigenen DbContext auf der
     /// Fixture-Datenbank; migriert das Schema nur bei <paramref name="migriere"/>.
     /// </summary>
     /// <param name="mode">Der zu speichernde Update-Modus.</param>
@@ -326,14 +326,14 @@ public sealed class UpdateE2EFixture : IDisposable
 
     /// <summary>Liest alle bisher geschriebenen JSONL-Protokolleinträge.</summary>
     /// <returns>Die Protokolleinträge in Dateireihenfolge.</returns>
-    public IReadOnlyList<UpdateE2EProtokollEintrag> LeseProtokoll()
+    public IReadOnlyList<UpdateE2ELogEntry> LeseProtokoll()
     {
-        if (!File.Exists(ProtokollDateiPfad))
+        if (!File.Exists(LogFilePath))
             return [];
 
-        var entries = new List<UpdateE2EProtokollEintrag>();
+        var entries = new List<UpdateE2ELogEntry>();
         string content;
-        using (var stream = new FileStream(ProtokollDateiPfad, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        using (var stream = new FileStream(LogFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
         using (var reader = new StreamReader(stream))
         {
             content = reader.ReadToEnd();
@@ -341,7 +341,7 @@ public sealed class UpdateE2EFixture : IDisposable
 
         foreach (var line in content.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
-            var entry = JsonSerializer.Deserialize<UpdateE2EProtokollEintrag>(line.Trim());
+            var entry = JsonSerializer.Deserialize<UpdateE2ELogEntry>(line.Trim());
             if (entry is not null)
                 entries.Add(entry);
         }
@@ -359,11 +359,11 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <param name="filter">Optionaler Filter auf den Nutzdaten-Eintrag.</param>
     /// <returns>Die gefundenen Einträge.</returns>
     /// <exception cref="TimeoutException">Die Ereignisse erschienen nicht rechtzeitig.</exception>
-    public async Task<IReadOnlyList<UpdateE2EProtokollEintrag>> WarteAufEreignisAsync(
+    public async Task<IReadOnlyList<UpdateE2ELogEntry>> WarteAufEreignisAsync(
         string evt,
         TimeSpan timeout,
         int mindestens = 1,
-        Func<UpdateE2EProtokollEintrag, bool>? filter = null)
+        Func<UpdateE2ELogEntry, bool>? filter = null)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
@@ -396,7 +396,7 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <summary>Liefert den <c>data</c>-Wert eines Protokolleintrags als <see cref="JsonElement"/>.</summary>
     /// <param name="entry">Der Protokolleintrag.</param>
     /// <returns>Das Nutzdaten-Element oder <c>null</c>.</returns>
-    public static JsonElement? Data(UpdateE2EProtokollEintrag entry)
+    public static JsonElement? Data(UpdateE2ELogEntry entry)
         => entry.Data as JsonElement? ?? (entry.Data is null ? null : JsonSerializer.SerializeToElement(entry.Data));
 
     /// <summary>GitHub-API-Asset-URL (Fallback-Download-Route) zu einer Asset-ID.</summary>
@@ -528,19 +528,19 @@ public sealed class UpdateE2EFixture : IDisposable
         _disposed = true;
 
         // Fehlersteuerung sicher zurücksetzen, auch wenn der Test mittendrin abbricht.
-        try { DeaktiviereLesefehler(); } catch { /* Testwurzel evtl. schon entfernt. */ }
+        try { DeaktiviereLesefehler(); } catch { /* TestRoot evtl. schon entfernt. */ }
 
-        // Diagnose-Fluchtventil: Mit SOFTWARESCHMIEDE_UPDATE_E2E_KEEP=1 bleibt die Testwurzel
+        // Diagnose-Fluchtventil: Mit SOFTWARESCHMIEDE_UPDATE_E2E_KEEP=1 bleibt die TestRoot
         // (Szenario, Gates, JSONL-Protokoll) zur Fehleranalyse erhalten.
         if (Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_UPDATE_E2E_KEEP") == "1")
             return;
 
-        for (var versuch = 0; versuch < 5; versuch++)
+        for (var attempt = 0; attempt < 5; attempt++)
         {
             try
             {
-                if (Directory.Exists(Testwurzel))
-                    Directory.Delete(Testwurzel, recursive: true);
+                if (Directory.Exists(TestRoot))
+                    Directory.Delete(TestRoot, recursive: true);
                 return;
             }
             catch (IOException)
@@ -565,11 +565,11 @@ public sealed class UpdateE2EFixture : IDisposable
     {
         var configuration = new UpdateE2ETestConfiguration
         {
-            Testwurzel = Testwurzel,
-            SzenarioDateiPfad = SzenarioDateiPfad,
-            ProtokollDateiPfad = ProtokollDateiPfad,
-            SzenarioId = SzenarioId,
-            GatesVerzeichnis = GatesVerzeichnis
+            TestRoot = TestRoot,
+            ScenarioFilePath = ScenarioFilePath,
+            LogFilePath = LogFilePath,
+            ScenarioId = ScenarioId,
+            GatesDirectory = GatesDirectory
         };
 
         File.WriteAllText(KonfigurationDateiPfad, JsonSerializer.Serialize(configuration, JsonOptionen));
@@ -601,5 +601,5 @@ public sealed class UpdateE2EFixture : IDisposable
     }
 
     private string RelativZurWurzel(string path)
-        => Path.GetRelativePath(Testwurzel, path);
+        => Path.GetRelativePath(TestRoot, path);
 }

@@ -17,19 +17,19 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AppSettingService _settingService;
-    private readonly WorkingDirectorySettingsService _arbeitsverzeichnisService;
+    private readonly WorkingDirectorySettingsService _workingDirectoryService;
     private readonly DarkModeService _darkModeService;
     private readonly Mock<IPluginManager> _pluginManagerMock;
     private readonly PluginActivationService _pluginActivationService;
     private readonly PluginSettingsService _pluginSettingsService;
-    private readonly PromptTemplateService _promptVorlagenService;
+    private readonly PromptTemplateService _promptTemplatesService;
 
     /// <summary>SettingsViewModelTests_IdePlugin.</summary>
     public SettingsViewModelTests_IdePlugin()
     {
         _db = TestDbContextFactory.Create();
         _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
-        _arbeitsverzeichnisService = new WorkingDirectorySettingsService(_db, NullLogger<WorkingDirectorySettingsService>.Instance);
+        _workingDirectoryService = new WorkingDirectorySettingsService(_db, NullLogger<WorkingDirectorySettingsService>.Instance);
 
         var scopeMock = new Mock<IServiceScope>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
@@ -45,7 +45,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         _pluginActivationService = new PluginActivationService(_settingService, _pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _pluginSettingsService = new PluginSettingsService(new Mock<ICredentialStore>().Object, NullLogger<PluginSettingsService>.Instance);
-        _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
+        _promptTemplatesService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
@@ -54,12 +54,12 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
     private SettingsViewModel CreateSut() =>
         new(
             _settingService,
-            _arbeitsverzeichnisService,
+            _workingDirectoryService,
             _darkModeService,
             _pluginManagerMock.Object,
             _pluginActivationService,
             _pluginSettingsService,
-            _promptVorlagenService,
+            _promptTemplatesService,
             new ProjectService(_db, NullLogger<ProjectService>.Instance),
             NullLogger<SettingsViewModel>.Instance,
             new Mock<IDialogService>().Object,
@@ -86,7 +86,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
     }
 
     /// <summary>
-    /// Die Sichtbarkeit der beiden Inhaltsbereiche (SCM/KI-Plugin-Einstellungen vs. IDE-Plugin-Einstellungen)
+    /// Die Sichtbarkeit der beiden Inhaltsbereiche (SCM/KI-Plugin--Einstellungen vs. IDE-Plugin--Einstellungen)
     /// ist exklusiv: Nur der zuletzt ausgewählte Bereich ist sichtbar. Die jeweils andere Auswahl
     /// (SelectedPlugin bzw. SelectedIdePlugin) bleibt dabei erhalten und wird nicht auf null zurückgesetzt.
     /// </summary>
@@ -98,24 +98,24 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio");
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         var scmEintrag = sut.SourceCodeManagementPlugins.Single();
         var idePluginEintrag = sut.DevelopmentEnvironmentPlugins.Single();
 
         sut.PluginSelectedCommand.Execute(scmEintrag);
 
-        sut.IsScmKiPluginContentVisible.Should().BeTrue();
+        sut.IsScmAiPluginContentVisible.Should().BeTrue();
         sut.IsIdePluginContentVisible.Should().BeFalse();
 
         sut.IdePluginSelectedCommand.Execute(idePluginEintrag);
 
         sut.IsIdePluginContentVisible.Should().BeTrue();
-        sut.IsScmKiPluginContentVisible.Should().BeFalse();
+        sut.IsScmAiPluginContentVisible.Should().BeFalse();
         sut.SelectedPlugin.Should().NotBeNull();
 
         sut.PluginSelectedCommand.Execute(scmEintrag);
 
-        sut.IsScmKiPluginContentVisible.Should().BeTrue();
+        sut.IsScmAiPluginContentVisible.Should().BeTrue();
         sut.IsIdePluginContentVisible.Should().BeFalse();
         sut.SelectedIdePlugin.Should().NotBeNull();
     }
@@ -129,7 +129,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio, vsCode]);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.DevelopmentEnvironmentPlugins.Select(e => e.PluginPrefix).Should().Equal(
             "Softwareschmiede.VisualStudio",
@@ -148,7 +148,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         await _settingService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Unbekannt,Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.IdePluginOrder.Should().Equal("Softwareschmiede.VisualStudioCode", "Softwareschmiede.VisualStudio");
     }
@@ -163,7 +163,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         await _settingService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.IdePluginOrder.Should().Equal("Softwareschmiede.VisualStudioCode", "Softwareschmiede.VisualStudio");
     }
@@ -176,7 +176,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode");
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio, vsCode]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         var ersterEintrag = sut.DevelopmentEnvironmentPlugins[0];
         var letzterEintrag = sut.DevelopmentEnvironmentPlugins[1];
 
@@ -194,7 +194,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode");
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio, vsCode]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         var ersterEintrag = sut.DevelopmentEnvironmentPlugins[0];
 
         sut.IdePluginMoveDownCommand.Execute(ersterEintrag);
@@ -213,14 +213,14 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio");
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         var entry = sut.DevelopmentEnvironmentPlugins.Single();
         entry.IsEnabled.Should().BeTrue();
 
         entry.IsEnabled = false;
 
         entry.IsEnabled.Should().BeTrue();
-        sut.FehlerMeldung.Should().Contain("Mindestens ein IDE-Plugin");
+        sut.ErrorMessage.Should().Contain("Mindestens ein IDE-Plugin");
     }
 
     /// <summary>Eine noch nicht gespeicherte IDE-Plugin-Aktivierungsänderung wird durch VerwerfenAsync rückgängig gemacht und bleibt in der Datenbank unverändert (Konsistenz mit SCM-/KI-Plugins).</summary>
@@ -231,10 +231,10 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode");
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio, vsCode]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.DevelopmentEnvironmentPlugins.Single(e => e.PluginPrefix == "Softwareschmiede.VisualStudioCode").IsEnabled = false;
-        await ((AsyncRelayCommand)sut.VerwerfenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.DiscardCommand).ExecuteAsync();
 
         sut.DevelopmentEnvironmentPlugins.Single(e => e.PluginPrefix == "Softwareschmiede.VisualStudioCode").IsEnabled.Should().BeTrue();
         var gespeicherterStatus = await _pluginActivationService.IsPluginEnabledAsync("Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
@@ -249,10 +249,10 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode");
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio, vsCode]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.DevelopmentEnvironmentPlugins.Single(e => e.PluginPrefix == "Softwareschmiede.VisualStudioCode").IsEnabled = false;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         var gespeicherterStatus = await _pluginActivationService.IsPluginEnabledAsync("Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
         gespeicherterStatus.Should().BeFalse();

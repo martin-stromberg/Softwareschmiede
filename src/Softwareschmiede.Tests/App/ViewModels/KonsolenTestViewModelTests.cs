@@ -9,14 +9,14 @@ using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.Tests.App.ViewModels;
 
-/// <summary>Unit-Tests für <see cref="KonsolenTestViewModel"/> (Konsolentestfenster).</summary>
+/// <summary>Unit-Tests für <see cref="ConsoleTestViewModel"/> (Konsolentestfenster).</summary>
 public sealed class KonsolenTestViewModelTests : IDisposable
 {
     private readonly List<string> _tempFiles = [];
     private readonly Mock<IDialogService> _dialogServiceMock = new();
     private readonly CliReplayRecordingStore _store = new();
     private readonly FakeTimeProvider _timeProvider = new();
-    private readonly List<KonsolenTestViewModel> _suts = [];
+    private readonly List<ConsoleTestViewModel> _suts = [];
 
     /// <summary>Dispose.</summary>
     public void Dispose()
@@ -28,13 +28,13 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 File.Delete(path);
     }
 
-    private KonsolenTestViewModel CreateSut()
+    private ConsoleTestViewModel CreateSut()
     {
-        var sut = new KonsolenTestViewModel(
+        var sut = new ConsoleTestViewModel(
             _dialogServiceMock.Object,
             _store,
             _timeProvider,
-            NullLogger<KonsolenTestViewModel>.Instance,
+            NullLogger<ConsoleTestViewModel>.Instance,
             dispatcherInvoke: action => action());
         _suts.Add(sut);
         return sut;
@@ -91,25 +91,25 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         SetupOpenDialog(path);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
 
         sut.Session.Should().NotBeNull();
         sut.Session.Should().BeOfType<TerminalReplaySession>();
         sut.FilePath.Should().Be(path);
-        sut.QuellEintraege.Should().HaveCount(2);
-        sut.QuellEintraege[0].Index.Should().Be(1, "die #-Spalte zählt 1-basiert wie der PositionsText");
-        sut.QuellEintraege[1].Index.Should().Be(2);
-        sut.QuellEintraege[0].Length.Should().Be(10);
-        sut.QuellEintraege[0].Quelltext.Should().Be("alpha␛[31m");
-        sut.QuellEintraege[1].Quelltext.Should().Be("beta");
-        sut.PositionsText.Should().Be("Chunk 0/2");
+        sut.SourceEntries.Should().HaveCount(2);
+        sut.SourceEntries[0].Index.Should().Be(1, "die #-Spalte zählt 1-basiert wie der PositionsText");
+        sut.SourceEntries[1].Index.Should().Be(2);
+        sut.SourceEntries[0].Length.Should().Be(10);
+        sut.SourceEntries[0].Sourcetext.Should().Be("alpha␛[31m");
+        sut.SourceEntries[1].Sourcetext.Should().Be("beta");
+        sut.PositionText.Should().Be("Chunk 0/2");
         sut.StatusText.Should().Contain("geladen");
-        sut.FehlerMeldung.Should().BeNull();
-        sut.UnvollstaendigHinweis.Should().BeNull();
-        sut.IstWiedergabeAktiv.Should().BeFalse();
+        sut.ErrorMessage.Should().BeNull();
+        sut.IncompleteNotice.Should().BeNull();
+        sut.IsReplayActive.Should().BeFalse();
     }
 
-    /// <summary>Nach dem Laden zeigt <see cref="KonsolenTestViewModel.GeometrieText"/> die
+    /// <summary>Nach dem Laden zeigt <see cref="ConsoleTestViewModel.GeometrieText"/> die
     /// aufgezeichnete Geometrie an; beim Schließen wird der Text wieder geleert.</summary>
     [Fact]
     public async Task AufzeichnungOeffnen_SetztGeometrieText()
@@ -120,12 +120,12 @@ public sealed class KonsolenTestViewModelTests : IDisposable
 
         sut.GeometrieText.Should().BeEmpty("ohne geladene Aufzeichnung ist der Geometrie-Text leer");
 
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
 
         sut.GeometrieText.Should().Be("Aufzeichnung: 80×24",
             "die Fixture-Aufzeichnung hat die Geometrie 80×24");
 
-        sut.SchliessenCommand.Execute(null);
+        sut.CloseCommand.Execute(null);
 
         sut.GeometrieText.Should().BeEmpty(
             "beim Schließen wird die Aufzeichnung entsorgt und der Geometrie-Text geleert");
@@ -139,12 +139,12 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         SetupOpenDialog(path);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
 
-        sut.UnvollstaendigHinweis.Should().NotBeNullOrWhiteSpace();
+        sut.IncompleteNotice.Should().NotBeNullOrWhiteSpace();
     }
 
-    /// <summary>Eine korrupte Datei setzt FehlerMeldung und lässt den Zustand unverändert.</summary>
+    /// <summary>Eine korrupte Datei setzt ErrorMessage und lässt den Zustand unverändert.</summary>
     [Fact]
     public async Task AufzeichnungOeffnen_KorrupteDatei_ZeigtFehlermeldung()
     {
@@ -154,9 +154,9 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         SetupOpenDialog(path);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().NotBeNullOrWhiteSpace();
+        sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
         sut.Session.Should().BeNull();
     }
 
@@ -167,10 +167,10 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         SetupOpenDialog(null);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
 
         sut.Session.Should().BeNull();
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         sut.StatusText.Should().Be("Keine Aufzeichnung geladen.");
     }
 
@@ -183,20 +183,20 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             chunkDaten: [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B")]);
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
-        sut.ZeitrafferSchwelleText = "0";
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
+        sut.TimelapseThresholdText = "0";
 
-        sut.WiedergabeStartenCommand.Execute(null);
+        sut.StartReplayCommand.Execute(null);
         // Der transiente Zwischenzustand wird nicht synchron assertiert: mit
-        // ZeitrafferSchwelle 0 und synchronem Dispatcher kann die 2-Chunk-Wiedergabe den
+        // TimeLapseThreshold 0 und synchronem Dispatcher kann die 2-Chunk-Wiedergabe den
         // Assert bereits überholt haben — beide Zustände sind gültig.
         sut.StatusText.Should().BeOneOf("Wiedergabe läuft.", "Wiedergabe beendet.");
 
         await WarteBisAsync(() => sut.StatusText == "Wiedergabe beendet.");
 
-        sut.IstWiedergabeAktiv.Should().BeFalse();
-        sut.PositionsText.Should().Be("Chunk 2/2");
-        sut.AktuellerQuellEintrag.Should().BeSameAs(sut.QuellEintraege[1],
+        sut.IsReplayActive.Should().BeFalse();
+        sut.PositionText.Should().Be("Chunk 2/2");
+        sut.CurrentSourceEntry.Should().BeSameAs(sut.SourceEntries[1],
             "der aktuelle Quell-Eintrag muss dem zuletzt abgespielten Chunk entsprechen");
     }
 
@@ -223,13 +223,13 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         _tempFiles.Add(path);
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
 
-        sut.WiedergabeStartenCommand.Execute(null);
+        sut.StartReplayCommand.Execute(null);
         var replay = (TerminalReplaySession)sut.Session!;
         await WarteBisAsync(() => replay.CurrentChunkIndex >= 1);
 
-        sut.WiedergabePausierenCommand.Execute(null);
+        sut.PauseReplayCommand.Execute(null);
         sut.IsPaused.Should().BeTrue();
         sut.StatusText.Should().Be("Pausiert.");
 
@@ -240,7 +240,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         replay.CurrentChunkIndex.Should().Be(1,
             "während der Pausierung darf kein weiterer Chunk angewendet werden");
 
-        sut.WiedergabePausierenCommand.Execute(null);
+        sut.PauseReplayCommand.Execute(null);
         sut.IsPaused.Should().BeFalse();
         // Die Pause des zweiten Chunks wird nach dem Fortsetzen ggf. erst neu auf der Schleife
         // angelegt — wiederholte Advances decken die Registrierungsreihenfolge ab. Großzügigere
@@ -264,16 +264,16 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             chunkDaten: [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B")]);
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
-        sut.ZeitrafferSchwelleText = "0";
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
+        sut.TimelapseThresholdText = "0";
         var ersteSession = (TerminalReplaySession)sut.Session!;
 
-        sut.WiedergabeStartenCommand.Execute(null);
+        sut.StartReplayCommand.Execute(null);
         await WarteBisAsync(() => sut.StatusText == "Wiedergabe beendet.");
 
-        sut.WiedergabeStartenCommand.CanExecute(null).Should().BeTrue(
+        sut.StartReplayCommand.CanExecute(null).Should().BeTrue(
             "Abspielen muss nach einem beendeten Durchlauf wieder aktivierbar sein");
-        sut.WiedergabeStartenCommand.Execute(null);
+        sut.StartReplayCommand.Execute(null);
 
         var zweiteSession = (TerminalReplaySession)sut.Session!;
         zweiteSession.Should().NotBeSameAs(ersteSession,
@@ -282,7 +282,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         await WarteBisAsync(() => sut.StatusText == "Wiedergabe beendet.");
         zweiteSession.CurrentChunkIndex.Should().Be(2,
             "die zweite Wiedergabe muss die Aufzeichnung tatsächlich nochmals durchlaufen");
-        sut.AktuellerQuellEintrag.Should().BeSameAs(sut.QuellEintraege[1]);
+        sut.CurrentSourceEntry.Should().BeSameAs(sut.SourceEntries[1]);
     }
 
     /// <summary>Ungültige Zeitraffer-Eingaben setzen die Fehlermeldung und lassen die zuletzt
@@ -293,23 +293,23 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var path = await ErstelleAufzeichnungsDateiAsync();
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
         var session = (TerminalReplaySession)sut.Session!;
 
         session.TimeLapseThreshold.Should().Be(TimeSpan.FromSeconds(1), "Default-Text '1' wird beim Laden angewendet");
 
-        sut.ZeitrafferSchwelleText = "0,25";
+        sut.TimelapseThresholdText = "0,25";
         session.TimeLapseThreshold.Should().Be(TimeSpan.FromMilliseconds(250));
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
 
-        sut.ZeitrafferSchwelleText = "keine-zahl";
-        sut.FehlerMeldung.Should().NotBeNullOrWhiteSpace();
+        sut.TimelapseThresholdText = "keine-zahl";
+        sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
         session.TimeLapseThreshold.Should().Be(TimeSpan.FromMilliseconds(250),
             "die letzte gültige Schwelle bleibt bei ungültiger Eingabe aktiv");
 
-        sut.ZeitrafferSchwelleText = "0";
+        sut.TimelapseThresholdText = "0";
         session.TimeLapseThreshold.Should().Be(TimeSpan.Zero);
-        sut.FehlerMeldung.Should().BeNull("ein anschließend gültiger Wert räumt die Validierungsmeldung auf");
+        sut.ErrorMessage.Should().BeNull("ein anschließend gültiger Wert räumt die Validierungsmeldung auf");
     }
 
     /// <summary>Ungültige Werte werden ohne Exception abgewiesen und ändern die aktive
@@ -323,12 +323,12 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var path = await ErstelleAufzeichnungsDateiAsync();
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
         var session = (TerminalReplaySession)sut.Session!;
 
-        sut.ZeitrafferSchwelleText = eingabe;
+        sut.TimelapseThresholdText = eingabe;
 
-        sut.FehlerMeldung.Should().NotBeNullOrWhiteSpace();
+        sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
         session.TimeLapseThreshold.Should().Be(TimeSpan.FromSeconds(1));
     }
 
@@ -341,15 +341,15 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var path = await ErstelleAufzeichnungsDateiAsync();
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
 
-        sut.ZeitrafferSchwelleText = "0"; // maximale Geschwindigkeit
-        sut.ZeitrafferSchwelleText = "ungueltig"; // Fehlerbanner — letzte gültige Schwelle bleibt 0
-        sut.FehlerMeldung.Should().NotBeNullOrWhiteSpace();
+        sut.TimelapseThresholdText = "0"; // maximale Geschwindigkeit
+        sut.TimelapseThresholdText = "ungueltig"; // Fehlerbanner — letzte gültige Schwelle bleibt 0
+        sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
 
         // Erneutes Laden erzeugt eine frische Session — sie muss die zuletzt gültige
         // Schwelle übernehmen, nicht ihren Default (TimeSpan.MaxValue = Echtzeit).
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
 
         var session = (TerminalReplaySession)sut.Session!;
         session.TimeLapseThreshold.Should().Be(TimeSpan.Zero,
@@ -380,25 +380,25 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         _tempFiles.Add(path);
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
         var erste = (TerminalReplaySession)sut.Session!;
 
-        sut.WiedergabeNeustartenCommand.CanExecute(null).Should().BeFalse(
+        sut.RestartPlaybackCommand.CanExecute(null).Should().BeFalse(
             "ohne laufende Wiedergabe ist der Neustart-Command deaktiviert");
 
-        sut.WiedergabeStartenCommand.Execute(null);
+        sut.StartReplayCommand.Execute(null);
         await WarteBisAsync(() => erste.CurrentChunkIndex >= 1);
-        sut.WiedergabePausierenCommand.Execute(null);
+        sut.PauseReplayCommand.Execute(null);
         sut.IsPaused.Should().BeTrue();
 
-        sut.WiedergabeNeustartenCommand.CanExecute(null).Should().BeTrue(
+        sut.RestartPlaybackCommand.CanExecute(null).Should().BeTrue(
             "der Neustart-Command muss auch aus dem Pausiert-Zustand erreichbar sein");
-        sut.WiedergabeNeustartenCommand.Execute(null);
+        sut.RestartPlaybackCommand.Execute(null);
 
         var zweite = (TerminalReplaySession)sut.Session!;
         zweite.Should().NotBeSameAs(erste, "der Neustart verwirft die laufende Session");
         sut.IsPaused.Should().BeFalse();
-        sut.IstWiedergabeAktiv.Should().BeTrue();
+        sut.IsReplayActive.Should().BeTrue();
         sut.StatusText.Should().Be("Wiedergabe läuft.");
 
         await WarteBisAsync(() => zweite.CurrentChunkIndex >= 1);
@@ -421,15 +421,15 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var path = await ErstelleAufzeichnungsDateiAsync();
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
         var closeRequested = false;
         sut.CloseRequested += (_, _) => closeRequested = true;
 
-        sut.SchliessenCommand.Execute(null);
+        sut.CloseCommand.Execute(null);
 
         closeRequested.Should().BeTrue();
         sut.Session.Should().BeNull("nach dem Schließen darf keine disposed Session gebunden bleiben");
-        sut.WiedergabeStartenCommand.CanExecute(null).Should().BeFalse(
+        sut.StartReplayCommand.CanExecute(null).Should().BeFalse(
             "Abspielen darf nach dem Entsorgen der Session nicht mehr aktivierbar sein");
     }
 
@@ -439,18 +439,18 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     {
         var sut = CreateSut();
 
-        sut.WiedergabeStartenCommand.CanExecute(null).Should().BeFalse();
-        sut.WiedergabeNeustartenCommand.CanExecute(null).Should().BeFalse();
-        sut.WiedergabePausierenCommand.CanExecute(null).Should().BeFalse();
-        sut.SchrittVorCommand.CanExecute(null).Should().BeFalse();
-        sut.SchrittZurueckCommand.CanExecute(null).Should().BeFalse();
-        sut.WiedergabeStartenCommand.Execute(null);
-        sut.WiedergabeNeustartenCommand.Execute(null);
-        sut.WiedergabePausierenCommand.Execute(null);
-        sut.SchrittVorCommand.Execute(null);
-        sut.SchrittZurueckCommand.Execute(null);
+        sut.StartReplayCommand.CanExecute(null).Should().BeFalse();
+        sut.RestartPlaybackCommand.CanExecute(null).Should().BeFalse();
+        sut.PauseReplayCommand.CanExecute(null).Should().BeFalse();
+        sut.StepBeforeCommand.CanExecute(null).Should().BeFalse();
+        sut.StepBackCommand.CanExecute(null).Should().BeFalse();
+        sut.StartReplayCommand.Execute(null);
+        sut.RestartPlaybackCommand.Execute(null);
+        sut.PauseReplayCommand.Execute(null);
+        sut.StepBeforeCommand.Execute(null);
+        sut.StepBackCommand.Execute(null);
 
-        sut.IstWiedergabeAktiv.Should().BeFalse();
+        sut.IsReplayActive.Should().BeFalse();
         sut.IsPaused.Should().BeFalse();
         sut.Session.Should().BeNull();
     }
@@ -464,30 +464,30 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             chunkDaten: [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B"), Encoding.UTF8.GetBytes("C")]);
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
 
-        sut.PositionsText.Should().Be("Chunk 0/3");
-        sut.AktuellerQuellEintrag.Should().BeNull();
+        sut.PositionText.Should().Be("Chunk 0/3");
+        sut.CurrentSourceEntry.Should().BeNull();
 
-        sut.SchrittVorCommand.Execute(null);
-        sut.SchrittVorCommand.Execute(null);
+        sut.StepBeforeCommand.Execute(null);
+        sut.StepBeforeCommand.Execute(null);
 
-        sut.PositionsText.Should().Be("Chunk 2/3");
-        sut.AktuellerQuellEintrag.Should().BeSameAs(sut.QuellEintraege[1],
+        sut.PositionText.Should().Be("Chunk 2/3");
+        sut.CurrentSourceEntry.Should().BeSameAs(sut.SourceEntries[1],
             "die Quell-Selektion markiert den zuletzt angewendeten Chunk");
         sut.StatusText.Should().Be("Einzelschritt — Chunk 2/3 angewendet.");
 
-        sut.SchrittZurueckCommand.Execute(null);
+        sut.StepBackCommand.Execute(null);
 
-        sut.PositionsText.Should().Be("Chunk 1/3");
-        sut.AktuellerQuellEintrag.Should().BeSameAs(sut.QuellEintraege[0]);
+        sut.PositionText.Should().Be("Chunk 1/3");
+        sut.CurrentSourceEntry.Should().BeSameAs(sut.SourceEntries[0]);
         sut.StatusText.Should().Be("Schritt zurück — Chunk 2/3 zurückgenommen.",
             "der Rückwärtsschritt benennt den zurückgenommenen Chunk (alte Position = #-Zeile)");
 
-        sut.SchrittZurueckCommand.Execute(null);
+        sut.StepBackCommand.Execute(null);
 
-        sut.PositionsText.Should().Be("Chunk 0/3");
-        sut.AktuellerQuellEintrag.Should().BeNull("an Position 0 ist kein Chunk angewendet");
+        sut.PositionText.Should().Be("Chunk 0/3");
+        sut.CurrentSourceEntry.Should().BeNull("an Position 0 ist kein Chunk angewendet");
         sut.StatusText.Should().Be("Schritt zurück — Chunk 1/3 zurückgenommen.");
     }
 
@@ -514,36 +514,36 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         _tempFiles.Add(path);
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
         var session = (TerminalReplaySession)sut.Session!;
 
         // Geladen, Wiedergabe nicht gestartet: Vor aktiv, Zurück an Position 0 inaktiv.
-        sut.SchrittVorCommand.CanExecute(null).Should().BeTrue();
-        sut.SchrittZurueckCommand.CanExecute(null).Should().BeFalse();
+        sut.StepBeforeCommand.CanExecute(null).Should().BeTrue();
+        sut.StepBackCommand.CanExecute(null).Should().BeFalse();
 
         // Laufend unpausiert (die Schleife parkt im Delay des zweiten Chunks): beide inaktiv.
-        sut.WiedergabeStartenCommand.Execute(null);
+        sut.StartReplayCommand.Execute(null);
         await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
-        sut.IstWiedergabeAktiv.Should().BeTrue();
+        sut.IsReplayActive.Should().BeTrue();
         sut.IsPaused.Should().BeFalse();
-        sut.SchrittVorCommand.CanExecute(null).Should().BeFalse(
+        sut.StepBeforeCommand.CanExecute(null).Should().BeFalse(
             "Schritte sind während unpausierter Wiedergabe gesperrt");
-        sut.SchrittZurueckCommand.CanExecute(null).Should().BeFalse();
+        sut.StepBackCommand.CanExecute(null).Should().BeFalse();
 
-        // Pausiert: beide aktiv.
-        sut.WiedergabePausierenCommand.Execute(null);
-        sut.SchrittVorCommand.CanExecute(null).Should().BeTrue();
-        sut.SchrittZurueckCommand.CanExecute(null).Should().BeTrue();
+        // Paused: beide aktiv.
+        sut.PauseReplayCommand.Execute(null);
+        sut.StepBeforeCommand.CanExecute(null).Should().BeTrue();
+        sut.StepBackCommand.CanExecute(null).Should().BeTrue();
 
         // Ende per Schritt erreicht: Vor inaktiv, Zurück aktiv.
-        sut.SchrittVorCommand.Execute(null);
+        sut.StepBeforeCommand.Execute(null);
         await WarteBisAsync(() => sut.StatusText == "Wiedergabe beendet.");
-        sut.SchrittVorCommand.CanExecute(null).Should().BeFalse("am Ende ist kein Vorwärtsschritt mehr möglich");
-        sut.SchrittZurueckCommand.CanExecute(null).Should().BeTrue("auch im beendeten Zustand darf zurückgeschritten werden");
+        sut.StepBeforeCommand.CanExecute(null).Should().BeFalse("am Ende ist kein Vorwärtsschritt mehr möglich");
+        sut.StepBackCommand.CanExecute(null).Should().BeTrue("auch im beendeten Zustand darf zurückgeschritten werden");
 
         // Zurück vom Ende: Vor wieder aktiv.
-        sut.SchrittZurueckCommand.Execute(null);
-        sut.SchrittVorCommand.CanExecute(null).Should().BeTrue();
+        sut.StepBackCommand.Execute(null);
+        sut.StepBeforeCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>Programmatische <c>Execute</c>-Aufrufe der Schritt-Commands während
@@ -571,21 +571,21 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         _tempFiles.Add(path);
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
         var session = (TerminalReplaySession)sut.Session!;
 
         // Laufend unpausiert: die Schleife parkt im Delay des zweiten Chunks.
-        sut.WiedergabeStartenCommand.Execute(null);
+        sut.StartReplayCommand.Execute(null);
         await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
-        sut.IstWiedergabeAktiv.Should().BeTrue();
+        sut.IsReplayActive.Should().BeTrue();
         sut.IsPaused.Should().BeFalse();
 
-        sut.SchrittVorCommand.Execute(null);
-        sut.SchrittZurueckCommand.Execute(null);
+        sut.StepBeforeCommand.Execute(null);
+        sut.StepBackCommand.Execute(null);
 
         session.CurrentChunkIndex.Should().Be(1,
             "programmatische Schritte während unpausierter Wiedergabe dürfen die Position nicht verändern");
-        sut.PositionsText.Should().Be("Chunk 1/2");
+        sut.PositionText.Should().Be("Chunk 1/2");
         sut.StatusText.Should().Be("Wiedergabe läuft.");
     }
 
@@ -599,29 +599,29 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             chunkDaten: [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B"), Encoding.UTF8.GetBytes("C")]);
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
-        sut.ZeitrafferSchwelleText = "0";
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
+        sut.TimelapseThresholdText = "0";
         var ersteSession = (TerminalReplaySession)sut.Session!;
 
-        sut.WiedergabeNeustartenCommand.CanExecute(null).Should().BeFalse(
+        sut.RestartPlaybackCommand.CanExecute(null).Should().BeFalse(
             "an Position 0 ohne laufende Wiedergabe ist der Neustart-Command deaktiviert");
 
-        sut.SchrittVorCommand.Execute(null);
-        sut.SchrittVorCommand.Execute(null);
-        sut.PositionsText.Should().Be("Chunk 2/3");
-        sut.IstWiedergabeAktiv.Should().BeFalse("reines Schreiten startet keine Wiedergabe");
+        sut.StepBeforeCommand.Execute(null);
+        sut.StepBeforeCommand.Execute(null);
+        sut.PositionText.Should().Be("Chunk 2/3");
+        sut.IsReplayActive.Should().BeFalse("reines Schreiten startet keine Wiedergabe");
 
-        sut.WiedergabeNeustartenCommand.CanExecute(null).Should().BeTrue(
+        sut.RestartPlaybackCommand.CanExecute(null).Should().BeTrue(
             "aus dem Schrittmodus muss der direkte Rückweg zu Position 0 erreichbar sein");
-        sut.WiedergabeNeustartenCommand.Execute(null);
+        sut.RestartPlaybackCommand.Execute(null);
 
         var zweiteSession = (TerminalReplaySession)sut.Session!;
         zweiteSession.Should().NotBeSameAs(ersteSession,
             "der Neustart verwirft die geschrittene Session zugunsten einer frischen ab Position 0");
-        // Der Neustart löst die Wiedergabe aus; mit ZeitrafferSchwelle 0 und nur drei
+        // Der Neustart löst die Wiedergabe aus; mit TimeLapseThreshold 0 und nur drei
         // Ein-Byte-Chunks kann sie den Assert aber schon überholt haben — OnReplayExited
         // setzt dann bereits IstWiedergabeAktiv=false und StatusText="Wiedergabe beendet.".
-        (sut.IstWiedergabeAktiv || sut.StatusText == "Wiedergabe beendet.").Should().BeTrue(
+        (sut.IsReplayActive || sut.StatusText == "Wiedergabe beendet.").Should().BeTrue(
             "der Neustart muss die Wiedergabe auslösen — laufend oder bereits durchgelaufen");
         sut.StatusText.Should().BeOneOf("Wiedergabe läuft.", "Wiedergabe beendet.");
 
@@ -640,22 +640,22 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             chunkDaten: [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B"), Encoding.UTF8.GetBytes("C")]);
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
-        sut.ZeitrafferSchwelleText = "0";
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
+        sut.TimelapseThresholdText = "0";
         var session = (TerminalReplaySession)sut.Session!;
 
-        sut.SchrittVorCommand.Execute(null);
-        sut.SchrittVorCommand.Execute(null);
-        sut.SchrittVorCommand.Execute(null);
+        sut.StepBeforeCommand.Execute(null);
+        sut.StepBeforeCommand.Execute(null);
+        sut.StepBeforeCommand.Execute(null);
 
         sut.StatusText.Should().Be("Wiedergabe beendet.",
             "der letzte Schritt feuert Exited — der OnReplayExited-Text gilt, nicht der Schritt-Hinweis");
-        sut.PositionsText.Should().Be("Chunk 3/3");
+        sut.PositionText.Should().Be("Chunk 3/3");
 
-        sut.SchrittZurueckCommand.Execute(null);
-        sut.PositionsText.Should().Be("Chunk 2/3");
+        sut.StepBackCommand.Execute(null);
+        sut.PositionText.Should().Be("Chunk 2/3");
 
-        sut.WiedergabeStartenCommand.Execute(null);
+        sut.StartReplayCommand.Execute(null);
 
         sut.Session.Should().BeSameAs(session,
             "nach einem Rückwärtsschritt aus dem Beendet-Zustand darf keine frische Session erzeugt werden");
@@ -688,21 +688,21 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         _tempFiles.Add(path);
         SetupOpenDialog(path);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenRecordingCommand).ExecuteAsync();
         var session = (TerminalReplaySession)sut.Session!;
 
-        sut.WiedergabeStartenCommand.Execute(null);
+        sut.StartReplayCommand.Execute(null);
         await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
-        sut.WiedergabePausierenCommand.Execute(null);
+        sut.PauseReplayCommand.Execute(null);
         sut.IsPaused.Should().BeTrue();
 
         // Schritte im Pausiert-Zustand verändern die Position der laufenden Wiedergabe.
-        sut.SchrittZurueckCommand.Execute(null);
-        sut.PositionsText.Should().Be("Chunk 0/3");
-        sut.SchrittVorCommand.Execute(null);
-        sut.PositionsText.Should().Be("Chunk 1/3");
+        sut.StepBackCommand.Execute(null);
+        sut.PositionText.Should().Be("Chunk 0/3");
+        sut.StepBeforeCommand.Execute(null);
+        sut.PositionText.Should().Be("Chunk 1/3");
 
-        sut.WiedergabePausierenCommand.Execute(null);
+        sut.PauseReplayCommand.Execute(null);
         sut.IsPaused.Should().BeFalse();
 
         // Die Inter-Chunk-Delays (5 min, auf die 1-s-Schwelle verkürzt) werden sequenziell und

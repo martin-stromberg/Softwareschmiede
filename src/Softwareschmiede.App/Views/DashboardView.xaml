@@ -30,7 +30,7 @@
                     Padding="16">
                 <StackPanel>
                     <TextBlock Text="Projekte" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="14" />
-                    <TextBlock Text="{Binding ProjektAnzahl}" FontSize="36" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                    <TextBlock Text="{Binding ProjectCount}" FontSize="36" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" />
                 </StackPanel>
             </Border>
             <Border Background="{DynamicResource SurfaceBrush}"
@@ -41,7 +41,7 @@
                     Padding="16">
                 <StackPanel>
                     <TextBlock Text="Aktive Aufgaben" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="14" />
-                    <TextBlock Text="{Binding AktiveAufgaben}" FontSize="36" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" />
+                    <TextBlock Text="{Binding ActiveWorkItems}" FontSize="36" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" />
                 </StackPanel>
             </Border>
             <Border Background="{DynamicResource SurfaceBrush}"
@@ -52,7 +52,7 @@
                     Padding="16">
                 <StackPanel>
                     <TextBlock Text="Wartend" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="14" />
-                    <TextBlock Text="{Binding WartendAufgaben}" FontSize="36" FontWeight="Bold" Foreground="{DynamicResource WarningBrush}" />
+                    <TextBlock Text="{Binding WaitingWorkItems}" FontSize="36" FontWeight="Bold" Foreground="{DynamicResource WarningBrush}" />
                 </StackPanel>
             </Border>
         </UniformGrid>
@@ -66,30 +66,30 @@
                            Foreground="{DynamicResource PrimaryTextBrush}"
                            VerticalAlignment="Center" />
                 <StackPanel Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center">
-                    <RadioButton GroupName="DashboardAufgabenModus"
+                    <RadioButton GroupName="DashboardWorkItemMode"
                                  Content="Datum"
-                                 IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Datum}"
-                                 AutomationProperties.Name="DashboardAufgabenModus:Datum"
+                                 IsChecked="{Binding WorkItemListMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Date}"
+                                 AutomationProperties.Name="DashboardWorkItemsMode:Date"
                                  ToolTip="Flache Liste, sortiert nach letzter Ausführung"
                                  Margin="0,0,8,0" />
-                    <RadioButton GroupName="DashboardAufgabenModus"
+                    <RadioButton GroupName="DashboardWorkItemMode"
                                  Content="Repository"
-                                 IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Repository}"
-                                 AutomationProperties.Name="DashboardAufgabenModus:Repository"
+                                 IsChecked="{Binding WorkItemListMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Repository}"
+                                 AutomationProperties.Name="DashboardWorkItemsMode:Repository"
                                  ToolTip="Gruppiert nach Repository-Name"
                                  Margin="0,0,8,0" />
-                    <RadioButton GroupName="DashboardAufgabenModus"
+                    <RadioButton GroupName="DashboardWorkItemMode"
                                  Content="KI"
-                                 IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Ki}"
-                                 AutomationProperties.Name="DashboardAufgabenModus:KI"
+                                 IsChecked="{Binding WorkItemListMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Ai}"
+                                 AutomationProperties.Name="DashboardWorkItemsMode:AI"
                                  ToolTip="Gruppiert nach aktiver bzw. zuletzt verwendeter KI" />
                 </StackPanel>
             </StackPanel>
 
-            <controls:ActiveTasksListControl ItemsSource="{Binding AktiveAufgabenListe}"
-                                              NavigateCommand="{Binding NavigateZuAufgabeCommand}"
-                                              ListenModus="{Binding AufgabenListenModus}"
-                                              AutomationProperties.AutomationId="AktiveAufgabenListeDashboard" />
+            <controls:ActiveTasksListControl ItemsSource="{Binding ActiveWorkItemsList}"
+                                              NavigateCommand="{Binding NavigateToWorkItemCommand}"
+                                              ListMode="{Binding WorkItemListMode}"
+                                              AutomationProperties.AutomationId="ActiveWorkItemsListDashboard" />
         </StackPanel>
 
         <!-- Recovery-Banner -->
@@ -102,8 +102,8 @@
                 Background="{DynamicResource ErrorBrush}"
                 CornerRadius="8"
                 Padding="16,12"
-                Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
-            <TextBlock Text="{Binding FehlerMeldung}" Foreground="White" FontSize="14" />
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock Text="{Binding ErrorMessage}" Foreground="White" FontSize="14" />
         </Border>
     </Grid>
 

@@ -19,8 +19,8 @@
         <DockPanel Grid.Row="1" Margin="0,0,0,10">
             <Button DockPanel.Dock="Right" Content="Aktualisieren" Command="{Binding RefreshCommand}" Padding="12,6" AutomationProperties.AutomationId="ScmEventRefresh"/>
             <TextBlock Text="Anzeigen:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <ComboBox ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" Width="150" HorizontalAlignment="Left"
-                      AutomationProperties.AutomationId="ScmEventFilter" AutomationProperties.Name="Ereignisfilter"/>
+            <ComboBox ItemsSource="{Binding Filter}" SelectedItem="{Binding SelectedFilter}" Width="150" HorizontalAlignment="Left"
+                      AutomationProperties.AutomationId="ScmEventFilter" AutomationProperties.Name="EventFilter"/>
         </DockPanel>
         <Grid Grid.Row="2">
             <DataGrid ItemsSource="{Binding Events}" SelectedItem="{Binding SelectedEvent}" IsReadOnly="True" AutoGenerateColumns="False"

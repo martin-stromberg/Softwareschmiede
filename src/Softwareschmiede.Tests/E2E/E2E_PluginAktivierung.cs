@@ -60,7 +60,7 @@ public partial class End2EndTest
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     /// <param name="projectDetail">Die Projektdetailansicht mit der neu angelegten Aufgabe in der Liste.</param>
-    /// <returns>Die Einstellungen-Ansicht (Plugins-Tab), bereit für Phase 2.</returns>
+    /// <returns>Die Settings-Ansicht (Plugins-Tab), bereit für Phase 2.</returns>
     private SettingsView DeaktivierenDesLetztenScmPlugins_ZeigtValidierungsfehler_E2E(Window mainWindow, ProjectDetailView projectDetail)
     {
         var settings = projectDetail.Menu.NavigateToSettings();
@@ -85,7 +85,7 @@ public partial class End2EndTest
     /// "Plugin ändern"-Selector als auch der Plugin-Auswahl-Dialog; die CLI startet direkt.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    /// <param name="settings">Die Einstellungen-Ansicht, aktuell im Plugins-Register.</param>
+    /// <param name="settings">Die Settings-Ansicht, aktuell im Plugins-Register.</param>
     private void DeaktivierenVonDreiKiPlugins_PersistiertUndBlendetAuswahlAus_E2E(Window mainWindow, SettingsView settings)
     {
         settings.SetPluginEnabled("Softwareschmiede.ClaudeCli", false);
@@ -94,7 +94,7 @@ public partial class End2EndTest
         settings.SetPluginEnabled("Softwareschmiede.GitHubCopilot", false);
         settings.SaveSettings();
 
-        // Einstellungen verlassen und erneut öffnen: Aktivierungsstatus bleibt erhalten (Persistenz)
+        // Settings verlassen und erneut öffnen: Aktivierungsstatus bleibt erhalten (Persistenz)
         var dashboard = settings.Menu.NavigateToDashboard();
 
         var settingsReloaded = dashboard.Menu.NavigateToSettings();

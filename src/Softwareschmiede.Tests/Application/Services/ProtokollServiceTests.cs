@@ -17,7 +17,7 @@ public sealed class ProtokollServiceTests : IDisposable
     private readonly Mock<ILogger<LogService>> _loggerMock;
     private readonly LogService _sut;
     private readonly Guid _workItemId = new Guid("22222222-2222-2222-2222-222222222222");
-    private readonly Guid _projektId = new Guid("33333333-3333-3333-3333-333333333333");
+    private readonly Guid _projectId = new Guid("33333333-3333-3333-3333-333333333333");
 
     /// <summary>ProtokollServiceTests.</summary>
     public ProtokollServiceTests()
@@ -29,7 +29,7 @@ public sealed class ProtokollServiceTests : IDisposable
         // Seed Projekt und Aufgabe für FK
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Protokoll-Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -37,7 +37,7 @@ public sealed class ProtokollServiceTests : IDisposable
         _db.WorkItems.Add(new Softwareschmiede.Domain.Entities.WorkItem
         {
             Id = _workItemId,
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = "Protokoll-Testaufgabe",
             Status = WorkItemStatus.New,
             CreatedAt = DateTimeOffset.UtcNow

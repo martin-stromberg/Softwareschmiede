@@ -19,7 +19,7 @@ public sealed class IssueSelectionDialogViewModel : ViewModelBase
     public event EventHandler<bool>? CloseRequested;
 
     /// <summary>Verfügbare Issues zur Auswahl.</summary>
-    public ObservableCollection<Issue> VerfuegbareIssues { get; } = new();
+    public ObservableCollection<Issue> AvailableIssues { get; } = new();
 
     /// <summary>Das vom Benutzer gewählte Issue.</summary>
     public Issue? SelectedIssue
@@ -28,7 +28,7 @@ public sealed class IssueSelectionDialogViewModel : ViewModelBase
         set
         {
             SetProperty(ref _selectedIssue, value);
-            OnPropertyChanged(nameof(KannBestaetigen));
+            OnPropertyChanged(nameof(CanConfirm));
         }
     }
 
@@ -40,13 +40,13 @@ public sealed class IssueSelectionDialogViewModel : ViewModelBase
     }
 
     /// <summary>CanExecute für BestaetigenCommand: ein Issue muss gewählt sein.</summary>
-    public bool KannBestaetigen => _selectedIssue != null;
+    public bool CanConfirm => _selectedIssue != null;
 
     /// <summary>Bestätigt die Auswahl und schließt den Dialog.</summary>
-    public ICommand BestaetigenCommand { get; }
+    public ICommand ConfirmCommand { get; }
 
     /// <summary>Bricht die Auswahl ab und schließt den Dialog.</summary>
-    public ICommand AbbrechenCommand { get; }
+    public ICommand CancelCommand { get; }
 
     /// <inheritdoc cref="IssueSelectionDialogViewModel"/>
     public IssueSelectionDialogViewModel(IGitPlugin gitPlugin, ILogger<IssueSelectionDialogViewModel> logger)
@@ -54,23 +54,23 @@ public sealed class IssueSelectionDialogViewModel : ViewModelBase
         _gitPlugin = gitPlugin;
         _logger = logger;
 
-        BestaetigenCommand = new RelayCommand(
+        ConfirmCommand = new RelayCommand(
             () => CloseRequested?.Invoke(this, true),
-            () => KannBestaetigen);
-        AbbrechenCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false));
+            () => CanConfirm);
+        CancelCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false));
     }
 
     /// <summary>Lädt Issues für das angegebene Repository.</summary>
     public async Task LoadAsync(string repositoryId, CancellationToken ct = default)
     {
         IsLoading = true;
-        VerfuegbareIssues.Clear();
+        AvailableIssues.Clear();
 
         try
         {
             var issues = await _gitPlugin.GetIssuesAsync(repositoryId, ct);
             foreach (var issue in issues)
-                VerfuegbareIssues.Add(issue);
+                AvailableIssues.Add(issue);
         }
         catch (OperationCanceledException)
         {

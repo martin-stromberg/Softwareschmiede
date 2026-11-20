@@ -14,7 +14,7 @@ public sealed class ProjectDetailView : BaseWindowView
 
     /// <inheritdoc/>
     public override bool IsVisible
-        => ElementExists(Window, cf => cf.ByName("ProjektName")) && ElementExists(Window, cf => cf.ByName("AufgabeNeu"));
+        => ElementExists(Window, cf => cf.ByName("ProjectName")) && ElementExists(Window, cf => cf.ByName("NewWorkItem"));
 
     /// <summary>
     /// Öffnet ein Projekt aus der Projektliste kann nur mit bekanntem Projektnamen erfolgen. Ist diese
@@ -35,8 +35,8 @@ public sealed class ProjectDetailView : BaseWindowView
     /// <inheritdoc/>
     public override ProjectDetailView ForceClose(bool recurseToDashboard)
     {
-        WaitForElement(Window, cf => cf.ByName("Zurück"), Short).AsButton().ClickInForeground();
-        WaitForElement(Window, cf => cf.ByName("Neu"), Medium);
+        WaitForElement(Window, cf => cf.ByName("Back"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("New"), Medium);
 
         if (recurseToDashboard)
             RecurseToDashboard();
@@ -45,14 +45,14 @@ public sealed class ProjectDetailView : BaseWindowView
     }
 
     /// <returns>Der aktuelle Projektname.</returns>
-    public string GetProjectName() => WaitForElement(Window, cf => cf.ByName("ProjektName"), Short).AsTextBox().Text;
+    public string GetProjectName() => WaitForElement(Window, cf => cf.ByName("ProjectName"), Short).AsTextBox().Text;
 
     /// <summary>Erstellt über den "AufgabeNeu"-Button eine neue Aufgabe und navigiert in deren Detailansicht.</summary>
     /// <returns>Die Aufgabendetailansicht der neu angelegten Aufgabe.</returns>
     public TaskDetailView CreateTask()
     {
-        WaitForElement(Window, cf => cf.ByName("AufgabeNeu"), Short).AsButton().ClickInForeground();
-        WaitForElement(Window, cf => cf.ByName("EditTitel"), Short);
+        WaitForElement(Window, cf => cf.ByName("NewWorkItem"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("EditTitle"), Short);
 
         return new TaskDetailView(Window);
     }
@@ -61,50 +61,50 @@ public sealed class ProjectDetailView : BaseWindowView
     /// <returns>Die Projektliste, die nach dem Löschen sichtbar wird.</returns>
     public ProjectListView DeleteProject()
     {
-        WaitForElement(Window, cf => cf.ByName("AufgabeNeu"), Short);
+        WaitForElement(Window, cf => cf.ByName("NewWorkItem"), Short);
 
-        WaitForElement(Window, cf => cf.ByName("Löschen"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("Delete"), Short).AsButton().ClickInForeground();
         new DeleteConfirmationDialogView(Window).Confirm();
 
-        WaitUntilGone(Window, cf => cf.ByName("Speichern"), Short);
+        WaitUntilGone(Window, cf => cf.ByName("Save"), Short);
 
         return new ProjectListView(Window);
     }
 
-    /// <returns>Die Aufgaben-Listenelemente der "OffeneAufgabenListe".</returns>
+    /// <returns>Die Aufgaben-Listenelemente der "OpenWorkItemsList".</returns>
     public AutomationElement[] GetTaskElements()
     {
-        var listBox = WaitForElement(Window, cf => cf.ByName("OffeneAufgabenListe"), Medium);
+        var listBox = WaitForElement(Window, cf => cf.ByName("OpenWorkItemsList"), Medium);
         return listBox.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
     }
 
-    /// <summary>Öffnet die erste Aufgabe aus der "OffeneAufgabenListe" per Doppelklick (fensterumfassend).</summary>
+    /// <summary>Öffnet die erste Aufgabe aus der "OpenWorkItemsList" per Doppelklick (fensterumfassend).</summary>
     /// <returns>Die Aufgabendetailansicht der geöffneten Aufgabe.</returns>
     /// <exception cref="InvalidOperationException">Wird geworfen, wenn die Aufgabenliste kein Element enthält.</exception>
     public TaskDetailView OpenFirstTask()
     {
         var items = GetTaskElements();
         if (items.Length == 0)
-            throw new InvalidOperationException("OffeneAufgabenListe enthielt kein Element.");
+            throw new InvalidOperationException("OpenWorkItemsList enthielt kein Element.");
 
         items[0].DoubleClickInForeground();
-        WaitForElement(Window, cf => cf.ByName("Zurück"), Short);
+        WaitForElement(Window, cf => cf.ByName("Back"), Short);
 
         return new TaskDetailView(Window);
     }
 
-    /// <summary>Öffnet eine Aufgabe aus der "OffeneAufgabenListe" anhand ihres Titels per Doppelklick (fensterumfassend).</summary>
+    /// <summary>Öffnet eine Aufgabe aus der "OpenWorkItemsList" anhand ihres Titels per Doppelklick (fensterumfassend).</summary>
     /// <param name="title">Der Titel der zu öffnenden Aufgabe.</param>
     /// <returns>Die Aufgabendetailansicht der geöffneten Aufgabe.</returns>
     public TaskDetailView OpenTask(string title)
     {
         WaitForElement(Window, cf => cf.ByName(title).And(cf.ByControlType(ControlType.ListItem)), Medium).DoubleClickInForeground();
-        WaitForElement(Window, cf => cf.ByName("Zurück"), Short);
+        WaitForElement(Window, cf => cf.ByName("Back"), Short);
 
         return new TaskDetailView(Window);
     }
 
-    /// <summary>Wartet, bis eine Aufgabe mit dem angegebenen Titel in der "OffeneAufgabenListe" erscheint.</summary>
+    /// <summary>Wartet, bis eine Aufgabe mit dem angegebenen Titel in der "OpenWorkItemsList" erscheint.</summary>
     /// <param name="title">Der erwartete Aufgabentitel.</param>
     /// <returns>Diese Instanz.</returns>
     public ProjectDetailView WaitForTask(string title)
@@ -130,7 +130,7 @@ public sealed class ProjectDetailView : BaseWindowView
     /// <param name="name">Der neue Projektname.</param>
     public void SetProjectName(string name)
     {
-        var nameBox = WaitForElement(Window, cf => cf.ByName("ProjektName"), Short);
+        var nameBox = WaitForElement(Window, cf => cf.ByName("ProjectName"), Short);
         ElementWaitHelper.ReplaceTextBoxText(nameBox, name);
     }
 
@@ -143,7 +143,7 @@ public sealed class ProjectDetailView : BaseWindowView
     /// geöffnet (das ViewModel lädt die Daten lediglich neu) - der "Speichern"-Button ist ein statischer
     /// Ribbon-Eintrag ohne Sichtbarkeitsbindung (siehe ProjectDetailView.xaml) und verschwindet daher
     /// NICHT. Wartet deshalb auf eines von zwei möglichen Abschlusssignalen: entweder verschwindet
-    /// "Speichern" (Neuanlage-Pfad), oder das "ProjektName"-Feld zeigt wieder den zuvor eingetragenen
+    /// "Speichern" (Neuanlage-Pfad), oder das "ProjectName"-Feld zeigt wieder den zuvor eingetragenen
     /// Namen (Bearbeitungs-Pfad - Beleg für den abgeschlossenen Speichern-und-Neuladen-Roundtrip).
     /// </summary>
     /// <returns>Diese Instanz.</returns>
@@ -152,16 +152,16 @@ public sealed class ProjectDetailView : BaseWindowView
     {
         var expectedName = GetProjectName().Trim();
 
-        ElementWaitHelper.WaitForElement(Window, cf => cf.ByName("Speichern"), Short,
+        ElementWaitHelper.WaitForElement(Window, cf => cf.ByName("Save"), Short,
             element => !element.IsOffscreen && element.IsEnabled).AsButton().ClickInForeground();
 
         var deadline = DateTime.UtcNow + Medium;
         while (DateTime.UtcNow < deadline)
         {
-            if (!ElementExists(Window, cf => cf.ByName("Speichern")))
+            if (!ElementExists(Window, cf => cf.ByName("Save")))
                 return this;
 
-            var nameBox = Window.FindFirstDescendant(cf => cf.ByName("ProjektName"));
+            var nameBox = Window.FindFirstDescendant(cf => cf.ByName("ProjectName"));
             if (nameBox is not null && string.Equals(nameBox.AsTextBox().Text, expectedName, StringComparison.Ordinal))
                 return this;
 
@@ -170,39 +170,39 @@ public sealed class ProjectDetailView : BaseWindowView
 
         throw new TimeoutException(
             $"Speichern wurde nicht innerhalb von {Medium.TotalSeconds}s abgeschlossen (weder verschwand 'Speichern', " +
-            $"noch zeigte 'ProjektName' wieder '{expectedName}').");
+            $"noch zeigte 'ProjectName' wieder '{expectedName}').");
     }
 
-    /// <returns>Der aktuell angezeigte Basis-Branch ("BasisBranchAnzeige").</returns>
-    public string GetBaseBranch() => WaitForElement(Window, cf => cf.ByAutomationId("BasisBranchAnzeige"), Short).Name;
+    /// <returns>Der aktuell angezeigte Basis-Branch ("BaseBranchDisplay").</returns>
+    public string GetBaseBranch() => WaitForElement(Window, cf => cf.ByAutomationId("BaseBranchDisplay"), Short).Name;
 
-    /// <summary>Öffnet den Bearbeitungsmodus für den Basis-Branch über den "BasisBranchBearbeiten"-Button.</summary>
+    /// <summary>Öffnet den Bearbeitungsmodus für den Basis-Branch über den "EditBaseBranch"-Button.</summary>
     /// <returns>Diese Instanz.</returns>
     public ProjectDetailView EditBaseBranch()
     {
-        WaitForElement(Window, cf => cf.ByName("BasisBranchBearbeiten"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("EditBaseBranch"), Short).AsButton().ClickInForeground();
         return this;
     }
 
-    /// <summary>Trägt einen neuen Basis-Branch im Bearbeitungsmodus ein ("BasisBranchBearbeitenEingabe").</summary>
+    /// <summary>Trägt einen neuen Basis-Branch im Bearbeitungsmodus ein ("EditBaseBranchInput").</summary>
     /// <param name="baseBranch">Der einzutragende Basis-Branch.</param>
     /// <returns>Diese Instanz.</returns>
     public ProjectDetailView SetBaseBranch(string baseBranch)
     {
-        WaitForElement(Window, cf => cf.ByName("BasisBranchBearbeitenEingabe"), Short).AsTextBox().Text = baseBranch;
+        WaitForElement(Window, cf => cf.ByName("EditBaseBranchInput"), Short).AsTextBox().Text = baseBranch;
         return this;
     }
 
-    /// <summary>Speichert den bearbeiteten Basis-Branch über den "BasisBranchSpeichern"-Button.</summary>
+    /// <summary>Speichert den bearbeiteten Basis-Branch über den "SaveBaseBranch"-Button.</summary>
     /// <returns>Diese Instanz.</returns>
     public ProjectDetailView SaveBaseBranch()
     {
-        WaitForElement(Window, cf => cf.ByName("BasisBranchSpeichern"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("SaveBaseBranch"), Short).AsButton().ClickInForeground();
         return this;
     }
 
     /// <returns><c>true</c>, wenn der "Öffnen"-Button sichtbar ist.</returns>
-    public bool HasOpenButton() => ElementExists(Window, cf => cf.ByName("Öffnen"));
+    public bool HasOpenButton() => ElementExists(Window, cf => cf.ByName("Open"));
 
     /// <summary>Öffnet das Filter-Overlay über den "Filter"-Button.</summary>
     /// <returns>Diese Instanz.</returns>
@@ -231,21 +231,21 @@ public sealed class ProjectDetailView : BaseWindowView
         return this;
     }
 
-    /// <returns><c>true</c>, wenn der "BeendeteAufgabenExpander" eingeklappt (Collapsed) ist.</returns>
+    /// <returns><c>true</c>, wenn der "CompletedWorkItemsExpander" eingeklappt (Collapsed) ist.</returns>
     public bool IsFinishedTasksExpanderCollapsed()
     {
-        var expander = WaitForElement(Window, cf => cf.ByName("BeendeteAufgabenExpander"), Short);
+        var expander = WaitForElement(Window, cf => cf.ByName("CompletedWorkItemsExpander"), Short);
         return expander.Patterns.ExpandCollapse.Pattern.ExpandCollapseState == ExpandCollapseState.Collapsed;
     }
 
-    /// <summary>Klappt den "BeendeteAufgabenExpander" auf und gibt die Listenelemente der beendeten Aufgaben zurück.</summary>
-    /// <returns>Die Listenelemente der "BeendeteAufgabenListe".</returns>
+    /// <summary>Klappt den "CompletedWorkItemsExpander" auf und gibt die Listenelemente der beendeten Aufgaben zurück.</summary>
+    /// <returns>Die Listenelemente der "CompletedWorkItemsList".</returns>
     public AutomationElement[] ExpandAndGetFinishedTasks()
     {
-        var expander = WaitForElement(Window, cf => cf.ByName("BeendeteAufgabenExpander"), Short);
+        var expander = WaitForElement(Window, cf => cf.ByName("CompletedWorkItemsExpander"), Short);
         expander.Patterns.ExpandCollapse.Pattern.Expand();
 
-        var list = WaitForElement(expander, cf => cf.ByName("BeendeteAufgabenListe"), Short);
+        var list = WaitForElement(expander, cf => cf.ByName("CompletedWorkItemsList"), Short);
         return list.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
     }
 }

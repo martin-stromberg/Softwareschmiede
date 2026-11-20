@@ -27,7 +27,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     private readonly AiExecutionService _aiService;
     private readonly CliProcessManager _sut;
     private readonly WorkItemRunDataChangedNotifier _runDataChangedNotifier = new();
-    private readonly Guid _projektId = Guid.NewGuid();
+    private readonly Guid _projectId = Guid.NewGuid();
     private readonly Guid _workItemId = Guid.NewGuid();
 
     /// <summary>CliProcessManagerTests_AktiverLauf.</summary>
@@ -47,7 +47,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
             db.Database.EnsureCreated();
             db.Projects.Add(new Project
             {
-                Id = _projektId,
+                Id = _projectId,
                 Name = "Testprojekt",
                 CreatedAt = DateTimeOffset.UtcNow,
                 Status = ProjectStatus.Active
@@ -55,7 +55,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
             db.WorkItems.Add(new WorkItem
             {
                 Id = _workItemId,
-                ProjectId = _projektId,
+                ProjectId = _projectId,
                 Title = "CLI-Prozess-Aufgabe",
                 Status = WorkItemStatus.Started,
                 CreatedAt = DateTimeOffset.UtcNow

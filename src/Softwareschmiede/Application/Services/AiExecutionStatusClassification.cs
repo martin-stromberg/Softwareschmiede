@@ -29,7 +29,7 @@ public static class AiExecutionStatusClassification
     /// <param name="status">Die zu klassifizierenden Aufgabendaten.</param>
     /// <param name="pauseRemaining">Restliche Pausenzeit im Zustand <see cref="AiExecutionState.Paused"/>, sonst <see cref="TimeSpan.Zero"/>.</param>
     /// <returns>Der klassifizierte Zustand.</returns>
-    public static AiExecutionState Klassifiziere(AiExecutionStatusData status, out TimeSpan pauseRemaining)
+    public static AiExecutionState Classify(AiExecutionStatusData status, out TimeSpan pauseRemaining)
     {
         pauseRemaining = default;
 

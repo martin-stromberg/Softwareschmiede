@@ -48,10 +48,10 @@ public partial class End2EndTest
             // Ausgangszustand: Funktion aus (Standard), Statuszeile „deaktiviert“.
             settings.OpenIssueAufbereitung();
             Assert.Equal("deaktiviert", settings.GetIssueAufbereitungStatus());
-            Assert.False(settings.IsIssueAufbereitungEnabled());
-            Assert.True(settings.IsIssueAufbereitungKommentarEnabled());
+            Assert.False(settings.IsIssuePreparationEnabled());
+            Assert.True(settings.IsIssuePreparationCommentEnabled());
 
-            // Funktion aktivieren und alle vier Einstellungen setzen
+            // Funktion aktivieren und alle vier Settings setzen
             // (die Felder sind bei deaktivierter Funktion gesperrt).
             settings.SetIssueAufbereitungEnabled(true);
             Assert.Equal("aktiviert", settings.GetIssueAufbereitungStatus());
@@ -67,11 +67,11 @@ public partial class End2EndTest
             // Persistenz-Nachweis über UI-Neuladen.
             var settingsReopened = settings.Menu.NavigateToSettings();
             settingsReopened.OpenIssueAufbereitung();
-            Assert.True(settingsReopened.IsIssueAufbereitungEnabled());
+            Assert.True(settingsReopened.IsIssuePreparationEnabled());
             Assert.Equal("aktiviert", settingsReopened.GetIssueAufbereitungStatus());
             Assert.Equal(gewaehltesPluginLabel, settingsReopened.GetIssueAufbereitungPlugin());
             Assert.True(settingsReopened.IsIssueAufbereitungRepositorySelected(repositoryName));
-            Assert.False(settingsReopened.IsIssueAufbereitungKommentarEnabled());
+            Assert.False(settingsReopened.IsIssuePreparationCommentEnabled());
 
             // Persistenz-Nachweis in AppEinstellungen und Repository-Flag.
             using (var db = OpenTestDbContext())

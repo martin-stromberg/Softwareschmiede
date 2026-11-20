@@ -12,5 +12,5 @@ public partial class HelpTextDialog : Window
         HelpTextBox.Text = text;
     }
 
-    private void OnSchliessenClick(object sender, RoutedEventArgs e) => Close();
+    private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
 }

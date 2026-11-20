@@ -59,7 +59,7 @@ public sealed class PluginSelectionService
     }
 
     /// <summary>Gibt die Prefixe aller aktiven KI-Plugins zurück.</summary>
-    public async Task<IReadOnlyList<string>> GetAvailableKiPluginPrefixesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<string>> GetAvailableAiPluginPrefixesAsync(CancellationToken ct = default)
     {
         var plugins = await _pluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync(ct);
         return plugins
@@ -96,7 +96,7 @@ public sealed class PluginSelectionService
     /// <summary>
     /// Löst das KI-Plugin-Prefix mit Projekt-Kontext auf: Aufgaben-Plugin → Projekt-Default → Global-Default
     /// (<c>plugins.default.*</c>) → in den Einstellungen konfigurierte Standard-CLI
-    /// (<see cref="AppSettingService.DefaultKiPluginKey"/>).
+    /// (<see cref="AppSettingService.DefaultAiPluginKey"/>).
     /// Wird nichts gefunden, gibt die Methode <c>null</c> zurück; der Aufrufer muss in diesem Fall
     /// den Plugin-Auswahl-Dialog anzeigen.
     /// </summary>
@@ -122,13 +122,13 @@ public sealed class PluginSelectionService
             return globalDefault;
         }
 
-        return await ResolveConfiguredDefaultKiPluginPrefixAsync(ct);
+        return await ResolveConfiguredDefaultAiPluginPrefixAsync(ct);
     }
 
     /// <summary>
     /// Löst das KI-Plugin-Prefix für die automatische SCM-Ereignisausführung aktivierungsbewusst auf:
     /// Aufgaben-Plugin → Projekt-Default → Global-Default (<c>plugins.default.*</c>) → in den
-    /// Einstellungen konfigurierte Standard-CLI (<see cref="AppSettingService.DefaultKiPluginKey"/>).
+    /// Einstellungen konfigurierte Standard-CLI (<see cref="AppSettingService.DefaultAiPluginKey"/>).
     /// Eine Stufe gilt nur, wenn das zugeordnete Plugin installiert, ladbar und aktiviert ist;
     /// konfigurierte, nicht ausführbare Zuordnungen werden ignoriert und im Ergebnis benannt.
     /// Anders als <see cref="ResolveDevelopmentAutomationPluginWithProjectScopeAsync"/> führt diese
@@ -187,7 +187,7 @@ public sealed class PluginSelectionService
 
         if (_appSettingService is not null)
         {
-            var configured = await _appSettingService.GetSettingAsync(AppSettingService.DefaultKiPluginKey, ct);
+            var configured = await _appSettingService.GetSettingAsync(AppSettingService.DefaultAiPluginKey, ct);
             if (!string.IsNullOrWhiteSpace(configured))
             {
                 var trimmed = configured.Trim();
@@ -201,7 +201,7 @@ public sealed class PluginSelectionService
                 {
                     ignored.Add(trimmed);
                     _logger.LogWarning(
-                        "Konfigurierte Standard-CLI '{DefaultKiPlugin}' ist nicht installiert oder nicht aktiviert.",
+                        "Konfigurierte Standard-CLI '{DefaultAiPlugin}' ist nicht installiert oder nicht aktiviert.",
                         trimmed);
                 }
             }
@@ -211,19 +211,19 @@ public sealed class PluginSelectionService
     }
 
     /// <summary>
-    /// Löst die in den Einstellungen konfigurierte Standard-CLI (<see cref="AppSettingService.DefaultKiPluginKey"/>)
+    /// Löst die in den Einstellungen konfigurierte Standard-CLI (<see cref="AppSettingService.DefaultAiPluginKey"/>)
     /// auf einen Plugin-Prefix auf. Die Einstellungen speichern den <see cref="IPlugin.PluginName"/>;
     /// zur Robustheit wird zusätzlich der <see cref="IPlugin.PluginPrefix"/> akzeptiert. Passt der gespeicherte
     /// Wert auf kein vorhandenes KI-Plugin, wird <c>null</c> zurückgegeben — es wird kein anderes Plugin vermutet.
     /// </summary>
-    private async Task<string?> ResolveConfiguredDefaultKiPluginPrefixAsync(CancellationToken ct)
+    private async Task<string?> ResolveConfiguredDefaultAiPluginPrefixAsync(CancellationToken ct)
     {
         if (_appSettingService is null)
         {
             return null;
         }
 
-        var configured = await _appSettingService.GetSettingAsync(AppSettingService.DefaultKiPluginKey, ct);
+        var configured = await _appSettingService.GetSettingAsync(AppSettingService.DefaultAiPluginKey, ct);
         if (string.IsNullOrWhiteSpace(configured))
         {
             return null;
@@ -233,7 +233,7 @@ public sealed class PluginSelectionService
         var match = FindKiPlugin(_pluginManager.GetDevelopmentAutomationPlugins(), trimmed);
         if (match is null)
         {
-            _logger.LogWarning("Konfigurierte Standard-CLI '{DefaultKiPlugin}' ist nicht installiert.", trimmed);
+            _logger.LogWarning("Konfigurierte Standard-CLI '{DefaultAiPlugin}' ist nicht installiert.", trimmed);
         }
 
         return match?.PluginPrefix;
@@ -289,7 +289,7 @@ public sealed class PluginSelectionService
     /// Liste mit <see cref="IPluginManager.GetDefaultIdePlugin"/> zurückgegeben (Konsistenz mit
     /// <see cref="ResolveIdePluginAsync"/>).
     /// </summary>
-    public async Task<IReadOnlyList<IIdePlugin>> ResolveAlleKompatiblenIdePluginsAsync(string repositoryPath, CancellationToken ct = default)
+    public async Task<IReadOnlyList<IIdePlugin>> ResolveAllCompatibleIdePluginsAsync(string repositoryPath, CancellationToken ct = default)
     {
         var orderedPlugins = await GetOrderedEnabledIdePluginsAsync(repositoryPath, ct);
         if (orderedPlugins.Count == 0)

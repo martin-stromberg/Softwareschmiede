@@ -23,7 +23,7 @@ public sealed class ScmEventDispatchTests_HostRetry
         await using var fixture = new ScmDispatchFixture(time: clock);
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync(configured: true);
-        fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        fixture.Ai.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
         var hostAttempts = 0;
         fixture.Git.As<IScmEventResponder>().Setup(x => x.ExecuteResponseAsync(
             It.Is<ScmResponseRequest>(r => r.Kind == delayedResponse), It.IsAny<CancellationToken>()))
@@ -41,12 +41,12 @@ public sealed class ScmEventDispatchTests_HostRetry
             await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents
                 .Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(e => e.NextAttemptUtc, retryAt), cancellationToken: TestContext.Current.CancellationToken);
 
-        fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        fixture.Ai.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         clock.Now = clock.Now.AddHours(1);
         await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, hostAttempts);
-        fixture.Ki.Verify(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()), Times.Once);
+        fixture.Ai.Verify(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()), Times.Once);
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Prompts);
         Assert.Equal(retryAt, (await fixture.EventAsync(eventId)).NextAttemptUtc);
@@ -95,7 +95,7 @@ public sealed class ScmEventDispatchTests_HostRetry
         Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
-        fixture.Ki.Verify(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()), Times.Once);
+        fixture.Ai.Verify(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private sealed class TestClock : TimeProvider

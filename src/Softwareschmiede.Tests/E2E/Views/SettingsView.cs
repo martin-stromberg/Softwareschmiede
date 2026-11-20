@@ -44,13 +44,13 @@ public sealed class SettingsView : BaseWindowView
 
     /// <summary>
     /// Prüft, ob der "Plugins"-Tab aktuell aktiv ist, anhand eines tab-spezifischen Markers
-    /// ("LocalDirectoryPlugin.Eintrag"). <see cref="GetActiveTab"/> ist dafür nicht geeignet: Die
+    /// ("LocalDirectoryPlugin.Entry"). <see cref="GetActiveTab"/> ist dafür nicht geeignet: Die
     /// TabItems dieser Ansicht haben keinen gebundenen <c>AutomationProperties.Name</c>, wodurch FlaUI
     /// für jeden Tab denselben generischen <c>TabItem.ToString()</c>-Fallback liefert, unabhängig davon,
     /// welcher Tab tatsächlich aktiv ist.
     /// </summary>
     /// <returns><c>true</c>, wenn der "Plugins"-Tab aktiv ist.</returns>
-    public bool IsOnPluginsTab() => ElementExists(Window, cf => cf.ByName("LocalDirectoryPlugin.Eintrag"));
+    public bool IsOnPluginsTab() => ElementExists(Window, cf => cf.ByName("LocalDirectoryPlugin.Entry"));
 
     /// <param name="tabName">Der Name des zu aktivierenden Tabs.</param>
     /// <returns>Diese Instanz.</returns>
@@ -66,16 +66,16 @@ public sealed class SettingsView : BaseWindowView
     public Dialogs.KonsolenTestDialogView OpenKonsolenTestDialog()
     {
         SwitchTab("Allgemein");
-        WaitForElement(Window, cf => cf.ByName("KonsolenTestOeffnen"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("OpenConsoleTest"), Short).AsButton().ClickInForeground();
         return new Dialogs.KonsolenTestDialogView(Window).ForceShow();
     }
 
-    /// <summary>Klickt den "Speichern"-Button und wartet auf die Bestätigung "Einstellungen gespeichert.".</summary>
+    /// <summary>Klickt den "Speichern"-Button und wartet auf die Bestätigung "Settings gespeichert.".</summary>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SaveSettings()
     {
-        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().ClickInForeground();
-        WaitForElement(Window, cf => cf.ByName("Einstellungen gespeichert."), Short);
+        WaitForElement(Window, cf => cf.ByName("Save"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("Settings gespeichert."), Short);
 
         return this;
     }
@@ -94,7 +94,7 @@ public sealed class SettingsView : BaseWindowView
 
         // Klickt gezielt auf das Namens-Label (nicht die Aktivierungs-CheckBox selbst), damit nur
         // der Listeneintrag ausgewählt wird, ohne den Aktivierungsstatus des Plugins zu verändern.
-        var localDirectoryPluginEntry = WaitForElement(Window, cf => cf.ByName("LocalDirectoryPlugin.Eintrag"), Short);
+        var localDirectoryPluginEntry = WaitForElement(Window, cf => cf.ByName("LocalDirectoryPlugin.Entry"), Short);
         localDirectoryPluginEntry.ClickInForeground();
 
         var workspaceModeBox = WaitForElement(Window, cf => cf.ByName("WorkspaceMode"), Short);
@@ -109,7 +109,7 @@ public sealed class SettingsView : BaseWindowView
         return Menu.NavigateToDashboard();
     }
 
-    /// <summary>Wählt im "Plugins"-Tab das angegebene KI-Plugin als Standard-Plugin (DefaultKiPlugin) aus.</summary>
+    /// <summary>Wählt im "Plugins"-Tab das angegebene KI-Plugin als Standard-Plugin (DefaultAiPlugin) aus.</summary>
     /// <param name="pluginDisplayName">Der Anzeigename des Plugins (z. B. "Codex CLI").</param>
     /// <returns>Diese Instanz.</returns>
     /// <remarks>
@@ -122,7 +122,7 @@ public sealed class SettingsView : BaseWindowView
     {
         SwitchTab("Plugins");
 
-        var kiPluginBox = WaitForElement(Window, cf => cf.ByName("DefaultKiPlugin"), Short);
+        var kiPluginBox = WaitForElement(Window, cf => cf.ByName("DefaultAiPlugin"), Short);
         var comboBox = kiPluginBox.AsComboBox();
 
         if (string.Equals(comboBox.SelectedItem?.Name, pluginDisplayName, StringComparison.Ordinal))
@@ -166,96 +166,96 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Der geöffnete Hilfetext-Dialog.</returns>
     public HelpTextDialogView OpenCliHelp()
     {
-        WaitForElement(Window, cf => cf.ByName("CliHilfeButton"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("CliHelpButton"), Short).AsButton().ClickInForeground();
 
         var dialog = new HelpTextDialogView(Window);
         dialog.ForceShow();
         return dialog;
     }
 
-    /// <summary>Wählt den Listeneintrag des IDE-Plugins aus ("{pluginPrefix}.Eintrag") und liest den Status der "IdePluginAktiviert"-Checkbox.</summary>
+    /// <summary>Wählt den Listeneintrag des IDE-Plugins aus ("{pluginPrefix}.Entry") und liest den Status der "IdePluginEnabled"-Checkbox.</summary>
     /// <param name="pluginPrefix">Der Plugin-Prefix, z. B. "Softwareschmiede.VisualStudioCode".</param>
     /// <returns><c>true</c>, wenn das Plugin aktuell aktiviert ist.</returns>
     public bool IsIdePluginEnabled(string pluginPrefix)
     {
-        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).ClickInForeground();
-        return WaitForElement(Window, cf => cf.ByName("IdePluginAktiviert"), Short).AsCheckBox().IsChecked ?? false;
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Entry"), Short).ClickInForeground();
+        return WaitForElement(Window, cf => cf.ByName("IdePluginEnabled"), Short).AsCheckBox().IsChecked ?? false;
     }
 
-    /// <summary>Wählt den Listeneintrag des IDE-Plugins aus und setzt seinen Aktivierungsstatus über die Checkbox "IdePluginAktiviert".</summary>
+    /// <summary>Wählt den Listeneintrag des IDE-Plugins aus und setzt seinen Aktivierungsstatus über die Checkbox "IdePluginEnabled".</summary>
     /// <param name="pluginPrefix">Der Plugin-Prefix, z. B. "Softwareschmiede.VisualStudioCode".</param>
     /// <param name="enabled">Der gewünschte Aktivierungsstatus.</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetIdePluginEnabled(string pluginPrefix, bool enabled)
     {
-        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).ClickInForeground();
-        WaitForElement(Window, cf => cf.ByName("IdePluginAktiviert"), Short).AsCheckBox().IsChecked = enabled;
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Entry"), Short).ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("IdePluginEnabled"), Short).AsCheckBox().IsChecked = enabled;
         return this;
     }
 
-    /// <summary>Klickt den "Nach oben"-Button des angegebenen IDE-Plugin-Eintrags in der "IdePluginListe".</summary>
+    /// <summary>Klickt den "Nach oben"-Button des angegebenen IDE-Plugin-Eintrags in der "IdePluginList".</summary>
     /// <param name="pluginPrefix">Der Plugin-Prefix, z. B. "Softwareschmiede.VisualStudioCode".</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView MoveIdePluginUp(string pluginPrefix)
     {
-        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.NachOben"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.MoveUp"), Short).AsButton().ClickInForeground();
         return this;
     }
 
-    /// <summary>Prüft, ob der angegebene IDE-Plugin-Eintrag aktuell an erster Stelle der "IdePluginListe" steht.</summary>
+    /// <summary>Prüft, ob der angegebene IDE-Plugin-Eintrag aktuell an erster Stelle der "IdePluginList" steht.</summary>
     /// <param name="pluginPrefix">Der Plugin-Prefix, z. B. "Softwareschmiede.VisualStudioCode".</param>
     /// <returns><c>true</c>, wenn der Eintrag an erster Stelle steht.</returns>
     public bool IsFirstIdePlugin(string pluginPrefix)
     {
-        var list = WaitForElement(Window, cf => cf.ByName("IdePluginListe"), Short);
+        var list = WaitForElement(Window, cf => cf.ByName("IdePluginList"), Short);
         var items = list.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
         if (items.Length < 2)
             return false;
 
-        return items[0].FindFirstDescendant(cf => cf.ByName($"{pluginPrefix}.Eintrag")) is not null;
+        return items[0].FindFirstDescendant(cf => cf.ByName($"{pluginPrefix}.Entry")) is not null;
     }
 
-    /// <summary>Wählt den Listeneintrag eines SCM-/KI-Plugins aus ("{pluginPrefix}.Eintrag") und liest den Status der "PluginAktiviert"-Checkbox.</summary>
+    /// <summary>Wählt den Listeneintrag eines SCM-/KI-Plugins aus ("{pluginPrefix}.Entry") und liest den Status der "PluginEnabled"-Checkbox.</summary>
     /// <param name="pluginPrefix">Der Plugin-Prefix, z. B. "Softwareschmiede.ClaudeCli".</param>
     /// <returns><c>true</c>, wenn das Plugin aktuell aktiviert ist.</returns>
     public bool IsPluginEnabled(string pluginPrefix)
     {
-        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).ClickInForeground();
-        return WaitForElement(Window, cf => cf.ByName("PluginAktiviert"), Short).AsCheckBox().IsChecked ?? false;
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Entry"), Short).ClickInForeground();
+        return WaitForElement(Window, cf => cf.ByName("PluginEnabled"), Short).AsCheckBox().IsChecked ?? false;
     }
 
-    /// <summary>Wählt den Listeneintrag eines SCM-/KI-Plugins aus und setzt seinen Aktivierungsstatus über die Checkbox "PluginAktiviert".</summary>
+    /// <summary>Wählt den Listeneintrag eines SCM-/KI-Plugins aus und setzt seinen Aktivierungsstatus über die Checkbox "PluginEnabled".</summary>
     /// <param name="pluginPrefix">Der Plugin-Prefix, z. B. "Softwareschmiede.ClaudeCli".</param>
     /// <param name="enabled">Der gewünschte Aktivierungsstatus.</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetPluginEnabled(string pluginPrefix, bool enabled)
     {
-        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).ClickInForeground();
-        WaitForElement(Window, cf => cf.ByName("PluginAktiviert"), Short).AsCheckBox().IsChecked = enabled;
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Entry"), Short).ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("PluginEnabled"), Short).AsCheckBox().IsChecked = enabled;
         return this;
     }
 
     /// <returns>Der aktuelle Wert des globalen Felds „Maximale parallele Ausführungen“
     /// (Expander „Aufgaben ausführen“ im „Automatisierung“-Tab).</returns>
     public string GetMaxParalleleAusfuehrungen()
-        => WaitForElement(Window, cf => cf.ByName("MaxParalleleAusfuehrungen"), Short).AsTextBox().Text;
+        => WaitForElement(Window, cf => cf.ByName("MaxParallelExecutions"), Short).AsTextBox().Text;
 
     /// <summary>Setzt den Wert des globalen Felds „Maximale parallele Ausführungen“.</summary>
     /// <param name="value">Der zu setzende Wert (leer = unbegrenzt).</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetMaxParalleleAusfuehrungen(string value)
     {
-        WaitForElement(Window, cf => cf.ByName("MaxParalleleAusfuehrungen"), Short).AsTextBox().Text = value;
+        WaitForElement(Window, cf => cf.ByName("MaxParallelExecutions"), Short).AsTextBox().Text = value;
         return this;
     }
 
     /// <summary>Wählt im „Plugins“-Tab den Listeneintrag eines SCM-/KI-Plugins aus
-    /// („{pluginPrefix}.Eintrag“), damit dessen Einstellungspanel geladen wird.</summary>
+    /// („{pluginPrefix}.Entry“), damit dessen Einstellungspanel geladen wird.</summary>
     /// <param name="pluginPrefix">Der Plugin-Prefix, z. B. „Softwareschmiede.ClaudeCli“.</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SelectPluginEntry(string pluginPrefix)
     {
-        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Entry"), Short).ClickInForeground();
         return this;
     }
 
@@ -275,19 +275,19 @@ public sealed class SettingsView : BaseWindowView
     }
 
     /// <summary>Klickt „Speichern“ und wartet auf das Fehlerbanner (für Validierungs-Negativpfade).</summary>
-    /// <returns>Die angezeigte Fehlermeldung (HelpText des FehlerMeldung-Elements).</returns>
+    /// <returns>Die angezeigte Fehlermeldung (HelpText des ErrorMessage-Elements).</returns>
     public string SaveSettingsExpectError()
     {
-        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().ClickInForeground();
-        return GetHelpTextOrName(WaitForElement(Window, cf => cf.ByName("FehlerMeldung"), Short));
+        WaitForElement(Window, cf => cf.ByName("Save"), Short).AsButton().ClickInForeground();
+        return GetHelpTextOrName(WaitForElement(Window, cf => cf.ByName("ErrorMessage"), Short));
     }
 
     /// <summary>Klickt den "Verwerfen"-Button und wartet, bis ein zuvor angezeigtes Fehlerbanner verschwindet.</summary>
     /// <returns>Diese Instanz.</returns>
     public SettingsView DiscardChanges()
     {
-        WaitForElement(Window, cf => cf.ByName("Verwerfen"), Short).AsButton().ClickInForeground();
-        WaitUntilGone(Window, cf => cf.ByName("FehlerMeldung"), Short);
+        WaitForElement(Window, cf => cf.ByName("Discard"), Short).AsButton().ClickInForeground();
+        WaitUntilGone(Window, cf => cf.ByName("ErrorMessage"), Short);
         return this;
     }
 
@@ -322,50 +322,50 @@ public sealed class SettingsView : BaseWindowView
     /// <summary>Wechselt in den "Automatisierung"-Tab und klappt den Expander
     /// "Aufgaben ausführen" auf, damit seine Steuerelemente in der UIA-Struktur existieren.</summary>
     /// <returns>Diese Instanz.</returns>
-    public SettingsView OpenAufgabenAusfuehren() => OpenExpander("AufgabenAusfuehrenExpander");
+    public SettingsView OpenAufgabenAusfuehren() => OpenExpander("WorkItemsExecuteExpander");
 
     /// <summary>Wechselt in den "Automatisierung"-Tab und klappt den Expander
     /// "Aufgaben beenden" auf, damit seine Steuerelemente in der UIA-Struktur existieren.</summary>
     /// <returns>Diese Instanz.</returns>
-    public SettingsView OpenAufgabenBeenden() => OpenExpander("AufgabenBeendenExpander");
+    public SettingsView OpenAufgabenBeenden() => OpenExpander("WorkItemsExitExpander");
 
     /// <summary>Wechselt in den "Automatisierung"-Tab und klappt den Expander
     /// "Prozessabläufe" auf, damit seine Steuerelemente in der UIA-Struktur existieren.</summary>
     /// <returns>Diese Instanz.</returns>
-    public SettingsView OpenProzessablaeufe() => OpenExpander("ProzessablaeufeExpander");
+    public SettingsView OpenProzessablaeufe() => OpenExpander("ProcessRunsExpander");
 
     /// <summary>Wechselt in den "Automatisierung"-Tab und klappt den Expander
     /// "Issue-Aufbereitung" auf, damit seine Steuerelemente in der UIA-Struktur existieren.</summary>
     /// <returns>Diese Instanz.</returns>
-    public SettingsView OpenIssueAufbereitung() => OpenExpander("IssueAufbereitungExpander");
+    public SettingsView OpenIssueAufbereitung() => OpenExpander("IssuePreparationExpander");
 
     /// <returns>Der Status der Funktion „Issue-Aufbereitung“ (Header-Statustext des Expanders).</returns>
     public string GetIssueAufbereitungStatus()
-        => GetHelpTextOrName(WaitForElement(Window, cf => cf.ByName("IssueAufbereitungStatus"), Short));
+        => GetHelpTextOrName(WaitForElement(Window, cf => cf.ByName("IssuePreparationStatus"), Short));
 
     /// <returns>Der Zustand des Funktionsschalters der Issue-Aufbereitung.</returns>
-    public bool IsIssueAufbereitungEnabled()
-        => WaitForElement(Window, cf => cf.ByName("IssueAufbereitungEnabledCheckBox"), Short).AsCheckBox().IsChecked ?? false;
+    public bool IsIssuePreparationEnabled()
+        => WaitForElement(Window, cf => cf.ByName("IssuePreparationEnabledCheckBox"), Short).AsCheckBox().IsChecked ?? false;
 
     /// <summary>Setzt den Funktionsschalter der Issue-Aufbereitung.</summary>
     /// <param name="enabled">Der neue Zustand.</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetIssueAufbereitungEnabled(bool enabled)
     {
-        WaitForElement(Window, cf => cf.ByName("IssueAufbereitungEnabledCheckBox"), Short).AsCheckBox().IsChecked = enabled;
+        WaitForElement(Window, cf => cf.ByName("IssuePreparationEnabledCheckBox"), Short).AsCheckBox().IsChecked = enabled;
         return this;
     }
 
     /// <returns>Der aktuell in der Aufbereitungs-Plugin-ComboBox angezeigte Eintrag (Label).</returns>
     public string GetIssueAufbereitungPlugin()
-        => WaitForElement(Window, cf => cf.ByName("IssueAufbereitungPluginComboBox"), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+        => WaitForElement(Window, cf => cf.ByName("IssuePreparationPluginComboBox"), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
 
     /// <summary>Wählt einen Eintrag der Aufbereitungs-Plugin-ComboBox anhand seines Labels aus.</summary>
     /// <param name="label">Das sichtbare Label der Option (z. B. „Globale Standard-CLI verwenden“).</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetIssueAufbereitungPlugin(string label)
     {
-        var box = WaitForElement(Window, cf => cf.ByName("IssueAufbereitungPluginComboBox"), Short);
+        var box = WaitForElement(Window, cf => cf.ByName("IssuePreparationPluginComboBox"), Short);
         SelectComboBoxItemByClick(box, label, Short);
         ElementWaitHelper.WaitForSelectedComboBoxItem(box, label, Short);
         return this;
@@ -374,7 +374,7 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Die sichtbaren Labels aller Aufbereitungs-Plugin-Optionen.</returns>
     public string[] GetIssueAufbereitungPluginOptionen()
     {
-        var box = WaitForElement(Window, cf => cf.ByName("IssueAufbereitungPluginComboBox"), Short).AsComboBox();
+        var box = WaitForElement(Window, cf => cf.ByName("IssuePreparationPluginComboBox"), Short).AsComboBox();
         box.Expand();
         // Die Items werden erst beim Öffnen des Dropdowns materialisiert.
         var deadline = DateTime.UtcNow + Short;
@@ -392,7 +392,7 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetIssueAufbereitungRepository(string repositoryName, bool selected)
     {
-        WaitForElement(Window, cf => cf.ByName("IssueAufbereitungRepositoriesList"), Short);
+        WaitForElement(Window, cf => cf.ByName("IssuePreparationRepositoriesList"), Short);
         WaitForElement(Window, cf => cf.ByName(repositoryName), Short).AsCheckBox().IsChecked = selected;
         return this;
     }
@@ -403,29 +403,29 @@ public sealed class SettingsView : BaseWindowView
         => WaitForElement(Window, cf => cf.ByName(repositoryName), Short).AsCheckBox().IsChecked ?? false;
 
     /// <returns>Der Zustand des Kommentar-Schalters der Issue-Aufbereitung.</returns>
-    public bool IsIssueAufbereitungKommentarEnabled()
-        => WaitForElement(Window, cf => cf.ByName("IssueAufbereitungCommentCheckBox"), Short).AsCheckBox().IsChecked ?? false;
+    public bool IsIssuePreparationCommentEnabled()
+        => WaitForElement(Window, cf => cf.ByName("IssuePreparationCommentCheckBox"), Short).AsCheckBox().IsChecked ?? false;
 
     /// <summary>Setzt den Kommentar-Schalter der Issue-Aufbereitung.</summary>
     /// <param name="enabled">Der neue Zustand.</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetIssueAufbereitungKommentarEnabled(bool enabled)
     {
-        WaitForElement(Window, cf => cf.ByName("IssueAufbereitungCommentCheckBox"), Short).AsCheckBox().IsChecked = enabled;
+        WaitForElement(Window, cf => cf.ByName("IssuePreparationCommentCheckBox"), Short).AsCheckBox().IsChecked = enabled;
         return this;
     }
 
     /// <summary>Klappt den Expander "Aufgaben ausführen" zu (no-op, wenn er bereits zu ist).</summary>
     /// <returns>Diese Instanz.</returns>
-    public SettingsView CollapseAufgabenAusfuehren() => CollapseExpander("AufgabenAusfuehrenExpander");
+    public SettingsView CollapseAufgabenAusfuehren() => CollapseExpander("WorkItemsExecuteExpander");
 
     /// <summary>Klappt den Expander "Aufgaben beenden" zu (no-op, wenn er bereits zu ist).</summary>
     /// <returns>Diese Instanz.</returns>
-    public SettingsView CollapseAufgabenBeenden() => CollapseExpander("AufgabenBeendenExpander");
+    public SettingsView CollapseAufgabenBeenden() => CollapseExpander("WorkItemsExitExpander");
 
     /// <summary>Klappt den Expander "Prozessabläufe" zu (no-op, wenn er bereits zu ist).</summary>
     /// <returns>Diese Instanz.</returns>
-    public SettingsView CollapseProzessablaeufe() => CollapseExpander("ProzessablaeufeExpander");
+    public SettingsView CollapseProzessablaeufe() => CollapseExpander("ProcessRunsExpander");
 
     /// <summary>Klappt den benannten Expander im "Automatisierung"-Tab auf (no-op, wenn er
     /// bereits geöffnet ist) und wartet kurz auf den Aufbau des Inhalts.</summary>
@@ -458,17 +458,17 @@ public sealed class SettingsView : BaseWindowView
     /// <summary>Liest den Schaltzustand der Titelleiste "Aufgaben ausführen" — auch im
     /// zugeklappten Zustand, da der Status-TextBlock im Expander-Header liegt.</summary>
     /// <returns>Der Status-Text ("aktiviert"/"deaktiviert").</returns>
-    public string GetAufgabenAusfuehrenStatus() => GetExpanderStatus("AufgabenAusfuehrenStatus");
+    public string GetAufgabenAusfuehrenStatus() => GetExpanderStatus("WorkItemsExecuteStatus");
 
     /// <summary>Liest den Schaltzustand der Titelleiste "Aufgaben beenden" — auch im
     /// zugeklappten Zustand, da der Status-TextBlock im Expander-Header liegt.</summary>
     /// <returns>Der Status-Text ("aktiviert"/"deaktiviert").</returns>
-    public string GetAufgabenBeendenStatus() => GetExpanderStatus("AufgabenBeendenStatus");
+    public string GetAufgabenBeendenStatus() => GetExpanderStatus("WorkItemsExitStatus");
 
     /// <summary>Liest den Schaltzustand der Titelleiste "Prozessabläufe" — auch im
     /// zugeklappten Zustand, da der Status-TextBlock im Expander-Header liegt.</summary>
     /// <returns>Der Status-Text ("aktiviert"/"deaktiviert").</returns>
-    public string GetProzessablaeufeStatus() => GetExpanderStatus("ProzessablaeufeStatus");
+    public string GetProzessablaeufeStatus() => GetExpanderStatus("ProcessRunsStatus");
 
     /// <summary>Liest den Status-Text des benannten Expander-Status-TextBlocks über den
     /// HelpText (der UIA-Name trägt den Automatisierungsnamen, nicht den Anzeigetext).</summary>
@@ -501,10 +501,10 @@ public sealed class SettingsView : BaseWindowView
         while (DateTime.UtcNow < deadline)
         {
             Thread.Sleep(100);
-            var aktuell = Window.FindFirstDescendant(cf => cf.ByName(automationName)) is not null;
-            if (aktuell == existing)
-                return aktuell;
-            existing = aktuell;
+            var current = Window.FindFirstDescendant(cf => cf.ByName(automationName)) is not null;
+            if (current == existing)
+                return current;
+            existing = current;
         }
         return existing;
     }
@@ -527,13 +527,13 @@ public sealed class SettingsView : BaseWindowView
         return this;
     }
 
-    /// <summary>Liest, ob die "Ueberwachungsmodus"-ComboBox bedienbar ist (nur bei aktivierter
+    /// <summary>Liest, ob die "MonitoringMode"-ComboBox bedienbar ist (nur bei aktivierter
     /// Ereignisüberwachung).</summary>
     /// <returns><c>true</c>, wenn die ComboBox aktiviert ist.</returns>
-    public bool IsUeberwachungsmodusEnabled()
+    public bool IsMonitoringModeEnabled()
     {
         OpenAufgabenAusfuehren();
-        return WaitForElement(Window, cf => cf.ByName("Ueberwachungsmodus").And(cf.ByControlType(ControlType.ComboBox)), Short).IsEnabled;
+        return WaitForElement(Window, cf => cf.ByName("MonitoringMode").And(cf.ByControlType(ControlType.ComboBox)), Short).IsEnabled;
     }
 
     /// <summary>Prüft, ob der Trigger-Keyword-Bereich sichtbar ist (nur bei aktivierter
@@ -566,16 +566,16 @@ public sealed class SettingsView : BaseWindowView
         return IsBereichSichtbar("ScmPromptAppendixGeneral");
     }
 
-    /// <summary>Liest das aktuell ausgewählte Label der "Ueberwachungsmodus"-ComboBox
+    /// <summary>Liest das aktuell ausgewählte Label der "MonitoringMode"-ComboBox
     /// im "Automatisierung"-Tab (Expander "Aufgaben ausführen").</summary>
     /// <returns>Das Anzeige-Label des gewählten SCM-Konto-Modus (siehe <c>ScmKontoModusTexte</c>).</returns>
     public string GetKontoModus()
     {
         OpenAufgabenAusfuehren();
-        return WaitForElement(Window, cf => cf.ByName("Ueberwachungsmodus").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+        return WaitForElement(Window, cf => cf.ByName("MonitoringMode").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
     }
 
-    /// <summary>Wählt einen Eintrag der "Ueberwachungsmodus"-ComboBox und wartet, bis er übernommen wurde.</summary>
+    /// <summary>Wählt einen Eintrag der "MonitoringMode"-ComboBox und wartet, bis er übernommen wurde.</summary>
     /// <param name="label">Das Anzeige-Label (aus <c>ScmKontoModusTexte</c>: "Benutzerkonto" oder "Separates Konto").</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetKontoModus(string label)
@@ -585,7 +585,7 @@ public sealed class SettingsView : BaseWindowView
         // sichtbaren Klickpunkt (das UIA-Element einer WPF-ComboBox ist selbst nicht
         // tastaturfokussierbar). Die Einträge liegen im Popup-Teilbaum der ComboBox; die
         // Auswahl erfolgt patternbasiert, da auch Items keinen eigenen Klickpunkt brauchen.
-        var box = WaitForElement(Window, cf => cf.ByName("Ueberwachungsmodus").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox();
+        var box = WaitForElement(Window, cf => cf.ByName("MonitoringMode").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox();
         box.Expand();
         AutomationElement? item = null;
         var deadline = DateTime.UtcNow + Short;
@@ -604,8 +604,8 @@ public sealed class SettingsView : BaseWindowView
     }
 
     /// <summary>
-    /// Wartet, bis die "Ueberwachungsmodus"-ComboBox das erwartete Label anzeigt. Dient als echtes
-    /// Synchronisationssignal für das Neuladen der persistierten Einstellungen.
+    /// Wartet, bis die "MonitoringMode"-ComboBox das erwartete Label anzeigt. Dient als echtes
+    /// Synchronisationssignal für das Neuladen der persistierten Settings.
     /// </summary>
     /// <param name="label">Das erwartete Anzeige-Label.</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
@@ -615,7 +615,7 @@ public sealed class SettingsView : BaseWindowView
     {
         OpenAufgabenAusfuehren();
         ElementWaitHelper.WaitForSelectedComboBoxItem(
-            WaitForElement(Window, cf => cf.ByName("Ueberwachungsmodus").And(cf.ByControlType(ControlType.ComboBox)), timeout), label, timeout);
+            WaitForElement(Window, cf => cf.ByName("MonitoringMode").And(cf.ByControlType(ControlType.ComboBox)), timeout), label, timeout);
         return this;
     }
 
@@ -637,13 +637,13 @@ public sealed class SettingsView : BaseWindowView
         return this;
     }
 
-    /// <summary>Liest, ob die "Pruefmodus"-ComboBox bedienbar ist (nur bei aktivierter
+    /// <summary>Liest, ob die "CheckMode"-ComboBox bedienbar ist (nur bei aktivierter
     /// Abschlussüberwachung).</summary>
     /// <returns><c>true</c>, wenn die ComboBox aktiviert ist.</returns>
     public bool IsPruefmodusEnabled()
     {
         OpenAufgabenBeenden();
-        return WaitForElement(Window, cf => cf.ByName("Pruefmodus").And(cf.ByControlType(ControlType.ComboBox)), Short).IsEnabled;
+        return WaitForElement(Window, cf => cf.ByName("CheckMode").And(cf.ByControlType(ControlType.ComboBox)), Short).IsEnabled;
     }
 
     /// <summary>Liest, ob das Wartezeit-Feld "ScmTaskCompletionWaitMinutes" bedienbar ist
@@ -655,25 +655,25 @@ public sealed class SettingsView : BaseWindowView
         return WaitForElement(Window, cf => cf.ByName("ScmTaskCompletionWaitMinutes"), Short).IsEnabled;
     }
 
-    /// <summary>Wählt einen Eintrag der "Pruefmodus"-ComboBox (Expander "Aufgaben beenden")
+    /// <summary>Wählt einen Eintrag der "CheckMode"-ComboBox (Expander "Aufgaben beenden")
     /// und wartet, bis er übernommen wurde.</summary>
     /// <param name="label">Das Anzeige-Label (aus <c>ScmTaskCompletionPruefmodusTexte</c>).</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetPruefmodus(string label)
     {
         OpenAufgabenBeenden();
-        var box = WaitForElement(Window, cf => cf.ByName("Pruefmodus").And(cf.ByControlType(ControlType.ComboBox)), Short);
+        var box = WaitForElement(Window, cf => cf.ByName("CheckMode").And(cf.ByControlType(ControlType.ComboBox)), Short);
         SelectComboBoxItemByClick(box, label, Short);
         ElementWaitHelper.WaitForSelectedComboBoxItem(box, label, Short);
         return this;
     }
 
-    /// <summary>Liest das aktuell ausgewählte Label der "Pruefmodus"-ComboBox.</summary>
+    /// <summary>Liest das aktuell ausgewählte Label der "CheckMode"-ComboBox.</summary>
     /// <returns>Das Anzeige-Label des gewählten Prüfmodus (siehe <c>ScmTaskCompletionPruefmodusTexte</c>).</returns>
     public string GetPruefmodus()
     {
         OpenAufgabenBeenden();
-        return WaitForElement(Window, cf => cf.ByName("Pruefmodus").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+        return WaitForElement(Window, cf => cf.ByName("CheckMode").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
     }
 
     /// <summary>Wählt einen Eintrag der "Backmerge-Modus"-ComboBox (Expander "Prozessabläufe")
@@ -703,7 +703,7 @@ public sealed class SettingsView : BaseWindowView
     public SettingsView SetBackmergeDraftAktivierungChecked(bool enabled)
     {
         OpenProzessablaeufe();
-        WaitForElement(Window, cf => cf.ByName("IsScmBackmergeDraftAktivierung"), Short).AsCheckBox().IsChecked = enabled;
+        WaitForElement(Window, cf => cf.ByName("IsScmBackmergeDraftActivation"), Short).AsCheckBox().IsChecked = enabled;
         return this;
     }
 
@@ -722,7 +722,7 @@ public sealed class SettingsView : BaseWindowView
     public bool IsBackmergeDraftAktivierungChecked()
     {
         OpenProzessablaeufe();
-        return WaitForElement(Window, cf => cf.ByName("IsScmBackmergeDraftAktivierung"), Short).AsCheckBox().IsChecked ?? false;
+        return WaitForElement(Window, cf => cf.ByName("IsScmBackmergeDraftActivation"), Short).AsCheckBox().IsChecked ?? false;
     }
 
     /// <summary>Liest, ob die Checkbox "Bei blockiertem Merge Admin-Merge erlauben" gesetzt ist.</summary>
@@ -739,7 +739,7 @@ public sealed class SettingsView : BaseWindowView
     public bool IsBackmergeDraftAktivierungEnabled()
     {
         OpenProzessablaeufe();
-        return WaitForElement(Window, cf => cf.ByName("IsScmBackmergeDraftAktivierung"), Short).IsEnabled;
+        return WaitForElement(Window, cf => cf.ByName("IsScmBackmergeDraftActivation"), Short).IsEnabled;
     }
 
     /// <summary>Liest, ob die Checkbox "Bei blockiertem Merge Admin-Merge erlauben" bedienbar
@@ -756,7 +756,7 @@ public sealed class SettingsView : BaseWindowView
     /// Tastatur. WPF-PasswordBoxen unterstützen über UI-Automation weder ValuePattern noch
     /// TextPattern; Fokus + Unicode-Tastatureingabe ist der einzig verlässliche Weg.
     /// </summary>
-    /// <param name="fieldKey">Der Feld-Key aus dem Plugin-Settings-Schema (z. B. "AgentToken").</param>
+    /// <param name="fieldKey">Der Feld-Key aus dem Plugin--Einstellungen-Schema (z. B. "AgentToken").</param>
     /// <param name="value">Der einzugebende Wert.</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetPluginSecretField(string fieldKey, string value)
@@ -802,7 +802,7 @@ public sealed class SettingsView : BaseWindowView
 
     /// <summary>
     /// Wartet, bis die "Update-Modus"-ComboBox das erwartete Label anzeigt. Dient als echtes
-    /// Synchronisationssignal für das Neuladen der persistierten Einstellungen.
+    /// Synchronisationssignal für das Neuladen der persistierten Settings.
     /// </summary>
     /// <param name="label">Das erwartete Anzeige-Label.</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
@@ -843,21 +843,21 @@ public sealed class SettingsView : BaseWindowView
         return this;
     }
 
-    /// <summary>Liest den schreibgeschützten Anzeigetext des abgeleiteten Update-Kanals im "Allgemein"-Tab.</summary>
+    /// <summary>Liest den schreibgeschützten Anzeigetext des abgeleiteten UpdateChannels im "Allgemein"-Tab.</summary>
     /// <returns>Der Kanal-Anzeigetext (siehe <c>UpdatePfadTexte</c>).</returns>
     /// <remarks>
     /// Das Element trägt kein <c>AutomationProperties.Name</c> — der gebundene Kanaltext ist
-    /// daher als UIA-Name des TextBlocks lesbar (Muster wie <c>UpdateHinweis</c>).
+    /// daher als UIA-Name des TextBlocks lesbar (Muster wie <c>UpdateNotice</c>).
     /// </remarks>
     public string GetAbgeleitetenUpdateKanal()
-        => WaitForElement(Window, cf => cf.ByAutomationId("Update-Kanal"), Short).Name;
+        => WaitForElement(Window, cf => cf.ByAutomationId("UpdateChannel"), Short).Name;
 
-    /// <summary>Wartet auf die Speicher-Bestätigung "Einstellungen gespeichert.".</summary>
+    /// <summary>Wartet auf die Speicher-Bestätigung "Settings gespeichert.".</summary>
     /// <returns>Diese Instanz.</returns>
     /// <exception cref="TimeoutException">Die Bestätigung erschien nicht rechtzeitig.</exception>
     public SettingsView WaitForSettingsSaved()
     {
-        WaitForElement(Window, cf => cf.ByName("Einstellungen gespeichert."), Medium);
+        WaitForElement(Window, cf => cf.ByName("Settings gespeichert."), Medium);
         return this;
     }
 }

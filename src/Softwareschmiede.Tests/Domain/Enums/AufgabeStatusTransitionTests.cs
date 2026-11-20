@@ -13,7 +13,7 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly WorkItemService _sut;
-    private readonly Guid _projektId = Guid.NewGuid();
+    private readonly Guid _projectId = Guid.NewGuid();
 
     /// <summary>AufgabeStatusTransitionTests.</summary>
     public AufgabeStatusTransitionTests()
@@ -23,7 +23,7 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
 
         _db.Projects.Add(new Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Transition-Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -38,7 +38,7 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     [Fact]
     public async Task TestStatusTransitions_NeuToGestartet_Direct_Succeeds()
     {
-        var workItem = await _sut.CreateAsync(_projektId, "Transition-Test", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Transition-Test", null, ct: TestContext.Current.CancellationToken);
 
         await _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
@@ -112,7 +112,7 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     [Fact]
     public async Task TestStatusValidation_InvalidTransition_ThrowsException()
     {
-        var workItem = await _sut.CreateAsync(_projektId, "Ungültiger Übergang", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Ungültiger Übergang", null, ct: TestContext.Current.CancellationToken);
 
         var act = () => _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Completed);
         await act.Should().ThrowAsync<InvalidStatusTransitionException>();
@@ -143,7 +143,7 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
         var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = $"Aufgabe-{status}",
             Status = status,
             CreatedAt = DateTimeOffset.UtcNow

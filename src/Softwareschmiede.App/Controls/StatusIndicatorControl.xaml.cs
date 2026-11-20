@@ -82,11 +82,11 @@ public sealed partial class StatusIndicatorControl : UserControl
     {
         if (d is StatusIndicatorControl control && e.NewValue is WorkItemStatus status)
         {
-            control.AktualisierenFuerStatus(status);
+            control.RefreshForStatus(status);
         }
     }
 
-    private void AktualisierenFuerStatus(WorkItemStatus status)
+    private void RefreshForStatus(WorkItemStatus status)
     {
         (StatusText, StatusColor) = status switch
         {

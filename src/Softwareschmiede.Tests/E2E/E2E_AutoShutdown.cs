@@ -33,7 +33,7 @@ public partial class End2EndTest
     /// </summary>
     protected async Task AutoShutdown_CountdownAbbruchAufzeichnungUndPersistenz_E2E(Window mainWindow)
     {
-        const string aufgabenTitel = "Neue Aufgabe";
+        const string workItemsTitle = "Neue Aufgabe";
         ConfirmLocalDirectoryGitInitInSourceDirectory();
         SetupProjectMitNeuerAufgabe(mainWindow, "AutoShutdown-Repo", "AutoShutdown-Projekt");
 
@@ -62,7 +62,7 @@ public partial class End2EndTest
         menu.WaitForAutoShutdownCountdownText("Herunterfahren in", Long);
 
         // Wiederanlauf bricht den Countdown ab (Statuswechsel 0 → >0).
-        WaitForElement(mainWindow, cf => cf.ByName("CliNeustarten"), Medium).AsButton().ClickInForeground();
+        WaitForElement(mainWindow, cf => cf.ByName("RestartCli"), Medium).AsButton().ClickInForeground();
         taskDetail.WaitForCliRunning();
         menu.WaitForAutoShutdownLaufendeAnzahlText("1 laufende", Long);
         menu.WaitForAutoShutdownCountdownVerschwunden(Long);
@@ -79,7 +79,7 @@ public partial class End2EndTest
         menu.WaitForAutoShutdownAktivierenVerschwunden(Medium);
 
         // Wiederanlauf → Checkbox wird wieder sichtbar; Toleranz 0 für den sofortigen Auslöser.
-        WaitForElement(mainWindow, cf => cf.ByName("CliNeustarten"), Medium).AsButton().ClickInForeground();
+        WaitForElement(mainWindow, cf => cf.ByName("RestartCli"), Medium).AsButton().ClickInForeground();
         taskDetail.WaitForCliRunning();
         menu.WaitForAutoShutdownLaufendeAnzahlText("1 laufende", Long);
         menu.SetzeAutoShutdownAktiviert(true);
@@ -97,8 +97,8 @@ public partial class End2EndTest
         var restartedMenu = new MenuView(mainWindow);
         var restartedDetail = restartedMenu.NavigateToProjects()
             .OpenProject("AutoShutdown-Projekt")
-            .OpenTask(aufgabenTitel);
-        WaitForElement(mainWindow, cf => cf.ByName("CliNeustarten"), Medium).AsButton().ClickInForeground();
+            .OpenTask(workItemsTitle);
+        WaitForElement(mainWindow, cf => cf.ByName("RestartCli"), Medium).AsButton().ClickInForeground();
         restartedDetail.WaitForCliRunning();
 
         restartedMenu.WaitForAutoShutdownLaufendeAnzahlText("1 laufende", Long);

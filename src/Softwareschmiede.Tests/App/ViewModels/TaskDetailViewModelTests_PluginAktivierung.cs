@@ -19,11 +19,11 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     private readonly LogService _logService;
     private readonly TodoService _todoService;
     private readonly AiExecutionService _aiService;
-    private readonly PromptTemplateService _promptVorlagenService;
-    private readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService = new();
+    private readonly PromptTemplateService _promptTemplatesService;
+    private readonly PromptTemplatePlaceholderService _promptTemplatesPlaceholderService = new();
     private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
     private readonly Mock<IDialogService> _dialogServiceMock;
-    private readonly Guid _projektId = Guid.NewGuid();
+    private readonly Guid _projectId = Guid.NewGuid();
 
     /// <summary>TaskDetailViewModelTests_PluginAktivierung.</summary>
     public TaskDetailViewModelTests_PluginAktivierung()
@@ -33,13 +33,13 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
         _aiService = TestKiAusfuehrungsServiceFactory.Create();
-        _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
+        _promptTemplatesService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
         _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _dialogServiceMock = new Mock<IDialogService>();
 
         _db.Projects.Add(new Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -67,7 +67,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
 
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
-        var entwicklungsprozessService = new DevelopmentProcessService(
+        var developmentprocessService = new DevelopmentProcessService(
             _workItemService,
             _logService,
             gitPluginMock.Object,
@@ -77,17 +77,17 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
             NullLogger<DevelopmentProcessService>.Instance);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
-        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService();
+        var workingDirectoryOpenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService();
         var serviceProviderMock = new Mock<IServiceProvider>();
 
         return new TaskDetailViewModel(
             _workItemService,
             _logService,
             _aiService,
-            entwicklungsprozessService,
+            developmentprocessService,
             pluginSelectionService,
-            _promptVorlagenService,
-            _promptVorlagenPlatzhalterService,
+            _promptTemplatesService,
+            _promptTemplatesPlaceholderService,
             _promptScheduleDispatchService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
@@ -96,11 +96,11 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService);
+            workingDirectoryOpenService);
     }
 
     private async Task<WorkItem> ErstelleAufgabe()
-        => await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
+        => await _workItemService.CreateAsync(_projectId, "Testaufgabe", "Beschreibung");
 
     private static Mock<IAiPlugin> CreateKiPluginMock(string name, string prefix)
     {
@@ -122,10 +122,10 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         var sut = CreateSut(einzigesPlugin);
         sut.WorkItemId = workItem.Id;
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.ZeigeKiPluginAuswahl.Should().BeFalse();
-        sut.SelectedKiPluginPrefix.Should().Be("Softwareschmiede.EinzigesKi");
+        sut.ShowAiPluginSelection.Should().BeFalse();
+        sut.SelectedAiPluginPrefix.Should().Be("Softwareschmiede.EinzigesKi");
     }
 
     /// <summary>Bei mehr als einem aktiven KI-Plugin bleibt der Selector sichtbar (ZeigeKiPluginAuswahl == true).</summary>
@@ -138,8 +138,8 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         var sut = CreateSut(erstesPlugin, zweitesPlugin);
         sut.WorkItemId = workItem.Id;
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.ZeigeKiPluginAuswahl.Should().BeTrue();
+        sut.ShowAiPluginSelection.Should().BeTrue();
     }
 }

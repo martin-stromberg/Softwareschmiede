@@ -21,10 +21,10 @@ public sealed class FileExplorerViewModelTests
         var nodes = new List<WorkspaceFileNode> { new() { Name = "a.txt", RelativePath = "a.txt" } };
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(nodes);
 
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
-        sut.AktuellerModus.Should().Be(DateibrowserAnsichtsmodus.Default);
-        sut.Wurzelknoten.Should().ContainSingle(node => node.Name == "a.txt");
+        sut.CurrentMode.Should().Be(FileBrowserViewMode.Default);
+        sut.RootNodes.Should().ContainSingle(node => node.Name == "a.txt");
         gitMock.Verify(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -34,16 +34,16 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var node = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt" };
         var preview = new FilePreview("a.txt", null, false, false, false, "inhalt", null, null);
         gitMock.Setup(g => g.LoadPreviewAsync(RepositoryPath, node, It.IsAny<CancellationToken>())).ReturnsAsync(preview);
 
-        sut.AusgewaehlterKnoten = node;
-        await WaitForAsync(() => sut.DateiInhalt == "inhalt");
+        sut.SelectedNode = node;
+        await WaitForAsync(() => sut.FileContent == "inhalt");
 
-        sut.DateiInhalt.Should().Be("inhalt");
+        sut.FileContent.Should().Be("inhalt");
         gitMock.Verify(g => g.LoadPreviewAsync(RepositoryPath, node, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -53,7 +53,7 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var nodeA = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt" };
         var nodeB = new WorkspaceFileNode { Name = "b.txt", RelativePath = "b.txt" };
@@ -69,11 +69,11 @@ public sealed class FileExplorerViewModelTests
         var previewB = new FilePreview("b.txt", null, false, false, false, "neu-inhalt", null, null);
         gitMock.Setup(g => g.LoadPreviewAsync(RepositoryPath, nodeB, It.IsAny<CancellationToken>())).ReturnsAsync(previewB);
 
-        sut.AusgewaehlterKnoten = nodeA;
+        sut.SelectedNode = nodeA;
         await WaitForAsync(() => capturedTokenForA is not null);
 
-        sut.AusgewaehlterKnoten = nodeB;
-        await WaitForAsync(() => sut.DateiInhalt == "neu-inhalt");
+        sut.SelectedNode = nodeB;
+        await WaitForAsync(() => sut.FileContent == "neu-inhalt");
 
         capturedTokenForA!.Value.IsCancellationRequested.Should().BeTrue();
     }
@@ -84,7 +84,7 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var node = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt" };
         CancellationToken? capturedToken = null;
@@ -96,10 +96,10 @@ public sealed class FileExplorerViewModelTests
                 return previewCompletionSource.Task;
             });
 
-        sut.AusgewaehlterKnoten = node;
+        sut.SelectedNode = node;
         await WaitForAsync(() => capturedToken is not null);
 
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         capturedToken!.Value.IsCancellationRequested.Should().BeTrue();
     }
@@ -110,7 +110,7 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var node = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt" };
         CancellationToken? capturedToken = null;
@@ -122,10 +122,10 @@ public sealed class FileExplorerViewModelTests
                 return previewCompletionSource.Task;
             });
 
-        sut.AusgewaehlterKnoten = node;
+        sut.SelectedNode = node;
         await WaitForAsync(() => capturedToken is not null);
 
-        await ((AsyncRelayCommand)sut.AktualisierenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.RefreshCommand).ExecuteAsync();
 
         capturedToken!.Value.IsCancellationRequested.Should().BeTrue();
     }
@@ -136,25 +136,25 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, diffMock) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var diffNode = new WorkspaceFileNode { Name = "a.cs", RelativePath = "a.cs", CommitSha = "abc123" };
         var preview = new FilePreview("a.cs", null, false, false, false, "neu", "alt", null);
         gitMock.Setup(g => g.LoadCommitPreviewAsync(RepositoryPath, diffNode, It.IsAny<CancellationToken>())).ReturnsAsync(preview);
         var diffLines = new List<TextDiffLine> { new("neu", DiffLineStatus.Modified, 1, 1, []) };
         diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(diffLines));
-        sut.AusgewaehlterKnoten = diffNode;
-        await WaitForAsync(() => sut.DiffZeilen.Count > 0);
+        sut.SelectedNode = diffNode;
+        await WaitForAsync(() => sut.DiffLines.Count > 0);
 
         var failingNode = new WorkspaceFileNode { Name = "b.txt", RelativePath = "b.txt" };
         gitMock.Setup(g => g.LoadPreviewAsync(RepositoryPath, failingNode, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        sut.AusgewaehlterKnoten = failingNode;
-        await WaitForAsync(() => sut.DateiInhalt == "Datei konnte nicht geladen werden.");
+        sut.SelectedNode = failingNode;
+        await WaitForAsync(() => sut.FileContent == "Datei konnte nicht geladen werden.");
 
-        sut.DateiInhalt.Should().Be("Datei konnte nicht geladen werden.");
-        sut.DiffZeilen.Should().BeEmpty();
+        sut.FileContent.Should().Be("Datei konnte nicht geladen werden.");
+        sut.DiffLines.Should().BeEmpty();
     }
 
     /// <summary>Die Auswahl eines Verzeichnis-Knotens leert den zuvor angezeigten Dateiinhalt und die Diff-Zeilen, statt die veraltete Anzeige stehen zu lassen.</summary>
@@ -163,7 +163,7 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, diffMock) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var fileNode = new WorkspaceFileNode { Name = "a.cs", RelativePath = "a.cs", CommitSha = "abc123" };
         var preview = new FilePreview("a.cs", null, false, false, false, "neu", "alt", null);
@@ -171,14 +171,14 @@ public sealed class FileExplorerViewModelTests
         var diffLines = new List<TextDiffLine> { new("neu", DiffLineStatus.Modified, 1, 1, []) };
         diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(diffLines));
 
-        sut.AusgewaehlterKnoten = fileNode;
-        await WaitForAsync(() => sut.DiffZeilen.Count > 0);
+        sut.SelectedNode = fileNode;
+        await WaitForAsync(() => sut.DiffLines.Count > 0);
 
         var directoryNode = new WorkspaceFileNode { Name = "src", RelativePath = "src", IsDirectory = true };
-        sut.AusgewaehlterKnoten = directoryNode;
+        sut.SelectedNode = directoryNode;
 
-        sut.DateiInhalt.Should().BeNull();
-        sut.DiffZeilen.Should().BeEmpty();
+        sut.FileContent.Should().BeNull();
+        sut.DiffLines.Should().BeEmpty();
     }
 
     /// <summary>Bei IsBinary/IsTooBig wird der Hinweistext statt des Inhalts angezeigt.</summary>
@@ -189,16 +189,16 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var node = new WorkspaceFileNode { Name = "datei.dat", RelativePath = "datei.dat" };
         var preview = new FilePreview("datei.dat", null, false, isBinary, isTooBig, null, null, hint);
         gitMock.Setup(g => g.LoadPreviewAsync(RepositoryPath, node, It.IsAny<CancellationToken>())).ReturnsAsync(preview);
 
-        sut.AusgewaehlterKnoten = node;
-        await WaitForAsync(() => sut.DateiInhalt == hint);
+        sut.SelectedNode = node;
+        await WaitForAsync(() => sut.FileContent == hint);
 
-        sut.DateiInhalt.Should().Be(hint);
+        sut.FileContent.Should().Be(hint);
     }
 
     /// <summary>Der Wechsel in den Vergleichsmodus lädt den Snapshot und füllt CommitGruppen.</summary>
@@ -207,16 +207,16 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var commits = new List<BranchCommit> { new() { Sha = "abc123", ShortSha = "abc123", Subject = "Testcommit" } };
         var snapshot = new WorkspaceSnapshot { RepositoryPath = RepositoryPath, BranchCommits = commits };
         gitMock.Setup(g => g.LoadSnapshotAsync(RepositoryPath, It.IsAny<CancellationToken>())).ReturnsAsync(snapshot);
 
-        await ((AsyncRelayCommand)sut.VergleichCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CompareCommand).ExecuteAsync();
 
-        sut.AktuellerModus.Should().Be(DateibrowserAnsichtsmodus.Vergleich);
-        sut.CommitGruppen.Should().ContainSingle(commit => commit.Sha == "abc123");
+        sut.CurrentMode.Should().Be(FileBrowserViewMode.Compare);
+        sut.CommitGroup.Should().ContainSingle(commit => commit.Sha == "abc123");
     }
 
     /// <summary>Das Aufklappen eines Commits lädt dessen geänderte Dateien und setzt ChildrenLoaded.</summary>
@@ -225,13 +225,13 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var commit = new BranchCommit { Sha = "abc123", ShortSha = "abc123", Subject = "Testcommit" };
         var files = new List<WorkspaceFileNode> { new() { Name = "a.cs", RelativePath = "a.cs", CommitSha = "abc123" } };
         gitMock.Setup(g => g.LoadCommitFilesAsync(RepositoryPath, "abc123", It.IsAny<CancellationToken>())).ReturnsAsync(files);
 
-        await sut.CommitAufklappenAsync(commit, TestContext.Current.CancellationToken);
+        await sut.ExpandCommitAsync(commit, TestContext.Current.CancellationToken);
 
         commit.Files.Should().ContainSingle(file => file.Name == "a.cs");
         commit.ChildrenLoaded.Should().BeTrue();
@@ -243,23 +243,23 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var commits = new List<BranchCommit> { new() { Sha = "abc123", ShortSha = "abc123", Subject = "Testcommit" } };
         gitMock.Setup(g => g.LoadSnapshotAsync(RepositoryPath, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkspaceSnapshot { RepositoryPath = RepositoryPath, BranchCommits = commits });
-        await ((AsyncRelayCommand)sut.VergleichCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CompareCommand).ExecuteAsync();
 
-        var commit = sut.CommitGruppen.Should().ContainSingle().Subject;
+        var commit = sut.CommitGroup.Should().ContainSingle().Subject;
         var files = new List<WorkspaceFileNode> { new() { Name = "a.cs", RelativePath = "a.cs", CommitSha = "abc123" } };
         gitMock.Setup(g => g.LoadCommitFilesAsync(RepositoryPath, "abc123", It.IsAny<CancellationToken>())).ReturnsAsync(files);
 
         var commitGruppenChanged = false;
-        sut.CommitGruppen.CollectionChanged += (_, _) => commitGruppenChanged = true;
+        sut.CommitGroup.CollectionChanged += (_, _) => commitGruppenChanged = true;
         var filesChanged = false;
         commit.Files.CollectionChanged += (_, _) => filesChanged = true;
 
-        await sut.CommitAufklappenAsync(commit, TestContext.Current.CancellationToken);
+        await sut.ExpandCommitAsync(commit, TestContext.Current.CancellationToken);
 
         commitGruppenChanged.Should().BeFalse();
         filesChanged.Should().BeTrue();
@@ -272,7 +272,7 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, diffMock) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var node = new WorkspaceFileNode { Name = "a.cs", RelativePath = "a.cs", CommitSha = "abc123" };
         var preview = new FilePreview("a.cs", null, false, false, false, "neu", "alt", null);
@@ -281,10 +281,10 @@ public sealed class FileExplorerViewModelTests
         var diffLines = new List<TextDiffLine> { new("neu", DiffLineStatus.Modified, 1, 1, []) };
         diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(diffLines));
 
-        sut.AusgewaehlterKnoten = node;
-        await WaitForAsync(() => sut.DiffZeilen.Count > 0);
+        sut.SelectedNode = node;
+        await WaitForAsync(() => sut.DiffLines.Count > 0);
 
-        sut.DiffZeilen.Should().ContainSingle();
+        sut.DiffLines.Should().ContainSingle();
         diffMock.Verify(d => d.BuildDiff("alt", "neu"), Times.Once);
     }
 
@@ -294,14 +294,14 @@ public sealed class FileExplorerViewModelTests
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
-        await ((AsyncRelayCommand)sut.AktualisierenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.RefreshCommand).ExecuteAsync();
         gitMock.Verify(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
 
         gitMock.Setup(g => g.LoadSnapshotAsync(RepositoryPath, It.IsAny<CancellationToken>())).ReturnsAsync(new WorkspaceSnapshot { RepositoryPath = RepositoryPath });
-        await ((AsyncRelayCommand)sut.VergleichCommand).ExecuteAsync();
-        await ((AsyncRelayCommand)sut.AktualisierenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CompareCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.RefreshCommand).ExecuteAsync();
 
         gitMock.Verify(g => g.LoadSnapshotAsync(RepositoryPath, It.IsAny<CancellationToken>()), Times.Exactly(2));
     }

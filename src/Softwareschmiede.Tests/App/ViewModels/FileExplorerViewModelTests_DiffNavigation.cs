@@ -25,9 +25,9 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
             Line(DiffLineStatus.Removed));
 
         var fokussierteIndizes = new List<int>();
-        sut.DiffZeileFokussiert += fokussierteIndizes.Add;
+        sut.DiffLineFocused += fokussierteIndizes.Add;
 
-        sut.NaechsteAenderungCommand.Execute(null);
+        sut.NextChangeCommand.Execute(null);
 
         fokussierteIndizes.Should().ContainSingle().Which.Should().Be(1);
     }
@@ -44,11 +44,11 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
             Line(DiffLineStatus.Removed));
 
         var fokussierteIndizes = new List<int>();
-        sut.DiffZeileFokussiert += fokussierteIndizes.Add;
+        sut.DiffLineFocused += fokussierteIndizes.Add;
 
-        sut.NaechsteAenderungCommand.Execute(null);
-        sut.NaechsteAenderungCommand.Execute(null);
-        sut.NaechsteAenderungCommand.Execute(null);
+        sut.NextChangeCommand.Execute(null);
+        sut.NextChangeCommand.Execute(null);
+        sut.NextChangeCommand.Execute(null);
 
         fokussierteIndizes.Should().Equal(1, 3, 1);
     }
@@ -63,9 +63,9 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
             Line(DiffLineStatus.Modified));
 
         var fokussierteIndizes = new List<int>();
-        sut.DiffZeileFokussiert += fokussierteIndizes.Add;
+        sut.DiffLineFocused += fokussierteIndizes.Add;
 
-        sut.VorherigeAenderungCommand.Execute(null);
+        sut.PreviousChangeCommand.Execute(null);
 
         fokussierteIndizes.Should().ContainSingle().Which.Should().Be(2);
     }
@@ -76,9 +76,9 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
     {
         var sut = CreateSut();
         var ereignisAusgeloest = false;
-        sut.DiffZeileFokussiert += _ => ereignisAusgeloest = true;
+        sut.DiffLineFocused += _ => ereignisAusgeloest = true;
 
-        sut.NaechsteAenderungCommand.Execute(null);
+        sut.NextChangeCommand.Execute(null);
 
         ereignisAusgeloest.Should().BeFalse();
     }
@@ -99,15 +99,15 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
         var sut = new FileExplorerViewModel(gitMock.Object, diffMock.Object, NullLogger<FileExplorerViewModel>.Instance);
 
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath);
+        await sut.InitializeAsync(RepositoryPath);
 
         var node = new WorkspaceFileNode { Name = "a.cs", RelativePath = "a.cs", CommitSha = "abc123" };
         var preview = new FilePreview("a.cs", null, false, false, false, "neu", "alt", null);
         gitMock.Setup(g => g.LoadCommitPreviewAsync(RepositoryPath, node, It.IsAny<CancellationToken>())).ReturnsAsync(preview);
         diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(lines));
 
-        sut.AusgewaehlterKnoten = node;
-        await WaitForAsync(() => sut.DiffZeilen.Count == lines.Length);
+        sut.SelectedNode = node;
+        await WaitForAsync(() => sut.DiffLines.Count == lines.Length);
 
         return sut;
     }

@@ -13,7 +13,7 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db = TestDbContextFactory.Create();
     private readonly WorkItemService _workItemService;
     private readonly AiPluginLimitService _kiPluginLimitService;
-    private readonly Guid _projektId = new("33333333-3333-3333-3333-333333333333");
+    private readonly Guid _projectId = new("33333333-3333-3333-3333-333333333333");
 
     /// <summary>Initialisiert die Testdatenbank.</summary>
     public CliUpdateSafetyServiceTests()
@@ -26,7 +26,7 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
             NullLogger<AiPluginLimitService>.Instance);
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Projekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -115,7 +115,7 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
         DateTimeOffset? lastHeartbeatUtc = null,
         string? aiPluginPrefix = null)
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, title, null);
+        var workItem = await _workItemService.CreateAsync(_projectId, title, null);
         await _workItemService.StartAsync(workItem.Id, "feature/test", "C:/repo");
         await _workItemService.SetActiveRunAsync(workItem.Id, Guid.NewGuid().ToString("N"));
         var tracked = await _db.WorkItems.FindAsync(workItem.Id);

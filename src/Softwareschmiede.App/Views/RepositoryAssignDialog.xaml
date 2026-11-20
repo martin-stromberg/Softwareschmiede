@@ -38,7 +38,7 @@
         <!-- Repository-Liste -->
         <ListBox Grid.Row="2"
                  Visibility="{Binding HasScmPlugins, Converter={StaticResource BoolToVisibilityConverter}}"
-                 ItemsSource="{Binding VerfuegbareRepositories}"
+                 ItemsSource="{Binding AvailableRepositories}"
                  SelectedItem="{Binding SelectedRepository}"
                  Background="{DynamicResource BackgroundBrush}"
                  BorderBrush="{DynamicResource BorderBrush}"
@@ -98,14 +98,14 @@
                       SelectedItem="{Binding SelectedWorkingDirectory, Mode=TwoWay}"
                       IsEnabled="{Binding IsLoadingDirectoryStructure, Converter={StaticResource InverseBoolConverter}}"
                       Visibility="{Binding IsWorkingDirectoryManualInput, Converter={StaticResource InverseBoolToVisibilityConverter}}"
-                      AutomationProperties.Name="ArbeitsverzeichnisComboBox"
+                      AutomationProperties.Name="WorkingDirectoryComboBox"
                       Background="{DynamicResource BackgroundBrush}"
                       Padding="8,6" />
 
             <TextBox Text="{Binding WorkingDirectoryInputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      IsEnabled="{Binding IsLoadingDirectoryStructure, Converter={StaticResource InverseBoolConverter}}"
                      Visibility="{Binding IsWorkingDirectoryManualInput, Converter={StaticResource BoolToVisibilityConverter}}"
-                     AutomationProperties.Name="ArbeitsverzeichnisEingabe"
+                     AutomationProperties.Name="WorkingDirectoryInput"
                      Background="{DynamicResource BackgroundBrush}"
                      Foreground="{DynamicResource PrimaryTextBrush}"
                      Padding="8,6" />
@@ -137,7 +137,7 @@
                       SelectedItem="{Binding DefaultSourceBranchName, Mode=TwoWay}"
                       IsEnabled="{Binding IsLoadingSourceBranches, Converter={StaticResource InverseBoolConverter}}"
                       Visibility="{Binding IsSourceBranchManualInput, Converter={StaticResource InverseBoolToVisibilityConverter}}"
-                      AutomationProperties.Name="BasisBranchAuswahlComboBox"
+                      AutomationProperties.Name="BaseBranchSelectionComboBox"
                       Background="{DynamicResource BackgroundBrush}"
                       Padding="8,6"
                       Margin="0,0,0,8" />
@@ -145,7 +145,7 @@
             <TextBox Text="{Binding DefaultSourceBranchName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      IsEnabled="{Binding IsLoadingSourceBranches, Converter={StaticResource InverseBoolConverter}}"
                      Visibility="{Binding IsSourceBranchManualInput, Converter={StaticResource BoolToVisibilityConverter}}"
-                     AutomationProperties.Name="BasisBranchEingabe"
+                     AutomationProperties.Name="BaseBranchInput"
                      Background="{DynamicResource BackgroundBrush}"
                      Foreground="{DynamicResource PrimaryTextBrush}"
                      Padding="8,6" />
@@ -173,11 +173,13 @@
                     HorizontalAlignment="Right"
                     Margin="0,16,0,0">
             <Button Content="Abbrechen"
-                    Command="{Binding AbbrechenCommand}"
+                    AutomationProperties.Name="Cancel"
+                    Command="{Binding CancelCommand}"
                     Padding="12,6"
                     Margin="0,0,8,0" />
             <Button Content="Zuweisen"
-                    Command="{Binding BestaetigenCommand}"
+                    AutomationProperties.Name="Assign"
+                    Command="{Binding ConfirmCommand}"
                     Padding="12,6"
                     Background="{DynamicResource AccentBrush}"
                     Foreground="White"

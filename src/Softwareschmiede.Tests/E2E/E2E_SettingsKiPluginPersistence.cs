@@ -5,7 +5,7 @@ using Softwareschmiede.Tests.E2E.Views;
 namespace Softwareschmiede.Tests.E2E;
 
 /// <summary>
-/// E2E-Test fuer das Speichern des Standard-KI-Plugins und der plugin-spezifischen Codex-Einstellungen.
+/// E2E-Test fuer das Speichern des Standard-KI-Plugins und der plugin-spezifischen Codex--Einstellungen.
 /// </summary>
 public partial class End2EndTest
 {
@@ -25,7 +25,7 @@ public partial class End2EndTest
         using (var db = OpenTestDbContext())
         {
             vorherigesDefault = db.AppSettings
-                .Where(e => e.Key == AppSettingService.DefaultKiPluginKey)
+                .Where(e => e.Key == AppSettingService.DefaultAiPluginKey)
                 .Select(e => e.Value)
                 .FirstOrDefault();
         }
@@ -68,15 +68,15 @@ public partial class End2EndTest
             {
                 using var db = OpenTestDbContext();
                 var entry = db.AppSettings
-                    .FirstOrDefault(e => e.Key == AppSettingService.DefaultKiPluginKey);
+                    .FirstOrDefault(e => e.Key == AppSettingService.DefaultAiPluginKey);
                 if (entry is null && vorherigesDefault is not null)
                 {
                     db.AppSettings.Add(new Softwareschmiede.Domain.Entities.AppSetting
                     {
                         Id = Guid.NewGuid(),
-                        Key = AppSettingService.DefaultKiPluginKey,
+                        Key = AppSettingService.DefaultAiPluginKey,
                     });
-                    entry = db.AppSettings.Local.FirstOrDefault(e => e.Key == AppSettingService.DefaultKiPluginKey);
+                    entry = db.AppSettings.Local.FirstOrDefault(e => e.Key == AppSettingService.DefaultAiPluginKey);
                 }
                 if (entry is not null)
                 {

@@ -44,7 +44,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
     /// <summary>
     /// Ein Lesefehler beim ersten Settings-Zugriff stoppt vor jedem Release-Request –
     /// für Startautomatik, manuelle Prüfung und direkten Installationsaufruf gleichermaßen.
-    /// Es gibt keinen internen Retry; über die Settings-UI ist eine Wiederherstellung möglich.
+    /// Es gibt keinen internen Retry; über die Einstellungen-UI ist eine Wiederherstellung möglich.
     /// </summary>
     [Theory]
     [InlineData(UpdateEinstieg.Startautomatik)]
@@ -79,10 +79,10 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
                 await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
                 break;
             case UpdateEinstieg.ManuellPruefen:
-                await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
+                await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
                 break;
             case UpdateEinstieg.ManuellInstallieren:
-                await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
+                await ((AsyncRelayCommand)sut.StartUpdateCommand).ExecuteAsync();
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(einstieg), einstieg, "Unbekannter Update-Einstieg.");
@@ -102,21 +102,21 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         _updateServiceMock.Verify(
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        sut.UpdateHinweis.Should().NotBeNullOrEmpty(
+        sut.UpdateNotice.Should().NotBeNullOrEmpty(
             "ein Lesefehler muss einen sichtbaren Hinweis setzen");
         sut.UpdateAvailable.Should().BeFalse();
-        sut.VerfuegbaresUpdate.Should().BeNull();
-        sut.UpdateCheckLaeuft.Should().BeFalse();
-        sut.UpdateWirdVorbereitet.Should().BeFalse();
+        sut.AvailableUpdate.Should().BeNull();
+        sut.UpdateCheckRunning.Should().BeFalse();
+        sut.UpdateWillPrepared.Should().BeFalse();
 
-        // Wiederherstellung: Fehler deaktivieren, Einstellungen über die UI neu laden und speichern
+        // Wiederherstellung: Fehler deaktivieren, Settings über die UI neu laden und speichern
         _interceptor.DeactivateFailure();
         await SpeichereUpdateEinstellungenUeberUiAsync(
-            sut, UpdateModusOption.FuerModus(UpdateMode.CheckAndRunAtStartup), UpdatePathChannelResolver.PrereleaseVersionsPath);
+            sut, UpdateModeOption.ForMode(UpdateMode.CheckAndRunAtStartup), UpdatePathChannelResolver.PrereleaseVersionsPath);
 
-        sut.UpdatePruefenCommand.CanExecute(null).Should().BeTrue(
+        sut.CheckUpdateCommand.CanExecute(null).Should().BeTrue(
             "nach erfolgreichem Speichern muss die Prüfung wieder verfügbar sein");
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
 
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(
@@ -166,7 +166,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         if (!automatisch)
         {
             sut.UpdateAvailable.Should().BeTrue();
-            await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
+            await ((AsyncRelayCommand)sut.StartUpdateCommand).ExecuteAsync();
         }
 
         _updateServiceMock.Verify(
@@ -177,19 +177,19 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
             Times.Never);
         progressViewModel.Should().NotBeNull("der Fortschrittsdialog war bereits geöffnet");
         progressViewModel!.HasError.Should().BeTrue("späte Lesefehler müssen im Dialog sichtbar sein");
-        progressViewModel.Message.Should().Contain("Update-Einstellungen");
+        progressViewModel.Message.Should().Contain("Update--Einstellungen");
         progressViewModel.CanClose.Should().BeTrue();
-        sut.UpdateHinweis.Should().NotBeNullOrEmpty();
+        sut.UpdateNotice.Should().NotBeNullOrEmpty();
         sut.UpdateAvailable.Should().BeFalse();
-        sut.VerfuegbaresUpdate.Should().BeNull();
-        sut.UpdateCheckLaeuft.Should().BeFalse();
-        sut.UpdateWirdVorbereitet.Should().BeFalse();
+        sut.AvailableUpdate.Should().BeNull();
+        sut.UpdateCheckRunning.Should().BeFalse();
+        sut.UpdateWillPrepared.Should().BeFalse();
 
-        // Wiederherstellung über die Settings-UI: Neue Prüfung findet das Update erneut.
+        // Wiederherstellung über die Einstellungen-UI: Neue Prüfung findet das Update erneut.
         var checksVorWiederherstellung = checkCalls;
         _interceptor.DeactivateFailure();
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.CheckOnly), UpdatePathChannelResolver.StableVersionsPath);
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModeOption.ForMode(UpdateMode.CheckOnly), UpdatePathChannelResolver.StableVersionsPath);
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
 
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),
@@ -234,7 +234,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         if (!automatisch)
         {
             sut.UpdateAvailable.Should().BeTrue();
-            await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
+            await ((AsyncRelayCommand)sut.StartUpdateCommand).ExecuteAsync();
         }
 
         prepareCalls.Should().Be(1);
@@ -243,18 +243,18 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
             Times.Never, "ein Lesefehler vor dem Updater-Start muss den Start verhindern");
         progressViewModel.Should().NotBeNull();
         progressViewModel!.HasError.Should().BeTrue();
-        progressViewModel.Message.Should().Contain("Update-Einstellungen",
+        progressViewModel.Message.Should().Contain("Update--Einstellungen",
             "der Fehlerzustand darf nicht als erfolgreicher Start erscheinen");
         progressViewModel.CanClose.Should().BeTrue();
-        sut.UpdateHinweis.Should().NotBeNullOrEmpty();
+        sut.UpdateNotice.Should().NotBeNullOrEmpty();
         sut.UpdateAvailable.Should().BeFalse();
-        sut.VerfuegbaresUpdate.Should().BeNull();
-        sut.UpdateWirdVorbereitet.Should().BeFalse();
+        sut.AvailableUpdate.Should().BeNull();
+        sut.UpdateWillPrepared.Should().BeFalse();
 
-        // Wiederherstellung über die Settings-UI: Neue Prüfung findet das Update erneut.
+        // Wiederherstellung über die Einstellungen-UI: Neue Prüfung findet das Update erneut.
         _interceptor.DeactivateFailure();
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.CheckOnly), UpdatePathChannelResolver.StableVersionsPath);
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModeOption.ForMode(UpdateMode.CheckOnly), UpdatePathChannelResolver.StableVersionsPath);
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
 
         sut.UpdateAvailable.Should().BeTrue();
         _updateServiceMock.Verify(

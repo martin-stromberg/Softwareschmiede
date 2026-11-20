@@ -77,8 +77,8 @@ public partial class End2EndTest
 
         var menu = new MenuView(mainWindow);
         WaitForElement(
-            mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("AktiveAufgabenListeMenue"))!,
-            cf => cf.ByName($"AufgabeNavigieren:{titelMitRepo}"),
+            mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("ActiveWorkItemsListMenu"))!,
+            cf => cf.ByName($"WorkItemNavigate:{titelMitRepo}"),
             Long);
 
         // Kompakte Kachel: KI-Glyph, SCM-Glyph und Status-Glyph lesbar; To-do-Button vorhanden.
@@ -96,7 +96,7 @@ public partial class End2EndTest
 
         // Kachelklick navigiert zur Aufgabendetailansicht (kein separater Pfeil-Button nötig).
         var detail = menu.NavigateToTask(titelMitRepo);
-        WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("Back"), Short);
         detail.GoBack();
 
         // Moduswechsel Seitenleiste: Repository- und KI-Gruppierung inkl. Fallback-Gruppen.
@@ -107,10 +107,10 @@ public partial class End2EndTest
         menu.SetzeAufgabenListenModus("Repository");
         menu.WaitForAufgabenGruppe("modi-repo", Medium);
         menu.WaitForAufgabenGruppe("Ohne Repository", Medium);
-        menu.SetzeAufgabenListenModus("KI");
+        menu.SetzeAufgabenListenModus("AI");
         menu.WaitForAufgabenGruppe("KI Simulator", Medium);
         menu.WaitForAufgabenGruppe("Nicht ausgeführt", Medium);
-        menu.SetzeAufgabenListenModus("Datum");
+        menu.SetzeAufgabenListenModus("Date");
         var deadlineFlach = DateTime.UtcNow + Medium;
         while (DateTime.UtcNow < deadlineFlach && menu.GetAufgabenGruppenNamen().Length > 0)
             Thread.Sleep(200);
@@ -167,10 +167,10 @@ public partial class End2EndTest
         // (Dashboard zeigt die Seitenleiste nicht - zur Projektliste wechseln.)
         menuNachNeustart.NavigateToProjects();
         menuNachNeustart.EnsureNavigationExpanded();
-        menuNachNeustart.SetzeAufgabenListenModus("Datum");
+        menuNachNeustart.SetzeAufgabenListenModus("Date");
         // Der Dashboard-Umschalter existiert nur auf der Dashboard-Ansicht - erst zurücknavigieren.
         menuNachNeustart.NavigateToDashboard();
-        dashboardNachNeustart.SetzeAufgabenListenModus("Datum");
+        dashboardNachNeustart.SetzeAufgabenListenModus("Date");
 
         // Aufräumen.
         var projectList = menuNachNeustart.NavigateToProjects();

@@ -42,9 +42,9 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         services.AddSingleton(db = TestDbContextFactory.Create());
         provider = services.BuildServiceProvider();
 
-        var kiService = TestKiAusfuehrungsServiceFactory.Create();
+        var aiService = TestKiAusfuehrungsServiceFactory.Create();
         promptScheduleDispatchService = new PromptScheduleDispatchService(
-            kiService,
+            aiService,
             TimeProvider.System,
             NullLogger<PromptScheduleDispatchService>.Instance);
 

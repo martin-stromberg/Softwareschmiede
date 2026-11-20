@@ -13,18 +13,18 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly WorkItemService _workItemService;
-    private readonly ProjectService _projektService;
-    private readonly Guid _projektId;
+    private readonly ProjectService _projectService;
+    private readonly Guid _projectId;
 
     /// <summary>RecoveryServiceIntegrationTests.</summary>
     public RecoveryServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
-        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        _projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
 
-        var project = _projektService.CreateAsync("Recovery-Projekt", null).GetAwaiter().GetResult();
-        _projektId = project.Id;
+        var project = _projectService.CreateAsync("Recovery-Projekt", null).GetAwaiter().GetResult();
+        _projectId = project.Id;
     }
 
     /// <summary>Dispose.</summary>
@@ -111,7 +111,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = "Recovery-Aufgabe",
             Status = status,
             ExecutionStatus = status.IsActiveOrWaiting()

@@ -794,7 +794,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
     }
 
     /// <summary>Startet eine Aufgabe: Status → Gestartet, Branch und Arbeitsverzeichnis setzen.</summary>
-    public async Task StartAsync(Guid id, string branchName, string localClonePath, string? basisBranchName = null, CancellationToken ct = default)
+    public async Task StartAsync(Guid id, string branchName, string localClonePath, string? baseBranchName = null, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} starten (Branch: {BranchName}).", id, branchName);
 
@@ -812,7 +812,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
 
             workItem.Status = WorkItemStatus.Started;
             workItem.ExecutionStatus = WorkItemExecutionStatus.Active;
-            workItem.GitWorkspace = new GitWorkspace(branchName, localClonePath, basisBranchName);
+            workItem.GitWorkspace = new GitWorkspace(branchName, localClonePath, baseBranchName);
             workItem.ActiveRunId = null;
             workItem.LastHeartbeatUtc = null;
             workItem.LastCliStartUtc = null;

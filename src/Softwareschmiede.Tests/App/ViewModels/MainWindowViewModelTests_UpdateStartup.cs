@@ -38,9 +38,9 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),
             Times.Never);
         sut.UpdateAvailable.Should().BeFalse();
-        sut.UpdatePruefenCommand.CanExecute(null).Should()
-            .BeFalse("vor dem erfolgreichen Laden der Update-Einstellungen ist die Prüfung gesperrt");
-        sut.UpdateStartenCommand.CanExecute(null).Should().BeFalse();
+        sut.CheckUpdateCommand.CanExecute(null).Should()
+            .BeFalse("vor dem erfolgreichen Laden der Update--Einstellungen ist die Prüfung gesperrt");
+        sut.StartUpdateCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>
@@ -84,8 +84,8 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
             erwarteteInstallation);
 
         sut.UpdateAvailable.Should().Be(mode != UpdateMode.Off);
-        sut.UpdateCheckLaeuft.Should().BeFalse();
-        sut.UpdateWirdVorbereitet.Should().BeFalse();
+        sut.UpdateCheckRunning.Should().BeFalse();
+        sut.UpdateWillPrepared.Should().BeFalse();
     }
 
     /// <summary>
@@ -107,11 +107,11 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
 
         await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
 
-        sut.UpdatePruefenCommand.CanExecute(null).Should().BeFalse();
-        sut.UpdateStartenCommand.CanExecute(null).Should().BeFalse();
+        sut.CheckUpdateCommand.CanExecute(null).Should().BeFalse();
+        sut.StartUpdateCommand.CanExecute(null).Should().BeFalse();
 
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
-        await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartUpdateCommand).ExecuteAsync();
 
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),
@@ -130,18 +130,18 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         await sut2.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
 
         sut2.UpdateAvailable.Should().BeTrue();
-        sut2.UpdatePruefenCommand.CanExecute(null).Should().BeTrue();
-        sut2.UpdateStartenCommand.CanExecute(null).Should().BeTrue();
+        sut2.CheckUpdateCommand.CanExecute(null).Should().BeTrue();
+        sut2.StartUpdateCommand.CanExecute(null).Should().BeTrue();
 
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, UpdateModusOption.FuerModus(UpdateMode.Off), UpdatePathChannelResolver.StableVersionsPath);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, UpdateModeOption.ForMode(UpdateMode.Off), UpdatePathChannelResolver.StableVersionsPath);
 
         sut2.UpdateAvailable.Should().BeFalse("ein Moduswechsel auf Aus muss das Angebot verwerfen");
-        sut2.VerfuegbaresUpdate.Should().BeNull();
-        sut2.UpdatePruefenCommand.CanExecute(null).Should().BeFalse();
-        sut2.UpdateStartenCommand.CanExecute(null).Should().BeFalse();
+        sut2.AvailableUpdate.Should().BeNull();
+        sut2.CheckUpdateCommand.CanExecute(null).Should().BeFalse();
+        sut2.StartUpdateCommand.CanExecute(null).Should().BeFalse();
 
-        await ((AsyncRelayCommand)sut2.UpdatePruefenCommand).ExecuteAsync();
-        await ((AsyncRelayCommand)sut2.UpdateStartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut2.CheckUpdateCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut2.StartUpdateCommand).ExecuteAsync();
 
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),
@@ -185,18 +185,18 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         var sut = CreateSut();
 
         // a) Verzögertes Check-Ergebnis wird nach Kanalwechsel verworfen
-        var laufendePruefung = ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.CheckOnly), UpdatePathChannelResolver.StableVersionsPath);
+        var laufendePruefung = ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModeOption.ForMode(UpdateMode.CheckOnly), UpdatePathChannelResolver.StableVersionsPath);
 
         verzoegertesErgebnis.SetResult(UpdateCheckResult.UpdateAvailable(ReleaseCandidateUpdate));
         await laufendePruefung.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-        sut.VerfuegbaresUpdate.Should().BeNull("das verzögerte Ergebnis stammt aus der alten Einstellungs-Generation");
+        sut.AvailableUpdate.Should().BeNull("das verzögerte Ergebnis stammt aus der alten Einstellungs-Generation");
         sut.UpdateAvailable.Should().BeFalse();
         eingecheckteOptionen[0].UpdatePath.Should().Be(UpdatePathChannelResolver.PrereleaseVersionsPath);
 
         // Folgeprüfung verwendet die aktuelle Einstellung (Update-Pfad jetzt auf Produktivversionen)
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
         eingecheckteOptionen.Should().HaveCount(2);
         eingecheckteOptionen[1].UpdatePath.Should().Be(UpdatePathChannelResolver.StableVersionsPath);
         sut.UpdateAvailable.Should().BeFalse();
@@ -223,7 +223,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         var startTask = sut2.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
         await vorbereitungGestartet.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, UpdateModusOption.FuerModus(UpdateMode.Off), UpdatePathChannelResolver.StableVersionsPath);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, UpdateModeOption.ForMode(UpdateMode.Off), UpdatePathChannelResolver.StableVersionsPath);
         vorbereitungFreigabe.SetResult(FertigeVorbereitung);
         await startTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
@@ -231,7 +231,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never, "eine Einstellungsänderung während der Vorbereitung muss den Updater-Start verhindern");
         sut2.UpdateAvailable.Should().BeFalse();
-        sut2.UpdateWirdVorbereitet.Should().BeFalse();
+        sut2.UpdateWillPrepared.Should().BeFalse();
     }
 
     /// <summary>
@@ -262,12 +262,12 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never);
         sut.UpdateAvailable.Should().BeFalse();
-        sut.UpdateCheckLaeuft.Should().BeFalse();
-        sut.UpdateWirdVorbereitet.Should().BeFalse();
+        sut.UpdateCheckRunning.Should().BeFalse();
+        sut.UpdateWillPrepared.Should().BeFalse();
         if (nichtPruefbar)
-            sut.UpdateHinweis.Should().Contain("Release-Quelle nicht erreichbar");
+            sut.UpdateNotice.Should().Contain("Release-Quelle nicht erreichbar");
         else
-            sut.UpdateHinweis.Should().BeNull();
+            sut.UpdateNotice.Should().BeNull();
     }
 
     /// <summary>
@@ -286,13 +286,13 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
             .ReturnsAsync(UpdateCheckResult.UpdateAvailable(NeuesUpdate));
         _safetyServiceMock.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliUpdateSafetyResult(1, ["Riskante Aufgabe"]));
-        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>()))
+        _dialogServiceMock.Setup(d => d.ConfirmDialog(It.IsAny<string>(), It.IsAny<string>()))
             .Returns(false);
 
         var sut = CreateSut();
         await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
         if (!automatisch)
-            await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
+            await ((AsyncRelayCommand)sut.StartUpdateCommand).ExecuteAsync();
 
         _progressDialogMock.Verify(d => d.Show(It.IsAny<UpdateProgressViewModel>()), Times.Never,
             "der Fortschrittsdialog darf erst nach bestätigter Sicherheitsprüfung erscheinen");
@@ -302,7 +302,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         _updateServiceMock.Verify(
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        sut.UpdateWirdVorbereitet.Should().BeFalse();
+        sut.UpdateWillPrepared.Should().BeFalse();
     }
 
     /// <summary>
@@ -341,7 +341,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         var sut = CreateSut();
         await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
         if (!automatisch)
-            await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
+            await ((AsyncRelayCommand)sut.StartUpdateCommand).ExecuteAsync();
 
         // Ohne propagierten Abbruch würde die unendliche Vorbereitung den Aufruf nie beenden.
         progressViewModel.Should().NotBeNull();
@@ -351,11 +351,11 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         _updateServiceMock.Verify(
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        sut.UpdateWirdVorbereitet.Should().BeFalse();
-        sut.UpdateHinweis.Should().NotBeNullOrEmpty();
+        sut.UpdateWillPrepared.Should().BeFalse();
+        sut.UpdateNotice.Should().NotBeNullOrEmpty();
 
         // Der Vorgang ist vollständig freigegeben: Eine neue manuelle Prüfung ist möglich.
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),
             Times.Exactly(automatisch ? 2 : 3));
@@ -406,11 +406,11 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         _updateServiceMock.Verify(
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             fehlerBeimStart ? Times.Once() : Times.Never());
-        sut.UpdateWirdVorbereitet.Should().BeFalse();
-        sut.UpdateHinweis.Should().NotBeNullOrEmpty();
+        sut.UpdateWillPrepared.Should().BeFalse();
+        sut.UpdateNotice.Should().NotBeNullOrEmpty();
 
         // Das Gate ist freigegeben: Eine neue manuelle Prüfung läuft durch.
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),
             Times.Exactly(2));
@@ -455,16 +455,16 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         await pruefungGestartet.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Parallele Aufrufe während die Prüfung läuft -> werden am Gate verworfen
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
-        await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartUpdateCommand).ExecuteAsync();
         await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
 
         pruefungFreigabe.SetResult(UpdateCheckResult.UpdateAvailable(NeuesUpdate));
         await vorbereitungGestartet.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Auch während der laufenden Vorbereitung darf nichts doppelt starten
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
-        await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.StartUpdateCommand).ExecuteAsync();
 
         vorbereitungFreigabe.SetResult(FertigeVorbereitung);
         await startTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);

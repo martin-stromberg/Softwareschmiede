@@ -115,27 +115,27 @@ public sealed class GreaterThanZeroToVisibilityConverter : IValueConverter
 /// <summary>
 /// App-seitiger Adapter der gemeinsamen Statusklassifikation
 /// (<see cref="Softwareschmiede.Application.Services.AiExecutionStatusClassification"/>) für
-/// <see cref="KiAusfuehrungsStatusConverter"/> (Volltext) und
-/// <see cref="KiAusfuehrungsStatusSymbolConverter"/> (nur Glyph): mappt die Eingabetypen
-/// <see cref="WorkItem"/> und <see cref="AktiveAufgabePanelItem"/> auf
+/// <see cref="AiExecutionStatusConverter"/> (Volltext) und
+/// <see cref="AiExecutionStatusSymbolConverter"/> (nur Glyph): mappt die Eingabetypen
+/// <see cref="WorkItem"/> und <see cref="ActiveWorkItemPanelItem"/> auf
 /// <see cref="AiExecutionStatusData"/> und delegiert die eigentliche Regellogik.
 /// </summary>
-internal static class KiAusfuehrungsStatusAdapter
+internal static class AiExecutionStatusAdapter
 {
     /// <summary>
-    /// Klassifiziert <paramref name="value"/> (<see cref="WorkItem"/> oder <see cref="AktiveAufgabePanelItem"/>)
+    /// Klassifiziert <paramref name="value"/> (<see cref="WorkItem"/> oder <see cref="ActiveWorkItemPanelItem"/>)
     /// in einen <see cref="AiExecutionState"/>; liefert <c>null</c> für nicht unterstützte Eingaben.
     /// Im Zustand <see cref="AiExecutionState.Paused"/> enthält <paramref name="pauseRemaining"/>
     /// die verbleibende Pausenzeit.
     /// </summary>
-    public static AiExecutionState? Klassifiziere(object value, out TimeSpan pauseRemaining)
+    public static AiExecutionState? Classify(object value, out TimeSpan pauseRemaining)
     {
         pauseRemaining = default;
 
         var status = value switch
         {
             WorkItem workItem => AiExecutionStatusData.FromWorkItem(workItem, liveRunStatus: null, hasScheduledPrompt: false),
-            AktiveAufgabePanelItem item => new AiExecutionStatusData(item.Status, item.ExecutionStatus, item.ActiveRunId, item.LastHeartbeatUtc, item.RunStatus, item.LiveRunStatus, item.HasScheduledPrompt, item.PausedUntilUtc),
+            ActiveWorkItemPanelItem item => new AiExecutionStatusData(item.Status, item.ExecutionStatus, item.ActiveRunId, item.LastHeartbeatUtc, item.RunStatus, item.LiveRunStatus, item.HasScheduledPrompt, item.PausedUntilUtc),
             _ => null
         };
 
@@ -145,22 +145,22 @@ internal static class KiAusfuehrungsStatusAdapter
         }
 
         return Softwareschmiede.Application.Services.AiExecutionStatusClassification
-            .Klassifiziere(status, out pauseRemaining);
+            .Classify(status, out pauseRemaining);
     }
 }
 
 /// <summary>Konvertiert eine Aufgabe oder ein Aufgabenpanel-Item in einen KI-Ausführungsstatus-String.</summary>
 [ValueConversion(typeof(object), typeof(string))]
-public sealed class KiAusfuehrungsStatusConverter : IValueConverter
+public sealed class AiExecutionStatusConverter : IValueConverter
 {
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        var state = KiAusfuehrungsStatusAdapter.Klassifiziere(value, out var pauseRemaining);
+        var state = AiExecutionStatusAdapter.Classify(value, out var pauseRemaining);
         return state switch
         {
             null => string.Empty,
-            AiExecutionState.Paused => $"⏸ Pausiert (noch {FormatiereRestzeit(pauseRemaining)})",
+            AiExecutionState.Paused => $"⏸ Pausiert (noch {FormatRemainingTime(pauseRemaining)})",
             AiExecutionState.PromptQueued => "⏳ Prompt in Wartestellung",
             AiExecutionState.Running => "▶ Läuft",
             AiExecutionState.Waiting => "⏸ Wartet",
@@ -172,10 +172,10 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
 
-    private static string FormatiereRestzeit(TimeSpan restzeit)
-        => restzeit >= TimeSpan.FromDays(1)
-            ? restzeit.ToString(@"d\.hh\:mm\:ss", CultureInfo.InvariantCulture)
-            : restzeit.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
+    private static string FormatRemainingTime(TimeSpan remaining)
+        => remaining >= TimeSpan.FromDays(1)
+            ? remaining.ToString(@"d\.hh\:mm\:ss", CultureInfo.InvariantCulture)
+            : remaining.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
 }
 
 /// <summary>
@@ -183,12 +183,12 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
 /// (<c>⏸</c>/<c>⏳</c>/<c>▶</c>/<c>✓</c>) ohne Text oder Countdown — Symbolzeile der Aufgabenkachel.
 /// </summary>
 [ValueConversion(typeof(object), typeof(string))]
-public sealed class KiAusfuehrungsStatusSymbolConverter : IValueConverter
+public sealed class AiExecutionStatusSymbolConverter : IValueConverter
 {
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        var state = KiAusfuehrungsStatusAdapter.Klassifiziere(value, out _);
+        var state = AiExecutionStatusAdapter.Classify(value, out _);
         return state switch
         {
             null => string.Empty,

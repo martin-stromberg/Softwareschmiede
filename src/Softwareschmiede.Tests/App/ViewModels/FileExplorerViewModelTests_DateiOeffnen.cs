@@ -16,7 +16,7 @@ public sealed class FileExplorerViewModelTests_DateiOeffnen
     {
         var sut = CreateSut();
 
-        sut.DateiMitStandardanwendungOeffnenCommand.CanExecute(null).Should().BeFalse();
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>Für eine normale, nicht gelöschte Datei ist der Command aktiv. Die CanExecute-Prüfung hängt nur vom
@@ -27,9 +27,9 @@ public sealed class FileExplorerViewModelTests_DateiOeffnen
         var sut = CreateSut();
         var node = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt" };
 
-        sut.AusgewaehlterKnoten = node;
+        sut.SelectedNode = node;
 
-        sut.DateiMitStandardanwendungOeffnenCommand.CanExecute(null).Should().BeTrue();
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>Für ein Verzeichnis ist der Command nicht aktiv.</summary>
@@ -39,9 +39,9 @@ public sealed class FileExplorerViewModelTests_DateiOeffnen
         var sut = CreateSut();
         var directoryNode = new WorkspaceFileNode { Name = "src", RelativePath = "src", IsDirectory = true };
 
-        sut.AusgewaehlterKnoten = directoryNode;
+        sut.SelectedNode = directoryNode;
 
-        sut.DateiMitStandardanwendungOeffnenCommand.CanExecute(null).Should().BeFalse();
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>Für eine als gelöscht markierte Datei ist der Command nicht aktiv.</summary>
@@ -51,9 +51,9 @@ public sealed class FileExplorerViewModelTests_DateiOeffnen
         var sut = CreateSut();
         var deletedNode = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt", IsDeleted = true };
 
-        sut.AusgewaehlterKnoten = deletedNode;
+        sut.SelectedNode = deletedNode;
 
-        sut.DateiMitStandardanwendungOeffnenCommand.CanExecute(null).Should().BeFalse();
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>Wechselt die Auswahl von einer gültigen Datei zurück auf keinen Knoten (z. B. nach Aktualisieren), wird der
@@ -63,12 +63,12 @@ public sealed class FileExplorerViewModelTests_DateiOeffnen
     {
         var sut = CreateSut();
         var node = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt" };
-        sut.AusgewaehlterKnoten = node;
-        sut.DateiMitStandardanwendungOeffnenCommand.CanExecute(null).Should().BeTrue();
+        sut.SelectedNode = node;
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeTrue();
 
-        sut.AusgewaehlterKnoten = null;
+        sut.SelectedNode = null;
 
-        sut.DateiMitStandardanwendungOeffnenCommand.CanExecute(null).Should().BeFalse();
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>Für einen aus einem historischen Commit stammenden Knoten (Vergleichsmodus, <c>CommitSha</c> gesetzt) ist der
@@ -80,9 +80,9 @@ public sealed class FileExplorerViewModelTests_DateiOeffnen
         var sut = CreateSut();
         var commitNode = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt", CommitSha = "abc123" };
 
-        sut.AusgewaehlterKnoten = commitNode;
+        sut.SelectedNode = commitNode;
 
-        sut.DateiMitStandardanwendungOeffnenCommand.CanExecute(null).Should().BeFalse();
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeFalse();
     }
 
     private static FileExplorerViewModel CreateSut()

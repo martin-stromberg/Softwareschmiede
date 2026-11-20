@@ -274,7 +274,7 @@ public sealed class TerminalReplaySessionTests
     }
 
     /// <summary>Nach <see cref="TerminalReplaySession.Dispose"/> darf die Wiedergabe-Schleife bei
-    /// <c>ZeitrafferSchwelle = 0</c> (alle Delays entfallen und das offene Pause-Gate liefert einen
+    /// <c>TimeLapseThreshold = 0</c> (alle Delays entfallen und das offene Pause-Gate liefert einen
     /// bereits erfüllten Task, dessen WaitAsync den Token nicht auswertet) nicht alle restlichen
     /// Chunks auf der disposed Session drain-en — der Abbruch muss zwischen den Chunks beachtet werden.</summary>
     [Fact]
@@ -585,7 +585,7 @@ public sealed class TerminalReplaySessionTests
     /// Position vor dem Positions-Lesen der Schleife wieder senkt — sonst liefe eine
     /// zeitgesteuerte „Geister-Wiedergabe" weiter, obwohl <see cref="ITerminalSession.Exited"/>
     /// bereits gefeuert hat. Der Rückwärtsschritt läuft hier deterministisch im synchronen
-    /// Exited-Handler, der im SchrittVor-Endpfad vor dem Öffnen des Pause-Gates ausgeführt wird.</summary>
+    /// Exited-Handler, der im StepForward-Endpfad vor dem Öffnen des Pause-Gates ausgeführt wird.</summary>
     [Fact]
     public async Task SchrittZurueck_ImExitedHandler_TerminiertAufgeweckteSchleife()
     {
@@ -601,7 +601,7 @@ public sealed class TerminalReplaySessionTests
         {
             Interlocked.Increment(ref exitedCount);
             // Senkt die Position deterministisch vor dem Fortsetzen()-Aufruf des
-            // SchrittVor-Endpfads — danach liest die aufgeweckte Schleife Position < Count.
+            // StepForward-Endpfads — danach liest die aufgeweckte Schleife Position < Count.
             session.StepBackward();
         };
 
@@ -668,11 +668,11 @@ public sealed class TerminalReplaySessionTests
     }
 
     /// <summary>Rest-Race-Regression: trifft <see cref="TerminalReplaySession.StartPlayback"/>
-    /// auf eine noch lebende, aber vom SchrittVor-Endpfad zum Abbruch verurteilte Schleife (CAS
+    /// auf eine noch lebende, aber vom StepForward-Endpfad zum Abbruch verurteilte Schleife (CAS
     /// schlägt fehl, Terminations-Flag gesetzt), darf der Aufruf nicht wirkungslos returnen —
     /// die sterbende Schleife feuert bei Position &lt; Count kein Exited und der Aufrufer bliebe
-    /// dauerhaft im Glauben einer laufenden Wiedergabe (UI-Sequenz: pausiert → SchrittVor bis
-    /// Ende → SchrittZurueck → „Abspielen" → dauerhaft „Wiedergabe läuft." ohne Fortschritt).
+    /// dauerhaft im Glauben einer laufenden Wiedergabe (UI-Sequenz: pausiert → StepForward bis
+    /// Ende → StepBack → „Abspielen" → dauerhaft „Wiedergabe läuft." ohne Fortschritt).
     /// Hier parkt die Schleife garantiert im FakeTimeProvider-Delay, kann das Flag also vor dem
     /// CAS-Fail nicht konsumieren — der Start widerruft die Termination und die Wiedergabe
     /// setzt an der Schrittposition fort.</summary>
@@ -691,7 +691,7 @@ public sealed class TerminalReplaySessionTests
         await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
         // Der Schleife Zeit geben, im 30-s-Fake-Delay des zweiten Chunks zu parken — bis zum
         // nächsten Advance kann sie das Terminations-Flag nicht lesen (Delays sind nicht
-        // ge-gatet; das Fenster entspricht dem realen bis zur ZeitrafferSchwelle).
+        // ge-gatet; das Fenster entspricht dem realen bis zur TimeLapseThreshold).
         await Task.Delay(150, TestContext.Current.CancellationToken);
         session.Pause();
 

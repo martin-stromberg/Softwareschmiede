@@ -12,7 +12,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly LogService _logService;
     private readonly WorkItemService _workItemService;
-    private readonly ProjectService _projektService;
+    private readonly ProjectService _projectService;
 
     /// <summary>RateLimitDetectionServiceIntegrationTests.</summary>
     public RateLimitDetectionServiceIntegrationTests()
@@ -20,7 +20,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
         _db = TestDbContextFactory.Create();
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
-        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        _projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
@@ -30,7 +30,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
     [Fact]
     public async Task MarkerInAusgabe_WirdErkannt_UndRateLimitEintragErstellt()
     {
-        var project = await _projektService.CreateAsync("RateLimit-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("RateLimit-Projekt", null, TestContext.Current.CancellationToken);
         var workItem = await _workItemService.CreateAsync(project.Id, "RateLimit-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         var markerZeile = "[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-15T10:00:00Z]]";
@@ -58,7 +58,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
     [Fact]
     public async Task VorschlagPrompt_WirdGespeichert_UndStatusWirdWartend()
     {
-        var project = await _projektService.CreateAsync("Vorschlag-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Vorschlag-Projekt", null, TestContext.Current.CancellationToken);
         var workItem = await _workItemService.CreateAsync(project.Id, "Vorschlag-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         await _workItemService.StartAsync(workItem.Id, "main", "/tmp/repo", ct: TestContext.Current.CancellationToken);
@@ -77,7 +77,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
     [Fact]
     public async Task ClearPromptVorschlag_EntferntVorschlagUndZeitstempel()
     {
-        var project = await _projektService.CreateAsync("Clear-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Clear-Projekt", null, TestContext.Current.CancellationToken);
         var workItem = await _workItemService.CreateAsync(project.Id, "Clear-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         await _workItemService.SavePromptSuggestionAsync(workItem.Id, "Ein Vorschlag", DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);

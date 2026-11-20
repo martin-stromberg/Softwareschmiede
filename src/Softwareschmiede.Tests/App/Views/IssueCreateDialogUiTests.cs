@@ -52,7 +52,7 @@ public sealed class IssueCreateDialogUiTests
             dialog.Show();
             dialog.UpdateLayout();
 
-            var comboBox = FindComboBox(dialog, "IssueKiProvider");
+            var comboBox = FindComboBox(dialog, "IssueAiProvider");
             comboBox.Should().NotBeNull();
             comboBox!.ItemsSource.Should().BeEquivalentTo(new[]
             {

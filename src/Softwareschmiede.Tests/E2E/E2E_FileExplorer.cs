@@ -76,7 +76,7 @@ public partial class End2EndTest
 
         // Dateiexplorer-Baum muss verschwinden - vorher blieb er wegen des defekten Bindings dauerhaft
         // sichtbar und überdeckte das Info-Register.
-        fileExplorer.WaitUntilNodeGone("FileExplorerBaum");
+        fileExplorer.WaitUntilNodeGone("FileExplorerTree");
 
         // In der Info-Ansicht ist weder die CLI- noch die Dateien-Ansicht ausgewählt - beide
         // Ribbon-Gruppen müssen daher verschwinden, obwohl ShowCliPanel und ShowFileExplorerPanel

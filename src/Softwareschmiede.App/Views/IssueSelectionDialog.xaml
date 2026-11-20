@@ -32,8 +32,8 @@
 
         <!-- Issue-Liste -->
         <DataGrid Grid.Row="2"
-                  AutomationProperties.Name="IssueAuswahl"
-                  ItemsSource="{Binding VerfuegbareIssues}"
+                  AutomationProperties.Name="IssueSelection"
+                  ItemsSource="{Binding AvailableIssues}"
                   SelectedItem="{Binding SelectedIssue, Mode=TwoWay}"
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
@@ -70,13 +70,13 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
             <Button Content="Abbrechen"
-                    AutomationProperties.Name="Abbrechen"
-                    Command="{Binding AbbrechenCommand}"
+                    AutomationProperties.Name="Cancel"
+                    Command="{Binding CancelCommand}"
                     Padding="12,6"
                     Margin="0,0,8,0" />
             <Button Content="OK"
                     AutomationProperties.Name="OK"
-                    Command="{Binding BestaetigenCommand}"
+                    Command="{Binding ConfirmCommand}"
                     Padding="12,6"
                     Background="{DynamicResource AccentBrush}"
                     Foreground="White"

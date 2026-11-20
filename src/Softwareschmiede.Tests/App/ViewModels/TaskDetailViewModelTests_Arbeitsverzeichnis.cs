@@ -25,9 +25,9 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.OeffneArbeitsverzeichnisCommand.Execute(null);
+        sut.OpenWorkingDirectoryCommand.Execute(null);
 
         var erwarteterPfad = Path.GetFullPath(Path.Combine(workingDirectory, "backend"));
         prozessStarterMock.Verify(
@@ -46,16 +46,16 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.OeffneArbeitsverzeichnisCommand.Execute(null);
+        sut.OpenWorkingDirectoryCommand.Execute(null);
 
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a => a.Arguments == $"\"{workingDirectory}\"")),
             Times.Once);
     }
 
-    /// <summary>Verweist die Startkonfiguration auf ein nicht existierendes Unterverzeichnis, wird eine aussagekräftige FehlerMeldung gesetzt und kein Prozess gestartet.</summary>
+    /// <summary>Verweist die Startkonfiguration auf ein nicht existierendes Unterverzeichnis, wird eine aussagekräftige ErrorMessage gesetzt und kein Prozess gestartet.</summary>
     [Fact]
     public async Task OeffneArbeitsverzeichnis_MitUngueltigemArbeitsverzeichnis_ZeigtFehlermeldung()
     {
@@ -66,11 +66,11 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.OeffneArbeitsverzeichnisCommand.Execute(null);
+        sut.OpenWorkingDirectoryCommand.Execute(null);
 
-        sut.FehlerMeldung.Should().StartWith("Arbeitsverzeichnis konnte nicht geöffnet werden:");
+        sut.ErrorMessage.Should().StartWith("Arbeitsverzeichnis konnte nicht geöffnet werden:");
         prozessStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
@@ -90,12 +90,12 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannIdeOeffnen.Should().BeTrue("das konfigurierte Arbeitsverzeichnis existiert");
-        sut.OeffneIdeCommand.CanExecute(null).Should().BeTrue();
+        sut.OpenCanIde.Should().BeTrue("das konfigurierte Arbeitsverzeichnis existiert");
+        sut.OpenIdeCommand.CanExecute(null).Should().BeTrue();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == solutionPath && a.UseShellExecute)),

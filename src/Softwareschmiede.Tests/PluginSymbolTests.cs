@@ -36,10 +36,10 @@ public sealed class PluginSymbolTests
         return pluginTypen.Select(ErstellePlugin).ToList();
     }
 
-    private static IPlugin ErstellePlugin(Type pluginTyp)
+    private static IPlugin ErstellePlugin(Type pluginType)
     {
         // Bei mehreren Konstruktoren (z. B. Convenience-Überladungen) genügt der einfachste.
-        var ctor = pluginTyp.GetConstructors()
+        var ctor = pluginType.GetConstructors()
             .OrderBy(c => c.GetParameters().Length)
             .First();
         var arguments = ctor.GetParameters().Select(p => ErstelleArgument(p.ParameterType)).ToArray();

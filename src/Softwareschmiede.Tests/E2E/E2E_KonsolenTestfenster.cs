@@ -135,7 +135,7 @@ public partial class End2EndTest
     /// Szenario: Synthetische .clireplay-Dateien werden auf der Platte erzeugt, das
     /// Konsolentestfenster über Einstellungen → Allgemein geöffnet. Abgedeckt werden der Abbruch
     /// des nativen Öffnen-Dialogs (kein Zustandswechsel, kein Fehler), eine defekte Datei
-    /// (sichtbare FehlerMeldung), die Pflicht-Phase Pausieren (keine neuen Chunks) → Fortsetzen
+    /// (sichtbare ErrorMessage), die Pflicht-Phase Pausieren (keine neuen Chunks) → Fortsetzen
     /// an einer Aufzeichnung mit langer Inter-Chunk-Pause, ein echtes erneutes Abspielen nach
     /// Ende, ein Neustart aus dem Pausiert-Zustand sowie das vollständige Abspielen mit
     /// Zeitraffer-Schwelle 0 (maximale Geschwindigkeit) inkl. Quell-Chunk-Liste mit sichtbar
@@ -290,7 +290,7 @@ public partial class End2EndTest
             dialog.WarteAufStatus("Aufzeichnung geladen (E2E-Schritt, 3 Chunks) — bereit.");
             Assert.Equal("Chunk 0/3", dialog.GetPositionsText());
             Assert.Equal(-1, dialog.GetSelektierterQuellEintragIndex());
-            Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittZurueck"),
+            Assert.False(dialog.IstSchaltflaecheAktiviert("StepBack"),
                 "an Position 0 muss 'Schritt zurück' deaktiviert sein");
 
             dialog.StepForward();
@@ -299,7 +299,7 @@ public partial class End2EndTest
             dialog.WarteAufStatus("Einzelschritt — Chunk 2/3 angewendet.");
             // Die Quell-Selektion muss den zuletzt angewendeten Chunk markieren.
             Assert.Equal(1, dialog.GetSelektierterQuellEintragIndex());
-            Assert.True(dialog.IstSchaltflaecheAktiviert("WiedergabeNeustarten"),
+            Assert.True(dialog.IstSchaltflaecheAktiviert("RestartPlayback"),
                 "aus dem Schrittmodus muss 'Neu starten' als direkter Rückweg zu Position 0 erreichbar sein");
 
             dialog.StepBackward();
@@ -310,9 +310,9 @@ public partial class End2EndTest
             dialog.WarteAufPosition("Chunk 0/3");
             // An Position 0 darf kein Quell-Eintrag selektiert sein.
             Assert.Equal(-1, dialog.GetSelektierterQuellEintragIndex());
-            Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittZurueck"),
+            Assert.False(dialog.IstSchaltflaecheAktiviert("StepBack"),
                 "an Position 0 muss 'Schritt zurück' deaktiviert sein");
-            Assert.False(dialog.IstSchaltflaecheAktiviert("WiedergabeNeustarten"),
+            Assert.False(dialog.IstSchaltflaecheAktiviert("RestartPlayback"),
                 "an Position 0 ohne laufende Wiedergabe muss 'Neu starten' deaktiviert sein");
 
             // Schrittmodus-Phase 2: bis ans Ende schreiten feuert die Ende-Semantik; danach
@@ -322,7 +322,7 @@ public partial class End2EndTest
             dialog.StepForward();
             dialog.WarteAufStatus("Wiedergabe beendet.");
             Assert.Equal("Chunk 3/3", dialog.GetPositionsText());
-            Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittVor"),
+            Assert.False(dialog.IstSchaltflaecheAktiviert("StepForward"),
                 "am Ende der Aufzeichnung muss 'Schritt vor' deaktiviert sein");
 
             dialog.StepBackward();
@@ -392,9 +392,9 @@ public partial class End2EndTest
             dialog.WarteAufPosition("Chunk 1/2");
             // Während der erneut abgewarteten 3-s-Pause (unpausiert laufende Wiedergabe)
             // müssen beide Schritt-Buttons deaktiviert sein.
-            Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittVor"),
+            Assert.False(dialog.IstSchaltflaecheAktiviert("StepForward"),
                 "während unpausierter Wiedergabe muss 'Schritt vor' deaktiviert sein");
-            Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittZurueck"),
+            Assert.False(dialog.IstSchaltflaecheAktiviert("StepBack"),
                 "während unpausierter Wiedergabe muss 'Schritt zurück' deaktiviert sein");
 
             dialog.WarteAufStatus("Wiedergabe beendet.");

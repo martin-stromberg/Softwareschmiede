@@ -21,7 +21,7 @@ public sealed class RepositoryAssignDialogView : DialogView
         if (IsVisible)
             return this;
 
-        WaitForElement(Window, cf => cf.ByName("Zuweisen"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("Assign"), Short).AsButton().ClickInForeground();
         GetDialogWindow();
 
         return this;
@@ -70,24 +70,24 @@ public sealed class RepositoryAssignDialogView : DialogView
         throw new TimeoutException("Repository-Liste im Zuweisungsdialog enthielt kein Element innerhalb des Timeouts.");
     }
 
-    /// <summary>Wählt einen Eintrag in der "ArbeitsverzeichnisComboBox" aus (erfolgreicher Strukturabruf).</summary>
+    /// <summary>Wählt einen Eintrag in der "WorkingDirectoryComboBox" aus (erfolgreicher Strukturabruf).</summary>
     /// <param name="name">Der Name des auszuwählenden Unterverzeichnisses.</param>
     /// <returns>Diese Instanz.</returns>
     public RepositoryAssignDialogView SelectWorkingDirectory(string name)
     {
         var dialog = GetDialogWindow();
-        var comboBox = WaitForElement(dialog, cf => cf.ByName("ArbeitsverzeichnisComboBox"), Short);
+        var comboBox = WaitForElement(dialog, cf => cf.ByName("WorkingDirectoryComboBox"), Short);
         SelectComboBoxItemByClick(comboBox, name, Short);
         return this;
     }
 
-    /// <summary>Trägt einen manuellen Pfad in das "ArbeitsverzeichnisEingabe"-Feld ein (fehlgeschlagener Strukturabruf).</summary>
+    /// <summary>Trägt einen manuellen Pfad in das "WorkingDirectoryInput"-Feld ein (fehlgeschlagener Strukturabruf).</summary>
     /// <param name="path">Der einzutragende relative Pfad.</param>
     /// <returns>Diese Instanz.</returns>
     public RepositoryAssignDialogView SetManualWorkingDirectory(string path)
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("ArbeitsverzeichnisEingabe"), Short).AsTextBox().Text = path;
+        WaitForElement(dialog, cf => cf.ByName("WorkingDirectoryInput"), Short).AsTextBox().Text = path;
         return this;
     }
 
@@ -96,13 +96,13 @@ public sealed class RepositoryAssignDialogView : DialogView
     public ProjectDetailView Confirm()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("Zuweisen"), Short).AsButton().ClickInForeground();
+        WaitForElement(dialog, cf => cf.ByName("Assign"), Short).AsButton().ClickInForeground();
 
         return new ProjectDetailView(Window);
     }
 
     /// <summary>
-    /// Trägt den Basis-Branch in das "BasisBranchEingabe"-Feld ein, sobald es aktiviert ist (nicht mehr
+    /// Trägt den Basis-Branch in das "BaseBranchInput"-Feld ein, sobald es aktiviert ist (nicht mehr
     /// durch <c>IsLoadingSourceBranches</c> deaktiviert - das Feld startet deaktiviert, während remote
     /// verfügbare Branches geladen werden).
     /// </summary>
@@ -111,21 +111,21 @@ public sealed class RepositoryAssignDialogView : DialogView
     public RepositoryAssignDialogView SetBaseBranch(string baseBranch)
     {
         var dialog = GetDialogWindow();
-        WaitForEnabledElement(dialog, "BasisBranchEingabe", Short).AsTextBox().Text = baseBranch;
+        WaitForEnabledElement(dialog, "BaseBranchInput", Short).AsTextBox().Text = baseBranch;
         return this;
     }
 
     /// <returns><c>true</c>, wenn das Label "Arbeitsverzeichnis im Repository" sichtbar ist.</returns>
     public bool HasWorkingDirectoryLabel() => ElementExists(GetDialogWindow(), cf => cf.ByName("Arbeitsverzeichnis im Repository"));
 
-    /// <returns><c>true</c>, wenn die "ArbeitsverzeichnisComboBox" sichtbar ist.</returns>
-    public bool HasWorkingDirectoryComboBox() => ElementExists(GetDialogWindow(), cf => cf.ByName("ArbeitsverzeichnisComboBox"));
+    /// <returns><c>true</c>, wenn die "WorkingDirectoryComboBox" sichtbar ist.</returns>
+    public bool HasWorkingDirectoryComboBox() => ElementExists(GetDialogWindow(), cf => cf.ByName("WorkingDirectoryComboBox"));
 
-    /// <summary>Bricht den Dialog über den "Abbrechen"-Button ab, ohne eine Zuweisung vorzunehmen.</summary>
+    /// <summary>Bricht den Dialog über den "Cancel"-Button ab, ohne eine Zuweisung vorzunehmen.</summary>
     public void Cancel()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short).AsButton().ClickInForeground();
+        WaitForElement(dialog, cf => cf.ByName("Cancel"), Short).AsButton().ClickInForeground();
     }
 
     private static AutomationElement WaitForEnabledElement(AutomationElement parent, string automationName, TimeSpan timeout)

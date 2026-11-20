@@ -15,43 +15,43 @@ public sealed class TodoListViewModel : ViewModelBase
     private readonly ILogger<TodoListViewModel> _logger;
 
     private Guid _workItemId;
-    private int _offeneTodoCount;
-    private string? _neuesTodoBeschreibung;
+    private int _openTodoCount;
+    private string? _newTodoDescription;
 
     /// <summary>To-Dos der Aufgabe.</summary>
     public ObservableCollection<TodoViewModel> Todos { get; } = new();
 
     /// <summary>Anzahl offener To-Dos der Aufgabe. Wird für die Badge-Anzeige im Ribbon verwendet.</summary>
-    public int OffeneTodoCount
+    public int OpenTodoCount
     {
-        get => _offeneTodoCount;
-        private set => SetProperty(ref _offeneTodoCount, value);
+        get => _openTodoCount;
+        private set => SetProperty(ref _openTodoCount, value);
     }
 
     /// <summary>Bindung des Eingabefelds für die Beschreibung eines neuen To-Dos.</summary>
-    public string? NeuesTodoBeschreibung
+    public string? NewTodoDescription
     {
-        get => _neuesTodoBeschreibung;
-        set => SetProperty(ref _neuesTodoBeschreibung, value);
+        get => _newTodoDescription;
+        set => SetProperty(ref _newTodoDescription, value);
     }
 
-    /// <summary>Wird von <see cref="TodoAnsichtCommand"/> aufgerufen, damit der Besitzer zur Todo-Ansicht wechselt.</summary>
-    public Action? AnsichtAktivierenCallback { get; set; }
+    /// <summary>Wird von <see cref="TodoViewCommand"/> aufgerufen, damit der Besitzer zur Todo-Ansicht wechselt.</summary>
+    public Action? ActivateViewCallback { get; set; }
 
     /// <summary>Wird bei Erfolg oder Fehlschlag einer Todo-Operation mit der (ggf. null) Fehlermeldung aufgerufen, damit der Besitzer sie anzeigen kann.</summary>
-    public Action<string?>? FehlerCallback { get; set; }
+    public Action<string?>? ErrorCallback { get; set; }
 
     /// <summary>Erstellt ein neues To-Do mit der eingegebenen Beschreibung.</summary>
-    public ICommand TodoHinzufuegenCommand { get; }
+    public ICommand AddTodoCommand { get; }
 
     /// <summary>Markiert ein To-Do als erledigt.</summary>
-    public ICommand TodoAlsErledigtMarkierenCommand { get; }
+    public ICommand MarkTodoAsCompletedCommand { get; }
 
     /// <summary>Löscht ein To-Do.</summary>
-    public ICommand TodoLoeschenCommand { get; }
+    public ICommand DeleteTodoCommand { get; }
 
     /// <summary>Wechselt zur Todo-Ansicht.</summary>
-    public ICommand TodoAnsichtCommand { get; }
+    public ICommand TodoViewCommand { get; }
 
     /// <inheritdoc cref="TodoListViewModel"/>
     public TodoListViewModel(TodoService todoService, ILogger<TodoListViewModel> logger)
@@ -59,23 +59,23 @@ public sealed class TodoListViewModel : ViewModelBase
         _todoService = todoService;
         _logger = logger;
 
-        TodoHinzufuegenCommand = new AsyncRelayCommand(TodoHinzufuegenAsync, () => !string.IsNullOrWhiteSpace(_neuesTodoBeschreibung));
-        TodoAlsErledigtMarkierenCommand = new AsyncRelayCommand<Guid>(TodoAlsErledigtMarkierenAsync);
-        TodoLoeschenCommand = new AsyncRelayCommand<Guid>(TodoLoeschenAsync);
-        TodoAnsichtCommand = new RelayCommand(() => AnsichtAktivierenCallback?.Invoke());
+        AddTodoCommand = new AsyncRelayCommand(AddTodoAsync, () => !string.IsNullOrWhiteSpace(_newTodoDescription));
+        MarkTodoAsCompletedCommand = new AsyncRelayCommand<Guid>(MarkTodoAsCompletedAsync);
+        DeleteTodoCommand = new AsyncRelayCommand<Guid>(DeleteTodoAsync);
+        TodoViewCommand = new RelayCommand(() => ActivateViewCallback?.Invoke());
     }
 
-    /// <summary>Lädt die To-Dos der angegebenen Aufgabe und aktualisiert <see cref="OffeneTodoCount"/>.</summary>
+    /// <summary>Lädt die To-Dos der angegebenen Aufgabe und aktualisiert <see cref="OpenTodoCount"/>.</summary>
     /// <param name="workItemId">ID der Aufgabe, deren To-Dos geladen werden sollen.</param>
     /// <param name="ct">Abbruch-Token.</param>
-    public async Task LadenAsync(Guid workItemId, CancellationToken ct)
+    public async Task LoadAsync(Guid workItemId, CancellationToken ct)
     {
         _workItemId = workItemId;
         Todos.Clear();
 
         if (workItemId == Guid.Empty)
         {
-            OffeneTodoCount = 0;
+            OpenTodoCount = 0;
             return;
         }
 
@@ -83,22 +83,22 @@ public sealed class TodoListViewModel : ViewModelBase
         foreach (var todo in todos)
             Todos.Add(new TodoViewModel(todo));
 
-        OffeneTodoCountAktualisieren();
+        RefreshOpenTodoCount();
     }
 
-    private async Task TodoHinzufuegenAsync(CancellationToken ct)
+    private async Task AddTodoAsync(CancellationToken ct)
     {
-        if (_workItemId == Guid.Empty || string.IsNullOrWhiteSpace(_neuesTodoBeschreibung))
+        if (_workItemId == Guid.Empty || string.IsNullOrWhiteSpace(_newTodoDescription))
             return;
 
-        FehlerCallback?.Invoke(null);
+        ErrorCallback?.Invoke(null);
 
         try
         {
-            var todo = await _todoService.CreateTodoAsync(_workItemId, _neuesTodoBeschreibung, ct);
+            var todo = await _todoService.CreateTodoAsync(_workItemId, _newTodoDescription, ct);
             Todos.Add(new TodoViewModel(todo));
-            OffeneTodoCountAktualisieren();
-            NeuesTodoBeschreibung = null;
+            RefreshOpenTodoCount();
+            NewTodoDescription = null;
         }
         catch (OperationCanceledException)
         {
@@ -107,22 +107,22 @@ public sealed class TodoListViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Erstellen eines To-Dos für Aufgabe {AufgabeId}.", _workItemId);
-            FehlerCallback?.Invoke($"To-Do konnte nicht erstellt werden: {ex.Message}");
+            ErrorCallback?.Invoke($"To-Do konnte nicht erstellt werden: {ex.Message}");
         }
     }
 
-    private async Task TodoAlsErledigtMarkierenAsync(Guid todoId, CancellationToken ct)
+    private async Task MarkTodoAsCompletedAsync(Guid todoId, CancellationToken ct)
     {
-        FehlerCallback?.Invoke(null);
+        ErrorCallback?.Invoke(null);
 
         try
         {
             await _todoService.MarkTodoAsCompletedAsync(todoId, ct);
             var todo = Todos.FirstOrDefault(t => t.Id == todoId);
             if (todo is not null)
-                todo.IstErledigt = true;
+                todo.IsCompleted = true;
 
-            OffeneTodoCountAktualisieren();
+            RefreshOpenTodoCount();
         }
         catch (OperationCanceledException)
         {
@@ -131,13 +131,13 @@ public sealed class TodoListViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Markieren des To-Dos {TodoId} als erledigt.", todoId);
-            FehlerCallback?.Invoke($"To-Do konnte nicht als erledigt markiert werden: {ex.Message}");
+            ErrorCallback?.Invoke($"To-Do konnte nicht als erledigt markiert werden: {ex.Message}");
         }
     }
 
-    private async Task TodoLoeschenAsync(Guid todoId, CancellationToken ct)
+    private async Task DeleteTodoAsync(Guid todoId, CancellationToken ct)
     {
-        FehlerCallback?.Invoke(null);
+        ErrorCallback?.Invoke(null);
 
         try
         {
@@ -146,7 +146,7 @@ public sealed class TodoListViewModel : ViewModelBase
             if (todo is not null)
                 Todos.Remove(todo);
 
-            OffeneTodoCountAktualisieren();
+            RefreshOpenTodoCount();
         }
         catch (OperationCanceledException)
         {
@@ -155,12 +155,12 @@ public sealed class TodoListViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Löschen des To-Dos {TodoId}.", todoId);
-            FehlerCallback?.Invoke($"To-Do konnte nicht gelöscht werden: {ex.Message}");
+            ErrorCallback?.Invoke($"To-Do konnte nicht gelöscht werden: {ex.Message}");
         }
     }
 
-    private void OffeneTodoCountAktualisieren()
+    private void RefreshOpenTodoCount()
     {
-        OffeneTodoCount = Todos.Count(t => !t.IstErledigt);
+        OpenTodoCount = Todos.Count(t => !t.IsCompleted);
     }
 }
