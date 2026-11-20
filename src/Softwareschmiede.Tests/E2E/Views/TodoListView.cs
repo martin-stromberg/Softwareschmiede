@@ -56,8 +56,8 @@ public sealed class TodoListView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TodoListView CreateTodo(string description)
     {
-        var eingabeFeld = WaitForElement(Window, cf => cf.ByName("NewTodoDescription"), Short);
-        eingabeFeld.ClickInForeground();
+        var inputField = WaitForElement(Window, cf => cf.ByName("NewTodoDescription"), Short);
+        inputField.ClickInForeground();
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
         Keyboard.Type(description);
         WaitForElement(Window, cf => cf.ByName("AddTodo"), Short).AsButton().ClickInForeground();
@@ -86,9 +86,9 @@ public sealed class TodoListView : BaseWindowView
     {
         var entry = WaitForElement(Window, cf => cf.ByName(description), Short);
         var container = entry.Parent;
-        var loeschenButton = container?.FindFirstDescendant(cf => cf.ByName("DeleteTodo"))
+        var deleteButton = container?.FindFirstDescendant(cf => cf.ByName("DeleteTodo"))
             ?? throw new InvalidOperationException($"Löschen-Button für To-Do '{description}' nicht gefunden.");
-        loeschenButton.AsButton().ClickInForeground();
+        deleteButton.AsButton().ClickInForeground();
         return this;
     }
 

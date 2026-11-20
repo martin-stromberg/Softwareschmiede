@@ -17,7 +17,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
     /// <summary>Ein aktives Projekt-Repository ohne Aufgabe wird enumeriert; Beobachtungen landen als
     /// nicht zuordenbare Snapshots ohne Inbox-Eintrag.</summary>
     [Fact]
-    public async Task Monitor_ActiveRepositoryWithoutTask_EnumeratesAndStoresSnapshotsWithoutInbox()
+    public async Task Monitor_ActiveRepositoryWithoutTask_EnumeratesAndStoresSnapshotWithoutInbox()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -30,9 +30,9 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        var snapshots = await db.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-        Assert.NotEmpty(snapshots);
-        Assert.All(snapshots, x =>
+        var snapshot = await db.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.NotEmpty(snapshot);
+        Assert.All(snapshot, x =>
         {
             Assert.Equal(ScmEventStore.UnassignedDiagnostic, x.Diagnostic);
             Assert.False(x.IdentityResolved);
@@ -146,8 +146,8 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
         var events = await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Single(events);
         Assert.Equal(taskId, events[0].WorkItemId);
-        var snapshots = await db.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal(snapshots.Count, snapshots.Select(x => x.ContentKey).Distinct().Count());
+        var snapshot = await db.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(snapshot.Count, snapshot.Select(x => x.ContentKey).Distinct().Count());
     }
 
     /// <summary>Deaktivierte Repositories und Repositories ohne Ereignis-Plugin werden nicht enumeriert.</summary>
@@ -157,7 +157,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, "https://github.com/owner/inactive", active: false);
-        await AddRepositoryAsync(fixture, "https://example.org/other/repo", pluginTyp: "Other.Plugin");
+        await AddRepositoryAsync(fixture, "https://example.org/other/repo", pluginType: "Other.Plugin");
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -252,7 +252,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
     }
 
     private static async Task<Guid> AddRepositoryAsync(ScmDispatchFixture fixture,
-        string url = "https://github.com/owner/repo", bool active = true, string? pluginTyp = null)
+        string url = "https://github.com/owner/repo", bool active = true, string? pluginType = null)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
@@ -263,7 +263,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
             Project = project,
             RepositoryUrl = url,
             RepositoryName = "repo",
-            PluginType = pluginTyp ?? fixture.Repository.ProviderPrefix,
+            PluginType = pluginType ?? fixture.Repository.ProviderPrefix,
             Active = active
         };
         db.AddRange(project, repository);

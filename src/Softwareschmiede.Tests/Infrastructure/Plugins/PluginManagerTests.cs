@@ -54,7 +54,7 @@ public sealed class PluginManagerTests : IDisposable
 
     /// <summary>GetSourceCodeManagementPlugins_ShouldLoadGitAndKiPlugins_WhenValidPluginDllsExist.</summary>
     [Fact]
-    public void GetSourceCodeManagementPlugins_ShouldLoadGitAndKiPlugins_WhenValidPluginDllsExist()
+    public void GetSourceCodeManagementPlugins_ShouldLoadGitAndAiPlugins_WhenValidPluginDllsExist()
     {
         Directory.CreateDirectory(_tempDirectory);
         File.Copy(typeof(GitHubPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHub.dll"), overwrite: true);
@@ -68,17 +68,17 @@ public sealed class PluginManagerTests : IDisposable
         var sut = CreateSut(_tempDirectory);
 
         var scmPlugins = sut.GetSourceCodeManagementPlugins();
-        var kiPlugins = sut.GetDevelopmentAutomationPlugins();
+        var aiPlugins = sut.GetDevelopmentAutomationPlugins();
 
         scmPlugins.Should().HaveCount(2);
         scmPlugins.Should().Contain(p => p.PluginName == "GitHub");
         scmPlugins.Should().Contain(p => p.PluginName == "Local Directory");
-        kiPlugins.Should().HaveCount(5);
-        kiPlugins.Should().Contain(p => p.PluginName == "GitHub Copilot");
-        kiPlugins.Should().Contain(p => p.PluginName == "Claude CLI");
-        kiPlugins.Should().Contain(p => p.PluginName == "Codex CLI");
-        kiPlugins.Should().Contain(p => p.PluginName == "Devin CLI");
-        kiPlugins.Should().Contain(p => p.PluginName == "KI Simulator");
+        aiPlugins.Should().HaveCount(5);
+        aiPlugins.Should().Contain(p => p.PluginName == "GitHub Copilot");
+        aiPlugins.Should().Contain(p => p.PluginName == "Claude CLI");
+        aiPlugins.Should().Contain(p => p.PluginName == "Codex CLI");
+        aiPlugins.Should().Contain(p => p.PluginName == "Devin CLI");
+        aiPlugins.Should().Contain(p => p.PluginName == "KI Simulator");
     }
 
     /// <summary>GetDefaultSourceCodeManagementPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>
@@ -107,7 +107,7 @@ public sealed class PluginManagerTests : IDisposable
 
     /// <summary>GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded.</summary>
     [Fact]
-    public void GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded()
+    public void GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleAiPluginsLoaded()
     {
         Directory.CreateDirectory(_tempDirectory);
         File.Copy(typeof(GitHubCopilotPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHubCopilot.dll"), overwrite: true);
@@ -152,13 +152,13 @@ public sealed class PluginManagerTests : IDisposable
 
         var firstCall = sut.GetSourceCodeManagementPlugins();
         var secondCall = sut.GetSourceCodeManagementPlugins();
-        var kiFirst = sut.GetDevelopmentAutomationPlugins();
-        var kiSecond = sut.GetDevelopmentAutomationPlugins();
+        var aiFirst = sut.GetDevelopmentAutomationPlugins();
+        var aiSecond = sut.GetDevelopmentAutomationPlugins();
 
         firstCall.Should().HaveCount(2);
         secondCall.Should().HaveCount(2);
-        kiFirst.Should().HaveCount(5);
-        kiSecond.Should().HaveCount(5);
+        aiFirst.Should().HaveCount(5);
+        aiSecond.Should().HaveCount(5);
     }
 
     /// <summary>GetIdePlugins gibt die eingebauten IDE-Plugins (Visual Studio, Visual Studio Code) zurück.</summary>

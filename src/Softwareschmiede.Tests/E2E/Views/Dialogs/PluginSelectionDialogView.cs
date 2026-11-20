@@ -32,16 +32,16 @@ public sealed class PluginSelectionDialogView : DialogView
     /// "UseForProject"-Checkbox (Projekt-Standard speichern).
     /// </summary>
     /// <param name="pluginName">Der Name des im Dialog auszuwählenden KI-Plugins.</param>
-    /// <param name="fuerProjektVerwenden">Wenn <c>true</c>, wird die "UseForProject"-Checkbox gesetzt.</param>
+    /// <param name="forProjectUse">Wenn <c>true</c>, wird die "UseForProject"-Checkbox gesetzt.</param>
     /// <returns>Diese Instanz.</returns>
-    public PluginSelectionDialogView SelectPlugin(string pluginName, bool fuerProjektVerwenden = false)
+    public PluginSelectionDialogView SelectPlugin(string pluginName, bool forProjectUse = false)
     {
         var dialog = GetDialogWindow();
-        var pluginAuswahlBox = WaitForElement(dialog, cf => cf.ByName("PluginSelection"), Short);
-        SelectComboBoxItemByClick(pluginAuswahlBox, pluginName, Short);
-        ElementWaitHelper.WaitForSelectedComboBoxItem(pluginAuswahlBox, pluginName, Short);
+        var pluginSelectionBox = WaitForElement(dialog, cf => cf.ByName("PluginSelection"), Short);
+        SelectComboBoxItemByClick(pluginSelectionBox, pluginName, Short);
+        ElementWaitHelper.WaitForSelectedComboBoxItem(pluginSelectionBox, pluginName, Short);
 
-        if (fuerProjektVerwenden)
+        if (forProjectUse)
         {
             var checkbox = WaitForElement(dialog, cf => cf.ByName("UseForProject"), Short);
             checkbox.AsCheckBox().IsChecked = true;

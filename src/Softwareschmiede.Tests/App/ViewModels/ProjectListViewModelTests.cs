@@ -72,7 +72,7 @@ public sealed class ProjectListViewModelTests : IDisposable
 
     /// <summary>LadenRepositorienSuggestionsAsync befüllt UnassignedRepositories und setzt IsLoadingRepositories korrekt.</summary>
     [Fact]
-    public async Task LadenRepositorienSuggestionsAsync_ShouldLoadAndPopulateUnassignedRepositories()
+    public async Task LoadRepositoriesSuggestionAsync_ShouldLoadAndPopulateUnassignedRepositories()
     {
         // Arrange
         var repo = new AvailableRepository("test-repo", DateTime.UtcNow, "owner/test-repo", "https://github.com/owner/test-repo");
@@ -80,11 +80,11 @@ public sealed class ProjectListViewModelTests : IDisposable
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin.Object]);
         var sut = CreateSut();
 
-        var loadingWasTrue = false;
+        var loadingWhatTrue = false;
         sut.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(sut.IsLoadingRepositories) && sut.IsLoadingRepositories)
-                loadingWasTrue = true;
+                loadingWhatTrue = true;
         };
 
         // Act
@@ -93,7 +93,7 @@ public sealed class ProjectListViewModelTests : IDisposable
         // Assert
         sut.UnassignedRepositories.Should().HaveCount(1);
         sut.UnassignedRepositories.Single().Url.Should().Be("https://github.com/owner/test-repo");
-        loadingWasTrue.Should().BeTrue();
+        loadingWhatTrue.Should().BeTrue();
         sut.IsLoadingRepositories.Should().BeFalse();
     }
 
@@ -142,7 +142,7 @@ public sealed class ProjectListViewModelTests : IDisposable
 
     /// <summary>KehreZuProjectZurueck lädt unzugeordnete Repositories neu.</summary>
     [Fact]
-    public async Task KehreZuProjectZurueck_ShouldReloadUnassignedRepositories()
+    public async Task ReturnToProjectBack_ShouldReloadUnassignedRepositories()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Test-Projekt", null, TestContext.Current.CancellationToken);
@@ -181,7 +181,7 @@ public sealed class ProjectListViewModelTests : IDisposable
 
     /// <summary>ZeigeTaskDetailView setzt DetailViewModel auf das übergebene TaskDetailViewModel.</summary>
     [Fact]
-    public async Task ProjectListViewModel_ZeigeTaskDetailView_SetsDetailViewModelToTask()
+    public async Task ProjectListViewModel_ShowTaskDetailView_SetsDetailViewModelToTask()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Task-Navigations-Projekt", null, TestContext.Current.CancellationToken);
@@ -207,7 +207,7 @@ public sealed class ProjectListViewModelTests : IDisposable
 
     /// <summary>KehreZuProjectZurueck setzt DetailViewModel zurück zum ProjectDetailViewModel.</summary>
     [Fact]
-    public async Task ProjectListViewModel_KehreZuProjectZurueck_RestoresProjectDetailView()
+    public async Task ProjectListViewModel_ReturnToProjectBack_RestoresProjectDetailView()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Zurueck-Navigations-Projekt", null, TestContext.Current.CancellationToken);

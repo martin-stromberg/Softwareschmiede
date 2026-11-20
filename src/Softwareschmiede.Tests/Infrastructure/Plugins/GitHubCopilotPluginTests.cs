@@ -67,7 +67,7 @@ public sealed class GitHubCopilotPluginTests
 
     /// <summary>StartCliAsync passes optional parameters as arguments.</summary>
     [Fact]
-    public async Task StartCliAsync_ShouldPassParameters_AsArguments()
+    public async Task StartCliAsync_ShouldPassParameter_AsArguments()
     {
         var psi = await _sut.StartCliAsync("/repo", "--continue", TestContext.Current.CancellationToken);
 
@@ -88,7 +88,7 @@ public sealed class GitHubCopilotPluginTests
 
     /// <summary>StartCliAsync appends CommandLineParameters from credential store to arguments.</summary>
     [Fact]
-    public async Task StartCliAsync_ShouldIncludeCommandLineParameters_InProcessStartInfo()
+    public async Task StartCliAsync_ShouldIncludeCommandLineParameter_InProcessStartInfo()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHubCopilot.CommandLineParameters"))
             .Returns("--model gpt-4o");
@@ -142,7 +142,7 @@ public sealed class GitHubCopilotPluginTests
 
     /// <summary>BuildIssueTemplateFillInvocation haengt gespeicherte CommandLineParameters als einzelne Argumente an.</summary>
     [Fact]
-    public void BuildIssueTemplateFillInvocation_ShouldAppendCommandLineParameters()
+    public void BuildIssueTemplateFillInvocation_ShouldAppendCommandLineParameter()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHubCopilot.CommandLineParameters"))
             .Returns("--model gpt-4o");

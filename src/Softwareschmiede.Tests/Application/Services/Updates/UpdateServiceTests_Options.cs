@@ -24,15 +24,15 @@ public sealed class UpdateServiceTests_Options
             .ReturnsAsync(UpdateReleaseLookupResult.Found(stable));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var rcKanal = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
-        var produktivKanal = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
+        var rcChannel = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
+        var productionChannel = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        rcKanal.Status.Should().Be(UpdateCheckStatus.UpdateAvailable);
-        rcKanal.Update.Should().Be(prerelease);
-        rcKanal.Message.Should().BeNull("RC-Installation und RC-Kanal passen zusammen");
-        produktivKanal.Status.Should().Be(UpdateCheckStatus.UpdateAvailable);
-        produktivKanal.Update.Should().Be(stable);
-        produktivKanal.Update!.IsPrerelease.Should().BeFalse();
+        rcChannel.Status.Should().Be(UpdateCheckStatus.UpdateAvailable);
+        rcChannel.Update.Should().Be(prerelease);
+        rcChannel.Message.Should().BeNull("RC-Installation und RC-Kanal passen zusammen");
+        productionChannel.Status.Should().Be(UpdateCheckStatus.UpdateAvailable);
+        productionChannel.Update.Should().Be(stable);
+        productionChannel.Update!.IsPrerelease.Should().BeFalse();
         releaseClient.Verify(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.UpdatePath == UpdatePathChannelResolver.PrereleaseVersionsPath), It.IsAny<CancellationToken>()), Times.Once);
         releaseClient.Verify(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.UpdatePath == UpdatePathChannelResolver.StableVersionsPath), It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -43,7 +43,7 @@ public sealed class UpdateServiceTests_Options
     [InlineData(false, UpdatePathChannelResolver.PrereleaseVersionsPath)]
     public async Task CheckForUpdateAsync_RejectsChannelMismatch(bool isPrereleaseResult, string updatePath)
     {
-        var gefundenes = isPrereleaseResult
+        var found = isPrereleaseResult
             ? new UpdateInfo("1.3.0-rc.1", "v1.3.0-rc.1", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/rc.zip")), null, IsPrerelease: true)
             : new UpdateInfo("1.3.0", "v1.3.0", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/stable.zip")), null, IsPrerelease: false);
         var versionProvider = new Mock<IApplicationVersionProvider>();
@@ -51,7 +51,7 @@ public sealed class UpdateServiceTests_Options
             .ReturnsAsync(new InstalledVersionInfo("1.2.0", "v1.2.0", null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateReleaseLookupResult.Found(gefundenes));
+            .ReturnsAsync(UpdateReleaseLookupResult.Found(found));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
         var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(updatePath), TestContext.Current.CancellationToken);

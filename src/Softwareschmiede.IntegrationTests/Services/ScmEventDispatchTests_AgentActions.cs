@@ -48,7 +48,7 @@ public sealed class ScmEventDispatchTests_AgentActions
     /// der persistierten Observation auf — ein SeparatesKonto-Ereignis wird dem Agent-Konto
     /// weitergereicht und unter der Bot-Viewer-Identität geprüft.</summary>
     [Fact]
-    public async Task Dispatch_SeparatesKontoEvent_RevalidatesUnderAgentKonto()
+    public async Task Dispatch_SeparatesAccountEvent_RevalidatesAndAgentAccount()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -98,7 +98,7 @@ public sealed class ScmEventDispatchTests_AgentActions
     /// <summary>Die Zustellung reicht die Repository-URL des verknüpften GitRepository an die
     /// Agenten-Umgebung durch, damit das SCM-Plugin den extraheader-Key hostgebunden bilden kann.</summary>
     [Fact]
-    public async Task Dispatch_PassesRepositoryUrlToAgentEnvironment()
+    public async Task Dispatch_AdjustRepositoryUrlToAgentEnvironment()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();

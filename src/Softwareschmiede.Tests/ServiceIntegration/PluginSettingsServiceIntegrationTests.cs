@@ -21,20 +21,20 @@ public sealed class PluginSettingsServiceIntegrationTests
 
     /// <summary>SetValue_SpeichertWert_UndGetValue_LaeadtIhn.</summary>
     [Fact]
-    public void SetValue_SpeichertWert_UndGetValue_LaeadtIhn()
+    public void SetValue_SavesValue_AndGetValue_LoadsIt()
     {
         var plugin = new FakeSettingsPlugin("TestPlugin", "test.plugin");
         var field = new PluginSettingField("api_key", "API Key", PluginSettingFieldType.Secret);
 
         _sut.SetValue(plugin, field, "mein-api-schluessel");
-        var geladen = _sut.GetValue(plugin, field);
+        var loaded = _sut.GetValue(plugin, field);
 
-        geladen.Should().Be("mein-api-schluessel");
+        loaded.Should().Be("mein-api-schluessel");
     }
 
     /// <summary>HasValue_GibtFalse_OhneGespeichertenWert.</summary>
     [Fact]
-    public void HasValue_GibtFalse_OhneGespeichertenWert()
+    public void HasValue_ReturnsFalse_WithoutSavedValue()
     {
         var plugin = new FakeSettingsPlugin("LeeresPlugin", "empty.plugin");
         var field = new PluginSettingField("some_key", "Some Key");
@@ -44,7 +44,7 @@ public sealed class PluginSettingsServiceIntegrationTests
 
     /// <summary>HasValue_GibtTrue_NachSpeichern.</summary>
     [Fact]
-    public void HasValue_GibtTrue_NachSpeichern()
+    public void HasValue_ReturnsTrue_SaveAfter()
     {
         var plugin = new FakeSettingsPlugin("VollPlugin", "voll.plugin");
         var field = new PluginSettingField("token", "Token", PluginSettingFieldType.Secret);
@@ -55,7 +55,7 @@ public sealed class PluginSettingsServiceIntegrationTests
 
     /// <summary>DeleteValue_EntferntGespeichertenWert.</summary>
     [Fact]
-    public void DeleteValue_EntferntGespeichertenWert()
+    public void DeleteValue_RemovesSavedValue()
     {
         var plugin = new FakeSettingsPlugin("DeletePlugin", "delete.plugin");
         var field = new PluginSettingField("to_delete", "To Delete");
@@ -68,7 +68,7 @@ public sealed class PluginSettingsServiceIntegrationTests
 
     /// <summary>GetValue_GibtNull_OhneGespeichertenWert.</summary>
     [Fact]
-    public void GetValue_GibtNull_OhneGespeichertenWert()
+    public void GetValue_ReturnsNull_WithoutSavedValue()
     {
         var plugin = new FakeSettingsPlugin("NullPlugin", "null.plugin");
         var field = new PluginSettingField("missing_key", "Missing Key");

@@ -358,7 +358,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient(sp => new MainWindowOptionalServices(
             DialogService: sp.GetService<IDialogService>(),
             VersionProvider: sp.GetService<IApplicationVersionProvider>(),
-            LaufdatenChangedNotifier: sp.GetService<WorkItemRunDataChangedNotifier>(),
+            RunDataChangedNotifier: sp.GetService<WorkItemRunDataChangedNotifier>(),
             UpdateServices: sp.GetService<MainWindowUpdateServices>(),
             WorkItemListModeService: sp.GetService<WorkItemListModeService>(),
             AutoShutdownOrchestrator: sp.GetService<IAutoShutdownOrchestrator>(),

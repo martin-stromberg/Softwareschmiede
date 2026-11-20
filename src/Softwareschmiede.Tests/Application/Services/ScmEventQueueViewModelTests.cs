@@ -157,7 +157,7 @@ public sealed class ScmEventQueueViewModelTests
     /// Ereignis und den heilsamen Weg über das ereignisbezogene „Erneut prüfen" — nicht die
     /// wirkungslose Quellen-Schaltfläche.</summary>
     [Fact]
-    public async Task FailedOutgoingAction_DiagnosticNamesEventAndEventRetry()
+    public async Task FailedOutgoingAction_DiagnosticNameEventAndEventRetry()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -273,7 +273,7 @@ public sealed class ScmEventQueueViewModelTests
 
     /// <summary>The dedicated filter and "Alle" keep cancelled entries visible; "Wartend" hides them.</summary>
     [Fact]
-    public async Task CancelledEvent_ListsUnderAbgebrochenAndAlle_NotWartend()
+    public async Task CancelledEvent_ListsAndCancelledAndAll_NotWaiting()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -330,7 +330,7 @@ public sealed class ScmEventQueueViewModelTests
     /// <summary>Unassigned references are the expected repo-wide state: no interruption banner and no
     /// diagnostics entry, while real observation errors on other sources still alarm.</summary>
     [Fact]
-    public async Task UnassignedSources_NeitherBannerNorDiagnostics_RealErrorsStillAlarm()
+    public async Task UnassignedSources_NeitherBannerNorDiagnostics_RealErrorsStillAlert()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -426,7 +426,7 @@ public sealed class ScmEventQueueViewModelTests
     /// <summary>„Quellen erneut prüfen" stößt auch den Aufbereitungs-Entdeckungszyklus an —
     /// unabhängig vom Ereignisüberwachungs-Schalter; der Dienst prüft seinen eigenen Schalter.</summary>
     [Fact]
-    public async Task RetrySourcesCommand_StillRunsAufbereitungCycle()
+    public async Task RetrySourcesCommand_StillRunsPreparationCycle()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();

@@ -37,7 +37,7 @@ public partial class End2EndTest
     /// Regressionstest für Issue #157 Nacharbeit: die Ribbon-Gruppen waren an ShowCliPanel/
     /// ShowFileExplorerPanel statt an IsCliViewSelected/IsFileExplorerViewSelected gebunden.
     /// </summary>
-    protected void DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E(Window mainWindow)
+    protected void FileExplorer_ShowsTreeAndModeButtons_AndSwitchesToInfoAndBack_E2E(Window mainWindow)
     {
         var settings = new SettingsView(mainWindow).ForceShow();
         settings.SwitchTab("Plugins");
@@ -45,11 +45,11 @@ public partial class End2EndTest
         settings.SaveSettings();
         settings.Menu.NavigateToDashboard();
 
-        SetupProjectMitNeuerAufgabe(mainWindow, "FileExplorer-Repo", "FileExplorer-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "FileExplorer-Repo", "FileExplorer-Projekt");
 
         // git init im Quellverzeichnis vorab bestätigen, damit "Starten" im ersten Versuch gelingt.
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
         // Nach erfolgreichem Start ist das Repository geklont (LokalerKlonPfad gesetzt) und
         // das CLI-Panel sichtbar - das bestätigt, dass der kombinierte Klon-/Start-Ablauf durchlief.
@@ -105,15 +105,15 @@ public partial class End2EndTest
     /// des Verzeichnisknotens auf der Grenztiefe ("Ebene2") löst LadeKinderAsync/LoadSubtreeAsync aus und
     /// lässt "Deep.cs" im Baum erscheinen.
     /// </summary>
-    protected async Task DateiExplorer_KlapptVerzeichnisAufUndLaedtKinderNach_E2E(Window mainWindow)
+    protected async Task FileExplorer_WorksDirectoryOnAndLoadsChildrenAfter_E2E(Window mainWindow)
     {
-        SetupProjectMitNeuerAufgabe(mainWindow, "FileExplorer-LazyLoad-Repo", "FileExplorer-LazyLoad-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "FileExplorer-LazyLoad-Repo", "FileExplorer-LazyLoad-Projekt");
 
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskDetail.WaitForCliRunning();
 
-        var localClonePath = await GetLokalerKlonPfadAsync();
+        var localClonePath = await GetLocalClonePathAsync();
         Directory.CreateDirectory(Path.Combine(localClonePath, "Ebene1", "Ebene2"));
         File.WriteAllText(Path.Combine(localClonePath, "Ebene1", "Ebene2", "Deep.cs"), "tief verschachtelter Inhalt");
 
@@ -152,18 +152,18 @@ public partial class End2EndTest
     /// Aufklappen "Deep2.cs" (statt weiterhin nur der veraltete Stand "Deep.cs"), bestätigt das einen echten
     /// Neu-Ladevorgang und damit, dass die Bereinigung ChildrenLoaded zurückgesetzt hat.
     /// </summary>
-    protected async Task DateiExplorer_KlapptVerzeichnisZuUndErneutAuf_LaedtKinderNach_E2E(Window mainWindow)
+    protected async Task FileExplorer_WorksDirectoryToAndAgainOn_LoadsChildrenAfter_E2E(Window mainWindow)
     {
-        SetupProjectMitNeuerAufgabe(mainWindow, "FileExplorer-LazyLoad-Collapse-Repo", "FileExplorer-LazyLoad-Collapse-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "FileExplorer-LazyLoad-Collapse-Repo", "FileExplorer-LazyLoad-Collapse-Projekt");
 
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskDetail.WaitForCliRunning();
 
-        var localClonePath = await GetLokalerKlonPfadAsync();
-        var ebene2Verzeichnis = Path.Combine(localClonePath, "Ebene1", "Ebene2");
-        Directory.CreateDirectory(ebene2Verzeichnis);
-        File.WriteAllText(Path.Combine(ebene2Verzeichnis, "Deep.cs"), "tief verschachtelter Inhalt");
+        var localClonePath = await GetLocalClonePathAsync();
+        var level2Directory = Path.Combine(localClonePath, "Ebene1", "Ebene2");
+        Directory.CreateDirectory(level2Directory);
+        File.WriteAllText(Path.Combine(level2Directory, "Deep.cs"), "tief verschachtelter Inhalt");
 
         taskDetail = taskDetail.Reload();
 
@@ -186,8 +186,8 @@ public partial class End2EndTest
 
         // Während zugeklappt ist, wird der Verzeichnisinhalt auf der Festplatte geändert - ein erneutes
         // Aufklappen kann den neuen Stand nur zeigen, wenn "Ebene2" tatsächlich neu geladen wird.
-        File.Delete(Path.Combine(ebene2Verzeichnis, "Deep.cs"));
-        File.WriteAllText(Path.Combine(ebene2Verzeichnis, "Deep2.cs"), "neuer Inhalt nach Bereinigung");
+        File.Delete(Path.Combine(level2Directory, "Deep.cs"));
+        File.WriteAllText(Path.Combine(level2Directory, "Deep2.cs"), "neuer Inhalt nach Bereinigung");
 
         fileExplorer.ExpandNode("Ebene1");
         fileExplorer.WaitForNode("Ebene2");
@@ -201,7 +201,7 @@ public partial class End2EndTest
         projectDetail.DeleteProject();
     }
 
-    private async Task<string> GetLokalerKlonPfadAsync()
+    private async Task<string> GetLocalClonePathAsync()
     {
         await using var db = OpenTestDbContext();
         var workItem = db.WorkItems.Single();

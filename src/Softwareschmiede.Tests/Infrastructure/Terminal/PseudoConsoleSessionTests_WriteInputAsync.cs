@@ -11,7 +11,7 @@ public sealed class PseudoConsoleSessionTests_WriteInputAsync
 {
     /// <summary>Ein langer Stacktrace-artiger Clipboard-Inhalt muss vollständig und bytegenau geschrieben werden.</summary>
     [Fact]
-    public async Task WriteInputAsync_LangerMehrzeiligerText_SchreibtVollstaendigeBytesInReihenfolge()
+    public async Task WriteInputAsync_LongerMultilineText_WritesCompleteBytesInOrder()
     {
         var inputStream = new RecordingInputStream();
         using var session = CreateSession(inputStream);
@@ -26,7 +26,7 @@ public sealed class PseudoConsoleSessionTests_WriteInputAsync
 
     /// <summary>Große Eingaben werden in stabile Chunks geteilt, deren Konkatenation der Originaleingabe entspricht.</summary>
     [Fact]
-    public async Task WriteInputAsync_GrosseEingabe_SchreibtChunksSequentiellUndFlushtEinmal()
+    public async Task WriteInputAsync_SizeInput_WritesChunksSequentialAndFlushtOnce()
     {
         var inputStream = new RecordingInputStream();
         using var session = CreateSession(inputStream);
@@ -44,7 +44,7 @@ public sealed class PseudoConsoleSessionTests_WriteInputAsync
 
     /// <summary>Parallele längere Eingaben auf dieselbe Session dürfen sich nicht im Input-Stream verschachteln.</summary>
     [Fact]
-    public async Task WriteInputAsync_ParalleleWrites_WerdenNichtVerschachtelt()
+    public async Task WriteInputAsync_ParallelWrites_BeNotNested()
     {
         var inputStream = new BlockingFirstWriteStream();
         using var session = CreateSession(inputStream);
@@ -67,7 +67,7 @@ public sealed class PseudoConsoleSessionTests_WriteInputAsync
 
     /// <summary>Dispose waehrend eines laufenden Writes darf keine Semaphore-Release-Exception maskieren.</summary>
     [Fact]
-    public async Task Dispose_WaehrendWriteInputAsync_MaskiertNichtReleaseUndHaengtNicht()
+    public async Task Dispose_WhileWriteInputAsync_MaskedNotReleaseAndHangsNot()
     {
         var inputStream = new BlockingFirstWriteStream();
         var session = CreateSession(inputStream);
@@ -87,7 +87,7 @@ public sealed class PseudoConsoleSessionTests_WriteInputAsync
 
     /// <summary>Bei einem Schreibfehler darf keine erfolgreiche Eingabeaktivität markiert werden.</summary>
     [Fact]
-    public async Task WriteInputAsync_WriteFehler_MarkiertKeineInputAktivitaet()
+    public async Task WriteInputAsync_WriteError_MarksNoInputActivity()
     {
         using var session = CreateSession(new WriteThrowingInputStream());
 

@@ -34,13 +34,13 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
         _dialogServiceMock = new Mock<IDialogService>();
         _pluginManagerMock = new Mock<IPluginManager>();
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
-        KonfiguriereEinstellungsScope();
+        ConfigureSettingScope();
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    private void KonfiguriereEinstellungsScope()
+    private void ConfigureSettingScope()
     {
         var providerMock = new Mock<IServiceProvider>();
         providerMock.Setup(p => p.GetService(typeof(AppSettingService))).Returns(_settingService);
@@ -60,7 +60,7 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
             _pluginManagerMock.Object,
             NullLogger<ProjectDetailViewModel>.Instance);
 
-    private async Task<Project> ErstelleProjektMitRepositoryAsync(string? baseBranch = "staging")
+    private async Task<Project> CreateProjectWithRepositoryAsync(string? baseBranch = "staging")
     {
         var project = await _projectService.CreateAsync("Backmerge-Test-Projekt", null);
         await _projectService.AddRepositoryAsync(
@@ -82,9 +82,9 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
     /// <summary>Im Modus „Projektbezogen aktivierbar“ ist die Option bei konfiguriertem Basis-Branch sichtbar
     /// und der gespeicherte Projekt-Schalter wird geladen.</summary>
     [Fact]
-    public async Task LadenAsync_ProjektbezogenerModus_OptionSichtbarUndFlagGeladen()
+    public async Task LoadAsync_ProjectspecificMode_OptionVisibleAndFlagLoaded()
     {
-        var project = await ErstelleProjektMitRepositoryAsync();
+        var project = await CreateProjectWithRepositoryAsync();
         await _settingService.SetScmBackmergeModeAsync(ScmBackmergeMode.ProjectScoped, TestContext.Current.CancellationToken);
         await _settingService.SetBackmergeProjectEnabledAsync(project.Id, true, TestContext.Current.CancellationToken);
         var sut = CreateSut();
@@ -99,9 +99,9 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
     [Theory]
     [InlineData(ScmBackmergeMode.Disabled)]
     [InlineData(ScmBackmergeMode.Global)]
-    public async Task LadenAsync_NichtProjektbezogenerModus_OptionVerborgen(ScmBackmergeMode mode)
+    public async Task LoadAsync_NotProjectspecificMode_OptionHidden(ScmBackmergeMode mode)
     {
-        var project = await ErstelleProjektMitRepositoryAsync();
+        var project = await CreateProjectWithRepositoryAsync();
         await _settingService.SetScmBackmergeModeAsync(mode, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
@@ -112,9 +112,9 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
 
     /// <summary>Ohne konfigurierten Basis-Branch bleibt die Option trotz projektbezogenem Modus verborgen.</summary>
     [Fact]
-    public async Task LadenAsync_OhneBasisBranch_OptionVerborgen()
+    public async Task LoadAsync_WithoutBaseBranch_OptionHidden()
     {
-        var project = await ErstelleProjektMitRepositoryAsync(baseBranch: null);
+        var project = await CreateProjectWithRepositoryAsync(baseBranch: null);
         await _settingService.SetScmBackmergeModeAsync(ScmBackmergeMode.ProjectScoped, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
@@ -125,9 +125,9 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
 
     /// <summary>Das Umschalten der Option persistiert die Projekt-Freigabe sofort.</summary>
     [Fact]
-    public async Task IsBackmergeAutoMergeEnabled_Umschalten_PersistiertProjektFlag()
+    public async Task IsBackmergeAutoMergeEnabled_Toggle_PersistedProjectFlag()
     {
-        var project = await ErstelleProjektMitRepositoryAsync();
+        var project = await CreateProjectWithRepositoryAsync();
         await _settingService.SetScmBackmergeModeAsync(ScmBackmergeMode.ProjectScoped, TestContext.Current.CancellationToken);
         var sut = CreateSut();
         await LoadAsync(sut, project.Id);

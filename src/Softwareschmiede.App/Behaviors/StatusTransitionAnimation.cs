@@ -56,7 +56,7 @@ public static class StatusTransitionAnimation
         RegisterUnloadedCleanup(element, workItemId.Value);
 
         var newStatus = (string?)e.NewValue;
-        if (!ChangeDetection.HasSichChanged(workItemId.Value, newStatus))
+        if (!ChangeDetection.HasChanged(workItemId.Value, newStatus))
             return;
 
         var animation = new DoubleAnimation

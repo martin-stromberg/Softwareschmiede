@@ -9,7 +9,7 @@ public sealed class CliOutputLineAccumulatorTests
 {
     /// <summary>Mehrere LF-Zeilen in einem Chunk werden in Reihenfolge geliefert.</summary>
     [Fact]
-    public void Chunks_MitMehrerenLfZeilen_LiefertZeilenInReihenfolge()
+    public void Chunks_WithSeveralLfLines_ReturnsLinesInOrder()
     {
         var sut = new CliOutputLineAccumulator();
 
@@ -21,7 +21,7 @@ public sealed class CliOutputLineAccumulatorTests
 
     /// <summary>Geteilte Zeilen werden ueber Chunk-Grenzen zusammengefuehrt.</summary>
     [Fact]
-    public void Chunks_MitGeteilterZeile_UeberChunkGrenze_LiefertEineZeile()
+    public void Chunks_WithSplitLine_OverChunkBoundary_ReturnsALine()
     {
         var sut = new CliOutputLineAccumulator();
 
@@ -33,7 +33,7 @@ public sealed class CliOutputLineAccumulatorTests
 
     /// <summary>CRLF erzeugt genau einen Protokolleintrag.</summary>
     [Fact]
-    public void Chunks_MitCrLf_ZaehltNichtDoppelt()
+    public void Chunks_WithCrLf_CountsNotDouble()
     {
         var sut = new CliOutputLineAccumulator();
 
@@ -44,7 +44,7 @@ public sealed class CliOutputLineAccumulatorTests
 
     /// <summary>Einzelnes CR flusht Progress-Ausgaben.</summary>
     [Fact]
-    public void Chunks_MitEinzelnemCr_FlushtProgressZeile()
+    public void Chunks_WithSingleCr_FlushtProgressLine()
     {
         var sut = new CliOutputLineAccumulator();
 
@@ -55,7 +55,7 @@ public sealed class CliOutputLineAccumulatorTests
 
     /// <summary>UTF-8-Multibyte-Zeichen bleiben ueber Chunk-Grenzen korrekt.</summary>
     [Fact]
-    public void Chunks_MitUtf8MultibyteGrenze_DekodiertKorrekt()
+    public void Chunks_WithUtf8MultibyteBoundary_DecodesCorrect()
     {
         var sut = new CliOutputLineAccumulator();
         var bytes = Encoding.UTF8.GetBytes("Preis: 10 EUR\n".Replace("EUR", "€", StringComparison.Ordinal));
@@ -68,7 +68,7 @@ public sealed class CliOutputLineAccumulatorTests
 
     /// <summary>Eine Restzeile ohne Zeilentrenner wird beim Flush geliefert.</summary>
     [Fact]
-    public void Flush_MitRestzeile_SpeichertUnvollstaendigeLetzteZeile()
+    public void Flush_WithRemainderline_SavesIncompleteLastLine()
     {
         var sut = new CliOutputLineAccumulator();
 

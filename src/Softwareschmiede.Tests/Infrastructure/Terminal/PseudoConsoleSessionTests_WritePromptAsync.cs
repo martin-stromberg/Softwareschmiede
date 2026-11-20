@@ -16,7 +16,7 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
     /// denselben Submit-Byte senden: ein einzelnes <c>\r</c> statt <see cref="Environment.NewLine"/> (<c>\r\n</c>
     /// unter Windows). Ein zusätzliches <c>\n</c> nach dem CR wird von manchen CLI-TUIs nicht als Submit erkannt.</summary>
     [Fact]
-    public async Task WritePromptAsync_SchreibtEinzelnesCarriageReturnAlsSubmit_KeinCrLf()
+    public async Task WritePromptAsync_WritesSingleCarriageReturnAsSubmit_NoCrLf()
     {
         var inputStream = new MemoryStream();
         using var session = CreateSession(inputStream);
@@ -34,7 +34,7 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
     /// normalisiert werden — analog zu <c>KeyToVt100Encoder.EncodeClipboardText</c>, das denselben Ansatz für
     /// eingefügten Zwischenablage-Text verwendet.</summary>
     [Fact]
-    public async Task WritePromptAsync_NormalisiertEingebetteteZeilenumbruecheAufCarriageReturn()
+    public async Task WritePromptAsync_NormalizesEmbeddedLinebreaksOnCarriageReturn()
     {
         var inputStream = new MemoryStream();
         using var session = CreateSession(inputStream);
@@ -50,7 +50,7 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
     /// werden Prompttext und Submit-<c>\r</c> als zwei getrennte Schreib-Batches gesendet: Ein <c>\r</c>
     /// im selben Eingabe-Read wie der Text wertet die Devin CLI als Zeilenumbruch statt als Submit.</summary>
     [Fact]
-    public async Task WritePromptAsync_MitSubmitDelay_SendetTextUndCrInGetrenntenBatches()
+    public async Task WritePromptAsync_WithSubmitDelay_SendsTextAndCrInSeparateBatches()
     {
         var inputStream = new WriteRecordingStream();
         using var session = TestPseudoConsoleSessionFactory.Create(
@@ -66,7 +66,7 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
     /// <summary>Auch im verzögerten Modus werden eingebettete Zeilenumbrüche weiterhin als <c>\r</c>
     /// im Text-Batch übertragen (in Devin = Zeilenumbruch im Entwurf); nur der Submit wandert in den zweiten Batch.</summary>
     [Fact]
-    public async Task WritePromptAsync_MitSubmitDelay_EingebetteteZeilenumbruecheBleibenImTextBatch()
+    public async Task WritePromptAsync_WithSubmitDelay_EmbeddedLinebreaksRemainInTextBatch()
     {
         var inputStream = new WriteRecordingStream();
         using var session = TestPseudoConsoleSessionFactory.Create(
@@ -82,7 +82,7 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
     /// <summary>Die Eingabesperre wird über Text, Verzögerung und Submit gehalten: Ein parallel
     /// eintreffender Tastatur-Input darf nicht zwischen Prompttext und Submit rutschen.</summary>
     [Fact]
-    public async Task WritePromptAsync_MitSubmitDelay_FremdinputWartetHinterDemSubmit()
+    public async Task WritePromptAsync_WithSubmitDelay_ForeigninputWaitsBehindTheSubmit()
     {
         var inputStream = new WriteRecordingStream();
         using var session = TestPseudoConsoleSessionFactory.Create(
@@ -107,7 +107,7 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
     /// Versuch kann bei großen Prompts noch im Paste-/Burst-Fenster der CLI verschluckt werden, spätere
     /// Versuche senden den Entwurf zuverlässig ab (empirisch an der Devin CLI vermessen).</summary>
     [Fact]
-    public async Task WritePromptAsync_MitSubmitWiederholung_SendetSubmitMehrfachAlsEigeneBatches()
+    public async Task WritePromptAsync_WithSubmitRetry_SendsSubmitMultipleAsOwnBatches()
     {
         var inputStream = new WriteRecordingStream();
         using var session = TestPseudoConsoleSessionFactory.Create(
@@ -129,7 +129,7 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
     /// eigener Ein-Byte-Batch hinter allen Text-Chunks — genau der Fall, der produktiv an mehreren
     /// KB langen SCM-Prompts scheiterte, wenn nur ein einziger Submit-Versuch gesendet wurde.</summary>
     [Fact]
-    public async Task WritePromptAsync_MitSubmitWiederholung_GrosserPrompt_SendetSubmitsHinterAllenTextChunks()
+    public async Task WritePromptAsync_WithSubmitRetry_LargePrompt_SendsSubmitsBehindAllTextChunks()
     {
         var prompt = new string('x', 10_000);
         var expectedTextChunks = (int)Math.Ceiling(Encoding.UTF8.GetByteCount(prompt) / 4096.0);
@@ -153,7 +153,7 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
 
     /// <summary>Ohne Wiederholungskonfiguration bleibt es beim einmaligen Submit (Bestandsverhalten).</summary>
     [Fact]
-    public async Task WritePromptAsync_MitSubmitDelay_OhneWiederholung_SendetGenauEinenSubmit()
+    public async Task WritePromptAsync_WithSubmitDelay_WithoutRetry_SendsExactlyASubmit()
     {
         var inputStream = new WriteRecordingStream();
         using var session = TestPseudoConsoleSessionFactory.Create(
@@ -168,7 +168,7 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
     /// <summary>Die Eingabesperre wird über Text, Verzögerung und <em>alle</em> Submit-Versuche gehalten:
     /// Fremdinput darf auch nicht zwischen zwei Wiederholungs-Submits rutschen.</summary>
     [Fact]
-    public async Task WritePromptAsync_MitSubmitWiederholung_FremdinputWartetHinterAllenSubmits()
+    public async Task WritePromptAsync_WithSubmitRetry_ForeigninputWaitsBehindAllSubmits()
     {
         var inputStream = new WriteRecordingStream();
         using var session = TestPseudoConsoleSessionFactory.Create(

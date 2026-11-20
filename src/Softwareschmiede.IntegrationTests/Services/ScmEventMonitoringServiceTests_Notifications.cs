@@ -18,12 +18,12 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
     /// <summary>Eine mention-Notification erzeugt Referenz → Read → Resolver-Aufgabe → Inbox-Ereignis;
     /// die repository-weite Enumeration läuft nicht.</summary>
     [Fact]
-    public async Task Monitor_SeparatesKonto_MentionNotification_EntersInboxViaResolver()
+    public async Task Monitor_SeparatesAccount_MentionNotification_EntersInboxViaResolver()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         fixture.ConfigureMentionObservations();
         fixture.ConfigureIssue();
@@ -57,13 +57,13 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         fixture.ConfigureMentionObservations(authorId: "U_gha", authorLogin: "github-actions[bot]");
         fixture.ConfigureIssue();
         using (var settingsScope = fixture.Services.CreateScope())
             await settingsScope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
-                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
+                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.AiPrefix, TestContext.Current.CancellationToken);
         fixture.AddNotification(new ScmNotification("T_1", "R_1", "github.com", "owner", "repo",
             ScmReferenceKind.Issue, 7, "mention", DateTimeOffset.UtcNow));
 
@@ -82,12 +82,12 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
     /// <summary>Eine Notification eines nicht registrierten Repositorys wird verworfen; die
     /// Verwerfungsdiagnose trägt das Inbox-Präfix und legt keinen Backoff an.</summary>
     [Fact]
-    public async Task Monitor_SeparatesKonto_ForeignNotification_DiscardedWithDiagnostic()
+    public async Task Monitor_SeparatesAccount_ForeignNotification_DiscardedWithDiagnostic()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         fixture.AddNotification(new ScmNotification("T_9", "R_FOREIGN", "github.com", "other", "other-repo",
             ScmReferenceKind.Issue, 5, "mention", DateTimeOffset.UtcNow));
@@ -107,12 +107,12 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
 
     /// <summary>Nur reason=mention triggert; andere Gründe werden ignoriert.</summary>
     [Fact]
-    public async Task Monitor_SeparatesKonto_NonMentionReasons_AreIgnored()
+    public async Task Monitor_SeparatesAccount_NonMentionReasons_AreIgnored()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         fixture.ConfigureMentionObservations();
         fixture.AddNotification(new ScmNotification("T_1", "R_1", "github.com", "owner", "repo",
@@ -132,12 +132,12 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
     /// <summary>Ein Inbox-Fehler geht in den eigenen Backoff-Checkpoint; der Watermark bleibt stehen,
     /// sodass die Notification im nächsten Fenster erneut gelesen wird.</summary>
     [Fact]
-    public async Task Monitor_SeparatesKonto_InboxFailure_KeepsWatermarkForRetry()
+    public async Task Monitor_SeparatesAccount_InboxFailure_KeepsWatermarkForRetry()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         fixture.ConfigureMentionObservations();
         fixture.Git.As<IScmNotificationSource>().Setup(x => x.EnumerateNotificationsAsync(
@@ -185,12 +185,12 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
     /// <summary>Existiert der Inbox-Checkpoint bereits mit Default-Werten (z. B. aus einem
     /// früheren Teillauf), wird er beim Watermark-Commit aktualisiert statt erneut eingefügt.</summary>
     [Fact]
-    public async Task Monitor_SeparatesKonto_InboxCommit_WithPreexistingCheckpoint_UpdatesWatermark()
+    public async Task Monitor_SeparatesAccount_InboxCommit_WithPreexistingCheckpoint_UpdatesWatermark()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         using (var scope = fixture.Services.CreateScope())
         {
@@ -211,13 +211,13 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
     /// <summary>Node-IDs sind instanzlokal: Eine Notification von Host B mit einer node_id, die nur
     /// ein Repository auf Host A trägt, wird verworfen statt dem fremden Repository zugeordnet.</summary>
     [Fact]
-    public async Task Monitor_SeparatesKonto_NotificationFromForeignHost_DiscardedDespiteMatchingNodeId()
+    public async Task Monitor_SeparatesAccount_NotificationFromForeignHost_DiscardedDespiteMatchingNodeId()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, "https://ghe-a.example.com/owner/repo-a", "repo-a");
         await AddRepositoryAsync(fixture, "https://ghe-b.example.com/owner/repo-b", "repo-b");
-        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         var repositoryA = new ScmEventRepository("test-scm", "ghe-a.example.com", "R_SAME",
             "owner", "repo-a", "U_1", "BOT", "scm-bot", true, ScmAccountMode.SeparateAccount);
         var repositoryB = new ScmEventRepository("test-scm", "ghe-b.example.com", "R_B",
@@ -254,7 +254,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture);
-        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         ConfigureBotResolution(fixture);
         var monitor = fixture.Monitor;
 
@@ -262,7 +262,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         fixture.Git.As<IScmNotificationSource>().Verify(x => x.EnumerateNotificationsAsync(
             It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Once);
 
-        await fixture.SetKontoModusAsync(ScmAccountMode.UserAccount);
+        await fixture.SetAccountModeAsync(ScmAccountMode.UserAccount);
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
             .Returns((ScmRepositoryContext context, CancellationToken _) =>

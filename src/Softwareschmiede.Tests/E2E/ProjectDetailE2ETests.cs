@@ -14,7 +14,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// - Windows-Desktop-Session (kein Headless-CI)
 /// - Softwareschmiede.App muss im Debug-Modus gebaut sein
 ///
-/// Konsolidierung (Issue #153): <see cref="ProjektDetailSzenarien"/> führt alle sechs Szenarien
+/// Konsolidierung (Issue #153): <see cref="ProjectDetailScenarios"/> führt alle sechs Szenarien
 /// (Navigation, Bearbeiten, Aufgaben/Filtern, Repository-Dialog, Offene/beendete Aufgaben-Trennung,
 /// Löschen) als aufeinanderfolgende Phasen in einem gemeinsamen App-Lifecycle aus. Jede Phase räumt ihr
 /// Projekt über <see cref="ProjectDetailView.DeleteProject"/> auf und kehrt über
@@ -37,16 +37,16 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// Jede Phase räumt ihr Projekt auf, bevor die nächste beginnt.
     /// </summary>
     [Fact]
-    public async Task ProjektDetailSzenarien()
+    public async Task ProjectDetailScenarios()
     {
         var mainWindow = LaunchAppAndGetMainWindow();
 
-        ProjektNavigation_NeuanlageAbbrechenUndOeffnenUndSchliessen_E2E(mainWindow);
-        ProjektBearbeiten_NamenAendernSpeichernZurueckUndErneutBearbeiten_E2E(mainWindow);
-        AufgabenInProjektdetail_NeuAnlegenUndFiltern_E2E(mainWindow);
-        RepositoryDialog_OeffnenButtonZuweisenPluginUndArbeitsverzeichnis_E2E(mainWindow);
-        await Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E(mainWindow);
-        ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E(mainWindow);
+        ProjectNavigation_CloseNewcreationCancelAndOpenAnd_E2E(mainWindow);
+        ProjectEdit_NamesChangeSaveBackAndAgainEdit_E2E(mainWindow);
+        WorkItemsInProjectdetail_FilterNewCreateAnd_E2E(mainWindow);
+        RepositoryDialog_OpenButtonAssignPluginAndWorkingDirectory_E2E(mainWindow);
+        await Projectdetailview_DisconnectsOpenAndFinishedWorkItems_E2E(mainWindow);
+        DeleteProject_ConfirmationRequiredAndOverlayClosed_E2E(mainWindow);
     }
 
     /// <summary>
@@ -57,7 +57,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// Projektkachel nach dem finalen "Zurück".
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private void ProjektNavigation_NeuanlageAbbrechenUndOeffnenUndSchliessen_E2E(Window mainWindow)
+    private void ProjectNavigation_CloseNewcreationCancelAndOpenAnd_E2E(Window mainWindow)
     {
         var projectList = new ProjectListView(mainWindow).ForceShow();
 
@@ -65,8 +65,8 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         projectList.CreateProject("Bestehendes-Projekt");
 
         // Neuanlage starten und über Zurück abbrechen (kein Speichern, direkter ForceClose reicht als "Cancel")
-        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("New"), Short);
-        neuButton.AsButton().ClickInForeground();
+        var newButton = WaitForElement(mainWindow, cf => cf.ByName("New"), Short);
+        newButton.AsButton().ClickInForeground();
         WaitForElement(mainWindow, cf => cf.ByName("Save"), Short);
 
         // ForceClose(false) gibt laut Vertrag stets die ursprüngliche Instanz zurück (siehe
@@ -81,12 +81,12 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         // Zurück zur Übersicht, Projekt erneut öffnen
         projectDetail.ForceClose(recurseToDashboard: false);
-        var projectListErneut = Assert.IsType<ProjectListView>(mainWindow.CurrentView());
-        var projectDetailErneut = projectListErneut.OpenProject("Bestehendes-Projekt");
-        Assert.True(projectDetailErneut.IsVisible);
+        var projectListAgain = Assert.IsType<ProjectListView>(mainWindow.CurrentView());
+        var projectDetailAgain = projectListAgain.OpenProject("Bestehendes-Projekt");
+        Assert.True(projectDetailAgain.IsVisible);
 
         // Zurück zur Übersicht
-        projectDetailErneut.ForceClose(recurseToDashboard: false);
+        projectDetailAgain.ForceClose(recurseToDashboard: false);
         var projectListFinal = Assert.IsType<ProjectListView>(mainWindow.CurrentView());
         Assert.True(projectListFinal.ProjectExists("Bestehendes-Projekt"));
 
@@ -102,7 +102,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// erneute Bearbeitung (UpdateAsync-Pfad) hält den aktualisierten Namen im Textfeld.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private void ProjektBearbeiten_NamenAendernSpeichernZurueckUndErneutBearbeiten_E2E(Window mainWindow)
+    private void ProjectEdit_NamesChangeSaveBackAndAgainEdit_E2E(Window mainWindow)
     {
         var projectList = new ProjectListView(mainWindow).ForceShow();
         projectList.CreateProject("Umbenennen-Test");
@@ -133,7 +133,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// Prüft: Bestätigungsdialog erscheint, Löschen schließt das Overlay.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private void ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E(Window mainWindow)
+    private void DeleteProject_ConfirmationRequiredAndOverlayClosed_E2E(Window mainWindow)
     {
         var projectList = new ProjectListView(mainWindow).ForceShow();
         projectList.CreateProject("Loeschen-Test");
@@ -147,34 +147,34 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// Prueft: Offene Aufgaben sind direkt sichtbar, beendete Aufgaben erst nach Aufklappen des Expanders.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private async Task Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E(Window mainWindow)
+    private async Task Projectdetailview_DisconnectsOpenAndFinishedWorkItems_E2E(Window mainWindow)
     {
-        var projektName = "Archivierte-Aufgaben-E2E";
-        var offeneAufgabeTitel = "Offene Aufgabe E2E";
-        var beendeteAufgabeTitel = "Beendete Aufgabe E2E";
+        var projectName = "Archivierte-Aufgaben-E2E";
+        var openWorkItemTitle = "Offene Aufgabe E2E";
+        var finishedWorkItemTitle = "Beendete Aufgabe E2E";
 
         await using (var db = OpenTestDbContext())
         {
             var projectService = new ProjectService(db, NullLogger<ProjectService>.Instance);
             var workItemService = new WorkItemService(db, NullLogger<WorkItemService>.Instance, new TodoService(db, NullLogger<TodoService>.Instance));
 
-            var project = await projectService.CreateAsync(projektName, null);
-            await workItemService.CreateAsync(project.Id, offeneAufgabeTitel, null);
-            var beendeteAufgabe = await workItemService.CreateAsync(project.Id, beendeteAufgabeTitel, null);
-            await workItemService.SetStatusUncheckedAsync(beendeteAufgabe.Id, WorkItemStatus.Completed);
+            var project = await projectService.CreateAsync(projectName, null);
+            await workItemService.CreateAsync(project.Id, openWorkItemTitle, null);
+            var finishedWorkItem = await workItemService.CreateAsync(project.Id, finishedWorkItemTitle, null);
+            await workItemService.SetStatusUncheckedAsync(finishedWorkItem.Id, WorkItemStatus.Completed);
         }
 
         var projectList = new ProjectListView(mainWindow).ForceShow();
-        var projectDetail = projectList.OpenProject(projektName);
+        var projectDetail = projectList.OpenProject(projectName);
 
-        var offeneItems = projectDetail.GetTaskElements();
-        Assert.Contains(offeneItems, item => item.Name == offeneAufgabeTitel);
-        Assert.DoesNotContain(offeneItems, item => item.Name == beendeteAufgabeTitel);
+        var openItems = projectDetail.GetTaskElements();
+        Assert.Contains(openItems, item => item.Name == openWorkItemTitle);
+        Assert.DoesNotContain(openItems, item => item.Name == finishedWorkItemTitle);
 
         Assert.True(projectDetail.IsFinishedTasksExpanderCollapsed());
 
-        var beendeteItems = projectDetail.ExpandAndGetFinishedTasks();
-        Assert.Contains(beendeteItems, item => item.Name == beendeteAufgabeTitel);
+        var finishedItems = projectDetail.ExpandAndGetFinishedTasks();
+        Assert.Contains(finishedItems, item => item.Name == finishedWorkItemTitle);
 
         var projectListAfterDelete = projectDetail.DeleteProject();
         projectListAfterDelete.Menu.NavigateToDashboard();
@@ -188,7 +188,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// und schließt sich korrekt.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private void AufgabenInProjektdetail_NeuAnlegenUndFiltern_E2E(Window mainWindow)
+    private void WorkItemsInProjectdetail_FilterNewCreateAnd_E2E(Window mainWindow)
     {
         var projectList = new ProjectListView(mainWindow).ForceShow();
         projectList.CreateProject("Aufgabe-Test");
@@ -223,7 +223,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// ausgeblendet); nach "Cancel" bleibt das Hauptfenster-Overlay ("Speichern") weiterhin sichtbar.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private void RepositoryDialog_OeffnenButtonZuweisenPluginUndArbeitsverzeichnis_E2E(Window mainWindow)
+    private void RepositoryDialog_OpenButtonAssignPluginAndWorkingDirectory_E2E(Window mainWindow)
     {
         var projectList = new ProjectListView(mainWindow).ForceShow();
         projectList.CreateProject("Repository-Dialog-Test");

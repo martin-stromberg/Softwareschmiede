@@ -7,7 +7,7 @@ namespace Softwareschmiede.Tests.E2E.Views;
 public sealed class DashboardView : BaseWindowView
 {
     /// <summary>AutomationId der Aufgabenliste auf dem Dashboard.</summary>
-    private const string AufgabenListeAutomationId = "ActiveWorkItemsListDashboard";
+    private const string WorkItemsListAutomationId = "ActiveWorkItemsListDashboard";
 
     /// <summary>Namenspräfix der Modus-Umschalter der Dashboard-Aufgabenliste.</summary>
     private const string WorkItemsModePrefix = "DashboardWorkItemsMode:";
@@ -44,9 +44,9 @@ public sealed class DashboardView : BaseWindowView
     /// </summary>
     /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
     /// <returns>Diese Instanz.</returns>
-    public DashboardView SetzeAufgabenListenModus(string mode)
+    public DashboardView SetWorkItemsListsMode(string mode)
     {
-        KlickeAufgabenModusUmschalter(WorkItemsModePrefix, mode);
+        ClickWorkItemsModeSwitch(WorkItemsModePrefix, mode);
         return this;
     }
 
@@ -55,7 +55,7 @@ public sealed class DashboardView : BaseWindowView
     /// (UIA-Namen 'WorkItemsGroup:{Name}' der Gruppenheader, gescoped unter 'ActiveWorkItemsListDashboard').
     /// </summary>
     /// <returns>Die Gruppennamen ohne das 'WorkItemsGroup:'-Präfix; leer im flachen Modus.</returns>
-    public string[] GetAufgabenGruppenNamen() => GetAufgabenGruppenNamen(AufgabenListeAutomationId);
+    public string[] GetWorkItemsGroupsNames() => GetWorkItemsGroupsNames(WorkItemsListAutomationId);
 
     /// <summary>
     /// Wartet, bis der Gruppenheader 'WorkItemsGroup:{name}' in der Dashboard-Aufgabenliste
@@ -65,9 +65,9 @@ public sealed class DashboardView : BaseWindowView
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Diese Instanz.</returns>
     /// <exception cref="TimeoutException">Der Gruppenheader erschien nicht rechtzeitig.</exception>
-    public DashboardView WaitForAufgabenGruppe(string name, TimeSpan timeout)
+    public DashboardView WaitForWorkItemsGroup(string name, TimeSpan timeout)
     {
-        WaitForAufgabenGruppe(AufgabenListeAutomationId, name, timeout);
+        WaitForWorkItemsGroup(WorkItemsListAutomationId, name, timeout);
         return this;
     }
 }

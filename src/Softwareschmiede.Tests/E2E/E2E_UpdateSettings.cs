@@ -23,19 +23,19 @@ namespace Softwareschmiede.Tests.E2E;
 /// </summary>
 public partial class End2EndTest
 {
-    private const string UpdateModusAusLabel = UpdateModeText.Off;
-    private const string UpdateModusNurPruefenLabel = UpdateModeText.CheckOnly;
-    private const string UpdateModusStartLabel = UpdateModeText.CheckAndRunAtStartup;
-    private const string UpdatePfadProduktivLabel = UpdatePathText.StableVersions;
-    private const string UpdatePfadVorabLabel = UpdatePathText.Vorabversionen;
-    private const string UpdateHinweisKanalKonfliktTeil = "passt nicht";
+    private const string UpdateModeOutLabel = UpdateModeText.Off;
+    private const string UpdateModeOnlyCheckLabel = UpdateModeText.CheckOnly;
+    private const string UpdateModeStartLabel = UpdateModeText.CheckAndRunAtStartup;
+    private const string UpdatePathProductionLabel = UpdatePathText.StableVersions;
+    private const string UpdatePathUpfrontLabel = UpdatePathText.Vorabversionen;
+    private const string UpdateNoticeChannelConflictPart = "passt nicht";
     private const string UpdateDownloadGate = "download-block";
     private const string UpdateReleaseGate = "release-block";
-    private const string UpdateHinweisNichtPruefbarTeil = "nicht prüfbar";
+    private const string UpdateNoticeNotCheckablePart = "nicht prüfbar";
     private const uint GwOwner = 4;
 
     [DllImport("user32.dll")]
-    private static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+    private static extern IntPtr GetWindow(IntPtr hWnd, uint andCmd);
 
     /// <summary>
     /// E-01: Alle drei exakten Update-Modus-Labels und beide Update-Pfade
@@ -44,126 +44,126 @@ public partial class End2EndTest
     /// Änderung wird über "Verwerfen" zurückgesetzt. Der lange Auswahltext bleibt bei der
     /// minimalen Fenstergröße lesbar (ComboBox ist breit genug).
     /// </summary>
-    private async Task Settings_AllModesAndUpdatePfadPersist()
+    private async Task Settings_AllModesAndUpdatePathPersist()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Off, UpdatePathChannelResolver.PrereleaseVersionsPath);
+        await fixture.SetUpdateSettingsAsync(UpdateMode.Off, UpdatePathChannelResolver.PrereleaseVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
         // protokolliert sein, bevor GetMainWindow zurückkehrt.
-        var basis = ProtokollBasis(fixture);
-        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.ErzeugeStartUmgebung());
+        var baseline = LogBase(fixture);
+        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.CreateStartEnvironment());
         Window? mainWindow = null;
         try
         {
-            mainWindow = WarteAufEchtesHauptfenster(app);
+            mainWindow = WaitOnRealMainwindow(app);
             var menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
 
-            var settings = await OeffneSettingsGeladenAsync(fixture, menu);
-            Assert.Equal(UpdateModusAusLabel, settings.GetUpdateMode());
-            Assert.Equal(UpdatePfadVorabLabel, settings.GetUpdatePfad());
-            Assert.Equal(UpdatePathText.ChannelReleaseCandidate, settings.GetAbgeleitetenUpdateKanal());
+            var settings = await OpenSettingsLoadedAsync(fixture, menu);
+            Assert.Equal(UpdateModeOutLabel, settings.GetUpdateMode());
+            Assert.Equal(UpdatePathUpfrontLabel, settings.GetUpdatePath());
+            Assert.Equal(UpdatePathText.ChannelReleaseCandidate, settings.GetDerivedUpdateChannel());
 
             // Alle drei exakten Labels nacheinander setzen und speichern.
-            settings.SetUpdateMode(UpdateModusNurPruefenLabel).SaveSettings();
-            WarteAufSpeichernAktiviert(settings);
-            Assert.Equal(UpdateModusNurPruefenLabel, settings.GetUpdateMode());
+            settings.SetUpdateMode(UpdateModeOnlyCheckLabel).SaveSettings();
+            WaitOnSaveEnabled(settings);
+            Assert.Equal(UpdateModeOnlyCheckLabel, settings.GetUpdateMode());
 
-            settings.SetUpdateMode(UpdateModusStartLabel).SaveSettings();
-            WarteAufSpeichernAktiviert(settings);
-            Assert.Equal(UpdateModusStartLabel, settings.GetUpdateMode());
+            settings.SetUpdateMode(UpdateModeStartLabel).SaveSettings();
+            WaitOnSaveEnabled(settings);
+            Assert.Equal(UpdateModeStartLabel, settings.GetUpdateMode());
 
             // Minimale Fenstergröße (MinWidth/MinHeight 900x600 aus MainWindow.xaml):
             // Der lange Auswahltext muss im aufgeklappten Dropdown vollständig im
             // Fenster lesbar bleiben (TextWrapping statt horizontalem Abschneiden).
             settings.Window.Patterns.Transform.Pattern.Resize(900, 600);
             Thread.Sleep(300);
-            var updateCombo = WaitForElement(settings.Window, cf => cf.ByName("Update-Modus"), Short);
+            var updateCombo = WaitForElement(settings.Window, cf => cf.ByName("Update-Mode"), Short);
             updateCombo.Patterns.ExpandCollapse.Pattern.Expand();
-            var langerEintrag = WaitForElement(
+            var longerEntry = WaitForElement(
                 updateCombo,
-                cf => cf.ByName(UpdateModusStartLabel).And(cf.ByControlType(ControlType.ListItem)),
+                cf => cf.ByName(UpdateModeStartLabel).And(cf.ByControlType(ControlType.ListItem)),
                 Medium);
-            var fensterRect = settings.Window.BoundingRectangle;
-            var eintragRect = langerEintrag.BoundingRectangle;
+            var windowRect = settings.Window.BoundingRectangle;
+            var entryRect = longerEntry.BoundingRectangle;
             Assert.True(
-                eintragRect.Left >= fensterRect.Left
-                && eintragRect.Right <= fensterRect.Right
-                && eintragRect.Top >= fensterRect.Top
-                && eintragRect.Bottom <= fensterRect.Bottom
-                && eintragRect.Width >= 200,
+                entryRect.Left >= windowRect.Left
+                && entryRect.Right <= windowRect.Right
+                && entryRect.Top >= windowRect.Top
+                && entryRect.Bottom <= windowRect.Bottom
+                && entryRect.Width >= 200,
                 $"Der lange Update-Modus-Text ist bei minimaler Fenstergröße nicht vollständig " +
-                $"lesbar (Eintrag {eintragRect}, Fenster {fensterRect}).");
+                $"lesbar (Eintrag {entryRect}, Fenster {windowRect}).");
             updateCombo.Patterns.ExpandCollapse.Pattern.Collapse();
 
-            settings.SetUpdateMode(UpdateModusAusLabel).SaveSettings();
-            WarteAufSpeichernAktiviert(settings);
-            Assert.Equal(UpdateModusAusLabel, settings.GetUpdateMode());
+            settings.SetUpdateMode(UpdateModeOutLabel).SaveSettings();
+            WaitOnSaveEnabled(settings);
+            Assert.Equal(UpdateModeOutLabel, settings.GetUpdateMode());
 
             // Beide Update-Pfade setzen und speichern; der abgeleitete Kanal folgt der Auswahl.
-            settings.SetUpdatePfad(UpdatePfadProduktivLabel).SaveSettings();
-            WarteAufSpeichernAktiviert(settings);
-            Assert.Equal(UpdatePfadProduktivLabel, settings.GetUpdatePfad());
-            Assert.Equal(UpdatePathText.ChannelStable, settings.GetAbgeleitetenUpdateKanal());
-            settings.SetUpdatePfad(UpdatePfadVorabLabel).SaveSettings();
-            WarteAufSpeichernAktiviert(settings);
-            Assert.Equal(UpdatePfadVorabLabel, settings.GetUpdatePfad());
-            Assert.Equal(UpdatePathText.ChannelReleaseCandidate, settings.GetAbgeleitetenUpdateKanal());
+            settings.SetUpdatePath(UpdatePathProductionLabel).SaveSettings();
+            WaitOnSaveEnabled(settings);
+            Assert.Equal(UpdatePathProductionLabel, settings.GetUpdatePath());
+            Assert.Equal(UpdatePathText.ChannelStable, settings.GetDerivedUpdateChannel());
+            settings.SetUpdatePath(UpdatePathUpfrontLabel).SaveSettings();
+            WaitOnSaveEnabled(settings);
+            Assert.Equal(UpdatePathUpfrontLabel, settings.GetUpdatePath());
+            Assert.Equal(UpdatePathText.ChannelReleaseCandidate, settings.GetDerivedUpdateChannel());
 
             // "Nur prüfen" als Restart-Ausgangslage (kein Auto-Install beim Neustart).
-            settings.SetUpdateMode(UpdateModusNurPruefenLabel).SaveSettings();
-            WarteAufSpeichernAktiviert(settings);
+            settings.SetUpdateMode(UpdateModeOnlyCheckLabel).SaveSettings();
+            WaitOnSaveEnabled(settings);
 
             // Weg- und zurücknavigieren: die persistierten Werte werden erneut angezeigt.
             menu.NavigateToDashboard();
-            settings = await OeffneSettingsGeladenAsync(fixture, menu);
-            Assert.Equal(UpdateModusNurPruefenLabel, settings.GetUpdateMode());
-            Assert.Equal(UpdatePfadVorabLabel, settings.GetUpdatePfad());
+            settings = await OpenSettingsLoadedAsync(fixture, menu);
+            Assert.Equal(UpdateModeOnlyCheckLabel, settings.GetUpdateMode());
+            Assert.Equal(UpdatePathUpfrontLabel, settings.GetUpdatePath());
 
             // Ungespeicherte Änderung wird über "Verwerfen" zurückgesetzt.
-            settings.SetUpdateMode(UpdateModusAusLabel);
-            Assert.Equal(UpdateModusAusLabel, settings.GetUpdateMode());
-            settings.SetUpdatePfad(UpdatePfadProduktivLabel);
-            Assert.Equal(UpdatePfadProduktivLabel, settings.GetUpdatePfad());
-            var readsVorher = fixture.ZaehleEreignis(UpdateE2EEvents.UpdateSettingsReadReached);
+            settings.SetUpdateMode(UpdateModeOutLabel);
+            Assert.Equal(UpdateModeOutLabel, settings.GetUpdateMode());
+            settings.SetUpdatePath(UpdatePathProductionLabel);
+            Assert.Equal(UpdatePathProductionLabel, settings.GetUpdatePath());
+            var readsBefore = fixture.CountEvent(UpdateE2EEvents.UpdateSettingsReadReached);
             settings.DiscardChanges();
-            await fixture.WarteAufEreignisAsync(UpdateE2EEvents.UpdateSettingsReadReached, Medium,
-                mindestens: readsVorher + 1);
-            settings.WaitForUpdateMode(UpdateModusNurPruefenLabel, Medium);
-            settings.WaitForUpdatePfad(UpdatePfadVorabLabel, Medium);
+            await fixture.WaitOnEventAsync(UpdateE2EEvents.UpdateSettingsReadReached, Medium,
+                mindestens: readsBefore + 1);
+            settings.WaitForUpdateMode(UpdateModeOnlyCheckLabel, Medium);
+            settings.WaitForUpdatePath(UpdatePathUpfrontLabel, Medium);
             menu.NavigateToDashboard();
 
             // Echter Neustart mit derselben DB: beide Werte sind persistiert und steuern den
             // Startlauf sichtbar (Nur prüfen + Vorabversionen -> RC-Angebot mit
             // nicht-blockierender Konfliktwarnung, ohne Installation).
-            basis = ProtokollBasis(fixture);
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
 
             Assert.Equal(UpdateE2EFixture.RcVersion, menu.WaitForOfferedUpdateVersion(Medium));
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.UpdateCheckStarted
-                && DatenText(e, "updatePfad") == UpdatePathChannelResolver.PrereleaseVersionsPath
-                && DatenText(e, "kanal") == nameof(UpdateChannel.ReleaseCandidate));
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
-                && DatenText(e, "version") == UpdateE2EFixture.RcVersion
-                && DatenBool(e, "isPrerelease") == true);
-            menu.WaitForUpdateHinweis(UpdateHinweisKanalKonfliktTeil, Medium);
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateProcessStartRecorded));
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.ShutdownRequested));
+            Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.UpdateCheckStarted
+                && DataText(e, "updatePfad") == UpdatePathChannelResolver.PrereleaseVersionsPath
+                && DataText(e, "kanal") == nameof(UpdateChannel.ReleaseCandidate));
+            Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
+                && DataText(e, "version") == UpdateE2EFixture.RcVersion
+                && DataBool(e, "isPrerelease") == true);
+            menu.WaitForUpdateNotice(UpdateNoticeChannelConflictPart, Medium);
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateProcessStartRecorded));
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.ShutdownRequested));
 
-            settings = await OeffneSettingsGeladenAsync(fixture, menu);
-            Assert.Equal(UpdateModusNurPruefenLabel, settings.GetUpdateMode());
-            Assert.Equal(UpdatePfadVorabLabel, settings.GetUpdatePfad());
-            Assert.Equal(UpdatePathText.ChannelReleaseCandidate, settings.GetAbgeleitetenUpdateKanal());
+            settings = await OpenSettingsLoadedAsync(fixture, menu);
+            Assert.Equal(UpdateModeOnlyCheckLabel, settings.GetUpdateMode());
+            Assert.Equal(UpdatePathUpfrontLabel, settings.GetUpdatePath());
+            Assert.Equal(UpdatePathText.ChannelReleaseCandidate, settings.GetDerivedUpdateChannel());
             menu.NavigateToDashboard();
         }
         finally
         {
-            await SetzeUpdateSteuerungZurueckAsync(fixture, mainWindow);
-            SchliesseFixtureApp();
+            await SetUpdateControlBackAsync(fixture, mainWindow);
+            CloseFixtureApp();
         }
     }
 
@@ -180,100 +180,100 @@ public partial class End2EndTest
     private async Task Startup_ModesDriveUpdatePipeline()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath);
+        await fixture.SetUpdateSettingsAsync(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
         // protokolliert sein, bevor GetMainWindow zurückkehrt.
-        var basis = ProtokollBasis(fixture);
-        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.ErzeugeStartUmgebung());
+        var baseline = LogBase(fixture);
+        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.CreateStartEnvironment());
         Window? mainWindow = null;
         try
         {
-            mainWindow = WarteAufEchtesHauptfenster(app);
+            mainWindow = WaitOnRealMainwindow(app);
             var menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
 
             // Modus "Aus" über die UI speichern, regulär schließen, gleiche DB neu starten.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusAusLabel, UpdatePfadProduktivLabel);
-            basis = ProtokollBasis(fixture);
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeOutLabel, UpdatePathProductionLabel);
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
 
-            WarteAufUiZustand(() => !menu.IsUpdatePruefenButtonEnabled(),
+            WaitOnUiState(() => !menu.IsUpdateCheckButtonEnabled(),
                 "Prüfen-Button im Modus Aus deaktiviert", Medium);
             Assert.False(menu.IsUpdateStartButtonVisible());
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest));
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateCheckStarted));
-            AssertKeinUpdateNebenwirkungSeit(fixture, basis);
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest));
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateCheckStarted));
+            AssertNoUpdateSideeffectSince(fixture, baseline);
 
             // Modus "Nur prüfen" über die UI speichern, regulär schließen, neu starten.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadProduktivLabel);
-            basis = ProtokollBasis(fixture);
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeOnlyCheckLabel, UpdatePathProductionLabel);
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
 
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.HttpRequest
-                && DatenText(e, "url") == UpdateE2EFixture.ReleaseApiUrl);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
-                && DatenText(e, "status") == "UpdateVerfuegbar"
-                && DatenText(e, "version") == UpdateE2EFixture.StableVersion
-                && DatenBool(e, "isPrerelease") == false);
+            Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.HttpRequest
+                && DataText(e, "url") == UpdateE2EFixture.ReleaseApiUrl);
+            Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
+                && DataText(e, "status") == "UpdateVerfuegbar"
+                && DataText(e, "version") == UpdateE2EFixture.StableVersion
+                && DataBool(e, "isPrerelease") == false);
             Assert.Equal(UpdateE2EFixture.StableVersion, menu.WaitForOfferedUpdateVersion(Medium));
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-                e => DatenText(e, "art") == "asset"));
-            AssertKeinUpdateNebenwirkungSeit(fixture, basis);
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+                e => DataText(e, "art") == "asset"));
+            AssertNoUpdateSideeffectSince(fixture, baseline);
 
             // Startmodus über die UI speichern; der ZIP-Stream wird per Gate blockiert.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadProduktivLabel);
-            fixture.AktualisiereSzenario(s =>
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeStartLabel, UpdatePathProductionLabel);
+            fixture.UpdateScenario(s =>
             {
-                var paket = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
-                paket.StreamGate = UpdateDownloadGate;
-                paket.StreamGateBytes = 128;
+                var package = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
+                package.StreamGate = UpdateDownloadGate;
+                package.StreamGateBytes = 128;
             });
-            basis = ProtokollBasis(fixture);
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
 
             // Ohne Updateklick erscheint der echte Fortschrittsdialog; der Download blockiert
             // kontrolliert im Stream-Gate, nachdem die Releaseantwort sofort ankam.
             var dialogElement = WaitForWindow("Update vorbereiten", Long);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.HttpRequestBlocked, Long,
-                filter: e => DatenText(e, "gate") == UpdateDownloadGate);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.HttpResponse
-                && DatenText(e, "url") == UpdateE2EFixture.ReleaseApiUrl);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.HttpRequestBlocked, Long,
+                filter: e => DataText(e, "gate") == UpdateDownloadGate);
+            Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.HttpResponse
+                && DataText(e, "url") == UpdateE2EFixture.ReleaseApiUrl);
 
             // Korrekter Owner: Der Fortschrittsdialog gehört dem Hauptfenster.
             Assert.Equal(
                 mainWindow.FrameworkAutomationElement.NativeWindowHandle,
                 GetWindow(dialogElement.FrameworkAutomationElement.NativeWindowHandle, GwOwner));
 
-            var fortschritt = new UpdateProgressDialogView(mainWindow);
-            Assert.True(fortschritt.IsVisible);
-            WarteAufUiZustand(() => fortschritt.GetPhase() == "Download", "Download-Phase", Medium);
-            Assert.True(fortschritt.CanCancel());
-            WarteAufUiZustand(() => fortschritt.GetProgress() is > 0 and < 100,
+            var progress = new UpdateProgressDialogView(mainWindow);
+            Assert.True(progress.IsVisible);
+            WaitOnUiState(() => progress.GetPhase() == "Download", "Download-Phase", Medium);
+            Assert.True(progress.CanCancel());
+            WaitOnUiState(() => progress.GetProgress() is > 0 and < 100,
                 "Teilfortschritt des blockierten Downloads", Medium);
 
             // Während des blockierten Downloads bleiben beide Update-Commands gesperrt.
-            WarteAufUiZustand(() => !menu.IsUpdatePruefenButtonEnabled(), "Prüfen während Download gesperrt", Medium);
+            WaitOnUiState(() => !menu.IsUpdateCheckButtonEnabled(), "Prüfen während Download gesperrt", Medium);
             Assert.False(menu.IsUpdateStartButtonEnabled());
 
             // Freigabe: reale Vorbereitung bis zur kontrollierten Launcher-/Shutdown-Grenze.
-            fixture.OeffneGate(UpdateDownloadGate);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            AssertiereInstallationsNachweis(fixture, basis,
+            fixture.OpenGate(UpdateDownloadGate);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            AssertInstallationProof(fixture, baseline,
                 UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, "stable-marker");
-            fortschritt.Close();
-            fixture.SetzeGateZurueck(UpdateDownloadGate);
+            progress.Close();
+            fixture.SetGateBack(UpdateDownloadGate);
         }
         finally
         {
-            await SetzeUpdateSteuerungZurueckAsync(fixture, mainWindow);
-            SchliesseFixtureApp();
+            await SetUpdateControlBackAsync(fixture, mainWindow);
+            CloseFixtureApp();
         }
     }
 
@@ -288,93 +288,93 @@ public partial class End2EndTest
     /// und im Versuchsprotokoll. Beide Pfade werden zusätzlich mit UI-gespeichertem
     /// Startmodus und je echtem Neustart ohne Updateklick geprüft.
     /// </summary>
-    private async Task UpdatePfad_SelectsExclusiveChannelAsset()
+    private async Task UpdatePath_SelectsExclusiveChannelAsset()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
+        await fixture.SetUpdateSettingsAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
         // protokolliert sein, bevor GetMainWindow zurückkehrt.
-        var basis = ProtokollBasis(fixture);
-        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.ErzeugeStartUmgebung());
+        var baseline = LogBase(fixture);
+        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.CreateStartEnvironment());
         Window? mainWindow = null;
         try
         {
-            mainWindow = WarteAufEchtesHauptfenster(app);
+            mainWindow = WaitOnRealMainwindow(app);
             var menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
 
             // Produktiv-Pfad: exakt Stable wird angeboten und installiert.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadProduktivLabel);
-            await PruefeUpdateUeberUiAsync(fixture, menu, basis = ProtokollBasis(fixture),
-                UpdateE2EFixture.StableVersion, isPrerelease: false, UpdatePfadProduktivLabel);
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeOnlyCheckLabel, UpdatePathProductionLabel);
+            await CheckUpdateOverUiAsync(fixture, menu, baseline = LogBase(fixture),
+                UpdateE2EFixture.StableVersion, isPrerelease: false, UpdatePathProductionLabel);
 
-            basis = ProtokollBasis(fixture);
-            menu.ClickUpdateStarten();
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-                filter: e => DatenText(e, "versuch") == "starten");
-            AssertiereInstallationsNachweis(fixture, basis,
+            baseline = LogBase(fixture);
+            menu.StartClickUpdate();
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+                filter: e => DataText(e, "versuch") == "starten");
+            AssertInstallationProof(fixture, baseline,
                 UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, "stable-marker");
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-                e => DatenText(e, "url") == fixture.RcDownloadUrl));
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+                e => DataText(e, "url") == fixture.RcDownloadUrl));
             new UpdateProgressDialogView(mainWindow).Close();
 
             // Vorab-Pfad mit semantisch höherer stabiler Konkurrenz: exakt RC - die höhere
             // stabile Version ist kanalfremd. Produktive Installation + Vorab-Pfad ergibt
             // den Kanalkonflikt: Angebot bleibt, die Warnung ist nicht blockierend.
-            fixture.AktualisiereSzenario(s =>
+            fixture.UpdateScenario(s =>
                 s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Content =
-                    ErzeugeRcUndHoeheresStableReleaseJson(fixture));
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadVorabLabel);
-            await PruefeUpdateUeberUiAsync(fixture, menu, basis = ProtokollBasis(fixture),
-                UpdateE2EFixture.RcVersion, isPrerelease: true, UpdatePfadVorabLabel);
-            menu.WaitForUpdateHinweis(UpdateHinweisKanalKonfliktTeil, Medium);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.UpdateAttemptCompleted
-                && DatenText(e, "versuch") == "pruefen"
-                && (DatenText(e, "hinweis") ?? string.Empty).Contains(UpdateHinweisKanalKonfliktTeil));
+                    CreateRcAndHigherStableReleaseJson(fixture));
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeOnlyCheckLabel, UpdatePathUpfrontLabel);
+            await CheckUpdateOverUiAsync(fixture, menu, baseline = LogBase(fixture),
+                UpdateE2EFixture.RcVersion, isPrerelease: true, UpdatePathUpfrontLabel);
+            menu.WaitForUpdateNotice(UpdateNoticeChannelConflictPart, Medium);
+            Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.UpdateAttemptCompleted
+                && DataText(e, "versuch") == "pruefen"
+                && (DataText(e, "hinweis") ?? string.Empty).Contains(UpdateNoticeChannelConflictPart));
 
-            basis = ProtokollBasis(fixture);
-            menu.ClickUpdateStarten();
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-                filter: e => DatenText(e, "versuch") == "starten");
-            AssertiereInstallationsNachweis(fixture, basis,
+            baseline = LogBase(fixture);
+            menu.StartClickUpdate();
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+                filter: e => DataText(e, "versuch") == "starten");
+            AssertInstallationProof(fixture, baseline,
                 UpdateE2EFixture.RcVersion, fixture.RcDownloadUrl, "rc-marker");
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-                e => DatenText(e, "url") == fixture.StableDownloadUrl));
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+                e => DataText(e, "url") == fixture.StableDownloadUrl));
             new UpdateProgressDialogView(mainWindow).Close();
 
             // Startmodus + Produktiv-Pfad über die UI speichern: echter Neustart installiert
             // Stable ohne Updateklick.
-            fixture.SetzeStandardAntworten();
-            fixture.SpeichereSzenario();
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadProduktivLabel);
-            basis = ProtokollBasis(fixture);
+            fixture.SetDefaultResponses();
+            fixture.SaveScenario();
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeStartLabel, UpdatePathProductionLabel);
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            AssertiereInstallationsNachweis(fixture, basis,
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            AssertInstallationProof(fixture, baseline,
                 UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, "stable-marker");
             new UpdateProgressDialogView(mainWindow).Close();
 
             // Startmodus + Vorab-Pfad: echter Neustart installiert RC ohne Updateklick;
             // die Konfliktwarnung erscheint erneut, blockiert die Installation aber nicht.
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadVorabLabel);
-            basis = ProtokollBasis(fixture);
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeStartLabel, UpdatePathUpfrontLabel);
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            AssertiereInstallationsNachweis(fixture, basis,
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            AssertInstallationProof(fixture, baseline,
                 UpdateE2EFixture.RcVersion, fixture.RcDownloadUrl, "rc-marker");
-            menu.WaitForUpdateHinweis(UpdateHinweisKanalKonfliktTeil, Medium);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.StartupUpdateCompleted
-                && (DatenText(e, "hinweis") ?? string.Empty).Contains(UpdateHinweisKanalKonfliktTeil));
+            menu.WaitForUpdateNotice(UpdateNoticeChannelConflictPart, Medium);
+            Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.StartupUpdateCompleted
+                && (DataText(e, "hinweis") ?? string.Empty).Contains(UpdateNoticeChannelConflictPart));
             new UpdateProgressDialogView(mainWindow).Close();
         }
         finally
         {
-            await SetzeUpdateSteuerungZurueckAsync(fixture, mainWindow);
-            SchliesseFixtureApp();
+            await SetUpdateControlBackAsync(fixture, mainWindow);
+            CloseFixtureApp();
         }
     }
 
@@ -392,102 +392,102 @@ public partial class End2EndTest
     private async Task SavedChangesInvalidatePreviousOffer()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.CheckOnly, UpdatePathChannelResolver.PrereleaseVersionsPath);
+        await fixture.SetUpdateSettingsAsync(UpdateMode.CheckOnly, UpdatePathChannelResolver.PrereleaseVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
         // protokolliert sein, bevor GetMainWindow zurückkehrt.
-        var basis = ProtokollBasis(fixture);
-        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.ErzeugeStartUmgebung());
+        var baseline = LogBase(fixture);
+        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.CreateStartEnvironment());
         Window? mainWindow = null;
         try
         {
-            mainWindow = WarteAufEchtesHauptfenster(app);
+            mainWindow = WaitOnRealMainwindow(app);
             var menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
             Assert.Equal(UpdateE2EFixture.RcVersion, menu.WaitForOfferedUpdateVersion(Medium));
 
             // Update-Pfad auf Produktivversionen + speichern: das alte RC-Angebot verschwindet sofort, ohne dass
             // das Speichern selbst einen Update-Request auslöst.
-            basis = ProtokollBasis(fixture);
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadProduktivLabel);
-            WarteAufUiZustand(() => !menu.IsUpdateStartButtonVisible(),
+            baseline = LogBase(fixture);
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeOnlyCheckLabel, UpdatePathProductionLabel);
+            WaitOnUiState(() => !menu.IsUpdateStartButtonVisible(),
                 "Updateangebot nach Speichern entfernt", Medium);
             Assert.Null(menu.GetOfferedUpdateVersion());
             Assert.False(menu.IsUpdateStartButtonEnabled());
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest));
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest));
 
             // Erneut prüfen: Stable-Angebot; Installation fordert nur das Stable-Asset an.
-            basis = ProtokollBasis(fixture);
-            menu.ClickUpdatePruefen();
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-                filter: e => DatenText(e, "versuch") == "pruefen");
+            baseline = LogBase(fixture);
+            menu.CheckClickUpdate();
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+                filter: e => DataText(e, "versuch") == "pruefen");
             Assert.Equal(UpdateE2EFixture.StableVersion, menu.WaitForOfferedUpdateVersion(Medium));
 
-            menu.ClickUpdateStarten();
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-                filter: e => DatenText(e, "versuch") == "starten");
-            AssertiereInstallationsNachweis(fixture, basis,
+            menu.StartClickUpdate();
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+                filter: e => DataText(e, "versuch") == "starten");
+            AssertInstallationProof(fixture, baseline,
                 UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, "stable-marker");
             new UpdateProgressDialogView(mainWindow).Close();
 
             // Erneut RC anbieten (Update-Pfad wieder auf Vorabversionen).
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadVorabLabel);
-            basis = ProtokollBasis(fixture);
-            menu.ClickUpdatePruefen();
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-                filter: e => DatenText(e, "versuch") == "pruefen");
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeOnlyCheckLabel, UpdatePathUpfrontLabel);
+            baseline = LogBase(fixture);
+            menu.CheckClickUpdate();
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+                filter: e => DataText(e, "versuch") == "pruefen");
             Assert.Equal(UpdateE2EFixture.RcVersion, menu.WaitForOfferedUpdateVersion(Medium));
 
             // Laufenden Prüfrequest blockieren; währenddessen "Aus" speichern.
-            fixture.AktualisiereSzenario(s =>
+            fixture.UpdateScenario(s =>
                 s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Gate = UpdateReleaseGate);
-            basis = ProtokollBasis(fixture);
-            menu.ClickUpdatePruefen();
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.HttpRequestBlocked, Long,
-                filter: e => DatenText(e, "url") == UpdateE2EFixture.ReleaseApiUrl
-                    && DatenText(e, "gate") == UpdateReleaseGate);
+            baseline = LogBase(fixture);
+            menu.CheckClickUpdate();
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.HttpRequestBlocked, Long,
+                filter: e => DataText(e, "url") == UpdateE2EFixture.ReleaseApiUrl
+                    && DataText(e, "gate") == UpdateReleaseGate);
 
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusAusLabel, UpdatePfadVorabLabel);
-            WarteAufUiZustand(() => !menu.IsUpdateStartButtonVisible(),
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeOutLabel, UpdatePathUpfrontLabel);
+            WaitOnUiState(() => !menu.IsUpdateStartButtonVisible(),
                 "Updateangebot nach Aus-Speichern entfernt", Medium);
-            WarteAufUiZustand(() => !menu.IsUpdatePruefenButtonEnabled(),
+            WaitOnUiState(() => !menu.IsUpdateCheckButtonEnabled(),
                 "Prüfen im Modus Aus deaktiviert", Medium);
 
             // Antwort freigeben: das späte Ergebnis wird verworfen.
-            fixture.OeffneGate(UpdateReleaseGate);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-                filter: e => DatenText(e, "versuch") == "pruefen");
+            fixture.OpenGate(UpdateReleaseGate);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+                filter: e => DataText(e, "versuch") == "pruefen");
 
-            var phaseEintraege = EintraegeSeit(fixture, basis);
-            Assert.Contains(phaseEintraege, e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
-                && DatenText(e, "version") == UpdateE2EFixture.RcVersion);
+            var phaseEntries = EntriesSince(fixture, baseline);
+            Assert.Contains(phaseEntries, e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
+                && DataText(e, "version") == UpdateE2EFixture.RcVersion);
             Assert.Null(menu.GetOfferedUpdateVersion());
             Assert.False(menu.IsUpdateStartButtonVisible());
-            Assert.DoesNotContain(phaseEintraege, e => e.Event == UpdateE2EEvents.HttpRequest
-                && DatenText(e, "art") == "asset");
-            AssertKeinUpdateNebenwirkungSeit(fixture, basis);
-            fixture.AktualisiereSzenario(s =>
+            Assert.DoesNotContain(phaseEntries, e => e.Event == UpdateE2EEvents.HttpRequest
+                && DataText(e, "art") == "asset");
+            AssertNoUpdateSideeffectSince(fixture, baseline);
+            fixture.UpdateScenario(s =>
                 s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Gate = null);
-            fixture.SetzeGateZurueck(UpdateReleaseGate);
+            fixture.SetGateBack(UpdateReleaseGate);
 
             // Gleiche DB neu starten: der Modus Aus erzeugt den Nullabruf.
-            basis = ProtokollBasis(fixture);
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateAttemptStarted));
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest));
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateCheckStarted));
-            AssertKeinUpdateNebenwirkungSeit(fixture, basis);
-            WarteAufUiZustand(() => !menu.IsUpdatePruefenButtonEnabled(),
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateAttemptStarted));
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest));
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateCheckStarted));
+            AssertNoUpdateSideeffectSince(fixture, baseline);
+            WaitOnUiState(() => !menu.IsUpdateCheckButtonEnabled(),
                 "Prüfen nach Aus-Restart deaktiviert", Medium);
             Assert.False(menu.IsUpdateStartButtonVisible());
         }
         finally
         {
-            await SetzeUpdateSteuerungZurueckAsync(fixture, mainWindow);
-            SchliesseFixtureApp();
+            await SetUpdateControlBackAsync(fixture, mainWindow);
+            CloseFixtureApp();
         }
     }
 
@@ -506,116 +506,116 @@ public partial class End2EndTest
     private async Task Startup_NoUpdateOrUncheckableRemainsUsable()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
+        await fixture.SetUpdateSettingsAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
         // protokolliert sein, bevor GetMainWindow zurückkehrt.
-        var basis = ProtokollBasis(fixture);
-        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.ErzeugeStartUmgebung());
+        var baseline = LogBase(fixture);
+        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.CreateStartEnvironment());
         Window? mainWindow = null;
         try
         {
-            mainWindow = WarteAufEchtesHauptfenster(app);
+            mainWindow = WaitOnRealMainwindow(app);
             var menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadProduktivLabel);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeStartLabel, UpdatePathProductionLabel);
 
-            var versionsDatei = Path.Combine(fixture.InstalliertesVerzeichnis, "version.json");
+            var versionsFile = Path.Combine(fixture.InstalledDirectory, "version.json");
 
             // Variante: gleiche/ältere Release-Version -> kein Update, keine Nebenwirkungen.
-            fixture.AktualisiereSzenario(s =>
+            fixture.UpdateScenario(s =>
                 s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Content =
-                    ErzeugeReleaseListenJson(fixture, "1.2.0", "1.1.9"));
-            basis = ProtokollBasis(fixture);
+                    CreateReleaseListsJson(fixture, "1.2.0", "1.1.9"));
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
-                && DatenText(e, "status") == "KeinUpdate");
-            Assert.Null(menu.GetUpdateHinweis());
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
+                && DataText(e, "status") == "KeinUpdate");
+            Assert.Null(menu.GetUpdateNotice());
             Assert.False(menu.IsUpdateStartButtonVisible());
             Assert.False(new UpdateProgressDialogView(mainWindow).IsVisible);
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-                e => DatenText(e, "art") == "asset"));
-            AssertKeinUpdateNebenwirkungSeit(fixture, basis);
-            await PruefeSettingsBedienbarAsync(fixture, menu);
-            Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateAttemptStarted));
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+                e => DataText(e, "art") == "asset"));
+            AssertNoUpdateSideeffectSince(fixture, baseline);
+            await CheckSettingsOperableAsync(fixture, menu);
+            Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateAttemptStarted));
 
             // Variante: ungültige lokale version.json -> NichtPruefbar ohne Releaseabruf.
-            File.WriteAllText(versionsDatei, """{"version":"keine-gueltige-version"}""");
-            basis = ProtokollBasis(fixture);
+            File.WriteAllText(versionsFile, """{"version":"keine-gueltige-version"}""");
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
-                && DatenText(e, "status") == "NichtPruefbar");
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest));
-            menu.WaitForUpdateHinweis("Lokale Version", Medium);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
+                && DataText(e, "status") == "NichtPruefbar");
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest));
+            menu.WaitForUpdateNotice("Lokale Version", Medium);
             Assert.False(menu.IsUpdateStartButtonVisible());
             Assert.False(new UpdateProgressDialogView(mainWindow).IsVisible);
-            AssertKeinUpdateNebenwirkungSeit(fixture, basis);
-            await PruefeSettingsBedienbarAsync(fixture, menu);
+            AssertNoUpdateSideeffectSince(fixture, baseline);
+            await CheckSettingsOperableAsync(fixture, menu);
 
             // Variante: fehlende lokale version.json in derselben Session (siehe Hinweis im
             // Methodenkommentar - als Start-Fixture scheitert bereits die Konfigurationsvalidierung).
-            File.Delete(versionsDatei);
-            basis = ProtokollBasis(fixture);
-            WarteAufUiZustand(() => menu.IsUpdatePruefenButtonEnabled(), "Prüfen-Button aktiviert", Medium);
-            menu.ClickUpdatePruefen();
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-                filter: e => DatenText(e, "versuch") == "pruefen");
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest));
-            menu.WaitForUpdateHinweis("Lokale Version", Medium);
+            File.Delete(versionsFile);
+            baseline = LogBase(fixture);
+            WaitOnUiState(() => menu.IsUpdateCheckButtonEnabled(), "Prüfen-Button aktiviert", Medium);
+            menu.CheckClickUpdate();
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+                filter: e => DataText(e, "versuch") == "pruefen");
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest));
+            menu.WaitForUpdateNotice("Lokale Version", Medium);
             Assert.False(menu.IsUpdateStartButtonVisible());
-            AssertKeinUpdateNebenwirkungSeit(fixture, basis);
-            File.WriteAllText(versionsDatei, $$"""{"version":"{{UpdateE2EFixture.InstallierteVersion}}","tagName":"v{{UpdateE2EFixture.InstallierteVersion}}"}""");
+            AssertNoUpdateSideeffectSince(fixture, baseline);
+            File.WriteAllText(versionsFile, $$"""{"version":"{{UpdateE2EFixture.InstalledVersion}}","tagName":"v{{UpdateE2EFixture.InstalledVersion}}"}""");
 
             // Variante: Release-HTTP-Fehler -> NichtPruefbar, Hinweis, keine Nebenwirkungen.
-            fixture.AktualisiereSzenario(s =>
+            fixture.UpdateScenario(s =>
             {
                 var response = s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl);
                 response.Status = 500;
                 response.Content = "e2e-fehler";
             });
-            basis = ProtokollBasis(fixture);
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-                e => DatenText(e, "url") == UpdateE2EFixture.ReleaseApiUrl));
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
-                && DatenText(e, "status") == "NichtPruefbar");
-            menu.WaitForUpdateHinweis(UpdateHinweisNichtPruefbarTeil, Medium);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+                e => DataText(e, "url") == UpdateE2EFixture.ReleaseApiUrl));
+            Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
+                && DataText(e, "status") == "NichtPruefbar");
+            menu.WaitForUpdateNotice(UpdateNoticeNotCheckablePart, Medium);
             Assert.False(menu.IsUpdateStartButtonVisible());
             Assert.False(new UpdateProgressDialogView(mainWindow).IsVisible);
-            AssertKeinUpdateNebenwirkungSeit(fixture, basis);
-            await PruefeSettingsBedienbarAsync(fixture, menu);
+            AssertNoUpdateSideeffectSince(fixture, baseline);
+            await CheckSettingsOperableAsync(fixture, menu);
 
             // Variante: ungültiges Release-JSON -> NichtPruefbar, Hinweis, keine Nebenwirkungen.
-            fixture.AktualisiereSzenario(s =>
+            fixture.UpdateScenario(s =>
             {
                 var response = s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl);
                 response.Status = 200;
                 response.Content = "definitiv kein gueltiges json {{{";
             });
-            basis = ProtokollBasis(fixture);
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-                e => DatenText(e, "url") == UpdateE2EFixture.ReleaseApiUrl));
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
-                && DatenText(e, "status") == "NichtPruefbar");
-            menu.WaitForUpdateHinweis(UpdateHinweisNichtPruefbarTeil, Medium);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+                e => DataText(e, "url") == UpdateE2EFixture.ReleaseApiUrl));
+            Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
+                && DataText(e, "status") == "NichtPruefbar");
+            menu.WaitForUpdateNotice(UpdateNoticeNotCheckablePart, Medium);
             Assert.False(menu.IsUpdateStartButtonVisible());
-            AssertKeinUpdateNebenwirkungSeit(fixture, basis);
-            await PruefeSettingsBedienbarAsync(fixture, menu);
+            AssertNoUpdateSideeffectSince(fixture, baseline);
+            await CheckSettingsOperableAsync(fixture, menu);
         }
         finally
         {
-            await SetzeUpdateSteuerungZurueckAsync(fixture, mainWindow);
-            SchliesseFixtureApp();
+            await SetUpdateControlBackAsync(fixture, mainWindow);
+            CloseFixtureApp();
         }
     }
 
@@ -638,72 +638,72 @@ public partial class End2EndTest
     private async Task Startup_SafetyCancelAndErrorsRemainUsable()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
+        await fixture.SetUpdateSettingsAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
         // protokolliert sein, bevor GetMainWindow zurückkehrt.
-        var basis = ProtokollBasis(fixture);
-        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.ErzeugeStartUmgebung());
+        var baseline = LogBase(fixture);
+        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.CreateStartEnvironment());
         Window? mainWindow = null;
         try
         {
-            mainWindow = WarteAufEchtesHauptfenster(app);
+            mainWindow = WaitOnRealMainwindow(app);
             var menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadProduktivLabel);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeStartLabel, UpdatePathProductionLabel);
 
             // (a) Riskante CLI-Fixture: der echte Sicherheitsdialog wird mit Nein beantwortet.
-            (mainWindow, menu) = await SafetyDialogAbgelehntPhaseAsync(fixture);
+            (mainWindow, menu) = await SafetyDialogRejectedPhaseAsync(fixture);
 
             // (b) Ja bestätigt: echter Downloadfortschritt, Cancel im blockierten Stream.
-            (mainWindow, menu) = await DownloadAbbruchPhaseAsync(fixture);
+            (mainWindow, menu) = await DownloadCancelPhaseAsync(fixture);
 
             // (c1) Asset-HTTP-Fehler beim automatischen Versuch: sichtbarer Vorbereitungsfehler.
-            (mainWindow, menu) = await AssetHttpFehlerPhaseAsync(fixture);
+            (mainWindow, menu) = await AssetHttpErrorPhaseAsync(fixture);
 
             // (c2) Defektes ZIP beim manuellen Startversuch in derselben Session.
-            await DefektesZipPhaseAsync(fixture, menu);
+            await DefectZipPhaseAsync(fixture, menu);
 
             // (c3) Gültiges ZIP mit fremdem Manifest-Hash beim manuellen Startversuch:
             // die Verifikation bricht vor dem Entpacken kontrolliert ab.
-            await ManipuliertesPaketPhaseAsync(fixture, menu);
+            await TamperedPackagePhaseAsync(fixture, menu);
 
             // (d) Gültige Vorbereitung, Launcherfehler: ein Versuch, kein erfolgreicher Start,
             // kein Shutdown.
-            (mainWindow, menu) = await LauncherFehlerPhaseAsync(fixture);
-            fixture.AktualisiereSzenario(s => s.ProcessStart = new UpdateE2EProcessStart { Result = "Erfolg" });
+            (mainWindow, menu) = await LauncherErrorPhaseAsync(fixture);
+            fixture.UpdateScenario(s => s.ProcessStart = new UpdateE2EProcessStart { Result = "Erfolg" });
 
             // (c4) Primärer Asset-Abruf 5xx, einmaliger Fallback auf die API-Asset-URL:
             // die Installation läuft vollständig durch.
-            (mainWindow, menu) = await AssetFallbackErfolgPhaseAsync(fixture);
+            (mainWindow, menu) = await AssetFallbackSuccessPhaseAsync(fixture);
 
             // T-09 automatisch: Lesefehler an allen drei Grenzen (Initial, BeforePreparation,
             // BeforeUpdaterStart) stoppen den Startversuch sicher.
             (mainWindow, menu) = await T09StartupPhaseAsync(fixture, "Initial", ordinal: 1,
-                erwarteReleaseAbruf: false, erwarteVorbereitung: false, erwarteDialogFehler: false);
+                expectReleaseQuery: false, expectPreparation: false, expectDialogError: false);
             (mainWindow, menu) = await T09StartupPhaseAsync(fixture, "BeforePreparation", ordinal: 2,
-                erwarteReleaseAbruf: true, erwarteVorbereitung: false, erwarteDialogFehler: true);
+                expectReleaseQuery: true, expectPreparation: false, expectDialogError: true);
             (mainWindow, menu) = await T09StartupPhaseAsync(fixture, "BeforeUpdaterStart", ordinal: 3,
-                erwarteReleaseAbruf: true, erwarteVorbereitung: true, erwarteDialogFehler: true);
+                expectReleaseQuery: true, expectPreparation: true, expectDialogError: true);
 
             // T-09 manuell: Grenze Initial beim Prüfversuch (kein Releaseabruf), dann die
             // Installationsgrenzen BeforePreparation/BeforeUpdaterStart beim Startversuch.
-            menu = await T09ManuellInitialPhaseAsync(fixture, menu);
-            await T09ManuellStartenPhaseAsync(fixture, menu, "BeforePreparation", ordinal: 2,
-                erwarteVorbereitung: false);
-            await T09ManuellStartenPhaseAsync(fixture, menu, "BeforeUpdaterStart", ordinal: 3,
-                erwarteVorbereitung: true);
-            Assert.True(fixture.ZaehleEreignis(UpdateE2EEvents.UpdateSettingsReadFailureDisabled) >= 1);
+            menu = await T09ManualInitialPhaseAsync(fixture, menu);
+            await T09ManualStartPhaseAsync(fixture, menu, "BeforePreparation", ordinal: 2,
+                expectPreparation: false);
+            await T09ManualStartPhaseAsync(fixture, menu, "BeforeUpdaterStart", ordinal: 3,
+                expectPreparation: true);
+            Assert.True(fixture.CountEvent(UpdateE2EEvents.UpdateSettingsReadFailureDisabled) >= 1);
 
             // Erfolgreiche manuelle Folgeprüfung nach Deaktivierung - ohne automatische
             // Installation.
-            menu = await NachLesefehlerFortsetzenAsync(fixture, menu);
+            menu = await ResumeAfterReadfailureAsync(fixture, menu);
         }
         finally
         {
-            await SetzeUpdateSteuerungZurueckAsync(fixture, mainWindow);
-            SchliesseFixtureApp();
+            await SetUpdateControlBackAsync(fixture, mainWindow);
+            CloseFixtureApp();
         }
     }
 
@@ -711,30 +711,30 @@ public partial class End2EndTest
     /// E-06 (a): Riskante CLI-Fixture aktivieren, neu starten, den echten Sicherheitsdialog
     /// mit Nein beantworten - keine Vorbereitung, kein Asset-Abruf, keine Nebenwirkungen.
     /// </summary>
-    private async Task<(Window MainWindow, MenuView Menu)> SafetyDialogAbgelehntPhaseAsync(
+    private async Task<(Window MainWindow, MenuView Menu)> SafetyDialogRejectedPhaseAsync(
         UpdateE2EFixture fixture)
     {
-        fixture.AktualisiereSzenario(s => s.CliSafe = new UpdateE2ECliSafety
+        fixture.UpdateScenario(s => s.CliSafe = new UpdateE2ECliSafety
         {
             Active = true,
             RiskyWorkItems = ["E2E-Risikoaufgabe"]
         });
-        var basis = ProtokollBasis(fixture);
+        var baseline = LogBase(fixture);
         var mainWindow = RestartAppPreservingDatabase();
         var menu = new MenuView(mainWindow);
-        var fortschritt = new UpdateProgressDialogView(mainWindow);
+        var progress = new UpdateProgressDialogView(mainWindow);
         var safe = new UpdateSafetyDialogView(mainWindow);
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.CliSafetyChecked, Long,
-            filter: e => DatenZahl(e, "riskyTaskCount") >= 1);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.CliSafetyChecked, Long,
+            filter: e => DataNumber(e, "riskyTaskCount") >= 1);
         safe.ForceShow();
         safe.Cancel();
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-        Assert.False(fortschritt.IsVisible);
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-            e => DatenText(e, "art") == "asset"));
-        AssertKeinUpdateNebenwirkungSeit(fixture, basis);
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateAttemptStarted));
-        await PruefeSettingsBedienbarAsync(fixture, menu);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+        Assert.False(progress.IsVisible);
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+            e => DataText(e, "art") == "asset"));
+        AssertNoUpdateSideeffectSince(fixture, baseline);
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateAttemptStarted));
+        await CheckSettingsOperableAsync(fixture, menu);
         return (mainWindow, menu);
     }
 
@@ -742,46 +742,46 @@ public partial class End2EndTest
     /// E-06 (b): Sicherheitsdialog mit Ja bestätigen, echten blockierten Download abbrechen -
     /// Abbruchzustand ohne Vorbereitung, Start oder Shutdown.
     /// </summary>
-    private async Task<(Window MainWindow, MenuView Menu)> DownloadAbbruchPhaseAsync(
+    private async Task<(Window MainWindow, MenuView Menu)> DownloadCancelPhaseAsync(
         UpdateE2EFixture fixture)
     {
-        fixture.AktualisiereSzenario(s =>
+        fixture.UpdateScenario(s =>
         {
-            var paket = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
-            paket.StreamGate = UpdateDownloadGate;
-            paket.StreamGateBytes = 128;
+            var package = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
+            package.StreamGate = UpdateDownloadGate;
+            package.StreamGateBytes = 128;
         });
-        var basis = ProtokollBasis(fixture);
+        var baseline = LogBase(fixture);
         var mainWindow = RestartAppPreservingDatabase();
         var menu = new MenuView(mainWindow);
-        var fortschritt = new UpdateProgressDialogView(mainWindow);
+        var progress = new UpdateProgressDialogView(mainWindow);
         var safe = new UpdateSafetyDialogView(mainWindow);
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.CliSafetyChecked, Long,
-            filter: e => DatenZahl(e, "riskyTaskCount") >= 1);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.CliSafetyChecked, Long,
+            filter: e => DataNumber(e, "riskyTaskCount") >= 1);
         safe.ForceShow();
         safe.Confirm();
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.HttpRequestBlocked, Long,
-            filter: e => DatenText(e, "gate") == UpdateDownloadGate);
-        Assert.True(fortschritt.IsVisible);
-        WarteAufUiZustand(() => fortschritt.GetPhase() == "Download", "Download-Phase", Medium);
-        fortschritt.Cancel();
-        var abbruchMeldung = fortschritt.WaitForErrorState(Medium);
-        Assert.Contains("abgebr", abbruchMeldung);
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.PreparationFailed));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.PreparationCompleted));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateStartAttempt));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateProcessStartRecorded));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.ShutdownRequested));
-        fortschritt.Close();
-        fixture.SetzeGateZurueck(UpdateDownloadGate);
-        fixture.AktualisiereSzenario(s =>
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.HttpRequestBlocked, Long,
+            filter: e => DataText(e, "gate") == UpdateDownloadGate);
+        Assert.True(progress.IsVisible);
+        WaitOnUiState(() => progress.GetPhase() == "Download", "Download-Phase", Medium);
+        progress.Cancel();
+        var cancelMessage = progress.WaitForErrorState(Medium);
+        Assert.Contains("abgebr", cancelMessage);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.PreparationFailed));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.PreparationCompleted));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateStartAttempt));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateProcessStartRecorded));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.ShutdownRequested));
+        progress.Close();
+        fixture.SetGateBack(UpdateDownloadGate);
+        fixture.UpdateScenario(s =>
         {
             s.CliSafe = new UpdateE2ECliSafety { Active = false };
             s.Answer.Single(a => a.Url == fixture.StableDownloadUrl).StreamGate = null;
         });
-        await PruefeSettingsBedienbarAsync(fixture, menu);
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateAttemptStarted));
+        await CheckSettingsOperableAsync(fixture, menu);
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateAttemptStarted));
         return (mainWindow, menu);
     }
 
@@ -790,31 +790,31 @@ public partial class End2EndTest
     /// API-Asset-Fallback-URL liefern beide 500, sichtbarer Vorbereitungsfehler ohne
     /// Start/Shutdown.
     /// </summary>
-    private async Task<(Window MainWindow, MenuView Menu)> AssetHttpFehlerPhaseAsync(
+    private async Task<(Window MainWindow, MenuView Menu)> AssetHttpErrorPhaseAsync(
         UpdateE2EFixture fixture)
     {
-        fixture.AktualisiereSzenario(s =>
+        fixture.UpdateScenario(s =>
         {
             s.Answer.Single(a => a.Url == fixture.StableDownloadUrl).Status = 500;
             s.Answer.Single(a => a.Url == UpdateE2EFixture.StableAssetApiUrl).Status = 500;
         });
-        var basis = ProtokollBasis(fixture);
+        var baseline = LogBase(fixture);
         var mainWindow = RestartAppPreservingDatabase();
         var menu = new MenuView(mainWindow);
-        var fortschritt = new UpdateProgressDialogView(mainWindow);
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.PreparationFailed, Long);
-        Assert.Contains("konnte nicht vorbereitet", fortschritt.WaitForErrorState(Medium));
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-            e => DatenText(e, "url") == fixture.StableDownloadUrl));
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-            e => DatenText(e, "url") == UpdateE2EFixture.StableAssetApiUrl));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateStartAttempt));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateProcessStartRecorded));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.ShutdownRequested));
-        fortschritt.Close();
-        await PruefeSettingsBedienbarAsync(fixture, menu);
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateAttemptStarted));
+        var progress = new UpdateProgressDialogView(mainWindow);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.PreparationFailed, Long);
+        Assert.Contains("konnte nicht vorbereitet", progress.WaitForErrorState(Medium));
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+            e => DataText(e, "url") == fixture.StableDownloadUrl));
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+            e => DataText(e, "url") == UpdateE2EFixture.StableAssetApiUrl));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateStartAttempt));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateProcessStartRecorded));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.ShutdownRequested));
+        progress.Close();
+        await CheckSettingsOperableAsync(fixture, menu);
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateAttemptStarted));
         return (mainWindow, menu);
     }
 
@@ -824,29 +824,29 @@ public partial class End2EndTest
     /// servierten defekten Datei, damit weiterhin der ZIP-Parse-Fehler (nicht der
     /// Hash-Mismatch) den Abbruch auslöst.
     /// </summary>
-    private async Task DefektesZipPhaseAsync(UpdateE2EFixture fixture, MenuView menu)
+    private async Task DefectZipPhaseAsync(UpdateE2EFixture fixture, MenuView menu)
     {
-        var defektesPaket = Path.Combine(fixture.PaketVerzeichnis, "defekt.zip");
-        File.WriteAllText(defektesPaket, "E2E: kein gueltiges ZIP");
-        fixture.AktualisiereSzenario(s =>
+        var defectPackage = Path.Combine(fixture.PackageDirectory, "defekt.zip");
+        File.WriteAllText(defectPackage, "E2E: kein gueltiges ZIP");
+        fixture.UpdateScenario(s =>
         {
             var response = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
             response.Status = 200;
-            response.BodyFile = Path.GetRelativePath(fixture.TestRoot, defektesPaket);
+            response.BodyFile = Path.GetRelativePath(fixture.TestRoot, defectPackage);
             s.Answer.Single(a => a.Url == fixture.StableManifestDownloadUrl).Content =
-                UpdateE2EFixture.ErzeugeManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, defektesPaket);
+                UpdateE2EFixture.CreateManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, defectPackage);
         });
-        var basis = ProtokollBasis(fixture);
-        menu.ClickUpdateStarten();
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-            filter: e => DatenText(e, "versuch") == "starten");
-        var fortschritt = new UpdateProgressDialogView(menu.Window);
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.PreparationFailed));
-        Assert.Contains("konnte nicht vorbereitet", fortschritt.WaitForErrorState(Medium));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateStartAttempt));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.ShutdownRequested));
-        fortschritt.Close();
-        await PruefeSettingsBedienbarAsync(fixture, menu);
+        var baseline = LogBase(fixture);
+        menu.StartClickUpdate();
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+            filter: e => DataText(e, "versuch") == "starten");
+        var progress = new UpdateProgressDialogView(menu.Window);
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.PreparationFailed));
+        Assert.Contains("konnte nicht vorbereitet", progress.WaitForErrorState(Medium));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateStartAttempt));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.ShutdownRequested));
+        progress.Close();
+        await CheckSettingsOperableAsync(fixture, menu);
     }
 
     /// <summary>
@@ -855,66 +855,66 @@ public partial class End2EndTest
     /// SHA-256-Verifikation vor dem Entpacken: sichtbarer Vorbereitungsfehler ohne
     /// Entpacken, Start oder Shutdown.
     /// </summary>
-    private async Task ManipuliertesPaketPhaseAsync(UpdateE2EFixture fixture, MenuView menu)
+    private async Task TamperedPackagePhaseAsync(UpdateE2EFixture fixture, MenuView menu)
     {
-        var manipuliertesPaket = Path.Combine(fixture.PaketVerzeichnis, "manipuliert.zip");
-        UpdateE2EFixture.ErstellePaketZip(manipuliertesPaket, UpdateE2EFixture.StableVersion, "manipulierter-marker");
-        fixture.AktualisiereSzenario(s =>
+        var tamperedPackage = Path.Combine(fixture.PackageDirectory, "manipuliert.zip");
+        UpdateE2EFixture.CreatePackageZip(tamperedPackage, UpdateE2EFixture.StableVersion, "manipulierter-marker");
+        fixture.UpdateScenario(s =>
         {
             var response = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
             response.Status = 200;
-            response.BodyFile = Path.GetRelativePath(fixture.TestRoot, manipuliertesPaket);
+            response.BodyFile = Path.GetRelativePath(fixture.TestRoot, tamperedPackage);
             s.Answer.Single(a => a.Url == fixture.StableManifestDownloadUrl).Content =
-                UpdateE2EFixture.ErzeugeManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, fixture.StableZipPfad);
+                UpdateE2EFixture.CreateManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, fixture.StableZipPath);
         });
-        var basis = ProtokollBasis(fixture);
-        menu.ClickUpdateStarten();
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-            filter: e => DatenText(e, "versuch") == "starten");
-        var fortschritt = new UpdateProgressDialogView(menu.Window);
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-            e => DatenText(e, "art") == "manifest" && DatenText(e, "url") == fixture.StableManifestDownloadUrl));
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.PreparationFailed));
-        Assert.Contains("konnte nicht vorbereitet", fortschritt.WaitForErrorState(Medium));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.PreparationPhase,
-            e => DatenText(e, "phase") == "Entpacken"));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateStartAttempt));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateProcessStartRecorded));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.ShutdownRequested));
-        fortschritt.Close();
-        await PruefeSettingsBedienbarAsync(fixture, menu);
+        var baseline = LogBase(fixture);
+        menu.StartClickUpdate();
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+            filter: e => DataText(e, "versuch") == "starten");
+        var progress = new UpdateProgressDialogView(menu.Window);
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+            e => DataText(e, "art") == "manifest" && DataText(e, "url") == fixture.StableManifestDownloadUrl));
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.PreparationFailed));
+        Assert.Contains("konnte nicht vorbereitet", progress.WaitForErrorState(Medium));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.PreparationPhase,
+            e => DataText(e, "phase") == "Entpacken"));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateStartAttempt));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateProcessStartRecorded));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.ShutdownRequested));
+        progress.Close();
+        await CheckSettingsOperableAsync(fixture, menu);
     }
 
     /// <summary>
     /// E-06 (d): Gültige Vorbereitung mit Launcherfehler - genau ein Versuch, kein
     /// erfolgreicher Start, kein Shutdown, sichtbarer Fehler.
     /// </summary>
-    private async Task<(Window MainWindow, MenuView Menu)> LauncherFehlerPhaseAsync(
+    private async Task<(Window MainWindow, MenuView Menu)> LauncherErrorPhaseAsync(
         UpdateE2EFixture fixture)
     {
-        fixture.AktualisiereSzenario(s =>
+        fixture.UpdateScenario(s =>
         {
             var response = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
-            response.BodyFile = Path.GetRelativePath(fixture.TestRoot, fixture.StableZipPfad);
+            response.BodyFile = Path.GetRelativePath(fixture.TestRoot, fixture.StableZipPath);
             s.ProcessStart = new UpdateE2EProcessStart { Result = "Fehler" };
         });
-        var basis = ProtokollBasis(fixture);
+        var baseline = LogBase(fixture);
         var mainWindow = RestartAppPreservingDatabase();
         var menu = new MenuView(mainWindow);
-        var fortschritt = new UpdateProgressDialogView(mainWindow);
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateProcessStartRecorded, Long);
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateStartAttempt));
-        var launcherFehler = Assert.Single(EintraegeSeit(fixture, basis),
+        var progress = new UpdateProgressDialogView(mainWindow);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateProcessStartRecorded, Long);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateStartAttempt));
+        var launcherError = Assert.Single(EntriesSince(fixture, baseline),
             e => e.Event == UpdateE2EEvents.UpdateProcessStartRecorded);
-        Assert.Equal("Fehler", DatenText(launcherFehler, "result"));
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateStartFailed));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateStartSucceeded));
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.ShutdownRequested));
-        Assert.Contains("konnte nicht vorbereitet", fortschritt.WaitForErrorState(Medium));
-        fortschritt.Close();
-        await PruefeSettingsBedienbarAsync(fixture, menu);
-        Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateAttemptStarted));
+        Assert.Equal("Fehler", DataText(launcherError, "result"));
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateStartFailed));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateStartSucceeded));
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.ShutdownRequested));
+        Assert.Contains("konnte nicht vorbereitet", progress.WaitForErrorState(Medium));
+        progress.Close();
+        await CheckSettingsOperableAsync(fixture, menu);
+        Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateAttemptStarted));
         return (mainWindow, menu);
     }
 
@@ -924,25 +924,25 @@ public partial class End2EndTest
     /// Genau ein Request je Download-Route; der vollständige Installationsnachweis läuft
     /// über <c>AssertiereInstallationsNachweis</c> mit beiden erwarteten Asset-URLs.
     /// </summary>
-    private async Task<(Window MainWindow, MenuView Menu)> AssetFallbackErfolgPhaseAsync(
+    private async Task<(Window MainWindow, MenuView Menu)> AssetFallbackSuccessPhaseAsync(
         UpdateE2EFixture fixture)
     {
-        fixture.AktualisiereSzenario(s =>
+        fixture.UpdateScenario(s =>
         {
             s.Answer.Single(a => a.Url == fixture.StableDownloadUrl).Status = 500;
             s.Answer.Single(a => a.Url == UpdateE2EFixture.StableAssetApiUrl).Status = 200;
         });
-        var basis = ProtokollBasis(fixture);
+        var baseline = LogBase(fixture);
         var mainWindow = RestartAppPreservingDatabase();
         var menu = new MenuView(mainWindow);
-        var fortschritt = new UpdateProgressDialogView(mainWindow);
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
+        var progress = new UpdateProgressDialogView(mainWindow);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
 
-        AssertiereInstallationsNachweis(fixture, basis,
+        AssertInstallationProof(fixture, baseline,
             UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, "stable-marker",
             [UpdateE2EFixture.StableAssetApiUrl]);
-        fortschritt.Close();
-        fixture.AktualisiereSzenario(s =>
+        progress.Close();
+        fixture.UpdateScenario(s =>
             s.Answer.Single(a => a.Url == fixture.StableDownloadUrl).Status = 200);
         return (mainWindow, menu);
     }
@@ -954,58 +954,58 @@ public partial class End2EndTest
     /// <param name="fixture">Die Update-Fixture.</param>
     /// <param name="limit">Die Lesegrenze (<c>Initial</c>, <c>BeforePreparation</c>, <c>BeforeUpdaterStart</c>).</param>
     /// <param name="ordinal">Die erwartete Ordnungszahl des blockierten Reads.</param>
-    /// <param name="erwarteReleaseAbruf">Ob der Releaseabruf vor dem Lesefehler gelaufen ist.</param>
-    /// <param name="erwarteVorbereitung">Ob die Vorbereitung vor dem Lesefehler abgeschlossen war.</param>
-    /// <param name="erwarteDialogFehler">Ob der Fehler im Fortschrittsdialog statt im Hinweistext erscheint.</param>
+    /// <param name="expectReleaseQuery">Ob der Releaseabruf vor dem Lesefehler gelaufen ist.</param>
+    /// <param name="expectPreparation">Ob die Vorbereitung vor dem Lesefehler abgeschlossen war.</param>
+    /// <param name="expectDialogError">Ob der Fehler im Fortschrittsdialog statt im Hinweistext erscheint.</param>
     /// <returns>Das neue Hauptfenster und das Navigationsmenü.</returns>
     private async Task<(Window MainWindow, MenuView Menu)> T09StartupPhaseAsync(
         UpdateE2EFixture fixture, string limit, int ordinal,
-        bool erwarteReleaseAbruf, bool erwarteVorbereitung, bool erwarteDialogFehler)
+        bool expectReleaseQuery, bool expectPreparation, bool expectDialogError)
     {
-        var (mainWindow, basis) = await LesefehlerStartupVarianteStartenAsync(fixture, limit, ordinal);
+        var (mainWindow, baseline) = await StartReadfailureStartupVariantAsync(fixture, limit, ordinal);
         var menu = new MenuView(mainWindow);
 
-        if (erwarteVorbereitung)
+        if (expectPreparation)
         {
-            var letzterRead = EintraegeSeit(fixture, basis)
+            var lastRead = EntriesSince(fixture, baseline)
                 .Last(e => e.Event == UpdateE2EEvents.UpdateSettingsReadReached
-                    && DatenText(e, "versuch") == "startup" && DatenZahl(e, "ordinal") == ordinal);
-            Assert.True(EintraegeSeit(fixture, basis)
-                    .Single(e => e.Event == UpdateE2EEvents.PreparationCompleted).Seq < letzterRead.Seq,
+                    && DataText(e, "versuch") == "startup" && DataNumber(e, "ordinal") == ordinal);
+            Assert.True(EntriesSince(fixture, baseline)
+                    .Single(e => e.Event == UpdateE2EEvents.PreparationCompleted).Seq < lastRead.Seq,
                 "Der Read an der Grenze muss erst nach PreparationCompleted erfolgen.");
         }
 
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
 
-        if (erwarteDialogFehler)
+        if (expectDialogError)
         {
-            var fortschritt = new UpdateProgressDialogView(mainWindow);
-            Assert.Contains(UpdateHinweisLesefehler, fortschritt.WaitForErrorState(Medium));
-            fortschritt.Close();
+            var progress = new UpdateProgressDialogView(mainWindow);
+            Assert.Contains(UpdateNoticeReadfailure, progress.WaitForErrorState(Medium));
+            progress.Close();
         }
         else
         {
-            menu.WaitForUpdateHinweis(UpdateHinweisLesefehler, Medium);
+            menu.WaitForUpdateNotice(UpdateNoticeReadfailure, Medium);
         }
 
-        if (!erwarteReleaseAbruf)
+        if (!expectReleaseQuery)
         {
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest));
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateCheckStarted));
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest));
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateCheckStarted));
         }
         else
         {
-            Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-                e => DatenText(e, "url") == UpdateE2EFixture.ReleaseApiUrl));
+            Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+                e => DataText(e, "url") == UpdateE2EFixture.ReleaseApiUrl));
             // BeforeUpdaterStart: die Vorbereitung inkl. Asset-Abruf läuft vollständig,
             // erst der letzte Read vor dem Updater-Start schlägt fehl.
-            Assert.Equal(erwarteVorbereitung ? 1 : 0,
-                ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-                    e => DatenText(e, "art") == "asset"));
+            Assert.Equal(expectPreparation ? 1 : 0,
+                CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+                    e => DataText(e, "art") == "asset"));
         }
 
-        AssertKeinUpdateNebenwirkungSeit(fixture, basis, erlaubeVorbereitung: erwarteVorbereitung);
-        await NachLesefehlerFortsetzenAsync(fixture, menu);
+        AssertNoUpdateSideeffectSince(fixture, baseline, allowPreparation: expectPreparation);
+        await ResumeAfterReadfailureAsync(fixture, menu);
         return (mainWindow, menu);
     }
 
@@ -1014,24 +1014,24 @@ public partial class End2EndTest
     /// freigegeben und schlägt fehl - kein Releaseabruf, Hinweis sichtbar, danach
     /// Wiederherstellung über die Einstellungen-UI.
     /// </summary>
-    private async Task<MenuView> T09ManuellInitialPhaseAsync(UpdateE2EFixture fixture, MenuView menu)
+    private async Task<MenuView> T09ManualInitialPhaseAsync(UpdateE2EFixture fixture, MenuView menu)
     {
-        fixture.AktiviereLesefehler("Initial", attempt: "pruefen");
-        var basis = ProtokollBasis(fixture);
-        menu.ClickUpdatePruefen();
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateSettingsReadReached, Long,
-            filter: e => DatenText(e, "versuch") == "pruefen" && DatenZahl(e, "ordinal") == 1);
-        fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName);
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateSettingsReadFailed, Long,
-            filter: e => DatenText(e, "versuch") == "pruefen" && DatenText(e, "grenze") == "Initial");
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-            filter: e => DatenText(e, "versuch") == "pruefen");
-        menu.WaitForUpdateHinweis(UpdateHinweisLesefehler, Medium);
-        Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest));
-        AssertKeinUpdateNebenwirkungSeit(fixture, basis);
-        fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName);
-        fixture.DeaktiviereLesefehler();
-        return await NachLesefehlerFortsetzenAsync(fixture, menu);
+        fixture.ActivateReadfailure("Initial", attempt: "pruefen");
+        var baseline = LogBase(fixture);
+        menu.CheckClickUpdate();
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateSettingsReadReached, Long,
+            filter: e => DataText(e, "versuch") == "pruefen" && DataNumber(e, "ordinal") == 1);
+        fixture.OpenGate(UpdateE2ETestContext.ReadFailureGateName);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateSettingsReadFailed, Long,
+            filter: e => DataText(e, "versuch") == "pruefen" && DataText(e, "grenze") == "Initial");
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+            filter: e => DataText(e, "versuch") == "pruefen");
+        menu.WaitForUpdateNotice(UpdateNoticeReadfailure, Medium);
+        Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest));
+        AssertNoUpdateSideeffectSince(fixture, baseline);
+        fixture.SetGateBack(UpdateE2ETestContext.ReadFailureGateName);
+        fixture.DeactivateReadfailure();
+        return await ResumeAfterReadfailureAsync(fixture, menu);
     }
 
     /// <summary>
@@ -1043,44 +1043,44 @@ public partial class End2EndTest
     /// <param name="menu">Das Navigationsmenü.</param>
     /// <param name="limit">Die Lesegrenze (<c>BeforePreparation</c>, <c>BeforeUpdaterStart</c>).</param>
     /// <param name="ordinal">Die erwartete Ordnungszahl des blockierten Reads.</param>
-    /// <param name="erwarteVorbereitung">Ob die Vorbereitung vor dem Lesefehler abgeschlossen war.</param>
-    private async Task T09ManuellStartenPhaseAsync(
-        UpdateE2EFixture fixture, MenuView menu, string limit, int ordinal, bool erwarteVorbereitung)
+    /// <param name="expectPreparation">Ob die Vorbereitung vor dem Lesefehler abgeschlossen war.</param>
+    private async Task T09ManualStartPhaseAsync(
+        UpdateE2EFixture fixture, MenuView menu, string limit, int ordinal, bool expectPreparation)
     {
-        fixture.AktiviereLesefehler(limit, attempt: "starten");
-        var basis = ProtokollBasis(fixture);
-        menu.ClickUpdatePruefen();
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-            filter: e => DatenText(e, "versuch") == "pruefen");
+        fixture.ActivateReadfailure(limit, attempt: "starten");
+        var baseline = LogBase(fixture);
+        menu.CheckClickUpdate();
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+            filter: e => DataText(e, "versuch") == "pruefen");
         menu.WaitForOfferedUpdateVersion(Medium);
-        menu.ClickUpdateStarten();
-        var letzterRead = (await WarteAufEreignisSeitAsync(fixture, basis,
+        menu.StartClickUpdate();
+        var lastRead = (await WaitOnEventSinceAsync(fixture, baseline,
             UpdateE2EEvents.UpdateSettingsReadReached, Long,
-            filter: e => DatenText(e, "versuch") == "starten" && DatenZahl(e, "ordinal") == ordinal))[0];
-        if (erwarteVorbereitung)
+            filter: e => DataText(e, "versuch") == "starten" && DataNumber(e, "ordinal") == ordinal))[0];
+        if (expectPreparation)
         {
-            Assert.True(EintraegeSeit(fixture, basis)
-                    .Single(e => e.Event == UpdateE2EEvents.PreparationCompleted).Seq < letzterRead.Seq,
+            Assert.True(EntriesSince(fixture, baseline)
+                    .Single(e => e.Event == UpdateE2EEvents.PreparationCompleted).Seq < lastRead.Seq,
                 "Der BeforeUpdaterStart-Read muss erst nach PreparationCompleted erfolgen.");
         }
 
-        fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName);
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateSettingsReadFailed, Long,
-            filter: e => DatenText(e, "versuch") == "starten" && DatenText(e, "grenze") == limit);
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-            filter: e => DatenText(e, "versuch") == "starten");
-        var fortschritt = new UpdateProgressDialogView(menu.Window);
-        Assert.Contains(UpdateHinweisLesefehler, fortschritt.WaitForErrorState(Medium));
-        fortschritt.Close();
-        if (!erwarteVorbereitung)
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest,
-                e => DatenText(e, "art") == "asset"));
+        fixture.OpenGate(UpdateE2ETestContext.ReadFailureGateName);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateSettingsReadFailed, Long,
+            filter: e => DataText(e, "versuch") == "starten" && DataText(e, "grenze") == limit);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+            filter: e => DataText(e, "versuch") == "starten");
+        var progress = new UpdateProgressDialogView(menu.Window);
+        Assert.Contains(UpdateNoticeReadfailure, progress.WaitForErrorState(Medium));
+        progress.Close();
+        if (!expectPreparation)
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.HttpRequest,
+                e => DataText(e, "art") == "asset"));
 
-        Assert.Equal(erwarteVorbereitung ? 1 : 0,
-            ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.PreparationCompleted));
-        AssertKeinUpdateNebenwirkungSeit(fixture, basis, erlaubeVorbereitung: erwarteVorbereitung);
-        fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName);
-        fixture.DeaktiviereLesefehler();
+        Assert.Equal(expectPreparation ? 1 : 0,
+            CountEventSince(fixture, baseline, UpdateE2EEvents.PreparationCompleted));
+        AssertNoUpdateSideeffectSince(fixture, baseline, allowPreparation: expectPreparation);
+        fixture.SetGateBack(UpdateE2ETestContext.ReadFailureGateName);
+        fixture.DeactivateReadfailure();
     }
 
     /// <summary>
@@ -1096,80 +1096,80 @@ public partial class End2EndTest
     private async Task Startup_IsOnceAndCommandsStayBlocked()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
+        await fixture.SetUpdateSettingsAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
         // protokolliert sein, bevor GetMainWindow zurückkehrt.
-        var basis = ProtokollBasis(fixture);
-        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.ErzeugeStartUmgebung());
+        var baseline = LogBase(fixture);
+        var app = LaunchApp(ensureDatabaseDeleted: false, fixture.CreateStartEnvironment());
         Window? mainWindow = null;
         try
         {
-            mainWindow = WarteAufEchtesHauptfenster(app);
+            mainWindow = WaitOnRealMainwindow(app);
             var menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadProduktivLabel);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            await SaveUpdateSettingsOverUiAsync(fixture, menu, UpdateModeStartLabel, UpdatePathProductionLabel);
 
-            fixture.AktualisiereSzenario(s =>
+            fixture.UpdateScenario(s =>
             {
-                var paket = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
-                paket.StreamGate = UpdateDownloadGate;
-                paket.StreamGateBytes = 128;
+                var package = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
+                package.StreamGate = UpdateDownloadGate;
+                package.StreamGateBytes = 128;
             });
-            basis = ProtokollBasis(fixture);
+            baseline = LogBase(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.HttpRequestBlocked, Long,
-                filter: e => DatenText(e, "gate") == UpdateDownloadGate);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.HttpRequestBlocked, Long,
+                filter: e => DataText(e, "gate") == UpdateDownloadGate);
 
-            var fortschritt = new UpdateProgressDialogView(mainWindow);
-            Assert.True(fortschritt.IsVisible);
-            WarteAufUiZustand(() => fortschritt.GetPhase() == "Download", "Download-Phase", Medium);
+            var progress = new UpdateProgressDialogView(mainWindow);
+            Assert.True(progress.IsVisible);
+            WaitOnUiState(() => progress.GetPhase() == "Download", "Download-Phase", Medium);
 
             // Gesperrte Commands: Prüfen deaktiviert, Installieren sichtbar aber deaktiviert.
-            WarteAufUiZustand(() => !menu.IsUpdatePruefenButtonEnabled(),
+            WaitOnUiState(() => !menu.IsUpdateCheckButtonEnabled(),
                 "Prüfen während blockierter Startautomatik gesperrt", Medium);
             Assert.True(menu.IsUpdateStartButtonVisible());
             Assert.False(menu.IsUpdateStartButtonEnabled());
 
             // Versuchte UI-Aktivierung erzeugt keinen zweiten Ablauf und keinen Shutdown.
-            var pruefenButton = mainWindow.FindFirstDescendant(
+            var checkButton = mainWindow.FindFirstDescendant(
                 cf => cf.ByName("Programmupdate prüfen").And(cf.ByControlType(ControlType.Button)));
-            pruefenButton?.AsButton().ClickInForeground();
-            var startenButton = mainWindow.FindFirstDescendant(
+            checkButton?.AsButton().ClickInForeground();
+            var startButton = mainWindow.FindFirstDescendant(
                 cf => cf.ByName("Programmupdate starten").And(cf.ByControlType(ControlType.Button)));
-            startenButton?.AsButton().ClickInForeground();
-            Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.UpdateAttemptStarted));
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.ShutdownRequested));
+            startButton?.AsButton().ClickInForeground();
+            Assert.Equal(1, CountEventSince(fixture, baseline, UpdateE2EEvents.UpdateAttemptStarted));
+            Assert.Equal(0, CountEventSince(fixture, baseline, UpdateE2EEvents.ShutdownRequested));
 
             // Freigabe: genau eine Vorbereitung, eine Übergabe, ein Shutdown.
-            fixture.OeffneGate(UpdateDownloadGate);
-            await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.StartupUpdateCompleted, Long);
-            var entries = EintraegeSeit(fixture, basis);
+            fixture.OpenGate(UpdateDownloadGate);
+            await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.StartupUpdateCompleted, Long);
+            var entries = EntriesSince(fixture, baseline);
             Assert.Single(entries, e => e.Event == UpdateE2EEvents.UpdateAttemptStarted);
             Assert.Single(entries, e => e.Event == UpdateE2EEvents.UpdateAttemptCompleted);
-            AssertiereInstallationsNachweis(fixture, basis,
+            AssertInstallationProof(fixture, baseline,
                 UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, "stable-marker");
-            fortschritt.Close();
-            fixture.SetzeGateZurueck(UpdateDownloadGate);
+            progress.Close();
+            fixture.SetGateBack(UpdateDownloadGate);
 
             // Offen gehaltenes Fenster: Navigation und erneutes Rendern ändern die Zähler nicht.
-            var nachBasis = ProtokollBasis(fixture);
-            var settings = await OeffneSettingsGeladenAsync(fixture, menu);
-            Assert.Equal(UpdateModusStartLabel, settings.GetUpdateMode());
+            var afterBase = LogBase(fixture);
+            var settings = await OpenSettingsLoadedAsync(fixture, menu);
+            Assert.Equal(UpdateModeStartLabel, settings.GetUpdateMode());
             menu.NavigateToDashboard();
             menu.NavigateToProjects();
             menu.NavigateToDashboard();
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, nachBasis, UpdateE2EEvents.UpdateAttemptStarted));
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, nachBasis, UpdateE2EEvents.HttpRequest));
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, nachBasis, UpdateE2EEvents.PreparationCompleted));
-            Assert.Equal(0, ZaehleEreignisSeit(fixture, nachBasis, UpdateE2EEvents.ShutdownRequested));
+            Assert.Equal(0, CountEventSince(fixture, afterBase, UpdateE2EEvents.UpdateAttemptStarted));
+            Assert.Equal(0, CountEventSince(fixture, afterBase, UpdateE2EEvents.HttpRequest));
+            Assert.Equal(0, CountEventSince(fixture, afterBase, UpdateE2EEvents.PreparationCompleted));
+            Assert.Equal(0, CountEventSince(fixture, afterBase, UpdateE2EEvents.ShutdownRequested));
         }
         finally
         {
-            await SetzeUpdateSteuerungZurueckAsync(fixture, mainWindow);
-            SchliesseFixtureApp();
+            await SetUpdateControlBackAsync(fixture, mainWindow);
+            CloseFixtureApp();
         }
     }
 
@@ -1181,18 +1181,18 @@ public partial class End2EndTest
     /// <param name="limit">Die Lesegrenze (<c>Initial</c>, <c>BeforePreparation</c>).</param>
     /// <param name="ordinal">Die erwartete Ordnungszahl des blockierten Reads.</param>
     /// <returns>Das neue Hauptfenster und die Protokoll-Basis der Phase.</returns>
-    private async Task<(Window MainWindow, int Basis)> LesefehlerStartupVarianteStartenAsync(
+    private async Task<(Window MainWindow, int Base)> StartReadfailureStartupVariantAsync(
         UpdateE2EFixture fixture, string limit, int ordinal)
     {
-        fixture.AktiviereLesefehler(limit, attempt: "startup");
-        var basis = ProtokollBasis(fixture);
+        fixture.ActivateReadfailure(limit, attempt: "startup");
+        var baseline = LogBase(fixture);
         var mainWindow = RestartAppPreservingDatabase();
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateSettingsReadReached, Long,
-            filter: e => DatenText(e, "versuch") == "startup" && DatenZahl(e, "ordinal") == ordinal);
-        fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName);
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateSettingsReadFailed, Long,
-            filter: e => DatenText(e, "versuch") == "startup" && DatenText(e, "grenze") == limit);
-        return (mainWindow, basis);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateSettingsReadReached, Long,
+            filter: e => DataText(e, "versuch") == "startup" && DataNumber(e, "ordinal") == ordinal);
+        fixture.OpenGate(UpdateE2ETestContext.ReadFailureGateName);
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateSettingsReadFailed, Long,
+            filter: e => DataText(e, "versuch") == "startup" && DataText(e, "grenze") == limit);
+        return (mainWindow, baseline);
     }
 
     /// <summary>
@@ -1204,26 +1204,26 @@ public partial class End2EndTest
     /// <param name="fixture">Die Update-Fixture.</param>
     /// <param name="menu">Das Navigationsmenü.</param>
     /// <returns>Das Navigationsmenü.</returns>
-    private async Task<MenuView> NachLesefehlerFortsetzenAsync(UpdateE2EFixture fixture, MenuView menu)
+    private async Task<MenuView> ResumeAfterReadfailureAsync(UpdateE2EFixture fixture, MenuView menu)
     {
-        fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName);
-        fixture.DeaktiviereLesefehler();
-        Assert.True(fixture.ZaehleEreignis(UpdateE2EEvents.UpdateSettingsReadFailureDisabled) >= 1);
+        fixture.SetGateBack(UpdateE2ETestContext.ReadFailureGateName);
+        fixture.DeactivateReadfailure();
+        Assert.True(fixture.CountEvent(UpdateE2EEvents.UpdateSettingsReadFailureDisabled) >= 1);
 
-        var settings = await OeffneSettingsGeladenAsync(fixture, menu);
-        Assert.Equal(UpdateModusStartLabel, settings.GetUpdateMode());
+        var settings = await OpenSettingsLoadedAsync(fixture, menu);
+        Assert.Equal(UpdateModeStartLabel, settings.GetUpdateMode());
         settings.SaveSettings();
-        WarteAufSpeichernAktiviert(settings);
+        WaitOnSaveEnabled(settings);
         menu.NavigateToDashboard();
 
-        var basis = ProtokollBasis(fixture);
-        WarteAufUiZustand(() => menu.IsUpdatePruefenButtonEnabled(),
+        var baseline = LogBase(fixture);
+        WaitOnUiState(() => menu.IsUpdateCheckButtonEnabled(),
             "Prüfen nach Einstellungs-Speichern aktiviert", Medium);
-        menu.ClickUpdatePruefen();
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-            filter: e => DatenText(e, "versuch") == "pruefen");
+        menu.CheckClickUpdate();
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+            filter: e => DataText(e, "versuch") == "pruefen");
         Assert.Equal(UpdateE2EFixture.StableVersion, menu.WaitForOfferedUpdateVersion(Medium));
-        AssertKeinUpdateNebenwirkungSeit(fixture, basis);
+        AssertNoUpdateSideeffectSince(fixture, baseline);
         return menu;
     }
 
@@ -1236,13 +1236,13 @@ public partial class End2EndTest
     /// <param name="fixture">Die Update-Fixture.</param>
     /// <param name="menu">Das Navigationsmenü.</param>
     /// <returns>Die geladene Einstellungs-Ansicht.</returns>
-    private async Task<SettingsView> OeffneSettingsGeladenAsync(UpdateE2EFixture fixture, MenuView menu)
+    private async Task<SettingsView> OpenSettingsLoadedAsync(UpdateE2EFixture fixture, MenuView menu)
     {
-        var readsVorher = fixture.ZaehleEreignis(UpdateE2EEvents.UpdateSettingsReadReached);
+        var readsBefore = fixture.CountEvent(UpdateE2EEvents.UpdateSettingsReadReached);
         var settings = menu.NavigateToSettings();
-        await fixture.WarteAufEreignisAsync(UpdateE2EEvents.UpdateSettingsReadReached, Medium,
-            mindestens: readsVorher + 1);
-        WarteAufSpeichernAktiviert(settings);
+        await fixture.WaitOnEventAsync(UpdateE2EEvents.UpdateSettingsReadReached, Medium,
+            mindestens: readsBefore + 1);
+        WaitOnSaveEnabled(settings);
         return settings;
     }
 
@@ -1252,16 +1252,16 @@ public partial class End2EndTest
     /// </summary>
     /// <param name="fixture">Die Update-Fixture.</param>
     /// <param name="menu">Das Navigationsmenü.</param>
-    /// <param name="modusLabel">Das exakte Update-Modus-Label.</param>
-    /// <param name="pfadLabel">Das zu setzende Update-Pfad-Label.</param>
-    private async Task SpeichereUpdateEinstellungenUeberUiAsync(
-        UpdateE2EFixture fixture, MenuView menu, string modusLabel, string pfadLabel)
+    /// <param name="modeLabel">Das exakte Update-Modus-Label.</param>
+    /// <param name="pathLabel">Das zu setzende Update-Pfad-Label.</param>
+    private async Task SaveUpdateSettingsOverUiAsync(
+        UpdateE2EFixture fixture, MenuView menu, string modeLabel, string pathLabel)
     {
-        var settings = await OeffneSettingsGeladenAsync(fixture, menu);
-        settings.SetUpdateMode(modusLabel);
-        settings.SetUpdatePfad(pfadLabel);
+        var settings = await OpenSettingsLoadedAsync(fixture, menu);
+        settings.SetUpdateMode(modeLabel);
+        settings.SetUpdatePath(pathLabel);
         settings.SaveSettings();
-        WarteAufSpeichernAktiviert(settings);
+        WaitOnSaveEnabled(settings);
         menu.NavigateToDashboard();
     }
 
@@ -1269,35 +1269,35 @@ public partial class End2EndTest
     /// Klickt "Programmupdate prüfen" und wartet auf den Abschluss des Prüfversuchs; prüft
     /// anschließend Angebot und CheckCompleted-Protokolleintrag für die erwartete Version.
     /// </summary>
-    private async Task PruefeUpdateUeberUiAsync(
-        UpdateE2EFixture fixture, MenuView menu, int basis, string erwarteteVersion,
-        bool isPrerelease, string erwarteterPfad)
+    private async Task CheckUpdateOverUiAsync(
+        UpdateE2EFixture fixture, MenuView menu, int baseline, string expectedVersion,
+        bool isPrerelease, string expectedPath)
     {
-        WarteAufUiZustand(() => menu.IsUpdatePruefenButtonEnabled(), "Prüfen-Button aktiviert", Medium);
-        menu.ClickUpdatePruefen();
-        await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
-            filter: e => DatenText(e, "versuch") == "pruefen");
-        Assert.Equal(erwarteteVersion, menu.WaitForOfferedUpdateVersion(Medium));
-        var erwarteterKanal = erwarteterPfad == UpdatePfadVorabLabel
+        WaitOnUiState(() => menu.IsUpdateCheckButtonEnabled(), "Prüfen-Button aktiviert", Medium);
+        menu.CheckClickUpdate();
+        await WaitOnEventSinceAsync(fixture, baseline, UpdateE2EEvents.UpdateAttemptCompleted, Long,
+            filter: e => DataText(e, "versuch") == "pruefen");
+        Assert.Equal(expectedVersion, menu.WaitForOfferedUpdateVersion(Medium));
+        var expectedChannel = expectedPath == UpdatePathUpfrontLabel
             ? nameof(UpdateChannel.ReleaseCandidate)
             : nameof(UpdateChannel.Stable);
-        Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.UpdateCheckStarted
-            && DatenText(e, "updatePfad") == erwarteterPfad
-            && DatenText(e, "kanal") == erwarteterKanal);
-        Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
-            && DatenText(e, "status") == "UpdateVerfuegbar"
-            && DatenText(e, "version") == erwarteteVersion
-            && DatenBool(e, "isPrerelease") == isPrerelease);
+        Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.UpdateCheckStarted
+            && DataText(e, "updatePfad") == expectedPath
+            && DataText(e, "kanal") == expectedChannel);
+        Assert.Contains(EntriesSince(fixture, baseline), e => e.Event == UpdateE2EEvents.UpdateCheckCompleted
+            && DataText(e, "status") == "UpdateVerfuegbar"
+            && DataText(e, "version") == expectedVersion
+            && DataBool(e, "isPrerelease") == isPrerelease);
     }
 
     /// <summary>
     /// Prüft, dass die Einstellungen bedienbar bleiben: öffnen, Update-Modus (Startmodus)
     /// wird angezeigt, zurück zum Dashboard.
     /// </summary>
-    private async Task PruefeSettingsBedienbarAsync(UpdateE2EFixture fixture, MenuView menu)
+    private async Task CheckSettingsOperableAsync(UpdateE2EFixture fixture, MenuView menu)
     {
-        var settings = await OeffneSettingsGeladenAsync(fixture, menu);
-        Assert.Equal(UpdateModusStartLabel, settings.GetUpdateMode());
+        var settings = await OpenSettingsLoadedAsync(fixture, menu);
+        Assert.Equal(UpdateModeStartLabel, settings.GetUpdateMode());
         menu.NavigateToDashboard();
     }
 
@@ -1308,40 +1308,40 @@ public partial class End2EndTest
     /// und Markerinhalt, Skript mit <c>-ExtractedDirectory</c> auf das entpackte Verzeichnis
     /// der Version, genau ein Launcher-Erfolg vor genau einem Shutdown.
     /// </summary>
-    private static void AssertiereInstallationsNachweis(
-        UpdateE2EFixture fixture, int basis, string erwarteteVersion, string erwarteteDownloadUrl,
-        string erwarteterMarker, IReadOnlyList<string>? weitereErwarteteAssetUrls = null)
+    private static void AssertInstallationProof(
+        UpdateE2EFixture fixture, int baseline, string expectedVersion, string expectedDownloadUrl,
+        string expectedMarker, IReadOnlyList<string>? furtherExpectedAssetUrl = null)
     {
-        var entries = EintraegeSeit(fixture, basis);
+        var entries = EntriesSince(fixture, baseline);
 
-        var erwarteteAssetUrls = new List<string?> { erwarteteDownloadUrl };
-        if (weitereErwarteteAssetUrls is not null)
-            erwarteteAssetUrls.AddRange(weitereErwarteteAssetUrls);
-        Assert.Equal(erwarteteAssetUrls, entries
-            .Where(e => e.Event == UpdateE2EEvents.HttpRequest && DatenText(e, "art") == "asset")
-            .Select(e => DatenText(e, "url"))
+        var expectedAssetUrl = new List<string?> { expectedDownloadUrl };
+        if (furtherExpectedAssetUrl is not null)
+            expectedAssetUrl.AddRange(furtherExpectedAssetUrl);
+        Assert.Equal(expectedAssetUrl, entries
+            .Where(e => e.Event == UpdateE2EEvents.HttpRequest && DataText(e, "art") == "asset")
+            .Select(e => DataText(e, "url"))
             .ToList());
 
-        var vorbereitung = Assert.Single(entries,
+        var preparation = Assert.Single(entries,
             e => e.Event == UpdateE2EEvents.PreparationCompleted);
-        var extractedDirectory = DatenText(vorbereitung, "extractedDirectory");
+        var extractedDirectory = DataText(preparation, "extractedDirectory");
         Assert.NotNull(extractedDirectory);
-        Assert.Equal(erwarteteVersion,
+        Assert.Equal(expectedVersion,
             Path.GetFileName(extractedDirectory!.TrimEnd(Path.DirectorySeparatorChar)));
         var versionJson = File.ReadAllText(Path.Combine(extractedDirectory, "version.json"));
-        Assert.Contains($"\"version\":\"{erwarteteVersion}\"", versionJson);
-        Assert.Equal($"E2E-Paket {erwarteteVersion} ({erwarteterMarker})",
-            UpdateE2EFixture.LesePaketExeInhalt(extractedDirectory));
-        var scriptPfad = DatenText(vorbereitung, "scriptPath");
-        Assert.NotNull(scriptPfad);
-        Assert.True(File.Exists(scriptPfad), $"Update-Skript fehlt: {scriptPfad}");
+        Assert.Contains($"\"version\":\"{expectedVersion}\"", versionJson);
+        Assert.Equal($"E2E-Paket {expectedVersion} ({expectedMarker})",
+            UpdateE2EFixture.ReadPackageExeContent(extractedDirectory));
+        var scriptPath = DataText(preparation, "scriptPath");
+        Assert.NotNull(scriptPath);
+        Assert.True(File.Exists(scriptPath), $"Update-Skript fehlt: {scriptPath}");
 
         var launcher = Assert.Single(entries,
             e => e.Event == UpdateE2EEvents.UpdateProcessStartRecorded);
-        Assert.Equal("Erfolg", DatenText(launcher, "result"));
-        Assert.Equal(fixture.TestRoot, DatenText(launcher, "workingDirectory"));
-        var arguments = UpdateE2EFixture.Data(launcher) is { } launcherDaten
-            && launcherDaten.TryGetProperty("arguments", out var argsElement)
+        Assert.Equal("Erfolg", DataText(launcher, "result"));
+        Assert.Equal(fixture.TestRoot, DataText(launcher, "workingDirectory"));
+        var arguments = UpdateE2EFixture.Data(launcher) is { } launcherData
+            && launcherData.TryGetProperty("arguments", out var argsElement)
                 ? argsElement.EnumerateArray().Select(a => a.GetString()).ToList()
                 : [];
         var dirIndex = arguments.IndexOf("-ExtractedDirectory");
@@ -1357,16 +1357,16 @@ public partial class End2EndTest
     }
 
     /// <summary>
-    /// Prüft, dass seit <paramref name="basis"/> keine Update-Nebenwirkungen auftraten.
-    /// Mit <paramref name="erlaubeVorbereitung"/> wird ein abgeschlossenes Paket-
+    /// Prüft, dass seit <paramref name="baseline"/> keine Update-Nebenwirkungen auftraten.
+    /// Mit <paramref name="allowPreparation"/> wird ein abgeschlossenes Paket-
     /// PreparationCompleted toleriert (BeforeUpdaterStart-Grenze: die Vorbereitung
     /// läuft, nur der Updater-Start selbst wird geblockt).
     /// </summary>
-    private static void AssertKeinUpdateNebenwirkungSeit(
-        UpdateE2EFixture fixture, int basis, bool erlaubeVorbereitung = false)
+    private static void AssertNoUpdateSideeffectSince(
+        UpdateE2EFixture fixture, int baseline, bool allowPreparation = false)
     {
-        var entries = EintraegeSeit(fixture, basis);
-        if (!erlaubeVorbereitung)
+        var entries = EntriesSince(fixture, baseline);
+        if (!allowPreparation)
             Assert.DoesNotContain(entries, e => e.Event == UpdateE2EEvents.PreparationCompleted);
         Assert.DoesNotContain(entries, e => e.Event == UpdateE2EEvents.UpdateStartAttempt);
         Assert.DoesNotContain(entries, e => e.Event == UpdateE2EEvents.UpdateProcessStartRecorded);
@@ -1374,28 +1374,28 @@ public partial class End2EndTest
     }
 
     /// <summary>Anzahl bisher geschriebener Protokolleinträge (Phasengrenze im JSONL).</summary>
-    private static int ProtokollBasis(UpdateE2EFixture fixture)
-        => fixture.LeseProtokoll().Count;
+    private static int LogBase(UpdateE2EFixture fixture)
+        => fixture.ReadLog().Count;
 
-    /// <summary>Protokolleinträge seit der Phasengrenze <paramref name="basis"/>.</summary>
-    private static List<UpdateE2ELogEntry> EintraegeSeit(UpdateE2EFixture fixture, int basis)
-        => fixture.LeseProtokoll().Skip(basis).ToList();
+    /// <summary>Protokolleinträge seit der Phasengrenze <paramref name="baseline"/>.</summary>
+    private static List<UpdateE2ELogEntry> EntriesSince(UpdateE2EFixture fixture, int baseline)
+        => fixture.ReadLog().Skip(baseline).ToList();
 
     /// <summary>Anzahl der Protokolleinträge eines Ereignisnamens seit der Phasengrenze.</summary>
-    private static int ZaehleEreignisSeit(
-        UpdateE2EFixture fixture, int basis, string evt,
+    private static int CountEventSince(
+        UpdateE2EFixture fixture, int baseline, string evt,
         Func<UpdateE2ELogEntry, bool>? filter = null)
-        => EintraegeSeit(fixture, basis).Count(e => e.Event == evt && (filter?.Invoke(e) ?? true));
+        => EntriesSince(fixture, baseline).Count(e => e.Event == evt && (filter?.Invoke(e) ?? true));
 
     /// <summary>Wartet auf ein Protokollereignis seit der Phasengrenze.</summary>
-    private async Task<IReadOnlyList<UpdateE2ELogEntry>> WarteAufEreignisSeitAsync(
-        UpdateE2EFixture fixture, int basis, string evt, TimeSpan timeout,
+    private async Task<IReadOnlyList<UpdateE2ELogEntry>> WaitOnEventSinceAsync(
+        UpdateE2EFixture fixture, int baseline, string evt, TimeSpan timeout,
         int mindestens = 1, Func<UpdateE2ELogEntry, bool>? filter = null)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            var match = EintraegeSeit(fixture, basis)
+            var match = EntriesSince(fixture, baseline)
                 .Where(e => e.Event == evt && (filter?.Invoke(e) ?? true))
                 .ToList();
             if (match.Count >= mindestens)
@@ -1405,13 +1405,13 @@ public partial class End2EndTest
         }
 
         throw new TimeoutException(
-            $"Protokollereignis '{evt}' (mindestens {mindestens}) seit Basis {basis} erschien nicht " +
+            $"Protokollereignis '{evt}' (mindestens {mindestens}) seit Basis {baseline} erschien nicht " +
             $"innerhalb von {timeout.TotalSeconds}s. Ereignisse seit Basis: " +
-            $"{string.Join(", ", EintraegeSeit(fixture, basis).Select(e => e.Event).Distinct())}");
+            $"{string.Join(", ", EntriesSince(fixture, baseline).Select(e => e.Event).Distinct())}");
     }
 
     /// <summary>Wartet begrenzt auf einen UI-Zustand (gebundene Waits statt fester Sleeps).</summary>
-    private static void WarteAufUiZustand(Func<bool> condition, string description, TimeSpan timeout)
+    private static void WaitOnUiState(Func<bool> condition, string description, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
@@ -1429,8 +1429,8 @@ public partial class End2EndTest
     /// Wartet, bis der "Speichern"-Ribbon-Button wieder aktiviert ist. Während
     /// <c>LadenAsync</c>/<c>SpeichernAsync</c> ist er über das AsyncRelayCommand deaktiviert.
     /// </summary>
-    private void WarteAufSpeichernAktiviert(SettingsView settings)
-        => WarteAufUiZustand(
+    private void WaitOnSaveEnabled(SettingsView settings)
+        => WaitOnUiState(
             () => settings.Window.FindFirstDescendant(cf => cf.ByName("Save"))?.IsEnabled == true,
             "Speichern-Button aktiviert", Medium);
 
@@ -1456,12 +1456,12 @@ public partial class End2EndTest
     /// Gibt blockierte Gates frei, deaktiviert die Fehlersteuerung und beantwortet ggf.
     /// offene Dialoge, damit die Fixture-App auch auf einem Fehlerpfad regulär schließt.
     /// </summary>
-    private async Task SetzeUpdateSteuerungZurueckAsync(UpdateE2EFixture fixture, Window? mainWindow)
+    private async Task SetUpdateControlBackAsync(UpdateE2EFixture fixture, Window? mainWindow)
     {
-        BestEffort(() => fixture.OeffneGate(UpdateDownloadGate));
-        BestEffort(() => fixture.OeffneGate(UpdateReleaseGate));
-        BestEffort(() => fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName));
-        BestEffort(fixture.DeaktiviereLesefehler);
+        BestEffort(() => fixture.OpenGate(UpdateDownloadGate));
+        BestEffort(() => fixture.OpenGate(UpdateReleaseGate));
+        BestEffort(() => fixture.OpenGate(UpdateE2ETestContext.ReadFailureGateName));
+        BestEffort(fixture.DeactivateReadfailure);
 
         if (mainWindow is not null)
         {
@@ -1477,7 +1477,7 @@ public partial class End2EndTest
         var deadline = DateTime.UtcNow + Medium;
         while (DateTime.UtcNow < deadline)
         {
-            var entries = fixture.LeseProtokoll();
+            var entries = fixture.ReadLog();
             if (entries.Count(e => e.Event == UpdateE2EEvents.UpdateAttemptStarted)
                 <= entries.Count(e => e.Event == UpdateE2EEvents.UpdateAttemptCompleted))
                 break;
@@ -1489,48 +1489,48 @@ public partial class End2EndTest
         {
             BestEffort(() =>
             {
-                var fortschritt = new UpdateProgressDialogView(mainWindow);
-                if (fortschritt.IsVisible)
-                    fortschritt.Close();
+                var progress = new UpdateProgressDialogView(mainWindow);
+                if (progress.IsVisible)
+                    progress.Close();
             });
         }
 
-        BestEffort(() => fixture.SetzeGateZurueck(UpdateDownloadGate));
-        BestEffort(() => fixture.SetzeGateZurueck(UpdateReleaseGate));
-        BestEffort(() => fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName));
+        BestEffort(() => fixture.SetGateBack(UpdateDownloadGate));
+        BestEffort(() => fixture.SetGateBack(UpdateReleaseGate));
+        BestEffort(() => fixture.SetGateBack(UpdateE2ETestContext.ReadFailureGateName));
     }
 
     /// <summary>Erzeugt eine Release-Liste mit dem RC-Paket und einer semantisch höheren stabilen Version.</summary>
-    private static string ErzeugeRcUndHoeheresStableReleaseJson(UpdateE2EFixture fixture)
+    private static string CreateRcAndHigherStableReleaseJson(UpdateE2EFixture fixture)
     {
         var releases = new[]
         {
-            UpdateE2EFixture.ErstelleReleaseJson(
+            UpdateE2EFixture.CreateReleaseJson(
                 UpdateE2EFixture.RcVersion,
                 prerelease: true,
                 DateTimeOffset.UtcNow,
-                UpdateE2EFixture.ErstelleAssetJson(
+                UpdateE2EFixture.CreateAssetJson(
                     UpdateE2EFixture.RcAssetApiUrl, UpdateE2EFixture.RcAssetId, fixture.RcDownloadUrl),
-                UpdateE2EFixture.ErstelleManifestAssetJson(
+                UpdateE2EFixture.CreateManifestAssetJson(
                     UpdateE2EFixture.RcManifestAssetApiUrl, UpdateE2EFixture.RcManifestAssetId, fixture.RcManifestDownloadUrl)),
-            UpdateE2EFixture.ErstelleReleaseJson(
+            UpdateE2EFixture.CreateReleaseJson(
                 "9.9.9",
                 prerelease: false,
                 DateTimeOffset.UtcNow,
-                UpdateE2EFixture.ErstelleAssetJson(
+                UpdateE2EFixture.CreateAssetJson(
                     UpdateE2EFixture.AssetApiUrl(91999), 91999L, "https://e2e.invalid/unused-stable.zip"))
         };
         return JsonSerializer.Serialize(releases);
     }
 
     /// <summary>Erzeugt eine Release-Listen-JSON mit den angegebenen Stable-Versionen.</summary>
-    private static string ErzeugeReleaseListenJson(UpdateE2EFixture fixture, params string[] versionen)
+    private static string CreateReleaseListsJson(UpdateE2EFixture fixture, params string[] versionen)
     {
-        var releases = versionen.Select(version => UpdateE2EFixture.ErstelleReleaseJson(
+        var releases = versionen.Select(version => UpdateE2EFixture.CreateReleaseJson(
             version,
             prerelease: false,
             DateTimeOffset.UtcNow.AddDays(-7),
-            UpdateE2EFixture.ErstelleAssetJson(
+            UpdateE2EFixture.CreateAssetJson(
                 UpdateE2EFixture.StableAssetApiUrl, UpdateE2EFixture.StableAssetId, fixture.StableDownloadUrl)));
         return JsonSerializer.Serialize(releases);
     }

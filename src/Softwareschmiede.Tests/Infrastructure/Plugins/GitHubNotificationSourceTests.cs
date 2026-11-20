@@ -88,7 +88,7 @@ public sealed class GitHubNotificationSourceTests
     /// <summary>Ein vorhandenes since-Fenster wird als ISO-Parameter weitergereicht, abzüglich des
     /// zweistündigen Sicherheitsabstands gegen GitHubs DST-verschobenen since-Filter.</summary>
     [Fact]
-    public async Task EnumerateNotifications_PassesSinceParameter()
+    public async Task EnumerateNotifications_AdjustSinceParameter()
     {
         var agent = new FakeGitHubEventApi();
         agent.AddJson("notifications", "[]");

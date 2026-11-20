@@ -18,7 +18,7 @@ public sealed class DiffLineStatusToBrushConverterTests
     [InlineData(DiffLineStatus.Added, "DiffAddedBrush")]
     [InlineData(DiffLineStatus.Removed, "DiffRemovedBrush")]
     [InlineData(DiffLineStatus.Modified, "DiffModifiedBrush")]
-    public void Convert_StatusMitThemeBrush_LiefertBrushAusAnwendungsressourcen(DiffLineStatus status, string resourceKey)
+    public void Convert_StatusWithThemeBrush_ReturnsBrushOutAppresources(DiffLineStatus status, string resourceKey)
     {
         StaDispatcher.Invoke(() =>
         {
@@ -34,7 +34,7 @@ public sealed class DiffLineStatusToBrushConverterTests
 
     /// <summary>Für Context-Zeilen liefert der Converter unabhängig vom Theme einen transparenten Brush.</summary>
     [Fact]
-    public void Convert_Context_LiefertTransparentenBrush()
+    public void Convert_Context_ReturnsTransparentBrush()
     {
         StaDispatcher.Invoke(() =>
         {

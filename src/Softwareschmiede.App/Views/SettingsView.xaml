@@ -288,7 +288,7 @@
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,8" />
                         <ComboBox SelectedItem="{Binding SelectedUpdateMode, UpdateSourceTrigger=PropertyChanged}"
-                                  AutomationProperties.Name="Update-Modus"
+                                  AutomationProperties.Name="Update-Mode"
                                   ItemsSource="{Binding UpdateModeOptions}"
                                   HorizontalAlignment="Stretch"
                                   Margin="0,0,0,12"
@@ -303,7 +303,7 @@
                                    Foreground="{DynamicResource PrimaryTextBrush}"
                                    Margin="0,0,0,4" />
                         <ComboBox SelectedItem="{Binding SelectedUpdatePath, UpdateSourceTrigger=PropertyChanged}"
-                                  AutomationProperties.Name="Update-Pfad"
+                                  AutomationProperties.Name="Update-Path"
                                   ItemsSource="{Binding UpdatePathOptions}"
                                   HorizontalAlignment="Stretch"
                                   Margin="0,0,0,8"

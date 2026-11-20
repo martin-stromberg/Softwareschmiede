@@ -59,7 +59,7 @@ public sealed class GitHubReleaseClientTests
 
     /// <summary>Das update.json-Asset liefert Manifest-Download-URL (browser_download_url) und Manifest-Fallback-URL (aus url/id abgeleitet).</summary>
     [Fact]
-    public async Task GetLatestReleaseAsync_ShouldReturnManifestUrls_WhenManifestAssetExists()
+    public async Task GetLatestReleaseAsync_ShouldReturnManifestUrl_WhenManifestAssetExists()
     {
         var httpClient = new HttpClient(new StaticHttpHandler(HttpStatusCode.OK, $$"""
 [

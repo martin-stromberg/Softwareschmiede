@@ -49,7 +49,7 @@ public sealed class ScmEventOrchestratorTests
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var project = new Project { Id = Guid.NewGuid(), Name = "SCM" };
             var repository = new GitRepository { Id = Guid.NewGuid(), ProjectId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginType = fixture.Repository.ProviderPrefix, RepositoryName = "repo" };
-            var task = new WorkItem { Id = Guid.NewGuid(), Title = "SCM task", ProjectId = project.Id, GitRepositoryId = repository.Id, Status = WorkItemStatus.Started, AiPluginPrefix = ScmDispatchFixture.KiPrefix };
+            var task = new WorkItem { Id = Guid.NewGuid(), Title = "SCM task", ProjectId = project.Id, GitRepositoryId = repository.Id, Status = WorkItemStatus.Started, AiPluginPrefix = ScmDispatchFixture.AiPrefix };
             var time = DateTimeOffset.UtcNow;
             var observation = new ScmEventObservation(new(fixture.Repository, ScmReferenceKind.Issue, 7), ScmContentKind.IssueComment,
                 Guid.NewGuid().ToString(), "42", time, time, null, "U_1", "owner", null, null,
@@ -110,7 +110,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Prompts);
         using var verification = fixture.Services.CreateScope();
         var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
-        Assert.Equal(ScmDispatchFixture.KiPrefix, task!.AiPluginPrefix);
+        Assert.Equal(ScmDispatchFixture.AiPrefix, task!.AiPluginPrefix);
     }
 
     /// <summary>A settings default that names no installed plugin is not guessed around:
@@ -136,9 +136,9 @@ public sealed class ScmEventOrchestratorTests
     /// <summary>A deactivated task plugin assignment is ignored: the dispatch falls back to the
     /// activated global default plugin, delivers the event and persists the used prefix.</summary>
     [Fact]
-    public async Task DisabledTaskPlugin_FallsBackToGlobalDefault_Delivers()
+    public async Task DisabledTaskPlugin_IfBackToGlobalDefault_Delivers()
     {
-        var second = new ScmKiProfile("Softwareschmiede.OtherKi", string.Empty, "OTHER", "OTHER>",
+        var second = new ScmAiProfile("Softwareschmiede.OtherKi", string.Empty, "OTHER", "OTHER>",
             new Dictionary<string, string?>());
         await using var fixture = new ScmDispatchFixture(ki2: second);
         await fixture.InitializeAsync();
@@ -151,7 +151,7 @@ public sealed class ScmEventOrchestratorTests
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
                 .SetPluginEnabledAsync(second.Prefix, false, TestContext.Current.CancellationToken);
             await scope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
-                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
+                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.AiPrefix, TestContext.Current.CancellationToken);
         }
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
@@ -161,7 +161,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Prompts);
         using var verification = fixture.Services.CreateScope();
         var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
-        Assert.Equal(ScmDispatchFixture.KiPrefix, task!.AiPluginPrefix);
+        Assert.Equal(ScmDispatchFixture.AiPrefix, task!.AiPluginPrefix);
     }
 
     /// <summary>With no executable plugin configured the event waits honestly: an understandable
@@ -175,24 +175,24 @@ public sealed class ScmEventOrchestratorTests
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
-                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, false, TestContext.Current.CancellationToken);
+                .SetPluginEnabledAsync(ScmDispatchFixture.AiPrefix, false, TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);
         Assert.Null(item.NextAttemptUtc);
         Assert.Contains("nicht mehr installiert oder aktiviert", item.Reason);
-        Assert.Contains(ScmDispatchFixture.KiPrefix, item.Reason);
+        Assert.Contains(ScmDispatchFixture.AiPrefix, item.Reason);
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Prompts);
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var entries = await db.LogEntries.Where(x => x.WorkItemId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-            Assert.Contains(entries, x => x.Type == LogEntryType.SystemMessage && x.Content.Contains(ScmDispatchFixture.KiPrefix));
+            Assert.Contains(entries, x => x.Type == LogEntryType.SystemMessage && x.Content.Contains(ScmDispatchFixture.AiPrefix));
         }
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
-                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, true, TestContext.Current.CancellationToken);
+                .SetPluginEnabledAsync(ScmDispatchFixture.AiPrefix, true, TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
         item = await fixture.EventAsync(eventId);
@@ -212,9 +212,9 @@ public sealed class ScmEventOrchestratorTests
         var (_, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
-                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, false, TestContext.Current.CancellationToken);
+                .SetPluginEnabledAsync(ScmDispatchFixture.AiPrefix, false, TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(eventId, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(eventId, ScmDispatchFixture.AiPrefix, TestContext.Current.CancellationToken);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);
         Assert.Equal(long.MaxValue, item.NextAttemptUtc);
@@ -335,7 +335,7 @@ public sealed class ScmEventOrchestratorTests
     [Fact]
     public async Task UnknownCliFormat_WaitsWithoutConfirmOption()
     {
-        await using var fixture = new ScmDispatchFixture(ki: new ScmKiProfile("Softwareschmiede.GitHubCopilot", string.Empty,
+        await using var fixture = new ScmDispatchFixture(ai: new ScmAiProfile("Softwareschmiede.GitHubCopilot", string.Empty,
             "GitHub Copilot CLI", ">", new Dictionary<string, string?>()));
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
@@ -360,7 +360,7 @@ public sealed class ScmEventOrchestratorTests
     {
         var prompts = new List<string>();
         var fixture = default(ScmDispatchFixture);
-        fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3001.0.0",
+        fixture = new ScmDispatchFixture(ai: ScmAiProfile.Devin(banner: "Devin CLI\nv3001.0.0",
             onWritePrompt: async prompt =>
             {
                 if (prompt.Contains("challengePath", StringComparison.Ordinal)) await ScmDispatchFixture.CompleteProbeAsync(prompt);

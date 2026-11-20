@@ -9,10 +9,10 @@ public sealed class CompositeTerminalOutputSinkTests
 {
     /// <summary>Normale Output-Chunks gehen an alle inneren Senken in Reihenfolge.</summary>
     [Fact]
-    public void OnOutputChunk_FaechertAufAlleSenken()
+    public void OnOutputChunk_FansOnAllSink()
     {
         var sinkA = new CollectingSink();
-        var sinkB = new CollectingDiagnoseSink();
+        var sinkB = new CollectingDiagnosticsSink();
         var sut = new CompositeTerminalOutputSink(sinkA, sinkB);
 
         var chunk = Encoding.UTF8.GetBytes("abc");
@@ -25,28 +25,28 @@ public sealed class CompositeTerminalOutputSinkTests
     /// <summary>Diagnose-Chunks erreichen nur innere Senken, die <see cref="ITerminalDiagnosticsSink"/>
     /// implementieren — byte-exakte Mitschnitt-Senken bleiben frei von Markerzeilen.</summary>
     [Fact]
-    public void OnDiagnoseChunk_GehtNurAnDiagnoseSenken()
+    public void OnDiagnosticsChunk_GoesOnlyAnDiagnosticsSink()
     {
-        var recorderAehnlich = new CollectingSink();           // kein ITerminalDiagnoseSink
-        var protokollAehnlich = new CollectingDiagnoseSink();  // implementiert ITerminalDiagnoseSink
-        var sut = new CompositeTerminalOutputSink(recorderAehnlich, protokollAehnlich);
+        var recorderSimilar = new CollectingSink();           // kein ITerminalDiagnoseSink
+        var logSimilar = new CollectingDiagnosticsSink();  // implementiert ITerminalDiagnoseSink
+        var sut = new CompositeTerminalOutputSink(recorderSimilar, logSimilar);
 
         sut.OnDiagnosticsChunk(Encoding.UTF8.GetBytes("[Terminal-Diagnose] test"));
 
-        protokollAehnlich.DiagnoseChunks.Should().Equal("[Terminal-Diagnose] test");
-        protokollAehnlich.Chunks.Should().BeEmpty(
+        logSimilar.DiagnosticsChunks.Should().Equal("[Terminal-Diagnose] test");
+        logSimilar.Chunks.Should().BeEmpty(
             "der Diagnose-Kanal darf nicht als normaler Output-Chunk in die Senke laufen");
-        recorderAehnlich.Chunks.Should().BeEmpty(
+        recorderSimilar.Chunks.Should().BeEmpty(
             "Senken ohne ITerminalDiagnoseSink erhalten keine Diagnose-Marker");
     }
 
     /// <summary><see cref="ITerminalOutputSink.Complete"/> und
     /// <see cref="ITerminalOutputSink.CompleteAsync"/> schließen alle inneren Senken ab.</summary>
     [Fact]
-    public async Task Complete_SchliesstAlleInnerenSenkenAb()
+    public async Task Complete_ClosesAllInnerSinkFrom()
     {
         var sinkA = new CollectingSink();
-        var sinkB = new CollectingDiagnoseSink();
+        var sinkB = new CollectingDiagnosticsSink();
         var sut = new CompositeTerminalOutputSink(sinkA, sinkB);
 
         sut.Complete();
@@ -54,7 +54,7 @@ public sealed class CompositeTerminalOutputSinkTests
         sinkB.IsCompleted.Should().BeTrue();
 
         var sinkC = new CollectingSink();
-        var sinkD = new CollectingDiagnoseSink();
+        var sinkD = new CollectingDiagnosticsSink();
         var sut2 = new CompositeTerminalOutputSink(sinkC, sinkD);
         await sut2.CompleteAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
         sinkC.IsCompleted.Should().BeTrue();
@@ -79,12 +79,12 @@ public sealed class CompositeTerminalOutputSinkTests
         }
     }
 
-    private sealed class CollectingDiagnoseSink : CollectingSink, ITerminalDiagnosticsSink
+    private sealed class CollectingDiagnosticsSink : CollectingSink, ITerminalDiagnosticsSink
     {
-        private readonly List<string> _diagnoseChunks = [];
-        public IReadOnlyList<string> DiagnoseChunks => _diagnoseChunks;
+        private readonly List<string> _diagnosticsChunks = [];
+        public IReadOnlyList<string> DiagnosticsChunks => _diagnosticsChunks;
 
         public void OnDiagnosticsChunk(ReadOnlySpan<byte> bytes)
-            => _diagnoseChunks.Add(Encoding.UTF8.GetString(bytes));
+            => _diagnosticsChunks.Add(Encoding.UTF8.GetString(bytes));
     }
 }

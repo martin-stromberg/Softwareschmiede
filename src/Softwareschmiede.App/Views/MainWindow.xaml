@@ -208,7 +208,7 @@
                                   Content="Herunterfahren erzwingen"
                                   ToolTip="Erzwingt das Herunterfahren auch dann, wenn andere Programme das Beenden verweigern — nicht gespeicherte Daten gehen dabei verloren."
                                   AutomationProperties.AutomationId="ForceAutoShutdown"
-                                  AutomationProperties.Name="Herunterfahren erzwingen"
+                                  AutomationProperties.Name="ForceShutdown"
                                   FontSize="11"
                                   Margin="8,0,8,2"
                                   Visibility="{Binding AutoShutdownOptionsVisible, Converter={StaticResource BoolToVisibilityConverter}}" />

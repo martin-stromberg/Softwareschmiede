@@ -27,7 +27,7 @@ public sealed class DiffServiceTests : IDisposable
 
     /// <summary>GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist.</summary>
     [Fact]
-    public async Task GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist()
+    public async Task GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenWorkItemDoesNotExist()
     {
         // Act
         var act = () => _sut.GenerateDiffAsync(Guid.NewGuid(), "src/file.cs", "a", "b");
@@ -38,10 +38,10 @@ public sealed class DiffServiceTests : IDisposable
 
     /// <summary>GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists.</summary>
     [Fact]
-    public async Task GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists()
+    public async Task GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenWorkItemExists()
     {
         // Arrange
-        var workItemId = await SeedAufgabeAsync();
+        var workItemId = await SeedWorkItemAsync();
 
         // Act
         var result = await _sut.GenerateDiffAsync(workItemId, "src/file.cs", "a\nb\nc", "a\nx\nc", ct: TestContext.Current.CancellationToken);
@@ -60,7 +60,7 @@ public sealed class DiffServiceTests : IDisposable
     public async Task GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit()
     {
         // Arrange
-        var workItemId = await SeedAufgabeAsync();
+        var workItemId = await SeedWorkItemAsync();
         var largeSource = new string('a', 102401);
         var largeTarget = new string('b', 102401);
 
@@ -77,7 +77,7 @@ public sealed class DiffServiceTests : IDisposable
     public async Task GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows()
     {
         // Arrange
-        var workItemId = await SeedAufgabeAsync();
+        var workItemId = await SeedWorkItemAsync();
 
         // Act
         var act = () => _sut.GenerateDiffAsync(workItemId, "src/file.cs", " ", "target");
@@ -89,10 +89,10 @@ public sealed class DiffServiceTests : IDisposable
 
     /// <summary>GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe.</summary>
     [Fact]
-    public async Task GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe()
+    public async Task GetStatisticsAsync_ShouldReturnAggregatesPerWorkItem()
     {
         // Arrange
-        var workItemId = await SeedAufgabeAsync();
+        var workItemId = await SeedWorkItemAsync();
         _db.DiffResults.AddRange(
             new DiffResult
             {
@@ -141,7 +141,7 @@ public sealed class DiffServiceTests : IDisposable
     public async Task DeleteDiffAsync_ShouldDeleteDiff_WhenExisting()
     {
         // Arrange
-        var workItemId = await SeedAufgabeAsync();
+        var workItemId = await SeedWorkItemAsync();
         var diff = await _sut.GenerateDiffAsync(workItemId, "src/file.cs", "a", "b", ct: TestContext.Current.CancellationToken);
 
         // Act
@@ -159,7 +159,7 @@ public sealed class DiffServiceTests : IDisposable
         _db.Dispose();
     }
 
-    private async Task<Guid> SeedAufgabeAsync()
+    private async Task<Guid> SeedWorkItemAsync()
     {
         var projectId = Guid.NewGuid();
         var workItemId = Guid.NewGuid();

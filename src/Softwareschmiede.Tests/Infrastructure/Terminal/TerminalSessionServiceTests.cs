@@ -47,7 +47,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
     /// <summary>Eine Spec ohne FileName wird mit ArgumentException abgelehnt.</summary>
     [Fact]
-    public async Task StartAsync_SpecOhneFileName_WirftArgumentException()
+    public async Task StartAsync_SpecWithoutFileName_ThrowsArgumentException()
     {
         var act = () => _sut.StartAsync(Guid.NewGuid(), new TerminalSessionStartSpec { FileName = "" }, null, null, CancellationToken.None);
 
@@ -56,7 +56,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
     /// <summary>Eine nicht auffindbare Executable führt zu InvalidOperationException inkl. Diagnose-Marker — ohne Pipe-Fallback.</summary>
     [Fact]
-    public async Task StartAsync_ExecutableNichtGefunden_WirftMitMarkerUndDiagnose()
+    public async Task StartAsync_ExecutableNotFound_ThrowsWithMarkerAndDiagnostics()
     {
         var spec = CreateSpec(fileName: "gibtes-garantiert-nicht-0815.exe");
 
@@ -70,7 +70,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
     /// <summary>Eine gefundene, aber nicht ausführbare Datei (.ps1) schlägt ebenfalls ohne Fallback fehl.</summary>
     [Fact]
-    public async Task StartAsync_ExecutableNichtAusfuehrbar_WirftMitMarkerUndDiagnose()
+    public async Task StartAsync_ExecutableNotExecutable_ThrowsWithMarkerAndDiagnostics()
     {
         var script = Path.Combine(Path.GetTempPath(), $"nicht-ausfuehrbar-{Guid.NewGuid():N}.ps1");
         await File.WriteAllTextAsync(script, "Write-Host x", TestContext.Current.CancellationToken);
@@ -91,7 +91,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
     /// <summary>Ein .cmd-Shim wird vor dem Launcher-Aufruf zu cmd.exe /d /s /c normalisiert.</summary>
     [Fact]
-    public async Task StartAsync_CmdShimSpec_LauncherErhaeltNormalisierteSpec()
+    public async Task StartAsync_CmdShimSpec_LauncherReceivesNormalizedSpec()
     {
         var shim = Path.Combine(Path.GetTempPath(), $"shim-{Guid.NewGuid():N}.cmd");
         await File.WriteAllTextAsync(shim, "@echo off", TestContext.Current.CancellationToken);
@@ -100,9 +100,9 @@ public sealed class TerminalSessionServiceTests : IDisposable
             var result = await _sut.StartAsync(Guid.NewGuid(), CreateSpec(fileName: shim), _sink, null, CancellationToken.None);
 
             _ptyLauncher.Calls.Should().Be(1, "bei verfügbarer PTY muss der PTY-Launcher verwendet werden");
-            _ptyLauncher.LetzteSpec.Should().NotBeNull();
-            _ptyLauncher.LetzteSpec!.FileName.Should().Be("cmd.exe");
-            _ptyLauncher.LetzteSpec.Arguments.Should().Be($"/d /s /c \"{shim}\"");
+            _ptyLauncher.LastSpec.Should().NotBeNull();
+            _ptyLauncher.LastSpec!.FileName.Should().Be("cmd.exe");
+            _ptyLauncher.LastSpec.Arguments.Should().Be($"/d /s /c \"{shim}\"");
             result.IsPseudoTerminal.Should().BeTrue();
         }
         finally
@@ -113,7 +113,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
     /// <summary>Der Health-Check-Delegate wird an den Preflight durchgereicht (bei auflösbarer Executable).</summary>
     [Fact]
-    public async Task StartAsync_HealthCheckWirdAnPreflightDurchgereicht()
+    public async Task StartAsync_HealthCheckWillAnPreflightPassedthrough()
     {
         var healthCheckCalled = false;
 
@@ -134,7 +134,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
     /// <summary>Ein Plugin ohne SupportsPty-Flag läuft auf dem Pipe-Backend inkl. Diagnose-Marker.</summary>
     [Fact]
-    public async Task StartAsync_OhneSupportsPty_PipeMitDiagnose()
+    public async Task StartAsync_WithoutSupportsPty_PipeWithDiagnostics()
     {
         var spec = CreateSpec() with { Capabilities = TerminalProviderCapabilities.None };
 
@@ -148,7 +148,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
     /// <summary>Der Test-Override Terminal.ForcePtyUnavailable erzwingt den Pipe-Fallback mit Diagnose-Marker.</summary>
     [Fact]
-    public async Task StartAsync_ForcePtyUnavailable_PipeMitDiagnoseMarker()
+    public async Task StartAsync_ForcePtyUnavailable_PipeWithDiagnosticsMarker()
     {
         await using (var scope = _provider.CreateAsyncScope())
         {
@@ -167,7 +167,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
     /// <summary>RequiresPty ohne PTY-Verfügbarkeit schlägt hart fehl — mit Diagnose-Marker, ohne Launcher-Aufruf.</summary>
     [Fact]
-    public async Task StartAsync_RequiresPtyOhnePty_WirftMitMarkerUndDiagnose()
+    public async Task StartAsync_RequiresPtyWithoutPty_ThrowsWithMarkerAndDiagnostics()
     {
         await using (var scope = _provider.CreateAsyncScope())
         {
@@ -188,9 +188,9 @@ public sealed class TerminalSessionServiceTests : IDisposable
     /// <c>OnDiagnoseChunk</c> — nicht über <c>OnOutputChunk</c> — damit byte-exakte
     /// Mitschnitt-Pfade frei von Artefakt-Zeilen bleiben.</summary>
     [Fact]
-    public async Task StartAsync_DiagnoseFaehigeSenke_ErhaeltMarkerUeberDiagnoseKanal()
+    public async Task StartAsync_DiagnosticsCapableSink_ReceivesMarkerOverDiagnosticsChannel()
     {
-        var sink = new CollectingDiagnoseSink();
+        var sink = new CollectingDiagnosticsSink();
 
         var act = () => _sut.StartAsync(
             Guid.NewGuid(),
@@ -200,14 +200,14 @@ public sealed class TerminalSessionServiceTests : IDisposable
             CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
-        sink.DiagnoseText.Should().Contain("[Terminal-Diagnose]");
+        sink.DiagnosticsText.Should().Contain("[Terminal-Diagnose]");
         sink.Text.Should().BeEmpty(
             "der Marker darf bei diagnose-fähigen Senken nicht als normaler Output-Chunk ankommen");
     }
 
     /// <summary>Ein negatives Replay-Budget ist eine ungültige Konfiguration und schlägt mit ArgumentOutOfRangeException fehl.</summary>
     [Fact]
-    public async Task StartAsync_ReplayBudgetUngueltig_WirftArgumentOutOfRange()
+    public async Task StartAsync_ReplayBudgetInvalid_ThrowsArgumentOutOfRange()
     {
         var sut = CreateService(Options.Create(new TerminalSessionOptions { ReplayBufferByteBudget = 0 }));
 
@@ -225,7 +225,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
     [InlineData(220, -1)]
     [InlineData(40000, 50)]
     [InlineData(220, 40000)]
-    public async Task StartAsync_TerminalgroesseUngueltig_WirftArgumentOutOfRange(int cols, int rows)
+    public async Task StartAsync_TerminalsizeInvalid_ThrowsArgumentOutOfRange(int cols, int rows)
     {
         var sut = CreateService(Options.Create(new TerminalSessionOptions { DefaultCols = cols, DefaultRows = rows }));
 
@@ -259,12 +259,12 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
         public bool IsPseudoTerminal { get; init; }
         public int Calls { get; private set; }
-        public TerminalSessionStartSpec? LetzteSpec { get; private set; }
+        public TerminalSessionStartSpec? LastSpec { get; private set; }
 
         public TerminalSessionStartResult Start(Guid workItemId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
         {
             Calls++;
-            LetzteSpec = spec;
+            LastSpec = spec;
             var process = Process.GetCurrentProcess();
             var session = new PseudoConsoleSession(
                 NullPseudoConsoleHandle.Instance,
@@ -318,10 +318,10 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
     /// <summary>Output-Senke mit <see cref="ITerminalDiagnosticsSink"/>: sammelt normale Chunks und
     /// Diagnose-Marker getrennt voneinander.</summary>
-    private sealed class CollectingDiagnoseSink : ITerminalOutputSink, ITerminalDiagnosticsSink
+    private sealed class CollectingDiagnosticsSink : ITerminalOutputSink, ITerminalDiagnosticsSink
     {
         private readonly StringBuilder _text = new();
-        private readonly StringBuilder _diagnoseText = new();
+        private readonly StringBuilder _diagnosticsText = new();
         private readonly object _lock = new();
 
         public string Text
@@ -329,9 +329,9 @@ public sealed class TerminalSessionServiceTests : IDisposable
             get { lock (_lock) return _text.ToString(); }
         }
 
-        public string DiagnoseText
+        public string DiagnosticsText
         {
-            get { lock (_lock) return _diagnoseText.ToString(); }
+            get { lock (_lock) return _diagnosticsText.ToString(); }
         }
 
         public void OnOutputChunk(ReadOnlySpan<byte> data)
@@ -343,7 +343,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
         public void OnDiagnosticsChunk(ReadOnlySpan<byte> bytes)
         {
             lock (_lock)
-                _diagnoseText.Append(Encoding.UTF8.GetString(bytes));
+                _diagnosticsText.Append(Encoding.UTF8.GetString(bytes));
         }
 
         public void Complete()

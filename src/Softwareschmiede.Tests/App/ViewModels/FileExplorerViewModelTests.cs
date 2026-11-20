@@ -15,7 +15,7 @@ public sealed class FileExplorerViewModelTests
 
     /// <summary>InitialisierenAsync lädt im Standardmodus den Arbeitsbaum und füllt Wurzelknoten.</summary>
     [Fact]
-    public async Task Standard_LaedtWurzelknotenUeberWorkingTree()
+    public async Task Default_LoadsRootnodeOverWorkingTree()
     {
         var (sut, gitMock, _) = CreateSut();
         var nodes = new List<WorkspaceFileNode> { new() { Name = "a.txt", RelativePath = "a.txt" } };
@@ -30,7 +30,7 @@ public sealed class FileExplorerViewModelTests
 
     /// <summary>Die Auswahl eines Datei-Knotens im Standardmodus lädt die Vorschau und setzt DateiInhalt auf CurrentContent.</summary>
     [Fact]
-    public async Task DateiAuswahl_Standard_SetztDateiInhaltAusPreview()
+    public async Task FileSelection_Default_SetsFileContentOutPreview()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -49,7 +49,7 @@ public sealed class FileExplorerViewModelTests
 
     /// <summary>Ein schneller Auswahlwechsel bricht den Ladevorgang der vorherigen Auswahl über deren CancellationToken ab, sodass er den neueren Inhalt nicht überschreiben kann.</summary>
     [Fact]
-    public async Task DateiAuswahl_SchnellerWechsel_BrichtTokenDesVorherigenLadevorgangsAb()
+    public async Task FileSelection_SwitchFast_CancelsTokenOfPreviousLoadprocessFrom()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -80,7 +80,7 @@ public sealed class FileExplorerViewModelTests
 
     /// <summary>InitialisierenAsync bricht einen noch laufenden DateiLadenAsync-Vorgang ab, statt ihn den gerade geleerten Zustand mit veraltetem Inhalt überschreiben zu lassen.</summary>
     [Fact]
-    public async Task InitialisierenAsync_BrichtLaufendenDateiLadevorgangAb()
+    public async Task InitializeAsync_CancelsRunningFileLoadprocessFrom()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -106,7 +106,7 @@ public sealed class FileExplorerViewModelTests
 
     /// <summary>AktualisierenAsync bricht einen noch laufenden DateiLadenAsync-Vorgang ab, statt ihn den gerade geleerten Zustand mit veraltetem Inhalt überschreiben zu lassen.</summary>
     [Fact]
-    public async Task AktualisierenCommand_BrichtLaufendenDateiLadevorgangAb()
+    public async Task RefreshCommand_CancelsRunningFileLoadprocessFrom()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -132,7 +132,7 @@ public sealed class FileExplorerViewModelTests
 
     /// <summary>Schlägt das Laden der Dateivorschau fehl, zeigt DateiInhalt einen Hinweistext statt des veralteten Inhalts der vorherigen Datei, und DiffZeilen wird geleert.</summary>
     [Fact]
-    public async Task DateiLadenAsync_FehlerBeimLaden_ZeigtHinweisUndLeertDiffZeilen()
+    public async Task LoadFileAsync_LoadErrorAt_ShowsNoticeAndClearsDiffLines()
     {
         var (sut, gitMock, diffMock) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -159,7 +159,7 @@ public sealed class FileExplorerViewModelTests
 
     /// <summary>Die Auswahl eines Verzeichnis-Knotens leert den zuvor angezeigten Dateiinhalt und die Diff-Zeilen, statt die veraltete Anzeige stehen zu lassen.</summary>
     [Fact]
-    public async Task DateiAuswahl_Verzeichnis_LeertVorherigenDateiInhaltUndDiffZeilen()
+    public async Task FileSelection_Directory_ClearsPreviousFileContentAndDiffLines()
     {
         var (sut, gitMock, diffMock) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -185,7 +185,7 @@ public sealed class FileExplorerViewModelTests
     [Theory]
     [InlineData(true, false, "Binärdatei – Vorschau nicht verfügbar.")]
     [InlineData(false, true, "Datei ist für die Inline-Vorschau zu groß (2 MB).")]
-    public async Task DateiAuswahl_BinaerOderZuGross_ZeigtHinweis(bool isBinary, bool isTooBig, string hint)
+    public async Task FileSelection_BinaryOrToLarge_ShowsNotice(bool isBinary, bool isTooBig, string hint)
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -203,7 +203,7 @@ public sealed class FileExplorerViewModelTests
 
     /// <summary>Der Wechsel in den Vergleichsmodus lädt den Snapshot und füllt CommitGruppen.</summary>
     [Fact]
-    public async Task VergleichCommand_LaedtCommitsAusSnapshot()
+    public async Task ComparisonCommand_LoadsCommitsOutSnapshot()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -221,7 +221,7 @@ public sealed class FileExplorerViewModelTests
 
     /// <summary>Das Aufklappen eines Commits lädt dessen geänderte Dateien und setzt ChildrenLoaded.</summary>
     [Fact]
-    public async Task CommitAufklappen_LaedtGeaenderteDateien()
+    public async Task ExpandCommit_LoadsChangedFiles()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -239,7 +239,7 @@ public sealed class FileExplorerViewModelTests
 
     /// <summary>Das Aufklappen eines Commits ändert CommitGruppen nicht (kein Remove/Insert-Umweg mehr) und benachrichtigt stattdessen über die Files-Collection selbst.</summary>
     [Fact]
-    public async Task CommitAufklappen_AendertCommitGruppenNichtUndBenachrichtigtUeberFiles()
+    public async Task ExpandCommit_ChangesCommitGroupsNotAndNotifiedOverFiles()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -254,21 +254,21 @@ public sealed class FileExplorerViewModelTests
         var files = new List<WorkspaceFileNode> { new() { Name = "a.cs", RelativePath = "a.cs", CommitSha = "abc123" } };
         gitMock.Setup(g => g.LoadCommitFilesAsync(RepositoryPath, "abc123", It.IsAny<CancellationToken>())).ReturnsAsync(files);
 
-        var commitGruppenChanged = false;
-        sut.CommitGroup.CollectionChanged += (_, _) => commitGruppenChanged = true;
+        var commitGroupsChanged = false;
+        sut.CommitGroup.CollectionChanged += (_, _) => commitGroupsChanged = true;
         var filesChanged = false;
         commit.Files.CollectionChanged += (_, _) => filesChanged = true;
 
         await sut.ExpandCommitAsync(commit, TestContext.Current.CancellationToken);
 
-        commitGruppenChanged.Should().BeFalse();
+        commitGroupsChanged.Should().BeFalse();
         filesChanged.Should().BeTrue();
         commit.Files.Should().ContainSingle(file => file.Name == "a.cs");
     }
 
     /// <summary>Die Auswahl einer Commit-Datei im Vergleichsmodus lädt die Commit-Vorschau und erzeugt Diff-Zeilen über ITextDiffService.</summary>
     [Fact]
-    public async Task DateiAuswahl_Vergleich_ErzeugtDiffZeilen()
+    public async Task FileSelection_Comparison_CreatesDiffLines()
     {
         var (sut, gitMock, diffMock) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -290,7 +290,7 @@ public sealed class FileExplorerViewModelTests
 
     /// <summary>AktualisierenCommand lädt je nach aktuellem Modus den Arbeitsbaum bzw. den Snapshot erneut.</summary>
     [Fact]
-    public async Task AktualisierenCommand_LaedtAktuellenModusNeu()
+    public async Task RefreshCommand_LoadsCurrentModeNew()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);

@@ -23,13 +23,13 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
     /// Inbox: Die Erwähnung in einem erreichbaren Repository wird trotzdem eingelesen, und das
     /// betroffene Repository wird mit verständlicher Diagnose ausgelassen.</summary>
     [Fact]
-    public async Task Monitor_SeparatesKonto_InaccessibleRepository_DoesNotBlockMentionsOfOtherRepositories()
+    public async Task Monitor_SeparatesAccount_InaccessibleRepository_DoesNotBlockMentionsOfOtherRepositories()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, AccessibleUrl, "repo");
         await AddRepositoryAsync(fixture, InaccessibleUrl, "private-repo");
-        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         ConfigureResolutionWithInaccessibleRepository(fixture);
         fixture.ConfigureMentionObservations();
         fixture.ConfigureIssue();
@@ -59,7 +59,7 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, AccessibleUrl, "repo");
         await AddRepositoryAsync(fixture, InaccessibleUrl, "private-repo");
-        await fixture.SetKontoModusAsync(ScmAccountMode.SeparateAccount);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         ConfigureResolutionWithInaccessibleRepository(fixture);
         var before = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 

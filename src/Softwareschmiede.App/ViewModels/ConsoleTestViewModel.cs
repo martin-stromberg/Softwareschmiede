@@ -136,7 +136,7 @@ public sealed class ConsoleTestViewModel : ViewModelBase, IDisposable
 
     /// <summary>Anzeigetext der aufgezeichneten Terminal-Geometrie („Aufzeichnung: {Cols}×{Rows}");
     /// leer, solange keine Aufzeichnung geladen ist.</summary>
-    public string GeometrieText
+    public string GeometryText
     {
         get => _geometrieText;
         private set => SetProperty(ref _geometrieText, value);
@@ -260,7 +260,7 @@ public sealed class ConsoleTestViewModel : ViewModelBase, IDisposable
             ? null
             : "Aufzeichnung unvollständig — das Speicher-Limit wurde erreicht; die Wiedergabe endet vor dem tatsächlichen Ende der Session.";
         PositionText = $"Chunk 0/{recording.Chunks.Count}";
-        SetGeometrieText(recording);
+        SetGeometryText(recording);
         StatusText = $"Aufzeichnung geladen ({recording.PluginName}, {recording.Chunks.Count} Chunks) — bereit.";
         Session = _replaySession;
     }
@@ -311,11 +311,11 @@ public sealed class ConsoleTestViewModel : ViewModelBase, IDisposable
         // gebundene TerminalControl einen Dead-State abbilden.
         _replaySession = null;
         Session = null;
-        GeometrieText = "";
+        GeometryText = "";
     }
 
-    private void SetGeometrieText(CliOutputRecording recording)
-        => GeometrieText = $"Aufzeichnung: {recording.Cols}×{recording.Rows}";
+    private void SetGeometryText(CliOutputRecording recording)
+        => GeometryText = $"Aufzeichnung: {recording.Cols}×{recording.Rows}";
 
     private void StartPlayback()
     {
@@ -356,7 +356,7 @@ public sealed class ConsoleTestViewModel : ViewModelBase, IDisposable
         _replaySession = CreateReplaySession(_recording!);
         CurrentSourceEntry = null;
         PositionText = $"Chunk 0/{_recording!.Chunks.Count}";
-        SetGeometrieText(_recording);
+        SetGeometryText(_recording);
         Session = _replaySession;
         _replayExited = false;
     }

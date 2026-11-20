@@ -73,7 +73,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>IssuesAbrufenAsync liefert die vom Plugin gelieferten Issues.</summary>
     [Fact]
-    public async Task IssuesAbrufenAsync_ShouldReturnIssues_WhenPluginProvidesData()
+    public async Task IssuesQueryAsync_ShouldReturnIssues_WhenPluginProvidesData()
     {
         // Arrange
         var expectedIssues = new[]
@@ -95,7 +95,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>CommitAsync führt Commit aus und schreibt einen Git-Protokolleintrag.</summary>
     [Fact]
-    public async Task CommitAsync_ShouldCommitAndAddLogEntry_WhenAufgabeHasKlonpfad()
+    public async Task CommitAsync_ShouldCommitAndAddLogEntry_WhenWorkItemHasClonepath()
     {
         // Arrange
         var workItem = await _workItemService.CreateAsync(_projectId, "Commit Aufgabe", null, ct: TestContext.Current.CancellationToken);
@@ -366,7 +366,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync nutzt das Repository der Aufgabe und protokolliert den PR.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldUseTaskRepositoryAndLog_WhenAufgabeHasLinkedRepository()
+    public async Task CreatePullRequestAsync_ShouldUseTaskRepositoryAndLog_WhenWorkItemHasLinkedRepository()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Git-Orchestration-Testprojekt", null, TestContext.Current.CancellationToken);
@@ -398,7 +398,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync baut den PR-Body aus den Branch-Commits statt aus der ursprünglichen Anforderungsbeschreibung.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldUseCommitListBody_WhenWorkspaceSnapshotAvailable()
+    public async Task CreatePullRequestAsync_ShouldUseCommitListBody_WhenWorkspaceSnapshotAvailable()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Projekt mit Commitliste", null, TestContext.Current.CancellationToken);
@@ -473,7 +473,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync verwendet den gespeicherten Basis-Branch der Aufgabe fuer die Commit-Liste statt des Zielbranches.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldUseTaskBasisBranch_WhenLoadingWorkspaceSnapshotForBody()
+    public async Task CreatePullRequestAsync_ShouldUseTaskBaseBranch_WhenLoadingWorkspaceSnapshotForBody()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Projekt mit Staging", null, TestContext.Current.CancellationToken);
@@ -548,7 +548,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync nutzt das aktive Projekt-Repository, wenn die Aufgabe keines zugewiesen hat.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldUseProjectRepository_WhenAufgabeHasNoLinkedRepository()
+    public async Task CreatePullRequestAsync_ShouldUseProjectRepository_WhenWorkItemHasNoLinkedRepository()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Projekt mit Repository", null, TestContext.Current.CancellationToken);
@@ -574,7 +574,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync übergibt den konfigurierten Basis-Branch (<see cref="GitRepository.DefaultSourceBranchName"/>) als Ziel-Branch an das Plugin.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldCallPluginWithBaseBranch_WhenConfigured()
+    public async Task CreatePullRequestAsync_ShouldCallPluginWithBaseBranch_WhenConfigured()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Projekt mit Basis-Branch", null, TestContext.Current.CancellationToken);
@@ -603,7 +603,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync übergibt <c>baseBranch = null</c> an das Plugin, wenn kein Basis-Branch konfiguriert ist (Plugin-Fallback auf Remote-Standard).</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldCallPluginWithoutBaseBranch_WhenNotConfigured()
+    public async Task CreatePullRequestAsync_ShouldCallPluginWithoutBaseBranch_WhenNotConfigured()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Projekt ohne Basis-Branch", null, TestContext.Current.CancellationToken);
@@ -629,7 +629,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync ergänzt die Closing-Direktive und protokolliert die Issue-Referenz.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldAppendClosingDirectiveAndLogIssue_WhenAufgabeHasIssueReference()
+    public async Task CreatePullRequestAsync_ShouldAppendClosingDirectiveAndLogIssue_WhenWorkItemHasIssueReference()
     {
         var project = await _projectService.CreateAsync("Projekt mit Issue", null, TestContext.Current.CancellationToken);
         var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/issue-repo", "test/issue-repo", ct: TestContext.Current.CancellationToken);
@@ -672,7 +672,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync dupliziert keine bereits vorhandene Closing-Direktive.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyAlreadyContainsDirective()
+    public async Task CreatePullRequestAsync_ShouldNotDuplicateClosingDirective_WhenBodyAlreadyContainsDirective()
     {
         var project = await _projectService.CreateAsync("Projekt mit bestehender Direktive", null, TestContext.Current.CancellationToken);
         var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/existing-directive", "test/existing-directive", ct: TestContext.Current.CancellationToken);
@@ -713,7 +713,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync ersetzt einen reinen Whitespace-Body bei bestehender Issue-Referenz durch die Closing-Direktive.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldUseOnlyClosingDirective_WhenBodyIsWhitespaceAndIssueExists()
+    public async Task CreatePullRequestAsync_ShouldUseOnlyClosingDirective_WhenBodyIsWhitespaceAndIssueExists()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Projekt mit Whitespace-Body", null, TestContext.Current.CancellationToken);
@@ -756,7 +756,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync ergänzt die Closing-Direktive der aktuellen Issue, wenn bereits eine Direktive für eine andere Issue vorhanden ist.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldAppendClosingDirectiveForCurrentIssue_WhenBodyContainsDirectiveForAnotherIssue()
+    public async Task CreatePullRequestAsync_ShouldAppendClosingDirectiveForCurrentIssue_WhenBodyContainsDirectiveForAnotherIssue()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Projekt mit anderer Direktive", null, TestContext.Current.CancellationToken);
@@ -801,7 +801,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync lässt den Body unverändert, wenn die Issue-Referenz keine Nummer enthält.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldKeepBodyUnchanged_WhenIssueReferenceHasNoIssueNumber()
+    public async Task CreatePullRequestAsync_ShouldKeepBodyUnchanged_WhenIssueReferenceHasNoIssueNumber()
     {
         var project = await _projectService.CreateAsync("Projekt mit Issue ohne Nummer", null, TestContext.Current.CancellationToken);
         var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/no-issue-number", "test/no-issue-number", ct: TestContext.Current.CancellationToken);
@@ -843,7 +843,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Theory]
     [InlineData(0)]
     [InlineData(-7)]
-    public async Task PullRequestErstellenAsync_ShouldKeepBodyUnchanged_WhenIssueNumberIsNotPositive(int issueNumber)
+    public async Task CreatePullRequestAsync_ShouldKeepBodyUnchanged_WhenIssueNumberIsNotPositive(int issueNumber)
     {
         var project = await _projectService.CreateAsync($"Projekt mit Issue {issueNumber}", null, TestContext.Current.CancellationToken);
         var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", $"https://github.com/test/non-positive-{Math.Abs(issueNumber)}", $"test/non-positive-{Math.Abs(issueNumber)}", ct: TestContext.Current.CancellationToken);
@@ -883,7 +883,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync erkennt qualifizierte Issue-Referenzen als bestehende Closing-Direktive.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyContainsQualifiedIssueReference()
+    public async Task CreatePullRequestAsync_ShouldNotDuplicateClosingDirective_WhenBodyContainsQualifiedIssueReference()
     {
         var project = await _projectService.CreateAsync("Projekt mit qualifizierter Direktive", null, TestContext.Current.CancellationToken);
         var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/qualified-directive", "test/qualified-directive", ct: TestContext.Current.CancellationToken);
@@ -926,7 +926,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Theory]
     [InlineData("resolved #654")]
     [InlineData("Closed #654")]
-    public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyUsesAlternativeClosingVerb(string directive)
+    public async Task CreatePullRequestAsync_ShouldNotDuplicateClosingDirective_WhenBodyUsesAlternativeClosingVerb(string directive)
     {
         var project = await _projectService.CreateAsync($"Projekt mit Direktive {directive}", null, TestContext.Current.CancellationToken);
         var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/alternative-directive", "test/alternative-directive", ct: TestContext.Current.CancellationToken);
@@ -967,7 +967,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync bricht bei mehrdeutiger Repository-Zuordnung kontrolliert ab.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldThrowInvalidOperationException_WhenMultipleActiveRepositoriesExist()
+    public async Task CreatePullRequestAsync_ShouldThrowInvalidOperationException_WhenMultipleActiveRepositoriesExist()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Projekt mit mehreren Repositories", null, TestContext.Current.CancellationToken);
@@ -990,7 +990,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync bricht kontrolliert ab, wenn im Projekt kein aktives Repository vorhanden ist.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldThrowInvalidOperationException_WhenNoActiveRepositoryExists()
+    public async Task CreatePullRequestAsync_ShouldThrowInvalidOperationException_WhenNoActiveRepositoryExists()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Projekt ohne Repository", null, TestContext.Current.CancellationToken);
@@ -1010,7 +1010,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary>PullRequestErstellenAsync löst die Repository-ID korrekt aus einer SSH-Repository-URL auf.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldResolveRepositoryId_FromSshRepositoryUrl()
+    public async Task CreatePullRequestAsync_ShouldResolveRepositoryId_FromSshRepositoryUrl()
     {
         // Arrange
         var project = await _projectService.CreateAsync("Projekt mit SSH-Repository", null, TestContext.Current.CancellationToken);

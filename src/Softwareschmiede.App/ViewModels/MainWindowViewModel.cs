@@ -228,7 +228,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _runningStatusSource = runningStatusSource;
         _dialogService = optionalServices?.DialogService;
         _versionProvider = optionalServices?.VersionProvider;
-        _runDataChangedNotifier = optionalServices?.LaufdatenChangedNotifier;
+        _runDataChangedNotifier = optionalServices?.RunDataChangedNotifier;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
         _scmNotifier = serviceProvider.GetService<ScmEventChangeNotifier>();
         _dispatcherInvoke = DispatcherInvokeFactory.Create(optionalServices?.DispatcherInvoke);

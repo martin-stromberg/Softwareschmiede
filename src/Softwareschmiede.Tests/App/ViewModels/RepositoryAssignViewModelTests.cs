@@ -30,7 +30,7 @@ public sealed class RepositoryAssignViewModelTests
 
     /// <summary>LadenAsync befüllt AvailableScmPlugins wenn Plugins vorhanden sind.</summary>
     [Fact]
-    public async Task LadenAsync_ShouldLoadAvailablePlugins_WhenPluginsExist()
+    public async Task LoadAsync_ShouldLoadAvailablePlugins_WhenPluginsExist()
     {
         var plugin1 = CreatePluginMock("GitHub").Object;
         var plugin2 = CreatePluginMock("GitLab").Object;
@@ -49,7 +49,7 @@ public sealed class RepositoryAssignViewModelTests
 
     /// <summary>LadenAsync setzt HasScmPlugins auf true wenn Plugins verfügbar sind.</summary>
     [Fact]
-    public async Task LadenAsync_ShouldSetHasScmPlugins_ToTrue_WhenPluginsAvailable()
+    public async Task LoadAsync_ShouldSetHasScmPlugins_ToTrue_WhenPluginsAvailable()
     {
         var plugin = CreatePluginMock("GitHub").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
@@ -62,7 +62,7 @@ public sealed class RepositoryAssignViewModelTests
 
     /// <summary>LadenAsync setzt HasScmPlugins auf false wenn keine Plugins vorhanden sind.</summary>
     [Fact]
-    public async Task LadenAsync_ShouldSetHasScmPlugins_ToFalse_WhenNoPluginsAvailable()
+    public async Task LoadAsync_ShouldSetHasScmPlugins_ToFalse_WhenNoPluginsAvailable()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         var sut = CreateSut();
@@ -75,7 +75,7 @@ public sealed class RepositoryAssignViewModelTests
 
     /// <summary>LadenAsync setzt SelectedScmPlugin auf das erste Plugin.</summary>
     [Fact]
-    public async Task LadenAsync_ShouldSetSelectedScmPlugin_ToFirstPlugin()
+    public async Task LoadAsync_ShouldSetSelectedScmPlugin_ToFirstPlugin()
     {
         var plugin1 = CreatePluginMock("GitHub").Object;
         var plugin2 = CreatePluginMock("LocalDirectory").Object;
@@ -136,18 +136,18 @@ public sealed class RepositoryAssignViewModelTests
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([pluginMock.Object]);
         var sut = CreateSut();
 
-        var loadingWasTrue = false;
+        var loadingWhatTrue = false;
         sut.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(sut.IsLoading) && sut.IsLoading)
-                loadingWasTrue = true;
+                loadingWhatTrue = true;
         };
 
-        var ladenTask = sut.LoadAsync(TestContext.Current.CancellationToken);
+        var loadTask = sut.LoadAsync(TestContext.Current.CancellationToken);
         tcs.SetResult([]);
-        await ladenTask;
+        await loadTask;
 
-        loadingWasTrue.Should().BeTrue();
+        loadingWhatTrue.Should().BeTrue();
         sut.IsLoading.Should().BeFalse();
     }
 
@@ -169,7 +169,7 @@ public sealed class RepositoryAssignViewModelTests
 
     /// <summary>BestaetigenCommand hat CanExecute true wenn ein Repository ausgewählt ist.</summary>
     [Fact]
-    public void RepositorySelection_ShouldEnableBestaetigenCommand_WhenRepositorySelected()
+    public void RepositorySelection_ShouldEnableConfirmCommand_WhenRepositorySelected()
     {
         var sut = CreateSut();
 
@@ -180,7 +180,7 @@ public sealed class RepositoryAssignViewModelTests
 
     /// <summary>BestaetigenCommand hat CanExecute false wenn kein Repository ausgewählt ist.</summary>
     [Fact]
-    public void RepositorySelection_ShouldDisableBestaetigenCommand_WhenRepositoryUnselected()
+    public void RepositorySelection_ShouldDisableConfirmCommand_WhenRepositoryUnselected()
     {
         var sut = CreateSut();
         sut.SelectedRepository = new AvailableRepository("repo", DateTime.UtcNow, "owner/repo", "https://github.com/owner/repo");

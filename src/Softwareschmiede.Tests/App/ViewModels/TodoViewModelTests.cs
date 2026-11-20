@@ -8,13 +8,13 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Unit-Tests für TodoViewModel.</summary>
 public sealed class TodoViewModelTests
 {
-    private static Todo CreateTodo(DateTimeOffset? erledaltAm = null) => new()
+    private static Todo CreateTodo(DateTimeOffset? completedAt = null) => new()
     {
         Id = Guid.NewGuid(),
         WorkItemId = Guid.NewGuid(),
         Description = "Testbeschreibung",
         CreatedAt = DateTimeOffset.UtcNow,
-        CompletedAt = erledaltAm
+        CompletedAt = completedAt
     };
 
     /// <summary>Properties sind nach der Konstruktion korrekt bindbar.</summary>
@@ -32,7 +32,7 @@ public sealed class TodoViewModelTests
 
     /// <summary>IstErledigt ist true, wenn ErledigtAm gesetzt ist.</summary>
     [Fact]
-    public void Constructor_IstErledigtTrue_WhenErledigtAmSet()
+    public void Constructor_IsCompletedTrue_WhenCompletedAtSet()
     {
         var todo = CreateTodo(DateTimeOffset.UtcNow);
         var sut = new TodoViewModel(todo);
@@ -42,7 +42,7 @@ public sealed class TodoViewModelTests
 
     /// <summary>PropertyChanged wird ausgelöst, wenn Beschreibung geändert wird.</summary>
     [Fact]
-    public void PropertyChanged_RaisedOnPropertyUpdate_ForBeschreibung()
+    public void PropertyChanged_RaisedOnPropertyUpdate_ForDescription()
     {
         var sut = new TodoViewModel(CreateTodo());
         var raised = new List<string?>();
@@ -56,7 +56,7 @@ public sealed class TodoViewModelTests
 
     /// <summary>PropertyChanged wird für IstErledigt ausgelöst, wenn der Wert geändert wird.</summary>
     [Fact]
-    public void PropertyChanged_RaisedOnPropertyUpdate_ForIstErledigt()
+    public void PropertyChanged_RaisedOnPropertyUpdate_ForIsCompleted()
     {
         var sut = new TodoViewModel(CreateTodo());
         var raised = new List<string?>();

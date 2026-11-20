@@ -16,24 +16,24 @@ public partial class End2EndTest
     /// Settings erhalten geblieben ist; klickt anschließend den Hilfe-Button (?) und prüft, dass
     /// ein Dialog mit einem "Schließen"-Button erscheint, der den Dialog schließt.
     /// </summary>
-    protected void CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(Window mainWindow)
+    protected void CommandLineParameter_TextBoxSavesValueAndHelpDialogWorks_E2E(Window mainWindow)
     {
         var expectedValue = $"--test-{Guid.NewGuid():N}";
 
         var settings = new SettingsView(mainWindow).ForceShow();
-        settings.SelectDefaultKiPlugin("Codex CLI");
+        settings.SelectDefaultAiPlugin("Codex CLI");
 
-        var oldValue = settings.GetCommandLineParameters();
+        var oldValue = settings.GetCommandLineParameter();
         try
         {
             // Wert setzen, speichern, Seite verlassen und erneut betreten - Wert bleibt erhalten
-            settings.SetCommandLineParameters(expectedValue);
+            settings.SetCommandLineParameter(expectedValue);
             settings.SaveSettings();
             settings.Menu.NavigateToDashboard();
 
             var settingsReopened = new SettingsView(mainWindow).ForceShow();
-            settingsReopened.SelectDefaultKiPlugin("Codex CLI");
-            Assert.Equal(expectedValue, settingsReopened.GetCommandLineParameters());
+            settingsReopened.SelectDefaultAiPlugin("Codex CLI");
+            Assert.Equal(expectedValue, settingsReopened.GetCommandLineParameter());
 
             // Hilfe-Button öffnet Dialog, der über "Schließen" wieder geschlossen werden kann
             var helpDialog = settingsReopened.OpenCliHelp();
@@ -45,7 +45,7 @@ public partial class End2EndTest
             try
             {
                 settings.ForceShow();
-                settings.SetCommandLineParameters(oldValue);
+                settings.SetCommandLineParameter(oldValue);
                 settings.SaveSettings();
                 settings.Menu.NavigateToDashboard();
             }

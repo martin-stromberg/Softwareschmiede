@@ -22,7 +22,7 @@ public partial class End2EndTest
     /// Rücknavigation in der Liste. Die im Abbrechen-Pfad eingegebene Titeländerung wird nicht
     /// persistiert, die zuvor angelegte Aufgabe (Status "Neu") bleibt jedoch weiterhin vorhanden.
     /// </summary>
-    protected void AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E(Window mainWindow)
+    protected void WorkItemCreate_SavePersisted_AndCancelDiscardsTitle_E2E(Window mainWindow)
     {
         var projectList = new ProjectListView(mainWindow).ForceShow();
         projectList.CreateProject("NeueAufgabe-Test");
@@ -44,9 +44,9 @@ public partial class End2EndTest
         projectDetailAfterSave.WaitForTask("Persistierte Neue Aufgabe");
 
         // Phase Cancel
-        var taskDetailAbbrechen = projectDetailAfterSave.CreateTask();
-        taskDetailAbbrechen.SetTaskTitle("Nicht gespeicherter Titel");
-        taskDetailAbbrechen.GoBack();
+        var taskDetailCancel = projectDetailAfterSave.CreateTask();
+        taskDetailCancel.SetTaskTitle("Nicht gespeicherter Titel");
+        taskDetailCancel.GoBack();
         var projectDetailAfterCancel = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         // Der nicht gespeicherte Titel erscheint nicht in der Aufgabenliste

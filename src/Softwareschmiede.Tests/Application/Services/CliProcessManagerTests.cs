@@ -21,7 +21,7 @@ public sealed class CliProcessManagerTests : IDisposable
     public CliProcessManagerTests()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _aiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        _aiService = TestAiExecutionServiceFactory.Create(scopeFactoryMock.Object);
         _sut = new CliProcessManager(
             _aiService,
             scopeFactoryMock.Object,
@@ -41,7 +41,7 @@ public sealed class CliProcessManagerTests : IDisposable
     /// weiterer Aufruf für dieselbe Aufgabe nicht fortschreiten. Erst nach Freigabe der Semaphore läuft der Aufruf weiter.
     /// </summary>
     [Fact]
-    public async Task AktualisierungAsync_WithConcurrentTimerTicks_Serializes()
+    public async Task UpdateAsync_WithConcurrentTimerTicks_Serializes()
     {
         var workItemId = Guid.NewGuid();
         _sut.StartHeartbeat(workItemId);
@@ -68,20 +68,20 @@ public sealed class CliProcessManagerTests : IDisposable
     /// Ein Aufruf für Aufgabe B muss fortschreiten können, während die Semaphore von Aufgabe A belegt ist.
     /// </summary>
     [Fact]
-    public async Task AktualisierungAsync_WithDifferentAufgaben_DoesNotSerializeAcrossTasks()
+    public async Task UpdateAsync_WithDifferentWorkItems_DoesNotSerializeAcrossTasks()
     {
-        var aufgabeIdA = Guid.NewGuid();
-        var aufgabeIdB = Guid.NewGuid();
-        _sut.StartHeartbeat(aufgabeIdA);
-        _sut.StartHeartbeat(aufgabeIdB);
+        var workItemIdA = Guid.NewGuid();
+        var workItemIdB = Guid.NewGuid();
+        _sut.StartHeartbeat(workItemIdA);
+        _sut.StartHeartbeat(workItemIdB);
 
         var semaphoresField = typeof(CliProcessManager).GetField("_updateSemaphores", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var semaphores = (ConcurrentDictionary<Guid, SemaphoreSlim>)semaphoresField.GetValue(_sut)!;
-        var semaphoreA = semaphores[aufgabeIdA];
+        var semaphoreA = semaphores[workItemIdA];
         await semaphoreA.WaitAsync(TestContext.Current.CancellationToken);
 
         var method = typeof(CliProcessManager).GetMethod("UpdateAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var taskB = (Task)method.Invoke(_sut, new object[] { aufgabeIdB })!;
+        var taskB = (Task)method.Invoke(_sut, new object[] { workItemIdB })!;
 
         var finished = await Task.WhenAny(taskB, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(taskB, "die Semaphore einer anderen Aufgabe darf den Heartbeat-Update von Aufgabe B nicht blockieren");
@@ -92,23 +92,23 @@ public sealed class CliProcessManagerTests : IDisposable
 
     /// <summary>Shutdown-Race: AktivenLaufSetzenAsync darf nicht fehlschlagen, wenn der DI-Provider bereits disposed ist.</summary>
     [Fact]
-    public async Task AktivenLaufSetzenAsync_WithDisposedScopeFactory_Completes()
+    public async Task SetActiveRunAsync_WithDisposedScopeFactory_Completes()
     {
-        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync("SetActiveRunAsync", Guid.NewGuid());
+        await InvokePersistenceMethodWithDisposedScopeFactoryAsync("SetActiveRunAsync", Guid.NewGuid());
     }
 
     /// <summary>Shutdown-Race: AktivenLaufBeendenAsync darf nicht fehlschlagen, wenn der DI-Provider bereits disposed ist.</summary>
     [Fact]
-    public async Task AktivenLaufBeendenAsync_WithDisposedScopeFactory_Completes()
+    public async Task EndActiveRunAsync_WithDisposedScopeFactory_Completes()
     {
-        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync("EndActiveRunAsync", Guid.NewGuid());
+        await InvokePersistenceMethodWithDisposedScopeFactoryAsync("EndActiveRunAsync", Guid.NewGuid());
     }
 
     /// <summary>Shutdown-Race: LaufdatenSicherstellenAsync darf nicht fehlschlagen, wenn der DI-Provider
     /// bereits disposed ist. Damit der interne <c>IsRunning</c>-Guard den Persistenzpfad wirklich erreicht
     /// (sonst wäre der Test wirkungslos), wird zuvor ein laufendes Handle gepflanzt.</summary>
     [Fact]
-    public async Task LaufdatenSicherstellenAsync_WithDisposedScopeFactory_Completes()
+    public async Task RundataEnsureAsync_WithDisposedScopeFactory_Completes()
     {
         var workItemId = Guid.NewGuid();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
@@ -116,7 +116,7 @@ public sealed class CliProcessManagerTests : IDisposable
             .Setup(f => f.CreateScope())
             .Throws(new ObjectDisposedException("ServiceProvider"));
 
-        using var aiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        using var aiService = TestAiExecutionServiceFactory.Create(scopeFactoryMock.Object);
 
         var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(aiService)!;
@@ -141,7 +141,7 @@ public sealed class CliProcessManagerTests : IDisposable
     /// laufendem Prozess permanent weiter.
     /// </summary>
     [Fact]
-    public async Task Dispose_VerhindertNeuanlageVonTimerUndSubscription()
+    public async Task Dispose_PreventsNewcreationOfTimerAndSubscription()
     {
         var workItemId = Guid.NewGuid();
 
@@ -179,14 +179,14 @@ public sealed class CliProcessManagerTests : IDisposable
             Times.Never);
     }
 
-    private async Task InvokePersistierungsMethodeMitDisposedScopeFactoryAsync(string methodName, params object[] arguments)
+    private async Task InvokePersistenceMethodWithDisposedScopeFactoryAsync(string methodName, params object[] arguments)
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         scopeFactoryMock
             .Setup(f => f.CreateScope())
             .Throws(new ObjectDisposedException("ServiceProvider"));
 
-        using var aiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        using var aiService = TestAiExecutionServiceFactory.Create(scopeFactoryMock.Object);
         using var manager = new CliProcessManager(
             aiService,
             scopeFactoryMock.Object,

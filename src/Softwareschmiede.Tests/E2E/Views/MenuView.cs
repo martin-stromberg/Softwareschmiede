@@ -6,12 +6,12 @@ namespace Softwareschmiede.Tests.E2E.Views;
 /// <summary>View für das persistente Navigationsmenü der Anwendung (Dashboard/Projects/Settings).</summary>
 public sealed class MenuView : BaseWindowView
 {
-    private static readonly string[] DashboardButtonNamen = ["Dashboard"];
-    private static readonly string[] ProjekteButtonNamen = [" Projekte", "Projekte"];
-    private static readonly string[] EinstellungenButtonNamen = [" Einstellungen", "Einstellungen"];
+    private static readonly string[] DashboardButtonNames = ["Dashboard"];
+    private static readonly string[] ProjectsButtonNames = [" Projekte", "Projekte"];
+    private static readonly string[] SettingsButtonNames = [" Einstellungen", "Einstellungen"];
 
     /// <summary>AutomationId der Aufgabenliste in der Seitenleiste.</summary>
-    private const string AufgabenListeAutomationId = "ActiveWorkItemsListMenu";
+    private const string WorkItemsListAutomationId = "ActiveWorkItemsListMenu";
 
     /// <summary>Namenspräfix der Modus-Umschalter der Seitenleisten-Aufgabenliste.</summary>
     private const string WorkItemsModePrefix = "WorkItemsMode:";
@@ -24,8 +24,8 @@ public sealed class MenuView : BaseWindowView
     /// <inheritdoc/>
     public override bool IsVisible
         => ElementExists(Window, cf => cf.ByName("Dashboard"))
-           && TryFindNavigationButton(ProjekteButtonNamen) is not null
-           && TryFindNavigationButton(EinstellungenButtonNamen) is not null;
+           && TryFindNavigationButton(ProjectsButtonNames) is not null
+           && TryFindNavigationButton(SettingsButtonNames) is not null;
 
     /// <inheritdoc/>
     public override MenuView ForceShow() => this;
@@ -38,8 +38,8 @@ public sealed class MenuView : BaseWindowView
     public DashboardView NavigateToDashboard()
     {
         var dashboard = new DashboardView(Window);
-        NavigiereBisSichtbar(
-            DashboardButtonNamen,
+        NavigateUntilVisible(
+            DashboardButtonNames,
             () => dashboard.IsVisible,
             "Dashboard sollte nach Klick auf 'Dashboard' sichtbar sein.");
         return dashboard;
@@ -50,8 +50,8 @@ public sealed class MenuView : BaseWindowView
     public ProjectListView NavigateToProjects()
     {
         var projectList = new ProjectListView(Window);
-        NavigiereBisSichtbar(
-            ProjekteButtonNamen,
+        NavigateUntilVisible(
+            ProjectsButtonNames,
             () => projectList.IsVisible,
             "Projektliste sollte nach Klick auf 'Projects' sichtbar sein.");
         return projectList;
@@ -62,8 +62,8 @@ public sealed class MenuView : BaseWindowView
     public SettingsView NavigateToSettings()
     {
         var settings = new SettingsView(Window);
-        NavigiereBisSichtbar(
-            EinstellungenButtonNamen,
+        NavigateUntilVisible(
+            SettingsButtonNames,
             () => settings.IsVisible,
             "Settings sollten nach Klick auf 'Settings' sichtbar sein.");
         return settings;
@@ -74,59 +74,59 @@ public sealed class MenuView : BaseWindowView
 
     /// <summary>Liest den Anzahl-Text des Auto-Shutdown-Blocks ("AutoShutdownRunningCount").</summary>
     /// <returns>Der Anzeigetext oder <c>null</c>, wenn das Element nicht sichtbar ist.</returns>
-    public string? GetAutoShutdownLaufendeAnzahlText()
-        => LiesElementText("AutoShutdownRunningCount");
+    public string? GetAutoShutdownRunningCountText()
+        => ReadElementText("AutoShutdownRunningCount");
 
-    /// <summary>Wartet, bis der Anzahl-Text des Auto-Shutdown-Blocks <paramref name="teilText"/> enthält.</summary>
-    /// <param name="teilText">Der erwartete Teiltext (z. B. "1 laufende").</param>
+    /// <summary>Wartet, bis der Anzahl-Text des Auto-Shutdown-Blocks <paramref name="partText"/> enthält.</summary>
+    /// <param name="partText">Der erwartete Teiltext (z. B. "1 laufende").</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Der vollständige Anzeigetext.</returns>
     /// <exception cref="TimeoutException">Der Text erschien nicht rechtzeitig.</exception>
-    public string WaitForAutoShutdownLaufendeAnzahlText(string teilText, TimeSpan timeout)
-        => WarteAufElementText("AutoShutdownRunningCount", teilText, timeout);
+    public string WaitForAutoShutdownRunningCountText(string partText, TimeSpan timeout)
+        => WaitOnElementText("AutoShutdownRunningCount", partText, timeout);
 
     /// <summary>Gibt an, ob die Aktivierungs-Checkbox des Auto-Shutdowns sichtbar ist.</summary>
     /// <returns><c>true</c>, wenn die Checkbox vorhanden und nicht ausgeblendet ist.</returns>
-    public bool IsAutoShutdownAktivierenVisible()
-        => IstElementSichtbar("ActivateAutoShutdown");
+    public bool IsAutoShutdownActivateVisible()
+        => IsElementVisible("ActivateAutoShutdown");
 
     /// <summary>Wartet, bis die Aktivierungs-Checkbox des Auto-Shutdowns nicht mehr sichtbar ist.</summary>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Diese Instanz.</returns>
     /// <exception cref="TimeoutException">Die Checkbox blieb sichtbar.</exception>
-    public MenuView WaitForAutoShutdownAktivierenVerschwunden(TimeSpan timeout)
-        => WarteAufElementUnsichtbar("ActivateAutoShutdown", timeout);
+    public MenuView WaitForAutoShutdownActivateDisappeared(TimeSpan timeout)
+        => WaitOnElementInvisible("ActivateAutoShutdown", timeout);
 
     /// <summary>Liest den gesetzten Zustand der Aktivierungs-Checkbox (<c>null</c> bei nicht gefundener Checkbox).</summary>
     /// <returns>Der Checked-Zustand oder <c>null</c>.</returns>
-    public bool? GetAutoShutdownAktiviertChecked()
+    public bool? GetAutoShutdownEnabledChecked()
         => GetCheckBoxChecked("ActivateAutoShutdown");
 
     /// <summary>Setzt die Aktivierungs-Checkbox auf den gewünschten Zustand (Togglen nur bei Abweichung).</summary>
-    /// <param name="aktiviert">Der Zielzustand.</param>
+    /// <param name="enabled">Der Zielzustand.</param>
     /// <returns>Diese Instanz.</returns>
     /// <exception cref="TimeoutException">Die Checkbox wurde nicht rechtzeitig sichtbar.</exception>
-    public MenuView SetzeAutoShutdownAktiviert(bool aktiviert)
-        => SetzeCheckBoxZustand(
+    public MenuView SetAutoShutdownEnabled(bool enabled)
+        => SetCheckBoxState(
             "ActivateAutoShutdown",
-            aktiviert,
+            enabled,
             "Die Auto-Shutdown-Aktivierungs-Checkbox wurde nicht rechtzeitig sichtbar.");
 
     /// <summary>Gibt an, ob das Toleranz-Textfeld sichtbar ist (Optionen nur bei aktiviertem Schalter).</summary>
     /// <returns><c>true</c>, wenn das Feld vorhanden und nicht ausgeblendet ist.</returns>
-    public bool IsAutoShutdownToleranzVisible()
-        => IstElementSichtbar("AutoShutdownToleranceMinutes");
+    public bool IsAutoShutdownToleranceVisible()
+        => IsElementVisible("AutoShutdownToleranceMinutes");
 
     /// <summary>
     /// Wartet, bis das Toleranz-Textfeld sichtbar ist. Das Options-Panel blendet sich über
     /// <c>AutoShutdownOptionenSichtbar</c> frühestens im selben Render-Pass wie die
-    /// Aktivierungs-Checkbox ein — nach <see cref="SetzeAutoShutdownAktiviert"/> kann ein
+    /// Aktivierungs-Checkbox ein — nach <see cref="SetAutoShutdownEnabled"/> kann ein
     /// direkter Read das Feld daher noch nicht sehen.
     /// </summary>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Diese Instanz.</returns>
     /// <exception cref="TimeoutException">Das Toleranz-Feld wurde nicht rechtzeitig sichtbar.</exception>
-    public MenuView WaitForAutoShutdownToleranzSichtbar(TimeSpan timeout)
+    public MenuView WaitForAutoShutdownToleranceVisible(TimeSpan timeout)
     {
         WaitForElement(Window, cf => cf.ByAutomationId("AutoShutdownToleranceMinutes"), timeout);
         return this;
@@ -135,7 +135,7 @@ public sealed class MenuView : BaseWindowView
     /// <summary>Setzt den Toleranzwert (Minuten) im Auto-Shutdown-Optionsfeld.</summary>
     /// <param name="minutes">Der einzugebende Wert als Text.</param>
     /// <returns>Diese Instanz.</returns>
-    public MenuView SetzeAutoShutdownToleranz(string minutes)
+    public MenuView SetAutoShutdownTolerance(string minutes)
     {
         var field = WaitForElement(Window, cf => cf.ByAutomationId("AutoShutdownToleranceMinutes"), Medium).AsTextBox();
         field.Focus();
@@ -145,21 +145,21 @@ public sealed class MenuView : BaseWindowView
 
     /// <summary>Liest den aktuellen Text des Toleranz-Feldes.</summary>
     /// <returns>Der Feldtext oder <c>null</c>, wenn das Feld nicht gefunden wurde.</returns>
-    public string? GetAutoShutdownToleranzText()
+    public string? GetAutoShutdownToleranceText()
         => Window.FindFirstDescendant(cf => cf.ByAutomationId("AutoShutdownToleranceMinutes"))
             ?.AsTextBox().Text;
 
     /// <summary>Liest den gesetzten Zustand der Erzwingen-Checkbox (<c>null</c> bei nicht gefundener Checkbox).</summary>
     /// <returns>Der Checked-Zustand oder <c>null</c>.</returns>
-    public bool? GetAutoShutdownErzwingenChecked()
+    public bool? GetAutoShutdownForceChecked()
         => GetCheckBoxChecked("ForceAutoShutdown");
 
     /// <summary>Setzt die Erzwingen-Checkbox auf den gewünschten Zustand (Togglen nur bei Abweichung).</summary>
     /// <param name="force">Der Zielzustand.</param>
     /// <returns>Diese Instanz.</returns>
     /// <exception cref="TimeoutException">Die Checkbox wurde nicht rechtzeitig sichtbar.</exception>
-    public MenuView SetzeAutoShutdownErzwingen(bool force)
-        => SetzeCheckBoxZustand(
+    public MenuView SetAutoShutdownForce(bool force)
+        => SetCheckBoxState(
             "ForceAutoShutdown",
             force,
             "Die Auto-Shutdown-Erzwingen-Checkbox wurde nicht rechtzeitig sichtbar.");
@@ -167,22 +167,22 @@ public sealed class MenuView : BaseWindowView
     /// <summary>Liest den Countdown-Text des Auto-Shutdown-Blocks ("AutoShutdownCountdown").</summary>
     /// <returns>Der Anzeigetext oder <c>null</c>, wenn kein Countdown sichtbar ist.</returns>
     public string? GetAutoShutdownCountdownText()
-        => LiesElementText("AutoShutdownCountdown");
+        => ReadElementText("AutoShutdownCountdown");
 
-    /// <summary>Wartet, bis der Countdown-Text sichtbar ist und <paramref name="teilText"/> enthält.</summary>
-    /// <param name="teilText">Der erwartete Teiltext (z. B. "Herunterfahren in").</param>
+    /// <summary>Wartet, bis der Countdown-Text sichtbar ist und <paramref name="partText"/> enthält.</summary>
+    /// <param name="partText">Der erwartete Teiltext (z. B. "Herunterfahren in").</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Der vollständige Anzeigetext.</returns>
     /// <exception cref="TimeoutException">Der Countdown-Text erschien nicht rechtzeitig.</exception>
-    public string WaitForAutoShutdownCountdownText(string teilText, TimeSpan timeout)
-        => WarteAufElementText("AutoShutdownCountdown", teilText, timeout);
+    public string WaitForAutoShutdownCountdownText(string partText, TimeSpan timeout)
+        => WaitOnElementText("AutoShutdownCountdown", partText, timeout);
 
     /// <summary>Wartet, bis kein Countdown-Text mehr sichtbar ist.</summary>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Diese Instanz.</returns>
     /// <exception cref="TimeoutException">Der Countdown-Text blieb sichtbar.</exception>
-    public MenuView WaitForAutoShutdownCountdownVerschwunden(TimeSpan timeout)
-        => WarteAufElementVerschwunden("AutoShutdownCountdown", timeout);
+    public MenuView WaitForAutoShutdownCountdownDisappeared(TimeSpan timeout)
+        => WaitOnElementDisappeared("AutoShutdownCountdown", timeout);
 
     /// <summary>
     /// Klickt den "Programmupdate prüfen"-Button der Seitenleiste. Der Button ist erst nach dem
@@ -190,7 +190,7 @@ public sealed class MenuView : BaseWindowView
     /// Aktivierung, damit ein Klick nicht wirkungslos auf einen noch gesperrten Button trifft.
     /// </summary>
     /// <returns>Diese Instanz.</returns>
-    public MenuView ClickUpdatePruefen()
+    public MenuView CheckClickUpdate()
     {
         var deadline = DateTime.UtcNow + Medium;
         while (DateTime.UtcNow < deadline)
@@ -220,7 +220,7 @@ public sealed class MenuView : BaseWindowView
     /// <summary>Klickt den "Programmupdate starten"-Button der Seitenleiste (nur bei Updateangebot sichtbar).</summary>
     /// <returns>Diese Instanz.</returns>
     /// <exception cref="TimeoutException">Der Button ist nicht sichtbar, weil kein Update angeboten wird.</exception>
-    public MenuView ClickUpdateStarten()
+    public MenuView StartClickUpdate()
     {
         var deadline = DateTime.UtcNow + Medium;
         while (DateTime.UtcNow < deadline)
@@ -267,7 +267,7 @@ public sealed class MenuView : BaseWindowView
 
     /// <summary>Gibt an, ob der "Programmupdate prüfen"-Button aktuell aktiviert ist.</summary>
     /// <returns><c>true</c>, wenn der Button klickbar ist.</returns>
-    public bool IsUpdatePruefenButtonEnabled()
+    public bool IsUpdateCheckButtonEnabled()
     {
         var button = Window.FindFirstDescendant(
             cf => cf.ByName("Programmupdate prüfen").And(cf.ByControlType(ControlType.Button)));
@@ -326,7 +326,7 @@ public sealed class MenuView : BaseWindowView
         throw new TimeoutException(
             $"Innerhalb von {timeout.TotalSeconds}s wurde kein Updateangebot angezeigt. " +
             $"Diagnose: Button={(button is null ? "nicht gefunden" : $"gefunden, IsOffscreen={button.IsOffscreen}, HelpText='{button.HelpText}'")}, " +
-            $"Hinweis='{GetUpdateHinweis()}'");
+            $"Hinweis='{GetUpdateNotice()}'");
     }
 
     /// <summary>Liest den aktuellen "UpdateNotice"-Text der Seitenleiste.</summary>
@@ -335,7 +335,7 @@ public sealed class MenuView : BaseWindowView
     /// Das Element trägt kein <c>AutomationProperties.Name</c> - der gebundene Hinweistext ist
     /// daher als UIA-Name des TextBlocks lesbar.
     /// </remarks>
-    public string? GetUpdateHinweis()
+    public string? GetUpdateNotice()
     {
         var element = Window.FindFirstDescendant(cf => cf.ByAutomationId("UpdateNotice"));
         if (element is null || element.IsOffscreen)
@@ -344,26 +344,26 @@ public sealed class MenuView : BaseWindowView
         return element.Name;
     }
 
-    /// <summary>Wartet, bis der "UpdateNotice" einen Text enthält, der <paramref name="teilText"/> umfasst.</summary>
-    /// <param name="teilText">Der erwartete Teiltext.</param>
+    /// <summary>Wartet, bis der "UpdateNotice" einen Text enthält, der <paramref name="partText"/> umfasst.</summary>
+    /// <param name="partText">Der erwartete Teiltext.</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Der vollständige Hinweistext.</returns>
     /// <exception cref="TimeoutException">Der Hinweis erschien nicht rechtzeitig.</exception>
-    public string WaitForUpdateHinweis(string teilText, TimeSpan timeout)
+    public string WaitForUpdateNotice(string partText, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
-        string? zuletzt = null;
+        string? last = null;
         while (DateTime.UtcNow < deadline)
         {
-            zuletzt = GetUpdateHinweis();
-            if (zuletzt is not null && zuletzt.Contains(teilText, StringComparison.Ordinal))
-                return zuletzt;
+            last = GetUpdateNotice();
+            if (last is not null && last.Contains(partText, StringComparison.Ordinal))
+                return last;
 
             Thread.Sleep(200);
         }
 
         throw new TimeoutException(
-            $"UpdateNotice enthielt nicht innerhalb von {timeout.TotalSeconds}s '{teilText}'. Zuletzt gesehen: '{zuletzt}'.");
+            $"UpdateNotice enthielt nicht innerhalb von {timeout.TotalSeconds}s '{partText}'. Zuletzt gesehen: '{last}'.");
     }
 
     /// <summary>
@@ -374,7 +374,7 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Die Aufgabendetailansicht der Zielaufgabe.</returns>
     public TaskDetailView NavigateToTask(string taskTitle)
     {
-        WaitForElement(AktiveAufgabenListeMenueElement(), cf => cf.ByName($"WorkItemNavigate:{taskTitle}"), Medium).AsButton().ClickInForeground();
+        WaitForElement(ActiveWorkItemsListMenuElement(), cf => cf.ByName($"WorkItemNavigate:{taskTitle}"), Medium).AsButton().ClickInForeground();
         return new TaskDetailView(Window);
     }
 
@@ -387,21 +387,21 @@ public sealed class MenuView : BaseWindowView
     public MenuView EnsureNavigationExpanded()
     {
         var deadline = DateTime.UtcNow + Medium;
-        var toggleGeklickt = false;
+        var toggleClicked = false;
         while (DateTime.UtcNow < deadline)
         {
-            var modusButton = Window.FindFirstDescendant(cf => cf.ByName($"{WorkItemsModePrefix}Date"));
-            if (modusButton is not null && !modusButton.IsOffscreen)
+            var modeButton = Window.FindFirstDescendant(cf => cf.ByName($"{WorkItemsModePrefix}Date"));
+            if (modeButton is not null && !modeButton.IsOffscreen)
                 return this;
 
-            if (!toggleGeklickt)
+            if (!toggleClicked)
             {
                 var toggle = Window.FindFirstDescendant(
                     cf => cf.ByName("☰").And(cf.ByControlType(ControlType.Button)));
                 if (toggle is not null)
                 {
                     toggle.ClickInForeground();
-                    toggleGeklickt = true;
+                    toggleClicked = true;
                 }
             }
 
@@ -418,9 +418,9 @@ public sealed class MenuView : BaseWindowView
     /// </summary>
     /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
     /// <returns>Diese Instanz.</returns>
-    public MenuView SetzeAufgabenListenModus(string mode)
+    public MenuView SetWorkItemsListsMode(string mode)
     {
-        KlickeAufgabenModusUmschalter(WorkItemsModePrefix, mode);
+        ClickWorkItemsModeSwitch(WorkItemsModePrefix, mode);
         return this;
     }
 
@@ -429,7 +429,7 @@ public sealed class MenuView : BaseWindowView
     /// (UIA-Namen 'WorkItemsGroup:{Name}' der Gruppenheader, gescoped unter 'ActiveWorkItemsListMenu').
     /// </summary>
     /// <returns>Die Gruppennamen ohne das 'WorkItemsGroup:'-Präfix; leer im flachen Modus.</returns>
-    public string[] GetAufgabenGruppenNamen() => GetAufgabenGruppenNamen(AufgabenListeAutomationId);
+    public string[] GetWorkItemsGroupsNames() => GetWorkItemsGroupsNames(WorkItemsListAutomationId);
 
     /// <summary>
     /// Wartet, bis der Gruppenheader 'WorkItemsGroup:{name}' in der Seitenleisten-Aufgabenliste
@@ -439,9 +439,9 @@ public sealed class MenuView : BaseWindowView
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Diese Instanz.</returns>
     /// <exception cref="TimeoutException">Der Gruppenheader erschien nicht rechtzeitig.</exception>
-    public MenuView WaitForAufgabenGruppe(string name, TimeSpan timeout)
+    public MenuView WaitForWorkItemsGroup(string name, TimeSpan timeout)
     {
-        WaitForAufgabenGruppe(AufgabenListeAutomationId, name, timeout);
+        WaitForWorkItemsGroup(WorkItemsListAutomationId, name, timeout);
         return this;
     }
 
@@ -451,13 +451,13 @@ public sealed class MenuView : BaseWindowView
     /// </summary>
     /// <param name="taskTitle">Der Titel der Aufgabe.</param>
     /// <returns>Der reine Plugin-Name ohne das "KI: "-Präfix.</returns>
-    public string GetActiveTaskKiPluginName(string taskTitle)
+    public string GetActiveTaskAiPluginName(string taskTitle)
     {
-        var kiPluginText = WaitForElement(
-            AktiveAufgabenListeMenueElement(),
+        var aiPluginText = WaitForElement(
+            ActiveWorkItemsListMenuElement(),
             cf => cf.ByAutomationId($"ActiveWorkItemAiPlugin_{taskTitle}"),
             Short);
-        var helpText = kiPluginText.HelpText;
+        var helpText = aiPluginText.HelpText;
         if (helpText is not null && helpText.StartsWith("KI: ", StringComparison.Ordinal))
         {
             return helpText.Substring(4);
@@ -469,9 +469,9 @@ public sealed class MenuView : BaseWindowView
     /// <summary>Liest den KI-Plugin-Glyph (UIA-Name des 'ActiveWorkItemAiPlugin_{titel}'-Elements) der Kachel.</summary>
     /// <param name="taskTitle">Der Titel der Aufgabe.</param>
     /// <returns>Der angezeigte Glyph.</returns>
-    public string GetActiveTaskKiPluginSymbol(string taskTitle)
+    public string GetActiveTaskAiPluginSymbol(string taskTitle)
         => WaitForElement(
-            AktiveAufgabenListeMenueElement(),
+            ActiveWorkItemsListMenuElement(),
             cf => cf.ByAutomationId($"ActiveWorkItemAiPlugin_{taskTitle}"),
             Short).Name;
 
@@ -480,7 +480,7 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Der angezeigte Glyph.</returns>
     public string GetActiveTaskScmPluginSymbol(string taskTitle)
         => WaitForElement(
-            AktiveAufgabenListeMenueElement(),
+            ActiveWorkItemsListMenuElement(),
             cf => cf.ByAutomationId($"ActiveWorkItemScmPlugin_{taskTitle}"),
             Short).Name;
 
@@ -493,7 +493,7 @@ public sealed class MenuView : BaseWindowView
     public string GetActiveTaskStatusGlyph(string taskTitle)
     {
         var element = WaitForElement(
-            AktiveAufgabenListeMenueElement(),
+            ActiveWorkItemsListMenuElement(),
             cf => cf.ByName($"WorkItemStatus:{taskTitle}"),
             Short);
         if (element.Patterns.Text.IsSupported)
@@ -502,7 +502,7 @@ public sealed class MenuView : BaseWindowView
         }
 
         // Fallback: AutomationId-Element ohne Name-Überschreibung lesen.
-        var glyphElement = AktiveAufgabenListeMenueElement()
+        var glyphElement = ActiveWorkItemsListMenuElement()
             .FindFirstDescendant(cf => cf.ByAutomationId($"ActiveWorkItemStatusGlyph_{taskTitle}"));
         return glyphElement?.Name ?? string.Empty;
     }
@@ -510,20 +510,20 @@ public sealed class MenuView : BaseWindowView
     /// <summary>Klickt den 'OffeneTodos:{titel}'-Button innerhalb der Kachel (verschachtelter Button, löst keine Kachel-Navigation aus).</summary>
     /// <param name="taskTitle">Der Titel der Aufgabe.</param>
     /// <returns>Diese Instanz.</returns>
-    public MenuView KlickeOffeneTodosButton(string taskTitle)
+    public MenuView ClickOpenTodosButton(string taskTitle)
     {
         WaitForElement(
-            AktiveAufgabenListeMenueElement(),
-            cf => cf.ByName($"OffeneTodos:{taskTitle}"),
+            ActiveWorkItemsListMenuElement(),
+            cf => cf.ByName($"OpenTodos:{taskTitle}"),
             Medium).ClickInForeground();
         return this;
     }
 
-    private AutomationElement AktiveAufgabenListeMenueElement()
+    private AutomationElement ActiveWorkItemsListMenuElement()
     {
-        var menue = Window.FindFirstDescendant(cf => cf.ByAutomationId(AufgabenListeAutomationId));
-        return menue ?? throw new InvalidOperationException(
-            $"Das Element '{AufgabenListeAutomationId}' wurde im Hauptfenster nicht gefunden.");
+        var menu = Window.FindFirstDescendant(cf => cf.ByAutomationId(WorkItemsListAutomationId));
+        return menu ?? throw new InvalidOperationException(
+            $"Das Element '{WorkItemsListAutomationId}' wurde im Hauptfenster nicht gefunden.");
     }
 
     /// <summary>
@@ -541,7 +541,7 @@ public sealed class MenuView : BaseWindowView
         string? lastStatus = null;
         while (DateTime.UtcNow < deadline)
         {
-            var statusElement = AktiveAufgabenListeMenueElement().FindFirstDescendant(cf => cf.ByName($"WorkItemStatus:{taskTitle}"));
+            var statusElement = ActiveWorkItemsListMenuElement().FindFirstDescendant(cf => cf.ByName($"WorkItemStatus:{taskTitle}"));
             lastStatus = statusElement?.HelpText;
             if (lastStatus == expectedStatus)
                 return this;
@@ -562,23 +562,23 @@ public sealed class MenuView : BaseWindowView
     /// Ansicht; bei "Projects" schließt ein Wiederholungsklick lediglich ein ggf. offenes
     /// Detail). Das Fehlerbanner-Fail-Fast ("ErrorMessage") bleibt während des Wartens aktiv.
     /// </summary>
-    /// <param name="buttonNamen">Akzeptierte UIA-Namen des Navigations-Buttons.</param>
-    /// <param name="zielSichtbar">Prädikat für die sichtbare Zielansicht.</param>
-    /// <param name="fehlertext">Assert-Meldung bei ausbleibender Zielansicht.</param>
-    private void NavigiereBisSichtbar(
-        IReadOnlyList<string> buttonNamen,
-        Func<bool> zielSichtbar,
-        string fehlertext)
+    /// <param name="buttonNames">Akzeptierte UIA-Namen des Navigations-Buttons.</param>
+    /// <param name="targetVisible">Prädikat für die sichtbare Zielansicht.</param>
+    /// <param name="errorText">Assert-Meldung bei ausbleibender Zielansicht.</param>
+    private void NavigateUntilVisible(
+        IReadOnlyList<string> buttonNames,
+        Func<bool> targetVisible,
+        string errorText)
     {
         // Erst auf den Button warten - fehlt er ganz, ist das eine andere Fehlerart als ein
         // verschluckter Klick und soll weiterhin mit eigenem Timeout diagnostiziert werden.
-        WaitForNavigationButton(buttonNamen, Short);
+        WaitForNavigationButton(buttonNames, Short);
 
         var deadline = DateTime.UtcNow + Medium;
-        var naechsterKlick = DateTime.UtcNow;
+        var nextClick = DateTime.UtcNow;
         while (DateTime.UtcNow < deadline)
         {
-            if (zielSichtbar())
+            if (targetVisible())
                 return;
 
             var errorMessage = Window.FindFirstDescendant(cf => cf.ByName("ErrorMessage"));
@@ -588,11 +588,11 @@ public sealed class MenuView : BaseWindowView
                     $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(errorMessage)}");
             }
 
-            if (DateTime.UtcNow >= naechsterKlick)
+            if (DateTime.UtcNow >= nextClick)
             {
                 try
                 {
-                    var button = TryFindNavigationButton(buttonNamen);
+                    var button = TryFindNavigationButton(buttonNames);
                     if (button is not null)
                         button.ClickInForeground();
                 }
@@ -602,45 +602,45 @@ public sealed class MenuView : BaseWindowView
                     // Schleifendurchlauf versucht erneut.
                 }
 
-                naechsterKlick = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+                nextClick = DateTime.UtcNow + TimeSpan.FromSeconds(2);
             }
 
             Thread.Sleep(200);
         }
 
-        Assert.True(zielSichtbar(), fehlertext + " " + TryFindNavigationButton(buttonNamen)?.DescribeClickTarget()
+        Assert.True(targetVisible(), errorText + " " + TryFindNavigationButton(buttonNames)?.DescribeClickTarget()
             + "; Window=" + Window.BoundingRectangle + "; Children=" + string.Join(" | ", Window.FindAllChildren().Select(e => e.ControlType + ":" + e.Name)));
     }
 
-    private AutomationElement WaitForNavigationButton(IReadOnlyList<string> names, TimeSpan timeout)
+    private AutomationElement WaitForNavigationButton(IReadOnlyList<string> name, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            var button = TryFindNavigationButton(names);
+            var button = TryFindNavigationButton(name);
             if (button is not null)
                 return button;
 
             Thread.Sleep(200);
         }
 
-        var fensterTitel = string.Empty;
-        var kinder = string.Empty;
+        var windowTitle = string.Empty;
+        var children = string.Empty;
         try
         {
-            fensterTitel = Window.Title;
-            kinder = string.Join(" | ", Window.FindAllChildren()
+            windowTitle = Window.Title;
+            children = string.Join(" | ", Window.FindAllChildren()
                 .Select(k => $"{k.ControlType}:{k.Name}")
                 .Take(20));
         }
         catch (Exception ex)
         {
-            fensterTitel = $"<Fehler: {ex.GetType().Name}: {ex.Message}>";
+            windowTitle = $"<Fehler: {ex.GetType().Name}: {ex.Message}>";
         }
 
         throw new TimeoutException(
-            $"Navigations-Button wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden. Gesucht: {string.Join(", ", names)}. " +
-            $"Fenster: '{fensterTitel}'. Kinder: {kinder}");
+            $"Navigations-Button wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden. Gesucht: {string.Join(", ", name)}. " +
+            $"Fenster: '{windowTitle}'. Kinder: {children}");
     }
 
     private AutomationElement? TryFindNavigationButton(IReadOnlyList<string> names)
@@ -666,14 +666,14 @@ public sealed class MenuView : BaseWindowView
     }
 
     /// <summary>Liest den UIA-Namen (Anzeigetext) eines Elements; <c>null</c>, wenn es fehlt oder ausgeblendet ist.</summary>
-    private string? LiesElementText(string automationId)
+    private string? ReadElementText(string automationId)
     {
         var element = Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
         return element is null || element.IsOffscreen ? null : element.Name;
     }
 
     /// <summary>Gibt an, ob ein Element vorhanden und nicht ausgeblendet ist.</summary>
-    private bool IstElementSichtbar(string automationId)
+    private bool IsElementVisible(string automationId)
     {
         var element = Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
         return element is not null && !element.IsOffscreen;
@@ -694,12 +694,12 @@ public sealed class MenuView : BaseWindowView
     /// bereits bewiesen — der Helper wartet nicht vergeblich auf einen lesbaren Zustand.
     /// </summary>
     /// <exception cref="TimeoutException">Die Checkbox wurde nicht rechtzeitig sichtbar oder erreichte den Zielzustand nicht.</exception>
-    private MenuView SetzeCheckBoxZustand(string automationId, bool target, string fehlertext)
+    private MenuView SetCheckBoxState(string automationId, bool target, string errorText)
     {
         var deadline = DateTime.UtcNow + Medium;
-        var naechsterKlick = DateTime.UtcNow;
-        var gefunden = false;
-        bool? zuletztIsChecked = null;
+        var nextClick = DateTime.UtcNow;
+        var found = false;
+        bool? lastIsChecked = null;
         while (DateTime.UtcNow < deadline)
         {
             var element = Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
@@ -707,18 +707,18 @@ public sealed class MenuView : BaseWindowView
             {
                 // Verschwinden NACH dem ersten Sichtbarwerden beweist bei ziel == false
                 // den ausgeschalteten Zustand (siehe Methoden-Dokumentation).
-                if (!target && gefunden)
+                if (!target && found)
                 {
                     return this;
                 }
             }
             else
             {
-                gefunden = true;
+                found = true;
                 var checkbox = element.AsCheckBox();
                 try
                 {
-                    zuletztIsChecked = checkbox.IsChecked;
+                    lastIsChecked = checkbox.IsChecked;
                 }
                 catch (FlaUI.Core.Exceptions.FlaUIException)
                 {
@@ -730,19 +730,19 @@ public sealed class MenuView : BaseWindowView
                     // UIA-Provider des kollabierenden Elements transient nicht erreichbar.
                 }
 
-                if (zuletztIsChecked == target)
+                if (lastIsChecked == target)
                 {
                     return this;
                 }
 
                 // Erneuter Klick erst nach Abstand: UIA kann den Zustand kurz verzögert
                 // melden; ein Sofort-Doppelklick würde den Zielzustand wieder zurückdrehen.
-                if (DateTime.UtcNow >= naechsterKlick)
+                if (DateTime.UtcNow >= nextClick)
                 {
                     try
                     {
                         checkbox.Click();
-                        naechsterKlick = DateTime.UtcNow + TimeSpan.FromSeconds(1);
+                        nextClick = DateTime.UtcNow + TimeSpan.FromSeconds(1);
                     }
                     catch (FlaUI.Core.Exceptions.FlaUIException)
                     {
@@ -759,56 +759,56 @@ public sealed class MenuView : BaseWindowView
             Thread.Sleep(200);
         }
 
-        var diagnose = gefunden
-            ? $" Zuletzt gesehen: IsChecked={zuletztIsChecked?.ToString() ?? "null"}, Ziel={target}."
+        var diagnostics = found
+            ? $" Zuletzt gesehen: IsChecked={lastIsChecked?.ToString() ?? "null"}, Ziel={target}."
             : string.Empty;
-        throw new TimeoutException(fehlertext + diagnose);
+        throw new TimeoutException(errorText + diagnostics);
     }
 
-    /// <summary>Wartet, bis der Anzeigetext eines Elements <paramref name="teilText"/> enthält.</summary>
+    /// <summary>Wartet, bis der Anzeigetext eines Elements <paramref name="partText"/> enthält.</summary>
     /// <exception cref="TimeoutException">Der Text erschien nicht rechtzeitig.</exception>
-    private string WarteAufElementText(string automationId, string teilText, TimeSpan timeout)
+    private string WaitOnElementText(string automationId, string partText, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
-        string? zuletzt = null;
+        string? last = null;
         while (DateTime.UtcNow < deadline)
         {
-            zuletzt = LiesElementText(automationId);
-            if (zuletzt is not null && zuletzt.Contains(teilText, StringComparison.Ordinal))
-                return zuletzt;
+            last = ReadElementText(automationId);
+            if (last is not null && last.Contains(partText, StringComparison.Ordinal))
+                return last;
 
             Thread.Sleep(200);
         }
 
         throw new TimeoutException(
-            $"{automationId} enthielt nicht innerhalb von {timeout.TotalSeconds}s '{teilText}'. Zuletzt gesehen: '{zuletzt}'.");
+            $"{automationId} enthielt nicht innerhalb von {timeout.TotalSeconds}s '{partText}'. Zuletzt gesehen: '{last}'.");
     }
 
     /// <summary>Wartet, bis ein Element keinen sichtbaren Anzeigetext mehr liefert.</summary>
     /// <exception cref="TimeoutException">Der Text blieb sichtbar.</exception>
-    private MenuView WarteAufElementVerschwunden(string automationId, TimeSpan timeout)
+    private MenuView WaitOnElementDisappeared(string automationId, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            if (LiesElementText(automationId) is null)
+            if (ReadElementText(automationId) is null)
                 return this;
 
             Thread.Sleep(200);
         }
 
         throw new TimeoutException(
-            $"{automationId} blieb länger als {timeout.TotalSeconds}s sichtbar. Zuletzt gesehen: '{LiesElementText(automationId)}'.");
+            $"{automationId} blieb länger als {timeout.TotalSeconds}s sichtbar. Zuletzt gesehen: '{ReadElementText(automationId)}'.");
     }
 
     /// <summary>Wartet, bis ein Element nicht mehr vorhanden oder ausgeblendet ist.</summary>
     /// <exception cref="TimeoutException">Das Element blieb sichtbar.</exception>
-    private MenuView WarteAufElementUnsichtbar(string automationId, TimeSpan timeout)
+    private MenuView WaitOnElementInvisible(string automationId, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            if (!IstElementSichtbar(automationId))
+            if (!IsElementVisible(automationId))
                 return this;
 
             Thread.Sleep(200);

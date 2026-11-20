@@ -8,7 +8,7 @@ public sealed class CliRuntimeStatusEvaluatorTests
 {
     /// <summary>Ein beendeter Prozess ergibt Inaktiv.</summary>
     [Fact]
-    public void Determine_ReturnsInaktiv_WhenProcessIsNotRunning()
+    public void Determine_ReturnsInactive_WhenProcessIsNotRunning()
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -25,7 +25,7 @@ public sealed class CliRuntimeStatusEvaluatorTests
 
     /// <summary>Frische Ausgabe ergibt Laeuft.</summary>
     [Fact]
-    public void Determine_ReturnsLaeuft_WhenOutputIsRecent()
+    public void Determine_ReturnsRuns_WhenOutputIsRecent()
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -42,7 +42,7 @@ public sealed class CliRuntimeStatusEvaluatorTests
 
     /// <summary>Lange fehlende Aktivitaet ergibt WartetAufEingabe.</summary>
     [Fact]
-    public void Determine_ReturnsWartetAufEingabe_WhenActivityIsStale()
+    public void Determine_ReturnsWaitsOnInput_WhenActivityIsStale()
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -59,7 +59,7 @@ public sealed class CliRuntimeStatusEvaluatorTests
 
     /// <summary>Frische Benutzereingabe setzt den Status wieder auf Laeuft.</summary>
     [Fact]
-    public void Determine_ReturnsLaeuft_WhenInputIsRecent()
+    public void Determine_ReturnsRuns_WhenInputIsRecent()
     {
         var now = DateTimeOffset.UtcNow;
 

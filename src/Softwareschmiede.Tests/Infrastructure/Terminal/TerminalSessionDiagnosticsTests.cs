@@ -13,7 +13,7 @@ public sealed class TerminalSessionDiagnosticsTests
 
     /// <summary>Bei auflösbarer Executable und verfügbarer PTY wird Pty empfohlen und die CLI-Health-Probe aufgerufen.</summary>
     [Fact]
-    public async Task RunPreflightAsync_AllesOk_EmpfiehltPtyUndRuftHealthCheck()
+    public async Task RunPreflightAsync_AllOk_SuggestsPtyAndCallsHealthCheck()
     {
         var healthCheckCalled = false;
         var resolution = ResolvedResolution(TerminalExecutableStatus.Direct);
@@ -37,7 +37,7 @@ public sealed class TerminalSessionDiagnosticsTests
 
     /// <summary>Der Test-Override zwingt den PTY-Check auf false und verschiebt die Empfehlung auf Pipe.</summary>
     [Fact]
-    public async Task RunPreflightAsync_ForcePtyUnavailable_EmpfiehltPipe()
+    public async Task RunPreflightAsync_ForcePtyUnavailable_SuggestsPipe()
     {
         var result = await _sut.RunPreflightAsync(
             CreateSpec(),
@@ -53,7 +53,7 @@ public sealed class TerminalSessionDiagnosticsTests
 
     /// <summary>Bei RequiresPty ohne PTY-Verfügbarkeit ist die Empfehlung Fehler.</summary>
     [Fact]
-    public async Task RunPreflightAsync_RequiresPtyOhnePty_EmpfiehltFehler()
+    public async Task RunPreflightAsync_RequiresPtyWithoutPty_SuggestsError()
     {
         var spec = CreateSpec() with { Capabilities = TerminalProviderCapabilities.RequiresPty | TerminalProviderCapabilities.SupportsPty };
 
@@ -71,7 +71,7 @@ public sealed class TerminalSessionDiagnosticsTests
     [Theory]
     [InlineData(TerminalExecutableStatus.NotFound)]
     [InlineData(TerminalExecutableStatus.NotExecutable)]
-    public async Task RunPreflightAsync_ExecutableNichtStartbar_FehlerUndKeinHealthCheck(TerminalExecutableStatus status)
+    public async Task RunPreflightAsync_ExecutableNotStartable_ErrorAndNoHealthCheck(TerminalExecutableStatus status)
     {
         var healthCheckCalled = false;
         var resolution = new TerminalExecutableResolution(CreateSpec(), status, null, "nicht gefunden");
@@ -95,7 +95,7 @@ public sealed class TerminalSessionDiagnosticsTests
     /// <summary>Ein Plugin ohne SupportsPty-Flag bekommt auch bei verfügbarer PTY die Empfehlung Pipe —
     /// dieselbe Entscheidung, die TerminalSessionService.SelectBackend daraus ableitet.</summary>
     [Fact]
-    public async Task RunPreflightAsync_OhneSupportsPty_EmpfiehltPipe()
+    public async Task RunPreflightAsync_WithoutSupportsPty_SuggestsPipe()
     {
         var spec = CreateSpec() with { Capabilities = TerminalProviderCapabilities.None };
 
@@ -120,7 +120,7 @@ public sealed class TerminalSessionDiagnosticsTests
     [InlineData(220, 40000, false)]
     [InlineData(0, 50, false)]
     [InlineData(220, 0, false)]
-    public async Task RunPreflightAsync_Terminalgroesse_CheckSpiegeltHartvalidierung(int cols, int rows, bool erwartetOk)
+    public async Task RunPreflightAsync_Terminalsize_CheckMirrorsHardvalidation(int cols, int rows, bool expectedOk)
     {
         var sut = new TerminalSessionDiagnostics(new TerminalSessionOptions { DefaultCols = cols, DefaultRows = rows });
 
@@ -131,13 +131,13 @@ public sealed class TerminalSessionDiagnosticsTests
             forcePtyUnavailable: false,
             CancellationToken.None);
 
-        result.Checks.Should().Contain(c => c.Name == "Terminalgröße" && c.Ok == erwartetOk,
+        result.Checks.Should().Contain(c => c.Name == "Terminalgröße" && c.Ok == expectedOk,
             $"die Terminalgröße {cols}x{rows} muss synchron zur Hartvalidierung bewertet werden");
     }
 
     /// <summary>Ein false meldender Health-Check erzeugt einen nicht-fatalen fehlgeschlagenen Check-Eintrag.</summary>
     [Fact]
-    public async Task RunPreflightAsync_HealthCheckFalse_NichtFatalerFehlerEintrag()
+    public async Task RunPreflightAsync_HealthCheckFalse_NotFatalErrorEntry()
     {
         var result = await _sut.RunPreflightAsync(
             CreateSpec(),
@@ -152,7 +152,7 @@ public sealed class TerminalSessionDiagnosticsTests
 
     /// <summary>Eine im Health-Check geworfene Exception wird als nicht-fataler Check-Eintrag abgefangen.</summary>
     [Fact]
-    public async Task RunPreflightAsync_HealthCheckWirftException_NichtFatalerFehlerEintrag()
+    public async Task RunPreflightAsync_HealthCheckThrowsException_NotFatalErrorEntry()
     {
         var result = await _sut.RunPreflightAsync(
             CreateSpec(),

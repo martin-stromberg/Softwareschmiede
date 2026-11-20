@@ -77,7 +77,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     /// <summary>Der Sitzungsname steht als erstes Feld im Probe-Prompt und wird in der Anweisung als
     /// Sitzungstitel benannt; Sonderzeichen bleiben JSON-kodiert, die Probe-Pfade unverändert.</summary>
     [Fact]
-    public void AccessProbePrompt_WithSessionName_NamesTheSession()
+    public void AccessProbePrompt_WithSessionName_NameTheSession()
     {
         var probe = new ScmExchangeAccessProbe(Guid.NewGuid(), "nonce", "fingerprint",
             Path.Combine(_root, "probe"), []);

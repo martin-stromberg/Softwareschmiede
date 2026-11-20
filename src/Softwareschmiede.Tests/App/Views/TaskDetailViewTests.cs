@@ -29,7 +29,7 @@ public sealed class TaskDetailViewTests
 
     /// <summary>Die CLI-Konsole liegt in einem vertikalen ScrollViewer, bleibt aber unter ihrem stabilen Automation-Namen erreichbar.</summary>
     [Fact]
-    public void Xaml_CliKonsole_IstVertikalScrollbar()
+    public void Xaml_CliConsole_IsVerticalScrollbar()
     {
         var solutionRoot = FindSolutionRoot();
         var xamlPath = Path.Combine(solutionRoot, "src", "Softwareschmiede.App", "Views", "TaskDetailView.xaml");
@@ -61,7 +61,7 @@ public sealed class TaskDetailViewTests
 
     /// <summary>Klicks in die CLI-Fläche sollen den Terminal-Fokuspfad auslösen, Scrollbar-Bedienung nicht.</summary>
     [Fact]
-    public void TerminalScrollViewer_Clickziel_SteuertFokuspfad()
+    public void TerminalScrollViewer_Clicktarget_ControlsFocuspath()
     {
         RunOnSta(() =>
         {

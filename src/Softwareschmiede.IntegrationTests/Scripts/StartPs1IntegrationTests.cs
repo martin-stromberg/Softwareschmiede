@@ -17,7 +17,7 @@ public sealed class StartPs1IntegrationTests : IDisposable
     /// Validates autonomous discovery and update of multiple projects without parameters.
     /// </summary>
     [Fact]
-    public async Task StartScript_ShouldDiscoverAndUpdateMultipleProjects_WhenRunWithoutParameters()
+    public async Task StartScript_ShouldDiscoverAndUpdateMultipleProjects_WhenRunWithoutParameter()
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -413,11 +413,11 @@ public sealed class StartPs1IntegrationTests : IDisposable
         }
 
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start powershell.exe.");
-        var standardOutput = await process.StandardOutput.ReadToEndAsync();
-        var standardError = await process.StandardError.ReadToEndAsync();
+        var defaultOutput = await process.StandardOutput.ReadToEndAsync();
+        var defaultError = await process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
 
-        return new ScriptExecutionResult(process.ExitCode, standardOutput, standardError);
+        return new ScriptExecutionResult(process.ExitCode, defaultOutput, defaultError);
     }
 
     private sealed record ScriptExecutionResult(int ExitCode, string StandardOutput, string StandardError);

@@ -18,7 +18,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
 
     /// <summary>Prüft, dass PluginName, PluginPrefix und PluginType korrekt gesetzt sind.</summary>
     [Fact]
-    public void Eigenschaften_SindKorrektGesetzt()
+    public void Property_AreCorrectSet()
     {
         var sut = CreateSut();
 
@@ -94,16 +94,16 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     public async Task CheckCompatibilityAsync_ShouldReturnIncompatible_WhenPathDoesNotExist()
     {
         var sut = CreateSut();
-        var nichtExistierendesVerzeichnis = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var notExistingDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
 
-        var result = await sut.CheckCompatibilityAsync(nichtExistierendesVerzeichnis, TestContext.Current.CancellationToken);
+        var result = await sut.CheckCompatibilityAsync(notExistingDirectory, TestContext.Current.CancellationToken);
 
         result.Should().Be(IdePluginCompatibility.Incompatible);
     }
 
     /// <summary>Bei mehreren .sln-/.slnx-Dateien liefert FindEntryPointsAsync alle Einstiegspunkte alphabetisch sortiert.</summary>
     [Fact]
-    public async Task FindEntryPointsAsync_MitMehrerenSln_LiefertAlleAlphabetischSortiert()
+    public async Task FindEntryPointsAsync_WithSeveralSln_ReturnsAllAlphabeticalSorts()
     {
         var directory = CreateTempDirectory();
         File.WriteAllText(Path.Combine(directory, "Zweite.sln"), string.Empty);
@@ -120,7 +120,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
 
     /// <summary>Bei genau einer .sln-Datei liefert FindEntryPointsAsync eine Liste mit genau einem Einstiegspunkt.</summary>
     [Fact]
-    public async Task FindEntryPointsAsync_MitGenauEinerSln_LiefertEinen()
+    public async Task FindEntryPointsAsync_WithExactlyASln_ReturnsA()
     {
         var directory = CreateTempDirectory();
         var solutionPath = Path.Combine(directory, "Einzige.sln");
@@ -135,7 +135,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
 
     /// <summary>Ohne .sln/.slnx-Datei liefert FindEntryPointsAsync eine leere Liste.</summary>
     [Fact]
-    public async Task FindEntryPointsAsync_OhneSln_LiefertLeereListe()
+    public async Task FindEntryPointsAsync_WithoutSln_ReturnsEmptyList()
     {
         var directory = CreateTempDirectory();
         File.WriteAllText(Path.Combine(directory, "readme.txt"), string.Empty);
@@ -148,17 +148,17 @@ public sealed class VisualStudioIdePluginTests : IDisposable
 
     /// <summary>OpenEntryPointAsync startet den übergebenen Einstiegspunkt per Shell-Execute über IProzessStarter.</summary>
     [Fact]
-    public async Task OpenEntryPointAsync_RuftOpenSolutionFileAuf()
+    public async Task OpenEntryPointAsync_CallsOpenSolutionFileOn()
     {
         var directory = CreateTempDirectory();
         var solutionPath = Path.Combine(directory, "Loesung.sln");
         File.WriteAllText(solutionPath, string.Empty);
-        var prozessStarterMock = new Mock<IProcessStarter>();
-        var sut = new VisualStudioIdePlugin(prozessStarterMock.Object);
+        var processStarterMock = new Mock<IProcessStarter>();
+        var sut = new VisualStudioIdePlugin(processStarterMock.Object);
 
         await sut.OpenEntryPointAsync(new IdeEntryPoint(solutionPath), TestContext.Current.CancellationToken);
 
-        prozessStarterMock.Verify(
+        processStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a =>
                 a.FileName == solutionPath &&
                 a.UseShellExecute == true)),
@@ -167,7 +167,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
 
     /// <summary>OpenEntryPointAsync wirft eine ArgumentNullException, wenn kein Einstiegspunkt übergeben wird.</summary>
     [Fact]
-    public async Task OpenEntryPointAsync_MitNull_WirftArgumentNullException()
+    public async Task OpenEntryPointAsync_WithNull_ThrowsArgumentNullException()
     {
         var sut = CreateSut();
 

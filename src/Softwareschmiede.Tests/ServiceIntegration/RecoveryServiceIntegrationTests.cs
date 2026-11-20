@@ -32,10 +32,10 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
 
     /// <summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit.</summary>
     [Fact]
-    public async Task ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit()
+    public async Task ScanForRecoveryCandidates_FindsWorkItems_WithOldHeartbeatAndInWork()
     {
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
-        SetzeAltenHeartbeat(workItem.Id, minutesAlt: 10);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        SetOldHeartbeat(workItem.Id, minutesAlt: 10);
 
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
@@ -47,10 +47,10 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
 
     /// <summary>ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat.</summary>
     [Fact]
-    public async Task ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat()
+    public async Task ScanForRecoveryCandidates_IgnoresWorkItems_WithFreshHeartbeat()
     {
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
-        SetzeAltenHeartbeat(workItem.Id, minutesAlt: 1);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        SetOldHeartbeat(workItem.Id, minutesAlt: 1);
 
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
@@ -62,10 +62,10 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
 
     /// <summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend.</summary>
     [Fact]
-    public async Task ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend()
+    public async Task ScanForRecoveryCandidates_FindsWorkItems_WithOldHeartbeatAndWaiting()
     {
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Waiting);
-        SetzeAltenHeartbeat(workItem.Id, minutesAlt: 10);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Waiting);
+        SetOldHeartbeat(workItem.Id, minutesAlt: 10);
 
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
@@ -77,10 +77,10 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
 
     /// <summary>ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben.</summary>
     [Fact]
-    public async Task ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben()
+    public async Task ScanForRecoveryCandidates_IgnoresRunningWorkItems()
     {
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
-        SetzeAltenHeartbeat(workItem.Id, minutesAlt: 10);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        SetOldHeartbeat(workItem.Id, minutesAlt: 10);
 
         var running = new E2EFakeRunningStatusSource(isRunning: true);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
@@ -92,21 +92,21 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
 
     /// <summary>RecoverManuellAsync_Setzt_StatusAufGestartet.</summary>
     [Fact]
-    public async Task RecoverManuellAsync_Setzt_StatusAufGestartet()
+    public async Task RecoverManualAsync_Sets_StatusOnStarted()
     {
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
-        SetzeAltenHeartbeat(workItem.Id, minutesAlt: 10);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        SetOldHeartbeat(workItem.Id, minutesAlt: 10);
 
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         await sut.RecoverManuallyAsync(workItem.Id, TestContext.Current.CancellationToken);
 
-        var geladen = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
-        geladen!.Status.Should().Be(WorkItemStatus.Started);
+        var loaded = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        loaded!.Status.Should().Be(WorkItemStatus.Started);
     }
 
-    private async Task<WorkItem> ErstelleAufgabeAsync(WorkItemStatus status)
+    private async Task<WorkItem> CreateWorkItemAsync(WorkItemStatus status)
     {
         var workItem = new WorkItem
         {
@@ -124,7 +124,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         return workItem;
     }
 
-    private void SetzeAltenHeartbeat(Guid workItemId, int minutesAlt)
+    private void SetOldHeartbeat(Guid workItemId, int minutesAlt)
     {
         var workItem = _db.WorkItems.Find(workItemId)!;
         workItem.LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-minutesAlt);

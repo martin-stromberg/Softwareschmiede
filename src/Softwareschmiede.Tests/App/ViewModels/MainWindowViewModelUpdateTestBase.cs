@@ -22,12 +22,12 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public abstract class MainWindowViewModelUpdateTestBase : IDisposable
 {
     /// <summary>Standard-Updateangebot der Tests (stabile Version 1.2.3).</summary>
-    protected static readonly UpdateInfo NeuesUpdate = new(
+    protected static readonly UpdateInfo NewUpdate = new(
         "1.2.3", "v1.2.3", "release.zip",
         new UpdateDownloadRoute(new Uri("https://example.invalid/release.zip")), null, IsPrerelease: false);
 
     /// <summary>Standard-Vorbereitungsergebnis der Tests.</summary>
-    protected static readonly UpdatePreparationResult FertigeVorbereitung = new(
+    protected static readonly UpdatePreparationResult DonePreparation = new(
         "release.zip", "extracted", "update.ps1", "update.log", false);
 
     private readonly string _dbPath = Path.Combine(
@@ -107,15 +107,15 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
     /// <summary>Erstellt ein MainWindowViewModel mit den konfigurierten Update-Mocks.</summary>
     protected MainWindowViewModel CreateSut()
     {
-        var aiService = TestKiAusfuehrungsServiceFactory.Create();
-        var promptZeitVersand = new PromptScheduleDispatchService(
+        var aiService = TestAiExecutionServiceFactory.Create();
+        var promptTimeDispatch = new PromptScheduleDispatchService(
             aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         return new MainWindowViewModel(
             _provider.GetRequiredService<DarkModeService>(),
             _provider,
             _provider.GetRequiredService<IActiveWorkItemsService>(),
             _provider.GetRequiredService<TodoService>(),
-            promptZeitVersand,
+            promptTimeDispatch,
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
             new MainWindowOptionalServices(
@@ -140,7 +140,7 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
     /// Speichert Update--Einstellungen über die echte Settings-UI (gleicher Pfad wie in der Anwendung),
     /// sodass das UpdateSettingsSaved-Ereignis im MainWindowViewModel ausgelöst wird.
     /// </summary>
-    protected async Task SpeichereUpdateEinstellungenUeberUiAsync(
+    protected async Task SaveUpdateSettingsOverUiAsync(
         MainWindowViewModel sut, UpdateModeOption mode, string updatePath)
     {
         sut.NavigateToSettingsCommand.Execute(null);

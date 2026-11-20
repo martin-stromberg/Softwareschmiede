@@ -12,7 +12,7 @@ public sealed class SystemShutdownServiceTests
 {
     /// <summary>Auf Windows liefert das Erzwingen-Flag das Forced-Shutdown-Kommando.</summary>
     [Fact]
-    public void ResolveShutdownCommand_WindowsMitErzwingen_LiefertForcedShutdown()
+    public void ResolveShutdownCommand_ForceWindowsWith_ReturnsForcedShutdown()
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows-spezifisches Mapping.");
 
@@ -24,7 +24,7 @@ public sealed class SystemShutdownServiceTests
 
     /// <summary>Auf Windows liefert der Shutdown ohne Erzwingen das reguläre Kommando.</summary>
     [Fact]
-    public void ResolveShutdownCommand_WindowsOhneErzwingen_LiefertRegulaeresShutdown()
+    public void ResolveShutdownCommand_ForceWindowsWithout_ReturnsRegularShutdown()
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows-spezifisches Mapping.");
 
@@ -36,7 +36,7 @@ public sealed class SystemShutdownServiceTests
 
     /// <summary>Unter Linux bleibt das Shutdown-Kommando unverändert <c>shutdown -h now</c>.</summary>
     [Fact]
-    public void ResolveShutdownCommand_Linux_BleibtUnveraendert()
+    public void ResolveShutdownCommand_Linux_RemainsUnchanged()
     {
         Assert.SkipUnless(OperatingSystem.IsLinux(), "Linux-spezifisches Mapping.");
 
@@ -48,7 +48,7 @@ public sealed class SystemShutdownServiceTests
 
     /// <summary>Unter macOS bleibt das AppleScript-Kommando unverändert.</summary>
     [Fact]
-    public void ResolveShutdownCommand_MacOS_BleibtUnveraendert()
+    public void ResolveShutdownCommand_MacOS_RemainsUnchanged()
     {
         Assert.SkipUnless(OperatingSystem.IsMacOS(), "macOS-spezifisches Mapping.");
 

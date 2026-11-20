@@ -16,21 +16,21 @@ namespace Softwareschmiede.Tests.E2E;
 /// Arbeitsverzeichnis weiterhin gezielt in der Test-Datenbank, weil dort die spätere CLI-Auswirkung
 /// im Vordergrund steht.
 ///
-/// Konsolidierung (Issue #153): <see cref="RepositoryZuweisung"/> führt fünf der sechs Szenarien
+/// Konsolidierung (Issue #153): <see cref="RepositoryAssignment"/> führt fünf der sechs Szenarien
 /// (beide Repository-Zuweisungs-Pfade, die Arbeitsverzeichnis-Bearbeitung sowie die beiden
 /// Start-Fehlerfälle) als aufeinanderfolgende Phasen in einem gemeinsamen App-Lifecycle aus. Jede
 /// Phase räumt ihr Projekt bzw. ihre Aufgabe über <see cref="Views.ProjectDetailView.DeleteProject"/> /
 /// <see cref="Views.TaskDetailView.DeleteTask"/> wieder auf, bevor die nächste Phase beginnt - damit bleiben
 /// DB-Abfragen wie <c>Single()</c>/<c>SingleOrDefault()</c> gültig, obwohl mehrere Projects/Repositories
 /// nacheinander im selben Prozess angelegt werden. Die Fallback-Zuweisung
-/// (<see cref="RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E"/>)
+/// (<see cref="AssignRepository_WithFailedStructurequery_ShowsTextBoxAndSavesManualPath_E2E"/>)
 /// initialisiert ihr lokales Quellverzeichnis bewusst ohne Git (<c>CreateLocalSourceDirectory(..., false)</c>):
 /// Der zuvor beobachtete <see cref="UnauthorizedAccessException"/> beim Löschen des Repository-Ordners
 /// trat gezielt bei einem tatsächlich initialisierten Git-Repository auf (der Zuweisungsdialog hält
 /// währenddessen einen Datei-Zugriff auf das Git-Verzeichnis offen); da dieser Test lediglich den
 /// Fallback-Pfad ohne Strukturabruf prüft, ist kein echtes Git-Repository nötig.
 ///
-/// <see cref="AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E"/> bleibt
+/// <see cref="StartWorkItem_WithConfiguredWorkingDirectory_CliStartsSuccessful_E2E"/> bleibt
 /// als eigenständiger <c>[Fact]</c> mit eigenem App-Lifecycle bestehen, da er als einziges
 /// Szenario einen erfolgreich laufenden CLI-Prozess (Status "CliStoppen") hinterlässt und daher vor
 /// einer Konsolidierung mit den übrigen Phasen zusätzliches Stoppen des Prozesses vor dem Aufräumen
@@ -48,14 +48,14 @@ public partial class End2EndTest
     /// Jede Phase räumt ihr Projekt bzw. ihre Aufgabe auf, bevor die nächste beginnt.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem alle Phasen ausgeführt werden.</param>
-    protected async Task RepositoryZuweisung(Window mainWindow)
+    protected async Task RepositoryAssignment(Window mainWindow)
     {
-        await RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E(mainWindow);
-        await RepositoryZuweisen_MitErfolgreichemStrukturabruf_ZeigtUndSpeichertArbeitsverzeichnis_E2E(mainWindow);
+        await AssignRepository_WithFailedStructurequery_ShowsTextBoxAndSavesManualPath_E2E(mainWindow);
+        await AssignRepository_WithSuccessfulStructurequery_ShowsAndSavesWorkingDirectory_E2E(mainWindow);
 
-        await ArbeitsverzeichnisBearbeiten_MitFehlgeschlagenemStrukturabruf_ZeigtUndBestaetigtVorhandenenWert_E2E(mainWindow);
-        await AufgabeStarten_MitFehlendemArbeitsverzeichnis_ZeigtFehler_E2E(mainWindow);
-        await AufgabeStarten_MitPathTraversalArbeitsverzeichnis_ZeigtFehler_E2E(mainWindow);
+        await WorkingDirectoryEdit_WithFailedStructurequery_ShowsAndConfirmsExistingValue_E2E(mainWindow);
+        await StartWorkItem_WithMissingWorkingDirectory_ShowsError_E2E(mainWindow);
+        await StartWorkItem_WithPathTraversalWorkingDirectory_ShowsError_E2E(mainWindow);
     }
 
     private string CreateLocalSourceDirectoryWithSubdirectories(string repositoryFolderName, params string[] subdirectories)
@@ -74,17 +74,17 @@ public partial class End2EndTest
     /// Erwartung: Die Auswahlbox zeigt Unterverzeichnisse und die Auswahl wird gespeichert.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private async Task RepositoryZuweisen_MitErfolgreichemStrukturabruf_ZeigtUndSpeichertArbeitsverzeichnis_E2E(Window mainWindow)
+    private async Task AssignRepository_WithSuccessfulStructurequery_ShowsAndSavesWorkingDirectory_E2E(Window mainWindow)
     {
         var repoFolderName = "WorkingDir-Assign-Success-Repo";
         var sourceDirectory = CreateLocalSourceDirectoryWithSubdirectories(repoFolderName, "backend", "frontend");
-        var projektName = "WorkingDir-Assign-Success-Projekt";
+        var projectName = "WorkingDir-Assign-Success-Projekt";
 
         var settings = new SettingsView(mainWindow).ForceShow();
         var dashboard = settings.ConfigureLocalDirectoryPlugin(sourceDirectory);
         var projectList = dashboard.Menu.NavigateToProjects();
-        projectList.CreateProject(projektName);
-        var projectDetail = projectList.OpenProject(projektName);
+        projectList.CreateProject(projectName);
+        var projectDetail = projectList.OpenProject(projectName);
 
         var dialog = new RepositoryAssignDialogView(mainWindow).ForceShow();
         dialog.SelectFirstRepository();
@@ -103,7 +103,7 @@ public partial class End2EndTest
     /// Erwartung: Eine TextBox erscheint und speichert einen manuellen relativen Pfad.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private async Task RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E(Window mainWindow)
+    private async Task AssignRepository_WithFailedStructurequery_ShowsTextBoxAndSavesManualPath_E2E(Window mainWindow)
     {
         var repositoryName = "WorkingDir-Assign-Fallback-Repo";
         var sourceDirectory = CreateLocalSourceDirectory(repositoryName, false);
@@ -138,19 +138,19 @@ public partial class End2EndTest
     /// Erwartung: Der vorhandene manuelle Wert erscheint im Textfeld und kann bestätigt werden.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private async Task ArbeitsverzeichnisBearbeiten_MitFehlgeschlagenemStrukturabruf_ZeigtUndBestaetigtVorhandenenWert_E2E(Window mainWindow)
+    private async Task WorkingDirectoryEdit_WithFailedStructurequery_ShowsAndConfirmsExistingValue_E2E(Window mainWindow)
     {
-        var projektName = "WorkingDir-Edit-Fallback-Projekt";
+        var projectName = "WorkingDir-Edit-Fallback-Projekt";
         var repositoryName = "WorkingDir-Edit-Fallback-Repo";
         var repositoryUrl = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_missing_repo_{Guid.NewGuid():N}");
         const string existingWorkingDirectory = "legacy/backend";
 
-        await SeedProjectRepositoryWithWorkingDirectoryAsync(projektName, repositoryName, repositoryUrl, existingWorkingDirectory);
+        await SeedProjectRepositoryWithWorkingDirectoryAsync(projectName, repositoryName, repositoryUrl, existingWorkingDirectory);
 
         var projectList = new ProjectListView(mainWindow).ForceShow();
-        var projectDetail = projectList.OpenProject(projektName);
+        var projectDetail = projectList.OpenProject(projectName);
 
-        var dialog = new ArbeitsverzeichnisBearbeitenDialogView(mainWindow).ForceShow();
+        var dialog = new WorkingDirectoryEditDialogView(mainWindow).ForceShow();
         Assert.Equal(existingWorkingDirectory, dialog.GetManualPath());
 
         var projectDetailAfterSave = dialog.Confirm();
@@ -167,14 +167,14 @@ public partial class End2EndTest
     /// Erwartung: CLI startet erfolgreich (Stoppen-Button erscheint), kein Fehlerbanner.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    protected async Task AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E(Window mainWindow)
+    protected async Task StartWorkItem_WithConfiguredWorkingDirectory_CliStartsSuccessful_E2E(Window mainWindow)
     {
-        SetupProjectMitNeuerAufgabe(mainWindow, "WorkingDir-Repo", "WorkingDir-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "WorkingDir-Repo", "WorkingDir-Projekt");
 
         await SeedWorkingDirectoryAsync("backend", createSubdirectory: true);
 
         new WindowsCredentialStore().SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskDetail.WaitForCliRunning();
 
         Assert.False(new ErrorView(mainWindow).IsVisible);
@@ -202,14 +202,14 @@ public partial class End2EndTest
     /// continue.md).
     /// </remarks>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private async Task AufgabeStarten_MitFehlendemArbeitsverzeichnis_ZeigtFehler_E2E(Window mainWindow)
+    private async Task StartWorkItem_WithMissingWorkingDirectory_ShowsError_E2E(Window mainWindow)
     {
-        _ = SetupProjectMitNeuerAufgabeForStartedApp(mainWindow, "WorkingDir-Missing-Repo", "WorkingDir-Missing-Projekt");
+        _ = SetupProjectWithNewWorkItemForStartedApp(mainWindow, "WorkingDir-Missing-Repo", "WorkingDir-Missing-Projekt");
 
         await SeedWorkingDirectoryAsync("does-not-exist", createSubdirectory: false);
 
         new WindowsCredentialStore().SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
         Assert.False(string.IsNullOrWhiteSpace(new ErrorView(mainWindow).GetErrorMessage()));
         Assert.False(taskDetail.IsCliRunning());
@@ -224,14 +224,14 @@ public partial class End2EndTest
     /// zu verlassen. Erwartung: Fehlerbanner erscheint, CLI startet nicht.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private async Task AufgabeStarten_MitPathTraversalArbeitsverzeichnis_ZeigtFehler_E2E(Window mainWindow)
+    private async Task StartWorkItem_WithPathTraversalWorkingDirectory_ShowsError_E2E(Window mainWindow)
     {
-        _ = SetupProjectMitNeuerAufgabeForStartedApp(mainWindow, "WorkingDir-Traversal-Repo", "WorkingDir-Traversal-Projekt");
+        _ = SetupProjectWithNewWorkItemForStartedApp(mainWindow, "WorkingDir-Traversal-Repo", "WorkingDir-Traversal-Projekt");
 
         await SeedWorkingDirectoryAsync(Path.Combine("..", "..", "etc"), createSubdirectory: false);
 
         new WindowsCredentialStore().SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
         Assert.False(string.IsNullOrWhiteSpace(new ErrorView(mainWindow).GetErrorMessage()));
         Assert.False(taskDetail.IsCliRunning());
@@ -268,7 +268,7 @@ public partial class End2EndTest
     }
 
     private async Task SeedProjectRepositoryWithWorkingDirectoryAsync(
-        string projektName,
+        string projectName,
         string repositoryName,
         string repositoryUrl,
         string workingDirectory)
@@ -277,7 +277,7 @@ public partial class End2EndTest
         var project = new Project
         {
             Id = Guid.NewGuid(),
-            Name = projektName,
+            Name = projectName,
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
         };

@@ -111,7 +111,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>Ein Explicit- und ein Fallback-kompatibles Plugin sind beide in der Rückgabeliste enthalten.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldReturnExplicitAndFallbackPlugins_WhenBothCompatible()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldReturnExplicitAndFallbackPlugins_WhenBothCompatible()
     {
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
@@ -126,7 +126,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>Bei gemischter Kompatibilität stehen alle Explicit-Plugins vor allen Fallback-Plugins, unabhängig von der Entdeckungsreihenfolge.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldOrderExplicitPluginsBeforeFallbackPlugins()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldOrderExplicitPluginsBeforeFallbackPlugins()
     {
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
@@ -141,7 +141,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>Innerhalb der Explicit- bzw. Fallback-Gruppe wird die plugins.ide.order-Reihenfolge eingehalten.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldRespectPluginOrder_FromSetting_WithinEachGroup()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldRespectPluginOrder_FromSetting_WithinEachGroup()
     {
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var rider = CreateIdePlugin("Rider", "Softwareschmiede.Rider", IdePluginCompatibility.Explicit);
@@ -157,7 +157,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>Ein Incompatible-Plugin taucht nicht in der Rückgabeliste auf, auch wenn es aktiviert ist.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldExcludeIncompatiblePlugins()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldExcludeIncompatiblePlugins()
     {
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var incompatible = CreateIdePlugin("Incompatible IDE", "Softwareschmiede.Incompatible", IdePluginCompatibility.Incompatible);
@@ -171,7 +171,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>Keine aktivierten Plugins → einelementige Liste mit dem Default-Plugin.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldReturnDefaultPlugin_WhenNoPluginActive()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldReturnDefaultPlugin_WhenNoPluginActive()
     {
         var defaultPlugin = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var pluginManager = CreatePluginManager([], defaultPlugin);
@@ -184,7 +184,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>Alle aktivierten Plugins Incompatible → einelementige Liste mit dem Default-Plugin.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldReturnDefaultPlugin_WhenNoPluginCompatible()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldReturnDefaultPlugin_WhenNoPluginCompatible()
     {
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Incompatible);
         var defaultPlugin = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Incompatible);

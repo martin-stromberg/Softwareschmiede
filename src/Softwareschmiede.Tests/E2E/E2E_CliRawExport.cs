@@ -10,73 +10,73 @@ namespace Softwareschmiede.Tests.E2E;
 public partial class End2EndTest
 {
     /// <summary>CLI-Rohausgabe kann über den Save-Dialog als *.raw-Datei exportiert werden.</summary>
-    protected void CliRawExport_ErstelltRawDateiMitCliOutput_HappyPath_E2E(Window mainWindow)
+    protected void CliRawExport_CreatesRawFileWithCliOutput_HappyPath_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        const string projektName = "CliRawExport-Happy-Projekt";
-        SetupProjectMitNeuerAufgabe(mainWindow, "CliRawExport-Happy-Repo", projektName);
-        var erwarteteCliZeile = $"CliRawExport-{Guid.NewGuid():N}";
-        SeedCliOutputForAktuelleAufgabe(erwarteteCliZeile);
+        const string projectName = "CliRawExport-Happy-Projekt";
+        SetupProjectWithNewWorkItem(mainWindow, "CliRawExport-Happy-Repo", projectName);
+        var expectedCliLine = $"CliRawExport-{Guid.NewGuid():N}";
+        SeedCliOutputForCurrentWorkItem(expectedCliLine);
 
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskDetail.WaitForCliRunning();
         taskDetail.SwitchPanel("CliViewButton");
 
-        var exportPfad = Path.Combine(Path.GetTempPath(), $"cli-raw-export-{Guid.NewGuid():N}.raw");
+        var exportPath = Path.Combine(Path.GetTempPath(), $"cli-raw-export-{Guid.NewGuid():N}.raw");
 
         try
         {
-            taskDetail.ExportCliRaw(exportPfad);
+            taskDetail.ExportCliRaw(exportPath);
 
             var deadline = DateTime.UtcNow + Medium;
-            while (DateTime.UtcNow < deadline && !File.Exists(exportPfad))
+            while (DateTime.UtcNow < deadline && !File.Exists(exportPath))
                 Thread.Sleep(200);
 
-            File.Exists(exportPfad).Should().BeTrue();
-            File.ReadAllText(exportPfad).Should().Contain(erwarteteCliZeile);
+            File.Exists(exportPath).Should().BeTrue();
+            File.ReadAllText(exportPath).Should().Contain(expectedCliLine);
             new ErrorView(mainWindow).IsVisible.Should().BeFalse();
         }
         finally
         {
-            if (File.Exists(exportPfad))
-                File.Delete(exportPfad);
+            if (File.Exists(exportPath))
+                File.Delete(exportPath);
 
             TryCloseTaskDetail(taskDetail);
-            DeleteProjectInDatenbank(projektName);
+            DeleteProjectInDatabase(projectName);
         }
     }
 
     /// <summary>Abbruch des Save-Dialogs erzeugt keine Datei und zeigt keinen Fehlerbanner.</summary>
-    protected void CliRawExport_AbbruchErzeugtKeineDateiUndKeinenFehlerbanner_E2E(Window mainWindow)
+    protected void CliRawExport_CancelCreatesNoFileAndNoErrorbanner_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        const string projektName = "CliRawExport-Cancel-Projekt";
-        SetupProjectMitNeuerAufgabe(mainWindow, "CliRawExport-Cancel-Repo", projektName);
+        const string projectName = "CliRawExport-Cancel-Projekt";
+        SetupProjectWithNewWorkItem(mainWindow, "CliRawExport-Cancel-Repo", projectName);
 
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskDetail.WaitForCliRunning();
         taskDetail.SwitchPanel("CliViewButton");
 
-        var exportPfad = Path.Combine(Path.GetTempPath(), $"cli-raw-export-cancel-{Guid.NewGuid():N}.raw");
+        var exportPath = Path.Combine(Path.GetTempPath(), $"cli-raw-export-cancel-{Guid.NewGuid():N}.raw");
 
         try
         {
             taskDetail.ExportCliRaw(null);
 
-            File.Exists(exportPfad).Should().BeFalse();
+            File.Exists(exportPath).Should().BeFalse();
             new ErrorView(mainWindow).IsVisible.Should().BeFalse();
         }
         finally
         {
-            if (File.Exists(exportPfad))
-                File.Delete(exportPfad);
+            if (File.Exists(exportPath))
+                File.Delete(exportPath);
 
             TryCloseTaskDetail(taskDetail);
-            DeleteProjectInDatenbank(projektName);
+            DeleteProjectInDatabase(projectName);
         }
     }
 
-    private void SeedCliOutputForAktuelleAufgabe(string output)
+    private void SeedCliOutputForCurrentWorkItem(string output)
     {
         using var db = OpenTestDbContext();
         var workItemId = db.WorkItems
@@ -107,10 +107,10 @@ public partial class End2EndTest
         }
     }
 
-    private void DeleteProjectInDatenbank(string projektName)
+    private void DeleteProjectInDatabase(string projectName)
     {
         using var db = OpenTestDbContext();
-        var project = db.Projects.SingleOrDefault(p => p.Name == projektName);
+        var project = db.Projects.SingleOrDefault(p => p.Name == projectName);
         if (project is null)
             return;
 

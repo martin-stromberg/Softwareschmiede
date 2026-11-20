@@ -198,7 +198,7 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
 
     /// <summary>Mehr als das Höchstmaß an verwertbaren Dateien wird gekappt und begründet.</summary>
     [Fact]
-    public async Task Collect_LimitsAttachmentCount()
+    public async Task Collect_LimitAttachmentCount()
     {
         var attempt = await _protocol.PrepareAsync(Request(), _root, TestContext.Current.CancellationToken);
         for (var i = 0; i < ScmEventExchangeProtocol.MaximumAttachments + 2; i++)

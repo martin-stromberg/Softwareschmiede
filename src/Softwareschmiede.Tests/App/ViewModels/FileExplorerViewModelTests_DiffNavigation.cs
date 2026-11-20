@@ -15,72 +15,72 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
 
     /// <summary>NaechsteAenderungCommand springt zum Start des ersten Änderungsblocks, wenn noch nicht navigiert wurde.</summary>
     [Fact]
-    public async Task NaechsteAenderungCommand_ErsterAufruf_SpringtZuErstemBlock()
+    public async Task NextChangeCommand_FirstCall_JumpsToFirstBlock()
     {
-        var sut = await CreateSutMitDiffZeilenAsync(
+        var sut = await CreateSutWithDiffLinesAsync(
             Line(DiffLineStatus.Context),
             Line(DiffLineStatus.Added),
             Line(DiffLineStatus.Added),
             Line(DiffLineStatus.Context),
             Line(DiffLineStatus.Removed));
 
-        var fokussierteIndizes = new List<int>();
-        sut.DiffLineFocused += fokussierteIndizes.Add;
+        var focusedIndexes = new List<int>();
+        sut.DiffLineFocused += focusedIndexes.Add;
 
         sut.NextChangeCommand.Execute(null);
 
-        fokussierteIndizes.Should().ContainSingle().Which.Should().Be(1);
+        focusedIndexes.Should().ContainSingle().Which.Should().Be(1);
     }
 
     /// <summary>Wiederholtes Aufrufen von NaechsteAenderungCommand springt der Reihe nach durch alle Änderungsblöcke und danach zurück zum Anfang (Wrap-Around).</summary>
     [Fact]
-    public async Task NaechsteAenderungCommand_MehrfachAufruf_SpringtDurchAlleBloeckeUndWrapt()
+    public async Task NextChangeCommand_MultipleCall_JumpsThroughAllBlocksAndWraps()
     {
-        var sut = await CreateSutMitDiffZeilenAsync(
+        var sut = await CreateSutWithDiffLinesAsync(
             Line(DiffLineStatus.Context),
             Line(DiffLineStatus.Added),
             Line(DiffLineStatus.Context),
             Line(DiffLineStatus.Removed),
             Line(DiffLineStatus.Removed));
 
-        var fokussierteIndizes = new List<int>();
-        sut.DiffLineFocused += fokussierteIndizes.Add;
+        var focusedIndexes = new List<int>();
+        sut.DiffLineFocused += focusedIndexes.Add;
 
         sut.NextChangeCommand.Execute(null);
         sut.NextChangeCommand.Execute(null);
         sut.NextChangeCommand.Execute(null);
 
-        fokussierteIndizes.Should().Equal(1, 3, 1);
+        focusedIndexes.Should().Equal(1, 3, 1);
     }
 
     /// <summary>VorherigeAenderungCommand springt beim ersten Aufruf zum letzten Änderungsblock.</summary>
     [Fact]
-    public async Task VorherigeAenderungCommand_ErsterAufruf_SpringtZuLetztemBlock()
+    public async Task PreviousChangeCommand_FirstCall_JumpsToLastBlock()
     {
-        var sut = await CreateSutMitDiffZeilenAsync(
+        var sut = await CreateSutWithDiffLinesAsync(
             Line(DiffLineStatus.Added),
             Line(DiffLineStatus.Context),
             Line(DiffLineStatus.Modified));
 
-        var fokussierteIndizes = new List<int>();
-        sut.DiffLineFocused += fokussierteIndizes.Add;
+        var focusedIndexes = new List<int>();
+        sut.DiffLineFocused += focusedIndexes.Add;
 
         sut.PreviousChangeCommand.Execute(null);
 
-        fokussierteIndizes.Should().ContainSingle().Which.Should().Be(2);
+        focusedIndexes.Should().ContainSingle().Which.Should().Be(2);
     }
 
     /// <summary>Ohne Diff-Zeilen (kein Vergleichsmodus aktiv) wird kein Fokus-Event ausgelöst.</summary>
     [Fact]
-    public void NaechsteAenderungCommand_OhneDiffZeilen_LoestKeinEreignisAus()
+    public void NextChangeCommand_WithoutDiffLines_TriggersNoEventOut()
     {
         var sut = CreateSut();
-        var ereignisAusgeloest = false;
-        sut.DiffLineFocused += _ => ereignisAusgeloest = true;
+        var eventTriggered = false;
+        sut.DiffLineFocused += _ => eventTriggered = true;
 
         sut.NextChangeCommand.Execute(null);
 
-        ereignisAusgeloest.Should().BeFalse();
+        eventTriggered.Should().BeFalse();
     }
 
     private static TextDiffLine Line(DiffLineStatus status) => new("inhalt", status, 1, 1, []);
@@ -92,7 +92,7 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
         return new FileExplorerViewModel(gitMock.Object, diffMock.Object, NullLogger<FileExplorerViewModel>.Instance);
     }
 
-    private static async Task<FileExplorerViewModel> CreateSutMitDiffZeilenAsync(params TextDiffLine[] lines)
+    private static async Task<FileExplorerViewModel> CreateSutWithDiffLinesAsync(params TextDiffLine[] lines)
     {
         var gitMock = new Mock<IGitWorkspaceBrowserService>();
         var diffMock = new Mock<ITextDiffService>();

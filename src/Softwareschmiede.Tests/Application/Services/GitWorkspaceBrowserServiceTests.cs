@@ -26,7 +26,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Prüft, dass ein fehlender Repository-Pfad als Fehler-Snapshot zurückkommt.</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_FehlenderRepositoryPfad_LiefertFehlerSnapshot()
+    public async Task LoadSnapshotAsync_MissingRepositoryPath_ReturnsErrorSnapshot()
     {
         var missingPath = Path.Combine(CreateTempDirectory(), "missing");
         var service = CreateService(missingPath, string.Empty);
@@ -39,7 +39,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Prüft, dass ein nicht-gitfähiger Ordner als Fehler-Snapshot zurückkommt.</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_KeinGitRepository_LiefertFehlerSnapshot()
+    public async Task LoadSnapshotAsync_NoGitRepository_ReturnsErrorSnapshot()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, string.Empty, repoCheckStdOut: "false");
@@ -52,7 +52,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Setzt CommitCount auf 0 wenn der rev-list-Aufruf fehlschlägt.</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_RevListFehlgeschlagen_SetztCommitCountAufNull()
+    public async Task LoadSnapshotAsync_RevListFailed_SetsCommitCountOnNull()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, "?? src/file.cs", commitCountSuccess: false, commitCountStdErr: "fatal");
@@ -64,7 +64,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Verwendet den Fallback-Basis-Branch, wenn origin/HEAD nicht aufgelöst werden kann.</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_OriginHeadNichtAufloesbar_VerwendetFallbackBasisBranch()
+    public async Task LoadSnapshotAsync_OriginHeadNotResolvable_UsesFallbackBaseBranch()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -84,7 +84,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Verwendet bei mehrdeutiger origin/HEAD-Ausgabe die erste gültige Referenz.</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_MehrdeutigeRemoteHeadAusgabe_VerwendetErsteGueltigeReferenz()
+    public async Task LoadSnapshotAsync_AmbiguousRemoteHeadOutput_UsesFirstValidReference()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -104,7 +104,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Normalisiert eine origin/HEAD-Ausgabe im Pfeil-Format (origin/HEAD -> origin/main).</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_RemoteHeadPfeilReferenz_WirdNormalisiert()
+    public async Task LoadSnapshotAsync_RemoteHeadArrowReference_WillNormalizes()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -124,7 +124,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Fällt auf eine bekannte Referenz zurück, wenn die origin/HEAD-Ausgabe nur aus Whitespace besteht.</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_RemoteHeadAusgabeNurWhitespace_FaelltAufBekannteReferenzZurueck()
+    public async Task LoadSnapshotAsync_RemoteHeadOutputOnlyWhitespace_FallsOnKnownReferenceBack()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -144,7 +144,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Liefert CommitCount 0 und keine Branch-Commits, wenn kein Basis-Ref ermittelt werden kann.</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_KeinBasisRefErkennbar_LiefertKeineBranchCommits()
+    public async Task LoadSnapshotAsync_NoBaseRefRecognizable_ReturnsNoBranchCommits()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -161,7 +161,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Verwendet den angegebenen Zielbranch als Basis-Referenz, wenn dieser vom Hauptbranch abweicht.</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_ZielbranchAbweichend_VerwendetKonfiguriertenBaseBranch()
+    public async Task LoadSnapshotAsync_TargetbranchDeviating_UsesConfiguredBaseBranch()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -180,7 +180,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Baut den Dateibaum aus dem Diff-Tree auf und weist jedem Knoten die Commit-SHA zu.</summary>
     [Fact]
-    public async Task LoadCommitFilesAsync_BautBaumAufUndWeistCommitShaZu()
+    public async Task LoadCommitFilesAsync_BuildsTreeOnAndAssignsCommitShaTo()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, string.Empty);
@@ -196,7 +196,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Ignoriert unvollständige Rename-Tokens im diff-tree-Output und behält die gültigen Einträge.</summary>
     [Fact]
-    public async Task LoadCommitFilesAsync_UnvollstaendigeRenameTokens_IgnoriertUndBehaeltGueltigeEintraege()
+    public async Task LoadCommitFilesAsync_IncompleteRenameTokens_IgnoresAndKeepsValidEntries()
     {
         var repositoryPath = CreateTempDirectory();
         var commitSha = "dddddddddddddddddddddddddddddddddddddddd";
@@ -215,7 +215,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Lädt sowohl die aktuelle als auch die ursprüngliche Version des Commit-Inhalts.</summary>
     [Fact]
-    public async Task LoadCommitPreviewAsync_LaedtAktuelleUndUrspruenglicheVersion()
+    public async Task LoadCommitPreviewAsync_LoadsCurrentAndOriginalVersion()
     {
         var repositoryPath = CreateTempDirectory();
         var commitSha = "cccccccccccccccccccccccccccccccccccccccc";
@@ -241,7 +241,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Liefert einen Hinweis statt Inhalt, wenn der Knoten ein Verzeichnis ist.</summary>
     [Fact]
-    public async Task LoadCommitPreviewAsync_KnotenIstVerzeichnis_LiefertHinweis()
+    public async Task LoadCommitPreviewAsync_NodeIsDirectory_ReturnsNotice()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, string.Empty);
@@ -261,7 +261,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Erkennt Binärinhalt anhand eines Null-Zeichens und liefert einen entsprechenden Hinweis.</summary>
     [Fact]
-    public async Task LoadCommitPreviewAsync_InhaltEnthaeltNullZeichen_LiefertBinaerHinweis()
+    public async Task LoadCommitPreviewAsync_ContentContainsNullCharacter_ReturnsBinaryNotice()
     {
         var repositoryPath = CreateTempDirectory();
         var commitSha = "dddddddddddddddddddddddddddddddddddddddd";
@@ -289,7 +289,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Prüft die Größen-Schutzschranke für Commit-Vorschauen, damit kein übergroßer Inhalt an den Zeilendiff übergeben wird.</summary>
     [Fact]
-    public async Task LoadCommitPreviewAsync_InhaltUeberschreitetLimit_LiefertZuGrossHinweis()
+    public async Task LoadCommitPreviewAsync_ContentExceedsLimit_ReturnsToLargeNotice()
     {
         var repositoryPath = CreateTempDirectory();
         var commitSha = "ffffffffffffffffffffffffffffffffffffffff";
@@ -318,7 +318,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Liefert einen Fehlerhinweis mit Fehlermeldung, wenn weder aktueller noch ursprünglicher Inhalt geladen werden kann.</summary>
     [Fact]
-    public async Task LoadCommitPreviewAsync_AktuellUndOriginalNichtLadbar_LiefertFehlerHinweis()
+    public async Task LoadCommitPreviewAsync_CurrentAndOriginalNotLoadable_ReturnsErrorNotice()
     {
         var repositoryPath = CreateTempDirectory();
         var commitSha = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -346,7 +346,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Liest gelöschte Dateien aus HEAD und verweigert Inline-Vorschau für Binärdateien.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_GeloeschteDateiUndBinaerdatei_VerwendetHeadUndErkenntBinaer()
+    public async Task LoadPreviewAsync_DeletedFileAndBinaryfile_UsesHeadAndDetectsBinary()
     {
         var repositoryPath = CreateTempDirectory();
         var deletedService = CreateService(repositoryPath, string.Empty, headContent: "old content");
@@ -388,7 +388,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Lädt bei fehlender Working-Tree-Datei den HEAD-Inhalt und liefert einen Hinweistext.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_ArbeitsbaumDateiFehlt_FaelltAufHeadZurueckMitHinweis()
+    public async Task LoadPreviewAsync_WorkingtreeFileMissing_FallsOnHeadBackWithNotice()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -414,7 +414,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Lädt bei regulären Textdateien den HEAD-Inhalt als OriginalContent.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_RegulaereTextdateiMitHead_FuelltOriginalContent()
+    public async Task LoadPreviewAsync_RegularTextfileWithHead_FillsOriginalContent()
     {
         var repositoryPath = CreateTempDirectory();
         var relativePath = Path.Combine("src", "changed.cs");
@@ -444,7 +444,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Setzt OriginalContent auf null wenn git show für HEAD-Inhalt fehlschlägt.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_GitShowFehlgeschlagen_SetztOriginalContentAufNull()
+    public async Task LoadPreviewAsync_GitShowFailed_SetsOriginalContentOnNull()
     {
         var repositoryPath = CreateTempDirectory();
         var relativePath = Path.Combine("src", "changed.cs");
@@ -474,7 +474,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Prüft, dass Verzeichnisse keine Dateivorschau auslösen.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_KnotenIstVerzeichnis_LiefertHinweis()
+    public async Task LoadPreviewAsync_NodeIsDirectory_ReturnsNotice()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, string.Empty);
@@ -493,7 +493,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Prüft die Größen-Schutzschranke für Inline-Vorschauen.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_DateiUeberschreitetLimit_LiefertZuGrossHinweis()
+    public async Task LoadPreviewAsync_FileExceedsLimit_ReturnsToLargeNotice()
     {
         var repositoryPath = CreateTempDirectory();
         var largeFilePath = Path.Combine(repositoryPath, "large.txt");
@@ -514,7 +514,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Prüft den Schutz gegen Pfad-Traversal außerhalb des Repository-Roots.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_PfadAusserhalbRepository_WirftException()
+    public async Task LoadPreviewAsync_PathOutsideRepository_ThrowsException()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, string.Empty);

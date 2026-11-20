@@ -164,7 +164,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
     public ICommand LoadTemplatesCommand { get; }
 
     /// <summary>Füllt das Template per KI aus.</summary>
-    public ICommand AiAusfuellenCommand { get; }
+    public ICommand AiFillCommand { get; }
 
     /// <summary>Legt das Issue beim Provider an.</summary>
     public ICommand CreateCommand { get; }
@@ -183,7 +183,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         _pluginActivationService = pluginActivationService;
 
         LoadTemplatesCommand = new AsyncRelayCommand(LoadTemplatesAsync);
-        AiAusfuellenCommand = new AsyncRelayCommand(AiAusfuellenAsync, () => CanUseAi);
+        AiFillCommand = new AsyncRelayCommand(AiFillAsync, () => CanUseAi);
         CreateCommand = new AsyncRelayCommand(CreateAsync, () => CanSubmit);
         CancelCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false), () => !IsSubmitting && !IsGenerating);
     }
@@ -274,17 +274,17 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
             return;
         }
 
-        var activePrefixe = (await _pluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync(ct))
+        var activePrefixes = (await _pluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync(ct))
             .Select(p => p.PluginPrefix)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var disabledPrefixe = AvailableAiPlugins.Where(p => !activePrefixe.Contains(p)).ToList();
-        foreach (var prefix in disabledPrefixe)
+        var disabledPrefixes = AvailableAiPlugins.Where(p => !activePrefixes.Contains(p)).ToList();
+        foreach (var prefix in disabledPrefixes)
         {
             AvailableAiPlugins.Remove(prefix);
         }
 
-        if (SelectedAiPluginPrefix is not null && !activePrefixe.Contains(SelectedAiPluginPrefix))
+        if (SelectedAiPluginPrefix is not null && !activePrefixes.Contains(SelectedAiPluginPrefix))
         {
             SelectedAiPluginPrefix = AvailableAiPlugins.FirstOrDefault();
         }
@@ -342,7 +342,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         }
     }
 
-    private async Task AiAusfuellenAsync(CancellationToken ct)
+    private async Task AiFillAsync(CancellationToken ct)
     {
         var generator = FindSelectedTextGenerator();
         if (generator is null || SelectedTemplate is null)

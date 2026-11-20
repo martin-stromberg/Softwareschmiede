@@ -362,7 +362,7 @@ internal static class ElementWaitHelper
     /// </summary>
     /// <param name="element">Das zu klickende Element.</param>
     internal static void ClickInForeground(this AutomationElement element)
-        => KlickInVordergrund(element, e => e.Click());
+        => ClickInForeground(element, e => e.Click());
 
     /// <summary>
     /// Wie <see cref="ClickInForeground"/>, nur als Doppelklick (z. B. zum Öffnen von Listeneinträgen).
@@ -370,17 +370,17 @@ internal static class ElementWaitHelper
     /// </summary>
     /// <param name="element">Das zu doppelklickende Element.</param>
     internal static void DoubleClickInForeground(this AutomationElement element)
-        => KlickInVordergrund(element, e => e.DoubleClick());
+        => ClickInForeground(element, e => e.DoubleClick());
 
     internal static string DescribeClickTarget(this AutomationElement element)
     {
         var target = $"Name={element.Name}, Type={element.ControlType}, Enabled={element.IsEnabled}, Offscreen={element.IsOffscreen}, Bounds={element.BoundingRectangle}, PID={element.Properties.ProcessId.ValueOrDefault}, Handle={element.Properties.NativeWindowHandle.ValueOrDefault}";
-        if (!HatKlickbarenPunkt(element, out var point)) return target + "; no clickable point";
+        if (!HasClickablePoint(element, out var point)) return target + "; no clickable point";
         var hit = element.Automation.FromPoint(point);
         return target + $"; Point={point}, HitType={hit?.ControlType}, HitPID={hit?.Properties.ProcessId.ValueOrDefault}, HitHandle={hit?.Properties.NativeWindowHandle.ValueOrDefault}, HitName={(hit?.Properties.ProcessId.ValueOrDefault == element.Properties.ProcessId.ValueOrDefault ? hit?.Name : "other process")}";
     }
 
-    private static void KlickInVordergrund(AutomationElement element, Action<AutomationElement> klick)
+    private static void ClickInForeground(AutomationElement element, Action<AutomationElement> click)
     {
         try
         {
@@ -392,9 +392,9 @@ internal static class ElementWaitHelper
             // Vordergrund-Aktivierung ist Best-Effort - der Klick wird trotzdem ausgeführt.
         }
 
-        if (HatKlickbarenPunkt(element, out var punkt) && !IstPunktVerdeckt(element, punkt))
+        if (HasClickablePoint(element, out var point) && !IsPointCovered(element, point))
         {
-            klick(element);
+            click(element);
             return;
         }
 
@@ -404,23 +404,23 @@ internal static class ElementWaitHelper
             return;
         }
 
-        try { klick(element); }
+        try { click(element); }
         catch (FlaUI.Core.Exceptions.NoClickablePointException ex)
         {
             throw new InvalidOperationException(element.DescribeClickTarget(), ex);
         }
     }
 
-    private static bool HatKlickbarenPunkt(AutomationElement element, out System.Drawing.Point punkt)
+    private static bool HasClickablePoint(AutomationElement element, out System.Drawing.Point point)
     {
         try
         {
-            punkt = element.GetClickablePoint();
+            point = element.GetClickablePoint();
             return true;
         }
         catch (FlaUI.Core.Exceptions.NoClickablePointException)
         {
-            punkt = default;
+            point = default;
             return false;
         }
     }
@@ -430,12 +430,12 @@ internal static class ElementWaitHelper
     /// das Zielelement (Verdeckung durch Fremd- oder eigenes Dialogfenster). Fensterlose
     /// WPF-Controls melden als <c>NativeWindowHandle</c> das Handle ihres Hostfensters.
     /// </summary>
-    private static bool IstPunktVerdeckt(AutomationElement element, System.Drawing.Point punkt)
+    private static bool IsPointCovered(AutomationElement element, System.Drawing.Point point)
     {
         AutomationElement? match;
         try
         {
-            match = element.Automation.FromPoint(punkt);
+            match = element.Automation.FromPoint(point);
         }
         catch (Exception)
         {
@@ -447,9 +447,9 @@ internal static class ElementWaitHelper
 
         try
         {
-            var fensterZiel = element.Properties.NativeWindowHandle.ValueOrDefault;
-            var fensterTreffer = match.Properties.NativeWindowHandle.ValueOrDefault;
-            return fensterZiel != IntPtr.Zero && fensterTreffer != IntPtr.Zero && fensterZiel != fensterTreffer;
+            var windowTarget = element.Properties.NativeWindowHandle.ValueOrDefault;
+            var windowHit = match.Properties.NativeWindowHandle.ValueOrDefault;
+            return windowTarget != IntPtr.Zero && windowHit != IntPtr.Zero && windowTarget != windowHit;
         }
         catch (Exception)
         {

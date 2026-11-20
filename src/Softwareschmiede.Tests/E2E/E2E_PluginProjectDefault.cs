@@ -27,18 +27,18 @@ public partial class End2EndTest
     /// die Checkbox "Für dieses Projekt verwenden"; zweite, neu angelegte Aufgabe desselben Projekts
     /// übernimmt ihn automatisch (kein Plugin-Auswahl-Dialog erscheint mehr).
     /// </summary>
-    protected void PluginProjectDefault_SpeichernUndAutomatischeUebernahmeInFolgeaufgabe_E2E(Window mainWindow)
+    protected void PluginProjectDefault_SaveAndAutomaticApplicationInFollowuptask_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        SetupProjectMitNeuerAufgabe(mainWindow,
+        SetupProjectWithNewWorkItem(mainWindow,
             "PluginProjectDefault-Repo",
             "PluginProjectDefault-Projekt",
             useInSourceDirectoryMode: false);
 
         // Phase 1: Plugin-Dialog mit aktivierter Checkbox "Für dieses Projekt verwenden" bestätigen.
-        var ersteAufgabe = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: true);
-        ersteAufgabe.WaitForCliRunning();
+        var firstWorkItem = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: true);
+        firstWorkItem.WaitForCliRunning();
 
         // Hauptfenster nach Schließen des Dialogs aktivieren, damit die UIA-Elemente
         // wieder einen gültigen Klickpunkt liefern (sonst NoClickablePointException möglich).
@@ -46,18 +46,18 @@ public partial class End2EndTest
         Thread.Sleep(300);
 
         // Zurück zur Projektdetailansicht, damit die nächste Phase eine neue Aufgabe anlegen kann
-        ersteAufgabe.GoBack();
+        firstWorkItem.GoBack();
         var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         // Phase 2: Zweite, neu erstellte Aufgabe desselben Projekts wird gestartet, ohne dass der
         // Plugin-Auswahl-Dialog erscheint; die CLI startet direkt mit dem gespeicherten Plugin.
-        var zweiteAufgabe = projectDetail.CreateTask();
-        zweiteAufgabe.Restart();
-        zweiteAufgabe.WaitForCliRunning();
+        var secondWorkItem = projectDetail.CreateTask();
+        secondWorkItem.Restart();
+        secondWorkItem.WaitForCliRunning();
 
         Assert.False(new PluginSelectionDialogView(mainWindow).IsVisible);
 
-        zweiteAufgabe.ForceClose(recurseToDashboard: false);
+        secondWorkItem.ForceClose(recurseToDashboard: false);
         var projectDetailFinal = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
         projectDetailFinal.DeleteProject();
     }

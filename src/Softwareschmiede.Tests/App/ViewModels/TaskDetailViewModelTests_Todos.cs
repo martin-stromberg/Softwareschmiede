@@ -38,7 +38,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
 
     private TaskDetailViewModel CreateSut() => TaskDetailViewModelTestFactory.Create(_db, _workItemService);
 
-    private async Task<WorkItem> ErstelleAufgabe(WorkItemStatus status = WorkItemStatus.New)
+    private async Task<WorkItem> CreateWorkItem(WorkItemStatus status = WorkItemStatus.New)
     {
         var workItem = await _workItemService.CreateAsync(_projectId, "Testaufgabe", "Beschreibung");
         if (status != WorkItemStatus.New)
@@ -50,7 +50,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
     [Fact]
     public async Task LoadAsync_LoadsTodos()
     {
-        var workItem = await ErstelleAufgabe();
+        var workItem = await CreateWorkItem();
         await _todoService.CreateTodoAsync(workItem.Id, "Erstes Todo", TestContext.Current.CancellationToken);
         await _todoService.CreateTodoAsync(workItem.Id, "Zweites Todo", TestContext.Current.CancellationToken);
 
@@ -64,12 +64,12 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
 
     /// <summary>OffeneTodoCount wird nach dem Laden korrekt anhand der offenen Todos berechnet.</summary>
     [Fact]
-    public async Task OffeneTodoCount_UpdatesCorrectly()
+    public async Task OpenTodoCount_UpdatesCorrectly()
     {
-        var workItem = await ErstelleAufgabe();
+        var workItem = await CreateWorkItem();
         await _todoService.CreateTodoAsync(workItem.Id, "Offenes Todo", TestContext.Current.CancellationToken);
-        var erledigt = await _todoService.CreateTodoAsync(workItem.Id, "Erledigtes Todo", TestContext.Current.CancellationToken);
-        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
+        var completed = await _todoService.CreateTodoAsync(workItem.Id, "Erledigtes Todo", TestContext.Current.CancellationToken);
+        await _todoService.MarkTodoAsCompletedAsync(completed.Id, TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -80,9 +80,9 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
 
     /// <summary>TodoHinzufuegenCommand erstellt ein neues Todo und fügt es der Collection hinzu.</summary>
     [Fact]
-    public async Task TodoHinzufuegenCommand_CreatesTodo()
+    public async Task AddTodoCommand_CreatesTodo()
     {
-        var workItem = await ErstelleAufgabe();
+        var workItem = await CreateWorkItem();
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
@@ -93,15 +93,15 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
         sut.TodoList.Todos.Should().ContainSingle(t => t.Description == "Neues Todo");
         sut.TodoList.OpenTodoCount.Should().Be(1);
         sut.TodoList.NewTodoDescription.Should().BeNullOrEmpty();
-        var alleTodos = await _todoService.GetAllTodosAsync(workItem.Id, TestContext.Current.CancellationToken);
-        alleTodos.Should().ContainSingle();
+        var allTodos = await _todoService.GetAllTodosAsync(workItem.Id, TestContext.Current.CancellationToken);
+        allTodos.Should().ContainSingle();
     }
 
     /// <summary>TodoLoeschenCommand löscht ein Todo aus Datenbank und Collection.</summary>
     [Fact]
-    public async Task TodoLoeschenCommand_DeletesTodo()
+    public async Task DeleteTodoCommand_DeletesTodo()
     {
-        var workItem = await ErstelleAufgabe();
+        var workItem = await CreateWorkItem();
         var todo = await _todoService.CreateTodoAsync(workItem.Id, "Zu löschendes Todo", TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -110,15 +110,15 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
         await ((AsyncRelayCommand<Guid>)sut.TodoList.DeleteTodoCommand).ExecuteAsync(todo.Id);
 
         sut.TodoList.Todos.Should().BeEmpty();
-        var alleTodos = await _todoService.GetAllTodosAsync(workItem.Id, TestContext.Current.CancellationToken);
-        alleTodos.Should().BeEmpty();
+        var allTodos = await _todoService.GetAllTodosAsync(workItem.Id, TestContext.Current.CancellationToken);
+        allTodos.Should().BeEmpty();
     }
 
     /// <summary>TodoAlsErledigtMarkierenCommand markiert ein Todo als erledigt und aktualisiert OffeneTodoCount.</summary>
     [Fact]
-    public async Task TodoAlsErledigtMarkierenCommand_MarksTodoCompleted()
+    public async Task MarkTodoAsCompletedCommand_MarksTodoCompleted()
     {
-        var workItem = await ErstelleAufgabe();
+        var workItem = await CreateWorkItem();
         var todo = await _todoService.CreateTodoAsync(workItem.Id, "Zu markierendes Todo", TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -128,15 +128,15 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
 
         sut.TodoList.Todos.Single().IsCompleted.Should().BeTrue();
         sut.TodoList.OpenTodoCount.Should().Be(0);
-        var alleTodos = await _todoService.GetAllTodosAsync(workItem.Id, TestContext.Current.CancellationToken);
-        alleTodos.Single().CompletedAt.Should().NotBeNull();
+        var allTodos = await _todoService.GetAllTodosAsync(workItem.Id, TestContext.Current.CancellationToken);
+        allTodos.Single().CompletedAt.Should().NotBeNull();
     }
 
     /// <summary>AufgabeAbschliessenCommand zeigt eine Fehlermeldung an und blockiert den Abschluss, wenn offene Todos vorhanden sind.</summary>
     [Fact]
-    public async Task AufgabeAbschliessenCommand_WithOpenTodos_ShowsError()
+    public async Task CompleteWorkItemCommand_WithOpenTodos_ShowsError()
     {
-        var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
+        var workItem = await CreateWorkItem(WorkItemStatus.Started);
         await _todoService.CreateTodoAsync(workItem.Id, "Offenes Todo", TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -151,9 +151,9 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
 
     /// <summary>AufgabeAbschliessenCommand schließt die Aufgabe erfolgreich ab, wenn keine offenen Todos vorhanden sind.</summary>
     [Fact]
-    public async Task AufgabeAbschliessenCommand_WithoutOpenTodos_Succeeds()
+    public async Task CompleteWorkItemCommand_WithoutOpenTodos_Succeeds()
     {
-        var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
+        var workItem = await CreateWorkItem(WorkItemStatus.Started);
         var todo = await _todoService.CreateTodoAsync(workItem.Id, "Erledigtes Todo", TestContext.Current.CancellationToken);
         await _todoService.MarkTodoAsCompletedAsync(todo.Id, TestContext.Current.CancellationToken);
         var sut = CreateSut();

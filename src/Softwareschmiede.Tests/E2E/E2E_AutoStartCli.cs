@@ -24,20 +24,20 @@ public partial class End2EndTest
     /// CLI-Prozess einbetten. Prüft außerdem (Issue 193), dass Protokolleinträge im Hintergrund
     /// nachgeladen werden.
     /// </summary>
-    protected void AufgabeOeffnen_NachStoppen_StartetCliNichtAutomatischErstExplizit_E2E(Window mainWindow)
+    protected void OpenWorkItem_StopAfter_StartsCliNotAutomaticFirstExplicit_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        SetupProjectMitNeuerAufgabe(mainWindow, "AutoStartCli-Repo", "AutoStartCli-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "AutoStartCli-Repo", "AutoStartCli-Projekt");
 
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskDetail.WaitForCliRunning();
 
         taskDetail.SwitchPanel("InfoCliToggle");
         // Protokoll-Nachladen (Issue 193): Der GitAktion-Eintrag aus der Repository-Vorbereitung
         // wird asynchron im Hintergrund geladen und muss ohne expliziten Reload sichtbar werden.
         // AutomationProperties.Name des Protokolltyp-TextBlocks ist explizit an Typ gebunden
-        // (TaskDetailView.xaml, "ProtokollTyp-{Typ}"), statt zufällig am impliziten Textinhalt.
+        // (TaskDetailView.xaml, "LogKind-{Typ}"), statt zufällig am impliziten Textinhalt.
         taskDetail.WaitForLogEntry("GitAktion");
 
         // CLI manuell stoppen, Gesamtstatus bleibt "Gestartet"

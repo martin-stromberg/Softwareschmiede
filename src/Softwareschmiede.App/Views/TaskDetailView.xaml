@@ -224,7 +224,7 @@
                             <controls:RibbonLargeButton ButtonIcon="＋"
                                                         ButtonText="Issue anlegen"
                                                         AutomationName="CreateIssue"
-                                                        ButtonCommand="{Binding IssueAnlegenCommand}"
+                                                        ButtonCommand="{Binding IssueCreateCommand}"
                                                         Visibility="{Binding CanCreateIssue, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="🔗"
                                                         ButtonText="Issue zuweisen"
@@ -436,7 +436,7 @@
                                                            VerticalAlignment="Top" />
                                                 <TextBlock Grid.Column="1"
                                                            Text="{Binding Type}"
-                                                           AutomationProperties.Name="{Binding Type, StringFormat={}ProtokollTyp-{0}}"
+                                                           AutomationProperties.Name="{Binding Type, StringFormat={}LogKind-{0}}"
                                                            FontSize="11"
                                                            Foreground="{DynamicResource AccentBrush}"
                                                            VerticalAlignment="Top" />

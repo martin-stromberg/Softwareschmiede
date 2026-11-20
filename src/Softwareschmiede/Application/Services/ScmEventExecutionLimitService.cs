@@ -14,7 +14,7 @@ public sealed record CliExecutionOccupancy(int Global, IReadOnlyDictionary<strin
     /// <summary>Anzahl laufender Ausführungen, die dem angegebenen Plugin-Prefix zugeordnet sind.</summary>
     /// <param name="pluginPrefix">KI-Plugin-Prefix (Groß-/Kleinschreibung wird ignoriert).</param>
     /// <returns>Anzahl laufender Ausführungen des Plugins; <c>0</c>, wenn keine bekannt sind.</returns>
-    public int FuerPlugin(string pluginPrefix)
+    public int ForPlugin(string pluginPrefix)
         => !string.IsNullOrWhiteSpace(pluginPrefix) && ProPlugin.TryGetValue(pluginPrefix, out var count) ? count : 0;
 }
 
@@ -141,7 +141,7 @@ public sealed class ScmEventExecutionLimitService(
     {
         if (globalLimit is { } g && occupancy.Global >= g)
             return $"Das globale Limit paralleler CLI-Ausführungen ({g}) ist erreicht; der Start erfolgt, sobald ein Platz frei wird.";
-        if (pluginLimit is { } p && !string.IsNullOrWhiteSpace(pluginPrefix) && occupancy.FuerPlugin(pluginPrefix) >= p)
+        if (pluginLimit is { } p && !string.IsNullOrWhiteSpace(pluginPrefix) && occupancy.ForPlugin(pluginPrefix) >= p)
             return $"Das Limit paralleler CLI-Ausführungen für die CLI '{pluginPrefix}' ({p}) ist erreicht; der Start erfolgt, sobald ein Platz frei wird.";
         return null;
     }
@@ -166,17 +166,17 @@ public sealed class ScmEventExecutionLimitService(
     private async Task<CliExecutionOccupancy> EffectiveOccupancyAsync(CancellationToken ct)
     {
         var occupancy = await GetOccupancyAsync(ct);
-        var aktive = reservationPool.ActiveReservations(time.GetUtcNow().ToUnixTimeMilliseconds());
-        if (aktive.Count == 0)
+        var active = reservationPool.ActiveReservations(time.GetUtcNow().ToUnixTimeMilliseconds());
+        if (active.Count == 0)
             return occupancy;
         var proPlugin = new Dictionary<string, int>(occupancy.ProPlugin, StringComparer.OrdinalIgnoreCase);
-        foreach (var reservation in aktive)
+        foreach (var reservation in active)
         {
             if (string.IsNullOrWhiteSpace(reservation.PluginPrefix)) continue;
             proPlugin.TryGetValue(reservation.PluginPrefix, out var count);
             proPlugin[reservation.PluginPrefix] = count + 1;
         }
-        return new(occupancy.Global + aktive.Count, proPlugin);
+        return new(occupancy.Global + active.Count, proPlugin);
     }
 
     private static int? ParseLimit(string? value)
@@ -196,9 +196,9 @@ public sealed class ScmEventExecutionLimitService(
             .Select(x => new { x.Id, x.AiPluginPrefix, x.PausedUntilUtc })
             .ToListAsync(ct);
         var now = time.GetUtcNow();
-        var aktive = workItems.Where(x => !x.PausedUntilUtc.IsCurrentlyPaused(now)).ToList();
+        var active = workItems.Where(x => !x.PausedUntilUtc.IsCurrentlyPaused(now)).ToList();
         var proPlugin = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var workItem in aktive)
+        foreach (var workItem in active)
         {
             var session = cli.GetScmPromptSession(workItem.Id);
             var prefix = session?.IsAlive == true && !string.IsNullOrWhiteSpace(session.PluginPrefix)
@@ -208,8 +208,8 @@ public sealed class ScmEventExecutionLimitService(
             proPlugin.TryGetValue(prefix, out var count);
             proPlugin[prefix] = count + 1;
         }
-        // Global = aktive Aufgaben plus laufende Handles ohne auflösbare Aufgabenzeile
+        // Global = active Aufgaben plus laufende Handles ohne auflösbare Aufgabenzeile
         // (letztere haben kein PausiertBisUtc und zählen bewusst weiterhin voll).
-        return new(aktive.Count + (runningIds.Count - workItems.Count), proPlugin);
+        return new(active.Count + (runningIds.Count - workItems.Count), proPlugin);
     }
 }

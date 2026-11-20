@@ -84,15 +84,15 @@ public sealed class ScmEventCancelTests
         ScmDispatchFixture? fixture = null;
         var eventId = Guid.Empty;
         var prompts = new List<string>();
-        var profile = new ScmKiProfile(ScmKiProfile.Simulator.Prefix, ScmKiProfile.Simulator.Arguments,
-            ScmKiProfile.Simulator.Banner, ScmKiProfile.Simulator.Prompt, ScmKiProfile.Simulator.EnvironmentVariables,
+        var profile = new ScmAiProfile(ScmAiProfile.Simulator.Prefix, ScmAiProfile.Simulator.Arguments,
+            ScmAiProfile.Simulator.Banner, ScmAiProfile.Simulator.Prompt, ScmAiProfile.Simulator.EnvironmentVariables,
             async prompt =>
             {
                 prompts.Add(prompt);
                 using var scope = fixture!.Services.CreateScope();
                 await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId);
             });
-        fixture = new ScmDispatchFixture(ki: profile);
+        fixture = new ScmDispatchFixture(ai: profile);
         await using (fixture)
         {
             await fixture.InitializeAsync();

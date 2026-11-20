@@ -50,58 +50,58 @@ public sealed class DashboardViewModelTests : IDisposable
 
     /// <summary>Initialize setzt AktiveAufgabenListe auf die übergebene Instanz, um die gemeinsame Datenquelle des MainWindowViewModel zu übernehmen.</summary>
     [Fact]
-    public void Initialize_ShouldSetAktiveAufgabenListeToProvidedInstance_WhenCalled()
+    public void Initialize_ShouldSetActiveWorkItemsListToProvidedInstance_WhenCalled()
     {
         // Arrange
         var sut = CreateSut();
-        var geteilteListe = new ObservableCollection<ActiveWorkItemPanelItem>();
+        var splitList = new ObservableCollection<ActiveWorkItemPanelItem>();
 
         // Act
-        sut.Initialize(geteilteListe, _ => { });
+        sut.Initialize(splitList, _ => { });
 
         // Assert
-        sut.ActiveWorkItemsList.Should().BeSameAs(geteilteListe);
+        sut.ActiveWorkItemsList.Should().BeSameAs(splitList);
     }
 
     /// <summary>LadenAsync lädt aktive Aufgaben nicht mehr selbst, sondern lässt die über Initialize gesetzte AktiveAufgabenListe unverändert (einzige gemeinsame Datenquelle im MainWindowViewModel).</summary>
     [Fact]
-    public async Task LadenAsync_ShouldNotModifyAktiveAufgabenListe_WhenCalled()
+    public async Task LoadAsync_ShouldNotModifyActiveWorkItemsList_WhenCalled()
     {
         // Arrange
         var workItem = await _workItemService.CreateAsync(_projectId, "Zu startende Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        var geteilteListe = new ObservableCollection<ActiveWorkItemPanelItem>();
-        sut.Initialize(geteilteListe, _ => { });
+        var splitList = new ObservableCollection<ActiveWorkItemPanelItem>();
+        sut.Initialize(splitList, _ => { });
 
         // Act
         await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         // Assert
-        sut.ActiveWorkItemsList.Should().BeSameAs(geteilteListe);
+        sut.ActiveWorkItemsList.Should().BeSameAs(splitList);
         sut.ActiveWorkItemsList.Should().BeEmpty();
     }
 
     /// <summary>NavigateZuAufgabeCommand delegiert an die über Initialize gesetzte NavigateZuAufgabeAction.</summary>
     [Fact]
-    public void NavigateZuAufgabeCommand_ShouldInvokeNavigateZuAufgabeAction_WhenExecuted()
+    public void NavigateToWorkItemCommand_ShouldInvokeNavigateToWorkItemAction_WhenExecuted()
     {
         // Arrange
         var sut = CreateSut();
-        Guid? aufgerufeneAufgabeId = null;
-        sut.Initialize(new ObservableCollection<ActiveWorkItemPanelItem>(), id => aufgerufeneAufgabeId = id);
+        Guid? invokedWorkItemId = null;
+        sut.Initialize(new ObservableCollection<ActiveWorkItemPanelItem>(), id => invokedWorkItemId = id);
         var workItemId = Guid.NewGuid();
 
         // Act
         ((RelayCommand<Guid>)sut.NavigateToWorkItemCommand).Execute(workItemId);
 
         // Assert
-        aufgerufeneAufgabeId.Should().Be(workItemId);
+        invokedWorkItemId.Should().Be(workItemId);
     }
 
     /// <summary>NavigateZuAufgabeCommand wirft keine Ausnahme, wenn Initialize noch nicht aufgerufen wurde.</summary>
     [Fact]
-    public void NavigateZuAufgabeCommand_ShouldNotThrow_WhenNavigateZuAufgabeActionNotSet()
+    public void NavigateToWorkItemCommand_ShouldNotThrow_WhenNavigateToWorkItemActionNotSet()
     {
         // Arrange
         var sut = CreateSut();
@@ -115,7 +115,7 @@ public sealed class DashboardViewModelTests : IDisposable
 
     /// <summary>AufgabenListenModus startet mit dem Default Datum.</summary>
     [Fact]
-    public void AufgabenListenModus_ShouldDefaultToDatum()
+    public void WorkItemsListsMode_ShouldDefaultToDate()
     {
         var sut = CreateSut();
 
@@ -124,7 +124,7 @@ public sealed class DashboardViewModelTests : IDisposable
 
     /// <summary>AufgabenListenModus ist setzbar und löst PropertyChanged aus.</summary>
     [Fact]
-    public void AufgabenListenModus_ShouldBeSettableAndRaisePropertyChanged()
+    public void WorkItemsListsMode_ShouldBeSettableAndRaisePropertyChanged()
     {
         var sut = CreateSut();
         var changed = new List<string?>();
@@ -138,10 +138,10 @@ public sealed class DashboardViewModelTests : IDisposable
 
     /// <summary>Ein persistierter Dashboard-Modus wird über GespeichertenAufgabenListenModusLadenAsync wiederhergestellt.</summary>
     [Fact]
-    public async Task AufgabenListenModus_ShouldRestorePersistedDashboardModus()
+    public async Task WorkItemsListsMode_ShouldRestorePersistedDashboardMode()
     {
         // Arrange
-        var (modeService, provider) = AufgabenListenModusServiceTestFactory.ErstelleModusService();
+        var (modeService, provider) = WorkItemsListsModeServiceTestFactory.CreateModeService();
         using (provider)
         {
             using (var scope = provider.CreateScope())
@@ -162,10 +162,10 @@ public sealed class DashboardViewModelTests : IDisposable
 
     /// <summary>Eine Modusänderung wird unter dem Dashboard-Schlüssel persistiert und lässt den Menü-Schlüssel unberührt.</summary>
     [Fact]
-    public async Task AufgabenListenModus_ShouldPersistDashboardModusOnChange_WithoutTouchingMenueKey()
+    public async Task WorkItemsListsMode_ShouldPersistDashboardModeOnChange_WithoutTouchingMenuKey()
     {
         // Arrange
-        var (modeService, provider) = AufgabenListenModusServiceTestFactory.ErstelleModusService();
+        var (modeService, provider) = WorkItemsListsModeServiceTestFactory.CreateModeService();
         using (provider)
         {
             var sut = CreateSut(modeService);
@@ -176,18 +176,18 @@ public sealed class DashboardViewModelTests : IDisposable
             // Assert (Polling, da das Speichern fire-and-forget läuft)
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
             string? value = null;
-            string? menueWert = null;
+            string? menuValue = null;
             while (DateTime.UtcNow < deadline && value != "Repository")
             {
                 using var scope = provider.CreateScope();
                 var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
                 value = await settings.GetSettingAsync(AppSettingService.ActiveWorkItemsListModeDashboardKey, TestContext.Current.CancellationToken);
-                menueWert = await settings.GetSettingAsync(AppSettingService.ActiveWorkItemsListModeKey, TestContext.Current.CancellationToken);
+                menuValue = await settings.GetSettingAsync(AppSettingService.ActiveWorkItemsListModeKey, TestContext.Current.CancellationToken);
                 if (value != "Repository")
                     await Task.Delay(50, TestContext.Current.CancellationToken);
             }
             value.Should().Be("Repository");
-            menueWert.Should().BeNull("der Dashboard-Moduswechsel darf den Menü-Schlüssel nicht schreiben");
+            menuValue.Should().BeNull("der Dashboard-Moduswechsel darf den Menü-Schlüssel nicht schreiben");
         }
     }
 }

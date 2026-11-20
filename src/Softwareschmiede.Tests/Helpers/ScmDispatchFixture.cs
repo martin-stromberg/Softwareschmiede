@@ -17,18 +17,18 @@ using Softwareschmiede.Infrastructure.Terminal;
 namespace Softwareschmiede.TestSupport;
 
 /// <summary>Terminal-Profil der gemockten KI-CLI: Prefix, Startargumente, Banner und Eingabezeile.</summary>
-internal sealed record ScmKiProfile(string Prefix, string Arguments, string Banner, string Prompt,
+internal sealed record ScmAiProfile(string Prefix, string Arguments, string Banner, string Prompt,
     IReadOnlyDictionary<string, string?> EnvironmentVariables, Func<string, Task>? OnWritePrompt = null)
 {
     /// <summary>Bisheriges Verhalten: deterministischer JSON-Simulator im SCM-Modus.</summary>
-    internal static ScmKiProfile Simulator => CreateSimulator();
+    internal static ScmAiProfile Simulator => CreateSimulator();
 
-    private static ScmKiProfile CreateSimulator() => new("Softwareschmiede.KiSimulator", string.Empty,
+    private static ScmAiProfile CreateSimulator() => new("Softwareschmiede.KiSimulator", string.Empty,
         "SCM_SIMULATOR_PROTOCOL_V1", "SCM_READY_V1",
         new Dictionary<string, string?> { ["SOFTWARESCHMIEDE_SCM_SIMULATOR"] = "1" });
 
     /// <summary>Devin-Startvertrag und Promptformat; das Banner ist auf den unterstützten Bereich v3000.x voreingestellt.</summary>
-    internal static ScmKiProfile Devin(string arguments = "--permission-mode accept-edits --respect-workspace-trust false",
+    internal static ScmAiProfile Devin(string arguments = "--permission-mode accept-edits --respect-workspace-trust false",
         Func<string, Task>? onWritePrompt = null, string banner = "Devin CLI\nv3000.11.92") => new("Softwareschmiede.Devin", arguments,
         banner, "❭", new Dictionary<string, string?>(), onWritePrompt);
 }
@@ -36,14 +36,14 @@ internal sealed record ScmKiProfile(string Prefix, string Arguments, string Bann
 /// <summary>Real SQLite and services with isolated SCM transport and deterministic terminal boundary.</summary>
 internal sealed class ScmDispatchFixture : IAsyncDisposable
 {
-    internal const string KiPrefix = "Softwareschmiede.KiSimulator";
-    internal readonly ScmKiProfile KiProfile;
+    internal const string AiPrefix = "Softwareschmiede.KiSimulator";
+    internal readonly ScmAiProfile AiProfile;
     internal readonly string Root;
     internal readonly Mock<IGitPlugin> Git = new();
     internal readonly Mock<IAiPlugin> Ai = new();
     /// <summary>Optionales zweites KI-Plugin (z. B. für Fallback-Tests mit deaktiviertem Prefix).</summary>
     internal readonly Mock<IAiPlugin>? Ki2;
-    internal readonly ScmKiProfile? Ki2Profile;
+    internal readonly ScmAiProfile? Ki2Profile;
     internal readonly Dictionary<Guid, Mock<ITerminalSession>> Sessions = new();
     internal readonly List<TerminalSessionStartSpec> StartSpecs = [];
     internal readonly List<string> Prompts = [];
@@ -60,11 +60,11 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     private readonly List<Process> _processes = [];
     private readonly bool _ownsRoot;
 
-    internal ScmDispatchFixture(string? root = null, TimeProvider? time = null, ScmKiProfile? ki = null, ScmKiProfile? ki2 = null)
+    internal ScmDispatchFixture(string? root = null, TimeProvider? time = null, ScmAiProfile? ai = null, ScmAiProfile? ki2 = null)
     {
-        KiProfile = ki ?? ScmKiProfile.Simulator;
+        AiProfile = ai ?? ScmAiProfile.Simulator;
         Ki2Profile = ki2;
-        Prompt = KiProfile.Prompt;
+        Prompt = AiProfile.Prompt;
         Root = root ?? Path.Combine(Path.GetTempPath(), "scm-dispatch-" + Guid.NewGuid().ToString("N"));
         _ownsRoot = root is null;
         Directory.CreateDirectory(Root);
@@ -94,18 +94,18 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 InitGit(directory);
                 await File.WriteAllTextAsync(Path.Combine(directory, "owned.txt"), "preserve workspace");
             });
-        Ai.SetupGet(x => x.PluginPrefix).Returns(KiProfile.Prefix);
+        Ai.SetupGet(x => x.PluginPrefix).Returns(AiProfile.Prefix);
         Ai.SetupGet(x => x.PluginName).Returns("Simulator");
         Ai.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         Ai.Setup(x => x.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns((string directory, string? _, CancellationToken _) => Task.FromResult(new TerminalSessionStartSpec
             {
                 FileName = "fixture",
-                Arguments = KiProfile.Arguments,
+                Arguments = AiProfile.Arguments,
                 WorkingDirectory = directory,
-                EnvironmentVariables = KiProfile.EnvironmentVariables
+                EnvironmentVariables = AiProfile.EnvironmentVariables
             }));
-        var kiPlugins = new List<IAiPlugin> { Ai.Object };
+        var aiPlugins = new List<IAiPlugin> { Ai.Object };
         if (ki2 is not null)
         {
             Ki2 = new Mock<IAiPlugin>();
@@ -120,12 +120,12 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                     WorkingDirectory = directory,
                     EnvironmentVariables = ki2.EnvironmentVariables
                 }));
-            kiPlugins.Add(Ki2.Object);
+            aiPlugins.Add(Ki2.Object);
         }
         var plugins = new Mock<IPluginManager>();
         plugins.Setup(x => x.GetSourceCodeManagementPlugins()).Returns([Git.Object]);
         plugins.Setup(x => x.GetDefaultSourceCodeManagementPlugin()).Returns(Git.Object);
-        plugins.Setup(x => x.GetDevelopmentAutomationPlugins()).Returns(kiPlugins);
+        plugins.Setup(x => x.GetDevelopmentAutomationPlugins()).Returns(aiPlugins);
         var directories = new Mock<IWorkingDirectoryResolver>();
         directories.Setup(x => x.ResolveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new WorkingDirectoryResolutionResult(Root, false, "test", Root));
         var factory = new Mock<ITerminalSessionFactory>();
@@ -137,11 +137,11 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 _processes.Add(process);
                 var session = new Mock<ITerminalSession>();
                 session.SetupGet(x => x.Process).Returns(process);
-                session.SetupGet(x => x.Buffer).Returns(Screen(KiProfile.Banner, Prompt));
+                session.SetupGet(x => x.Buffer).Returns(Screen(AiProfile.Banner, Prompt));
                 session.Setup(x => x.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                     .Returns(async (string prompt, CancellationToken _) =>
                     {
-                        if (KiProfile.OnWritePrompt is { } handler) await handler(prompt);
+                        if (AiProfile.OnWritePrompt is { } handler) await handler(prompt);
                         else Prompts.Add(prompt);
                     });
                 Sessions.Add(taskId, session);
@@ -212,7 +212,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var project = new Project { Id = Guid.NewGuid(), Name = "SCM" };
         var repository = new GitRepository { Id = Guid.NewGuid(), ProjectId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginType = Repository.ProviderPrefix, RepositoryName = "repo" };
-        var task = new WorkItem { Id = Guid.NewGuid(), Title = "SCM task", ProjectId = project.Id, GitRepositoryId = repository.Id, Status = status, AiPluginPrefix = configured ? (aiPluginPrefix ?? KiProfile.Prefix) : null };
+        var task = new WorkItem { Id = Guid.NewGuid(), Title = "SCM task", ProjectId = project.Id, GitRepositoryId = repository.Id, Status = status, AiPluginPrefix = configured ? (aiPluginPrefix ?? AiProfile.Prefix) : null };
         if (cloned) { task.LocalClonePath = Path.Combine(Root, task.Id.ToString("N")); InitGit(task.LocalClonePath); }
         db.AddRange(project, repository, task);
         await db.SaveChangesAsync();
@@ -260,10 +260,10 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal ScmStartCheckTrigger Trigger => Services.GetRequiredService<ScmStartCheckTrigger>();
 
     /// <summary>Der ereignisgesteuerte Startprüfungs-Dienst aus dem Service-Provider der Fixture.</summary>
-    internal ScmStartCheckService StartPruefung => Services.GetRequiredService<ScmStartCheckService>();
+    internal ScmStartCheckService StartCheck => Services.GetRequiredService<ScmStartCheckService>();
 
     /// <summary>Setzt den Konto-Modus über den <see cref="AppSettingService"/>.</summary>
-    internal async Task SetKontoModusAsync(ScmAccountMode mode)
+    internal async Task SetAccountModeAsync(ScmAccountMode mode)
     {
         using var scope = Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AppSettingService>().SetScmAccountModeAsync(mode);
@@ -305,7 +305,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
 
     internal void SetPrompt(Guid task, string prompt)
     {
-        Sessions[task].SetupGet(x => x.Buffer).Returns(Screen(KiProfile.Banner, prompt));
+        Sessions[task].SetupGet(x => x.Buffer).Returns(Screen(AiProfile.Banner, prompt));
         Sessions[task].Raise(x => x.BufferChanged += null, EventArgs.Empty);
     }
 
