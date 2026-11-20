@@ -34,7 +34,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
     private CancellationTokenSource? _updateFlowCts;
     private bool _updateAvailable;
     private UpdateInfo? _availableUpdate;
-    private bool _updateCheckLaeuft;
+    private bool _updateCheckRunning;
     private bool _updateWillPrepared;
     private string? _updateNotice;
 
@@ -69,10 +69,10 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
     }
 
     /// <summary>Gibt an, ob gerade eine Update-Prüfung läuft.</summary>
-    public bool UpdateCheckLaeuft
+    public bool UpdateCheckRunning
     {
-        get => _updateCheckLaeuft;
-        private set => SetProperty(ref _updateCheckLaeuft, value, RelayCommand.Refresh);
+        get => _updateCheckRunning;
+        private set => SetProperty(ref _updateCheckRunning, value, RelayCommand.Refresh);
     }
 
     /// <summary>Gibt an, ob gerade ein Update heruntergeladen oder vorbereitet wird.</summary>
@@ -99,7 +99,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
     public bool CheckCan()
         => _updateService is not null
            && _currentUpdateSettings is { Mode: not UpdateMode.Off }
-           && !UpdateCheckLaeuft
+           && !UpdateCheckRunning
            && !UpdateWillPrepared;
 
     /// <summary>Gibt an, ob die Installation des angebotenen Updates aktuell gestartet werden kann.</summary>
@@ -110,7 +110,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
            && _dialogService is not null
            && _currentUpdateSettings is { Mode: not UpdateMode.Off }
            && UpdateAvailable
-           && !UpdateCheckLaeuft
+           && !UpdateCheckRunning
            && !UpdateWillPrepared;
 
     /// <summary>
@@ -247,7 +247,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         if (preparatory)
             UpdateWillPrepared = true;
         else
-            UpdateCheckLaeuft = true;
+            UpdateCheckRunning = true;
         UpdateNotice = null;
         var generation = Volatile.Read(ref _updateSettingsGeneration);
         try
@@ -255,7 +255,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
             var settings = await ReadUpdateSettingsAsync(ct);
             if (settings is null)
             {
-                ShowUpdateSettingsReadfailure();
+                ShowUpdateSettingsReadFailure();
                 return;
             }
 
@@ -276,7 +276,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
             if (preparatory)
                 UpdateWillPrepared = false;
             else
-                UpdateCheckLaeuft = false;
+                UpdateCheckRunning = false;
             // BeendeVersuch muss vor der Gate-Freigabe liegen: Sonst kann der nächste Versuch
             // beginnen, bevor dieser Versuch AktuellerVersuch zurückgesetzt hat.
             _attemptLog?.EndAttempt(attemptKind, UpdateAvailable, UpdateNotice);
@@ -308,7 +308,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
             _updateProgressDialogService!.Show(progressViewModel);
 
             // Aktualitätsnachweis unmittelbar vor der Vorbereitung: gespeicherte Werte erneut lesen.
-            if (!await CheckSettingsAktualitaetAsync(snapshot, generation, progressViewModel, updateCts.Token))
+            if (!await CheckSettingsFreshnessAsync(snapshot, generation, progressViewModel, updateCts.Token))
                 return;
 
             updateCts.Token.ThrowIfCancellationRequested();
@@ -319,7 +319,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
             updateCts.Token.ThrowIfCancellationRequested();
 
             // Letzter Aktualitätsnachweis unmittelbar vor dem Updater-Start.
-            if (!await CheckSettingsAktualitaetAsync(snapshot, generation, progressViewModel, updateCts.Token))
+            if (!await CheckSettingsFreshnessAsync(snapshot, generation, progressViewModel, updateCts.Token))
                 return;
 
             updateCts.Token.ThrowIfCancellationRequested();
@@ -349,7 +349,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
     /// Werte erneut und bricht ab, wenn sie nicht lesbar sind oder seit dem Snapshot geändert
     /// wurden bzw. die Einstellungen-Generation inzwischen weitergelaufen ist.
     /// </summary>
-    private async Task<bool> CheckSettingsAktualitaetAsync(
+    private async Task<bool> CheckSettingsFreshnessAsync(
         UpdateSettings snapshot,
         int generation,
         UpdateProgressViewModel progressViewModel,
@@ -358,7 +358,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         var current = await ReadUpdateSettingsAsync(ct);
         if (current is null)
         {
-            ShowUpdateSettingsReadfailure();
+            ShowUpdateSettingsReadFailure();
             progressViewModel.SetError(UpdateSettingsNotReadableNotice);
             return false;
         }
@@ -398,7 +398,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
     private bool IsUpdateAttemptCurrent(int generation)
         => Volatile.Read(ref _updateSettingsGeneration) == generation;
 
-    private void ShowUpdateSettingsReadfailure()
+    private void ShowUpdateSettingsReadFailure()
     {
         RemoveUpdateOffer();
         UpdateNotice = UpdateSettingsNotReadableNotice;

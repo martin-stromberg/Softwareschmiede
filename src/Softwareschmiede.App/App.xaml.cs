@@ -420,7 +420,7 @@ public sealed partial class App : System.Windows.Application
         if (updateTestContext is not null)
         {
             var updateContext = updateTestContext;
-            var testwurzel = updateContext.Configuration.Testwurzel;
+            var testwurzel = updateContext.Configuration.TestRoot;
 
             services.AddSingleton<IApplicationVersionProvider>(sp => new ApplicationVersionProvider(
                 updateContext.Configuration.InstallationDirectory,

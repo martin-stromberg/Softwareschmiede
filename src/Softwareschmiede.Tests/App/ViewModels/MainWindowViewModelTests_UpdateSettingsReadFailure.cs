@@ -106,7 +106,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
             "ein Lesefehler muss einen sichtbaren Hinweis setzen");
         sut.UpdateAvailable.Should().BeFalse();
         sut.AvailableUpdate.Should().BeNull();
-        sut.UpdateCheckLaeuft.Should().BeFalse();
+        sut.UpdateCheckRunning.Should().BeFalse();
         sut.UpdateWillPrepared.Should().BeFalse();
 
         // Wiederherstellung: Fehler deaktivieren, Settings über die UI neu laden und speichern
@@ -182,7 +182,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         sut.UpdateNotice.Should().NotBeNullOrEmpty();
         sut.UpdateAvailable.Should().BeFalse();
         sut.AvailableUpdate.Should().BeNull();
-        sut.UpdateCheckLaeuft.Should().BeFalse();
+        sut.UpdateCheckRunning.Should().BeFalse();
         sut.UpdateWillPrepared.Should().BeFalse();
 
         // Wiederherstellung über die Einstellungen-UI: Neue Prüfung findet das Update erneut.

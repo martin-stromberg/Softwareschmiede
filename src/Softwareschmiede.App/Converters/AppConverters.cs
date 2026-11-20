@@ -128,7 +128,7 @@ internal static class AiExecutionStatusAdapter
     /// Im Zustand <see cref="AiExecutionState.Paused"/> enthält <paramref name="pauseRemaining"/>
     /// die verbleibende Pausenzeit.
     /// </summary>
-    public static AiExecutionState? Klassifiziere(object value, out TimeSpan pauseRemaining)
+    public static AiExecutionState? Classify(object value, out TimeSpan pauseRemaining)
     {
         pauseRemaining = default;
 
@@ -145,7 +145,7 @@ internal static class AiExecutionStatusAdapter
         }
 
         return Softwareschmiede.Application.Services.AiExecutionStatusClassification
-            .Klassifiziere(status, out pauseRemaining);
+            .Classify(status, out pauseRemaining);
     }
 }
 
@@ -156,7 +156,7 @@ public sealed class AiExecutionStatusConverter : IValueConverter
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        var state = AiExecutionStatusAdapter.Klassifiziere(value, out var pauseRemaining);
+        var state = AiExecutionStatusAdapter.Classify(value, out var pauseRemaining);
         return state switch
         {
             null => string.Empty,
@@ -188,7 +188,7 @@ public sealed class AiExecutionStatusSymbolConverter : IValueConverter
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        var state = AiExecutionStatusAdapter.Klassifiziere(value, out _);
+        var state = AiExecutionStatusAdapter.Classify(value, out _);
         return state switch
         {
             null => string.Empty,

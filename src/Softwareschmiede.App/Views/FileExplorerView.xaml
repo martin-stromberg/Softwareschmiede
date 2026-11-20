@@ -62,7 +62,7 @@
                 <TreeView.Style>
                     <Style TargetType="TreeView">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding CurrentMode}" Value="Vergleich">
+                            <DataTrigger Binding="{Binding CurrentMode}" Value="Compare">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
@@ -112,7 +112,7 @@
                 <TreeView.Style>
                     <Style TargetType="TreeView">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding CurrentMode}" Value="Standard">
+                            <DataTrigger Binding="{Binding CurrentMode}" Value="Default">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>

@@ -85,7 +85,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
     }
 
     /// <summary>Ein erkannter, anzuwendender Lesefehler-Fall inklusive des Read-Zeitpunkts im Versuch.</summary>
-    private sealed record FailureCase(UpdateE2EReadFailure Readfailure, string? Attempt, int AttemptIndex, int Ordinal);
+    private sealed record FailureCase(UpdateE2EReadFailure ReadFailure, string? Attempt, int AttemptIndex, int Ordinal);
 
     /// <summary>
     /// Prüft einen Lesebefehl gegen den Abfragetag und die Szenariokonfiguration. Liefert den
@@ -113,7 +113,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
         var ordinal = _context.NextMarkedReadOrdinal();
         var attempt = _context.CurrentAttempt;
         var attemptIndex = _context.CurrentAttemptIndex;
-        var readfailure = _context.ReadScenario()?.Readfailure;
+        var readFailure = _context.ReadScenario()?.ReadFailure;
 
         _context.Log.Write(
             UpdateE2EEvents.UpdateSettingsReadReached,
@@ -122,31 +122,31 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
                 versuch = attempt,
                 versuchIndex = attemptIndex,
                 ordinal,
-                limit = readfailure?.Limit,
-                fehlerAktiv = readfailure?.Active == true || _failureEnabled
+                grenze = readFailure?.Limit,
+                fehlerAktiv = readFailure?.Active == true || _failureEnabled
             });
 
         if (_failureEnabled)
             throw FailureException;
 
-        if (readfailure?.Active != true
+        if (readFailure?.Active != true
             || attempt is null
-            || !readfailure.MatchesAttempt(attempt)
-            || ordinal < readfailure.GrenzOrdinal())
+            || !readFailure.MatchesAttempt(attempt)
+            || ordinal < readFailure.BoundaryOrdinal())
         {
             return null;
         }
 
-        return new FailureCase(readfailure, attempt, attemptIndex, ordinal);
+        return new FailureCase(readFailure, attempt, attemptIndex, ordinal);
     }
 
     private void WaitAndThrow(FailureCase failureCase, CancellationToken cancellationToken)
     {
         var reason = "sofort";
-        if (failureCase.Readfailure.WaitForRelease)
+        if (failureCase.ReadFailure.WaitForRelease)
         {
             var released = _context!.WaitOnGate(
-                UpdateE2ETestContext.ReadfailureGateName, cancellationToken, WaitTimeout(failureCase));
+                UpdateE2ETestContext.ReadFailureGateName, cancellationToken, WaitTimeout(failureCase));
             reason = ResolveWaitReason(released);
         }
 
@@ -156,13 +156,13 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
     private async Task WaitAndThrowAsync(FailureCase failureCase, CancellationToken cancellationToken)
     {
         var reason = "sofort";
-        if (failureCase.Readfailure.WaitForRelease)
+        if (failureCase.ReadFailure.WaitForRelease)
         {
             bool released;
             try
             {
                 released = await _context!.WaitOnGateAsync(
-                    UpdateE2ETestContext.ReadfailureGateName, cancellationToken, WaitTimeout(failureCase));
+                    UpdateE2ETestContext.ReadFailureGateName, cancellationToken, WaitTimeout(failureCase));
             }
             catch (OperationCanceledException)
             {
@@ -176,7 +176,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
 
     /// <summary>Die konfigurierte Wartezeit des Lesefehlers, mindestens eine Sekunde.</summary>
     private static TimeSpan WaitTimeout(FailureCase failureCase)
-        => TimeSpan.FromSeconds(Math.Max(1, failureCase.Readfailure.WaittimeSeconds));
+        => TimeSpan.FromSeconds(Math.Max(1, failureCase.ReadFailure.WaitTimeoutSeconds));
 
     /// <summary>
     /// WarteAufGate liefert bei Abbruch und Timeout beide <c>false</c> - die Abbruch-Datei
@@ -185,7 +185,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
     private string ResolveWaitReason(bool released)
         => released
             ? "freigegeben"
-            : _context!.CheckGate(UpdateE2ETestContext.ReadfailureGateName) == false
+            : _context!.CheckGate(UpdateE2ETestContext.ReadFailureGateName) == false
                 ? "abgebrochen"
                 : "timeout";
 
@@ -198,8 +198,8 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
                 versuch = failureCase.Attempt,
                 versuchIndex = failureCase.AttemptIndex,
                 ordinal = failureCase.Ordinal,
-                limit = failureCase.Readfailure.Limit,
-                reason
+                grenze = failureCase.ReadFailure.Limit,
+                grund = reason
             });
 
         throw FailureException;

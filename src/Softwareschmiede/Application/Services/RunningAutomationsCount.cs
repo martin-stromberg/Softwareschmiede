@@ -51,7 +51,7 @@ public sealed class RunningAutomationsCount : IRunningAutomationsCount
                 _statusSource.GetLiveRunStatus(workItem.Id),
                 _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id) is not null);
 
-            if (AiExecutionStatusClassification.Klassifiziere(data, out _) == AiExecutionState.Running)
+            if (AiExecutionStatusClassification.Classify(data, out _) == AiExecutionState.Running)
             {
                 count++;
             }

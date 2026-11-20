@@ -87,7 +87,7 @@ public static class UpdateE2EEvents
 /// <summary>
 /// Strukturierter JSONL-Protokollschreiber der Update-E2E-Umgebung. Jede Zeile enthält eine pro
 /// Quelle monotone Sequenznummer, die Szenario-ID und die Prozess-ID. Der Test-Runner kann über
-/// <see cref="Anfuegen"/> eigene Steuerereignisse (z. B. <see cref="UpdateE2EEvents.UpdateSettingsReadFailureDisabled"/>)
+/// <see cref="Append"/> eigene Steuerereignisse (z. B. <see cref="UpdateE2EEvents.UpdateSettingsReadFailureDisabled"/>)
 /// in dieselbe Datei schreiben.
 /// </summary>
 public sealed class UpdateE2ELog
@@ -148,7 +148,7 @@ public sealed class UpdateE2ELog
     /// <param name="evt">Der Ereignisname.</param>
     /// <param name="data">Optionale strukturierte Nutzdaten.</param>
     /// <param name="source">Quellkennung des Eintrags.</param>
-    public static void Anfuegen(string filePath, string scenarioId, string evt, object? data = null, string source = "runner")
+    public static void Append(string filePath, string scenarioId, string evt, object? data = null, string source = "runner")
     {
         var seq = CountExistingEntries(filePath, source) + 1;
         var entry = new UpdateE2ELogEntry

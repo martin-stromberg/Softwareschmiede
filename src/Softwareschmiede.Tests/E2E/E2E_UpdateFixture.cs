@@ -60,20 +60,20 @@ public partial class End2EndTest
             var vorbereitung = Assert.Single(log, e => e.Event == UpdateE2EEvents.PreparationCompleted);
             var scriptPfad = DatenText(vorbereitung, "scriptPath");
             Assert.NotNull(scriptPfad);
-            Assert.StartsWith(Path.GetFullPath(fixture.Testwurzel), Path.GetFullPath(scriptPfad!));
+            Assert.StartsWith(Path.GetFullPath(fixture.TestRoot), Path.GetFullPath(scriptPfad!));
 
             // Kontrollierte Updater-Prozessgrenze: Launcher-Record statt echtem Prozess.
             var launcher = Assert.Single(log, e => e.Event == UpdateE2EEvents.UpdateProcessStartRecorded);
-            Assert.Equal(fixture.Testwurzel, DatenText(launcher, "workingDirectory"));
+            Assert.Equal(fixture.TestRoot, DatenText(launcher, "workingDirectory"));
             Assert.Equal(false, DatenBool(launcher, "runElevated"));
             Assert.Equal("Erfolg", DatenText(launcher, "result"));
             Assert.Contains(log, e => e.Event == UpdateE2EEvents.UpdateStartSucceeded);
             Assert.Single(log, e => e.Event == UpdateE2EEvents.ShutdownRequested);
 
             // Testpfade: Update-Artefakte liegen ausschließlich unterhalb der Fixture-Wurzel.
-            var zipPfad = Path.Combine(fixture.Testwurzel, "updates", "download", "release.zip");
+            var zipPfad = Path.Combine(fixture.TestRoot, "updates", "download", "release.zip");
             Assert.True(File.Exists(zipPfad), $"Heruntergeladenes Paket fehlt: {zipPfad}");
-            var entpackt = Path.Combine(fixture.Testwurzel, "updates", "extracted", UpdateE2EFixture.StableVersion);
+            var entpackt = Path.Combine(fixture.TestRoot, "updates", "extracted", UpdateE2EFixture.StableVersion);
             Assert.Equal("E2E-Paket 1.3.0 (stable-marker)", UpdateE2EFixture.LesePaketExeInhalt(entpackt));
             Assert.True(File.Exists(Path.Combine(entpackt, "version.json")), "Entpacktes version.json fehlt.");
             Assert.True(File.Exists(scriptPfad), $"Update-Skript fehlt: {scriptPfad}");
@@ -107,7 +107,7 @@ public partial class End2EndTest
                 && DatenBool(e, "isPrerelease") == true);
             Assert.Equal(2, protokollNachRestart.Count(e => e.Event == UpdateE2EEvents.UpdateProcessStartRecorded));
             Assert.Equal(2, protokollNachRestart.Count(e => e.Event == UpdateE2EEvents.ShutdownRequested));
-            var entpacktRc = Path.Combine(fixture.Testwurzel, "updates", "extracted", UpdateE2EFixture.RcVersion);
+            var entpacktRc = Path.Combine(fixture.TestRoot, "updates", "extracted", UpdateE2EFixture.RcVersion);
             Assert.Equal($"E2E-Paket {UpdateE2EFixture.RcVersion} (rc-marker)", UpdateE2EFixture.LesePaketExeInhalt(entpacktRc));
         }
         finally
@@ -146,7 +146,7 @@ public partial class End2EndTest
                 UpdateE2EEvents.UpdateSettingsReadReached, Medium,
                 filter: e => DatenText(e, "versuch") == "startup" && DatenZahl(e, "ordinal") == 1);
             Assert.Equal("Initial", DatenText(erreicht[0], "grenze"));
-            fixture.OeffneGate(UpdateE2ETestContext.ReadfailureGateName);
+            fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName);
 
             await fixture.WarteAufEreignisAsync(UpdateE2EEvents.UpdateSettingsReadFailed, Medium,
                 filter: e => DatenText(e, "versuch") == "startup");
@@ -155,7 +155,7 @@ public partial class End2EndTest
 
             // Kein unerlaubter Folgeschritt: Der Releaseabruf durfte nicht stattfinden.
             Assert.Equal(0, fixture.ZaehleEreignis(UpdateE2EEvents.HttpRequest));
-            fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadfailureGateName);
+            fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName);
             fixture.DeaktiviereLesefehler();
             Assert.True(fixture.ZaehleEreignis(UpdateE2EEvents.UpdateSettingsReadFailureDisabled) >= 1);
 
@@ -176,7 +176,7 @@ public partial class End2EndTest
             await fixture.WarteAufEreignisAsync(
                 UpdateE2EEvents.UpdateSettingsReadReached, Medium,
                 filter: e => DatenText(e, "versuch") == "starten" && DatenZahl(e, "ordinal") == 2);
-            fixture.OeffneGate(UpdateE2ETestContext.ReadfailureGateName);
+            fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName);
             await fixture.WarteAufEreignisAsync(UpdateE2EEvents.UpdateSettingsReadFailed, Medium,
                 filter: e => DatenText(e, "versuch") == "starten" && DatenText(e, "grenze") == "BeforePreparation");
 
@@ -184,7 +184,7 @@ public partial class End2EndTest
             Assert.Contains(UpdateHinweisLesefehler, fortschritt.WaitForErrorState(Medium));
             fortschritt.Close();
             Assert.Equal(0, fixture.ZaehleEreignis(UpdateE2EEvents.PreparationCompleted));
-            fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadfailureGateName);
+            fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName);
             fixture.DeaktiviereLesefehler();
 
             // Grenze BeforeUpdaterStart: Reads 1+2 und die komplette Vorbereitung gelingen;
@@ -200,7 +200,7 @@ public partial class End2EndTest
                 fixture.LeseProtokoll(), e => e.Event == UpdateE2EEvents.PreparationCompleted);
             Assert.True(vorbereitungAbgeschlossen.Seq < letzterRead.Seq,
                 "Der BeforeUpdaterStart-Read muss erst nach PreparationCompleted erfolgen.");
-            fixture.OeffneGate(UpdateE2ETestContext.ReadfailureGateName);
+            fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName);
             await fixture.WarteAufEreignisAsync(UpdateE2EEvents.UpdateSettingsReadFailed, Medium,
                 filter: e => DatenText(e, "grenze") == "BeforeUpdaterStart");
             Assert.Contains(UpdateHinweisLesefehler, fortschritt.WaitForErrorState(Medium));
@@ -209,7 +209,7 @@ public partial class End2EndTest
             // Bis zur Installation durfte es nicht kommen: kein Updater-Start, kein Shutdown.
             Assert.Equal(0, fixture.ZaehleEreignis(UpdateE2EEvents.UpdateStartAttempt));
             Assert.Equal(0, fixture.ZaehleEreignis(UpdateE2EEvents.ShutdownRequested));
-            fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadfailureGateName);
+            fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName);
 
             // Einmal aktiviert, bleibt der Fehler bis zur expliziten Deaktivierung aktiv
             // (zwei aufeinanderfolgende markierte Reads desselben Versuchstyps scheitern).
@@ -226,12 +226,12 @@ public partial class End2EndTest
                     mindestens: reachedPruefenVorher + 1,
                     filter: e => DatenText(e, "versuch") == "pruefen" && DatenZahl(e, "ordinal") == 1);
                 if (i == 0)
-                    fixture.BrecheGateAb(UpdateE2ETestContext.ReadfailureGateName); // Abbruch-Pfad
+                    fixture.BrecheGateAb(UpdateE2ETestContext.ReadFailureGateName); // Abbruch-Pfad
                 else
-                    fixture.OeffneGate(UpdateE2ETestContext.ReadfailureGateName); // Freigabe-Pfad
+                    fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName); // Freigabe-Pfad
                 await fixture.WarteAufEreignisAsync(UpdateE2EEvents.UpdateSettingsReadFailed, Medium,
                     mindestens: fehlerVorher + i + 1);
-                fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadfailureGateName);
+                fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName);
             }
             var abbruch = fixture.LeseProtokoll()
                 .Where(e => e.Event == UpdateE2EEvents.UpdateSettingsReadFailed)
@@ -255,8 +255,8 @@ public partial class End2EndTest
         {
             // Fehlersteuerung und Gates auch bei Testabbruch zurücksetzen - jeder Schritt
             // einzeln geschützt, damit ein Fehler nicht die Original-Assertion maskiert.
-            try { fixture.DeaktiviereLesefehler(); } catch { /* Testwurzel evtl. schon entfernt. */ }
-            try { fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadfailureGateName); } catch { /* Testwurzel evtl. schon entfernt. */ }
+            try { fixture.DeaktiviereLesefehler(); } catch { /* TestRoot evtl. schon entfernt. */ }
+            try { fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName); } catch { /* TestRoot evtl. schon entfernt. */ }
             SchliesseFixtureApp();
         }
     }

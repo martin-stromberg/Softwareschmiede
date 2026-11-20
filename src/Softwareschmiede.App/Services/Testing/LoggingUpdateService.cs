@@ -29,7 +29,7 @@ public sealed class LoggingUpdateService : IUpdateService
     {
         _context.Log.Write(
             UpdateE2EEvents.UpdateCheckStarted,
-            new { updatePath = options.UpdatePath, channel = options.Channel.ToString() });
+            new { updatePfad = options.UpdatePath, kanal = options.Channel.ToString() });
 
         var result = await _inner.CheckForUpdateAsync(options, ct);
 
@@ -37,7 +37,7 @@ public sealed class LoggingUpdateService : IUpdateService
             UpdateE2EEvents.UpdateCheckCompleted,
             new
             {
-                status = result.Status.ToString(),
+                status = ToProtocolStatus(result.Status),
                 version = result.Update?.Version,
                 isPrerelease = result.Update?.IsPrerelease,
                 message = result.Message
@@ -105,6 +105,25 @@ public sealed class LoggingUpdateService : IUpdateService
     /// und schreibt anschließend das Phasen-Ereignis ins Protokoll. <c>Protokoll.Schreibe</c> ist
     /// thread-sicher und darf daher vom aufrufenden Thread aus erfolgen.
     /// </summary>
+    // Protokollwerte bleiben die bisherigen deutschen Bezeichner — der JSONL-Feed des
+    // E2E-Fixtures ist ein stabiles Protokoll, das die Tests gegen Literal-Namen prüfen.
+    private static string ToProtocolStatus(UpdateCheckStatus status)
+        => status switch
+        {
+            UpdateCheckStatus.NoUpdate => "KeinUpdate",
+            UpdateCheckStatus.UpdateAvailable => "UpdateVerfuegbar",
+            _ => "NichtPruefbar"
+        };
+
+    private static string ToProtocolPhase(UpdatePreparationPhase phase)
+        => phase switch
+        {
+            UpdatePreparationPhase.Verify => "Verifizieren",
+            UpdatePreparationPhase.Extract => "Entpacken",
+            UpdatePreparationPhase.PrepareUpdate => "UpdateVorbereiten",
+            _ => "Download"
+        };
+
     private sealed class LoggingProgress(
         IProgress<UpdatePreparationProgress>? inner,
         UpdateE2ETestContext context) : IProgress<UpdatePreparationProgress>
@@ -115,7 +134,7 @@ public sealed class LoggingUpdateService : IUpdateService
             inner?.Report(value);
             context.Log.Write(
                 UpdateE2EEvents.PreparationPhase,
-                new { phase = value.Phase.ToString(), percent = value.Percent, message = value.Message });
+                new { phase = ToProtocolPhase(value.Phase), percent = value.Percent, message = value.Message });
         }
     }
 }

@@ -81,7 +81,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public UpdateInfo? AvailableUpdate => _updateFlow.AvailableUpdate;
 
     /// <summary>Gibt an, ob gerade eine Update-Prüfung läuft.</summary>
-    public bool UpdateCheckLaeuft => _updateFlow.UpdateCheckLaeuft;
+    public bool UpdateCheckRunning => _updateFlow.UpdateCheckRunning;
 
     /// <summary>Gibt an, ob gerade ein Update heruntergeladen oder vorbereitet wird.</summary>
     public bool UpdateWillPrepared => _updateFlow.UpdateWillPrepared;
@@ -426,7 +426,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             var openTodoCounts = await _todoService.GetOpenTodoCountsAsync(workItems.Select(a => a.Id), ct);
             ActiveWorkItemsList.ReplaceAll(workItems.Select(a => MapActiveWorkItemPanelItem(a, openTodoCounts)));
             RunningAutomationsCount = ActiveWorkItemsList.Count(item =>
-                Softwareschmiede.App.Converters.AiExecutionStatusAdapter.Klassifiziere(item, out _)
+                Softwareschmiede.App.Converters.AiExecutionStatusAdapter.Classify(item, out _)
                     == AiExecutionState.Running);
         }
         catch (OperationCanceledException)

@@ -133,14 +133,14 @@
             </StackPanel>
             <TextBlock Text="{Binding Message}" TextWrapping="Wrap" AutomationProperties.AutomationId="ScmEventMessage"/>
             <TextBlock Text="{Binding MonitoringNotice}" Visibility="{Binding MonitoringNotice, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" TextWrapping="Wrap" AutomationProperties.AutomationId="ScmEventMonitoringNotice"/>
-            <Button Content="Sources erneut prüfen" Command="{Binding RetrySourcesCommand}" HorizontalAlignment="Left" Padding="10,4"
+            <Button Content="Quellen erneut prüfen" Command="{Binding RetrySourcesCommand}" HorizontalAlignment="Left" Padding="10,4"
                     Visibility="{Binding Diagnostics, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" AutomationProperties.AutomationId="ScmEventRetrySources"/>
             <Expander Header="Integrationshinweise" Visibility="{Binding Diagnostics, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" Margin="0,4,0,0">
                 <StackPanel>
                     <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto"><TextBlock Text="{Binding Diagnostics}" TextWrapping="Wrap" AutomationProperties.AutomationId="ScmEventDiagnostics"/></ScrollViewer>
                 </StackPanel>
             </Expander>
-            <Button Content="CLI-Settings" Command="{Binding NavigateToSettingsCommand}" HorizontalAlignment="Left" Padding="10,4" Margin="0,6,0,0" AutomationProperties.AutomationId="ScmEventSettings"/>
+            <Button Content="CLI-Einstellungen" Command="{Binding NavigateToSettingsCommand}" HorizontalAlignment="Left" Padding="10,4" Margin="0,6,0,0" AutomationProperties.AutomationId="ScmEventSettings"/>
         </StackPanel>
     </Grid>
 </UserControl>

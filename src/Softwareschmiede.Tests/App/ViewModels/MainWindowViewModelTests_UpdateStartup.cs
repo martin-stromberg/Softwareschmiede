@@ -84,7 +84,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
             erwarteteInstallation);
 
         sut.UpdateAvailable.Should().Be(mode != UpdateMode.Off);
-        sut.UpdateCheckLaeuft.Should().BeFalse();
+        sut.UpdateCheckRunning.Should().BeFalse();
         sut.UpdateWillPrepared.Should().BeFalse();
     }
 
@@ -262,7 +262,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never);
         sut.UpdateAvailable.Should().BeFalse();
-        sut.UpdateCheckLaeuft.Should().BeFalse();
+        sut.UpdateCheckRunning.Should().BeFalse();
         sut.UpdateWillPrepared.Should().BeFalse();
         if (nichtPruefbar)
             sut.UpdateNotice.Should().Contain("Release-Quelle nicht erreichbar");

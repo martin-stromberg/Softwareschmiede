@@ -16,7 +16,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// SQLite-Datenbank, Szenario- und Konfigurationsdatei, Stable-/RC-ZIP-Paketen mit getrennten
 /// Download-URLs und unterscheidbarem Inhalt, dateibasierten Freigabe-Gates sowie dem
 /// strukturierten JSONL-Protokoll. Alle App-seitig geschriebenen Update-Artefakte bleiben
-/// innerhalb der Testwurzel.
+/// innerhalb der TestRoot.
 /// </summary>
 public sealed class UpdateE2EFixture : IDisposable
 {
@@ -29,7 +29,7 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <summary>Version des simulierten Release-Candidates (neuer als <see cref="StableVersion"/>).</summary>
     public const string RcVersion = "1.4.0-rc.1";
 
-    /// <summary>Release-Listendaten-Dateiname relativ zur Testwurzel.</summary>
+    /// <summary>Release-Listendaten-Dateiname relativ zur TestRoot.</summary>
     public const string ReleaseListDateiName = "releases.json";
 
     private static readonly UpdateOptions StandardOptionen = new();
@@ -74,14 +74,14 @@ public sealed class UpdateE2EFixture : IDisposable
     public UpdateE2EFixture()
     {
         ScenarioId = $"update-e2e-{Guid.NewGuid():N}";
-        Testwurzel = Path.Combine(Path.GetTempPath(), $"softwareschmiede_update_e2e_{Guid.NewGuid():N}");
-        InstalliertesVerzeichnis = Path.Combine(Testwurzel, "installed");
-        GatesDirectory = Path.Combine(Testwurzel, "gates");
-        PaketVerzeichnis = Path.Combine(Testwurzel, "packages");
-        ScenarioFilePath = Path.Combine(Testwurzel, "scenario.json");
-        LogFilePath = Path.Combine(Testwurzel, "events.jsonl");
-        KonfigurationDateiPfad = Path.Combine(Testwurzel, "testconfig.json");
-        DatenbankPfad = Path.Combine(Testwurzel, "test.db");
+        TestRoot = Path.Combine(Path.GetTempPath(), $"softwareschmiede_update_e2e_{Guid.NewGuid():N}");
+        InstalliertesVerzeichnis = Path.Combine(TestRoot, "installed");
+        GatesDirectory = Path.Combine(TestRoot, "gates");
+        PaketVerzeichnis = Path.Combine(TestRoot, "packages");
+        ScenarioFilePath = Path.Combine(TestRoot, "scenario.json");
+        LogFilePath = Path.Combine(TestRoot, "events.jsonl");
+        KonfigurationDateiPfad = Path.Combine(TestRoot, "testconfig.json");
+        DatenbankPfad = Path.Combine(TestRoot, "test.db");
 
         Directory.CreateDirectory(InstalliertesVerzeichnis);
         Directory.CreateDirectory(GatesDirectory);
@@ -109,7 +109,7 @@ public sealed class UpdateE2EFixture : IDisposable
     public string ScenarioId { get; }
 
     /// <summary>Eindeutiges Temp-Wurzelverzeichnis dieser Fixture.</summary>
-    public string Testwurzel { get; }
+    public string TestRoot { get; }
 
     /// <summary>Simuliertes Installationsverzeichnis mit der <c>version.json</c>.</summary>
     public string InstalliertesVerzeichnis { get; }
@@ -243,13 +243,13 @@ public sealed class UpdateE2EFixture : IDisposable
         bool aufFreigabeWarten = true,
         int wartezeitSekunden = 30)
     {
-        AktualisiereSzenario(s => s.Readfailure = new UpdateE2EReadFailure
+        AktualisiereSzenario(s => s.ReadFailure = new UpdateE2EReadFailure
         {
             Active = true,
             Attempt = attempt,
             Limit = limit,
             WaitForRelease = aufFreigabeWarten,
-            WaittimeSeconds = wartezeitSekunden
+            WaitTimeoutSeconds = wartezeitSekunden
         });
     }
 
@@ -259,8 +259,8 @@ public sealed class UpdateE2EFixture : IDisposable
     /// </summary>
     public void DeaktiviereLesefehler()
     {
-        AktualisiereSzenario(s => s.Readfailure = new UpdateE2EReadFailure { Active = false });
-        UpdateE2ELog.Anfuegen(
+        AktualisiereSzenario(s => s.ReadFailure = new UpdateE2EReadFailure { Active = false });
+        UpdateE2ELog.Append(
             LogFilePath, ScenarioId, UpdateE2EEvents.UpdateSettingsReadFailureDisabled);
     }
 
@@ -528,9 +528,9 @@ public sealed class UpdateE2EFixture : IDisposable
         _disposed = true;
 
         // Fehlersteuerung sicher zurücksetzen, auch wenn der Test mittendrin abbricht.
-        try { DeaktiviereLesefehler(); } catch { /* Testwurzel evtl. schon entfernt. */ }
+        try { DeaktiviereLesefehler(); } catch { /* TestRoot evtl. schon entfernt. */ }
 
-        // Diagnose-Fluchtventil: Mit SOFTWARESCHMIEDE_UPDATE_E2E_KEEP=1 bleibt die Testwurzel
+        // Diagnose-Fluchtventil: Mit SOFTWARESCHMIEDE_UPDATE_E2E_KEEP=1 bleibt die TestRoot
         // (Szenario, Gates, JSONL-Protokoll) zur Fehleranalyse erhalten.
         if (Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_UPDATE_E2E_KEEP") == "1")
             return;
@@ -539,8 +539,8 @@ public sealed class UpdateE2EFixture : IDisposable
         {
             try
             {
-                if (Directory.Exists(Testwurzel))
-                    Directory.Delete(Testwurzel, recursive: true);
+                if (Directory.Exists(TestRoot))
+                    Directory.Delete(TestRoot, recursive: true);
                 return;
             }
             catch (IOException)
@@ -565,7 +565,7 @@ public sealed class UpdateE2EFixture : IDisposable
     {
         var configuration = new UpdateE2ETestConfiguration
         {
-            Testwurzel = Testwurzel,
+            TestRoot = TestRoot,
             ScenarioFilePath = ScenarioFilePath,
             LogFilePath = LogFilePath,
             ScenarioId = ScenarioId,
@@ -601,5 +601,5 @@ public sealed class UpdateE2EFixture : IDisposable
     }
 
     private string RelativZurWurzel(string path)
-        => Path.GetRelativePath(Testwurzel, path);
+        => Path.GetRelativePath(TestRoot, path);
 }

@@ -16,7 +16,7 @@ public sealed class UpdateE2EScenario
 
     /// <summary>Steuerung des kontrollierten Settings-Lesefehlers (T-09).</summary>
     [JsonPropertyName("settingsReadFailure")]
-    public UpdateE2EReadFailure? Readfailure { get; set; }
+    public UpdateE2EReadFailure? ReadFailure { get; set; }
 
     /// <summary>Kontrollierte riskante CLI-Aufgaben für den echten Sicherheitsdialog.</summary>
     [JsonPropertyName("cliSafety")]
@@ -50,7 +50,7 @@ public sealed class UpdateE2EResponse
     [JsonPropertyName("headers")]
     public Dictionary<string, string>? Header { get; set; }
 
-    /// <summary>Pfad der Antwortdatei relativ zur Testwurzel (JSON-Seite oder ZIP).</summary>
+    /// <summary>Pfad der Antwortdatei relativ zur TestRoot (JSON-Seite oder ZIP).</summary>
     [JsonPropertyName("bodyFile")]
     public string? BodyFile { get; set; }
 
@@ -123,11 +123,11 @@ public sealed class UpdateE2EReadFailure
 
     /// <summary>Maximale Wartezeit der Freigabe in Sekunden (Standard 60).</summary>
     [JsonPropertyName("waitTimeoutSeconds")]
-    public int WaittimeSeconds { get; set; } = 60;
+    public int WaitTimeoutSeconds { get; set; } = 60;
 
     /// <summary>Ordnet die konfigurierte Lesegrenze der Read-Ordnungszahl innerhalb des Versuchs zu.</summary>
     /// <returns>Die Ordnungszahl (1-basiert), ab der markierte Reads fehlschlagen.</returns>
-    public int GrenzOrdinal() => Limit switch
+    public int BoundaryOrdinal() => Limit switch
     {
         "BeforePreparation" => 2,
         "BeforeUpdaterStart" => 3,

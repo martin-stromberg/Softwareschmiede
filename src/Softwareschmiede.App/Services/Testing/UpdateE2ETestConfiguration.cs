@@ -20,7 +20,7 @@ public sealed class UpdateE2ETestConfiguration
 
     /// <summary>Wurzelverzeichnis des Tests; alle Fixture-Dateien und geschriebenen Update-Artefakte liegen darunter.</summary>
     [JsonPropertyName("testRoot")]
-    public string Testwurzel { get; init; } = string.Empty;
+    public string TestRoot { get; init; } = string.Empty;
 
     /// <summary>Pfad der Szenariodatei (JSON), die pro Request/Lesebefehl neu gelesen wird.</summary>
     [JsonPropertyName("scenarioFile")]
@@ -34,16 +34,16 @@ public sealed class UpdateE2ETestConfiguration
     [JsonPropertyName("scenarioId")]
     public string ScenarioId { get; init; } = string.Empty;
 
-    /// <summary>Verzeichnis der Freigabe-/Abbruch-Gate-Dateien. Standard: <c>{Testwurzel}/gates</c>.</summary>
+    /// <summary>Verzeichnis der Freigabe-/Abbruch-Gate-Dateien. Standard: <c>{TestRoot}/gates</c>.</summary>
     [JsonPropertyName("gatesDirectory")]
     public string? GatesDirectory { get; init; }
 
-    /// <summary>Das simulierte Installationsverzeichnis: <c>{Testwurzel}/installed</c> mit der <c>version.json</c>.</summary>
-    public string InstallationDirectory => Path.Combine(Testwurzel, "installed");
+    /// <summary>Das simulierte Installationsverzeichnis: <c>{TestRoot}/installed</c> mit der <c>version.json</c>.</summary>
+    public string InstallationDirectory => Path.Combine(TestRoot, "installed");
 
-    /// <summary>Effektives Gate-Verzeichnis (konfiguriert oder Standard unterhalb der Testwurzel).</summary>
+    /// <summary>Effektives Gate-Verzeichnis (konfiguriert oder Standard unterhalb der TestRoot).</summary>
     public string EffectiveGatesDirectory
-        => string.IsNullOrWhiteSpace(GatesDirectory) ? Path.Combine(Testwurzel, "gates") : GatesDirectory;
+        => string.IsNullOrWhiteSpace(GatesDirectory) ? Path.Combine(TestRoot, "gates") : GatesDirectory;
 
     /// <summary>
     /// Lädt die Testkonfiguration aus der per <see cref="EnvironmentVariable"/> referenzierten JSON-Datei.
@@ -103,22 +103,22 @@ public sealed class UpdateE2ETestConfiguration
 
     private static void Validate(UpdateE2ETestConfiguration configuration, string path)
     {
-        if (string.IsNullOrWhiteSpace(configuration.Testwurzel))
+        if (string.IsNullOrWhiteSpace(configuration.TestRoot))
         {
             throw new UpdateE2ETestConfigurationException(
                 $"Update-E2E-Testkonfiguration ohne testRoot: {path}");
         }
 
-        if (!Directory.Exists(configuration.Testwurzel))
+        if (!Directory.Exists(configuration.TestRoot))
         {
             throw new UpdateE2ETestConfigurationException(
-                $"Update-E2E-Testwurzel existiert nicht: {configuration.Testwurzel}");
+                $"Update-E2E-TestRoot existiert nicht: {configuration.TestRoot}");
         }
 
         if (!File.Exists(configuration.InstallationVersionsFilePath()))
         {
             throw new UpdateE2ETestConfigurationException(
-                $"Update-E2E-Testwurzel enthält keine installierte version.json: " +
+                $"Update-E2E-TestRoot enthält keine installierte version.json: " +
                 $"{configuration.InstallationVersionsFilePath()}");
         }
 
@@ -135,14 +135,14 @@ public sealed class UpdateE2ETestConfiguration
                 $"Update-E2E-Testkonfiguration ohne protocolFile: {path}");
         }
 
-        // Sicherstellen, dass kein Pfad aus der Testwurzel ausbricht.
-        var root = Path.GetFullPath(configuration.Testwurzel);
+        // Sicherstellen, dass kein Pfad aus der TestRoot ausbricht.
+        var root = Path.GetFullPath(configuration.TestRoot);
         CheckInnerhalbDerRoot(configuration.ScenarioFilePath, root, "Szenariodatei");
         CheckInnerhalbDerRoot(configuration.LogFilePath, root, "Protokolldatei");
         CheckInnerhalbDerRoot(configuration.EffectiveGatesDirectory, root, "Gate-Verzeichnis");
     }
 
-    /// <summary>Pfad der installierten <c>version.json</c> unterhalb der Testwurzel.</summary>
+    /// <summary>Pfad der installierten <c>version.json</c> unterhalb der TestRoot.</summary>
     public string InstallationVersionsFilePath() => Path.Combine(InstallationDirectory, "version.json");
 
     private static void CheckInnerhalbDerRoot(string path, string root, string description)
@@ -155,7 +155,7 @@ public sealed class UpdateE2ETestConfiguration
             || Path.IsPathRooted(relativ))
         {
             throw new UpdateE2ETestConfigurationException(
-                $"Update-E2E-{description} liegt außerhalb der Testwurzel: {full}");
+                $"Update-E2E-{description} liegt außerhalb der TestRoot: {full}");
         }
     }
 }

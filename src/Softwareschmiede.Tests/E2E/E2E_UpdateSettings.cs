@@ -832,7 +832,7 @@ public partial class End2EndTest
         {
             var response = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
             response.Status = 200;
-            response.BodyFile = Path.GetRelativePath(fixture.Testwurzel, defektesPaket);
+            response.BodyFile = Path.GetRelativePath(fixture.TestRoot, defektesPaket);
             s.Answer.Single(a => a.Url == fixture.StableManifestDownloadUrl).Content =
                 UpdateE2EFixture.ErzeugeManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, defektesPaket);
         });
@@ -863,7 +863,7 @@ public partial class End2EndTest
         {
             var response = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
             response.Status = 200;
-            response.BodyFile = Path.GetRelativePath(fixture.Testwurzel, manipuliertesPaket);
+            response.BodyFile = Path.GetRelativePath(fixture.TestRoot, manipuliertesPaket);
             s.Answer.Single(a => a.Url == fixture.StableManifestDownloadUrl).Content =
                 UpdateE2EFixture.ErzeugeManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, fixture.StableZipPfad);
         });
@@ -895,7 +895,7 @@ public partial class End2EndTest
         fixture.AktualisiereSzenario(s =>
         {
             var response = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
-            response.BodyFile = Path.GetRelativePath(fixture.Testwurzel, fixture.StableZipPfad);
+            response.BodyFile = Path.GetRelativePath(fixture.TestRoot, fixture.StableZipPfad);
             s.ProcessStart = new UpdateE2EProcessStart { Result = "Fehler" };
         });
         var basis = ProtokollBasis(fixture);
@@ -1021,7 +1021,7 @@ public partial class End2EndTest
         menu.ClickUpdatePruefen();
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateSettingsReadReached, Long,
             filter: e => DatenText(e, "versuch") == "pruefen" && DatenZahl(e, "ordinal") == 1);
-        fixture.OeffneGate(UpdateE2ETestContext.ReadfailureGateName);
+        fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName);
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateSettingsReadFailed, Long,
             filter: e => DatenText(e, "versuch") == "pruefen" && DatenText(e, "grenze") == "Initial");
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
@@ -1029,7 +1029,7 @@ public partial class End2EndTest
         menu.WaitForUpdateHinweis(UpdateHinweisLesefehler, Medium);
         Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.HttpRequest));
         AssertKeinUpdateNebenwirkungSeit(fixture, basis);
-        fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadfailureGateName);
+        fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName);
         fixture.DeaktiviereLesefehler();
         return await NachLesefehlerFortsetzenAsync(fixture, menu);
     }
@@ -1064,7 +1064,7 @@ public partial class End2EndTest
                 "Der BeforeUpdaterStart-Read muss erst nach PreparationCompleted erfolgen.");
         }
 
-        fixture.OeffneGate(UpdateE2ETestContext.ReadfailureGateName);
+        fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName);
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateSettingsReadFailed, Long,
             filter: e => DatenText(e, "versuch") == "starten" && DatenText(e, "grenze") == limit);
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateAttemptCompleted, Long,
@@ -1079,7 +1079,7 @@ public partial class End2EndTest
         Assert.Equal(erwarteVorbereitung ? 1 : 0,
             ZaehleEreignisSeit(fixture, basis, UpdateE2EEvents.PreparationCompleted));
         AssertKeinUpdateNebenwirkungSeit(fixture, basis, erlaubeVorbereitung: erwarteVorbereitung);
-        fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadfailureGateName);
+        fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName);
         fixture.DeaktiviereLesefehler();
     }
 
@@ -1189,7 +1189,7 @@ public partial class End2EndTest
         var mainWindow = RestartAppPreservingDatabase();
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateSettingsReadReached, Long,
             filter: e => DatenText(e, "versuch") == "startup" && DatenZahl(e, "ordinal") == ordinal);
-        fixture.OeffneGate(UpdateE2ETestContext.ReadfailureGateName);
+        fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName);
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEvents.UpdateSettingsReadFailed, Long,
             filter: e => DatenText(e, "versuch") == "startup" && DatenText(e, "grenze") == limit);
         return (mainWindow, basis);
@@ -1206,7 +1206,7 @@ public partial class End2EndTest
     /// <returns>Das Navigationsmenü.</returns>
     private async Task<MenuView> NachLesefehlerFortsetzenAsync(UpdateE2EFixture fixture, MenuView menu)
     {
-        fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadfailureGateName);
+        fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName);
         fixture.DeaktiviereLesefehler();
         Assert.True(fixture.ZaehleEreignis(UpdateE2EEvents.UpdateSettingsReadFailureDisabled) >= 1);
 
@@ -1339,7 +1339,7 @@ public partial class End2EndTest
         var launcher = Assert.Single(entries,
             e => e.Event == UpdateE2EEvents.UpdateProcessStartRecorded);
         Assert.Equal("Erfolg", DatenText(launcher, "result"));
-        Assert.Equal(fixture.Testwurzel, DatenText(launcher, "workingDirectory"));
+        Assert.Equal(fixture.TestRoot, DatenText(launcher, "workingDirectory"));
         var arguments = UpdateE2EFixture.Data(launcher) is { } launcherDaten
             && launcherDaten.TryGetProperty("arguments", out var argsElement)
                 ? argsElement.EnumerateArray().Select(a => a.GetString()).ToList()
@@ -1460,7 +1460,7 @@ public partial class End2EndTest
     {
         BestEffort(() => fixture.OeffneGate(UpdateDownloadGate));
         BestEffort(() => fixture.OeffneGate(UpdateReleaseGate));
-        BestEffort(() => fixture.OeffneGate(UpdateE2ETestContext.ReadfailureGateName));
+        BestEffort(() => fixture.OeffneGate(UpdateE2ETestContext.ReadFailureGateName));
         BestEffort(fixture.DeaktiviereLesefehler);
 
         if (mainWindow is not null)
@@ -1497,7 +1497,7 @@ public partial class End2EndTest
 
         BestEffort(() => fixture.SetzeGateZurueck(UpdateDownloadGate));
         BestEffort(() => fixture.SetzeGateZurueck(UpdateReleaseGate));
-        BestEffort(() => fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadfailureGateName));
+        BestEffort(() => fixture.SetzeGateZurueck(UpdateE2ETestContext.ReadFailureGateName));
     }
 
     /// <summary>Erzeugt eine Release-Liste mit dem RC-Paket und einer semantisch höheren stabilen Version.</summary>

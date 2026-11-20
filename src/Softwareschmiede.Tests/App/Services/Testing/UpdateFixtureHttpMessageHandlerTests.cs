@@ -8,7 +8,7 @@ namespace Softwareschmiede.Tests.App.Services.Testing;
 /// <summary>
 /// Unit-Tests für den kontrollierten Update-HTTP-Handler der E2E-Fixture: exakte URL-Abbildung,
 /// Header/Status, fehlender Netzwerkfallback, absichtliche Transportfehler, Antwort- und
-/// Stream-Gates sowie die Testwurzel-Isolation der Antwortdateien.
+/// Stream-Gates sowie die TestRoot-Isolation der Antwortdateien.
 /// </summary>
 public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
 {
@@ -18,14 +18,14 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
     private readonly UpdateE2ETestContext _context;
     private readonly HttpClient _client;
 
-    /// <summary>Richtet eine frische Temp-Testwurzel mit Szenario-, Protokoll- und Gate-Pfaden ein.</summary>
+    /// <summary>Richtet eine frische Temp-TestRoot mit Szenario-, Protokoll- und Gate-Pfaden ein.</summary>
     public UpdateFixtureHttpMessageHandlerTests()
     {
         _wurzel = Path.Combine(Path.GetTempPath(), $"swm-update-handler-tests-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_wurzel);
         _context = new UpdateE2ETestContext(new UpdateE2ETestConfiguration
         {
-            Testwurzel = _wurzel,
+            TestRoot = _wurzel,
             ScenarioFilePath = Path.Combine(_wurzel, "scenario.json"),
             LogFilePath = Path.Combine(_wurzel, "protocol.jsonl"),
             ScenarioId = "handler-tests",
@@ -220,7 +220,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         Assert.Equal(content, System.Text.Encoding.UTF8.GetString(buffer));
     }
 
-    /// <summary>Eine Antwortdatei außerhalb der Testwurzel wird mit HttpRequestException abgelehnt.</summary>
+    /// <summary>Eine Antwortdatei außerhalb der TestRoot wird mit HttpRequestException abgelehnt.</summary>
     [Fact]
     public async Task SendAsync_AntwortdateiAusserhalbDerTestwurzel_WirdAbgelehnt()
     {
@@ -241,7 +241,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
             });
 
             var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken));
-            Assert.Contains("außerhalb der Testwurzel", ex.Message);
+            Assert.Contains("außerhalb der TestRoot", ex.Message);
         }
         finally
         {
@@ -249,7 +249,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         }
     }
 
-    /// <summary>Eine Antwortdatei innerhalb der Testwurzel wird geladen (ZIP-Content-Type aus Endung).</summary>
+    /// <summary>Eine Antwortdatei innerhalb der TestRoot wird geladen (ZIP-Content-Type aus Endung).</summary>
     [Fact]
     public async Task SendAsync_AntwortdateiInnerhalbDerWurzel_WirdGeladen()
     {

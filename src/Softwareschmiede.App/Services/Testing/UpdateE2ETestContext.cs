@@ -14,7 +14,7 @@ namespace Softwareschmiede.App.Services.Testing;
 public sealed class UpdateE2ETestContext : IUpdateAttemptLog
 {
     /// <summary>Name des Gates für die kontrollierte Settings-Lesefehler-Freigabe.</summary>
-    public const string ReadfailureGateName = "settingsReadFailure";
+    public const string ReadFailureGateName = "settingsReadFailure";
 
     private int _attemptIndex;
     private string? _currentAttempt;
@@ -113,12 +113,12 @@ public sealed class UpdateE2ETestContext : IUpdateAttemptLog
         }
         Log.Write(
             UpdateE2EEvents.UpdateAttemptCompleted,
-            new { versuch = kind, versuchIndex = index, updateVerfuegbar = updateAvailable, hint });
+            new { versuch = kind, versuchIndex = index, updateVerfuegbar = updateAvailable, hinweis = hint });
         if (kind == "startup")
         {
             Log.Write(
                 UpdateE2EEvents.StartupUpdateCompleted,
-                new { updateVerfuegbar = updateAvailable, hint });
+                new { updateVerfuegbar = updateAvailable, hinweis = hint });
         }
     }
 

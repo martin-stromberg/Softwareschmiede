@@ -91,7 +91,7 @@
         </Grid>
 
         <Button Grid.Row="3"
-                Content="Schliessen"
+                Content="Schließen"
                 AutomationProperties.Name="Close"
                 IsCancel="True"
                 Padding="12,6"
