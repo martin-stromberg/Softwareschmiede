@@ -1,3 +1,5 @@
+using Softwareschmiede.TestSupport;
+
 namespace Softwareschmiede.Tests.Helpers;
 
 /// <summary>Temporäres Verzeichnis, das beim Dispose rekursiv gelöscht wird.</summary>
@@ -21,5 +23,5 @@ public sealed class TempDirectory : IDisposable
     }
 
     /// <inheritdoc/>
-    public void Dispose() => Directory.Delete(Path, recursive: true);
+    public void Dispose() => TempDirectoryCleanup.DeleteBestEffort(Path);
 }

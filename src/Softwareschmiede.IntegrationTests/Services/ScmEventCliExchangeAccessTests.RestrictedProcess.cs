@@ -13,8 +13,19 @@ namespace Softwareschmiede.IntegrationTests.Services;
 
 public sealed partial class ScmEventCliExchangeAccessTests
 {
+    // Zeitbudget-Kopplung Host <-> Kind: Jede Wartephase des eingebetteten PowerShell-Kinds
+    // bekommt ChildPhaseBudgetSeconds eigenes Budget; der Host pollt mit HostPhaseTimeoutSeconds
+    // laenger als dieses Phasenbudget, damit ein echter Kind-Timeout zuerst in child-error.txt
+    // bzw. ExitCode 1 sichtbar wird statt als Unknown-Timeout des Hosts.
+    private const int ChildPhaseBudgetSeconds = 90;
+    private const int HostPhaseTimeoutSeconds = ChildPhaseBudgetSeconds + 30;
+
     /// <summary>A normal CLI parent delegates the actual access probe and channel I/O to its restricted file-tool child.</summary>
     [Theory]
+    [Trait("Category", "OsInterface")]
+    // Dokumentiertes Flake-Ereignis aus PR #427: Der eingebettete PowerShell-Kindprozess
+    // ueberschritt unter CI-Last die Host-Pollfenster (Phasenbudgets s.o.).
+    [Trait("Category", "Flaky")]
     [InlineData("Codex", true)]
     [InlineData("Codex", false)]
     [InlineData("ClaudeCli", true)]
@@ -53,7 +64,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
               # Jede Wartephase bekommt eine eigene Frist: Die sequentiellen Host-Pollfenster
               # wuerden eine gemeinsame Gesamtfrist unter CI-Last in einer spaeteren Phase
               # ablaufen lassen, obwohl der Host noch innerhalb seines Zeitbudgets arbeitet.
-              $phaseTimeout = 90
+              $phaseTimeout = {{ChildPhaseBudgetSeconds}}
               $deadline = [DateTime]::UtcNow.AddSeconds($phaseTimeout)
               $probePromptPath = [IO.Path]::Combine($workspace, 'probe-prompt.json')
               TracePhase 'Waiting for host probe prompt'
@@ -116,6 +127,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
             }
             """;
         using var process = ScmRestrictedWindowsProcess.Start(workspace, command, sid);
+        _restrictedChildren.Add(process);
         try
         {
             ScmRestrictedProcessAccess.Capture(process).Should().ContainSingle().Which.Should().Be(sid);
@@ -134,7 +146,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
             using var adapter = new ScmPromptSessionAdapter(request.AufgabeId, request.CliRunId, prefix, spec, session.Object, [], () => !process.HasExited);
             var access = await adapter.CheckExchangeAccessAsync(directory, TestContext.Current.CancellationToken);
             access.Status.Should().Be(ScmExchangeAccessStatus.Unknown, "only the real file tool may complete the probe");
-            var probeDeadline = DateTime.UtcNow.AddSeconds(30);
+            var probeDeadline = DateTime.UtcNow.AddSeconds(HostPhaseTimeoutSeconds);
             while (access.Status == ScmExchangeAccessStatus.Unknown && !process.HasExited && DateTime.UtcNow < probeDeadline)
             {
                 await Task.Delay(25, TestContext.Current.CancellationToken);
@@ -151,7 +163,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
             var protocol = new ScmEventExchangeProtocol();
             var attempt = await protocol.PrepareAsync(request, workspace, TestContext.Current.CancellationToken, restrictedWriteSids: access.RestrictedWriteSids);
             await File.WriteAllTextAsync(Path.Combine(workspace, "go"), "go", TestContext.Current.CancellationToken);
-            var deadline = DateTime.UtcNow.AddSeconds(30);
+            var deadline = DateTime.UtcNow.AddSeconds(HostPhaseTimeoutSeconds);
             ScmExchangeMessages messages;
             do
             {
@@ -173,7 +185,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
             // The host responder uses the stored origin; child documents cannot select another remote target.
             request.OriginUrl.Should().Be("https://github.com/owner/repo/issues/7#issuecomment-9");
             await protocol.WriteResultAsync(attempt, new ScmExchangeActionResult(1, request.EventId, request.AttemptId, request.CliRunId, actionId, true, "comment-1"), TestContext.Current.CancellationToken);
-            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
+            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(HostPhaseTimeoutSeconds), TestContext.Current.CancellationToken);
             process.ExitCode.Should().Be(0, File.Exists(diagnostic) ? await File.ReadAllTextAsync(diagnostic, TestContext.Current.CancellationToken) : "restricted child must finish");
             await protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
             (await protocol.ReadAsync(attempt, TestContext.Current.CancellationToken)).Complete!.ActionIds.Should().Equal(actionId);
@@ -187,6 +199,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
 
     /// <summary>Real accounts, local-domain identities and broad token helpers never become channel grants.</summary>
     [Fact]
+    [Trait("Category", "OsInterface")]
     public void RestrictingSid_RejectsAccountsAndBroadPrincipals()
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("The SID proof requires Windows.");
@@ -202,6 +215,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
 
     /// <summary>A real restricted child denied by the workspace cannot claim access through its normal CLI parent.</summary>
     [Theory]
+    [Trait("Category", "OsInterface")]
     [InlineData("Codex")]
     [InlineData("ClaudeCli")]
     [InlineData("Devin")]
@@ -233,9 +247,10 @@ public sealed partial class ScmEventCliExchangeAccessTests
             catch { [IO.File]::WriteAllText({{Quote(Path.Combine(_root, "denial-error.txt"))}}, $_.Exception.ToString()); exit 6 }
             """;
         using var process = ScmRestrictedWindowsProcess.Start(_root, command, sid);
+        _restrictedChildren.Add(process);
         try
         {
-            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
+            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(HostPhaseTimeoutSeconds), TestContext.Current.CancellationToken);
             process.ExitCode.Should().Be(5, File.Exists(Path.Combine(_root, "denial-error.txt"))
                 ? await File.ReadAllTextAsync(Path.Combine(_root, "denial-error.txt"), TestContext.Current.CancellationToken) : "the actual file tool is denied despite a normal CLI parent");
             File.Exists(temporary).Should().BeFalse();

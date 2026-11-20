@@ -17,7 +17,10 @@
       5. Für jeden Test wird das Ergebnis (TRX-Logger) ausgewertet: Bestanden / Fehlgeschlagen /
          Ausführungsfehler (Testhost-Absturz, fehlende Build-Artefakte o.ä. statt einer echten
          Assertion). Bei einem Ausführungsfehler wird die Solution neu gebaut und der betroffene
-         Test genau einmal wiederholt.
+         Test genau einmal wiederholt. Schlägt dagegen ein als "Flaky" markierter Test
+         (Category=Flaky, nur in Kombination mit OsInterface vergeben) fachlich fehl, wird er
+         genau einmal ohne Rebuild wiederholt — das Retry-TRX heißt dann <name>-flaky-retry.trx
+         und wird in der summary.md als "(Flaky-Retry)" ausgewiesen.
       6. Alle Ergebnisse werden in einer Markdown-Zusammenfassung sowie den rohen TRX-Dateien unter
          test-results/<Zeitstempel>/ abgelegt.
 
@@ -57,6 +60,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
+
+. (Join-Path $PSScriptRoot "lib/Trx.ps1")
+. (Join-Path $PSScriptRoot "lib/TestDiscovery.ps1")
 
 Push-Location $repoRoot
 try {
@@ -180,15 +186,9 @@ try {
 
     function Get-TrxResult {
         param([string]$TrxPath)
-        if (-not (Test-Path $TrxPath)) { return $null }
-        try {
-            [xml]$trx = Get-Content $TrxPath -Raw
-        }
-        catch {
-            return $null
-        }
-        $ns = [System.Xml.XmlNamespaceManager]::new($trx.NameTable)
-        $ns.AddNamespace("t", "http://microsoft.com/schemas/VisualStudio/TeamTest/2010")
+        $trx = Get-TrxDocument -TrxPath $TrxPath
+        if ($null -eq $trx) { return $null }
+        $ns = New-TrxNamespaceManager -Trx $trx
         $resultNodes = @($trx.SelectNodes("//t:UnitTestResult", $ns))
         if ($resultNodes.Count -eq 0) { return $null }
         $result = $resultNodes | Where-Object { $_.outcome -eq "Failed" } | Select-Object -First 1
@@ -240,18 +240,23 @@ try {
         return $false
     }
 
-    function Invoke-SingleTest {
-        param([string]$ProjectPath, [object]$TestTarget)
+    # Dateisystem-tauglicher Basisname fuer TRX-Dateien (FilterName ohne Sonderzeichen).
+    function Get-SafeTrxBaseName {
+        param([string]$FilterName)
+        return ($FilterName -replace '[^A-Za-z0-9_.]', '_')
+    }
 
-        $safeName = ($TestTarget.FilterName -replace '[^A-Za-z0-9_.]', '_')
-        $trxFileName = "$safeName.trx"
-        $trxFullPath = Join-Path $trxDirectory $trxFileName
+    function Invoke-SingleTest {
+        param([string]$ProjectPath, [object]$TestTarget, [string]$TrxFileName = "")
+
+        if ([string]::IsNullOrWhiteSpace($TrxFileName)) { $TrxFileName = "$(Get-SafeTrxBaseName $TestTarget.FilterName).trx" }
+        $trxFullPath = Join-Path $trxDirectory $TrxFileName
         if (Test-Path $trxFullPath) { Remove-Item $trxFullPath -Force }
 
         $dotnetFilter = Join-TestFilter -NameFilter "FullyQualifiedName=$($TestTarget.FilterName)" -CategoryFilter $categoryFilterExpression
         $output = & dotnet test $ProjectPath -c $Configuration --no-build `
             --filter $dotnetFilter `
-            --logger "trx;LogFileName=$trxFileName" `
+            --logger "trx;LogFileName=$TrxFileName" `
             --results-directory $trxDirectory `
             --logger "console;verbosity=quiet" 2>&1
 
@@ -269,9 +274,11 @@ try {
     # werden als entdeckte Tests gezaehlt, aber methodenbasiert ausgefuehrt: Der Displayname einer
     # einzelnen Datenzeile ist nicht stabil als FullyQualifiedName-Filter adressierbar.
     $allTests = [System.Collections.Generic.List[object]]::new()
+    $flakyTargetsByProject = @{}
     foreach ($project in $testProjects) {
         Write-Host "==> Ermittle Tests: $($project.Name)" -ForegroundColor Cyan
         $targets = Get-TestTargets -ProjectPath $project.FullName
+        $flakyTargetsByProject[$project.FullName] = Get-FlakyTestNames -ProjectPath $project.FullName -Configuration $Configuration
         foreach ($target in $targets) {
             if ([string]::IsNullOrWhiteSpace($Filter) -or ($target.DisplayName -like "*$Filter*") -or ($target.FilterName -like "*$Filter*")) {
                 $allTests.Add([PSCustomObject]@{ Project = $project; TestTarget = $target })
@@ -305,6 +312,7 @@ try {
 
         $run = Invoke-SingleTest -ProjectPath $entry.Project.FullName -TestTarget $entry.TestTarget
         $retried = $false
+        $flakyRetried = $false
 
         if ($run.IsRuntimeError) {
             Write-Host " -> Ausfuehrungsfehler, baue neu und wiederhole einmal..." -ForegroundColor Yellow
@@ -313,6 +321,14 @@ try {
             if ($rebuildOk) {
                 $run = Invoke-SingleTest -ProjectPath $entry.Project.FullName -TestTarget $entry.TestTarget
             }
+        }
+        elseif ($run.Trx -and $run.Trx.Outcome -eq "Failed" -and
+                $flakyTargetsByProject[$entry.Project.FullName].Contains($entry.TestTarget.FilterName)) {
+            # Flaky-Einmal-Retry ohne Rebuild; Primaer-TRX bleibt erhalten, der Retry schreibt
+            # <name>-flaky-retry.trx (Konvention von Retry-FlakyTests.ps1 / Analyze-FlakyTestResults.ps1).
+            Write-Host " -> Flaky-Fehlschlag, wiederhole einmal ohne Rebuild..." -ForegroundColor Yellow
+            $flakyRetried = $true
+            $run = Invoke-SingleTest -ProjectPath $entry.Project.FullName -TestTarget $entry.TestTarget -TrxFileName "$(Get-SafeTrxBaseName $entry.TestTarget.FilterName)-flaky-retry.trx"
         }
 
         $status = if ($run.Trx) {
@@ -349,6 +365,7 @@ try {
             Message    = if ($run.Trx) { $run.Trx.Message } else { $null }
             StackTrace = if ($run.Trx) { $run.Trx.StackTrace } else { $null }
             Retried    = $retried
+            FlakyRetried = $flakyRetried
         })
     }
 
@@ -391,7 +408,7 @@ try {
         foreach ($r in ($results | Where-Object { $_.Status -ne "Bestanden" })) {
             $lines.Add("### $($r.Project) - $($r.TestName)")
             $lines.Add("")
-            $retriedNote = if ($r.Retried) { " (nach Wiederholung)" } else { "" }
+            $retriedNote = if ($r.FlakyRetried) { " (Flaky-Retry)" } elseif ($r.Retried) { " (nach Wiederholung)" } else { "" }
             $lines.Add("- Status: $($r.Status)$retriedNote")
             if ($r.Message) {
                 $flatMessage = ($r.Message -replace "`r?`n", " ")
@@ -407,7 +424,8 @@ try {
     $lines.Add("|---|---|---|---|---|---|")
     foreach ($r in $results) {
         $execution = if ($r.ExecutionMode -eq "TheoryMethod") { "Theory-Methode" } else { "Einzeltest" }
-        $lines.Add("| $($r.Project) | $($r.TestName) | $execution | $($r.DiscoveryCount) | $($r.Status) | $($r.Duration) |")
+        $statusText = if ($r.FlakyRetried) { "$($r.Status) (Flaky-Retry)" } else { $r.Status }
+        $lines.Add("| $($r.Project) | $($r.TestName) | $execution | $($r.DiscoveryCount) | $statusText | $($r.Duration) |")
     }
 
     $lines | Out-File -FilePath $summaryPath -Encoding utf8
