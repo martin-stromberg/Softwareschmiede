@@ -1,0 +1,686 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="20e71418-a5cc-47d0-9318-5babc2f3813d" name="Martin@DESKTOP-CM8OBSG 2026-11-19 22:20:04" runUser="DESKTOP-CM8OBSG\Martin" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-11-19T22:20:04.4957200+01:00" queuing="2026-11-19T22:20:04.4957201+01:00" start="2026-11-19T22:20:02.7836210+01:00" finish="2026-11-19T22:20:26.8795034+01:00" />
+  <TestSettings name="default" id="ccdd7570-b4bd-45e1-a133-bf2c553be1c1">
+    <Deployment runDeploymentRoot="Martin_DESKTOP-CM8OBSG_2026-11-19_22_20_04" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="8b5f0b79-a1c9-4551-837c-c6f415754b1e" testId="3f171aed-112e-84a2-18b0-e77d185d61a8" testName="Softwareschmiede.Tests.E2E.End2EndTest.General_UpdateFixtureSmoke_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:12.6235413+01:00" endTime="2026-11-19T22:20:15.2675176+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8b5f0b79-a1c9-4551-837c-c6f415754b1e">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="004db754-2ae9-4112-8265-d2bcfd9c4d62" testId="ccb79201-0e91-71f7-495e-81d1f62cc781" testName="Softwareschmiede.Tests.E2E.WpfE2ETests.WpfBasisSzenarien" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:12.3491757+01:00" endTime="2026-11-19T22:20:12.4080956+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="004db754-2ae9-4112-8265-d2bcfd9c4d62">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="9d3b0bf0-8d3e-442b-b31e-a5096c66521c" testId="5281966a-a6ce-28cc-ac67-c13dcfc9b338" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_PersistiertSessionOutputAlsCliOutput" computerName="DESKTOP-CM8OBSG" duration="00:00:00.1070000" startTime="2026-11-19T22:20:23.6389396+01:00" endTime="2026-11-19T22:20:23.7461712+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9d3b0bf0-8d3e-442b-b31e-a5096c66521c" />
+    <UnitTestResult executionId="a3353e40-1ab5-47fc-84a1-4ef70ce4f2c6" testId="76e8876a-9bbd-2584-4b0a-545ca6f7231f" testName="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.CheckAppStartupException_ErkenntMainWindowFehler" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:12.2451450+01:00" endTime="2026-11-19T22:20:12.2461210+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a3353e40-1ab5-47fc-84a1-4ef70ce4f2c6" />
+    <UnitTestResult executionId="f3af6ed1-a31e-42cf-833f-bb7addfc6628" testId="a64d7e20-9a6b-5320-fd5a-0774d3e1ea16" testName="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.GetNewEntries_WaehltNeuesteDatei" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0050000" startTime="2026-11-19T22:20:12.2233647+01:00" endTime="2026-11-19T22:20:12.2285810+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f3af6ed1-a31e-42cf-833f-bb7addfc6628" />
+    <UnitTestResult executionId="8a525038-cb4b-410b-89e0-328cd13b801e" testId="96fa0a5a-1f2b-d47e-59ef-cafa7ee3d3f2" testName="Softwareschmiede.Tests.E2E.End2EndTest.General_BasisUndEinstellungen_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:17.1336548+01:00" endTime="2026-11-19T22:20:17.1846517+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8a525038-cb4b-410b-89e0-328cd13b801e">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="37fd5eda-f2bb-4ae4-9fcf-0be100d08ec3" testId="b6d7a60e-5fc0-4112-53af-8d6efdc2472d" testName="Softwareschmiede.Tests.E2E.End2EndTest.ConPty_WeitereLebenszyklusSzenarien_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:16.8681229+01:00" endTime="2026-11-19T22:20:16.9222122+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="37fd5eda-f2bb-4ae4-9fcf-0be100d08ec3">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 gesetzt (siehe CLAUDE.md, Abschnitt Testing) - bestätigte Sandbox-Limitation dieses Ausführungskontexts, keine automatische Erkennung.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="d53315b6-936a-4c55-a9d5-c52e6a04ef17" testId="dcec4b44-4fad-734f-44f5-b532b3c1b581" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_FruehesProzessende_KeineWarnungWegenGeschlossenemStream" computerName="DESKTOP-CM8OBSG" duration="00:00:01.0300000" startTime="2026-11-19T22:20:23.7682658+01:00" endTime="2026-11-19T22:20:24.7984741+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d53315b6-936a-4c55-a9d5-c52e6a04ef17" />
+    <UnitTestResult executionId="e0ddd8d3-c7fa-4505-93cf-61fe8b467064" testId="ebde70a9-854f-21ad-1160-b1c84235a5e5" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests_WorkingDirectory.StartCliAsync_ShouldUseEffectiveWorkingDirectory" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0240000" startTime="2026-11-19T22:20:04.2630819+01:00" endTime="2026-11-19T22:20:04.2879923+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e0ddd8d3-c7fa-4505-93cf-61fe8b467064" />
+    <UnitTestResult executionId="bf91c7c1-e2dd-47f0-9c9c-956e6abb211f" testId="34d3a7ee-05a8-50e7-3be5-87b9abff68b3" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.AddCliOutputAsync_RateLimitMarkerAusConPtyOutput_ErzeugtRateLimitEintrag" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0290000" startTime="2026-11-19T22:20:17.7673998+01:00" endTime="2026-11-19T22:20:17.7972408+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bf91c7c1-e2dd-47f0-9c9c-956e6abb211f" />
+    <UnitTestResult executionId="9c6b04cc-8c0c-49fd-a38c-8832b2092433" testId="5439f510-9abf-d4dd-7b4b-33a52b4f9561" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlShiftV_CallsReadClipboardAndInsertAsync" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0509999" startTime="2026-11-19T22:20:10.9977855+01:00" endTime="2026-11-19T22:20:11.0498434+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9c6b04cc-8c0c-49fd-a38c-8832b2092433" />
+    <UnitTestResult executionId="bd6fcd5c-ec39-4e4d-8da6-b09ccaab22de" testId="214a5a20-88cb-6379-20dc-ee89a6e1d36c" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_ParalleleAufgaben_TrenntProtokolleNachAufgabeId" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0900000" startTime="2026-11-19T22:20:17.4989182+01:00" endTime="2026-11-19T22:20:17.5891251+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bd6fcd5c-ec39-4e4d-8da6-b09ccaab22de" />
+    <UnitTestResult executionId="49d66de3-7432-42ab-973b-6e7be533de57" testId="57ae54b5-ebbc-a91a-4258-1751e4f27bd6" testName="Softwareschmiede.Tests.E2E.End2EndTest.ReplayText_MarkAndCopyViaMouse_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:17.0312171+01:00" endTime="2026-11-19T22:20:17.0826989+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="49d66de3-7432-42ab-973b-6e7be533de57">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="9c140128-6dbd-4565-85e3-ab1bba5c79a8" testId="9a216e29-748f-3fec-d34b-2940821e2281" testName="Softwareschmiede.Tests.E2E.End2EndTest.General_Konsolenwiedergabe_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:16.9733667+01:00" endTime="2026-11-19T22:20:17.0303510+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9c140128-6dbd-4565-85e3-ab1bba5c79a8">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="b76223d3-8e40-46de-9a01-31df5d5584ea" testId="5486a42d-d216-3b2e-753f-93025d95dcd6" testName="Softwareschmiede.Tests.E2E.End2EndTest.TerminalText_LiveMarkCopyAndKeepSelection_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:12.5704985+01:00" endTime="2026-11-19T22:20:12.6227458+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b76223d3-8e40-46de-9a01-31df5d5584ea">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 gesetzt (siehe CLAUDE.md, Abschnitt Testing) - bestätigte Sandbox-Limitation dieses Ausführungskontexts, keine automatische Erkennung.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="379b60cc-c57f-4dfa-b667-ca3a85c1df60" testId="319eb863-cb90-32ab-204b-66ffee43ed6e" testName="Softwareschmiede.Tests.E2E.ScmEventsE2ETests.ScmEvents_QueueReceptionDispatchAndReplies_UseRealPipeline" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:12.5114875+01:00" endTime="2026-11-19T22:20:12.5692535+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="379b60cc-c57f-4dfa-b667-ca3a85c1df60">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="3dcc262e-b382-43d1-955e-e190b9b79ce3" testId="883bb55e-0d12-a832-4e8c-b994f961c8d6" testName="Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungConfigTests.InitialisierungsskriptKonfiguration" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:12.2481841+01:00" endTime="2026-11-19T22:20:12.3480988+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3dcc262e-b382-43d1-955e-e190b9b79ce3">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="d3e3a817-1c29-4440-ab5e-951d7b3bb630" testId="c40fc78e-e60e-38c5-13d1-5eb4abdc518e" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_MitInjiziertemFakeLauncher_ErreichtGestartet" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0210000" startTime="2026-11-19T22:20:22.8615416+01:00" endTime="2026-11-19T22:20:22.8834085+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d3e3a817-1c29-4440-ab5e-951d7b3bb630" />
+    <UnitTestResult executionId="9762771b-5f45-4a79-9af3-9aa8f205547e" testId="744d1cc9-9e72-a8c5-ffc8-1179015520de" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_LangerMehrzeiligerText_WritesCompleteEncodedBytes" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0250000" startTime="2026-11-19T22:20:10.9506780+01:00" endTime="2026-11-19T22:20:10.9764523+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9762771b-5f45-4a79-9af3-9aa8f205547e" />
+    <UnitTestResult executionId="713155e0-54eb-4df0-89e4-4d74946938db" testId="86ee3a10-3d4e-232e-0388-645e46beaca9" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlShiftV_SetsHandledTrue" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0390000" startTime="2026-11-19T22:20:10.2906462+01:00" endTime="2026-11-19T22:20:10.3304466+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="713155e0-54eb-4df0-89e4-4d74946938db" />
+    <UnitTestResult executionId="e9cd13f6-2cc0-4525-be18-c3a45044a8c0" testId="39653fae-18b4-092b-4e2e-c6ea4ae1e6e3" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirectory.StartCliAsync_ShouldResolveConfiguredWorkingDirectory_ViaSourcePath_WhenPluginIsInSourceDirectoryMode" computerName="DESKTOP-CM8OBSG" duration="00:00:00.1160000" startTime="2026-11-19T22:20:04.1061530+01:00" endTime="2026-11-19T22:20:04.2313536+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e9cd13f6-2cc0-4525-be18-c3a45044a8c0" />
+    <UnitTestResult executionId="1d2274d3-ab7c-4932-b027-27cbb4ad2eb5" testId="25022f8f-e139-9829-5d0b-6fceb1723eae" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_CallsMarkInputActivity" computerName="DESKTOP-CM8OBSG" duration="00:00:00.2340000" startTime="2026-11-19T22:20:11.9735149+01:00" endTime="2026-11-19T22:20:12.2079732+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1d2274d3-ab7c-4932-b027-27cbb4ad2eb5" />
+    <UnitTestResult executionId="d72b0fdf-b1e3-4797-b47f-a2e76ffc9e8d" testId="d56e21e5-349b-f4fb-6a3f-46a399d31231" testName="Softwareschmiede.Tests.E2E.End2EndTest.ConPty_SessionReattach_KeineDoppelausgabe_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:17.1854033+01:00" endTime="2026-11-19T22:20:17.2356971+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d72b0fdf-b1e3-4797-b47f-a2e76ffc9e8d">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 gesetzt (siehe CLAUDE.md, Abschnitt Testing) - bestätigte Sandbox-Limitation dieses Ausführungskontexts, keine automatische Erkennung.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="9551b5c1-b2ea-422d-b43d-2ed7e00cb368" testId="2409ccd9-e5b1-e818-fbd1-0b2c7d193707" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlV_SetsHandledTrue" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0370000" startTime="2026-11-19T22:20:11.0512137+01:00" endTime="2026-11-19T22:20:11.0889743+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9551b5c1-b2ea-422d-b43d-2ed7e00cb368" />
+    <UnitTestResult executionId="44c493b1-3b5d-41c6-a702-894dc8d8acbb" testId="264462ac-84ba-77a7-d26a-a40aafbc1c48" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_Success_WritesEncodedBytesToInputStream" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0180000" startTime="2026-11-19T22:20:10.9785101+01:00" endTime="2026-11-19T22:20:10.9969622+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="44c493b1-3b5d-41c6-a702-894dc8d8acbb" />
+    <UnitTestResult executionId="7a08c7c5-e7c5-4b92-ad3e-38503792008c" testId="88e28083-af23-2896-1eb6-db216cfaf1ef" testName="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests.Start_ProzessBeendetSichAufKillEntireProcessTree" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0330000" startTime="2026-11-19T22:20:09.7606140+01:00" endTime="2026-11-19T22:20:09.7942791+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7a08c7c5-e7c5-4b92-ad3e-38503792008c" />
+    <UnitTestResult executionId="4284b9b4-ae75-4647-bb07-c972200b98ba" testId="921288cd-4020-5855-24a6-07400c7ae517" testName="Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.ProjektDetailSzenarien" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:12.4091251+01:00" endTime="2026-11-19T22:20:12.4572578+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4284b9b4-ae75-4647-bb07-c972200b98ba">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="5e0669cb-1185-4b3a-9797-30f76e88f657" testId="0dbbfc0e-6a1e-8107-2fa9-e91866d5524d" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_ProzessVorVerdrahtungBeendet_MapptExitCodeAufStatus(exitCode: 0, erwarteterStatus: Gestoppt)" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0260000" startTime="2026-11-19T22:20:22.9927392+01:00" endTime="2026-11-19T22:20:23.0196482+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5e0669cb-1185-4b3a-9797-30f76e88f657" />
+    <UnitTestResult executionId="2cef0a0d-1c0b-473b-84b6-37d7a6653d2c" testId="e2528f48-eeea-52eb-0fbd-f8603a5476df" testName="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests.Start_UeberWritePromptAsyncGesendeterPromptWirdAusgefuehrt" computerName="DESKTOP-CM8OBSG" duration="00:00:00.1230000" startTime="2026-11-19T22:20:09.9147213+01:00" endTime="2026-11-19T22:20:10.0384244+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2cef0a0d-1c0b-473b-84b6-37d7a6653d2c" />
+    <UnitTestResult executionId="876fac2a-4196-477e-92e6-36d9f521cc23" testId="3063305f-49ba-e544-9a3c-acaab3c8967a" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.GetClipboardText_ClipboardAccessThrows_ReturnsEmptyString" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0140000" startTime="2026-11-19T22:20:11.9582906+01:00" endTime="2026-11-19T22:20:11.9726943+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="876fac2a-4196-477e-92e6-36d9f521cc23" />
+    <UnitTestResult executionId="9f49c5c2-23bf-401c-9a22-c8ec8ef7d987" testId="99d30cd6-b106-c4fe-a2c1-395134ec830e" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.ConPtyProcessExited_SubscriberThrows_LogsAndDoesNotCrash" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0210000" startTime="2026-11-19T22:20:23.4006612+01:00" endTime="2026-11-19T22:20:23.4217600+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9f49c5c2-23bf-401c-9a22-c8ec8ef7d987" />
+    <UnitTestResult executionId="64d1b5fb-26f4-4d4e-886b-a59d96668834" testId="58d8a627-a229-4a83-bd44-bae8cf6e7829" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_RestzeileOhneZeilentrenner_PersistiertCliOutput" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0220000" startTime="2026-11-19T22:20:23.3778103+01:00" endTime="2026-11-19T22:20:23.4001315+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="64d1b5fb-26f4-4d4e-886b-a59d96668834" />
+    <UnitTestResult executionId="94d49541-0ed4-44d7-a181-04c69d8680d8" testId="d6395bd6-017f-f293-b218-98ed6c9168b4" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.ProcessExited_ExitCodeZero_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden" computerName="DESKTOP-CM8OBSG" duration="00:00:00.1760000" startTime="2026-11-19T22:20:17.5896942+01:00" endTime="2026-11-19T22:20:17.7666895+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="94d49541-0ed4-44d7-a181-04c69d8680d8" />
+    <UnitTestResult executionId="9a6dae67-ea2c-4d70-8694-37769daf8a9d" testId="b99a7e35-c142-f240-0f79-fb9f2c1dde43" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests_WorkingDirectory.StartCliAsync_ShouldUseRepoRootWhenConfigNull" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0210000" startTime="2026-11-19T22:20:04.2403538+01:00" endTime="2026-11-19T22:20:04.2624383+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9a6dae67-ea2c-4d70-8694-37769daf8a9d" />
+    <UnitTestResult executionId="dbfdd401-2812-4212-a9d5-86bd60c5f7f4" testId="e701ed2e-a0ff-188f-d70b-c0d9f01f180c" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.KiAusfuehrungsService_Dispose_CancelsAllSessions" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0210000" startTime="2026-11-19T22:20:23.7466812+01:00" endTime="2026-11-19T22:20:23.7677550+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="dbfdd401-2812-4212-a9d5-86bd60c5f7f4" />
+    <UnitTestResult executionId="8786c616-17c1-487a-af59-55b313a27488" testId="d9cb8f9a-7f84-d785-b41f-a1a60f46912a" testName="Softwareschmiede.Tests.ServiceIntegration.CliEmbeddingServiceIntegrationTests.StartTerminalSessionAsync_StartetProzess_UndSetztPseudoConsoleSession" computerName="DESKTOP-CM8OBSG" duration="00:00:05.4250000" startTime="2026-11-19T22:20:04.2896155+01:00" endTime="2026-11-19T22:20:09.7167979+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8786c616-17c1-487a-af59-55b313a27488" />
+    <UnitTestResult executionId="92316ae1-5811-4561-b5e1-cdd3b8ac5ea4" testId="89c34482-ee44-94ba-0aba-db0ae695f0b2" testName="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.GetNewEntries_KeinVerzeichnis_LiefertLeer" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:12.2097508+01:00" endTime="2026-11-19T22:20:12.2115783+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="92316ae1-5811-4561-b5e1-cdd3b8ac5ea4" />
+    <UnitTestResult executionId="33eff9f8-1975-4e17-8b2f-56a00f99363b" testId="0ae1cd9c-5b10-543a-7527-0556321e216c" testName="Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungAusfuehrungTests.InitialisierungsskriptAusfuehrung" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:12.4582250+01:00" endTime="2026-11-19T22:20:12.5095745+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="33eff9f8-1975-4e17-8b2f-56a00f99363b">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 gesetzt (siehe CLAUDE.md, Abschnitt Testing) - bestätigte Sandbox-Limitation dieses Ausführungskontexts, keine automatische Erkennung.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="55b0f295-ce52-48f4-a77e-a7f5b13b03a7" testId="6c3b27eb-7de3-415e-0b40-71af8e7d59cf" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_ClipboardAccessThrows_LogsWarningAndContinues" computerName="DESKTOP-CM8OBSG" duration="00:00:00.2470000" startTime="2026-11-19T22:20:11.0899562+01:00" endTime="2026-11-19T22:20:11.3377696+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="55b0f295-ce52-48f4-a77e-a7f5b13b03a7" />
+    <UnitTestResult executionId="c031fc7c-a5b4-48bb-b2e3-15eabe6a87c6" testId="c9959287-bc07-2766-13c3-0937d57f26b6" testName="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.GetNewEntries_BeiLogRollover_LiestNeueDateiAbAnfang" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0050000" startTime="2026-11-19T22:20:12.2291844+01:00" endTime="2026-11-19T22:20:12.2350672+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c031fc7c-a5b4-48bb-b2e3-15eabe6a87c6" />
+    <UnitTestResult executionId="c07da822-6b1a-4b23-9d13-ef8fb64b8ab3" testId="25d417a0-73ca-ad0c-d612-d0a6b78c9725" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlShiftCOhneAuswahl_LaesstClipboardUndCliInputUnveraendert" computerName="DESKTOP-CM8OBSG" duration="00:00:00.2600000" startTime="2026-11-19T22:20:11.6970048+01:00" endTime="2026-11-19T22:20:11.9571857+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c07da822-6b1a-4b23-9d13-ef8fb64b8ab3" />
+    <UnitTestResult executionId="aa3cc624-6faa-42ba-a364-74f6661021ff" testId="ed97e3bb-dcf2-66e8-188e-4561fdbac463" testName="Softwareschmiede.Tests.E2E.E2E_RepositoryManagementTests.BasisBranchVerwaltung" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:17.4454425+01:00" endTime="2026-11-19T22:20:17.4974777+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="aa3cc624-6faa-42ba-a364-74f6661021ff">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="316f1305-4234-49c2-b3fa-e014128f608e" testId="0204c820-8497-5696-93fb-ce3246bb94bb" testName="Softwareschmiede.Tests.E2E.End2EndTest.ConPty_LifecycleUndReplay_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:17.2364260+01:00" endTime="2026-11-19T22:20:17.2873074+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="316f1305-4234-49c2-b3fa-e014128f608e">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 gesetzt (siehe CLAUDE.md, Abschnitt Testing) - bestätigte Sandbox-Limitation dieses Ausführungskontexts, keine automatische Erkennung.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="4656cfca-c62c-4b3f-a5ce-9ce866526df6" testId="03cfa187-2e1a-7a25-45c2-f229a8c46726" testName="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.CheckAppStartupException_OhneFehler_LiefertNull" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:12.2464596+01:00" endTime="2026-11-19T22:20:12.2471379+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4656cfca-c62c-4b3f-a5ce-9ce866526df6" />
+    <UnitTestResult executionId="d9270be8-478f-4166-97fa-7981d623e616" testId="0b0af7ea-6859-9ced-dfbe-78658104577a" testName="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests.Start_LiefertLaufendenProzessUndSession" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0030000" startTime="2026-11-19T22:20:09.7950354+01:00" endTime="2026-11-19T22:20:09.7987448+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d9270be8-478f-4166-97fa-7981d623e616" />
+    <UnitTestResult executionId="b6054b87-1cb1-48d6-98e3-52ffe2a00cfe" testId="ae80d8c1-e280-cb43-3766-6cc12f75c95f" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.GetClipboardText_ClipboardContainsText_ReturnsText" computerName="DESKTOP-CM8OBSG" duration="00:00:00.2350000" startTime="2026-11-19T22:20:10.3312875+01:00" endTime="2026-11-19T22:20:10.5664361+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b6054b87-1cb1-48d6-98e3-52ffe2a00cfe" />
+    <UnitTestResult executionId="1b6d77c2-b4a5-4f33-a298-1117855e090a" testId="fbd1667d-eac0-405c-438f-390a530c7751" testName="Softwareschmiede.Tests.E2E.End2EndTest.ReplayText_CopyShortcutWithFocusedSelection_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:17.2880953+01:00" endTime="2026-11-19T22:20:17.3391898+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1b6d77c2-b4a5-4f33-a298-1117855e090a">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="c4511252-88a4-4177-b4fa-589f085e59be" testId="9880ea43-6ef7-fc93-f56e-14f5aa29a96c" testName="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests.Start_GesendetesKommandoWirdAusgefuehrt" computerName="DESKTOP-CM8OBSG" duration="00:00:00.1130000" startTime="2026-11-19T22:20:09.7992712+01:00" endTime="2026-11-19T22:20:09.9129099+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c4511252-88a4-4177-b4fa-589f085e59be" />
+    <UnitTestResult executionId="f815f3b3-fcec-4baf-886f-15163f773d43" testId="1eef257a-c385-1c7b-0256-41748ed8151c" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.ProcessExited_SubscriberThrows_LogsAndDoesNotCrash" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0250000" startTime="2026-11-19T22:20:22.8359474+01:00" endTime="2026-11-19T22:20:22.8610468+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f815f3b3-fcec-4baf-886f-15163f773d43" />
+    <UnitTestResult executionId="9015e0b4-c00f-4b68-a316-cef22b524fbe" testId="b3e43d2e-4fb3-c010-d3ae-a3ca7ebb537f" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.TestCliStartAsync" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0230000" startTime="2026-11-19T22:20:22.9672940+01:00" endTime="2026-11-19T22:20:22.9908066+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9015e0b4-c00f-4b68-a316-cef22b524fbe" />
+    <UnitTestResult executionId="09fc73f2-6c7d-4dcc-b822-57d17a12ea50" testId="9363b3d2-b418-8257-22a8-60c83fcb5fb4" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartCliAsync_ShouldReturnHandle_WhenPluginProvidesValidProcessStartInfo" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0210000" startTime="2026-11-19T22:20:22.9170702+01:00" endTime="2026-11-19T22:20:22.9390611+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="09fc73f2-6c7d-4dcc-b822-57d17a12ea50" />
+    <UnitTestResult executionId="28d397e9-b525-4c80-81ee-880fdda99eaa" testId="ef8d06a0-7e6f-90b4-d40c-359df03b82d4" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_SessionWechseltWaerendPaste_SchreibtInSnapshotSession" computerName="DESKTOP-CM8OBSG" duration="00:00:00.2360000" startTime="2026-11-19T22:20:11.3388652+01:00" endTime="2026-11-19T22:20:11.5759257+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="28d397e9-b525-4c80-81ee-880fdda99eaa" />
+    <UnitTestResult executionId="c3bc3b85-968d-42c7-ada9-dd24468bb3d1" testId="588f1ff2-feea-4c80-3e34-ef36fe64435c" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.ProcessExited_ScopeFactoryDisposed_PersistiertNichtUndWirftNicht" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0260000" startTime="2026-11-19T22:20:22.9397282+01:00" endTime="2026-11-19T22:20:22.9667320+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c3bc3b85-968d-42c7-ada9-dd24468bb3d1" />
+    <UnitTestResult executionId="005331ca-0993-48c8-b134-0b12e7a97958" testId="028ffa4e-268d-2c71-c2ca-ab87167dc080" testName="Softwareschmiede.Tests.E2E.End2EndTest.General_UpdateStartvarianten_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:15.2694474+01:00" endTime="2026-11-19T22:20:16.8666207+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="005331ca-0993-48c8-b134-0b12e7a97958">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="13c02e9b-23de-4078-b420-adba2757d1fa" testId="bbb3183f-523a-082e-5a7a-e3cbb61c8894" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.ProcessExited_ExitCodeNonZero_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0220000" startTime="2026-11-19T22:20:24.7990211+01:00" endTime="2026-11-19T22:20:24.8230851+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="13c02e9b-23de-4078-b420-adba2757d1fa" />
+    <UnitTestResult executionId="803fbe5d-bc9c-4081-aa82-3dd9689c78dc" testId="086ce61c-5525-d200-660b-7bc989658ae8" testName="Softwareschmiede.Tests.E2E.End2EndTest.Simulator_PluginwechselProjektstandardAufgabenstartUndNavigation_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:16.9234991+01:00" endTime="2026-11-19T22:20:16.9725340+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="803fbe5d-bc9c-4081-aa82-3dd9689c78dc">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="c662b7e0-2128-4fa7-a55e-60db4a4612d4" testId="d73328ce-c506-ca58-9aad-d7353455871a" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_ClipboardEmpty_DoesNothing" computerName="DESKTOP-CM8OBSG" duration="00:00:00.1190000" startTime="2026-11-19T22:20:11.5769676+01:00" endTime="2026-11-19T22:20:11.6963669+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c662b7e0-2128-4fa7-a55e-60db4a4612d4" />
+    <UnitTestResult executionId="ff62c123-0b51-4734-bf57-855bbfea8f03" testId="b84319ed-3905-62db-5e06-b10fbd694264" testName="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.GetNewEntries_OhneRollover_WendetOffsetWeiterhinAn" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0080000" startTime="2026-11-19T22:20:12.2355150+01:00" endTime="2026-11-19T22:20:12.2445823+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ff62c123-0b51-4734-bf57-855bbfea8f03" />
+    <UnitTestResult executionId="b138a079-637d-419a-abd5-16bf8e11e4df" testId="6720bb3c-655c-394e-8690-1807e7edae73" testName="Softwareschmiede.Tests.E2E.End2EndTest.General_AutoShutdown_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:17.3930236+01:00" endTime="2026-11-19T22:20:17.4443988+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b138a079-637d-419a-abd5-16bf8e11e4df">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="463e37c0-3dbe-4952-a7b5-e5b0832b7d70" testId="6bb18395-9ee2-d11f-d724-b4f8451891de" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StopCliAsync_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0320000" startTime="2026-11-19T22:20:22.8838897+01:00" endTime="2026-11-19T22:20:22.9165827+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="463e37c0-3dbe-4952-a7b5-e5b0832b7d70" />
+    <UnitTestResult executionId="e727f579-7482-4805-931e-d1a321d5c5a7" testId="d4db2f33-3b86-36a1-b72c-61b266a5b71f" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_ProzessEndeVorReadLoopDrain_VerliertTailOutputNicht" computerName="DESKTOP-CM8OBSG" duration="00:00:00.2160000" startTime="2026-11-19T22:20:23.4222726+01:00" endTime="2026-11-19T22:20:23.6383677+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e727f579-7482-4805-931e-d1a321d5c5a7" />
+    <UnitTestResult executionId="b29b0138-0e3b-4131-b2c2-242cb5ae6677" testId="90451a9f-1855-46f8-2b7e-e7b485aab9de" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_ProzessVorVerdrahtungBeendet_MapptExitCodeAufStatus(exitCode: 1, erwarteterStatus: Fehler)" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0250000" startTime="2026-11-19T22:20:23.0199476+01:00" endTime="2026-11-19T22:20:23.0450463+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b29b0138-0e3b-4131-b2c2-242cb5ae6677" />
+    <UnitTestResult executionId="1dff4ceb-2292-4c80-848b-06ece80db64d" testId="6fb41965-e99f-4746-a458-283a583d27a6" testName="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.GetNewEntries_LiestNurInhaltNachOffset" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0100000" startTime="2026-11-19T22:20:12.2121715+01:00" endTime="2026-11-19T22:20:12.2227982+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1dff4ceb-2292-4c80-848b-06ece80db64d" />
+    <UnitTestResult executionId="29611e5d-8dc7-46ae-bbd4-11ac2a3e3e77" testId="214c2d8e-4d29-cad9-1ed0-a86a25093f46" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_FailedVorVerdrahtung_WirdErkanntUndAlsFehlerGemeldet" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0240000" startTime="2026-11-19T22:20:24.8237099+01:00" endTime="2026-11-19T22:20:24.8486499+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="29611e5d-8dc7-46ae-bbd4-11ac2a3e3e77" />
+    <UnitTestResult executionId="004d7c3f-e671-4394-b80a-74af1bfab6e0" testId="dfafce58-7e08-47a7-e824-c0c73b0a45dd" testName="Softwareschmiede.Tests.ServiceIntegration.CliEmbeddingServiceIntegrationTests.StartCliAsync_StartetProzess_UndSetztIsRunningAufTrue" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0340000" startTime="2026-11-19T22:20:09.7212179+01:00" endTime="2026-11-19T22:20:09.7555679+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="004d7c3f-e671-4394-b80a-74af1bfab6e0" />
+    <UnitTestResult executionId="2df46153-50cd-4c2f-a910-7cf5d5a689b4" testId="a69ad4b2-1f64-e173-0728-1fa34d9eb7b4" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlV_CallsReadClipboardAndInsertAsync" computerName="DESKTOP-CM8OBSG" duration="00:00:00.2480000" startTime="2026-11-19T22:20:10.0404497+01:00" endTime="2026-11-19T22:20:10.2889776+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2df46153-50cd-4c2f-a910-7cf5d5a689b4" />
+    <UnitTestResult executionId="1a64972e-8aa7-4afb-8cd6-0fedaf9f0a7a" testId="b07b0c12-4f2e-0e05-66bc-f21e636612c5" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlShiftC_CopiesSelectionWithoutCliInput" computerName="DESKTOP-CM8OBSG" duration="00:00:00.3810000" startTime="2026-11-19T22:20:10.5674056+01:00" endTime="2026-11-19T22:20:10.9494394+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1a64972e-8aa7-4afb-8cd6-0fedaf9f0a7a" />
+    <UnitTestResult executionId="edf6ce8a-88c4-4e91-844b-4945b0c5b4b1" testId="0d68c64b-b8a3-8696-a145-1a1f41135e9c" testName="Softwareschmiede.Tests.E2E.End2EndTest.General_ViewNavigation_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:17.3399335+01:00" endTime="2026-11-19T22:20:17.3923595+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="edf6ce8a-88c4-4e91-844b-4945b0c5b4b1">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="2c1a2932-426a-44a3-b0ff-1199c0b760e5" testId="e4872025-3d52-09c4-8cb5-40088b3610be" testName="Softwareschmiede.Tests.E2E.End2EndTest.General_RepositoryUndAufgaben_E2E" computerName="DESKTOP-CM8OBSG" duration="00:00:00.0010000" startTime="2026-11-19T22:20:17.0834705+01:00" endTime="2026-11-19T22:20:17.1329830+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2c1a2932-426a-44a3-b0ff-1199c0b760e5">
+      <Output>
+        <ErrorInfo>
+          <Message>Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="25b52306-d0b3-4d8c-a7bc-59f3a8b3d486" testId="ea9ff866-f224-4f2e-3eb6-18efc44a0839" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_SessionFailed_MeldetFehlerStattGestoppt" computerName="DESKTOP-CM8OBSG" duration="00:00:00.3310000" startTime="2026-11-19T22:20:23.0456134+01:00" endTime="2026-11-19T22:20:23.3772858+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="25b52306-d0b3-4d8c-a7bc-59f3a8b3d486" />
+    <UnitTestResult executionId="24796251-241d-4f9f-999b-20f3e57438f7" testId="4398f24a-1109-2310-d62c-0fd7277ed229" testName="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.KiAusfuehrungsService_HandleProcessExited_DisposesSession" computerName="DESKTOP-CM8OBSG" duration="00:00:05.0370000" startTime="2026-11-19T22:20:17.7978528+01:00" endTime="2026-11-19T22:20:22.8351556+01:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="24796251-241d-4f9f-999b-20f3e57438f7" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests_WorkingDirectory.StartCliAsync_ShouldUseRepoRootWhenConfigNull" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="b99a7e35-c142-f240-0f79-fb9f2c1dde43">
+      <Execution id="9a6dae67-ea2c-4d70-8694-37769daf8a9d" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests_WorkingDirectory" name="StartCliAsync_ShouldUseRepoRootWhenConfigNull" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests.Start_UeberWritePromptAsyncGesendeterPromptWirdAusgefuehrt" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="e2528f48-eeea-52eb-0fbd-f8603a5476df">
+      <Execution id="2cef0a0d-1c0b-473b-84b6-37d7a6653d2c" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests" name="Start_UeberWritePromptAsyncGesendeterPromptWirdAusgefuehrt" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.E2E_RepositoryManagementTests.BasisBranchVerwaltung" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="ed97e3bb-dcf2-66e8-188e-4561fdbac463">
+      <Execution id="aa3cc624-6faa-42ba-a364-74f6661021ff" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.E2E_RepositoryManagementTests" name="BasisBranchVerwaltung" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.ScmEventsE2ETests.ScmEvents_QueueReceptionDispatchAndReplies_UseRealPipeline" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="319eb863-cb90-32ab-204b-66ffee43ed6e">
+      <Execution id="379b60cc-c57f-4dfa-b667-ca3a85c1df60" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.ScmEventsE2ETests" name="ScmEvents_QueueReceptionDispatchAndReplies_UseRealPipeline" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.General_Konsolenwiedergabe_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="9a216e29-748f-3fec-d34b-2940821e2281">
+      <Execution id="9c140128-6dbd-4565-85e3-ab1bba5c79a8" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="General_Konsolenwiedergabe_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.TestCliStartAsync" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="b3e43d2e-4fb3-c010-d3ae-a3ca7ebb537f">
+      <Execution id="9015e0b4-c00f-4b68-a316-cef22b524fbe" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="TestCliStartAsync" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.AddCliOutputAsync_RateLimitMarkerAusConPtyOutput_ErzeugtRateLimitEintrag" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="34d3a7ee-05a8-50e7-3be5-87b9abff68b3">
+      <Execution id="bf91c7c1-e2dd-47f0-9c9c-956e6abb211f" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="AddCliOutputAsync_RateLimitMarkerAusConPtyOutput_ErzeugtRateLimitEintrag" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.GetNewEntries_OhneRollover_WendetOffsetWeiterhinAn" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="b84319ed-3905-62db-5e06-b10fbd694264">
+      <Execution id="ff62c123-0b51-4734-bf57-855bbfea8f03" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests" name="GetNewEntries_OhneRollover_WendetOffsetWeiterhinAn" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_CallsMarkInputActivity" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="25022f8f-e139-9829-5d0b-6fceb1723eae">
+      <Execution id="1d2274d3-ab7c-4932-b027-27cbb4ad2eb5" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="ReadClipboardAndInsertAsync_CallsMarkInputActivity" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.GetClipboardText_ClipboardAccessThrows_ReturnsEmptyString" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="3063305f-49ba-e544-9a3c-acaab3c8967a">
+      <Execution id="876fac2a-4196-477e-92e6-36d9f521cc23" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="GetClipboardText_ClipboardAccessThrows_ReturnsEmptyString" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungAusfuehrungTests.InitialisierungsskriptAusfuehrung" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="0ae1cd9c-5b10-543a-7527-0556321e216c">
+      <Execution id="33eff9f8-1975-4e17-8b2f-56a00f99363b" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungAusfuehrungTests" name="InitialisierungsskriptAusfuehrung" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_FailedVorVerdrahtung_WirdErkanntUndAlsFehlerGemeldet" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="214c2d8e-4d29-cad9-1ed0-a86a25093f46">
+      <Execution id="29611e5d-8dc7-46ae-bbd4-11ac2a3e3e77" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StartTerminalSessionAsync_FailedVorVerdrahtung_WirdErkanntUndAlsFehlerGemeldet" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests_WorkingDirectory.StartCliAsync_ShouldUseEffectiveWorkingDirectory" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="ebde70a9-854f-21ad-1160-b1c84235a5e5">
+      <Execution id="e0ddd8d3-c7fa-4505-93cf-61fe8b467064" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests_WorkingDirectory" name="StartCliAsync_ShouldUseEffectiveWorkingDirectory" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_SessionWechseltWaerendPaste_SchreibtInSnapshotSession" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="ef8d06a0-7e6f-90b4-d40c-359df03b82d4">
+      <Execution id="28d397e9-b525-4c80-81ee-880fdda99eaa" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="ReadClipboardAndInsertAsync_SessionWechseltWaerendPaste_SchreibtInSnapshotSession" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.General_ViewNavigation_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="0d68c64b-b8a3-8696-a145-1a1f41135e9c">
+      <Execution id="edf6ce8a-88c4-4e91-844b-4945b0c5b4b1" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="General_ViewNavigation_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlShiftV_CallsReadClipboardAndInsertAsync" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="5439f510-9abf-d4dd-7b4b-33a52b4f9561">
+      <Execution id="9c6b04cc-8c0c-49fd-a38c-8832b2092433" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="OnPreviewKeyDown_CtrlShiftV_CallsReadClipboardAndInsertAsync" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlShiftCOhneAuswahl_LaesstClipboardUndCliInputUnveraendert" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="25d417a0-73ca-ad0c-d612-d0a6b78c9725">
+      <Execution id="c07da822-6b1a-4b23-9d13-ef8fb64b8ab3" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="OnPreviewKeyDown_CtrlShiftCOhneAuswahl_LaesstClipboardUndCliInputUnveraendert" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.ServiceIntegration.CliEmbeddingServiceIntegrationTests.StartCliAsync_StartetProzess_UndSetztIsRunningAufTrue" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="dfafce58-7e08-47a7-e824-c0c73b0a45dd">
+      <Execution id="004d7c3f-e671-4394-b80a-74af1bfab6e0" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.ServiceIntegration.CliEmbeddingServiceIntegrationTests" name="StartCliAsync_StartetProzess_UndSetztIsRunningAufTrue" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_ProzessEndeVorReadLoopDrain_VerliertTailOutputNicht" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="d4db2f33-3b86-36a1-b72c-61b266a5b71f">
+      <Execution id="e727f579-7482-4805-931e-d1a321d5c5a7" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StartTerminalSessionAsync_ProzessEndeVorReadLoopDrain_VerliertTailOutputNicht" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_PersistiertSessionOutputAlsCliOutput" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="5281966a-a6ce-28cc-ac67-c13dcfc9b338">
+      <Execution id="9d3b0bf0-8d3e-442b-b31e-a5096c66521c" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StartTerminalSessionAsync_PersistiertSessionOutputAlsCliOutput" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_LangerMehrzeiligerText_WritesCompleteEncodedBytes" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="744d1cc9-9e72-a8c5-ffc8-1179015520de">
+      <Execution id="9762771b-5f45-4a79-9af3-9aa8f205547e" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="ReadClipboardAndInsertAsync_LangerMehrzeiligerText_WritesCompleteEncodedBytes" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.WpfE2ETests.WpfBasisSzenarien" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="ccb79201-0e91-71f7-495e-81d1f62cc781">
+      <Execution id="004db754-2ae9-4112-8265-d2bcfd9c4d62" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.WpfE2ETests" name="WpfBasisSzenarien" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.GetClipboardText_ClipboardContainsText_ReturnsText" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="ae80d8c1-e280-cb43-3766-6cc12f75c95f">
+      <Execution id="b6054b87-1cb1-48d6-98e3-52ffe2a00cfe" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="GetClipboardText_ClipboardContainsText_ReturnsText" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.TerminalText_LiveMarkCopyAndKeepSelection_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="5486a42d-d216-3b2e-753f-93025d95dcd6">
+      <Execution id="b76223d3-8e40-46de-9a01-31df5d5584ea" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="TerminalText_LiveMarkCopyAndKeepSelection_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartCliAsync_ShouldReturnHandle_WhenPluginProvidesValidProcessStartInfo" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="9363b3d2-b418-8257-22a8-60c83fcb5fb4">
+      <Execution id="09fc73f2-6c7d-4dcc-b822-57d17a12ea50" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StartCliAsync_ShouldReturnHandle_WhenPluginProvidesValidProcessStartInfo" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.GetNewEntries_WaehltNeuesteDatei" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="a64d7e20-9a6b-5320-fd5a-0774d3e1ea16">
+      <Execution id="f3af6ed1-a31e-42cf-833f-bb7addfc6628" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests" name="GetNewEntries_WaehltNeuesteDatei" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.ReplayText_CopyShortcutWithFocusedSelection_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="fbd1667d-eac0-405c-438f-390a530c7751">
+      <Execution id="1b6d77c2-b4a5-4f33-a298-1117855e090a" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="ReplayText_CopyShortcutWithFocusedSelection_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.CheckAppStartupException_ErkenntMainWindowFehler" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="76e8876a-9bbd-2584-4b0a-545ca6f7231f">
+      <Execution id="a3353e40-1ab5-47fc-84a1-4ef70ce4f2c6" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests" name="CheckAppStartupException_ErkenntMainWindowFehler" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.General_UpdateStartvarianten_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="028ffa4e-268d-2c71-c2ca-ab87167dc080">
+      <Execution id="005331ca-0993-48c8-b134-0b12e7a97958" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="General_UpdateStartvarianten_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests.Start_LiefertLaufendenProzessUndSession" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="0b0af7ea-6859-9ced-dfbe-78658104577a">
+      <Execution id="d9270be8-478f-4166-97fa-7981d623e616" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests" name="Start_LiefertLaufendenProzessUndSession" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.General_RepositoryUndAufgaben_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="e4872025-3d52-09c4-8cb5-40088b3610be">
+      <Execution id="2c1a2932-426a-44a3-b0ff-1199c0b760e5" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="General_RepositoryUndAufgaben_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_ClipboardAccessThrows_LogsWarningAndContinues" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="6c3b27eb-7de3-415e-0b40-71af8e7d59cf">
+      <Execution id="55b0f295-ce52-48f4-a77e-a7f5b13b03a7" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="ReadClipboardAndInsertAsync_ClipboardAccessThrows_LogsWarningAndContinues" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.GetNewEntries_BeiLogRollover_LiestNeueDateiAbAnfang" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="c9959287-bc07-2766-13c3-0937d57f26b6">
+      <Execution id="c031fc7c-a5b4-48bb-b2e3-15eabe6a87c6" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests" name="GetNewEntries_BeiLogRollover_LiestNeueDateiAbAnfang" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.ProcessExited_ExitCodeZero_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="d6395bd6-017f-f293-b218-98ed6c9168b4">
+      <Execution id="94d49541-0ed4-44d7-a181-04c69d8680d8" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="ProcessExited_ExitCodeZero_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlShiftV_SetsHandledTrue" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="86ee3a10-3d4e-232e-0388-645e46beaca9">
+      <Execution id="713155e0-54eb-4df0-89e4-4d74946938db" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="OnPreviewKeyDown_CtrlShiftV_SetsHandledTrue" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirectory.StartCliAsync_ShouldResolveConfiguredWorkingDirectory_ViaSourcePath_WhenPluginIsInSourceDirectoryMode" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="39653fae-18b4-092b-4e2e-c6ea4ae1e6e3">
+      <Execution id="e9cd13f6-2cc0-4525-be18-c3a45044a8c0" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirectory" name="StartCliAsync_ShouldResolveConfiguredWorkingDirectory_ViaSourcePath_WhenPluginIsInSourceDirectoryMode" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.GetNewEntries_LiestNurInhaltNachOffset" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="6fb41965-e99f-4746-a458-283a583d27a6">
+      <Execution id="1dff4ceb-2292-4c80-848b-06ece80db64d" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests" name="GetNewEntries_LiestNurInhaltNachOffset" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.General_AutoShutdown_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="6720bb3c-655c-394e-8690-1807e7edae73">
+      <Execution id="b138a079-637d-419a-abd5-16bf8e11e4df" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="General_AutoShutdown_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.Simulator_PluginwechselProjektstandardAufgabenstartUndNavigation_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="086ce61c-5525-d200-660b-7bc989658ae8">
+      <Execution id="803fbe5d-bc9c-4081-aa82-3dd9689c78dc" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="Simulator_PluginwechselProjektstandardAufgabenstartUndNavigation_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlShiftC_CopiesSelectionWithoutCliInput" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="b07b0c12-4f2e-0e05-66bc-f21e636612c5">
+      <Execution id="1a64972e-8aa7-4afb-8cd6-0fedaf9f0a7a" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="OnPreviewKeyDown_CtrlShiftC_CopiesSelectionWithoutCliInput" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.ProjektDetailSzenarien" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="921288cd-4020-5855-24a6-07400c7ae517">
+      <Execution id="4284b9b4-ae75-4647-bb07-c972200b98ba" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.ProjectDetailE2ETests" name="ProjektDetailSzenarien" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests.Start_ProzessBeendetSichAufKillEntireProcessTree" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="88e28083-af23-2896-1eb6-db216cfaf1ef">
+      <Execution id="7a08c7c5-e7c5-4b92-ad3e-38503792008c" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests" name="Start_ProzessBeendetSichAufKillEntireProcessTree" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.KiAusfuehrungsService_HandleProcessExited_DisposesSession" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="4398f24a-1109-2310-d62c-0fd7277ed229">
+      <Execution id="24796251-241d-4f9f-999b-20f3e57438f7" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="KiAusfuehrungsService_HandleProcessExited_DisposesSession" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.ProcessExited_ExitCodeNonZero_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="bbb3183f-523a-082e-5a7a-e3cbb61c8894">
+      <Execution id="13c02e9b-23de-4078-b420-adba2757d1fa" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="ProcessExited_ExitCodeNonZero_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.ConPtyProcessExited_SubscriberThrows_LogsAndDoesNotCrash" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="99d30cd6-b106-c4fe-a2c1-395134ec830e">
+      <Execution id="9f49c5c2-23bf-401c-9a22-c8ec8ef7d987" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="ConPtyProcessExited_SubscriberThrows_LogsAndDoesNotCrash" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_ParalleleAufgaben_TrenntProtokolleNachAufgabeId" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="214a5a20-88cb-6379-20dc-ee89a6e1d36c">
+      <Execution id="bd6fcd5c-ec39-4e4d-8da6-b09ccaab22de" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StartTerminalSessionAsync_ParalleleAufgaben_TrenntProtokolleNachAufgabeId" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests.Start_GesendetesKommandoWirdAusgefuehrt" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="9880ea43-6ef7-fc93-f56e-14f5aa29a96c">
+      <Execution id="c4511252-88a4-4177-b4fa-589f085e59be" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Infrastructure.Terminal.SimulatedPseudoConsoleProcessLauncherTests" name="Start_GesendetesKommandoWirdAusgefuehrt" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlV_CallsReadClipboardAndInsertAsync" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="a69ad4b2-1f64-e173-0728-1fa34d9eb7b4">
+      <Execution id="2df46153-50cd-4c2f-a910-7cf5d5a689b4" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="OnPreviewKeyDown_CtrlV_CallsReadClipboardAndInsertAsync" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlV_SetsHandledTrue" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="2409ccd9-e5b1-e818-fbd1-0b2c7d193707">
+      <Execution id="9551b5c1-b2ea-422d-b43d-2ed7e00cb368" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="OnPreviewKeyDown_CtrlV_SetsHandledTrue" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.ConPty_SessionReattach_KeineDoppelausgabe_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="d56e21e5-349b-f4fb-6a3f-46a399d31231">
+      <Execution id="d72b0fdf-b1e3-4797-b47f-a2e76ffc9e8d" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="ConPty_SessionReattach_KeineDoppelausgabe_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_Success_WritesEncodedBytesToInputStream" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="264462ac-84ba-77a7-d26a-a40aafbc1c48">
+      <Execution id="44c493b1-3b5d-41c6-a702-894dc8d8acbb" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="ReadClipboardAndInsertAsync_Success_WritesEncodedBytesToInputStream" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.General_BasisUndEinstellungen_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="96fa0a5a-1f2b-d47e-59ef-cafa7ee3d3f2">
+      <Execution id="8a525038-cb4b-410b-89e0-328cd13b801e" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="General_BasisUndEinstellungen_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StopCliAsync_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="6bb18395-9ee2-d11f-d724-b4f8451891de">
+      <Execution id="463e37c0-3dbe-4952-a7b5-e5b0832b7d70" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StopCliAsync_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_ClipboardEmpty_DoesNothing" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="d73328ce-c506-ca58-9aad-d7353455871a">
+      <Execution id="c662b7e0-2128-4fa7-a55e-60db4a4612d4" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="ReadClipboardAndInsertAsync_ClipboardEmpty_DoesNothing" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungConfigTests.InitialisierungsskriptKonfiguration" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="883bb55e-0d12-a832-4e8c-b994f961c8d6">
+      <Execution id="3dcc262e-b382-43d1-955e-e190b9b79ce3" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungConfigTests" name="InitialisierungsskriptKonfiguration" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_MitInjiziertemFakeLauncher_ErreichtGestartet" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="c40fc78e-e60e-38c5-13d1-5eb4abdc518e">
+      <Execution id="d3e3a817-1c29-4440-ab5e-951d7b3bb630" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StartTerminalSessionAsync_MitInjiziertemFakeLauncher_ErreichtGestartet" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.GetNewEntries_KeinVerzeichnis_LiefertLeer" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="89c34482-ee44-94ba-0aba-db0ae695f0b2">
+      <Execution id="92316ae1-5811-4561-b5e1-cdd3b8ac5ea4" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests" name="GetNewEntries_KeinVerzeichnis_LiefertLeer" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.ProcessExited_SubscriberThrows_LogsAndDoesNotCrash" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="1eef257a-c385-1c7b-0256-41748ed8151c">
+      <Execution id="f815f3b3-fcec-4baf-886f-15163f773d43" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="ProcessExited_SubscriberThrows_LogsAndDoesNotCrash" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.ReplayText_MarkAndCopyViaMouse_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="57ae54b5-ebbc-a91a-4258-1751e4f27bd6">
+      <Execution id="49d66de3-7432-42ab-973b-6e7be533de57" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="ReplayText_MarkAndCopyViaMouse_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_FruehesProzessende_KeineWarnungWegenGeschlossenemStream" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="dcec4b44-4fad-734f-44f5-b532b3c1b581">
+      <Execution id="d53315b6-936a-4c55-a9d5-c52e6a04ef17" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StartTerminalSessionAsync_FruehesProzessende_KeineWarnungWegenGeschlossenemStream" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests.CheckAppStartupException_OhneFehler_LiefertNull" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="03cfa187-2e1a-7a25-45c2-f229a8c46726">
+      <Execution id="4656cfca-c62c-4b3f-a5ce-9ce866526df6" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.AppStartupLogInspectorTests" name="CheckAppStartupException_OhneFehler_LiefertNull" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_SessionFailed_MeldetFehlerStattGestoppt" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="ea9ff866-f224-4f2e-3eb6-18efc44a0839">
+      <Execution id="25b52306-d0b3-4d8c-a7bc-59f3a8b3d486" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StartTerminalSessionAsync_SessionFailed_MeldetFehlerStattGestoppt" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.ProcessExited_ScopeFactoryDisposed_PersistiertNichtUndWirftNicht" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="588f1ff2-feea-4c80-3e34-ef36fe64435c">
+      <Execution id="c3bc3b85-968d-42c7-ada9-dd24468bb3d1" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="ProcessExited_ScopeFactoryDisposed_PersistiertNichtUndWirftNicht" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.ConPty_LifecycleUndReplay_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="0204c820-8497-5696-93fb-ce3246bb94bb">
+      <Execution id="316f1305-4234-49c2-b3fa-e014128f608e" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="ConPty_LifecycleUndReplay_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.ConPty_WeitereLebenszyklusSzenarien_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="b6d7a60e-5fc0-4112-53af-8d6efdc2472d">
+      <Execution id="37fd5eda-f2bb-4ae4-9fcf-0be100d08ec3" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="ConPty_WeitereLebenszyklusSzenarien_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.KiAusfuehrungsService_Dispose_CancelsAllSessions" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="e701ed2e-a0ff-188f-d70b-c0d9f01f180c">
+      <Execution id="dbfdd401-2812-4212-a9d5-86bd60c5f7f4" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="KiAusfuehrungsService_Dispose_CancelsAllSessions" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.ServiceIntegration.CliEmbeddingServiceIntegrationTests.StartTerminalSessionAsync_StartetProzess_UndSetztPseudoConsoleSession" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="d9cb8f9a-7f84-d785-b41f-a1a60f46912a">
+      <Execution id="8786c616-17c1-487a-af59-55b313a27488" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.ServiceIntegration.CliEmbeddingServiceIntegrationTests" name="StartTerminalSessionAsync_StartetProzess_UndSetztPseudoConsoleSession" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_ProzessVorVerdrahtungBeendet_MapptExitCodeAufStatus(exitCode: 1, erwarteterStatus: Fehler)" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="90451a9f-1855-46f8-2b7e-e7b485aab9de">
+      <Execution id="b29b0138-0e3b-4131-b2c2-242cb5ae6677" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StartTerminalSessionAsync_ProzessVorVerdrahtungBeendet_MapptExitCodeAufStatus" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_ProzessVorVerdrahtungBeendet_MapptExitCodeAufStatus(exitCode: 0, erwarteterStatus: Gestoppt)" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="0dbbfc0e-6a1e-8107-2fa9-e91866d5524d">
+      <Execution id="5e0669cb-1185-4b3a-9797-30f76e88f657" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StartTerminalSessionAsync_ProzessVorVerdrahtungBeendet_MapptExitCodeAufStatus" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.E2E.End2EndTest.General_UpdateFixtureSmoke_E2E" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="3f171aed-112e-84a2-18b0-e77d185d61a8">
+      <Execution id="8b5f0b79-a1c9-4551-837c-c6f415754b1e" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.E2E.End2EndTest" name="General_UpdateFixtureSmoke_E2E" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.StartTerminalSessionAsync_RestzeileOhneZeilentrenner_PersistiertCliOutput" storage="d:\repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\softwareschmiede.tests\bin\debug\net11.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="58d8a627-a229-4a83-bd44-bae8cf6e7829">
+      <Execution id="64d1b5fb-26f4-4d4e-886b-a59d96668834" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\3a03b2a9-50b8-4446-8c09-c6a65dfc52c2\src\Softwareschmiede.Tests\bin\Debug\net11.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests" name="StartTerminalSessionAsync_RestzeileOhneZeilentrenner_PersistiertCliOutput" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="3f171aed-112e-84a2-18b0-e77d185d61a8" executionId="8b5f0b79-a1c9-4551-837c-c6f415754b1e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ccb79201-0e91-71f7-495e-81d1f62cc781" executionId="004db754-2ae9-4112-8265-d2bcfd9c4d62" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5281966a-a6ce-28cc-ac67-c13dcfc9b338" executionId="9d3b0bf0-8d3e-442b-b31e-a5096c66521c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="76e8876a-9bbd-2584-4b0a-545ca6f7231f" executionId="a3353e40-1ab5-47fc-84a1-4ef70ce4f2c6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a64d7e20-9a6b-5320-fd5a-0774d3e1ea16" executionId="f3af6ed1-a31e-42cf-833f-bb7addfc6628" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="96fa0a5a-1f2b-d47e-59ef-cafa7ee3d3f2" executionId="8a525038-cb4b-410b-89e0-328cd13b801e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b6d7a60e-5fc0-4112-53af-8d6efdc2472d" executionId="37fd5eda-f2bb-4ae4-9fcf-0be100d08ec3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="dcec4b44-4fad-734f-44f5-b532b3c1b581" executionId="d53315b6-936a-4c55-a9d5-c52e6a04ef17" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ebde70a9-854f-21ad-1160-b1c84235a5e5" executionId="e0ddd8d3-c7fa-4505-93cf-61fe8b467064" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="34d3a7ee-05a8-50e7-3be5-87b9abff68b3" executionId="bf91c7c1-e2dd-47f0-9c9c-956e6abb211f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5439f510-9abf-d4dd-7b4b-33a52b4f9561" executionId="9c6b04cc-8c0c-49fd-a38c-8832b2092433" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="214a5a20-88cb-6379-20dc-ee89a6e1d36c" executionId="bd6fcd5c-ec39-4e4d-8da6-b09ccaab22de" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="57ae54b5-ebbc-a91a-4258-1751e4f27bd6" executionId="49d66de3-7432-42ab-973b-6e7be533de57" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9a216e29-748f-3fec-d34b-2940821e2281" executionId="9c140128-6dbd-4565-85e3-ab1bba5c79a8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5486a42d-d216-3b2e-753f-93025d95dcd6" executionId="b76223d3-8e40-46de-9a01-31df5d5584ea" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="319eb863-cb90-32ab-204b-66ffee43ed6e" executionId="379b60cc-c57f-4dfa-b667-ca3a85c1df60" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="883bb55e-0d12-a832-4e8c-b994f961c8d6" executionId="3dcc262e-b382-43d1-955e-e190b9b79ce3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c40fc78e-e60e-38c5-13d1-5eb4abdc518e" executionId="d3e3a817-1c29-4440-ab5e-951d7b3bb630" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="744d1cc9-9e72-a8c5-ffc8-1179015520de" executionId="9762771b-5f45-4a79-9af3-9aa8f205547e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="86ee3a10-3d4e-232e-0388-645e46beaca9" executionId="713155e0-54eb-4df0-89e4-4d74946938db" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="39653fae-18b4-092b-4e2e-c6ea4ae1e6e3" executionId="e9cd13f6-2cc0-4525-be18-c3a45044a8c0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="25022f8f-e139-9829-5d0b-6fceb1723eae" executionId="1d2274d3-ab7c-4932-b027-27cbb4ad2eb5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d56e21e5-349b-f4fb-6a3f-46a399d31231" executionId="d72b0fdf-b1e3-4797-b47f-a2e76ffc9e8d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2409ccd9-e5b1-e818-fbd1-0b2c7d193707" executionId="9551b5c1-b2ea-422d-b43d-2ed7e00cb368" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="264462ac-84ba-77a7-d26a-a40aafbc1c48" executionId="44c493b1-3b5d-41c6-a702-894dc8d8acbb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="88e28083-af23-2896-1eb6-db216cfaf1ef" executionId="7a08c7c5-e7c5-4b92-ad3e-38503792008c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="921288cd-4020-5855-24a6-07400c7ae517" executionId="4284b9b4-ae75-4647-bb07-c972200b98ba" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0dbbfc0e-6a1e-8107-2fa9-e91866d5524d" executionId="5e0669cb-1185-4b3a-9797-30f76e88f657" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e2528f48-eeea-52eb-0fbd-f8603a5476df" executionId="2cef0a0d-1c0b-473b-84b6-37d7a6653d2c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3063305f-49ba-e544-9a3c-acaab3c8967a" executionId="876fac2a-4196-477e-92e6-36d9f521cc23" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="99d30cd6-b106-c4fe-a2c1-395134ec830e" executionId="9f49c5c2-23bf-401c-9a22-c8ec8ef7d987" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="58d8a627-a229-4a83-bd44-bae8cf6e7829" executionId="64d1b5fb-26f4-4d4e-886b-a59d96668834" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d6395bd6-017f-f293-b218-98ed6c9168b4" executionId="94d49541-0ed4-44d7-a181-04c69d8680d8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b99a7e35-c142-f240-0f79-fb9f2c1dde43" executionId="9a6dae67-ea2c-4d70-8694-37769daf8a9d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e701ed2e-a0ff-188f-d70b-c0d9f01f180c" executionId="dbfdd401-2812-4212-a9d5-86bd60c5f7f4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d9cb8f9a-7f84-d785-b41f-a1a60f46912a" executionId="8786c616-17c1-487a-af59-55b313a27488" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="89c34482-ee44-94ba-0aba-db0ae695f0b2" executionId="92316ae1-5811-4561-b5e1-cdd3b8ac5ea4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0ae1cd9c-5b10-543a-7527-0556321e216c" executionId="33eff9f8-1975-4e17-8b2f-56a00f99363b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6c3b27eb-7de3-415e-0b40-71af8e7d59cf" executionId="55b0f295-ce52-48f4-a77e-a7f5b13b03a7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c9959287-bc07-2766-13c3-0937d57f26b6" executionId="c031fc7c-a5b4-48bb-b2e3-15eabe6a87c6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="25d417a0-73ca-ad0c-d612-d0a6b78c9725" executionId="c07da822-6b1a-4b23-9d13-ef8fb64b8ab3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ed97e3bb-dcf2-66e8-188e-4561fdbac463" executionId="aa3cc624-6faa-42ba-a364-74f6661021ff" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0204c820-8497-5696-93fb-ce3246bb94bb" executionId="316f1305-4234-49c2-b3fa-e014128f608e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="03cfa187-2e1a-7a25-45c2-f229a8c46726" executionId="4656cfca-c62c-4b3f-a5ce-9ce866526df6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0b0af7ea-6859-9ced-dfbe-78658104577a" executionId="d9270be8-478f-4166-97fa-7981d623e616" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ae80d8c1-e280-cb43-3766-6cc12f75c95f" executionId="b6054b87-1cb1-48d6-98e3-52ffe2a00cfe" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fbd1667d-eac0-405c-438f-390a530c7751" executionId="1b6d77c2-b4a5-4f33-a298-1117855e090a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9880ea43-6ef7-fc93-f56e-14f5aa29a96c" executionId="c4511252-88a4-4177-b4fa-589f085e59be" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1eef257a-c385-1c7b-0256-41748ed8151c" executionId="f815f3b3-fcec-4baf-886f-15163f773d43" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b3e43d2e-4fb3-c010-d3ae-a3ca7ebb537f" executionId="9015e0b4-c00f-4b68-a316-cef22b524fbe" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9363b3d2-b418-8257-22a8-60c83fcb5fb4" executionId="09fc73f2-6c7d-4dcc-b822-57d17a12ea50" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ef8d06a0-7e6f-90b4-d40c-359df03b82d4" executionId="28d397e9-b525-4c80-81ee-880fdda99eaa" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="588f1ff2-feea-4c80-3e34-ef36fe64435c" executionId="c3bc3b85-968d-42c7-ada9-dd24468bb3d1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="028ffa4e-268d-2c71-c2ca-ab87167dc080" executionId="005331ca-0993-48c8-b134-0b12e7a97958" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="bbb3183f-523a-082e-5a7a-e3cbb61c8894" executionId="13c02e9b-23de-4078-b420-adba2757d1fa" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="086ce61c-5525-d200-660b-7bc989658ae8" executionId="803fbe5d-bc9c-4081-aa82-3dd9689c78dc" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d73328ce-c506-ca58-9aad-d7353455871a" executionId="c662b7e0-2128-4fa7-a55e-60db4a4612d4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b84319ed-3905-62db-5e06-b10fbd694264" executionId="ff62c123-0b51-4734-bf57-855bbfea8f03" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6720bb3c-655c-394e-8690-1807e7edae73" executionId="b138a079-637d-419a-abd5-16bf8e11e4df" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6bb18395-9ee2-d11f-d724-b4f8451891de" executionId="463e37c0-3dbe-4952-a7b5-e5b0832b7d70" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d4db2f33-3b86-36a1-b72c-61b266a5b71f" executionId="e727f579-7482-4805-931e-d1a321d5c5a7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="90451a9f-1855-46f8-2b7e-e7b485aab9de" executionId="b29b0138-0e3b-4131-b2c2-242cb5ae6677" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6fb41965-e99f-4746-a458-283a583d27a6" executionId="1dff4ceb-2292-4c80-848b-06ece80db64d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="214c2d8e-4d29-cad9-1ed0-a86a25093f46" executionId="29611e5d-8dc7-46ae-bbd4-11ac2a3e3e77" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="dfafce58-7e08-47a7-e824-c0c73b0a45dd" executionId="004d7c3f-e671-4394-b80a-74af1bfab6e0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a69ad4b2-1f64-e173-0728-1fa34d9eb7b4" executionId="2df46153-50cd-4c2f-a910-7cf5d5a689b4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b07b0c12-4f2e-0e05-66bc-f21e636612c5" executionId="1a64972e-8aa7-4afb-8cd6-0fedaf9f0a7a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0d68c64b-b8a3-8696-a145-1a1f41135e9c" executionId="edf6ce8a-88c4-4e91-844b-4945b0c5b4b1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e4872025-3d52-09c4-8cb5-40088b3610be" executionId="2c1a2932-426a-44a3-b0ff-1199c0b760e5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ea9ff866-f224-4f2e-3eb6-18efc44a0839" executionId="25b52306-d0b3-4d8c-a7bc-59f3a8b3d486" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4398f24a-1109-2310-d62c-0fd7277ed229" executionId="24796251-241d-4f9f-999b-20f3e57438f7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Ergebnisse nicht in einer Liste" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="Alle geladenen Ergebnisse" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="71" executed="51" passed="51" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v4.0.1+0f7d528729 (64-bit .NET 11.0.0)&#xD;
+[xUnit.net 00:00:00.21]   Discovering: Softwareschmiede.Tests&#xD;
+[xUnit.net 00:00:00.89]   Discovered:  Softwareschmiede.Tests&#xD;
+[xUnit.net 00:00:01.04]   Starting:    Softwareschmiede.Tests&#xD;
+[xUnit.net 00:00:09.35]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungConfigTests.InitialisierungsskriptKonfiguration" wurde im Testlauf übersprungen.&#xD;
+[xUnit.net 00:00:09.40]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+[xUnit.net 00:00:09.45]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+[xUnit.net 00:00:09.51]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 gesetzt (siehe CLAUDE.md, Abschnitt Testing) - bestätigte Sandbox-Limitation dieses Ausführungskontexts, keine automatische Erkennung.&#xD;
+[xUnit.net 00:00:09.56]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+[xUnit.net 00:00:09.62]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 gesetzt (siehe CLAUDE.md, Abschnitt Testing) - bestätigte Sandbox-Limitation dieses Ausführungskontexts, keine automatische Erkennung.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.WpfE2ETests.WpfBasisSzenarien" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.ProjektDetailSzenarien" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungAusfuehrungTests.InitialisierungsskriptAusfuehrung" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.ScmEventsE2ETests.ScmEvents_QueueReceptionDispatchAndReplies_UseRealPipeline" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.TerminalText_LiveMarkCopyAndKeepSelection_E2E" wurde im Testlauf übersprungen.&#xD;
+[xUnit.net 00:00:12.26]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.General_UpdateFixtureSmoke_E2E" wurde im Testlauf übersprungen.&#xD;
+[xUnit.net 00:00:13.86]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.General_UpdateStartvarianten_E2E" wurde im Testlauf übersprungen.&#xD;
+[xUnit.net 00:00:13.92]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 gesetzt (siehe CLAUDE.md, Abschnitt Testing) - bestätigte Sandbox-Limitation dieses Ausführungskontexts, keine automatische Erkennung.&#xD;
+[xUnit.net 00:00:13.97]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+[xUnit.net 00:00:14.03]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+[xUnit.net 00:00:14.08]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+[xUnit.net 00:00:14.13]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+[xUnit.net 00:00:14.18]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+[xUnit.net 00:00:14.23]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 gesetzt (siehe CLAUDE.md, Abschnitt Testing) - bestätigte Sandbox-Limitation dieses Ausführungskontexts, keine automatische Erkennung.&#xD;
+[xUnit.net 00:00:14.28]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 gesetzt (siehe CLAUDE.md, Abschnitt Testing) - bestätigte Sandbox-Limitation dieses Ausführungskontexts, keine automatische Erkennung.&#xD;
+[xUnit.net 00:00:14.33]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.ConPty_WeitereLebenszyklusSzenarien_E2E" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.Simulator_PluginwechselProjektstandardAufgabenstartUndNavigation_E2E" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.General_Konsolenwiedergabe_E2E" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.ReplayText_MarkAndCopyViaMouse_E2E" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.General_RepositoryUndAufgaben_E2E" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.General_BasisUndEinstellungen_E2E" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.ConPty_SessionReattach_KeineDoppelausgabe_E2E" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.ConPty_LifecycleUndReplay_E2E" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.ReplayText_CopyShortcutWithFocusedSelection_E2E" wurde im Testlauf übersprungen.&#xD;
+[xUnit.net 00:00:14.39]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+[xUnit.net 00:00:14.44]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+[xUnit.net 00:00:14.49]       Umgebungsvariable SOFTWARESCHMIEDE_SKIP_WPF_E2E_TESTS=1 gesetzt - keine interaktive Windows-Desktop-Session in dieser Ausführungsumgebung (z. B. GitHub-gehosteter CI-Runner oder Sandbox); echte Fenster-E2E-Tests werden übersprungen statt mit TimeoutException zu scheitern.&#xD;
+timeout: invalid time interval '/t'&#xD;
+Try 'timeout --help' for more information.&#xD;
+timeout: invalid time interval '/t'&#xD;
+Try 'timeout --help' for more information.&#xD;
+timeout: invalid time interval '/t'&#xD;
+Try 'timeout --help' for more information.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.General_ViewNavigation_E2E" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.End2EndTest.General_AutoShutdown_E2E" wurde im Testlauf übersprungen.&#xD;
+Der Test "Softwareschmiede.Tests.E2E.E2E_RepositoryManagementTests.BasisBranchVerwaltung" wurde im Testlauf übersprungen.&#xD;
+timeout: invalid time interval '/t'&#xD;
+Try 'timeout --help' for more information.&#xD;
+timeout: invalid time interval '/t'&#xD;
+Try 'timeout --help' for more information.&#xD;
+[xUnit.net 00:00:23.75]   Finished:    Softwareschmiede.Tests (ID = 'ab6073c4ce6d3089382882912b35d2fc24c6fe131e35422acd3a47bea10946fa')&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:12.3498802+01:00">
+        <Text>[xUnit.net 00:00:09.34]     Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungConfigTests.InitialisierungsskriptKonfiguration [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:12.4086279+01:00">
+        <Text>[xUnit.net 00:00:09.40]     Softwareschmiede.Tests.E2E.WpfE2ETests.WpfBasisSzenarien [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:12.4576244+01:00">
+        <Text>[xUnit.net 00:00:09.45]     Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.ProjektDetailSzenarien [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:12.5100662+01:00">
+        <Text>[xUnit.net 00:00:09.50]     Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungAusfuehrungTests.InitialisierungsskriptAusfuehrung [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:12.5697035+01:00">
+        <Text>[xUnit.net 00:00:09.56]     Softwareschmiede.Tests.E2E.ScmEventsE2ETests.ScmEvents_QueueReceptionDispatchAndReplies_UseRealPipeline [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:12.6231986+01:00">
+        <Text>[xUnit.net 00:00:09.62]     Softwareschmiede.Tests.E2E.End2EndTest.TerminalText_LiveMarkCopyAndKeepSelection_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:15.2679327+01:00">
+        <Text>[xUnit.net 00:00:12.26]     Softwareschmiede.Tests.E2E.End2EndTest.General_UpdateFixtureSmoke_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:16.8670486+01:00">
+        <Text>[xUnit.net 00:00:13.86]     Softwareschmiede.Tests.E2E.End2EndTest.General_UpdateStartvarianten_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:16.9226391+01:00">
+        <Text>[xUnit.net 00:00:13.92]     Softwareschmiede.Tests.E2E.End2EndTest.ConPty_WeitereLebenszyklusSzenarien_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:16.9729647+01:00">
+        <Text>[xUnit.net 00:00:13.97]     Softwareschmiede.Tests.E2E.End2EndTest.Simulator_PluginwechselProjektstandardAufgabenstartUndNavigation_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:17.0308916+01:00">
+        <Text>[xUnit.net 00:00:14.03]     Softwareschmiede.Tests.E2E.End2EndTest.General_Konsolenwiedergabe_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:17.0831291+01:00">
+        <Text>[xUnit.net 00:00:14.08]     Softwareschmiede.Tests.E2E.End2EndTest.ReplayText_MarkAndCopyViaMouse_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:17.1333471+01:00">
+        <Text>[xUnit.net 00:00:14.13]     Softwareschmiede.Tests.E2E.End2EndTest.General_RepositoryUndAufgaben_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:17.1850324+01:00">
+        <Text>[xUnit.net 00:00:14.18]     Softwareschmiede.Tests.E2E.End2EndTest.General_BasisUndEinstellungen_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:17.2360929+01:00">
+        <Text>[xUnit.net 00:00:14.23]     Softwareschmiede.Tests.E2E.End2EndTest.ConPty_SessionReattach_KeineDoppelausgabe_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:17.2877252+01:00">
+        <Text>[xUnit.net 00:00:14.28]     Softwareschmiede.Tests.E2E.End2EndTest.ConPty_LifecycleUndReplay_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:17.3395465+01:00">
+        <Text>[xUnit.net 00:00:14.33]     Softwareschmiede.Tests.E2E.End2EndTest.ReplayText_CopyShortcutWithFocusedSelection_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:17.3927411+01:00">
+        <Text>[xUnit.net 00:00:14.39]     Softwareschmiede.Tests.E2E.End2EndTest.General_ViewNavigation_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:17.4447733+01:00">
+        <Text>[xUnit.net 00:00:14.44]     Softwareschmiede.Tests.E2E.End2EndTest.General_AutoShutdown_E2E [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="DESKTOP-CM8OBSG" outcome="Warning" timestamp="2026-11-19T22:20:17.4978397+01:00">
+        <Text>[xUnit.net 00:00:14.49]     Softwareschmiede.Tests.E2E.E2E_RepositoryManagementTests.BasisBranchVerwaltung [SKIP]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>
