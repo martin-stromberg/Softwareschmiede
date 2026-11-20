@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Serialization;
 using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.Domain.ValueObjects;
@@ -14,7 +15,8 @@ public enum ScmContentKind { Description, IssueComment, ReviewComment, PullReque
 /// <summary>Vom Provider geladene Repository- und Authentifizierungsdaten, ohne Credentials.</summary>
 public sealed record ScmEventRepository(string ProviderPrefix, string Host, string RepositoryId,
     string Owner, string Name, string? OwnerId, string ViewerId, string ViewerLogin, bool CanWrite,
-    ScmAccountMode Account = ScmAccountMode.UserAccount, string? NumericRepositoryId = null);
+    [property: JsonPropertyName("konto")] ScmAccountMode Account = ScmAccountMode.UserAccount,
+    string? NumericRepositoryId = null);
 
 /// <summary>Validierter Ursprung einer Beobachtung oder Antwort.</summary>
 public sealed record ScmEventReference(ScmEventRepository Repository, ScmReferenceKind Kind, int Number);

@@ -183,7 +183,7 @@ public sealed class ScmIssuePreparationMonitoringService(
         if (await preparation.SkipEvaluationAsync(issue, ct))
             return;
         // Die erzeugte Referenz trägt das konfigurierte Monitoring-Konto: Remote-Aktionen des
-        // Ausführungspfads wählen ihr Credential über ScmEventRepository.Konto.
+        // Ausführungspfads wählen ihr Credential über ScmEventRepository.Account.
         var tagged = issue with { Repository = issue.Repository with { Account = accountMode } };
         var batch = await source.ReadEventsAsync(
             new ScmEventReadRequest(tagged, ScmContentKind.Description, null, _time.GetUtcNow()), ct);
