@@ -11,7 +11,7 @@ public sealed class CliOutputRecorderTests
 {
     /// <summary>Der Recorder zeichnet jeden Chunk mit Offset und kopiert die Bytes sofort.</summary>
     [Fact]
-    public void OnOutputChunk_ZeichnetChunksMitOffsetUndBytekopie()
+    public void OnOutputChunk_DrawsChunksWithOffsetAndBytecopy()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var workItemId = Guid.NewGuid();
@@ -42,7 +42,7 @@ public sealed class CliOutputRecorderTests
     /// <summary>Bei Budget-Überschreitung bleibt das intakte Präfix erhalten und die Aufzeichnung
     /// wird als unvollständig markiert; weitere Chunks werden ignoriert.</summary>
     [Fact]
-    public void OnOutputChunk_BudgetUeberschritten_BehaeltIntaktesPraefixUndStoppt()
+    public void OnOutputChunk_BudgetExceeded_StopsKeepsIntactPrefixAnd()
     {
         var sut = new CliOutputRecorder(Guid.NewGuid(), "P", 80, 24, 5, new FakeTimeProvider());
 
@@ -59,7 +59,7 @@ public sealed class CliOutputRecorderTests
     /// <summary><see cref="CliOutputRecorder.Complete"/> setzt das Ende-Zeitstempel-Feld einmalig
     /// und ist idempotent; <see cref="ITerminalOutputSink.CompleteAsync"/> verhält sich gleich.</summary>
     [Fact]
-    public async Task Complete_SetztEndeUtc_Idempotent()
+    public async Task Complete_SetsEndUtc_Idempotent()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 12, 0, 0, TimeSpan.Zero));
         var sut = new CliOutputRecorder(Guid.NewGuid(), "P", 80, 24, 1024, timeProvider);
@@ -78,7 +78,7 @@ public sealed class CliOutputRecorderTests
     /// <summary><see cref="CliOutputRecorder.GetRecording"/> liefert einen Snapshot: später
     /// aufgezeichnete Chunks ändern eine bereits geholte Aufzeichnung nicht.</summary>
     [Fact]
-    public void GetAufzeichnung_LiefertUnabhaengigenSnapshot()
+    public void GetRecording_ReturnsIndependentSnapshot()
     {
         var sut = new CliOutputRecorder(Guid.NewGuid(), "P", 80, 24, 1024, new FakeTimeProvider());
 
@@ -94,7 +94,7 @@ public sealed class CliOutputRecorderTests
 
     /// <summary>Leere Chunks werden nicht aufgezeichnet (kein Rauschen im Mitschnitt).</summary>
     [Fact]
-    public void OnOutputChunk_LeererChunk_WirdIgnoriert()
+    public void OnOutputChunk_EmptyChunk_WillIgnores()
     {
         var sut = new CliOutputRecorder(Guid.NewGuid(), "P", 80, 24, 1024, new FakeTimeProvider());
 
@@ -106,7 +106,7 @@ public sealed class CliOutputRecorderTests
     /// <summary>Der Recorder implementiert bewusst nicht <see cref="ITerminalDiagnosticsSink"/>, damit
     /// Diagnose-Markerzeilen nicht in den byte-exakten Mitschnitt gelangen.</summary>
     [Fact]
-    public void Recorder_ImplementiertNichtITerminalDiagnoseSink()
+    public void Recorder_ImplementsNotITerminalDiagnosticsSink()
     {
         ITerminalOutputSink sut = new CliOutputRecorder(Guid.NewGuid(), "P", 80, 24, 1024, new FakeTimeProvider());
 

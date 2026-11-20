@@ -103,16 +103,16 @@ public sealed class E2E_IdePluginSelection : IDisposable
         await plugin.OpenEntryPointAsync(entryPoints[0]);
     }
 
-    private (PluginSelectionService PluginSelectionService, RecordingProzessStarter ProzessStarter) CreateStack()
+    private (PluginSelectionService PluginSelectionService, RecordingProcessStarter ProcessStarter) CreateStack()
     {
         var (pluginSelectionService, processStarter, _) = CreateStackWithActivationService();
         return (pluginSelectionService, processStarter);
     }
 
-    private (PluginSelectionService PluginSelectionService, RecordingProzessStarter ProzessStarter, PluginActivationService PluginActivationService) CreateStackWithActivationService()
+    private (PluginSelectionService PluginSelectionService, RecordingProcessStarter ProcessStarter, PluginActivationService PluginActivationService) CreateStackWithActivationService()
     {
         var db = TestDbContextFactory.Create();
-        var processStarter = new RecordingProzessStarter();
+        var processStarter = new RecordingProcessStarter();
         var visualStudioCodeLocator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
 
         var services = new ServiceCollection()
@@ -139,7 +139,7 @@ public sealed class E2E_IdePluginSelection : IDisposable
         return (pluginSelectionService, processStarter, pluginActivationService);
     }
 
-    private sealed class RecordingProzessStarter : IProcessStarter
+    private sealed class RecordingProcessStarter : IProcessStarter
     {
         public List<ProcessStartRequest> Calls { get; } = [];
 

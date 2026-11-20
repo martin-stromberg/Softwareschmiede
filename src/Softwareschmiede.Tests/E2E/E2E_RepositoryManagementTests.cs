@@ -34,12 +34,12 @@ public sealed class E2E_RepositoryManagementTests : WpfTestBase
     /// Basis-Branches in der Projektdetailansicht.
     /// </summary>
     [Fact]
-    public async Task BasisBranchVerwaltung()
+    public async Task BaseBranchManagement()
     {
         var mainWindow = LaunchAppAndGetMainWindow();
 
-        await RepositoryZuweisen_MitBasisBranchAuswahl_SpeichertUndZeigtBasisBranch_E2E(mainWindow);
-        await BasisBranchBearbeiten_InProjektdetailansicht_SpeichertNeuenBasisBranch_E2E(mainWindow);
+        await AssignRepository_WithBaseBranchSelection_SavesAndShowsBaseBranch_E2E(mainWindow);
+        await BaseBranchEdit_InProjectdetailview_SavesNewBaseBranch_E2E(mainWindow);
     }
 
     /// <summary>
@@ -48,10 +48,10 @@ public sealed class E2E_RepositoryManagementTests : WpfTestBase
     /// Projektdetailansicht angezeigt.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private async Task RepositoryZuweisen_MitBasisBranchAuswahl_SpeichertUndZeigtBasisBranch_E2E(Window mainWindow)
+    private async Task AssignRepository_WithBaseBranchSelection_SavesAndShowsBaseBranch_E2E(Window mainWindow)
     {
         const string repoFolderName = "BasisBranch-Assign-Repo";
-        const string projektName = "BasisBranch-Assign-Projekt";
+        const string projectName = "BasisBranch-Assign-Projekt";
         const string baseBranch = "staging";
 
         var sourceDirectory = CreateLocalSourceDirectory(repoFolderName);
@@ -59,8 +59,8 @@ public sealed class E2E_RepositoryManagementTests : WpfTestBase
         var settings = new SettingsView(mainWindow).ForceShow();
         var dashboard = settings.ConfigureLocalDirectoryPlugin(sourceDirectory);
         var projectList = dashboard.Menu.NavigateToProjects();
-        projectList.CreateProject(projektName);
-        var projectDetail = projectList.OpenProject(projektName);
+        projectList.CreateProject(projectName);
+        var projectDetail = projectList.OpenProject(projectName);
 
         var dialog = new RepositoryAssignDialogView(mainWindow).ForceShow();
         dialog.SelectFirstRepository();
@@ -80,21 +80,21 @@ public sealed class E2E_RepositoryManagementTests : WpfTestBase
     /// wird persistiert und angezeigt.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private async Task BasisBranchBearbeiten_InProjektdetailansicht_SpeichertNeuenBasisBranch_E2E(Window mainWindow)
+    private async Task BaseBranchEdit_InProjectdetailview_SavesNewBaseBranch_E2E(Window mainWindow)
     {
         const string repoFolderName = "BasisBranch-Assign-Repo";
-        const string neuerBasisBranch = "release";
+        const string newBaseBranch = "release";
 
         var projectList = new ProjectListView(mainWindow).ForceShow();
         var projectDetail = projectList.OpenProject("BasisBranch-Assign-Projekt");
 
         projectDetail.EditBaseBranch();
-        projectDetail.SetBaseBranch(neuerBasisBranch);
+        projectDetail.SetBaseBranch(newBaseBranch);
         projectDetail.SaveBaseBranch();
 
-        var saved = await WaitForSavedSourceBranchAsync(repoFolderName, neuerBasisBranch);
-        Assert.Equal(neuerBasisBranch, saved);
-        Assert.Equal(neuerBasisBranch, projectDetail.GetBaseBranch());
+        var saved = await WaitForSavedSourceBranchAsync(repoFolderName, newBaseBranch);
+        Assert.Equal(newBaseBranch, saved);
+        Assert.Equal(newBaseBranch, projectDetail.GetBaseBranch());
 
         projectDetail.DeleteProject();
         projectDetail.Menu.NavigateToDashboard();

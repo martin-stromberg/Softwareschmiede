@@ -27,12 +27,12 @@ public partial class End2EndTest
     /// selben App-Lifecycle (<c>RunConPtyTests</c>) beide IDE-Plugins aktiv vorfinden.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected async Task IdeAuswahl_KeineEinstiegspunkteUndDropdownAbbruch_E2E(Window mainWindow)
+    protected async Task IdeSelection_NoEntrypointsAndDropdownCancel_E2E(Window mainWindow)
     {
-        SetupProjectMitNeuerAufgabe(mainWindow, "IdeAuswahl-Repo", "IdeAuswahl-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "IdeAuswahl-Repo", "IdeAuswahl-Projekt");
 
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskDetail.WaitForCliRunning();
 
         taskDetail.ForceClose(recurseToDashboard: false);
@@ -60,31 +60,31 @@ public partial class End2EndTest
 
         // Phase 2: Ohne .sln-Datei und ohne aktives Fallback-Plugin liefert der Haupt-Button eine
         // Fehlermeldung; der Dropdown-Button bleibt unsichtbar (KannIdeAuswaehlen erfordert >= 2 Einstiegspunkte).
-        var protokollVorFehler = await ReadProzessStartLogAsync();
+        var logBeforeError = await ReadProcessStartLogAsync();
         taskDetailReopened.OpenIde();
 
         Assert.False(string.IsNullOrWhiteSpace(new ErrorView(mainWindow).GetErrorMessage()));
 
-        var protokollNachFehler = await ReadProzessStartLogAsync();
-        Assert.Equal(protokollVorFehler, protokollNachFehler);
+        var logAfterError = await ReadProcessStartLogAsync();
+        Assert.Equal(logBeforeError, logAfterError);
 
         Assert.False(taskDetailReopened.HasIdeDropdown());
 
         // Phase 3: Zwei .sln-Dateien anlegen und die Aufgabe neu laden - der Dropdown-Button wird sichtbar.
-        var localClonePath = await GetLokalerKlonPfadAsync();
-        var ersteSolution = Path.Combine(localClonePath, "Erste.sln");
-        var zweiteSolution = Path.Combine(localClonePath, "Zweite.sln");
-        File.WriteAllText(ersteSolution, string.Empty);
-        File.WriteAllText(zweiteSolution, string.Empty);
+        var localClonePath = await GetLocalClonePathAsync();
+        var firstSolution = Path.Combine(localClonePath, "Erste.sln");
+        var secondSolution = Path.Combine(localClonePath, "Zweite.sln");
+        File.WriteAllText(firstSolution, string.Empty);
+        File.WriteAllText(secondSolution, string.Empty);
         taskDetailReopened = taskDetailReopened.Reload();
 
         Assert.True(taskDetailReopened.HasIdeDropdown());
-        var protokollVorAbbruch = await ReadProzessStartLogAsync();
+        var logBeforeCancel = await ReadProcessStartLogAsync();
         var solutionDialog = taskDetailReopened.OpenIdeDropdown();
         solutionDialog.Cancel();
 
-        var protokollNachAbbruch = await ReadProzessStartLogAsync();
-        Assert.Equal(protokollVorAbbruch, protokollNachAbbruch);
+        var logAfterCancel = await ReadProcessStartLogAsync();
+        Assert.Equal(logBeforeCancel, logAfterCancel);
 
         mainWindow.AsWindow().Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Normal);
         taskDetailReopened.ForceClose(recurseToDashboard: false);
@@ -94,11 +94,11 @@ public partial class End2EndTest
         // Das in Phase 1 deaktivierte Visual-Studio-Code-Plugin wieder aktivieren und speichern, damit
         // nachfolgende E2E-Methoden in RunConPtyTests denselben App-Lifecycle mit beiden IDE-Plugins aktiv
         // vorfinden (analog zu E2E_IdePluginSettings.cs).
-        var settingsEnde = projectDetailFinal.Menu.NavigateToSettings();
-        settingsEnde.SwitchTab("Plugins");
-        settingsEnde.SetIdePluginEnabled("Softwareschmiede.VisualStudioCode", true);
-        settingsEnde.SaveSettings();
+        var settingsEnd = projectDetailFinal.Menu.NavigateToSettings();
+        settingsEnd.SwitchTab("Plugins");
+        settingsEnd.SetIdePluginEnabled("Softwareschmiede.VisualStudioCode", true);
+        settingsEnd.SaveSettings();
 
-        settingsEnde.Menu.NavigateToDashboard();
+        settingsEnd.Menu.NavigateToDashboard();
     }
 }

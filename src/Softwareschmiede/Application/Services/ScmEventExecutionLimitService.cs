@@ -14,7 +14,7 @@ public sealed record CliExecutionOccupancy(int Global, IReadOnlyDictionary<strin
     /// <summary>Anzahl laufender Ausführungen, die dem angegebenen Plugin-Prefix zugeordnet sind.</summary>
     /// <param name="pluginPrefix">KI-Plugin-Prefix (Groß-/Kleinschreibung wird ignoriert).</param>
     /// <returns>Anzahl laufender Ausführungen des Plugins; <c>0</c>, wenn keine bekannt sind.</returns>
-    public int FuerPlugin(string pluginPrefix)
+    public int ForPlugin(string pluginPrefix)
         => !string.IsNullOrWhiteSpace(pluginPrefix) && ProPlugin.TryGetValue(pluginPrefix, out var count) ? count : 0;
 }
 
@@ -141,7 +141,7 @@ public sealed class ScmEventExecutionLimitService(
     {
         if (globalLimit is { } g && occupancy.Global >= g)
             return $"Das globale Limit paralleler CLI-Ausführungen ({g}) ist erreicht; der Start erfolgt, sobald ein Platz frei wird.";
-        if (pluginLimit is { } p && !string.IsNullOrWhiteSpace(pluginPrefix) && occupancy.FuerPlugin(pluginPrefix) >= p)
+        if (pluginLimit is { } p && !string.IsNullOrWhiteSpace(pluginPrefix) && occupancy.ForPlugin(pluginPrefix) >= p)
             return $"Das Limit paralleler CLI-Ausführungen für die CLI '{pluginPrefix}' ({p}) ist erreicht; der Start erfolgt, sobald ein Platz frei wird.";
         return null;
     }

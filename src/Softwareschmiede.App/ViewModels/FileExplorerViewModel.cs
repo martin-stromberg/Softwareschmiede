@@ -204,7 +204,7 @@ public sealed class FileExplorerViewModel : ViewModelBase
 
     /// <summary>Räumt beim Zuklappen eines Verzeichnisknotens dessen Groß-Enkel-Knoten auf, sodass pro Verzeichnis stets eine Ebene mehr geladen als sichtbar ist.</summary>
     /// <param name="node">Der zugeklappte Verzeichnisknoten.</param>
-    public void BeraeumeNode(WorkspaceFileNode node)
+    public void CleanNode(WorkspaceFileNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
 

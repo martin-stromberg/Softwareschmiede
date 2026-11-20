@@ -24,7 +24,7 @@ public sealed class AppStartupLogInspectorTests : IDisposable
 
     /// <summary>CheckAppStartupException liefert den Fehlerauszug, wenn eine MainWindow-Fehlersignatur enthalten ist.</summary>
     [Fact]
-    public void CheckAppStartupException_ErkenntMainWindowFehler()
+    public void CheckAppStartupException_DetectsMainWindowError()
     {
         // Serilog-Standardformat (Serilog.Sinks.File-Default-Template): "yyyy-MM-dd HH:mm:ss.fff zzz [LVL] Message".
         var logContent = "2026-07-10 10:30:45.100 +02:00 [INF] Application started.\n" +
@@ -37,7 +37,7 @@ public sealed class AppStartupLogInspectorTests : IDisposable
 
     /// <summary>CheckAppStartupException liefert null, wenn kein [ERR]/[FTL]-Eintrag im Log enthalten ist.</summary>
     [Fact]
-    public void CheckAppStartupException_OhneFehler_LiefertNull()
+    public void CheckAppStartupException_WithoutError_ReturnsNull()
     {
         var logContent = "2026-07-10 10:30:45.100 +02:00 [INF] Application started.\n" +
                           "2026-07-10 10:30:46.200 +02:00 [INF] MainWindow angezeigt.\n";
@@ -49,7 +49,7 @@ public sealed class AppStartupLogInspectorTests : IDisposable
 
     /// <summary>GetNewEntries wertet nur den nach dem Snapshot-Offset angehängten Inhalt aus, alte Zeilen werden ignoriert.</summary>
     [Fact]
-    public void GetNewEntries_LiestNurInhaltNachOffset()
+    public void GetNewEntries_ReadsOnlyContentAfterOffset()
     {
         var logFile = Path.Combine(_logDirectory, "softwareschmiede-20260710.log");
         File.WriteAllText(logFile, "2026-07-10 10:00:00.000 +02:00 [INF] Alte Zeile.\n");
@@ -65,25 +65,25 @@ public sealed class AppStartupLogInspectorTests : IDisposable
 
     /// <summary>GetNewEntries liefert einen leeren String, wenn das Log-Verzeichnis nicht existiert.</summary>
     [Fact]
-    public void GetNewEntries_KeinVerzeichnis_LiefertLeer()
+    public void GetNewEntries_NoDirectory_ReturnsEmpty()
     {
-        var fehlendesVerzeichnis = Path.Combine(_logDirectory, "existiert-nicht");
+        var missingDirectory = Path.Combine(_logDirectory, "existiert-nicht");
 
-        var result = AppStartupLogInspector.GetNewEntries(fehlendesVerzeichnis, new LogSnapshot(null, 0));
+        var result = AppStartupLogInspector.GetNewEntries(missingDirectory, new LogSnapshot(null, 0));
 
         result.Should().BeEmpty();
     }
 
     /// <summary>GetNewEntries wählt bei mehreren Log-Dateien die zuletzt geänderte aus.</summary>
     [Fact]
-    public void GetNewEntries_WaehltNeuesteDatei()
+    public void GetNewEntries_SelectsNewestFile()
     {
-        var aelteresLog = Path.Combine(_logDirectory, "softwareschmiede-20260708.log");
-        var neueresLog = Path.Combine(_logDirectory, "softwareschmiede-20260710.log");
-        File.WriteAllText(aelteresLog, "Aeltere Datei.");
-        File.WriteAllText(neueresLog, "Neuere Datei.");
-        File.SetLastWriteTimeUtc(aelteresLog, DateTime.UtcNow.AddMinutes(-10));
-        File.SetLastWriteTimeUtc(neueresLog, DateTime.UtcNow);
+        var olderLog = Path.Combine(_logDirectory, "softwareschmiede-20260708.log");
+        var newLog = Path.Combine(_logDirectory, "softwareschmiede-20260710.log");
+        File.WriteAllText(olderLog, "Aeltere Datei.");
+        File.WriteAllText(newLog, "Neuere Datei.");
+        File.SetLastWriteTimeUtc(olderLog, DateTime.UtcNow.AddMinutes(-10));
+        File.SetLastWriteTimeUtc(newLog, DateTime.UtcNow);
 
         var result = AppStartupLogInspector.GetNewEntries(_logDirectory, new LogSnapshot(null, 0));
 
@@ -97,18 +97,18 @@ public sealed class AppStartupLogInspectorTests : IDisposable
     /// abweichendem Dateipfad ab Anfang der neuen Datei lesen.
     /// </summary>
     [Fact]
-    public void GetNewEntries_BeiLogRollover_LiestNeueDateiAbAnfang()
+    public void GetNewEntries_AtLogRollover_ReadsNewFileFromStart()
     {
-        var altesLog = Path.Combine(_logDirectory, "softwareschmiede-20260710.log");
-        File.WriteAllText(altesLog, new string('A', 200) + "\n");
+        var oldLog = Path.Combine(_logDirectory, "softwareschmiede-20260710.log");
+        File.WriteAllText(oldLog, new string('A', 200) + "\n");
         var snapshot = AppStartupLogInspector.Snapshot(_logDirectory);
 
         // Rollover: eine neue, jüngere Datei entsteht. Deren Anfang (die ERR-Zeile) liegt innerhalb
         // der ersten `snapshot.Offset` Bytes — würde der alte Offset fälschlich angewandt, ginge sie verloren.
-        var neuesLog = Path.Combine(_logDirectory, "softwareschmiede-20260711.log");
-        File.WriteAllText(neuesLog, "[ERR] MainWindow konnte nicht angezeigt werden.\n" + new string('B', 300));
-        File.SetLastWriteTimeUtc(altesLog, DateTime.UtcNow.AddMinutes(-1));
-        File.SetLastWriteTimeUtc(neuesLog, DateTime.UtcNow);
+        var newLog = Path.Combine(_logDirectory, "softwareschmiede-20260711.log");
+        File.WriteAllText(newLog, "[ERR] MainWindow konnte nicht angezeigt werden.\n" + new string('B', 300));
+        File.SetLastWriteTimeUtc(oldLog, DateTime.UtcNow.AddMinutes(-1));
+        File.SetLastWriteTimeUtc(newLog, DateTime.UtcNow);
 
         var result = AppStartupLogInspector.GetNewEntries(_logDirectory, snapshot);
 
@@ -120,7 +120,7 @@ public sealed class AppStartupLogInspectorTests : IDisposable
     /// muss der Offset weiterhin angewandt werden, damit alte Zeilen nicht erneut als "neu" gemeldet werden.
     /// </summary>
     [Fact]
-    public void GetNewEntries_OhneRollover_WendetOffsetWeiterhinAn()
+    public void GetNewEntries_WithoutRollover_AppliesOffsetStillAn()
     {
         var logFile = Path.Combine(_logDirectory, "softwareschmiede-20260710.log");
         File.WriteAllText(logFile, "Alte Zeile.\n");

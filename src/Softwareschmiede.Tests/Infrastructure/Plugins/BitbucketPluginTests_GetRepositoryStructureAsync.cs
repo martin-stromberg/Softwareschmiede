@@ -323,7 +323,7 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
     /// HTTPS-Form umgewandelt, sodass die Repository-ID aufgelöst und die Source-API
     /// aufgerufen wird statt mit „Repository-ID konnte nicht ermittelt werden" zu scheitern.</summary>
     [Fact]
-    public async Task GetRepositoryStructureLoadResultAsync_SshUrl_LoestRepositoryIdAuf()
+    public async Task GetRepositoryStructureLoadResultAsync_SshUrl_TriggersRepositoryIdOn()
     {
         SetupDefaultBranch();
         const string sourceJson = """{ "values": [] }""";

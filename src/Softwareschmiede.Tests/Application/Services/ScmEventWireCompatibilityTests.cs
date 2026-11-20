@@ -11,7 +11,7 @@ public sealed class ScmEventWireCompatibilityTests
     /// <summary>Der persistierte Feldname „konto" bleibt nach der Umbenennung von
     /// <see cref="ScmEventRepository.Account"/> stabil.</summary>
     [Fact]
-    public void ScmEventRepository_Account_SerializesAsKonto()
+    public void ScmEventRepository_Account_SerializesAsAccount()
     {
         var repository = new ScmEventRepository("test", "host", "R_1", "owner", "repo",
             "42", "viewer", "login", true, ScmAccountMode.SeparateAccount);
@@ -24,7 +24,7 @@ public sealed class ScmEventWireCompatibilityTests
 
     /// <summary>Altbestand-Zeilen mit „konto" lesen den Kontomodus korrekt zurück.</summary>
     [Fact]
-    public void ScmEventRepository_LegacyKonto_DeserializesAsAccount()
+    public void ScmEventRepository_LegacyAccount_DeserializesAsAccount()
     {
         const string json = """
             {"providerPrefix":"test","host":"host","repositoryId":"R_1","owner":"owner",
@@ -39,7 +39,7 @@ public sealed class ScmEventWireCompatibilityTests
 
     /// <summary>Fehlendes „konto" fällt auf das Benutzerkonto zurück (Default).</summary>
     [Fact]
-    public void ScmEventRepository_MissingKonto_DefaultsToUserAccount()
+    public void ScmEventRepository_MissingAccount_DefaultsToUserAccount()
     {
         const string json = """
             {"providerPrefix":"test","host":"host","repositoryId":"R_1","owner":"owner",

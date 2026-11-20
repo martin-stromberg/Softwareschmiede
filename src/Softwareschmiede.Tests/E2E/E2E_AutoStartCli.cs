@@ -24,13 +24,13 @@ public partial class End2EndTest
     /// CLI-Prozess einbetten. Prüft außerdem (Issue 193), dass Protokolleinträge im Hintergrund
     /// nachgeladen werden.
     /// </summary>
-    protected void AufgabeOeffnen_NachStoppen_StartetCliNichtAutomatischErstExplizit_E2E(Window mainWindow)
+    protected void OpenWorkItem_StopAfter_StartsCliNotAutomaticFirstExplicit_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        SetupProjectMitNeuerAufgabe(mainWindow, "AutoStartCli-Repo", "AutoStartCli-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "AutoStartCli-Repo", "AutoStartCli-Projekt");
 
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskDetail.WaitForCliRunning();
 
         taskDetail.SwitchPanel("InfoCliToggle");

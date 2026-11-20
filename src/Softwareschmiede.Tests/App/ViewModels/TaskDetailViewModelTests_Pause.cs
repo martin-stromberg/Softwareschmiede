@@ -38,7 +38,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _aiService = TestKiAusfuehrungsServiceFactory.Create();
+        _aiService = TestAiExecutionServiceFactory.Create();
         _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _appSettingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
 
@@ -52,13 +52,13 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         _promptTemplatesService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
-        var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
+        var workingDirectoryMock = new Mock<IWorkingDirectoryResolver>();
         _developmentprocessService = new DevelopmentProcessService(
             _workItemService,
             _logService,
             gitPluginMock.Object,
             _pluginSelectionService,
-            arbeitsverzeichnisMock.Object,
+            workingDirectoryMock.Object,
             new DevelopmentProcessServiceOptions(AiExecutionService: _aiService),
             NullLogger<DevelopmentProcessService>.Instance);
 
@@ -109,11 +109,11 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
             TimeProvider.System,
             TaskDetailViewModelTestFactory.CreateStub(),
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(),
+            TaskDetailViewModelTestFactory.CreateWorkingDirectoryOpenService(),
             runDataChangedNotifier: _runDataChangedNotifier);
     }
 
-    private async Task<TaskDetailViewModel> LadeSutAsync(WorkItem workItem)
+    private async Task<TaskDetailViewModel> LoadSutAsync(WorkItem workItem)
     {
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -121,7 +121,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         return sut;
     }
 
-    private async Task<WorkItem> ErstelleAufgabeAsync(WorkItemStatus status = WorkItemStatus.New)
+    private async Task<WorkItem> CreateWorkItemAsync(WorkItemStatus status = WorkItemStatus.New)
     {
         var workItem = await _workItemService.CreateAsync(_projectId, "Testaufgabe", "Beschreibung");
         if (status != WorkItemStatus.New)
@@ -129,16 +129,16 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         return await _workItemService.GetByIdAsync(workItem.Id) ?? workItem;
     }
 
-    private async Task<WorkItem> ErstelleAufgabeMitAusfuehrungsStatusAsync(WorkItemStatus status, WorkItemExecutionStatus executionStatus)
+    private async Task<WorkItem> CreateWorkItemWithExecutionStatusAsync(WorkItemStatus status, WorkItemExecutionStatus executionStatus)
     {
-        var workItem = await ErstelleAufgabeAsync(status);
+        var workItem = await CreateWorkItemAsync(status);
         var tracked = await _db.WorkItems.FindAsync(workItem.Id);
         tracked!.ExecutionStatus = executionStatus;
         await _db.SaveChangesAsync();
         return tracked;
     }
 
-    private static void SetzeIsCliRunning(TaskDetailViewModel sut, bool value)
+    private static void SetIsCliRunning(TaskDetailViewModel sut, bool value)
         => typeof(TaskDetailViewModel)
             .GetField("_isCliRunning", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(sut, value);
@@ -148,10 +148,10 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
     [InlineData(WorkItemStatus.New)]
     [InlineData(WorkItemStatus.Started)]
     [InlineData(WorkItemStatus.Waiting)]
-    public async Task KannPausieren_ShouldBeTrue_FuerPausierbareStati(WorkItemStatus status)
+    public async Task PauseCan_ShouldBeTrue_ForPausableStates(WorkItemStatus status)
     {
-        var workItem = await ErstelleAufgabeAsync(status);
-        var sut = await LadeSutAsync(workItem);
+        var workItem = await CreateWorkItemAsync(status);
+        var sut = await LoadSutAsync(workItem);
 
         sut.PauseCan.Should().BeTrue();
         sut.SetPauseCommand.CanExecute(null).Should().BeTrue();
@@ -159,10 +159,10 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
     /// <summary>KannPausieren ist für beendete Aufgaben false.</summary>
     [Fact]
-    public async Task KannPausieren_ShouldBeFalse_WhenStatusBeendet()
+    public async Task PauseCan_ShouldBeFalse_WhenStatusCompleted()
     {
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Completed);
-        var sut = await LadeSutAsync(workItem);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Completed);
+        var sut = await LoadSutAsync(workItem);
 
         sut.PauseCan.Should().BeFalse();
         sut.SetPauseCommand.CanExecute(null).Should().BeFalse();
@@ -170,11 +170,11 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
     /// <summary>IsPaused und PauseDisplayText spiegeln den geladenen PausiertBisUtc-Wert wider.</summary>
     [Fact]
-    public async Task IstPausiert_UndPauseAnzeigeText_ReflektierenGeladenenWert()
+    public async Task IsPaused_AndPauseDisplayText_ReflectLoadedValue()
     {
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
         await _workItemService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
-        var sut = await LadeSutAsync(workItem);
+        var sut = await LoadSutAsync(workItem);
 
         sut.IsPaused.Should().BeTrue();
         sut.PausedUntilUtc.Should().NotBeNull();
@@ -183,10 +183,10 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
     /// <summary>Bei aktiver Pause darf der Start-Command nicht ausführbar sein (Issue 151).</summary>
     [Fact]
-    public async Task StartenCommand_CanExecuteFalse_WhenAufgabePausiert()
+    public async Task StartCommand_CanExecuteFalse_WhenWorkItemPaused()
     {
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.New);
-        var sut = await LadeSutAsync(workItem);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.New);
+        var sut = await LoadSutAsync(workItem);
         sut.StartCommand.CanExecute(null).Should().BeTrue("ohne Pause ist der Start erlaubt");
 
         await _workItemService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
@@ -197,10 +197,10 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
     /// <summary>Bei aktiver Pause darf der CLI-Neustart nicht ausführbar sein, obwohl der Ausführungsstatus ihn sonst erlauben würde (Issue 151).</summary>
     [Fact]
-    public async Task KannCliNeuStarten_False_WhenAufgabePausiert()
+    public async Task StartCanCliNew_False_WhenWorkItemPaused()
     {
-        var workItem = await ErstelleAufgabeMitAusfuehrungsStatusAsync(WorkItemStatus.Started, WorkItemExecutionStatus.Completed);
-        var sut = await LadeSutAsync(workItem);
+        var workItem = await CreateWorkItemWithExecutionStatusAsync(WorkItemStatus.Started, WorkItemExecutionStatus.Completed);
+        var sut = await LoadSutAsync(workItem);
         sut.StartCanCliNew.Should().BeTrue("ohne Pause ist der CLI-Neustart bei beendeter Ausführung erlaubt");
 
         await _workItemService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
@@ -212,14 +212,14 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
     /// <summary>Bei aktiver Pause sind KannPromptVorlageSenden und KannPromptPlanen false — trotz laufender CLI, vorhandener Vorlagen und ausgefüllter Zeitfelder (Issue 151).</summary>
     [Fact]
-    public async Task PromptGuards_False_WhenAufgabePausiert()
+    public async Task PromptGuards_False_WhenWorkItemPaused()
     {
         var template = await _promptTemplatesService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
-        var sut = await LadeSutAsync(workItem);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        var sut = await LoadSutAsync(workItem);
 
         // Vorbedingung: Ohne Pause sind die Guards bei laufender CLI + Vorlage + Zeitangabe erfüllt.
-        SetzeIsCliRunning(sut, true);
+        SetIsCliRunning(sut, true);
         sut.ScheduledPromptTargetMinutes = 30;
         sut.SelectedPromptTemplate = template;
         sut.SendCanPromptTemplate.Should().BeTrue();
@@ -230,7 +230,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
         // LadenAsync setzt IsCliRunning aus dem KiService neu — für die Guard-Prüfung erneut
         // simulieren, ebenso die durch das Neuladen zurückgesetzten Eingaben.
-        SetzeIsCliRunning(sut, true);
+        SetIsCliRunning(sut, true);
         sut.ScheduledPromptTargetMinutes = 30;
         sut.SelectedPromptTemplate = template;
 
@@ -240,22 +240,22 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
     /// <summary>PauseEinstellenCommand ruft den Dialog auf, persistiert das Ergebnis via SetPauseAsync und meldet die Laufdaten-Änderung.</summary>
     [Fact]
-    public async Task PauseEinstellenCommand_SetztPause_UeberDialogUndService()
+    public async Task SetPauseCommand_SetsPause_OverDialogAndService()
     {
         var pausedUntil = DateTimeOffset.UtcNow.AddHours(2);
         _dialogServiceMock
             .Setup(d => d.ShowWorkItemPauseDialogAsync(It.IsAny<PauseWorkItemDialogViewModel>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PauseWorkItemResult(pausedUntil, Aufheben: false));
+            .ReturnsAsync(new PauseWorkItemResult(pausedUntil, Lift: false));
         var notified = new List<Guid>();
         _runDataChangedNotifier.RunDataChanged += id => notified.Add(id);
 
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
-        var sut = await LadeSutAsync(workItem);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        var sut = await LoadSutAsync(workItem);
 
         await ((AsyncRelayCommand)sut.SetPauseCommand).ExecuteAsync();
 
-        var geladen = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
-        geladen!.PausedUntilUtc.Should().BeCloseTo(pausedUntil, TimeSpan.FromSeconds(5));
+        var loaded = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        loaded!.PausedUntilUtc.Should().BeCloseTo(pausedUntil, TimeSpan.FromSeconds(5));
         sut.IsPaused.Should().BeTrue();
         notified.Should().Contain(workItem.Id);
         _dialogServiceMock.Verify(
@@ -265,35 +265,35 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
     /// <summary>PauseEinstellenCommand mit Aufheben-Ergebnis leert PausiertBisUtc.</summary>
     [Fact]
-    public async Task PauseEinstellenCommand_HebtPauseAuf_BeiAufhebenErgebnis()
+    public async Task SetPauseCommand_RaisesPauseOn_AtLiftResult()
     {
         _dialogServiceMock
             .Setup(d => d.ShowWorkItemPauseDialogAsync(It.IsAny<PauseWorkItemDialogViewModel>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PauseWorkItemResult(null, Aufheben: true));
+            .ReturnsAsync(new PauseWorkItemResult(null, Lift: true));
 
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
         await _workItemService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
-        var sut = await LadeSutAsync(workItem);
+        var sut = await LoadSutAsync(workItem);
         sut.IsPaused.Should().BeTrue();
 
         await ((AsyncRelayCommand)sut.SetPauseCommand).ExecuteAsync();
 
-        var geladen = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
-        geladen!.PausedUntilUtc.Should().BeNull();
+        var loaded = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        loaded!.PausedUntilUtc.Should().BeNull();
         sut.IsPaused.Should().BeFalse();
         sut.PauseDisplayText.Should().BeNull();
     }
 
     /// <summary>PauseEinstellenCommand ändert nichts, wenn der Dialog abgebrochen wird.</summary>
     [Fact]
-    public async Task PauseEinstellenCommand_AendertNichts_BeiAbbruch()
+    public async Task SetPauseCommand_ChangesNothing_AtCancel()
     {
         _dialogServiceMock
             .Setup(d => d.ShowWorkItemPauseDialogAsync(It.IsAny<PauseWorkItemDialogViewModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((PauseWorkItemResult?)null);
 
-        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
-        var sut = await LadeSutAsync(workItem);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        var sut = await LoadSutAsync(workItem);
 
         await ((AsyncRelayCommand)sut.SetPauseCommand).ExecuteAsync();
 

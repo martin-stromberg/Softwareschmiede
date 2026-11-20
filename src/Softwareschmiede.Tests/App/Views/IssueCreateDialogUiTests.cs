@@ -20,17 +20,17 @@ public sealed class IssueCreateDialogUiTests
 {
     /// <summary>Die KI-Plugin-Auswahl zeigt alle verfügbaren Textgeneratoren an.</summary>
     [Fact]
-    public void IssueCreateDialog_ShouldListAllKiPluginsInSelection()
+    public void IssueCreateDialog_ShouldListAllAiPluginsInSelection()
     {
         WpfUnitTestHelpers.RunOnSta(() =>
         {
             var pluginManagerMock = new Mock<IPluginManager>();
             var plugins = new[]
             {
-                new UiTestKiPlugin("Softwareschmiede.Codex"),
-                new UiTestKiPlugin("Softwareschmiede.ClaudeCli"),
-                new UiTestKiPlugin("Softwareschmiede.Devin"),
-                new UiTestKiPlugin("Softwareschmiede.GitHubCopilot"),
+                new UiTestAiPlugin("Softwareschmiede.Codex"),
+                new UiTestAiPlugin("Softwareschmiede.ClaudeCli"),
+                new UiTestAiPlugin("Softwareschmiede.Devin"),
+                new UiTestAiPlugin("Softwareschmiede.GitHubCopilot"),
             };
             pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns(plugins);
 
@@ -99,9 +99,9 @@ public sealed class IssueCreateDialogUiTests
             => Task.FromResult(IssueTemplateLoadResult.Success([]));
     }
 
-    private sealed class UiTestKiPlugin : IAiPlugin, IIssueTemplateTextGenerator
+    private sealed class UiTestAiPlugin : IAiPlugin, IIssueTemplateTextGenerator
     {
-        public UiTestKiPlugin(string prefix)
+        public UiTestAiPlugin(string prefix)
         {
             PluginPrefix = prefix;
         }
@@ -114,13 +114,13 @@ public sealed class IssueCreateDialogUiTests
             => Task.FromResult($"Ergebnis für {PluginPrefix}");
 
         public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
-        public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+        public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default)
             => Task.FromResult(new ProcessStartInfo());
         public string GetProcessWindowTitle(Guid workItemId) => PluginName;
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
-        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default)
             => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
     }
 }

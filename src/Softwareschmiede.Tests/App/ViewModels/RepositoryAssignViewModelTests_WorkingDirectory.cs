@@ -150,11 +150,11 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         var sut = CreateSut();
         await SelectPluginAndWaitAsync(sut, pluginMock.Object);
 
-        var loadingWasTrue = false;
+        var loadingWhatTrue = false;
         sut.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(sut.IsLoadingDirectoryStructure) && sut.IsLoadingDirectoryStructure)
-                loadingWasTrue = true;
+                loadingWhatTrue = true;
         };
 
         sut.SelectedRepository = new AvailableRepository("repo", DateTime.UtcNow, "owner/repo", "https://example.com/repo.git");
@@ -162,7 +162,7 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         tcs.SetResult([]);
         await loadTask;
 
-        loadingWasTrue.Should().BeTrue();
+        loadingWhatTrue.Should().BeTrue();
         sut.IsLoadingDirectoryStructure.Should().BeFalse();
     }
 
@@ -268,7 +268,7 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
 
     /// <summary>Manuelle Eingabe wird beim Bestätigen normalisiert und nach SelectedWorkingDirectory synchronisiert.</summary>
     [Fact]
-    public async Task BestaetigenCommand_ShouldUseManualWorkingDirectoryInput()
+    public async Task ConfirmCommand_ShouldUseManualWorkingDirectoryInput()
     {
         var pluginMock = CreatePluginMock("GitHub");
         pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))

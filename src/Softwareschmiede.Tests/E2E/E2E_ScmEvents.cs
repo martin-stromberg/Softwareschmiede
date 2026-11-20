@@ -21,12 +21,12 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
     public async Task ScmEvents_QueueReceptionDispatchAndReplies_UseRealPipeline()
     {
         // Früh überspringen, bevor die Fixture ihre Git-Workspaces/DB aufbaut.
-        SkipWennWpfE2ENichtVerfuegbar();
+        SkipWhenWpfE2ENotAvailable();
 
         var fixture = new ScmE2EFixture();
         await fixture.InitializeAsync();
         output.WriteLine("SCM fixture and evidence: " + fixture.Configuration.TestRoot);
-        var window = WarteAufEchtesHauptfenster(LaunchApp(false, fixture.EnvironmentVariables()));
+        var window = WaitOnRealMainwindow(LaunchApp(false, fixture.EnvironmentVariables()));
         NavigateQueue(window);
         const string original = "$sOfTwArEsChMiEdE Prüfe \"Original\"\nzweite Zeile\u001b\u0000";
         fixture.AddText(1, 101, original);
@@ -121,7 +121,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Equal(promptCount, fixture.Prompts().Count);
         SelectEvent(window, 5);
         Click(window, "ScmEventTask");
-        new AufgabePausierenDialogView(window).ForceShow().Aufheben();
+        new WorkItemPauseDialogView(window).ForceShow().Lift();
         NavigateQueue(window);
         SelectEvent(window, 5);
         StartSelected(window);
@@ -383,18 +383,18 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         // Fehlerfall zuerst: Separates Konto ohne AgentToken wird mit sichtbarer
         // Fehlermeldung abgelehnt; DiscardChanges setzt Banner und Modus zurück.
         var settings = new SettingsView(window).ForceShow();
-        settings.OpenAufgabenAusfuehren();
-        settings.SetKontoModus("Separates Konto");
+        settings.ExecuteOpenWorkItems();
+        settings.SetAccountMode("Separates Konto");
         var rejected = Assert.Throws<InvalidOperationException>(() => settings.SaveSettings());
         Assert.Contains("Personal Access Token", rejected.Message);
         settings.DiscardChanges();
-        settings.WaitForKontoModus("Benutzerkonto", Medium);
+        settings.WaitForAccountMode("Benutzerkonto", Medium);
 
         settings.SwitchTab("Plugins");
         WaitForElement(window, cf => cf.ByName("Softwareschmiede.GitHub.Entry"), Long).ClickInForeground();
         settings.SetPluginSecretField("AgentToken", "fixture-agent-token");
-        settings.OpenAufgabenAusfuehren();
-        settings.SetKontoModus("Separates Konto");
+        settings.ExecuteOpenWorkItems();
+        settings.SetAccountMode("Separates Konto");
         settings.SaveSettings();
         output.WriteLine("Bot: Separates Konto ohne Token abgelehnt; AgentToken per Tastatur eingetragen und gemeinsam gespeichert.");
 
@@ -473,7 +473,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
 
         // Rückschaltung: der nächste Poll enumeriert wieder repository-weit, der Keyword-
         // Trigger läuft wie bisher.
-        await fixture.SetKontoModus(ScmAccountMode.UserAccount);
+        await fixture.SetAccountMode(ScmAccountMode.UserAccount);
         fixture.AddText(1, 106, "$Softwareschmiede Zurück im Benutzerkonto");
         await fixture.WaitEventAsync(1, "Verarbeitet", 106);
         output.WriteLine("Bot: Rückschaltung auf Benutzerkonto — Enumeration und Keyword-Pfad laufen wieder.");

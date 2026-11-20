@@ -311,7 +311,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
     /// <summary>Zeigen Branch- und Issue-Signal auf unterschiedliche aktive Aufgaben, bleibt das
     /// Ereignis mit Mehrdeutigkeitsdiagnose unzugeordnet; es entsteht weder Aufgabe noch Inbox-Eintrag.</summary>
     [Fact]
-    public async Task Monitor_PullRequestConflictingContextSignals_ReportsAmbiguityWithoutTask()
+    public async Task Monitor_PullRequestConflictingContextSignal_ReportsAmbiguityWithoutTask()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -329,9 +329,9 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         Assert.Equal(2, await db.WorkItems.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
         var events = await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.DoesNotContain(events, x => ScmEventStore.Observation(x).Reference.Kind == ScmReferenceKind.PullRequest);
-        var snapshots = await db.ScmContentSnapshots.Where(x => x.ContentKey.Contains("/PullRequest/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-        Assert.NotEmpty(snapshots);
-        Assert.All(snapshots, x => Assert.Equal(ScmEventStore.AmbiguousAssignmentDiagnostic, x.Diagnostic));
+        var snapshot = await db.ScmContentSnapshots.Where(x => x.ContentKey.Contains("/PullRequest/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.NotEmpty(snapshot);
+        Assert.All(snapshot, x => Assert.Equal(ScmEventStore.AmbiguousAssignmentDiagnostic, x.Diagnostic));
     }
 
     /// <summary>Ein Fork-PR mit gleichem Branchnamen ist kein Kontexttreffer; es entsteht eine

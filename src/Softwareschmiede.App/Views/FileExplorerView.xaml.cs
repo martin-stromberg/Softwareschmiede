@@ -76,7 +76,7 @@ public sealed partial class FileExplorerView : UserControl
         if (e.OriginalSource is TreeViewItem { DataContext: WorkspaceFileNode node }
             && DataContext is FileExplorerViewModel vm)
         {
-            vm.BeraeumeNode(node);
+            vm.CleanNode(node);
         }
     }
 }

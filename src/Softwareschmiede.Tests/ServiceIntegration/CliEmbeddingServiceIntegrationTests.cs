@@ -19,7 +19,7 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     {
         _db = TestDbContextFactory.Create();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _aiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        _aiService = TestAiExecutionServiceFactory.Create(scopeFactoryMock.Object);
     }
 
     /// <summary>Dispose.</summary>
@@ -31,7 +31,7 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
 
     /// <summary>IsRunning gibt false zurück wenn kein Prozess gestartet wurde.</summary>
     [Fact]
-    public void IsRunning_GibtFalse_WennKeinProzessGestartet()
+    public void IsRunning_ReturnsFalse_WhenNoProcessStarted()
     {
         var workItemId = Guid.NewGuid();
         _aiService.IsRunning(workItemId).Should().BeFalse();
@@ -39,7 +39,7 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
 
     /// <summary>GetLastExitCode gibt null zurück wenn kein Prozess gestartet wurde.</summary>
     [Fact]
-    public void GetLastExitCode_GibtNull_WennKeinProzessGestartet()
+    public void GetLastExitCode_ReturnsNull_WhenNoProcessStarted()
     {
         var workItemId = Guid.NewGuid();
         _aiService.GetLastExitCode(workItemId).Should().BeNull();
@@ -47,10 +47,10 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
 
     /// <summary>StartCliAsync startet einen Prozess und setzt IsRunning auf true.</summary>
     [OsInterfaceFact]
-    public async Task StartCliAsync_StartetProzess_UndSetztIsRunningAufTrue()
+    public async Task StartCliAsync_StartsProcess_AndSetsIsRunningOnTrue()
     {
         var workItemId = Guid.NewGuid();
-        var pluginMock = new FakeKiPlugin();
+        var pluginMock = new FakeAiPlugin();
 
         var handle = await _aiService.StartCliAsync(workItemId, pluginMock, Path.GetTempPath());
 
@@ -63,10 +63,10 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     /// <summary>StartTerminalSessionAsync startet einen Prozess via ConPTY und liefert eine PseudoConsoleSession.</summary>
     [OsInterfaceFact]
     [Trait("Category", "ConPTY")]
-    public async Task StartTerminalSessionAsync_StartetProzess_UndSetztPseudoConsoleSession()
+    public async Task StartTerminalSessionAsync_StartsProcess_AndSetsPseudoConsoleSession()
     {
         var workItemId = Guid.NewGuid();
-        var pluginMock = new FakeKiPlugin();
+        var pluginMock = new FakeAiPlugin();
 
         var handle = await _aiService.StartTerminalSessionAsync(workItemId, pluginMock, Path.GetTempPath());
 
@@ -79,7 +79,7 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
 }
 
 /// <summary>Fake-KI-Plugin für Tests.</summary>
-internal sealed class FakeKiPlugin : IAiPlugin
+internal sealed class FakeAiPlugin : IAiPlugin
 {
     public string PluginName => "FakeKi";
     public string PluginPrefix => "fake";
@@ -92,7 +92,7 @@ internal sealed class FakeKiPlugin : IAiPlugin
     /// <summary>Task.</summary>
     public Task<System.Diagnostics.ProcessStartInfo> StartCliAsync(
         string localRepoPath,
-        string? parameters = null,
+        string? parameter = null,
         CancellationToken ct = default)
     {
         var psi = new System.Diagnostics.ProcessStartInfo
@@ -118,6 +118,6 @@ internal sealed class FakeKiPlugin : IAiPlugin
     public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
 
     /// <summary>GetTerminalStartSpecAsync.</summary>
-    public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+    public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default)
         => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
 }

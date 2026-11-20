@@ -89,15 +89,15 @@ public sealed class UpdateServiceTests
     [InlineData("v1.2.0", UpdatePathChannelResolver.StableVersionsPath, false)]
     [InlineData("v1.2.0-rc.1", UpdatePathChannelResolver.PrereleaseVersionsPath, false)]
     public async Task CheckForUpdateAsync_WarnsOnInstallationChannelConflict(
-        string installierterTag, string updatePath, bool erwarteWarnung)
+        string installedTag, string updatePath, bool expectWarning)
     {
-        var istRcKanal = updatePath == UpdatePathChannelResolver.PrereleaseVersionsPath;
-        var update = istRcKanal
+        var isRcChannel = updatePath == UpdatePathChannelResolver.PrereleaseVersionsPath;
+        var update = isRcChannel
             ? new UpdateInfo("1.3.0-rc.1", "v1.3.0-rc.1", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/rc.zip")), null, IsPrerelease: true)
             : new UpdateInfo("1.3.0", "v1.3.0", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/stable.zip")), null, IsPrerelease: false);
         var versionProvider = new Mock<IApplicationVersionProvider>();
         versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new InstalledVersionInfo("1.2.0", installierterTag, null, null));
+            .ReturnsAsync(new InstalledVersionInfo("1.2.0", installedTag, null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateReleaseLookupResult.Found(update));
@@ -107,7 +107,7 @@ public sealed class UpdateServiceTests
 
         result.Status.Should().Be(UpdateCheckStatus.UpdateAvailable);
         result.Update.Should().Be(update);
-        if (erwarteWarnung)
+        if (expectWarning)
             result.Message.Should().NotBeNullOrEmpty("ein Kanalkonflikt muss als nicht-blockierende Warnung mitreisen");
         else
             result.Message.Should().BeNull("bei passendem Kanal darf keine Warnung mitreisen");

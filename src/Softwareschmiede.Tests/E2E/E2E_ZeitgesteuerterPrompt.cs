@@ -22,13 +22,13 @@ public partial class End2EndTest
     /// der Detailansicht (persistierter Datensatz), ist beim Wiederöffnen weiterhin sichtbar und
     /// lässt sich über den Button "Wartestellung aufheben" stornieren (Anzeige weg, Datensatz gelöscht).
     /// </summary>
-    protected async Task ZeitgesteuerterPrompt_NachPlanen_ZeigtWartestellungStatus_E2E(Window mainWindow)
+    protected async Task ScheduledPrompt_AfterPlan_ShowsQueueStatus_E2E(Window mainWindow)
     {
-        SkipWennConPtyNichtVerfuegbar();
+        SkipWhenConPtyNotAvailable();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        SetupProjectMitNeuerAufgabe(mainWindow, "ZeitgesteuertPrompt-Repo", "ZeitgesteuertPrompt-Projekt");
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        SetupProjectWithNewWorkItem(mainWindow, "ZeitgesteuertPrompt-Repo", "ZeitgesteuertPrompt-Projekt");
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskDetail.WaitForCliRunning();
 
         // Die App berechnet die Zielzeit stets aus dem heutigen Datum. Läge "jetzt + 5 Minuten" bereits am
@@ -42,12 +42,12 @@ public partial class End2EndTest
         var now = DateTime.Now;
         Assert.SkipWhen(now.Hour == 23 && now.Minute >= 59, "Letzte Tagesminute: Mitternachts-Guard würde eine bereits vergangene Zielzeit liefern.");
 
-        var zielzeitKandidat = now.AddMinutes(5);
-        var zielzeit = zielzeitKandidat.Date == now.Date
-            ? zielzeitKandidat
+        var targettimeCandidate = now.AddMinutes(5);
+        var targettime = targettimeCandidate.Date == now.Date
+            ? targettimeCandidate
             : new DateTime(now.Year, now.Month, now.Day, 23, 59, 0);
 
-        taskDetail.SetScheduledPromptTime(zielzeit.Hour, zielzeit.Minute);
+        taskDetail.SetScheduledPromptTime(targettime.Hour, targettime.Minute);
         taskDetail.SelectPromptTemplate("Weitermachen");
 
         // Erscheint erst, sobald ScheduledPromptStatus gesetzt ist (NullOrEmptyToVisibilityConverter).
@@ -79,8 +79,8 @@ public partial class End2EndTest
         }
 
         taskDetailReopened.ForceClose(recurseToDashboard: false);
-        var projectDetailNachStorno = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
-        projectDetailNachStorno.DeleteProject();
-        projectDetailNachStorno.Menu.NavigateToDashboard();
+        var projectDetailAfterCancellation = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetailAfterCancellation.DeleteProject();
+        projectDetailAfterCancellation.Menu.NavigateToDashboard();
     }
 }

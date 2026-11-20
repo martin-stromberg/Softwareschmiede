@@ -26,7 +26,7 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
 
     /// <summary>StartenAsync_Setzt_Status_AufGestartet.</summary>
     [Fact]
-    public async Task StartenAsync_Setzt_Status_AufGestartet()
+    public async Task StartAsync_Sets_Status_OnStarted()
     {
         var project = await _projectService.CreateAsync("Startup-Projekt", null, TestContext.Current.CancellationToken);
         var workItem = await _workItemService.CreateAsync(project.Id, "Startup-Aufgabe", null, ct: TestContext.Current.CancellationToken);
@@ -35,15 +35,15 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
 
         await _workItemService.StartAsync(workItem.Id, "feature/test-branch", "/tmp/repo", ct: TestContext.Current.CancellationToken);
 
-        var geladen = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
-        geladen!.Status.Should().Be(WorkItemStatus.Started);
-        geladen.BranchName.Should().Be("feature/test-branch");
-        geladen.LocalClonePath.Should().Be("/tmp/repo");
+        var loaded = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        loaded!.Status.Should().Be(WorkItemStatus.Started);
+        loaded.BranchName.Should().Be("feature/test-branch");
+        loaded.LocalClonePath.Should().Be("/tmp/repo");
     }
 
     /// <summary>StatusUebergang_Gestartet_NachWartend_IstErlaubt.</summary>
     [Fact]
-    public async Task StatusUebergang_Gestartet_NachWartend_IstErlaubt()
+    public async Task StatusTransition_Started_AfterWaiting_IsAllows()
     {
         var project = await _projectService.CreateAsync("Uebergang-Projekt", null, TestContext.Current.CancellationToken);
         var workItem = await _workItemService.CreateAsync(project.Id, "Uebergang-Aufgabe", null, ct: TestContext.Current.CancellationToken);
@@ -51,13 +51,13 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
         await _workItemService.StartAsync(workItem.Id, "main", "/tmp/repo", ct: TestContext.Current.CancellationToken);
         await _workItemService.SetStatusAsync(workItem.Id, WorkItemStatus.Waiting, TestContext.Current.CancellationToken);
 
-        var geladen = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
-        geladen!.Status.Should().Be(WorkItemStatus.Waiting);
+        var loaded = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        loaded!.Status.Should().Be(WorkItemStatus.Waiting);
     }
 
     /// <summary>StatusUebergang_Wartend_NachGestartet_IstErlaubt.</summary>
     [Fact]
-    public async Task StatusUebergang_Wartend_NachGestartet_IstErlaubt()
+    public async Task StatusTransition_Waiting_AfterStarted_IsAllows()
     {
         var project = await _projectService.CreateAsync("Resume-Projekt", null, TestContext.Current.CancellationToken);
         var workItem = await _workItemService.CreateAsync(project.Id, "Resume-Aufgabe", null, ct: TestContext.Current.CancellationToken);
@@ -66,7 +66,7 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
         await _workItemService.SetStatusAsync(workItem.Id, WorkItemStatus.Waiting, TestContext.Current.CancellationToken);
         await _workItemService.SetStatusAsync(workItem.Id, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
-        var geladen = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
-        geladen!.Status.Should().Be(WorkItemStatus.Started);
+        var loaded = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        loaded!.Status.Should().Be(WorkItemStatus.Started);
     }
 }

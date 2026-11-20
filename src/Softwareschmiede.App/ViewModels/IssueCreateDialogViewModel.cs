@@ -164,7 +164,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
     public ICommand LoadTemplatesCommand { get; }
 
     /// <summary>Füllt das Template per KI aus.</summary>
-    public ICommand AiAusfuellenCommand { get; }
+    public ICommand AiFillCommand { get; }
 
     /// <summary>Legt das Issue beim Provider an.</summary>
     public ICommand CreateCommand { get; }
@@ -183,7 +183,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         _pluginActivationService = pluginActivationService;
 
         LoadTemplatesCommand = new AsyncRelayCommand(LoadTemplatesAsync);
-        AiAusfuellenCommand = new AsyncRelayCommand(AiAusfuellenAsync, () => CanUseAi);
+        AiFillCommand = new AsyncRelayCommand(AiAusfuellenAsync, () => CanUseAi);
         CreateCommand = new AsyncRelayCommand(CreateAsync, () => CanSubmit);
         CancelCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false), () => !IsSubmitting && !IsGenerating);
     }

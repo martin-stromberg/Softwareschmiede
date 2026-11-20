@@ -24,7 +24,7 @@ public sealed class ScmEventDispatchTests
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        await AddAliasLinksAsync(fixture, kind, alias);
+        await AddAliasLeftAsync(fixture, kind, alias);
         ConfigureObservations(fixture);
 
         await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
@@ -49,7 +49,7 @@ public sealed class ScmEventDispatchTests
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        await AddAliasLinksAsync(fixture, ScmReferenceKind.Issue, "git@github.com:owner/repo.git", secondNumber: 8);
+        await AddAliasLeftAsync(fixture, ScmReferenceKind.Issue, "git@github.com:owner/repo.git", secondNumber: 8);
         ConfigureObservations(fixture);
 
         await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
@@ -70,7 +70,7 @@ public sealed class ScmEventDispatchTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         const string alias = "git@github.com:owner/repo.git";
-        await AddAliasLinksAsync(fixture, ScmReferenceKind.Issue, alias);
+        await AddAliasLeftAsync(fixture, ScmReferenceKind.Issue, alias);
         ConfigureObservations(fixture);
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
             It.Is<ScmRepositoryContext>(context => context.RepositoryId == alias), It.IsAny<CancellationToken>()))
@@ -162,7 +162,7 @@ public sealed class ScmEventDispatchTests
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         using var manualScope = fixture.Services.CreateScope();
         var manual = manualScope.ServiceProvider.GetRequiredService<DevelopmentProcessService>()
-            .StartProcessAndCliAsync(taskId, "https://github.com/owner/repo", null, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
+            .StartProcessAndCliAsync(taskId, "https://github.com/owner/repo", null, ScmDispatchFixture.AiPrefix, TestContext.Current.CancellationToken);
         Assert.False(manual.IsCompleted);
         release.TrySetResult();
         await Task.WhenAll(automatic, manual).WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
@@ -175,7 +175,7 @@ public sealed class ScmEventDispatchTests
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
     }
 
-    private static async Task AddAliasLinksAsync(ScmDispatchFixture fixture, ScmReferenceKind kind, string alias, int secondNumber = 7)
+    private static async Task AddAliasLeftAsync(ScmDispatchFixture fixture, ScmReferenceKind kind, string alias, int secondNumber = 7)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();

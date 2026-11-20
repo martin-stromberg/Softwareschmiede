@@ -88,9 +88,9 @@
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            VerticalAlignment="Center"
                            Margin="12,0,0,0" />
-                <TextBlock Text="{Binding GeometrieText}"
+                <TextBlock Text="{Binding GeometryText}"
                            AutomationProperties.Name="RecordingGeometry"
-                           AutomationProperties.HelpText="{Binding GeometrieText}"
+                           AutomationProperties.HelpText="{Binding GeometryText}"
                            FontSize="12"
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            VerticalAlignment="Center"

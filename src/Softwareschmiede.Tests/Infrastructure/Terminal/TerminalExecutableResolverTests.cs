@@ -19,7 +19,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
 
     /// <summary>Ein existierender absoluter .exe-Pfad bleibt unverändert und wird als Direct gemeldet.</summary>
     [Fact]
-    public void Resolve_AbsoluterExePfad_BleibtDirect()
+    public void Resolve_AbsoluteExePath_RemainsDirect()
     {
         var exe = CreateFile("cli.exe");
         var spec = CreateSpec(fileName: exe, pathEnv: _tempRoot);
@@ -33,7 +33,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
 
     /// <summary>Ein nackter Name findet eine .exe über den PATH aus den Spec-Umgebungsvariablen und liefert den absoluten Pfad.</summary>
     [Fact]
-    public void Resolve_NackterName_FindetExeAufSpecPath_AbsoluterPfad()
+    public void Resolve_BareName_FindsExeOnSpecPath_AbsolutePath()
     {
         var pathDir = CreateSubdir("path");
         var exe = CreateFile(Path.Combine(pathDir, "meincli.exe"));
@@ -48,7 +48,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
 
     /// <summary>Ein nackter Name, zu dem nur ein .cmd-Shim existiert, wird zu cmd.exe /d /s /c "&lt;pfad&gt;" normalisiert.</summary>
     [Fact]
-    public void Resolve_NackterName_NurCmdShimVorhanden_WrapptCmdExeC()
+    public void Resolve_BareName_OnlyCmdShimExisting_WrapsCmdExeC()
     {
         var pathDir = CreateSubdir("path");
         var shim = CreateFile(Path.Combine(pathDir, "meincli.cmd"));
@@ -64,7 +64,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
 
     /// <summary>Ein expliziter .cmd-Pfad wird zu cmd.exe /d /s /c normalisiert, Original-Arguments werden angehängt.</summary>
     [Fact]
-    public void Resolve_CmdBatPfad_WirdZuCmdExeCNormalisiert()
+    public void Resolve_CmdBatPath_WillToCmdExeCNormalizes()
     {
         var shim = CreateFile("tool.cmd");
         var spec = CreateSpec(fileName: shim, arguments: "--flag wert", pathEnv: _tempRoot);
@@ -78,7 +78,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
 
     /// <summary>Ein Name mit Erweiterung wird nur literal gesucht — PATHEXT-Kandidaten greifen nicht.</summary>
     [Fact]
-    public void Resolve_NameMitErweiterung_WirdNurLiteralGesucht()
+    public void Resolve_NameWithExtension_WillOnlyLiteralSearched()
     {
         var pathDir = CreateSubdir("path");
         CreateFile(Path.Combine(pathDir, "meincli.exe"));
@@ -91,7 +91,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
 
     /// <summary>Die Suche beginnt im WorkingDirectory — eine dort liegende Datei gewinnt gegen den PATH.</summary>
     [Fact]
-    public void Resolve_SuchtZuerstImWorkingDirectory()
+    public void Resolve_SearchesFirstInWorkingDirectory()
     {
         var workDir = CreateSubdir("work");
         var pathDir = CreateSubdir("path");
@@ -112,7 +112,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
 
     /// <summary>Ein nicht vorhandener Name ergibt NotFound.</summary>
     [Fact]
-    public void Resolve_NichtGefunden_StatusNotFound()
+    public void Resolve_NotFound_StatusNotFound()
     {
         var spec = CreateSpec(fileName: "gibtes-garantiert-nicht-4711.xyz", pathEnv: _tempRoot);
 
@@ -124,7 +124,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
 
     /// <summary>Ein Treffer mit nicht ausführbarer Erweiterung (z. B. .ps1) ergibt NotExecutable.</summary>
     [Fact]
-    public void Resolve_GefundenAberNichtAusfuehrbar_StatusNotExecutable()
+    public void Resolve_FoundButNotExecutable_StatusNotExecutable()
     {
         var script = CreateFile("tool.ps1");
         var spec = CreateSpec(fileName: script, pathEnv: _tempRoot);
@@ -139,7 +139,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
     /// &lt;name&gt;.cmd, muss der Resolver das Shell-Skript überspringen und den .cmd-Shim wählen —
     /// CreateProcess würde sonst mit Win32Exception 193 scheitern.</summary>
     [Fact]
-    public void Resolve_ErweiterungslosesSkriptNebenCmdShim_WrapptCmdShim()
+    public void Resolve_ExtensionlessScriptBesideCmdShim_WrapsCmdShim()
     {
         var pathDir = CreateSubdir("path");
         var shim = Path.Combine(pathDir, "meincli");
@@ -157,7 +157,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
     /// <summary>Ein erweiterungsloser Treffer, der kein PE-Image ist und keinen PATHEXT-Ersatz hat,
     /// wird als NotExecutable gemeldet (statt als Direct in den Win32Exception-193-Fehler zu laufen).</summary>
     [Fact]
-    public void Resolve_ErweiterungslosesSkriptOhneErsatz_StatusNotExecutable()
+    public void Resolve_ExtensionlessScriptWithoutReplacement_StatusNotExecutable()
     {
         var pathDir = CreateSubdir("path");
         var shim = Path.Combine(pathDir, "meincli");
@@ -173,7 +173,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
     /// <summary>Ein erweiterungsloser Treffer mit PE-Magic (MZ) bleibt Direct — reale
     /// erweiterungslose Native-Images sind gültige CreateProcess-Ziele.</summary>
     [Fact]
-    public void Resolve_ErweiterungslosePeDatei_BleibtDirect()
+    public void Resolve_ExtensionlessPeFile_RemainsDirect()
     {
         var pathDir = CreateSubdir("path");
         var exe = Path.Combine(pathDir, "meincli");
@@ -188,7 +188,7 @@ public sealed class TerminalExecutableResolverTests : IDisposable
 
     /// <summary>Ein leerer FileName ergibt sofort NotFound.</summary>
     [Fact]
-    public void Resolve_LeereFileName_StatusNotFound()
+    public void Resolve_EmptyFileName_StatusNotFound()
     {
         var spec = CreateSpec(fileName: " ", pathEnv: _tempRoot);
 

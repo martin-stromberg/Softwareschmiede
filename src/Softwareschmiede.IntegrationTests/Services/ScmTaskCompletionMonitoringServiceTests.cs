@@ -23,7 +23,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
     /// <summary>Ein im Abschluss gemeldeter Pull Request wird mit der Aufgabe als
     /// <see cref="PullRequestReference"/> verknüpft — Grundlage der Abschlussüberwachung.</summary>
     [Fact]
-    public async Task Complete_ReportedPullRequestNumber_LinksReferenceToTask()
+    public async Task Complete_ReportedPullRequestNumber_LeftReferenceToTask()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -160,7 +160,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
     /// SeparatesKonto der Ereignisüberwachung wird der Repository-Kontext der Abschlussprüfung mit
     /// <see cref="ScmAccountMode.UserAccount"/> aufgebaut.</summary>
     [Fact]
-    public async Task CompletionService_IssueCheck_UsesBenutzerkontoContext()
+    public async Task CompletionService_IssueCheck_UsesUseraccountContext()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -189,7 +189,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
 
     /// <summary>Deaktivierte Abschlussüberwachung beobachtet nichts: kein Provider-Aufruf,
     /// kein Abschluss-Countdown. (Der Ereignisgesteuert-Fall manuell angelegter Aufgaben ist
-    /// in <see cref="Monitor_Ereignisgesteuert_SkipsManualTaskWithPullRequest"/> abgedeckt.)</summary>
+    /// in <see cref="Monitor_Eventdriven_SkipsManualTaskWithPullRequest"/> abgedeckt.)</summary>
     [Fact]
     public async Task Monitor_Disabled_SkipsObservation()
     {
@@ -250,12 +250,12 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
     /// <summary>Im Prüfmodus „AlleAufgaben“ wird auch eine manuell angelegte Aufgabe ohne
     /// SCM-Ereigniszuordnung beobachtet, sofern sie eine Pull-Request-Referenz trägt.</summary>
     [Fact]
-    public async Task Monitor_AlleAufgabenMode_ObservesManualTaskWithPullRequest()
+    public async Task Monitor_AllWorkItemsMode_ObservesManualTaskWithPullRequest()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddManualTaskWithPullRequestAsync(fixture);
-        await SetPruefmodusAsync(fixture, ScmTaskCompletionCheckMode.AllWorkItems);
+        await SetCheckmodeAsync(fixture, ScmTaskCompletionCheckMode.AllWorkItems);
         SetupPullRequestStatus(fixture, PullRequestStatus.Merged, number: 42);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
@@ -274,7 +274,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
     /// <summary>Im Standard-Prüfmodus „Ereignisgesteuert“ wird dieselbe manuell angelegte Aufgabe
     /// ohne SCM-Ereigniszuordnung nicht beobachtet.</summary>
     [Fact]
-    public async Task Monitor_Ereignisgesteuert_SkipsManualTaskWithPullRequest()
+    public async Task Monitor_Eventdriven_SkipsManualTaskWithPullRequest()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -296,13 +296,13 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
     /// <summary>Im Prüfmodus „AlleAufgaben“ wird eine manuell angelegte Aufgabe auch über ihr
     /// verknüpftes Issue beobachtet: ein geschlossenes Issue beendet sie nach der Wartezeit.</summary>
     [Fact]
-    public async Task Monitor_PruefmodusAlleAufgaben_ManuellAngelegteAufgabeMitGeschlossenemIssue_WirdBeendet()
+    public async Task Monitor_CheckmodeAllWorkItems_ManualCreatedWorkItemWithClosedIssue_WillCompleted()
     {
         var time = new TestTimeProvider();
         await using var fixture = new ScmDispatchFixture(time: time);
         await fixture.InitializeAsync();
         var taskId = await AddManualTaskWithIssueAsync(fixture, 7);
-        await SetPruefmodusAsync(fixture, ScmTaskCompletionCheckMode.AllWorkItems);
+        await SetCheckmodeAsync(fixture, ScmTaskCompletionCheckMode.AllWorkItems);
         await SetWaitAsync(fixture, 5);
         fixture.Git.As<IScmEventSource>().Setup(x => x.ReadIssueAsync(
                 It.Is<ScmEventReference>(r => r.Number == 7), It.IsAny<CancellationToken>()))
@@ -324,7 +324,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
     /// <summary>Im Standard-Prüfmodus „Ereignisgesteuert“ wird eine Aufgabe mit ungültiger
     /// Issue-Referenz (keine Nummer) trotz SCM-Ereigniszuordnung nie beobachtet.</summary>
     [Fact]
-    public async Task Monitor_Ereignisgesteuert_TaskWithInvalidIssueReference_IsNeverObserved()
+    public async Task Monitor_Eventdriven_TaskWithInvalidIssueReference_IsNeverObserved()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -346,13 +346,13 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
     /// <summary>Im Prüfmodus „AlleAufgaben“ gilt eine ungültige Issue-Referenz (keine Nummer)
     /// ebenfalls nicht als beobachtbare Referenz — kein Provider-Aufruf.</summary>
     [Fact]
-    public async Task Monitor_AlleAufgaben_TaskWithInvalidIssueReference_IsNeverObserved()
+    public async Task Monitor_AllWorkItems_TaskWithInvalidIssueReference_IsNeverObserved()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var (taskId, _) = await fixture.AddAsync(configured: true);
         await AddIssueReferenceAsync(fixture, taskId, null);
-        await SetPruefmodusAsync(fixture, ScmTaskCompletionCheckMode.AllWorkItems);
+        await SetCheckmodeAsync(fixture, ScmTaskCompletionCheckMode.AllWorkItems);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
@@ -369,14 +369,14 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
     [Theory]
     [InlineData(ScmTaskCompletionCheckMode.EventDriven)]
     [InlineData(ScmTaskCompletionCheckMode.AllWorkItems)]
-    public async Task Monitor_AufgabeOhneIssueUndOhnePullRequest_WirdNiemalsBeendet(ScmTaskCompletionCheckMode mode)
+    public async Task Monitor_WorkItemWithoutIssueAndWithoutPullRequest_WillNeverCompleted(ScmTaskCompletionCheckMode mode)
     {
         var time = new TestTimeProvider();
         await using var fixture = new ScmDispatchFixture(time: time);
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: null);
-        await SetPruefmodusAsync(fixture, mode);
+        await SetCheckmodeAsync(fixture, mode);
         await SetWaitAsync(fixture, 0);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
@@ -426,7 +426,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
             .SetIntSettingAsync(AppSettingService.ScmTaskCompletionWaitMinutesKey, minutes);
     }
 
-    private static async Task SetPruefmodusAsync(ScmDispatchFixture fixture, ScmTaskCompletionCheckMode mode)
+    private static async Task SetCheckmodeAsync(ScmDispatchFixture fixture, ScmTaskCompletionCheckMode mode)
     {
         using var scope = fixture.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AppSettingService>()

@@ -22,7 +22,7 @@ public partial class End2EndTest
     /// (ProjectDetailView nicht mehr sichtbar).
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected void TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(Window mainWindow)
+    protected void TaskDetail_ShowsData_Back_AndOpenWindowspanning_E2E(Window mainWindow)
     {
         var projectList = new ProjectListView(mainWindow).ForceShow();
         projectList.CreateProject("TaskNav-Test");

@@ -13,7 +13,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>Klartext ohne Escapes ergibt TextWrittenEvent mit korrektem Text.</summary>
     [Fact]
-    public void Parse_PlainText_ErgibtTextWrittenEvent()
+    public void Parse_PlainText_YieldsTextWrittenEvent()
     {
         var sut = new AnsiSequenceParser();
 
@@ -25,7 +25,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>SGR-Sequenz ESC[31m ergibt ColorChangedEvent mit roter Vordergrundfarbe.</summary>
     [Fact]
-    public void Parse_SgrFarbe_ErgibtColorChangedEvent()
+    public void Parse_SgrColor_YieldsColorChangedEvent()
     {
         var sut = new AnsiSequenceParser();
 
@@ -41,7 +41,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>SGR-Reset ESC[0m ergibt ColorChangedEvent mit Reset=true.</summary>
     [Fact]
-    public void Parse_SgrReset_ErgibtColorChangedEventMitStandardfarben()
+    public void Parse_SgrReset_YieldsColorChangedEventWithStandardcolors()
     {
         var sut = new AnsiSequenceParser();
 
@@ -54,7 +54,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>SGR 24-Bit-Farbe ESC[38;2;100;200;50m ergibt korrekte RGB-Vordergrundfarbe.</summary>
     [Fact]
-    public void Parse_Sgr24BitFarbe_WirdKorrektParsiert()
+    public void Parse_Sgr24BitColor_WillCorrectParsed()
     {
         var sut = new AnsiSequenceParser();
 
@@ -70,7 +70,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>ESC[5;10H ergibt CursorMovedEvent mit Row=4 und Col=9 (0-basiert).</summary>
     [Fact]
-    public void Parse_CursorMove_ErgibtCursorMovedEvent()
+    public void Parse_CursorMove_YieldsCursorMovedEvent()
     {
         var sut = new AnsiSequenceParser();
 
@@ -85,7 +85,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>ESC[2J ergibt ScreenClearedEvent.</summary>
     [Fact]
-    public void Parse_ClearScreen_ErgibtScreenClearedEvent()
+    public void Parse_ClearScreen_YieldsScreenClearedEvent()
     {
         var sut = new AnsiSequenceParser();
 
@@ -96,7 +96,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>ESC[K ergibt LineErasedEvent.</summary>
     [Fact]
-    public void Parse_EraseLine_ErgibtLineErasedEvent()
+    public void Parse_EraseLine_YieldsLineErasedEvent()
     {
         var sut = new AnsiSequenceParser();
 
@@ -107,7 +107,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>Escape-Sequenz über zwei Parse-Aufrufe aufgeteilt wird vollständig verarbeitet.</summary>
     [Fact]
-    public void Parse_MehrteiligePakete_WerdenZusammengesetzt()
+    public void Parse_MultipartPackages_BeComposed()
     {
         var sut = new AnsiSequenceParser();
 
@@ -125,7 +125,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>SGR-Sequenz Bold ESC[1m setzt Bold=true im ColorChangedEvent.</summary>
     [Fact]
-    public void Parse_SgrBold_SetzBoldTrue()
+    public void Parse_SgrBold_SetBoldTrue()
     {
         var sut = new AnsiSequenceParser();
 
@@ -137,7 +137,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>Cursor-Sichtbarkeit ESC[?25l ergibt CursorVisibilityChangedEvent mit Visible=false.</summary>
     [Fact]
-    public void Parse_CursorHide_ErgibtCursorVisibilityChangedEventFalse()
+    public void Parse_CursorHide_YieldsCursorVisibilityChangedEventFalse()
     {
         var sut = new AnsiSequenceParser();
 
@@ -149,7 +149,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>Cursor-Sichtbarkeit ESC[?25h ergibt CursorVisibilityChangedEvent mit Visible=true.</summary>
     [Fact]
-    public void Parse_CursorShow_ErgibtCursorVisibilityChangedEventTrue()
+    public void Parse_CursorShow_YieldsCursorVisibilityChangedEventTrue()
     {
         var sut = new AnsiSequenceParser();
 
@@ -162,7 +162,7 @@ public sealed class AnsiSequenceParserTests
     /// <summary>Text mit CRLF wird unverändert im TextWrittenEvent belassen — die Zeilenvorschub-Semantik
     /// liegt bewusst im TerminalBuffer, nicht im Parser.</summary>
     [Fact]
-    public void Parse_CrLfText_ErgibtTextMitCrLf()
+    public void Parse_CrLfText_YieldsTextWithCrLf()
     {
         var sut = new AnsiSequenceParser();
 
@@ -174,7 +174,7 @@ public sealed class AnsiSequenceParserTests
     /// <summary>Ein chunk-übergreifendes UTF-8-Multibyte-Zeichen wird über die Decoder-Pufferung
     /// korrekt zusammengesetzt, statt in zwei Ersatzzeichen zu zerfallen.</summary>
     [Fact]
-    public void Parse_Utf8UeberChunkGrenze_WirdKorrektDekodiert()
+    public void Parse_Utf8OverChunkBoundary_WillCorrectDecodes()
     {
         var sut = new AnsiSequenceParser();
         var bytes = Encode("€"); // E2 82 AC
@@ -190,7 +190,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>CSI L ergibt LinesInsertedEvent.</summary>
     [Fact]
-    public void Parse_CsiL_ErgibtLinesInsertedEvent()
+    public void Parse_CsiL_YieldsLinesInsertedEvent()
     {
         var sut = new AnsiSequenceParser();
         var events = sut.Parse(Encode("\x1b[3L")).ToList();
@@ -200,7 +200,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>CSI M ergibt LinesDeletedEvent.</summary>
     [Fact]
-    public void Parse_CsiM_ErgibtLinesDeletedEvent()
+    public void Parse_CsiM_YieldsLinesDeletedEvent()
     {
         var sut = new AnsiSequenceParser();
         var events = sut.Parse(Encode("\x1b[2M")).ToList();
@@ -213,7 +213,7 @@ public sealed class AnsiSequenceParserTests
     [InlineData("\x1b[4@", typeof(CharsInsertedEvent), 4)]
     [InlineData("\x1b[5P", typeof(CharsDeletedEvent), 5)]
     [InlineData("\x1b[6X", typeof(CharsErasedEvent), 6)]
-    public void Parse_CsiZeichenOperationen_ErgebenKorrekteEvents(string seq, Type expectedType, int expectedCount)
+    public void Parse_CsiCharacterOperation_YieldCorrectEvents(string seq, Type expectedType, int expectedCount)
     {
         var sut = new AnsiSequenceParser();
         var events = sut.Parse(Encode(seq)).ToList();
@@ -224,7 +224,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>CSI r ergibt ScrollRegionChangedEvent mit den übergebenen Grenzen.</summary>
     [Fact]
-    public void Parse_CsiR_ErgibtScrollRegionChangedEvent()
+    public void Parse_CsiR_YieldsScrollRegionChangedEvent()
     {
         var sut = new AnsiSequenceParser();
         var events = sut.Parse(Encode("\x1b[2;10r")).ToList();
@@ -240,7 +240,7 @@ public sealed class AnsiSequenceParserTests
     [InlineData("\x1b[?1047h", true)]
     [InlineData("\x1b[?1049l", false)]
     [InlineData("\x1b[?1047l", false)]
-    public void Parse_AltScreenSequenzen_ErgebenAlternateScreenChangedEvent(string seq, bool expectedActive)
+    public void Parse_AltScreenSequences_YieldAlternateScreenChangedEvent(string seq, bool expectedActive)
     {
         var sut = new AnsiSequenceParser();
         var events = sut.Parse(Encode(seq)).ToList();
@@ -255,7 +255,7 @@ public sealed class AnsiSequenceParserTests
     [InlineData("\x1b[s", false)]
     [InlineData("\x1b" + "8", true)]
     [InlineData("\x1b[u", true)]
-    public void Parse_SaveRestoreCursor_ErgibtCursorSavedEvent(string seq, bool expectedRestored)
+    public void Parse_SaveRestoreCursor_YieldsCursorSavedEvent(string seq, bool expectedRestored)
     {
         var sut = new AnsiSequenceParser();
         var events = sut.Parse(Encode(seq)).ToList();
@@ -265,7 +265,7 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>ESC c ergibt TerminalResetEvent.</summary>
     [Fact]
-    public void Parse_EscC_ErgibtTerminalResetEvent()
+    public void Parse_EscC_YieldsTerminalResetEvent()
     {
         var sut = new AnsiSequenceParser();
         var events = sut.Parse(Encode("\x1b" + "c")).ToList();
@@ -276,7 +276,7 @@ public sealed class AnsiSequenceParserTests
     [Theory]
     [InlineData("\x1b[3S", 3)]
     [InlineData("\x1b[2T", -2)]
-    public void Parse_ScrollUpDown_ErgebenScreenScrolledEvent(string seq, int expectedDelta)
+    public void Parse_ScrollUpDown_YieldScreenScrolledEvent(string seq, int expectedDelta)
     {
         var sut = new AnsiSequenceParser();
         var events = sut.Parse(Encode(seq)).ToList();
@@ -287,7 +287,7 @@ public sealed class AnsiSequenceParserTests
     /// <summary>Die xterm-Window-Manipulation CSI 8;Zeilen;Spalten t passt nur die
     /// Terminal-Textfläche an; Zeilen und Spalten sind gegenüber der Sequenz bewusst vertauscht.</summary>
     [Fact]
-    public void Parse_Csi8TextflaechenResize_ErgibtTerminalResizedEvent()
+    public void Parse_Csi8TextareasResize_YieldsTerminalResizedEvent()
     {
         var sut = new AnsiSequenceParser();
 
@@ -305,7 +305,7 @@ public sealed class AnsiSequenceParserTests
     [InlineData("\x1b[18t")]
     [InlineData("\x1b[8;0;142t")]
     [InlineData("\x1b[8;73;0t")]
-    public void Parse_AndereCsiTSequenzen_ErzeugenKeinResizeEvent(string sequence)
+    public void Parse_OtherCsiTSequences_CreateNoResizeEvent(string sequence)
     {
         var sut = new AnsiSequenceParser();
 
@@ -316,7 +316,7 @@ public sealed class AnsiSequenceParserTests
     /// das ESC beginnt die nächste Sequenz, statt dass das folgende '[' fälschlich als Final-Byte
     /// interpretiert und der Rest der echten Sequenz als Text ausgegeben wird.</summary>
     [Fact]
-    public void Parse_EscInCsi_BrichtUnvollstaendigeSequenzAb()
+    public void Parse_EscInCsi_CancelsIncompleteSequenceFrom()
     {
         var sut = new AnsiSequenceParser();
 
@@ -333,16 +333,16 @@ public sealed class AnsiSequenceParserTests
 
     /// <summary>Regression: ESC mitten in einer CSI ?-Sequenz bricht ebenfalls ab.</summary>
     [Fact]
-    public void Parse_EscInCsiQuestion_BrichtUnvollstaendigeSequenzAb()
+    public void Parse_EscInCsiQuestion_CancelsIncompleteSequenceFrom()
     {
         var sut = new AnsiSequenceParser();
 
         var events = sut.Parse(Encode("\x1b[?25\x1b[2Jrest")).ToList();
 
         events.Should().ContainSingle(e => e is ScreenClearedEvent);
-        var texts = events.OfType<TextWrittenEvent>().ToList();
-        texts.Should().ContainSingle();
-        texts[0].Text.Should().Be("rest");
+        var text = events.OfType<TextWrittenEvent>().ToList();
+        text.Should().ContainSingle();
+        text[0].Text.Should().Be("rest");
     }
 
     /// <summary>Regression: DCS/SOS/PM/APC-String-Sequenzen (ESC P / X / ^ / _) werden bis zum
@@ -353,21 +353,21 @@ public sealed class AnsiSequenceParserTests
     [InlineData("\x1b^msg\x1b\\Z", "Z")]
     [InlineData("\x1b_hint\x1b\\W", "W")]
     [InlineData("\x1bPpayload\x07Q", "Q")]
-    public void Parse_StringSequenzen_WerdenUebersprungen(string seq, string expectedText)
+    public void Parse_StringSequences_BeSkipped(string seq, string expectedText)
     {
         var sut = new AnsiSequenceParser();
 
         var events = sut.Parse(Encode(seq)).ToList();
 
-        var texts = events.OfType<TextWrittenEvent>().ToList();
-        texts.Should().ContainSingle("nur das Zeichen nach dem Terminator darf als Text erscheinen");
-        texts[0].Text.Should().Be(expectedText);
+        var text = events.OfType<TextWrittenEvent>().ToList();
+        text.Should().ContainSingle("nur das Zeichen nach dem Terminator darf als Text erscheinen");
+        text[0].Text.Should().Be(expectedText);
     }
 
     /// <summary>Regression: Ein OSC-Terminator (ESC \), dessen zweites Byte an einer Chunk-Grenze
     /// liegt, darf nicht als Text-Backslash durchschlagen — der Escape-State überlebt die Grenze.</summary>
     [Fact]
-    public void Parse_OscStAnChunkGrenze_WirdKorrektTerminiert()
+    public void Parse_OscStAnChunkBoundary_WillCorrectTerminated()
     {
         var sut = new AnsiSequenceParser();
 
@@ -382,30 +382,30 @@ public sealed class AnsiSequenceParserTests
     /// <summary>OSC mit String-Terminator im selben Chunk bleibt weiterhin funktionsfähig —
     /// und eine direkt anschließende Escape-Sequenz wird regulär geparst.</summary>
     [Fact]
-    public void Parse_OscMitStImSelbenChunk_TerminiertUndParsetFolgesequenz()
+    public void Parse_OscWithStInSameChunk_TerminatedAndParsesFollowingsequence()
     {
         var sut = new AnsiSequenceParser();
 
         var events = sut.Parse(Encode("\x1b]0;Titel\x1b\\\x1b[2Jtext")).ToList();
 
         events.Should().ContainSingle(e => e is ScreenClearedEvent);
-        var texts = events.OfType<TextWrittenEvent>().ToList();
-        texts.Should().ContainSingle();
-        texts[0].Text.Should().Be("text");
+        var text = events.OfType<TextWrittenEvent>().ToList();
+        text.Should().ContainSingle();
+        text[0].Text.Should().Be("text");
     }
 
     /// <summary>Regression: Ein zweiter OSC-String, der direkt nach einem unvollständig beendeten
     /// ersten beginnt (ESC ] mitten im String), wird als neue String-Sequenz interpretiert.</summary>
     [Fact]
-    public void Parse_EscInOsc_BeginntNeueSequenz()
+    public void Parse_EscInOsc_BeginsNewSequence()
     {
         var sut = new AnsiSequenceParser();
 
         var events = sut.Parse(Encode("\x1b]8;;http://x\x1b]0;T\adone")).ToList();
 
-        var texts = events.OfType<TextWrittenEvent>().ToList();
-        texts.Should().ContainSingle();
-        texts[0].Text.Should().Be("done",
+        var text = events.OfType<TextWrittenEvent>().ToList();
+        text.Should().ContainSingle();
+        text[0].Text.Should().Be("done",
             "der String-Payload des zweiten OSC darf nicht als Text erscheinen");
     }
 }

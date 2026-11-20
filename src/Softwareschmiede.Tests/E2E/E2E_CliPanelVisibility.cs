@@ -25,13 +25,13 @@ public partial class End2EndTest
     /// neu gestartet werden kann.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected void CliPanel_BleibtSichtbarNachBeendigung_E2E(Window mainWindow)
+    protected void CliPanel_RemainsVisibleAfterTermination_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        SetupProjectMitNeuerAufgabe(mainWindow, "CliPanelVisibility-Repo", "CliPanelVisibility-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "CliPanelVisibility-Repo", "CliPanelVisibility-Projekt");
 
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
         // CLI läuft: Stoppen-Button sichtbar, CLI-Panel-Tab sichtbar (ShowCliPanel==true, AusfuehrungsStatus==Aktiv)
         taskDetail.WaitForCliRunning();

@@ -33,7 +33,7 @@ public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
             .ToList();
 
         // Persistierte, noch zukünftige Plugin-Session-Limits in einer Abfrage laden.
-        var sessionLimits = await _kiPluginLimitService.GetAktiveSessionLimitsAsync(prefixes, ct);
+        var sessionLimits = await _kiPluginLimitService.GetActiveSessionLimitsAsync(prefixes, ct);
 
         var now = DateTimeOffset.UtcNow;
         var riskyTasks = activeTasks

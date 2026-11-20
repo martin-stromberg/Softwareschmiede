@@ -9,7 +9,7 @@ public sealed class BranchCommitTests
 {
     /// <summary>Das Setzen von IsLoadingFiles löst PropertyChanged aus, damit WPF-Bindings den Ladezustand anzeigen können.</summary>
     [Fact]
-    public void IsLoadingFiles_Setzen_LoestPropertyChangedAus()
+    public void IsLoadingFiles_Set_TriggersPropertyChangedOut()
     {
         var commit = new BranchCommit();
         var raised = new List<string?>();
@@ -22,7 +22,7 @@ public sealed class BranchCommitTests
 
     /// <summary>Das Setzen von ErrorMessage löst PropertyChanged aus, damit WPF-Bindings die Fehlermeldung anzeigen können.</summary>
     [Fact]
-    public void ErrorMessage_Setzen_LoestPropertyChangedAus()
+    public void ErrorMessage_Set_TriggersPropertyChangedOut()
     {
         var commit = new BranchCommit();
         var raised = new List<string?>();
@@ -35,7 +35,7 @@ public sealed class BranchCommitTests
 
     /// <summary>Das erneute Setzen desselben Werts löst PropertyChanged nicht erneut aus.</summary>
     [Fact]
-    public void IsLoadingFiles_GleicherWert_LoestPropertyChangedNichtErneutAus()
+    public void IsLoadingFiles_SameValue_TriggersPropertyChangedNotAgainOut()
     {
         var commit = new BranchCommit { IsLoadingFiles = true };
         var raised = 0;

@@ -35,7 +35,7 @@ public sealed class GitHubPluginNetrcCleanupTests : IDisposable
     /// <summary>GitHub- und Fremd-Stanzas in einer Datei: nur die GitHub-Einträge werden entfernt,
     /// der restliche Inhalt bleibt byteidentisch erhalten.</summary>
     [Fact]
-    public void Ctor_BereinigtGithubStanzas_UndBehalteFremdeintraege()
+    public void Ctor_CleanedGithubStanzas_AndKeepForeignentries()
     {
         const string bitbucketBlock = "machine bitbucket.org\nlogin bitbucket-user\npassword bb-pass\n";
         const string selfHostedBlock = "machine git.example.com\nlogin self-user\npassword sh-pass\n";
@@ -52,7 +52,7 @@ public sealed class GitHubPluginNetrcCleanupTests : IDisposable
 
     /// <summary>Bestand die _netrc ausschließlich aus GitHub-Stanzas, wird die Datei gelöscht.</summary>
     [Fact]
-    public void Ctor_LoeschtNetrc_WennNurGithubStanzas()
+    public void Ctor_DeletesNetrc_WhenOnlyGithubStanzas()
     {
         var netrcPath = CreateNetrc(
             "machine github.com\nlogin oauth2\npassword ghp_secret\n"
@@ -65,7 +65,7 @@ public sealed class GitHubPluginNetrcCleanupTests : IDisposable
 
     /// <summary>Eine _netrc ohne GitHub-Einträge wird nicht angefasst (Inhalt byteidentisch, kein Rewrite).</summary>
     [Fact]
-    public void Ctor_LaesstNetrcUnveraendert_OhneGithubStanzas()
+    public void Ctor_LetsNetrcUnchanged_WithoutGithubStanzas()
     {
         const string content = "machine bitbucket.org\nlogin bitbucket-user\npassword bb-pass\n";
         var netrcPath = CreateNetrc(content);
@@ -77,7 +77,7 @@ public sealed class GitHubPluginNetrcCleanupTests : IDisposable
 
     /// <summary>Existiert keine _netrc, wird keine angelegt.</summary>
     [Fact]
-    public void Ctor_LegtKeineNetrcAn_WennFehlend()
+    public void Ctor_CreatesNoNetrcAn_WhenMissing()
     {
         var netrcPath = Path.Combine(_tempDir, "nicht-vorhanden", "_netrc");
 
@@ -89,7 +89,7 @@ public sealed class GitHubPluginNetrcCleanupTests : IDisposable
     /// <summary>Die machine-Erkennung tokenisiert die Zeilen: Tabulator- und
     /// Mehrfach-Leerzeichen-Trenner werden genauso entfernt wie das Einzel-Leerzeichen-Format.</summary>
     [Fact]
-    public void Ctor_BereinigtGithubStanzas_MitBeliebigenWhitespaceTrennern()
+    public void Ctor_CleanedGithubStanzas_WithAnyWhitespaceSeparator()
     {
         const string bitbucketBlock = "machine bitbucket.org\nlogin bitbucket-user\npassword bb-pass\n";
         var netrcPath = CreateNetrc(
@@ -104,7 +104,7 @@ public sealed class GitHubPluginNetrcCleanupTests : IDisposable
 
     /// <summary>Eine Stanza mit Inline-Tokens (alle Angaben in einer Zeile) wird komplett entfernt.</summary>
     [Fact]
-    public void Ctor_BereinigtGithubStanzas_MitInlineTokens()
+    public void Ctor_CleanedGithubStanzas_WithInlineTokens()
     {
         const string bitbucketBlock = "machine bitbucket.org\nlogin bitbucket-user\npassword bb-pass\n";
         var netrcPath = CreateNetrc(
@@ -119,7 +119,7 @@ public sealed class GitHubPluginNetrcCleanupTests : IDisposable
     /// <summary>Eine <c>default</c>-Stanza ist eine Blockgrenze: Sie beendet eine zu
     /// entfernende GitHub-Stanza und bleibt samt Folgezeilen erhalten.</summary>
     [Fact]
-    public void Ctor_BehalteDefaultStanza_AlsBlockgrenze()
+    public void Ctor_KeepDefaultStanza_AsBlockboundary()
     {
         const string defaultBlock = "default\nlogin anonymous\npassword anon-pass\n";
         const string bitbucketBlock = "machine bitbucket.org\npassword bb-pass\n";
@@ -136,7 +136,7 @@ public sealed class GitHubPluginNetrcCleanupTests : IDisposable
     /// <summary>Die finale Zeilenschaltung des verbleibenden Inhalts bleibt erhalten,
     /// wenn die letzte Stanza der Datei entfernt wird.</summary>
     [Fact]
-    public void Ctor_BehalteFinaleZeilenschaltung_DesRestinhalts()
+    public void Ctor_KeepFinalLinebreak_OfRemainingcontent()
     {
         const string bitbucketBlock = "machine bitbucket.org\nlogin bitbucket-user\npassword bb-pass\n";
         var netrcPath = CreateNetrc(
@@ -153,7 +153,7 @@ public sealed class GitHubPluginNetrcCleanupTests : IDisposable
     /// <c>netrcPath</c> übergeben wird — die Seam für Instanziierungen, bei denen der
     /// Konstruktorparameter nicht erreichbar ist (Plugin-Discovery via ActivatorUtilities).</summary>
     [Fact]
-    public void Ctor_NutztUmgebungsvariablenOverride_WennKeinExpliziterNetrcPath()
+    public void Ctor_UsesEnvironmentvariablesOverride_WhenNoExplicitNetrcPath()
     {
         const string bitbucketBlock = "machine bitbucket.org\nlogin bitbucket-user\npassword bb-pass\n";
         var netrcPath = CreateNetrc("machine github.com\nlogin oauth2\npassword ghp_secret\n" + bitbucketBlock);
@@ -174,7 +174,7 @@ public sealed class GitHubPluginNetrcCleanupTests : IDisposable
     /// <summary>Der explizite <c>netrcPath</c>-Konstruktorparameter hat Vorrang vor der
     /// Umgebungsvariable: Die Datei am Env-Pfad bleibt unverändert.</summary>
     [Fact]
-    public void Ctor_ExpliziterNetrcPath_HatVorrangVorUmgebungsvariable()
+    public void Ctor_ExplicitNetrcPath_HasPriorityBeforeEnvironmentvariable()
     {
         const string githubBlock = "machine github.com\nlogin oauth2\npassword ghp_secret\n";
         var envNetrcPath = Path.Combine(_tempDir, "env_netrc");
@@ -198,7 +198,7 @@ public sealed class GitHubPluginNetrcCleanupTests : IDisposable
     /// <summary>Bereinigungsfehler (hier: netrcPath ist ein Verzeichnis) werden nur als
     /// Warning geloggt und lassen die Plugin-Instanziierung nicht fehlschlagen.</summary>
     [Fact]
-    public void Ctor_Bereinigungsfehler_WirftNicht()
+    public void Ctor_Cleanuperror_ThrowsNot()
     {
         var directoryAsNetrcPath = Path.Combine(_tempDir, "netrc-als-verzeichnis");
         Directory.CreateDirectory(directoryAsNetrcPath);

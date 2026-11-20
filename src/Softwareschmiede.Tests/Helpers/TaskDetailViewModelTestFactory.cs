@@ -24,7 +24,7 @@ public static class TaskDetailViewModelTestFactory
         dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
-        var aiService = TestKiAusfuehrungsServiceFactory.Create();
+        var aiService = TestAiExecutionServiceFactory.Create();
         var logService = new LogService(db, NullLogger<LogService>.Instance);
         var todoService = new TodoService(db, NullLogger<TodoService>.Instance);
         var pluginManagerMock = new Mock<IPluginManager>();
@@ -39,13 +39,13 @@ public static class TaskDetailViewModelTestFactory
         var promptTemplatesPlaceholderService = new PromptTemplatePlaceholderService();
         var promptScheduleDispatchService = new PromptScheduleDispatchService(aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         var gitPluginMock = new Mock<IGitPlugin>();
-        var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
+        var workingDirectoryMock = new Mock<IWorkingDirectoryResolver>();
         var developmentprocessService = new DevelopmentProcessService(
             workItemService,
             logService,
             gitPluginMock.Object,
             pluginSelectionService,
-            arbeitsverzeichnisMock.Object,
+            workingDirectoryMock.Object,
             new DevelopmentProcessServiceOptions(AiExecutionService: aiService, PromptScheduleDispatchService: promptScheduleDispatchService),
             NullLogger<DevelopmentProcessService>.Instance);
 
@@ -54,7 +54,7 @@ public static class TaskDetailViewModelTestFactory
         var fileExplorerViewModel = CreateStub();
         var todoListViewModel = new TodoListViewModel(todoService, NullLogger<TodoListViewModel>.Instance);
 
-        var workingDirectoryOpenService = CreateArbeitsverzeichnisOeffnenService();
+        var workingDirectoryOpenService = CreateWorkingDirectoryOpenService();
 
         return new TaskDetailViewModel(
             workItemService,
@@ -84,12 +84,12 @@ public static class TaskDetailViewModelTestFactory
             NullLogger<FileExplorerViewModel>.Instance);
 
     /// <summary>Erstellt einen ArbeitsverzeichnisOeffnenService mit dem übergebenen (oder einem neuen) IProzessStarter-Mock.</summary>
-    /// <param name="prozessStarterMock">Der zu verwendende IProzessStarter-Mock, oder null um einen neuen Mock zu erstellen.</param>
+    /// <param name="processStarterMock">Der zu verwendende IProzessStarter-Mock, oder null um einen neuen Mock zu erstellen.</param>
     /// <returns>Ein einsatzbereiter ArbeitsverzeichnisOeffnenService.</returns>
-    public static WorkingDirectoryOpenService CreateArbeitsverzeichnisOeffnenService(
-        Mock<IProcessStarter>? prozessStarterMock = null)
+    public static WorkingDirectoryOpenService CreateWorkingDirectoryOpenService(
+        Mock<IProcessStarter>? processStarterMock = null)
     {
-        prozessStarterMock ??= new Mock<IProcessStarter>();
-        return new WorkingDirectoryOpenService(prozessStarterMock.Object);
+        processStarterMock ??= new Mock<IProcessStarter>();
+        return new WorkingDirectoryOpenService(processStarterMock.Object);
     }
 }

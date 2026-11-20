@@ -26,7 +26,7 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
 
     /// <summary>ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu.</summary>
     [Fact]
-    public async Task ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu()
+    public async Task CreateProject_AddAndWorkItem_StatusIsNew()
     {
         var project = await _projectService.CreateAsync("Neues Projekt", null, TestContext.Current.CancellationToken);
         project.Id.Should().NotBeEmpty();
@@ -40,18 +40,18 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
 
     /// <summary>MehrereProjekte_KoennenErstellt_UndGeladen_Werden.</summary>
     [Fact]
-    public async Task MehrereProjekte_KoennenErstellt_UndGeladen_Werden()
+    public async Task SeveralProjects_CreatesCan_AndLoaded_Be()
     {
         await _projectService.CreateAsync("Projekt A", null, TestContext.Current.CancellationToken);
         await _projectService.CreateAsync("Projekt B", null, TestContext.Current.CancellationToken);
 
-        var alle = await _projectService.GetAllAsync(TestContext.Current.CancellationToken);
-        alle.Count.Should().BeGreaterThanOrEqualTo(2);
+        var all = await _projectService.GetAllAsync(TestContext.Current.CancellationToken);
+        all.Count.Should().BeGreaterThanOrEqualTo(2);
     }
 
     /// <summary>Aufgabe_KannInProjektGeladen_Werden.</summary>
     [Fact]
-    public async Task Aufgabe_KannInProjektGeladen_Werden()
+    public async Task WorkItem_CanInProjectLoaded_Be()
     {
         var project = await _projectService.CreateAsync("Test Projekt", null, TestContext.Current.CancellationToken);
         await _workItemService.CreateAsync(project.Id, "Aufgabe 1", null, ct: TestContext.Current.CancellationToken);

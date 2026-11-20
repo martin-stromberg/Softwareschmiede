@@ -150,7 +150,7 @@ public sealed class AiPluginLimitService
     /// <param name="prefixes">Die zu prüfenden <see cref="WorkItem.AiPluginPrefix"/>-Werte.</param>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
     /// <returns>Zuordnung Prefix → Reset-Zeitpunkt (nur zukünftige Limits; Schlüsselvergleich OrdinalIgnoreCase).</returns>
-    public async Task<IReadOnlyDictionary<string, DateTimeOffset>> GetAktiveSessionLimitsAsync(
+    public async Task<IReadOnlyDictionary<string, DateTimeOffset>> GetActiveSessionLimitsAsync(
         IReadOnlyCollection<string> prefixes,
         CancellationToken ct = default)
     {

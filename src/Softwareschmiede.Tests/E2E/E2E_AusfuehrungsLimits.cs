@@ -20,30 +20,30 @@ public partial class End2EndTest
     /// Folgeszenarien von unbegrenzten Limits ausgehen.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected void Einstellungen_AusfuehrungsLimitsGlobalUndProPlugin_E2E(Window mainWindow)
+    protected void Settings_ExecutionLimitGlobalAndPerPlugin_E2E(Window mainWindow)
     {
-        const string kiPrefix = "Softwareschmiede.ClaudeCli";
+        const string aiPrefix = "Softwareschmiede.ClaudeCli";
         var settings = new SettingsView(mainWindow).ForceShow();
         try
         {
             // Globales Limit: Feld im Expander „Aufgaben ausführen“, leer = unbegrenzt.
-            settings.OpenAufgabenAusfuehren();
-            Assert.Equal(string.Empty, settings.GetMaxParalleleAusfuehrungen());
-            settings.SetMaxParalleleAusfuehrungen("1");
+            settings.ExecuteOpenWorkItems();
+            Assert.Equal(string.Empty, settings.GetMaxParallelExecutions());
+            settings.SetMaxParallelExecutions("1");
 
             // Plugin-Limit: hostseitiges Feld im KI-Plugin-Panel (Gruppe „Ausführungsbegrenzung“).
             settings.SwitchTab("Plugins");
-            settings.SelectPluginEntry(kiPrefix);
+            settings.SelectPluginEntry(aiPrefix);
             Assert.Equal(string.Empty, settings.GetPluginParallelLimit());
             settings.SetPluginParallelLimit("2");
             settings.SaveSettings();
 
             // Persistenz-Nachweis über UI-Neuladen und AppEinstellung-Schlüssel.
             var settingsReopened = settings.Menu.NavigateToSettings();
-            settingsReopened.OpenAufgabenAusfuehren();
-            Assert.Equal("1", settingsReopened.GetMaxParalleleAusfuehrungen());
+            settingsReopened.ExecuteOpenWorkItems();
+            Assert.Equal("1", settingsReopened.GetMaxParallelExecutions());
             settingsReopened.SwitchTab("Plugins");
-            settingsReopened.SelectPluginEntry(kiPrefix);
+            settingsReopened.SelectPluginEntry(aiPrefix);
             Assert.Equal("2", settingsReopened.GetPluginParallelLimit());
             using (var db = OpenTestDbContext())
             {
@@ -51,13 +51,13 @@ public partial class End2EndTest
                     .Where(e => e.Key == ScmEventExecutionLimitService.GlobalLimitKey)
                     .Select(e => e.Value).FirstOrDefault());
                 Assert.Equal("2", db.AppSettings
-                    .Where(e => e.Key == ScmEventExecutionLimitService.PluginLimitKey(kiPrefix))
+                    .Where(e => e.Key == ScmEventExecutionLimitService.PluginLimitKey(aiPrefix))
                     .Select(e => e.Value).FirstOrDefault());
             }
 
             // Validierung: „0“ ist kein gültiges globales Limit → Fehler, nichts wird persistiert.
-            settingsReopened.OpenAufgabenAusfuehren();
-            settingsReopened.SetMaxParalleleAusfuehrungen("0");
+            settingsReopened.ExecuteOpenWorkItems();
+            settingsReopened.SetMaxParallelExecutions("0");
             var error = settingsReopened.SaveSettingsExpectError();
             Assert.Contains("Limit paralleler CLI-Ausführungen", error);
             using (var db = OpenTestDbContext())
@@ -75,10 +75,10 @@ public partial class End2EndTest
             try
             {
                 settings.ForceShow();
-                settings.OpenAufgabenAusfuehren();
-                settings.SetMaxParalleleAusfuehrungen(string.Empty);
+                settings.ExecuteOpenWorkItems();
+                settings.SetMaxParallelExecutions(string.Empty);
                 settings.SwitchTab("Plugins");
-                settings.SelectPluginEntry(kiPrefix);
+                settings.SelectPluginEntry(aiPrefix);
                 settings.SetPluginParallelLimit(string.Empty);
                 settings.SaveSettings();
                 settings.Menu.NavigateToDashboard();
@@ -91,7 +91,7 @@ public partial class End2EndTest
                     using var db = OpenTestDbContext();
                     db.AppSettings
                         .Where(e => e.Key == ScmEventExecutionLimitService.GlobalLimitKey
-                            || e.Key == ScmEventExecutionLimitService.PluginLimitKey(kiPrefix))
+                            || e.Key == ScmEventExecutionLimitService.PluginLimitKey(aiPrefix))
                         .ToList()
                         .ForEach(e => e.Value = null);
                     db.SaveChanges();

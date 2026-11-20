@@ -84,7 +84,7 @@
                     Margin="0,0,8,0" />
             <Button Content="Pause aufheben"
                     AutomationProperties.Name="LiftPause"
-                    Command="{Binding AufhebenCommand}"
+                    Command="{Binding LiftCommand}"
                     Padding="12,6"
                     Margin="0,0,8,0" />
             <Button Content="Übernehmen"

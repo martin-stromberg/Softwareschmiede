@@ -18,7 +18,7 @@ public partial class End2EndTest
     /// Prüft: Der Versions-TextBlock (AutomationId "AppVersionText") in der Fußzeile der Seitenleiste
     /// zeigt einen nicht-leeren Versionstext an.
     /// </summary>
-    protected void AppStarten_ZeigtVersionsTextInFusszeile_E2E(FlaUI.Core.AutomationElements.Window mainWindow)
+    protected void StartApp_ShowsVersionsTextInFooter_E2E(FlaUI.Core.AutomationElements.Window mainWindow)
     {
         var versionText = new MenuView(mainWindow).GetVersionText();
         Assert.False(string.IsNullOrWhiteSpace(versionText));

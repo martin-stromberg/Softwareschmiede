@@ -26,9 +26,9 @@ public partial class End2EndTest
     /// und „IDE öffnen" über das Ribbon prüfen - zunächst ohne, dann mit einer und mit mehreren
     /// „*.sln"-Dateien im Arbeitsverzeichnis.
     /// </summary>
-    protected async Task VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E(Window mainWindow)
+    protected async Task DirectoryAction_OpenWorkingDirectoryAndIde_E2E(Window mainWindow)
     {
-        SetupProjectMitNeuerAufgabe(mainWindow, "VerzeichnisAktionen-Repo", "VerzeichnisAktionen-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "VerzeichnisAktionen-Repo", "VerzeichnisAktionen-Projekt");
 
         // Das Ribbon kann bei sichtbarer CLI-Gruppe (Status Gestartet/Wartend) breiter als das Standard-
         // Fenster werden (Dateien- und Werkzeuge-Gruppe kommen neu hinzu). Ein Button einfacher WPF-Buttons
@@ -39,16 +39,16 @@ public partial class End2EndTest
 
         // git init im Quellverzeichnis vorab bestätigen, damit "Starten" im ersten Versuch gelingt.
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
         // Nach erfolgreichem Start ist das Repository geklont (LokalerKlonPfad gesetzt).
         taskDetail.WaitForCliRunning();
 
-        var localClonePath = await GetLokalerKlonPfadAsync();
+        var localClonePath = await GetLocalClonePathAsync();
 
         // Phase 1: "Arbeitsverzeichnis öffnen" zeichnet den OS-Dateiexplorer-Start mit dem LokalerKlonPfad auf.
         taskDetail.OpenWorkingDirectory();
-        await WaitForProzessStartEintragAsync(localClonePath);
+        await WaitForProcessStartEntryAsync(localClonePath);
 
         // Phase 2: Ohne "*.sln" ist "IDE öffnen" weiterhin aktiv (CanExecute hängt nur noch vom vorhandenen
         // Arbeitsverzeichnis ab, nicht mehr von gefundenen Solutions) - ein Klick löst über
@@ -56,15 +56,15 @@ public partial class End2EndTest
         // Visual Studio Code standardmäßig als aktives IDE-Plugin gilt.
         Assert.True(taskDetail.IsIdeButtonEnabled(), "das Arbeitsverzeichnis existiert bereits, auch ohne .sln-Datei");
 
-        var protokollVorFallback = await ReadProzessStartLogAsync();
+        var logBeforeFallback = await ReadProcessStartLogAsync();
         taskDetail.OpenIde();
-        await WaitForProzessStartEintragAsync(Path.GetFullPath(localClonePath), sinceContent: protokollVorFallback);
+        await WaitForProcessStartEntryAsync(Path.GetFullPath(localClonePath), sinceContent: logBeforeFallback);
 
         Assert.False(new SolutionSelectionDialogView(mainWindow).IsVisible, "ohne gefundene Solution öffnet der Visual-Studio-Code-Fallback direkt, ohne Auswahl-Dialog");
 
         // Genau eine "*.sln" anlegen und die Aufgabe neu laden (Ribbon-Button-CanExecute wird beim Laden gecacht).
-        var ersteSolution = Path.Combine(localClonePath, "Erste.sln");
-        File.WriteAllText(ersteSolution, string.Empty);
+        var firstSolution = Path.Combine(localClonePath, "Erste.sln");
+        File.WriteAllText(firstSolution, string.Empty);
         taskDetail = taskDetail.Reload();
 
         // Phase 3: Bei genau einer "*.sln" öffnet der Haupt-Button von "IDE öffnen" diese weiterhin direkt,
@@ -74,14 +74,14 @@ public partial class End2EndTest
         // weiteren Einstiegspunkt - aggregiert über alle kompatiblen Plugins sind das 2 Einstiegspunkte.
         Assert.True(taskDetail.IsIdeButtonEnabled(), "es existiert jetzt genau eine .sln-Datei");
         taskDetail.OpenIde();
-        await WaitForProzessStartEintragAsync(ersteSolution);
+        await WaitForProcessStartEntryAsync(firstSolution);
 
         Assert.False(new SolutionSelectionDialogView(mainWindow).IsVisible, "der Haupt-Button des Split-Buttons öffnet weiterhin direkt, ohne Auswahl-Dialog");
         Assert.True(taskDetail.HasIdeDropdown(), "Visual Studio liefert die eine .sln als Explicit-Einstiegspunkt, zusätzlich liefert das weiterhin aktive Visual-Studio-Code-Fallback-Plugin einen weiteren Einstiegspunkt - aggregiert sind das 2 Einstiegspunkte, der Dropdown-Button muss also sichtbar sein");
 
         // Eine zweite "*.slnx" anlegen und die Aufgabe erneut neu laden.
-        var zweiteSolution = Path.Combine(localClonePath, "Zweite.slnx");
-        File.WriteAllText(zweiteSolution, string.Empty);
+        var secondSolution = Path.Combine(localClonePath, "Zweite.slnx");
+        File.WriteAllText(secondSolution, string.Empty);
         taskDetail = taskDetail.Reload();
 
         // Phase 4: Bei mehreren "*.sln"-Dateien öffnet der Haupt-Button des Split-Buttons weiterhin direkt
@@ -90,18 +90,18 @@ public partial class End2EndTest
         // formatierten) Einstiegspunkten an.
         Assert.True(taskDetail.HasIdeDropdown());
 
-        var protokollVorHauptklick = await ReadProzessStartLogAsync();
+        var logBeforeMainclick = await ReadProcessStartLogAsync();
         taskDetail.OpenIde();
-        await WaitForProzessStartEintragAsync(ersteSolution, sinceContent: protokollVorHauptklick);
+        await WaitForProcessStartEntryAsync(firstSolution, sinceContent: logBeforeMainclick);
 
         Assert.False(new SolutionSelectionDialogView(mainWindow).IsVisible, "der Haupt-Button des Split-Buttons öffnet weiterhin direkt, ohne Auswahl-Dialog");
 
         var solutionDialog = taskDetail.OpenIdeDropdown();
         // Die Liste zeigt plugin-qualifizierte Anzeigewerte ("{PluginName}: {Dateiname}"), keine Rohpfade.
-        solutionDialog.SelectSolution($"Visual Studio: {Path.GetFileName(zweiteSolution)}");
+        solutionDialog.SelectSolution($"Visual Studio: {Path.GetFileName(secondSolution)}");
         solutionDialog.Confirm();
 
-        await WaitForProzessStartEintragAsync(zweiteSolution);
+        await WaitForProcessStartEntryAsync(secondSolution);
 
         mainWindow.AsWindow().Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Normal);
         taskDetail.ForceClose(recurseToDashboard: false);
@@ -118,17 +118,17 @@ public partial class End2EndTest
     /// Solution im Unterverzeichnis liegt, muss diese gefunden und geöffnet werden (nicht im Root) - der
     /// Beweis, dass die Solution-Suche im aufgelösten Arbeitsverzeichnis stattfindet.
     /// </summary>
-    protected async Task VerzeichnisAktionen_KonfiguriertesArbeitsverzeichnisWirdAufgeloest_E2E(Window mainWindow)
+    protected async Task DirectoryAction_ConfiguredWorkingDirectoryWillResolved_E2E(Window mainWindow)
     {
-        SetupProjectMitNeuerAufgabe(mainWindow, "WorkDir-Ribbon-Repo", "WorkDir-Ribbon-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "WorkDir-Ribbon-Repo", "WorkDir-Ribbon-Projekt");
 
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskDetail.WaitForCliRunning();
 
-        var localClonePath = await GetLokalerKlonPfadAsync();
-        var unterverzeichnis = Path.Combine(localClonePath, "backend");
-        Directory.CreateDirectory(unterverzeichnis);
+        var localClonePath = await GetLocalClonePathAsync();
+        var subdirectory = Path.Combine(localClonePath, "backend");
+        Directory.CreateDirectory(subdirectory);
 
         await SeedRepositoryWorkingDirectoryAsync("backend");
 
@@ -137,7 +137,7 @@ public partial class End2EndTest
 
         // Phase 1: "Arbeitsverzeichnis öffnen" muss das aufgelöste Unterverzeichnis öffnen, nicht den Repository-Root.
         taskDetail.OpenWorkingDirectory();
-        await WaitForProzessStartEintragAsync(Path.GetFullPath(unterverzeichnis));
+        await WaitForProcessStartEntryAsync(Path.GetFullPath(subdirectory));
 
         // Phase 2: Ohne "*.sln" im Unterverzeichnis ist "IDE öffnen" weiterhin aktiv (CanExecute hängt nur
         // vom vorhandenen Arbeitsverzeichnis ab) und fällt über ResolveIdePluginAsync automatisch auf das
@@ -145,24 +145,24 @@ public partial class End2EndTest
         // Unterverzeichnis öffnet - ohne Solution-Auswahl-Dialog. Da Phase 1 bereits einen Prozessstart mit
         // demselben aufgelösten Pfad aufgezeichnet hat, wird nur der seit diesem Zeitpunkt neu hinzugekommene
         // Teil der Log-Datei geprüft.
-        var protokollVorFallback = await ReadProzessStartLogAsync();
+        var logBeforeFallback = await ReadProcessStartLogAsync();
 
         Assert.True(taskDetail.IsIdeButtonEnabled(), "das konfigurierte Arbeitsverzeichnis existiert, auch ohne .sln-Datei");
         taskDetail.OpenIde();
-        await WaitForProzessStartEintragAsync(Path.GetFullPath(unterverzeichnis), sinceContent: protokollVorFallback);
+        await WaitForProcessStartEntryAsync(Path.GetFullPath(subdirectory), sinceContent: logBeforeFallback);
 
         Assert.False(new SolutionSelectionDialogView(mainWindow).IsVisible, "ohne gefundene Solution öffnet der Fallback Visual Studio Code direkt, ohne Auswahl-Dialog");
 
         // Eine "*.sln" NUR im Unterverzeichnis anlegen (nicht im Repository-Root) und neu laden.
-        var solutionImUnterverzeichnis = Path.Combine(unterverzeichnis, "Backend.sln");
-        File.WriteAllText(solutionImUnterverzeichnis, string.Empty);
+        var solutionInSubdirectory = Path.Combine(subdirectory, "Backend.sln");
+        File.WriteAllText(solutionInSubdirectory, string.Empty);
         taskDetail = taskDetail.Reload();
 
         // Phase 3: "IDE öffnen" muss die Solution aus dem Unterverzeichnis finden und öffnen - der Repository-Root
         // enthält keine Solution, das kann also nur gelingen, wenn tatsächlich im aufgelösten Verzeichnis gesucht wurde.
         Assert.True(taskDetail.IsIdeButtonEnabled(), "es liegt jetzt eine .sln-Datei im konfigurierten Arbeitsverzeichnis");
         taskDetail.OpenIde();
-        await WaitForProzessStartEintragAsync(solutionImUnterverzeichnis);
+        await WaitForProcessStartEntryAsync(solutionInSubdirectory);
 
         taskDetail.ForceClose(recurseToDashboard: false);
         var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
@@ -191,9 +191,9 @@ public partial class End2EndTest
 
     /// <summary>Liest den aktuellen Inhalt der Prozessstart-Logdatei (leer, falls sie noch nicht existiert).</summary>
     /// <returns>Der vollständige aktuelle Inhalt der Logdatei, oder <see cref="string.Empty"/>.</returns>
-    private async Task<string> ReadProzessStartLogAsync()
+    private async Task<string> ReadProcessStartLogAsync()
     {
-        var path = ResolveProzessStartLogPfad();
+        var path = ResolveProcessStartLogPath();
         return File.Exists(path) ? await File.ReadAllTextAsync(path) : string.Empty;
     }
 }

@@ -13,13 +13,13 @@ public static class WindowExtensions
         w => new PluginSelectionDialogView(w),
         w => new IssueSelectionDialogView(w),
         w => new IssueCreateDialogView(w),
-        w => new ArbeitsverzeichnisBearbeitenDialogView(w),
+        w => new WorkingDirectoryEditDialogView(w),
         w => new OpenTodosDialogView(w),
         w => new HelpTextDialogView(w),
         w => new SolutionSelectionDialogView(w),
         w => new UpdateProgressDialogView(w),
         w => new DeleteConfirmationDialogView(w),
-        w => new KonsolenTestDialogView(w),
+        w => new ConsoleTestDialogView(w),
     ];
 
     /// <summary>
@@ -105,7 +105,7 @@ public static class WindowExtensions
             "Dashboard-Titeltext", "Dialogtitel (z. B. 'Repository zuweisen')"
         ]);
 
-        var visibleNames = window
+        var visibleName = window
             .FindAllChildren()
             .Select(e => e.Name)
             .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -114,6 +114,6 @@ public static class WindowExtensions
 
         return new InvalidOperationException(
             $"CurrentView() konnte keine bekannte Ansicht erkennen. Erwartete Marker (mindestens einer je View): " +
-            $"{expectedMarkers}. Aktuell sichtbare Top-Level-Elemente im Hauptfenster: {string.Join(", ", visibleNames)}.");
+            $"{expectedMarkers}. Aktuell sichtbare Top-Level-Elemente im Hauptfenster: {string.Join(", ", visibleName)}.");
     }
 }

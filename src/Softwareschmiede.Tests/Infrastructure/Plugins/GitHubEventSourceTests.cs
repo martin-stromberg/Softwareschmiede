@@ -942,7 +942,7 @@ public sealed class GitHubEventSourceTests
     [Theory]
     [InlineData(ScmAccountMode.UserAccount)]
     [InlineData(ScmAccountMode.SeparateAccount)]
-    public async Task IssueBodyUpdate_RoutesByReferenceKonto(ScmAccountMode account)
+    public async Task IssueBodyUpdate_RoutesByReferenceAccount(ScmAccountMode account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();
@@ -1120,7 +1120,7 @@ public sealed class GitHubEventSourceTests
     /// <summary>Die Repository-Auflösung läuft im SeparatesKonto ausschließlich über den
     /// Agent-Client; der Benutzer-Client wird nicht berührt und das Ergebnis trägt das Konto.</summary>
     [Fact]
-    public async Task GetEventRepositoryAsync_SeparatesKonto_UsesAgentToken()
+    public async Task GetEventRepositoryAsync_SeparatesAccount_UsesAgentToken()
     {
         var user = new FakeApi();
         var agent = new FakeApi();
@@ -1139,7 +1139,7 @@ public sealed class GitHubEventSourceTests
     [Theory]
     [InlineData(ScmAccountMode.UserAccount)]
     [InlineData(ScmAccountMode.SeparateAccount)]
-    public async Task ReadEventsAsync_RoutesByReferenceKonto(ScmAccountMode account)
+    public async Task ReadEventsAsync_RoutesByReferenceAccount(ScmAccountMode account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();
@@ -1161,7 +1161,7 @@ public sealed class GitHubEventSourceTests
     [Theory]
     [InlineData(ScmAccountMode.UserAccount)]
     [InlineData(ScmAccountMode.SeparateAccount)]
-    public async Task Response_RoutesByReferenceKonto(ScmAccountMode account)
+    public async Task Response_RoutesByReferenceAccount(ScmAccountMode account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();

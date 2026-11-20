@@ -89,7 +89,7 @@ public sealed class ScmCliPromptProfileTests
 
     /// <summary>An out-of-range version names CLI, detected version and supported range, and stays confirmable.</summary>
     [Fact]
-    public void Describe_UnsupportedVersion_NamesCliVersionAndRange()
+    public void Describe_UnsupportedVersion_NameCliVersionAndRange()
     {
         var reason = ScmCliWaitReason.Describe(new(ScmCliRecognitionState.Unsupported, "Devin CLI", new Version(3001, 0, 0), "v3000.x"));
         Assert.Contains("Devin CLI", reason);

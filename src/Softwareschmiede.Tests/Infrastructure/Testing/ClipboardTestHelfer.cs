@@ -17,7 +17,7 @@ public static class ClipboardTestHelfer
 {
     /// <summary>Setzt Text in die Zwischenablage und bestätigt per Read-back die stabile
     /// Vorbedingung. Wiederholt bei <see cref="COMException"/> bis <paramref name="maxAttempts"/>.</summary>
-    public static void SetTextMitRetry(string text, int maxAttempts = 25)
+    public static void SetTextWithRetry(string text, int maxAttempts = 25)
     {
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -42,9 +42,9 @@ public static class ClipboardTestHelfer
     }
 
     /// <summary>Liest den Zwischenablage-Text mit Retry bei <see cref="COMException"/>.</summary>
-    public static string GetTextMitRetry(int maxAttempts = 15)
+    public static string GetTextWithRetry(int maxAttempts = 15)
     {
-        COMException? letzterFehler = null;
+        COMException? lastError = null;
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             try
@@ -55,18 +55,18 @@ public static class ClipboardTestHelfer
             }
             catch (COMException ex) when (attempt < maxAttempts)
             {
-                letzterFehler = ex;
+                lastError = ex;
                 Thread.Sleep(200);
             }
         }
 
         throw new InvalidOperationException(
             $"Die Zwischenablage konnte nach {maxAttempts} Versuchen nicht gelesen werden. " +
-            $"Aktueller Halter: {BeschreibeHalter()}.", letzterFehler);
+            $"Aktueller Halter: {BeschreibeHalter()}.", lastError);
     }
 
     /// <summary>Leert die Zwischenablage mit Retry bei <see cref="COMException"/>.</summary>
-    public static void LeerenMitRetry(int maxAttempts = 25)
+    public static void EmptyWithRetry(int maxAttempts = 25)
     {
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -92,19 +92,19 @@ public static class ClipboardTestHelfer
     /// <returns>Prozessname und PID des Halters bzw. Besitzers, oder „unbekannt".</returns>
     public static string BeschreibeHalter()
     {
-        var offen = GetOpenClipboardWindow();
+        var open = GetOpenClipboardWindow();
         var besitzer = GetClipboardOwner();
-        var teile = new List<string>();
-        if (offen != IntPtr.Zero)
-            teile.Add($"offen gehalten von {ProzessName(offen)}");
-        if (besitzer != IntPtr.Zero && besitzer != offen)
-            teile.Add($"Inhalt zuletzt von {ProzessName(besitzer)} gesetzt");
-        return teile.Count > 0
-            ? string.Join("; ", teile)
+        var part = new List<string>();
+        if (open != IntPtr.Zero)
+            part.Add($"offen gehalten von {ProcessName(open)}");
+        if (besitzer != IntPtr.Zero && besitzer != open)
+            part.Add($"Inhalt zuletzt von {ProcessName(besitzer)} gesetzt");
+        return part.Count > 0
+            ? string.Join("; ", part)
             : "kein offener Halter/Besitzer ermittelbar (zwischen den Versuchen freigegeben)";
     }
 
-    private static string ProzessName(IntPtr hWnd)
+    private static string ProcessName(IntPtr hWnd)
     {
         GetWindowThreadProcessId(hWnd, out var pid);
         if (pid == 0)

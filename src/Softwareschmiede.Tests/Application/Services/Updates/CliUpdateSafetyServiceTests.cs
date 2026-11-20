@@ -12,14 +12,14 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db = TestDbContextFactory.Create();
     private readonly WorkItemService _workItemService;
-    private readonly AiPluginLimitService _kiPluginLimitService;
+    private readonly AiPluginLimitService _aiPluginLimitService;
     private readonly Guid _projectId = new("33333333-3333-3333-3333-333333333333");
 
     /// <summary>Initialisiert die Testdatenbank.</summary>
     public CliUpdateSafetyServiceTests()
     {
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
-        _kiPluginLimitService = new AiPluginLimitService(
+        _aiPluginLimitService = new AiPluginLimitService(
             _db,
             new AppSettingService(_db, NullLogger<AppSettingService>.Instance),
             new WorkItemRunDataChangedNotifier(),
@@ -42,7 +42,7 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     public async Task CheckAsync_ShouldTreatTaskWithFreshHeartbeatAsRisky()
     {
         var running = await CreateActiveTaskAsync("Laeuft", WorkItemRunStatus.Running);
-        var sut = new CliUpdateSafetyService(_workItemService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
+        var sut = new CliUpdateSafetyService(_workItemService, _aiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
         var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 
@@ -65,7 +65,7 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
             "Stale",
             WorkItemRunStatus.Running,
             DateTimeOffset.UtcNow.AddMinutes(-(WorkItemRecoveryService.HeartbeatTimeoutMinutes + 1)));
-        var sut = new CliUpdateSafetyService(_workItemService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
+        var sut = new CliUpdateSafetyService(_workItemService, _aiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
         var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 
@@ -82,8 +82,8 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     public async Task CheckAsync_ShouldNotTreatTaskWithFutureSessionLimitAsRisky()
     {
         var limited = await CreateActiveTaskAsync("Limitiert", WorkItemRunStatus.Running, aiPluginPrefix: "Test.Plugin");
-        await _kiPluginLimitService.ProcessRateLimitAsync(limited.Id, DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
-        var sut = new CliUpdateSafetyService(_workItemService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
+        await _aiPluginLimitService.ProcessRateLimitAsync(limited.Id, DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
+        var sut = new CliUpdateSafetyService(_workItemService, _aiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
         var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 
@@ -100,8 +100,8 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     public async Task CheckAsync_ShouldTreatTaskWithExpiredSessionLimitAsRisky()
     {
         var expired = await CreateActiveTaskAsync("Abgelaufen", WorkItemRunStatus.Running, aiPluginPrefix: "Test.Plugin");
-        await _kiPluginLimitService.ProcessRateLimitAsync(expired.Id, DateTimeOffset.UtcNow.AddMinutes(-5), TestContext.Current.CancellationToken);
-        var sut = new CliUpdateSafetyService(_workItemService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
+        await _aiPluginLimitService.ProcessRateLimitAsync(expired.Id, DateTimeOffset.UtcNow.AddMinutes(-5), TestContext.Current.CancellationToken);
+        var sut = new CliUpdateSafetyService(_workItemService, _aiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
         var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 

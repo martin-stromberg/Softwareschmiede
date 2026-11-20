@@ -27,7 +27,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    private async Task SeedAufgabeAsync()
+    private async Task SeedWorkItemAsync()
     {
         var project = await _projectService.CreateAsync("Log-Projekt", null);
         var workItem = await _workItemService.CreateAsync(project.Id, "Log-Aufgabe", null);
@@ -36,9 +36,9 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 
     /// <summary>AddCliOutputAsync_StreichtAusgabeInProtokoll.</summary>
     [Fact]
-    public async Task AddCliOutputAsync_StreichtAusgabeInProtokoll()
+    public async Task AddCliOutputAsync_StrikesOutputInLog()
     {
-        await SeedAufgabeAsync();
+        await SeedWorkItemAsync();
 
         await _logService.AddCliOutputAsync(_workItemId, "Zeile 1 der Ausgabe", TestContext.Current.CancellationToken);
         await _logService.AddCliOutputAsync(_workItemId, "Zeile 2 der Ausgabe", TestContext.Current.CancellationToken);
@@ -50,9 +50,9 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 
     /// <summary>AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert.</summary>
     [Fact]
-    public async Task AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert()
+    public async Task AddCliOutputAsync_SeveralLines_AreInOrderSaved()
     {
-        await SeedAufgabeAsync();
+        await SeedWorkItemAsync();
         var lines = Enumerable.Range(1, 5).Select(i => $"Ausgabezeile {i}").ToList();
 
         foreach (var line in lines)
@@ -66,9 +66,9 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 
     /// <summary>AddStatusUebergangAsync_ErstelltEintragImProtokoll.</summary>
     [Fact]
-    public async Task AddStatusUebergangAsync_ErstelltEintragImProtokoll()
+    public async Task AddStatusTransitionAsync_CreatesEntryInLog()
     {
-        await SeedAufgabeAsync();
+        await SeedWorkItemAsync();
 
         await _logService.AddStatusTransitionAsync(_workItemId, WorkItemStatus.New, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 

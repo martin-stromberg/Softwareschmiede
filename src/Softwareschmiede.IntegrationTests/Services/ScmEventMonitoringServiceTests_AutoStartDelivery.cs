@@ -28,7 +28,7 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         fixture.ConfigureIssue(9);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
-                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
+                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.AiPrefix, TestContext.Current.CancellationToken);
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -38,7 +38,7 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         Assert.Equal(WorkItemStatus.Started, task.Status);
         Assert.Equal(WorkItemExecutionStatus.Active, task.ExecutionStatus);
         Assert.Equal(repositoryId, task.GitRepositoryId);
-        Assert.Equal(ScmDispatchFixture.KiPrefix, task.AiPluginPrefix);
+        Assert.Equal(ScmDispatchFixture.AiPrefix, task.AiPluginPrefix);
         Assert.NotNull(task.LocalClonePath);
         Assert.StartsWith(fixture.Root, task.LocalClonePath);
         Assert.NotNull(task.BranchName);
@@ -76,7 +76,7 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         Assert.Equal(WorkItemStatus.Started, task.Status);
         Assert.Equal(WorkItemExecutionStatus.Active, task.ExecutionStatus);
         Assert.Equal(repositoryId, task.GitRepositoryId);
-        Assert.Equal(ScmDispatchFixture.KiPrefix, task.AiPluginPrefix);
+        Assert.Equal(ScmDispatchFixture.AiPrefix, task.AiPluginPrefix);
         Assert.NotNull(task.LocalClonePath);
         Assert.StartsWith(fixture.Root, task.LocalClonePath);
         Assert.NotNull(task.BranchName);
@@ -135,7 +135,7 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
 
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
-                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
+                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.AiPrefix, TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
 
@@ -146,7 +146,7 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         Assert.NotNull(verified.DeliveryAttemptId);
         var startedTask = await verifiedDb.WorkItems.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(startedTask.LocalClonePath);
-        Assert.Equal(ScmDispatchFixture.KiPrefix, startedTask.AiPluginPrefix);
+        Assert.Equal(ScmDispatchFixture.AiPrefix, startedTask.AiPluginPrefix);
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
     }
@@ -177,7 +177,7 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
             await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().OpenFromQueueAsync(eventId, (task, _, _) =>
                 {
                     selectedTask = task;
-                    return Task.FromResult<string?>(ScmDispatchFixture.KiPrefix);
+                    return Task.FromResult<string?>(ScmDispatchFixture.AiPrefix);
                 }, TestContext.Current.CancellationToken);
 
         Assert.NotNull(selectedTask);

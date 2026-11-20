@@ -224,7 +224,7 @@
                             <controls:RibbonLargeButton ButtonIcon="＋"
                                                         ButtonText="Issue anlegen"
                                                         AutomationName="CreateIssue"
-                                                        ButtonCommand="{Binding IssueAnlegenCommand}"
+                                                        ButtonCommand="{Binding IssueCreateCommand}"
                                                         Visibility="{Binding CanCreateIssue, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="🔗"
                                                         ButtonText="Issue zuweisen"

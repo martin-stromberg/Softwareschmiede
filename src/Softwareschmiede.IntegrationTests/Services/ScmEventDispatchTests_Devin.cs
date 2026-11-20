@@ -16,7 +16,7 @@ public sealed class ScmEventDispatchTests_Devin
         var prompts = new List<string>();
         var probes = new List<string>();
         var fixture = default(ScmDispatchFixture);
-        fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(onWritePrompt: async prompt =>
+        fixture = new ScmDispatchFixture(ai: ScmAiProfile.Devin(onWritePrompt: async prompt =>
         {
             if (prompt.Contains("challengePath", StringComparison.Ordinal)) { probes.Add(prompt); await ScmDispatchFixture.CompleteProbeAsync(prompt); }
             else prompts.Add(prompt);
@@ -60,7 +60,7 @@ public sealed class ScmEventDispatchTests_Devin
     {
         var prompts = new List<string>();
         var fixture = default(ScmDispatchFixture);
-        fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3000.12.7", onWritePrompt: async prompt =>
+        fixture = new ScmDispatchFixture(ai: ScmAiProfile.Devin(banner: "Devin CLI\nv3000.12.7", onWritePrompt: async prompt =>
         {
             if (prompt.Contains("challengePath", StringComparison.Ordinal)) await ScmDispatchFixture.CompleteProbeAsync(prompt);
             else prompts.Add(prompt);
@@ -93,7 +93,7 @@ public sealed class ScmEventDispatchTests_Devin
     [Fact]
     public async Task DevinTask_WithUnsupportedVersion_WaitsWithHonestReason()
     {
-        await using var fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3001.0.0"));
+        await using var fixture = new ScmDispatchFixture(ai: ScmAiProfile.Devin(banner: "Devin CLI\nv3001.0.0"));
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync(configured: true);
 
@@ -109,7 +109,7 @@ public sealed class ScmEventDispatchTests_Devin
     [Fact]
     public async Task DevinTask_WithAutoPermissionMode_WaitsWithoutPrompt()
     {
-        await using var fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin("--permission-mode auto --respect-workspace-trust false"));
+        await using var fixture = new ScmDispatchFixture(ai: ScmAiProfile.Devin("--permission-mode auto --respect-workspace-trust false"));
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync(configured: true);
 

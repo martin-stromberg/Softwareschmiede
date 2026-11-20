@@ -75,7 +75,7 @@ public sealed class UpdateProgressDialogView : DialogView
     {
         var dialog = GetDialogWindow();
         var deadline = DateTime.UtcNow + timeout;
-        string? letzteMeldung = null;
+        string? lastMessage = null;
         while (DateTime.UtcNow < deadline)
         {
             var cancel = dialog.FindFirstDescendant(cf => cf.ByName("CancelUpdate"));
@@ -85,16 +85,16 @@ public sealed class UpdateProgressDialogView : DialogView
             // aufeinanderfolgenden Reads identisch sein: ViewModel-Setzungen (CanCancel=false vor
             // dem Fehlertext in SetError) können über den Dispatcher zeitversetzt in der UIA
             // sichtbar werden, sonst würde ein veralteter Fortschrittstext als "Fehler" zurückkehren.
-            if (cancel is not null && !cancel.IsEnabled && message.Length > 0 && message == letzteMeldung)
+            if (cancel is not null && !cancel.IsEnabled && message.Length > 0 && message == lastMessage)
                 return message;
 
-            letzteMeldung = message;
+            lastMessage = message;
             Thread.Sleep(200);
         }
 
         throw new TimeoutException(
             $"Der Update-Dialog erreichte innerhalb von {timeout.TotalSeconds}s keinen stabilen Fehlerzustand. " +
-            $"Zuletzt gelesen: '{letzteMeldung}'.");
+            $"Zuletzt gelesen: '{lastMessage}'.");
     }
 
     /// <summary>Schließt den Dialog über das Window-Pattern (nur im Fehler-/Abschlusszustand erlaubt).</summary>

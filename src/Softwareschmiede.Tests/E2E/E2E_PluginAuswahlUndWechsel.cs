@@ -27,14 +27,14 @@ public partial class End2EndTest
     /// laufender CLI als zwei Phasen an derselben Aufgabe aus.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem beide Phasen ausgeführt werden.</param>
-    protected void PluginAuswahlAbbrechenOkUndWechsel_E2E(Window mainWindow)
+    protected void SwitchPluginSelectionCancelOkAnd_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        SetupProjectMitNeuerAufgabe(mainWindow, "PluginDialog-Repo", "PluginDialog-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "PluginDialog-Repo", "PluginDialog-Projekt");
 
-        var taskDetail = PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E(mainWindow);
-        PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E(taskDetail);
+        var taskDetail = PluginSelection_CancelRemainsNew_AndOkStartsCli_E2E(mainWindow);
+        PluginChangeAtRunningCli_StopsAndStartsWithNewPlugin_E2E(taskDetail);
 
         taskDetail.GoBack();
         var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
@@ -52,26 +52,26 @@ public partial class End2EndTest
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der neu angelegten Aufgabe im Edit-Panel.</param>
     /// <returns>Die Aufgabendetailansicht mit laufender CLI (Softwareschmiede.KiSimulator).</returns>
-    private TaskDetailView PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E(Window mainWindow)
+    private TaskDetailView PluginSelection_CancelRemainsNew_AndOkStartsCli_E2E(Window mainWindow)
     {
         // Phase Cancel
         var taskDetail = new TaskDetailView(mainWindow);
-        var abbrechenDialog = new Views.Dialogs.PluginSelectionDialogView(mainWindow).ForceShow();
-        abbrechenDialog.Cancel();
+        var cancelDialog = new Views.Dialogs.PluginSelectionDialogView(mainWindow).ForceShow();
+        cancelDialog.Cancel();
 
         // Edit-Panel weiterhin sichtbar (Status nach wie vor "Neu")
         Assert.True(taskDetail.IsVisible);
         Assert.False(taskDetail.IsCliRunning());
 
         // Phase OK
-        taskDetail.Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        taskDetail.Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
         // Nach Bestätigung: kombinierter Start-Ablauf läuft weiter, CLI startet
         taskDetail.WaitForCliRunning();
 
         // Der gestartete Plugin-Name erscheint in der Fußzeile und in der Seitenleiste.
         Assert.Equal("KI Simulator", taskDetail.GetActiveCliName());
-        Assert.Equal("KI Simulator", new MenuView(mainWindow).GetActiveTaskKiPluginName("Neue Aufgabe"));
+        Assert.Equal("KI Simulator", new MenuView(mainWindow).GetActiveTaskAiPluginName("Neue Aufgabe"));
 
         return taskDetail;
     }
@@ -86,7 +86,7 @@ public partial class End2EndTest
     /// Zusätzlich wird geprüft, dass die Fußzeile den neuen CLI-Namen anzeigt.
     /// </summary>
     /// <param name="taskDetail">Die Aufgabendetailansicht mit bereits laufender CLI (Softwareschmiede.KiSimulator).</param>
-    private void PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E(TaskDetailView taskDetail)
+    private void PluginChangeAtRunningCli_StopsAndStartsWithNewPlugin_E2E(TaskDetailView taskDetail)
     {
         // Kurze Stabilisierungspause nach Schließen des vorherigen Dialogs, damit die UIA-Elemente
         // wieder einen gültigen Klickpunkt liefern (sonst NoClickablePointException möglich).
@@ -104,9 +104,9 @@ public partial class End2EndTest
         credentialStore.DeleteCredential("Softwareschmiede.Codex.CommandLineParameters");
 
         // Plugin ändern: Dialog mit aktuellem Plugin vorselektiert anzeigen
-        var wechselDialog = taskDetail.OpenPluginChangeDialog();
-        wechselDialog.SelectPlugin("Softwareschmiede.Codex");
-        wechselDialog.Confirm();
+        var switchDialog = taskDetail.OpenPluginChangeDialog();
+        switchDialog.SelectPlugin("Softwareschmiede.Codex");
+        switchDialog.Confirm();
 
         // Nach dem Wechsel: alter Prozess gestoppt, neuer CLI-Prozess läuft (Stoppen-Button weiterhin sichtbar)
         taskDetail.WaitForCliRunning();
@@ -118,7 +118,7 @@ public partial class End2EndTest
         Assert.Equal("Codex CLI", taskDetail.GetActiveCliName());
 
         // Seitenleiste/Programmmenü-Button muss ebenfalls den neuen CLI-Namen anzeigen.
-        Assert.Equal("Codex CLI", new MenuView(taskDetail.Window).GetActiveTaskKiPluginName("Neue Aufgabe"));
+        Assert.Equal("Codex CLI", new MenuView(taskDetail.Window).GetActiveTaskAiPluginName("Neue Aufgabe"));
 
         Assert.False(new ErrorView(taskDetail.Window).IsVisible);
     }

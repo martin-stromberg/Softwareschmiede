@@ -142,32 +142,32 @@ public abstract class BaseWindowView
     }
 
     /// <summary>
-    /// Klickt den Modus-Umschalter '<paramref name="umschalterPraefix"/>{modus}' einer
+    /// Klickt den Modus-Umschalter '<paramref name="switchPrefix"/>{modus}' einer
     /// Aufgabenliste. Gemeinsame Logik für die ansichtsspezifischen Umschalter der
     /// Seitenleiste ('WorkItemsMode:*') und des Dashboards ('DashboardWorkItemsMode:*').
     /// </summary>
-    /// <param name="umschalterPraefix">Das ansichtsspezifische Namenspräfix inkl. Doppelpunkt (z. B. "WorkItemsMode:").</param>
+    /// <param name="switchPrefix">Das ansichtsspezifische Namenspräfix inkl. Doppelpunkt (z. B. "WorkItemsMode:").</param>
     /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
-    protected void KlickeAufgabenModusUmschalter(string umschalterPraefix, string mode)
-        => WaitForElement(Window, cf => cf.ByName($"{umschalterPraefix}{mode}"), Medium).ClickInForeground();
+    protected void ClickWorkItemsModeSwitch(string switchPrefix, string mode)
+        => WaitForElement(Window, cf => cf.ByName($"{switchPrefix}{mode}"), Medium).ClickInForeground();
 
     /// <summary>
     /// Liest die Gruppennamen einer Aufgabenliste im gruppierten Modus (UIA-Namen
     /// 'WorkItemsGroup:{Name}' der Gruppenheader, gescoped unter der Listenwurzel).
     /// </summary>
-    /// <param name="listenAutomationId">Die AutomationId der Listenwurzel (z. B. "ActiveWorkItemsListMenu").</param>
+    /// <param name="listsAutomationId">Die AutomationId der Listenwurzel (z. B. "ActiveWorkItemsListMenu").</param>
     /// <returns>Die Gruppennamen ohne das 'WorkItemsGroup:'-Präfix; leer im flachen Modus.</returns>
-    protected string[] GetAufgabenGruppenNamen(string listenAutomationId)
+    protected string[] GetWorkItemsGroupsNames(string listsAutomationId)
     {
-        const string praefix = "WorkItemsGroup:";
-        var list = Window.FindFirstDescendant(cf => cf.ByAutomationId(listenAutomationId));
+        const string prefix = "WorkItemsGroup:";
+        var list = Window.FindFirstDescendant(cf => cf.ByAutomationId(listsAutomationId));
         if (list is null)
             return [];
 
         return list.FindAllDescendants()
             .Select(e => e.Name)
-            .Where(n => n is not null && n.StartsWith(praefix, StringComparison.Ordinal))
-            .Select(n => n![praefix.Length..])
+            .Where(n => n is not null && n.StartsWith(prefix, StringComparison.Ordinal))
+            .Select(n => n![prefix.Length..])
             .ToArray();
     }
 
@@ -175,17 +175,17 @@ public abstract class BaseWindowView
     /// Wartet, bis der Gruppenheader 'WorkItemsGroup:{name}' in einer Aufgabenliste
     /// erscheint (gescoped unter der Listenwurzel).
     /// </summary>
-    /// <param name="listenAutomationId">Die AutomationId der Listenwurzel.</param>
+    /// <param name="listsAutomationId">Die AutomationId der Listenwurzel.</param>
     /// <param name="name">Der erwartete Gruppenname (z. B. ein Repository-Name).</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <exception cref="TimeoutException">Der Gruppenheader erschien nicht rechtzeitig.</exception>
-    protected void WaitForAufgabenGruppe(string listenAutomationId, string name, TimeSpan timeout)
+    protected void WaitForWorkItemsGroup(string listsAutomationId, string name, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         string[]? zuletzt = null;
         while (DateTime.UtcNow < deadline)
         {
-            zuletzt = GetAufgabenGruppenNamen(listenAutomationId);
+            zuletzt = GetWorkItemsGroupsNames(listsAutomationId);
             if (zuletzt.Contains(name))
                 return;
 

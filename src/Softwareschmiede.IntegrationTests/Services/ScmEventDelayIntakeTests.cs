@@ -14,7 +14,7 @@ public sealed class ScmEventDelayIntakeTests
     /// <summary>Eine gültige Direktive stellt die Zustellung zurück, pausiert die Aufgabe
     /// und legt den Empfangskommentar als wartende Hostaktion an.</summary>
     [Fact]
-    public async Task DelayDirective_DefersEventAndPausesTask()
+    public async Task DelayDirective_DefersEventAndPauseTask()
     {
         await using var db = await CreateDbAsync();
         var taskId = await SeedTaskAsync(db);

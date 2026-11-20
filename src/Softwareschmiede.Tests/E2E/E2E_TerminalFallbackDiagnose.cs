@@ -29,21 +29,21 @@ public partial class End2EndTest
     /// Overrides startet KiSimulator auf einer zweiten Aufgabe wieder normal.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected async Task TerminalFallbackDiagnose_PipeFallbackUndRequiresPtyFehler_E2E(Window mainWindow)
+    protected async Task TerminalFallbackDiagnostics_PipeFallbackAndRequiresPtyError_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
         await SetForcePtyUnavailableAsync(true);
 
         try
         {
-            SetupProjectMitNeuerAufgabe(mainWindow, "TerminalDiag-Repo", "TerminalDiag-Projekt");
-            var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+            SetupProjectWithNewWorkItem(mainWindow, "TerminalDiag-Repo", "TerminalDiag-Projekt");
+            var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
             taskDetail.WaitForCliRunning();
 
             // Pipe-Fallback ist diagnostiziert: Markerzeile mit Einzelcheck-Ergebnissen im
             // CliOutput-Protokoll; die Session läuft trotzdem (Interaktivität via Pipe).
-            await WarteAufCliOutputAsync("[Terminal-Diagnose]");
-            await WarteAufCliOutputAsync("PtyVerfuegbar=False");
+            await WaitOnCliOutputAsync("[Terminal-Diagnose]");
+            await WaitOnCliOutputAsync("PtyVerfuegbar=False");
             Assert.True(taskDetail.IsCliRunning());
 
             // Der eingeschränkte Modus muss auch ohne Blick ins Protokoll sichtbar sein —
@@ -54,13 +54,13 @@ public partial class End2EndTest
             // RequiresPty-Plugin bei laufender CLI wechseln ("Plugin ändern" ist nur bei
             // laufender CLI aktiv): der Start muss fehlschlagen und eine Fehlermeldung zeigen —
             // tolerant gegenüber der Installationslage von devin (NotFound oder RequiresPty-Fehler).
-            var wechselDialog = taskDetail.OpenPluginChangeDialog();
-            wechselDialog.SelectPlugin("Softwareschmiede.Devin");
-            wechselDialog.Confirm();
+            var switchDialog = taskDetail.OpenPluginChangeDialog();
+            switchDialog.SelectPlugin("Softwareschmiede.Devin");
+            switchDialog.Confirm();
 
-            var fehlerBanner = new ErrorView(mainWindow);
-            await WartenBisAsync(() => Task.FromResult(fehlerBanner.IsVisible), maxVersuche: 50);
-            var fehlertext = fehlerBanner.GetErrorMessage();
+            var errorBanner = new ErrorView(mainWindow);
+            await WaitUntilAsync(() => Task.FromResult(errorBanner.IsVisible), maxAttempts: 50);
+            var fehlertext = errorBanner.GetErrorMessage();
             Assert.False(string.IsNullOrWhiteSpace(fehlertext));
             Assert.False(taskDetail.IsCliRunning());
         }
@@ -79,9 +79,9 @@ public partial class End2EndTest
         taskNormal.SaveTask();
         taskNormal.GoBack();
 
-        var projectDetailNachSpeichern = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
-        taskNormal = projectDetailNachSpeichern.OpenTask("Normalstart-Aufgabe");
-        taskNormal.Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var projectDetailAfterSave = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        taskNormal = projectDetailAfterSave.OpenTask("Normalstart-Aufgabe");
+        taskNormal.Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskNormal.WaitForCliRunning();
         Assert.True(taskNormal.IsCliRunning());
 

@@ -31,8 +31,8 @@ namespace Softwareschmiede.Tests.E2E;
 /// </summary>
 public partial class End2EndTest
 {
-    private const string TitelA = "Aufgabe-A-Wechseltest";
-    private const string TitelB = "Aufgabe-B-Wechseltest";
+    private const string TitleA = "Aufgabe-A-Wechseltest";
+    private const string TitleB = "Aufgabe-B-Wechseltest";
 
     /// <summary>
     /// Szenario: Aufgabe A ist geöffnet und ihre CLI läuft. Ohne über "Zurück" zu navigieren, wählt
@@ -40,7 +40,7 @@ public partial class End2EndTest
     /// Prüft: Danach wird tatsächlich Aufgabe B angezeigt — inklusive der zu Aufgabe B gehörenden CLI
     /// (eigene Aufgaben-ID), nicht mehr die CLI von Aufgabe A.
     /// </summary>
-    protected void AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E(Window mainWindow)
+    protected void WorkItemSwitchOverSidebar_ShowsNewWorkItemWithOwnCli_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
@@ -57,7 +57,7 @@ public partial class End2EndTest
         projectDetail = dialog.Confirm();
 
         // Aufgabe A anlegen, öffnen und CLI starten
-        var taskA = ErstelleUndStarteAufgabe(projectDetail, TitelA);
+        var taskA = CreateAndStartWorkItem(projectDetail, TitleA);
         var taskIdA = taskA.WaitForTerminalTaskId(Medium);
 
         // Zurück zum Projekt, um Aufgabe B anzulegen
@@ -65,7 +65,7 @@ public partial class End2EndTest
         var projectDetailForB = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         // Aufgabe B anlegen, öffnen und CLI starten (eigene Aufgaben-ID, nicht Aufgabe A)
-        var taskB = ErstelleUndStarteAufgabe(projectDetailForB, TitelB);
+        var taskB = CreateAndStartWorkItem(projectDetailForB, TitleB);
         var taskIdB = taskB.WaitForTerminalTaskId(Medium);
         Assert.NotEqual(taskIdA, taskIdB);
 
@@ -73,39 +73,39 @@ public partial class End2EndTest
         taskB.GoBack();
         var projectDetailForReopen = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
-        var taskAReopened = projectDetailForReopen.OpenTask(TitelA);
+        var taskAReopened = projectDetailForReopen.OpenTask(TitleA);
         taskAReopened.WaitForCliRunning();
-        var taskIdAErneutGeoeffnet = taskAReopened.WaitForTerminalTaskId(Medium);
-        Assert.Equal(taskIdA, taskIdAErneutGeoeffnet);
+        var taskIdAAgainOpened = taskAReopened.WaitForTerminalTaskId(Medium);
+        Assert.Equal(taskIdA, taskIdAAgainOpened);
 
         // Über die Aufgabenliste in der Seitenleiste ("Aktive Aufgaben") zu Aufgabe B wechseln,
         // OHNE über "Zurück" zu navigieren — genau das im Bug-Report beschriebene Szenario.
-        var taskAfterSwitchToB = taskAReopened.Menu.NavigateToTask(TitelB);
+        var taskAfterSwitchToB = taskAReopened.Menu.NavigateToTask(TitleB);
 
         // Die eingebettete CLI muss jetzt tatsächlich zu Aufgabe B gehören (nicht mehr zu Aufgabe A).
-        var taskIdNachWechsel = taskAfterSwitchToB.WaitForTerminalTaskId(Medium);
-        Assert.NotEqual(taskIdA, taskIdNachWechsel);
-        Assert.Equal(taskIdB, taskIdNachWechsel);
+        var taskIdAfterSwitch = taskAfterSwitchToB.WaitForTerminalTaskId(Medium);
+        Assert.NotEqual(taskIdA, taskIdAfterSwitch);
+        Assert.Equal(taskIdB, taskIdAfterSwitch);
 
         // Zusätzlich (nicht nur Titel/Fußzeile): Das Info-Panel zeigt den Titel von Aufgabe B.
         taskAfterSwitchToB.SwitchPanel("InfoCliToggle");
-        taskAfterSwitchToB.WaitForText(TitelB);
+        taskAfterSwitchToB.WaitForText(TitleB);
 
         // Über die Aufgabenliste in der Seitenleiste("Aktive Aufgaben") zu Aufgabe A wechseln,
         // OHNE über "Zurück" zu navigieren — genau das im Bug-Report beschriebene Szenario.
-        var taskAfterSwitchToA = taskAfterSwitchToB.Menu.NavigateToTask(TitelA);
+        var taskAfterSwitchToA = taskAfterSwitchToB.Menu.NavigateToTask(TitleA);
 
         // Die eingebettete CLI muss jetzt tatsächlich zu Aufgabe A gehören (nicht mehr zu Aufgabe B).
         // Der vorherige Informationsnachweis hat das Info-Panel geöffnet; für die CLI-Prüfung
         // muss das Terminal daher bewusst wieder sichtbar geschaltet werden.
         taskAfterSwitchToA.SwitchPanel("CliViewButton");
-        taskIdNachWechsel = taskAfterSwitchToA.WaitForTerminalTaskId(Medium);
-        Assert.NotEqual(taskIdB, taskIdNachWechsel);
-        Assert.Equal(taskIdA, taskIdNachWechsel);
+        taskIdAfterSwitch = taskAfterSwitchToA.WaitForTerminalTaskId(Medium);
+        Assert.NotEqual(taskIdB, taskIdAfterSwitch);
+        Assert.Equal(taskIdA, taskIdAfterSwitch);
 
         // Zusätzlich (nicht nur Titel/Fußzeile): Das Info-Panel zeigt den Titel von Aufgabe A.
         taskAfterSwitchToA.SwitchPanel("InfoCliToggle");
-        taskAfterSwitchToA.WaitForText(TitelA);
+        taskAfterSwitchToA.WaitForText(TitleA);
 
         // taskAfterSwitchToA wurde zuletzt über das Menü (Menu.NavigateToTask) erreicht, nicht über die
         // Projektdetailansicht. MainWindowViewModel.NavigateZuAufgabe setzt für diesen Navigationsweg
@@ -122,7 +122,7 @@ public partial class End2EndTest
     /// <param name="projectDetail">Die Projektdetailansicht, in der die Aufgabe angelegt wird.</param>
     /// <param name="title">Der Titel, auf den die neue Aufgabe umbenannt werden soll.</param>
     /// <returns>Die Aufgabendetailansicht der gestarteten Aufgabe.</returns>
-    private TaskDetailView ErstelleUndStarteAufgabe(ProjectDetailView projectDetail, string title)
+    private TaskDetailView CreateAndStartWorkItem(ProjectDetailView projectDetail, string title)
     {
         var task = projectDetail.CreateTask();
         task.SetTaskTitle(title);
@@ -131,7 +131,7 @@ public partial class End2EndTest
 
         var projectDetailAfterSave = Assert.IsType<ProjectDetailView>(task.Window.CurrentView());
         var taskReopened = projectDetailAfterSave.OpenTask(title);
-        taskReopened.Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        taskReopened.Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskReopened.WaitForCliRunning();
 
         return taskReopened;

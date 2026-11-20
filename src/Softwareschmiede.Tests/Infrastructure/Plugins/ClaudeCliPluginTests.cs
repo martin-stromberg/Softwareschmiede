@@ -47,7 +47,7 @@ public sealed class ClaudeCliPluginTests
 
     /// <summary>Die Issue-Ausfuellhilfe uebergibt Template und Originalanforderung vollstaendig ueber stdin.</summary>
     [Fact]
-    public void BuildIssueTemplateFillInvocation_ShouldIncludeTemplateAndRequirement_InStandardInput()
+    public void BuildIssueTemplateFillInvocation_ShouldIncludeTemplateAndRequirement_InDefaultInput()
     {
         const string templateBody = "## Akzeptanzkriterien\n- offen";
         const string originalRequirement = "Die Issue-Anlage soll Templates per KI ausfuellen.";
@@ -74,7 +74,7 @@ public sealed class ClaudeCliPluginTests
 
     /// <summary>StartCliAsync passes optional parameters as arguments.</summary>
     [Fact]
-    public async Task StartCliAsync_ShouldPassParameters_AsArguments()
+    public async Task StartCliAsync_ShouldPassParameter_AsArguments()
     {
         var psi = await _sut.StartCliAsync("/repo", "--continue session-123", TestContext.Current.CancellationToken);
 
@@ -117,7 +117,7 @@ public sealed class ClaudeCliPluginTests
 
     /// <summary>StartCliAsync appends CommandLineParameters from credential store to arguments.</summary>
     [Fact]
-    public async Task StartCliAsync_ShouldIncludeCommandLineParameters_InProcessStartInfo()
+    public async Task StartCliAsync_ShouldIncludeCommandLineParameter_InProcessStartInfo()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.ClaudeCli.CommandLineParameters"))
             .Returns("--dangerously-skip-permissions");

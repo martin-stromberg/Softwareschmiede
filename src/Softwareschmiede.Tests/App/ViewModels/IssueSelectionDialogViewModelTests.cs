@@ -21,15 +21,15 @@ public sealed class IssueSelectionDialogViewModelTests
     private IssueSelectionDialogViewModel CreateSut()
         => new(_gitPluginMock.Object, NullLogger<IssueSelectionDialogViewModel>.Instance);
 
-    private static Issue ErstelleIssue(int nummer = 1, string title = "Titel")
-        => new(nummer, title, "Body", [], null, "https://github.com/test/repo/issues/" + nummer);
+    private static Issue CreateIssue(int number = 1, string title = "Titel")
+        => new(number, title, "Body", [], null, "https://github.com/test/repo/issues/" + number);
 
     /// <summary>LoadAsync füllt VerfuegbareIssues aus dem Plugin.</summary>
     [Fact]
-    public async Task LoadAsync_PopulatesVerfuegbareIssues()
+    public async Task LoadAsync_PopulatesAvailableIssues()
     {
         // Arrange
-        var issues = new[] { ErstelleIssue(1), ErstelleIssue(2) };
+        var issues = new[] { CreateIssue(1), CreateIssue(2) };
         _gitPluginMock.Setup(p => p.GetIssuesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(issues);
 
@@ -63,14 +63,14 @@ public sealed class IssueSelectionDialogViewModelTests
 
     /// <summary>Wenn ein Issue selektiert wird, wird KannBestaetigen true.</summary>
     [Fact]
-    public void SelectedIssue_UpdatesKannBestaetigen()
+    public void SelectedIssue_UpdatesCanConfirm()
     {
         // Arrange
         var sut = CreateSut();
         sut.CanConfirm.Should().BeFalse();
 
         // Act
-        sut.SelectedIssue = ErstelleIssue();
+        sut.SelectedIssue = CreateIssue();
 
         // Assert
         sut.CanConfirm.Should().BeTrue();
@@ -78,10 +78,10 @@ public sealed class IssueSelectionDialogViewModelTests
 
     /// <summary>BestaetigenCommand löst CloseRequested mit true aus.</summary>
     [Fact]
-    public async Task BestaetigenCommand_RaisesCloseRequestedWithTrue()
+    public async Task ConfirmCommand_RaisesCloseRequestedWithTrue()
     {
         // Arrange
-        var issues = new[] { ErstelleIssue() };
+        var issues = new[] { CreateIssue() };
         _gitPluginMock.Setup(p => p.GetIssuesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(issues);
 
@@ -101,7 +101,7 @@ public sealed class IssueSelectionDialogViewModelTests
 
     /// <summary>AbbrechenCommand löst CloseRequested mit false aus.</summary>
     [Fact]
-    public void AbbrechenCommand_RaisesCloseRequestedWithFalse()
+    public void CancelCommand_RaisesCloseRequestedWithFalse()
     {
         // Arrange
         var sut = CreateSut();
@@ -118,7 +118,7 @@ public sealed class IssueSelectionDialogViewModelTests
 
     /// <summary>BestaetigenCommand.CanExecute ist false wenn kein Issue gewählt ist.</summary>
     [Fact]
-    public void BestaetigenCommand_CanExecuteFalse_WennKeinIssueGewaehlt()
+    public void ConfirmCommand_CanExecuteFalse_WhenNoIssueSelected()
     {
         // Arrange
         var sut = CreateSut();

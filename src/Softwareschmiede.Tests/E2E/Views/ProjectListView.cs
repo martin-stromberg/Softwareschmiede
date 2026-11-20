@@ -80,7 +80,7 @@ public sealed class ProjectListView : BaseWindowView
         WaitUntilGone(Window, cf => cf.ByName("ProjectName"), Medium);
         WaitForElement(GetProjectTilesContainer(), cf => cf.ByName(name), Medium);
         Assert.True(IsVisible, "Projektlisten-Ansicht sollte nach Speichern des neuen Projekts sichtbar sein.");
-        Assert.Contains(name, GetProjectNames());
+        Assert.Contains(name, GetProjectName());
         return this;
     }
 
@@ -88,7 +88,7 @@ public sealed class ProjectListView : BaseWindowView
     /// Ruft die Namen aller Projekte in der Projektliste ab.
     /// </summary>
     /// <returns>Ein Array der Projektnamen.</returns>
-    public string[] GetProjectNames()
+    public string[] GetProjectName()
     {
         return GetProjectElements().Select(e => e.Name).ToArray();
     }
@@ -99,7 +99,7 @@ public sealed class ProjectListView : BaseWindowView
     /// <returns>True, wenn das Projekt existiert, andernfalls False.</returns>
     public bool ProjectExists(string name)
     {
-        return GetProjectNames().Contains(name);
+        return GetProjectName().Contains(name);
     }
 
     /// <summary>

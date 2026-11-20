@@ -111,7 +111,7 @@ public sealed class PluginDefaultSettingsServiceTests
 
     /// <summary>Projekt-Default wird mit scoped Key in AppEinstellung gespeichert.</summary>
     [Fact]
-    public async Task TestSaveProjectDefaultPluginPrefix_StoresInAppEinstellung()
+    public async Task TestSaveProjectDefaultPluginPrefix_StoresInAppSetting()
     {
         // Arrange
         await using var db = TestDbContextFactory.Create();

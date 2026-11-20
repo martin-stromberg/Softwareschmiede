@@ -48,9 +48,9 @@ public sealed class TaskDetailView : BaseWindowView
     /// maßgebliche Quelle; nach dem Start bleibt nur das Anzeigeelement sichtbar.</returns>
     public string GetTaskTitle()
     {
-        var editTitel = Window.FindFirstDescendant(cf => cf.ByName("EditTitle"));
-        if (editTitel is not null && !editTitel.IsOffscreen)
-            return editTitel.AsTextBox().Text;
+        var editTitle = Window.FindFirstDescendant(cf => cf.ByName("EditTitle"));
+        if (editTitle is not null && !editTitle.IsOffscreen)
+            return editTitle.AsTextBox().Text;
 
         return WaitForElement(Window, cf => cf.ByName("WorkItemTitle"), Short).Name;
     }
@@ -140,13 +140,13 @@ public sealed class TaskDetailView : BaseWindowView
     /// <c>Assert.IsType&lt;ErrorView&gt;(mainWindow.CurrentView())</c>.
     /// </summary>
     /// <param name="pluginName">Der Name des im Dialog auszuwählenden KI-Plugins.</param>
-    /// <param name="fuerProjektVerwenden">Wenn <c>true</c>, wird die "UseForProject"-Checkbox gesetzt, damit das gewählte Plugin als Projekt-Standard gespeichert wird.</param>
+    /// <param name="forProjectUse">Wenn <c>true</c>, wird die "UseForProject"-Checkbox gesetzt, damit das gewählte Plugin als Projekt-Standard gespeichert wird.</param>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView Start(string pluginName, bool fuerProjektVerwenden)
+    public TaskDetailView Start(string pluginName, bool forProjectUse)
     {
         new PluginSelectionDialogView(Window)
             .ForceShow()
-            .SelectPlugin(pluginName, fuerProjektVerwenden)
+            .SelectPlugin(pluginName, forProjectUse)
             .Confirm();
 
         return this;
@@ -157,7 +157,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// Verwendbar, wenn das KI-Plugin bereits persistiert ist und der Start direkt beginnt.
     /// </summary>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView ClickStarten()
+    public TaskDetailView StartClick()
     {
         WaitForElement(Window, cf => cf.ByName("Start"), Short).AsButton().ClickInForeground();
         return this;
@@ -224,11 +224,11 @@ public sealed class TaskDetailView : BaseWindowView
     }
 
     /// <summary>Wartet, bis ein Protokolleintrag des angegebenen Typs ("ProtokollTyp-{Typ}") sichtbar ist.</summary>
-    /// <param name="typ">Der Protokolltyp (z. B. "GitAktion").</param>
+    /// <param name="type">Der Protokolltyp (z. B. "GitAktion").</param>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView WaitForLogEntry(string typ)
+    public TaskDetailView WaitForLogEntry(string type)
     {
-        WaitForElement(Window, cf => cf.ByName($"ProtokollTyp-{typ}"), Long);
+        WaitForElement(Window, cf => cf.ByName($"ProtokollTyp-{type}"), Long);
         return this;
     }
 
@@ -275,8 +275,8 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView SetScheduledPromptTime(int hour, int minute)
     {
-        var stundeBox = WaitForElement(Window, cf => cf.ByName("ScheduledPromptHour"), Short);
-        stundeBox.ClickInForeground();
+        var hourBox = WaitForElement(Window, cf => cf.ByName("ScheduledPromptHour"), Short);
+        hourBox.ClickInForeground();
         Keyboard.Type(hour.ToString("00"));
 
         var minuteBox = WaitForElement(Window, cf => cf.ByName("ScheduledPromptMinute"), Short);
@@ -448,7 +448,7 @@ public sealed class TaskDetailView : BaseWindowView
     }
 
     /// <summary>Markiert eine sichtbare Zeile des Live-Terminals mit einem echten Mausdrag.</summary>
-    public void MarkiereLiveTerminalZeile(LiveTerminalGeometry geometry, int viewportRow, int startCol, int endCol)
+    public void MarkLiveTerminalLine(LiveTerminalGeometry geometry, int viewportRow, int startCol, int endCol)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(viewportRow);
         ArgumentOutOfRangeException.ThrowIfNegative(startCol);
@@ -490,7 +490,7 @@ public sealed class TaskDetailView : BaseWindowView
     }
 
     /// <summary>Fokussiert die Auswahl und löst den realen Strg+Umschalt+C-Kopierpfad aus.</summary>
-    public void KopiereLiveAuswahl()
+    public void CopyLiveSelection()
     {
         var terminal = WaitForElement(Window, cf => cf.ByName("TerminalConsole"), Short);
         terminal.Focus();
@@ -621,21 +621,21 @@ public sealed class TaskDetailView : BaseWindowView
         try
         {
             var descendants = parent.FindAllDescendants();
-            var beschreibungen = new List<string>(descendants.Length);
+            var description = new List<string>(descendants.Length);
             foreach (var element in descendants)
             {
                 try
                 {
-                    beschreibungen.Add($"{element.ControlType}:'{element.Name}'");
+                    description.Add($"{element.ControlType}:'{element.Name}'");
                 }
                 catch
                 {
                     // Element nicht mehr abrufbar (z. B. bereits aus dem Baum entfernt) — überspringen.
                 }
             }
-            return beschreibungen.Count == 0
+            return description.Count == 0
                 ? "(keine)"
-                : $"[{beschreibungen.Count}] {string.Join(", ", beschreibungen)}";
+                : $"[{description.Count}] {string.Join(", ", description)}";
         }
         catch (Exception ex)
         {

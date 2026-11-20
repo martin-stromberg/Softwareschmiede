@@ -31,31 +31,31 @@ public partial class End2EndTest
     /// <c>system-shutdowns.log</c> enthält <c>erzwingen=True</c> → Neustart → Aktivierung aus,
     /// Force/Toleranz wiederhergestellt.
     /// </summary>
-    protected async Task AutoShutdown_CountdownAbbruchAufzeichnungUndPersistenz_E2E(Window mainWindow)
+    protected async Task AutoShutdown_CountdownCancelRecordingAndPersistence_E2E(Window mainWindow)
     {
         const string workItemsTitle = "Neue Aufgabe";
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        SetupProjectMitNeuerAufgabe(mainWindow, "AutoShutdown-Repo", "AutoShutdown-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "AutoShutdown-Repo", "AutoShutdown-Projekt");
 
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskDetail.WaitForCliRunning();
         var menu = taskDetail.Menu;
 
         // Die Fußzeile zeigt die laufende Automatisierung; die Aktivierungs-Checkbox erscheint
         // erst bei Anzahl > 0 (Sichtbarkeitsregel).
-        menu.WaitForAutoShutdownLaufendeAnzahlText("1 laufende", Long);
+        menu.WaitForAutoShutdownRunningCountText("1 laufende", Long);
         Assert.True(
-            menu.IsAutoShutdownAktivierenVisible(),
+            menu.IsAutoShutdownActivateVisible(),
             "Die Aktivierungs-Checkbox sollte bei einer laufenden Automatisierung sichtbar sein.");
 
-        menu.SetzeAutoShutdownAktiviert(true);
+        menu.SetAutoShutdownEnabled(true);
         // Das Options-Panel aktualisiert den UIA-Baum erst im Render-Pass nach der
         // Aktivierung — Reads ohne Synchronisation können die Elemente noch nicht sehen.
-        menu.WaitForAutoShutdownToleranzSichtbar(Medium);
-        Assert.True(menu.IsAutoShutdownToleranzVisible(), "Das Toleranz-Feld sollte nach der Aktivierung sichtbar sein.");
-        menu.SetzeAutoShutdownToleranz("5");
-        menu.SetzeAutoShutdownErzwingen(true);
-        Assert.True(menu.GetAutoShutdownErzwingenChecked() == true, "Die Erzwingen-Checkbox sollte gesetzt sein.");
+        menu.WaitForAutoShutdownToleranceVisible(Medium);
+        Assert.True(menu.IsAutoShutdownToleranceVisible(), "Das Toleranz-Feld sollte nach der Aktivierung sichtbar sein.");
+        menu.SetAutoShutdownTolerance("5");
+        menu.SetAutoShutdownForce(true);
+        Assert.True(menu.GetAutoShutdownForceChecked() == true, "Die Erzwingen-Checkbox sollte gesetzt sein.");
 
         // Stopp der letzten laufenden Automatisierung → Toleranz-Countdown wird armiert.
         taskDetail.StopCli();
@@ -64,8 +64,8 @@ public partial class End2EndTest
         // Wiederanlauf bricht den Countdown ab (Statuswechsel 0 → >0).
         WaitForElement(mainWindow, cf => cf.ByName("RestartCli"), Medium).AsButton().ClickInForeground();
         taskDetail.WaitForCliRunning();
-        menu.WaitForAutoShutdownLaufendeAnzahlText("1 laufende", Long);
-        menu.WaitForAutoShutdownCountdownVerschwunden(Long);
+        menu.WaitForAutoShutdownRunningCountText("1 laufende", Long);
+        menu.WaitForAutoShutdownCountdownDisappeared(Long);
 
         // Erneuter Stopp → neuer voller Countdown (positive → null-Transition armiert neu).
         taskDetail.StopCli();
@@ -73,23 +73,23 @@ public partial class End2EndTest
 
         // Deaktivierung während des Countdowns bricht ab; bei Anzahl 0 blendet sich der
         // gesamte Block anschließend aus (Sichtbarkeitsregel).
-        menu.SetzeAutoShutdownAktiviert(false);
-        menu.WaitForAutoShutdownCountdownVerschwunden(Long);
+        menu.SetAutoShutdownEnabled(false);
+        menu.WaitForAutoShutdownCountdownDisappeared(Long);
         // Bei Anzahl 0 und deaktiviertem Schalter blendet sich der gesamte Block aus.
-        menu.WaitForAutoShutdownAktivierenVerschwunden(Medium);
+        menu.WaitForAutoShutdownActivateDisappeared(Medium);
 
         // Wiederanlauf → Checkbox wird wieder sichtbar; Toleranz 0 für den sofortigen Auslöser.
         WaitForElement(mainWindow, cf => cf.ByName("RestartCli"), Medium).AsButton().ClickInForeground();
         taskDetail.WaitForCliRunning();
-        menu.WaitForAutoShutdownLaufendeAnzahlText("1 laufende", Long);
-        menu.SetzeAutoShutdownAktiviert(true);
-        menu.SetzeAutoShutdownToleranz("0");
+        menu.WaitForAutoShutdownRunningCountText("1 laufende", Long);
+        menu.SetAutoShutdownEnabled(true);
+        menu.SetAutoShutdownTolerance("0");
 
         taskDetail.StopCli();
 
         // Toleranz 0 → die Shutdown-Aufforderung wird unmittelbar aufgezeichnet (Testmodus-Fake,
         // kein echter OS-Shutdown). Force wurde zuvor gesetzt → "erzwingen=True".
-        await WaitForSystemShutdownEintragAsync("erzwingen=True", Medium);
+        await WaitForSystemShutdownEntryAsync("erzwingen=True", Medium);
 
         // Persistenz-Nachweis über Neustart: Force + Toleranz wiederhergestellt,
         // Aktivierung sitzungsgebunden zurückgesetzt (Checkbox aus).
@@ -101,19 +101,19 @@ public partial class End2EndTest
         WaitForElement(mainWindow, cf => cf.ByName("RestartCli"), Medium).AsButton().ClickInForeground();
         restartedDetail.WaitForCliRunning();
 
-        restartedMenu.WaitForAutoShutdownLaufendeAnzahlText("1 laufende", Long);
+        restartedMenu.WaitForAutoShutdownRunningCountText("1 laufende", Long);
         Assert.Equal(
             false,
-            restartedMenu.GetAutoShutdownAktiviertChecked());
-        restartedMenu.SetzeAutoShutdownAktiviert(true);
+            restartedMenu.GetAutoShutdownEnabledChecked());
+        restartedMenu.SetAutoShutdownEnabled(true);
         // Wie oben: erst auf das eingeblendete Options-Panel synchronisieren, dann lesen.
-        restartedMenu.WaitForAutoShutdownToleranzSichtbar(Medium);
-        Assert.Equal("0", restartedMenu.GetAutoShutdownToleranzText());
-        Assert.Equal(true, restartedMenu.GetAutoShutdownErzwingenChecked());
+        restartedMenu.WaitForAutoShutdownToleranceVisible(Medium);
+        Assert.Equal("0", restartedMenu.GetAutoShutdownToleranceText());
+        Assert.Equal(true, restartedMenu.GetAutoShutdownForceChecked());
 
         // Aufräumen: Schalter wieder lösen, damit kein weiterer Log-Eintrag entsteht, und
         // die CLI sauber beenden.
-        restartedMenu.SetzeAutoShutdownAktiviert(false);
+        restartedMenu.SetAutoShutdownEnabled(false);
         restartedDetail.StopCli();
     }
 }

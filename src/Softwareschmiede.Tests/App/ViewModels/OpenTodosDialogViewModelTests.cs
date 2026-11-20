@@ -50,9 +50,9 @@ public sealed class OpenTodosDialogViewModelTests : IDisposable
     public async Task LoadAsync_ShouldLoadOnlyOpenTodosAndSetTaskData()
     {
         // Arrange
-        var offen = await _todoService.CreateTodoAsync(_workItemId, "Offen", TestContext.Current.CancellationToken);
-        var erledigt = await _todoService.CreateTodoAsync(_workItemId, "Erledigt", TestContext.Current.CancellationToken);
-        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
+        var open = await _todoService.CreateTodoAsync(_workItemId, "Offen", TestContext.Current.CancellationToken);
+        var completed = await _todoService.CreateTodoAsync(_workItemId, "Erledigt", TestContext.Current.CancellationToken);
+        await _todoService.MarkTodoAsCompletedAsync(completed.Id, TestContext.Current.CancellationToken);
         var sut = new OpenTodosDialogViewModel(_todoService, NullLogger<OpenTodosDialogViewModel>.Instance);
 
         // Act
@@ -62,7 +62,7 @@ public sealed class OpenTodosDialogViewModelTests : IDisposable
         sut.WorkItemId.Should().Be(_workItemId);
         sut.WorkItemsTitle.Should().Be("Aufgabentitel");
         sut.Todos.Should().ContainSingle();
-        sut.Todos[0].Id.Should().Be(offen.Id);
+        sut.Todos[0].Id.Should().Be(open.Id);
         sut.HasOpenTodos.Should().BeTrue();
         sut.IsEmpty.Should().BeFalse();
     }
@@ -72,8 +72,8 @@ public sealed class OpenTodosDialogViewModelTests : IDisposable
     public async Task LoadAsync_ShouldSetEmptyState_WhenNoOpenTodosExist()
     {
         // Arrange
-        var erledigt = await _todoService.CreateTodoAsync(_workItemId, "Erledigt", TestContext.Current.CancellationToken);
-        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
+        var completed = await _todoService.CreateTodoAsync(_workItemId, "Erledigt", TestContext.Current.CancellationToken);
+        await _todoService.MarkTodoAsCompletedAsync(completed.Id, TestContext.Current.CancellationToken);
         var sut = new OpenTodosDialogViewModel(_todoService, NullLogger<OpenTodosDialogViewModel>.Instance);
 
         // Act

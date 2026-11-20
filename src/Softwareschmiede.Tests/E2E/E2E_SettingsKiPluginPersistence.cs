@@ -16,15 +16,15 @@ public partial class End2EndTest
     /// damit nachfolgende Szenarien nicht ungewollt mit dem Codex-Default starten (dessen
     /// Executable im Direct-Start-Pfad von Issue #271 fehlen kann → NotFound-Fehler).
     /// </summary>
-    protected void Einstellungen_SpeichernCodexAlsStandardKiPluginUndExecutablePath_PersistiertBeides_E2E(Window mainWindow)
+    protected void Settings_SaveCodexAsDefaultAiPluginAndExecutablePath_PersistedBoth_E2E(Window mainWindow)
     {
         var codexPath = $@"C:\tools\codex-{Guid.NewGuid():N}.exe";
 
         // Vorherigen Default-Plugin-Wert direkt aus der Test-DB lesen (Robustheit ohne UI-Feld).
-        string? vorherigesDefault;
+        string? previousDefault;
         using (var db = OpenTestDbContext())
         {
-            vorherigesDefault = db.AppSettings
+            previousDefault = db.AppSettings
                 .Where(e => e.Key == AppSettingService.DefaultAiPluginKey)
                 .Select(e => e.Value)
                 .FirstOrDefault();
@@ -33,7 +33,7 @@ public partial class End2EndTest
         var settings = new SettingsView(mainWindow).ForceShow();
         // Das Codex-Einstellungspanel mit "ExecutablePath" existiert erst, nachdem Codex CLI als
         // Standard-KI-Plugin gewählt wurde (SelectedPluginSettings wird erst dann befüllt).
-        settings.SelectDefaultKiPlugin("Codex CLI");
+        settings.SelectDefaultAiPlugin("Codex CLI");
         var oldValue = settings.GetExecutablePath();
         try
         {
@@ -42,7 +42,7 @@ public partial class End2EndTest
             settings.Menu.NavigateToDashboard();
 
             var settingsReopened = new SettingsView(mainWindow).ForceShow();
-            settingsReopened.SelectDefaultKiPlugin("Codex CLI");
+            settingsReopened.SelectDefaultAiPlugin("Codex CLI");
             Assert.Equal(codexPath, settingsReopened.GetExecutablePath());
 
             settingsReopened.Menu.NavigateToDashboard();
@@ -52,7 +52,7 @@ public partial class End2EndTest
             try
             {
                 settings.ForceShow();
-                settings.SelectDefaultKiPlugin("Codex CLI");
+                settings.SelectDefaultAiPlugin("Codex CLI");
                 settings.SetExecutablePath(oldValue);
                 settings.SaveSettings();
                 settings.Menu.NavigateToDashboard();
@@ -69,7 +69,7 @@ public partial class End2EndTest
                 using var db = OpenTestDbContext();
                 var entry = db.AppSettings
                     .FirstOrDefault(e => e.Key == AppSettingService.DefaultAiPluginKey);
-                if (entry is null && vorherigesDefault is not null)
+                if (entry is null && previousDefault is not null)
                 {
                     db.AppSettings.Add(new Softwareschmiede.Domain.Entities.AppSetting
                     {
@@ -80,7 +80,7 @@ public partial class End2EndTest
                 }
                 if (entry is not null)
                 {
-                    entry.Value = vorherigesDefault;
+                    entry.Value = previousDefault;
                     entry.UpdatedAt = DateTimeOffset.UtcNow;
                     db.SaveChanges();
                 }

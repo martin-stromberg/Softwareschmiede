@@ -22,7 +22,7 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldKeepPullRequestDue_WhenProviderFailsTransiently()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, workItem) = AddAufgabe(db);
+        var (_, workItem) = AddWorkItem(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
@@ -48,7 +48,7 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldMarkPostMergeUncertain_WhenMergedPullRequestHasNoMergeSha()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, workItem) = AddAufgabe(db);
+        var (_, workItem) = AddWorkItem(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeSucceeded, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
@@ -70,7 +70,7 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldPersistApprovalOnlyAsNonTerminalApproval()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, workItem) = AddAufgabe(db);
+        var (_, workItem) = AddWorkItem(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
@@ -114,7 +114,7 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldNotApproveAgain_WhenApprovalOnlyAlreadySucceeded()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, workItem) = AddAufgabe(db);
+        var (_, workItem) = AddWorkItem(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
@@ -160,7 +160,7 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldKeepAutoMergeOpen_WhenCompletionDidNotMergePullRequest()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, workItem) = AddAufgabe(db);
+        var (_, workItem) = AddWorkItem(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
@@ -200,7 +200,7 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldNotEnableAutoMergeAgain_WhenWaitingForMerge()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, workItem) = AddAufgabe(db);
+        var (_, workItem) = AddWorkItem(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
@@ -246,7 +246,7 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldTreatSkippedPreMergeRunsAsSucceeded()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, workItem) = AddAufgabe(db);
+        var (_, workItem) = AddWorkItem(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
@@ -270,7 +270,7 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldTreatSkippedPostMergeRunsAsSucceeded()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, workItem) = AddAufgabe(db);
+        var (_, workItem) = AddWorkItem(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeSucceeded, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
@@ -294,7 +294,7 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task GetDueForMonitoringAsync_ShouldExcludeCompletedPullRequests()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, workItem) = AddAufgabe(db);
+        var (_, workItem) = AddWorkItem(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
         var service = new PullRequestReferenceService(db, _timeProvider, NullLogger<PullRequestReferenceService>.Instance);
 
@@ -305,10 +305,10 @@ public sealed class PullRequestMonitoringServiceTests
 
     /// <summary>Ein manueller Refresh aktualisiert auch terminal gespeicherte PRs erneut vom Provider.</summary>
     [Fact]
-    public async Task RefreshAufgabeAsync_ShouldUpdateCompletedPullRequestStatus_WhenProviderReportsMerged()
+    public async Task RefreshWorkItemAsync_ShouldUpdateCompletedPullRequestStatus_WhenProviderReportsMerged()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, workItem) = AddAufgabe(db);
+        var (_, workItem) = AddWorkItem(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
@@ -331,10 +331,10 @@ public sealed class PullRequestMonitoringServiceTests
 
     /// <summary>Ein manueller Refresh aktualisiert nur den Providerstatus und loest keinen Auto-Abschluss aus.</summary>
     [Fact]
-    public async Task RefreshAufgabeAsync_ShouldNotCompletePullRequest_WhenOpenPreMergeSucceeded()
+    public async Task RefreshWorkItemAsync_ShouldNotCompletePullRequest_WhenOpenPreMergeSucceeded()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, workItem) = AddAufgabe(db);
+        var (_, workItem) = AddWorkItem(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
@@ -459,7 +459,7 @@ public sealed class PullRequestMonitoringServiceTests
         return pullRequest;
     }
 
-    private static (Project Project, WorkItem WorkItem) AddAufgabe(SoftwareschmiedeDbContext db)
+    private static (Project Project, WorkItem WorkItem) AddWorkItem(SoftwareschmiedeDbContext db)
     {
         var project = new Project
         {

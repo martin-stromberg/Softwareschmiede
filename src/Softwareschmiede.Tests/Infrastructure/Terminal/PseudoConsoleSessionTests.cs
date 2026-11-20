@@ -65,8 +65,8 @@ public sealed class PseudoConsoleSessionTests
 
         session.Dispose();
 
-        outputStream.WasDisposed.Should().BeTrue("Dispose() muss den Output-Stream der Sitzung schließen");
-        var finished = readLoopTask.IsCompleted || await WurdeInnerhalbAsync(readLoopTask, TimeSpan.FromSeconds(5));
+        outputStream.WhatDisposed.Should().BeTrue("Dispose() muss den Output-Stream der Sitzung schließen");
+        var finished = readLoopTask.IsCompleted || await WasWithinAsync(readLoopTask, TimeSpan.FromSeconds(5));
         finished.Should().BeTrue("die Leseschleife muss nach Dispose() sauber beendet sein");
     }
 
@@ -90,8 +90,8 @@ public sealed class PseudoConsoleSessionTests
             TimeSpan.FromSeconds(2),
             "Dispose() darf nicht auf den vollen Leseschleifen-Timeout warten, wenn ein blockierter, nicht " +
             "kooperativ abbrechbarer Read durch das Schließen des Output-Streams sofort unterbrochen werden kann");
-        outputStream.WasDisposed.Should().BeTrue("Dispose() muss den Output-Stream der Sitzung schließen");
-        var finished = readLoopTask.IsCompleted || await WurdeInnerhalbAsync(readLoopTask, TimeSpan.FromSeconds(2));
+        outputStream.WhatDisposed.Should().BeTrue("Dispose() muss den Output-Stream der Sitzung schließen");
+        var finished = readLoopTask.IsCompleted || await WasWithinAsync(readLoopTask, TimeSpan.FromSeconds(2));
         finished.Should().BeTrue("die Leseschleife muss nach Dispose() sauber beendet sein");
     }
 
@@ -101,7 +101,7 @@ public sealed class PseudoConsoleSessionTests
     /// <param name="task">Der zu erwartende Task.</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>true, wenn der Task innerhalb von <paramref name="timeout"/> abgeschlossen wurde; sonst false.</returns>
-    private static async Task<bool> WurdeInnerhalbAsync(Task task, TimeSpan timeout)
+    private static async Task<bool> WasWithinAsync(Task task, TimeSpan timeout)
     {
         try
         {
@@ -231,7 +231,7 @@ public sealed class PseudoConsoleSessionTests
     /// <summary>Die Leseschleife meldet gelesene Rohbytes an die optionale Output-Senke und aktualisiert den
     /// Terminal-Buffer weiterhin wie bisher.</summary>
     [Fact]
-    public async Task ReadLoopAsync_MeldetOutputChunksAnSink_UndAktualisiertBufferWeiterhin()
+    public async Task ReadLoopAsync_ReportsOutputChunksAnSink_AndUpdatesBufferStill()
     {
         var sink = new CapturingOutputSink();
         using var session = TestPseudoConsoleSessionFactory.Create(
@@ -252,7 +252,7 @@ public sealed class PseudoConsoleSessionTests
     /// <summary><see cref="ITerminalSession.OutputChunk"/> feuert mit den rohen, ungeparsten Bytes des
     /// gelesenen Chunks — die Grundlage für Raw-Replay bei UI-Reattachment.</summary>
     [Fact]
-    public async Task ReadLoopAsync_OutputChunk_EventEnthaeltRohbytes()
+    public async Task ReadLoopAsync_OutputChunk_EventContainsRawbytes()
     {
         var received = new System.Text.StringBuilder();
         var chunkFired = new ManualResetEventSlim(false);
@@ -277,7 +277,7 @@ public sealed class PseudoConsoleSessionTests
     /// Chunk nicht doppelt angewendet werden — Replay-Append und Parse/Apply stehen unter demselben
     /// <c>_renderLock</c>, damit der Rebuild den Chunk entweder ganz oder gar nicht sieht.</summary>
     [Fact]
-    public async Task ReadLoopAsync_RebuildAusOutputSink_WendetChunkNichtDoppeltAn()
+    public async Task ReadLoopAsync_RebuildOutOutputSink_AppliesChunkNotDoubleAn()
     {
         var sink = new RebuildCallingSink();
         using var session = TestPseudoConsoleSessionFactory.Create(
@@ -298,13 +298,13 @@ public sealed class PseudoConsoleSessionTests
     /// (Rebuild gegen noch nicht angewendeten Chunk).</summary>
     private sealed class RebuildCallingSink : ITerminalOutputSink
     {
-        private int _rebuildAufrufe;
+        private int _rebuildCalls;
 
         public PseudoConsoleSession? Session { get; set; }
 
         public void OnOutputChunk(ReadOnlySpan<byte> bytes)
         {
-            if (Interlocked.Increment(ref _rebuildAufrufe) == 1)
+            if (Interlocked.Increment(ref _rebuildCalls) == 1)
                 Session?.RebuildBufferFromReplay();
         }
 
@@ -319,7 +319,7 @@ public sealed class PseudoConsoleSessionTests
     /// <summary>Der Buffer kann jederzeit aus den aufgezeichneten Replay-Rohdaten komplett neu aufgebaut
     /// werden — deterministisch derselbe Endzustand wie zur Laufzeit.</summary>
     [Fact]
-    public async Task RebuildBufferFromReplay_StelltBufferzustandWiederHer()
+    public async Task RebuildBufferFromReplay_SetsBufferstateReStore()
     {
         using var session = CreateSession(new FixedContentStream("A\r\nB"));
         var bufferChanged = new ManualResetEventSlim(false);
@@ -338,7 +338,7 @@ public sealed class PseudoConsoleSessionTests
     /// <summary>CSI 8;Zeilen;Spalten t wird auch im Live-Parserpfad als Änderung der
     /// Terminal-Textfläche verarbeitet. Das betrifft nur den Buffer, nicht das WPF-Fenster.</summary>
     [Fact]
-    public async Task ReadLoopAsync_Csi8Resize_AktualisiertBufferGeometrie()
+    public async Task ReadLoopAsync_Csi8Resize_UpdatesBufferGeometry()
     {
         using var session = CreateSession(new FixedContentStream("A\x1b[8;73;142tB"));
 
@@ -353,7 +353,7 @@ public sealed class PseudoConsoleSessionTests
     /// <summary>Ein identischer Resize-Aufruf wird dedupliziert und kehrt sofort zurück; ein zweiter
     /// identischer Aufruf löst keinen weiteren ConPTY-Resize aus.</summary>
     [Fact]
-    public void Resize_IdentischeDimensionen_WirdDedupliziert()
+    public void Resize_IdenticalDimensions_WillDeduplicated()
     {
         using var session = CreateSession(new MemoryStream());
 
@@ -364,21 +364,21 @@ public sealed class PseudoConsoleSessionTests
     /// <summary>Beim normalen Prozessende (Stream-EOF) wird <see cref="ITerminalSession.Exited"/> mit dem
     /// Exit-Code gefeuert — für <c>Process.GetCurrentProcess()</c> (läuft weiter) kein Event.</summary>
     [Fact]
-    public async Task ReadLoopAsync_EofOhneProzessende_KeinExitedEvent()
+    public async Task ReadLoopAsync_EofWithoutProcessend_NoExitedEvent()
     {
-        var exited = false;
+        var completed = false;
         using var session = CreateSession(new FixedContentStream("X"));
-        session.Exited += (_, _) => exited = true;
+        session.Exited += (_, _) => completed = true;
 
         await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await Task.Delay(200, TestContext.Current.CancellationToken);
 
-        exited.Should().BeFalse("der Testprozess läuft noch — Exited darf bei reinem Stream-EOF nicht feuern");
+        completed.Should().BeFalse("der Testprozess läuft noch — Exited darf bei reinem Stream-EOF nicht feuern");
     }
 
     /// <summary><see cref="ITerminalSession.IsPseudoTerminal"/> spiegelt den verwendeten Backend-Pfad.</summary>
     [Fact]
-    public void IsPseudoTerminal_SpiegeltBackend()
+    public void IsPseudoTerminal_MirrorsBackend()
     {
         using var pipeSession = TestPseudoConsoleSessionFactory.Create(new MemoryStream(), new MemoryStream());
         pipeSession.IsPseudoTerminal.Should().BeFalse();
@@ -399,7 +399,7 @@ public sealed class PseudoConsoleSessionTests
     /// war. Das ist die Grundlage des Fehler-Rechecks in
     /// <c>KiAusfuehrungsService.StartTerminalSessionAsync</c> (Failed vor der Event-Verdrahtung).</summary>
     [Fact]
-    public async Task ReadLoopAsync_Lesefehler_SetztFailureZustand()
+    public async Task ReadLoopAsync_Readfailure_SetsFailureState()
     {
         using var session = CreateSession(new ThrowingStream());
 
@@ -414,7 +414,7 @@ public sealed class PseudoConsoleSessionTests
     /// <see cref="ITerminalSession.Failure"/> setzen und <see cref="ITerminalSession.Failed"/> mit demselben
     /// Argument-Objekt auslösen (Konsistenz zwischen beobachtbarem Zustand und Event).</summary>
     [Fact]
-    public async Task WriteInputAsync_Schreibfehler_SetztFailureUndFeiertFailed()
+    public async Task WriteInputAsync_Writeerror_SetsFailureAndCelebratesFailed()
     {
         using var session = TestPseudoConsoleSessionFactory.Create(new ThrowingWriteStream(), new MemoryStream());
         TerminalSessionFailedEventArgs? failedArgs = null;
@@ -504,7 +504,7 @@ public sealed class PseudoConsoleSessionTests
     /// aufgerufen wurde.</summary>
     private sealed class BlockingUntilCancelledStream : Stream
     {
-        public bool WasDisposed { get; private set; }
+        public bool WhatDisposed { get; private set; }
 
         public override bool CanRead => true;
         public override bool CanSeek => false;
@@ -526,7 +526,7 @@ public sealed class PseudoConsoleSessionTests
 
         protected override void Dispose(bool disposing)
         {
-            WasDisposed = true;
+            WhatDisposed = true;
             base.Dispose(disposing);
         }
     }
@@ -573,7 +573,7 @@ public sealed class PseudoConsoleSessionTests
     {
         private readonly TaskCompletionSource<int> _unblockSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public bool WasDisposed { get; private set; }
+        public bool WhatDisposed { get; private set; }
 
         public override bool CanRead => true;
         public override bool CanSeek => false;
@@ -592,7 +592,7 @@ public sealed class PseudoConsoleSessionTests
 
         protected override void Dispose(bool disposing)
         {
-            WasDisposed = true;
+            WhatDisposed = true;
             _unblockSignal.TrySetException(new IOException("Simulierter Pipe-Fehler durch Schließen des Handles."));
             base.Dispose(disposing);
         }

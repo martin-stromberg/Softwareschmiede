@@ -67,9 +67,9 @@ public sealed class PluginManagerTests_Whitelist : IDisposable
         var loggerMock = new Mock<ILogger<PluginManager>>();
         var sut = CreateSut(_tempDirectory, loggerMock);
 
-        var kiPlugins = sut.GetDevelopmentAutomationPlugins();
+        var aiPlugins = sut.GetDevelopmentAutomationPlugins();
 
-        kiPlugins.Should().ContainSingle(p => p.PluginName == "Claude CLI");
+        aiPlugins.Should().ContainSingle(p => p.PluginName == "Claude CLI");
         VerifyWarningForFile(loggerMock, "helper.dll", Times.Never());
     }
 

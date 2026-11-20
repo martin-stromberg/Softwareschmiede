@@ -86,7 +86,7 @@ public sealed class GitHubReleaseClientTests_Pagination
         result.Release.Should().NotBeNull();
         result.Release!.Version.Should().Be(expectedVersion);
         result.Release.IsPrerelease.Should().Be(expectedIsPrerelease);
-        handler.RequestedUrls.Should().Equal(Page1Url, Page2Url);
+        handler.RequestedUrl.Should().Equal(Page1Url, Page2Url);
     }
 
     /// <summary>Ein HTTP-Fehler auf einer Folgeseite verwirft auch gültige frühere Funde.</summary>
@@ -102,7 +102,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         result.Success.Should().BeFalse();
         result.Release.Should().BeNull();
-        handler.RequestedUrls.Should().Equal(Page1Url, Page2Url);
+        handler.RequestedUrl.Should().Equal(Page1Url, Page2Url);
     }
 
     /// <summary>Ungültiges JSON auf einer Folgeseite verwirft auch gültige frühere Funde.</summary>
@@ -161,7 +161,7 @@ public sealed class GitHubReleaseClientTests_Pagination
     [InlineData("https://api.github.com/repositories/abc/releases?page=2")]
     [InlineData("https://api.github.com/repositories/12345/issues?page=2")]
     [InlineData("http://api.github.com/repos/martin-stromberg/Softwareschmiede/releases?page=2")]
-    public async Task GetLatestReleaseAsync_RejectsDisallowedFollowUpUrls(string nextUrl)
+    public async Task GetLatestReleaseAsync_RejectsDisallowedFollowUpUrl(string nextUrl)
     {
         var handler = new RoutingHttpHandler();
         handler.AddPage(Page1Url, ValidPageBody(), nextUrl);
@@ -171,7 +171,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         result.Success.Should().BeFalse();
         result.Release.Should().BeNull();
-        handler.RequestedUrls.Should().Equal(Page1Url);
+        handler.RequestedUrl.Should().Equal(Page1Url);
     }
 
     /// <summary>GitHub liefert in Link-Headern auch die numerische Repository-Form
@@ -198,7 +198,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         result.Success.Should().BeTrue();
         result.Release!.Version.Should().Be("1.5.0-rc.1");
-        handler.RequestedUrls.Should().Equal(Page1Url, numericPage2Url);
+        handler.RequestedUrl.Should().Equal(Page1Url, numericPage2Url);
     }
 
     /// <summary>Caller-Cancellation propagiert als OperationCanceledException statt als null-Ergebnis.</summary>

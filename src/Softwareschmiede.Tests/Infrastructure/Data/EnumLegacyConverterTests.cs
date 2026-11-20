@@ -67,7 +67,7 @@ public sealed class EnumLegacyConverterTests
     [Theory]
     [MemberData(nameof(PinnedEnumCases))]
     public void PersistedEnumValues_ShouldRoundTripToLegacyStrings(Type entityType, string propertyName,
-        Type enumType, Dictionary<string, string> expectedPersistedNames)
+        Type enumType, Dictionary<string, string> expectedPersistedName)
     {
         using var context = TestDbContextFactory.Create();
         var property = context.Model.FindEntityType(entityType)!.FindProperty(propertyName)!;
@@ -76,7 +76,7 @@ public sealed class EnumLegacyConverterTests
         foreach (var member in Enum.GetValues(enumType))
         {
             var name = Enum.GetName(enumType, member)!;
-            var expected = expectedPersistedNames.TryGetValue(name, out var p) ? p : name;
+            var expected = expectedPersistedName.TryGetValue(name, out var p) ? p : name;
 
             var persisted = converter.ConvertToProvider(member);
             persisted.Should().Be(expected,
@@ -91,13 +91,13 @@ public sealed class EnumLegacyConverterTests
     [Theory]
     [MemberData(nameof(PinnedEnumCases))]
     public void PersistedEnumValues_ShouldReadAllMappedLegacyStrings(Type entityType, string propertyName,
-        Type enumType, Dictionary<string, string> expectedPersistedNames)
+        Type enumType, Dictionary<string, string> expectedPersistedName)
     {
         using var context = TestDbContextFactory.Create();
         var property = context.Model.FindEntityType(entityType)!.FindProperty(propertyName)!;
         var converter = property.GetTypeMapping().Converter!;
 
-        foreach (var (name, persisted) in expectedPersistedNames)
+        foreach (var (name, persisted) in expectedPersistedName)
         {
             var member = converter.ConvertFromProvider(persisted);
             Enum.GetName(enumType, member!).Should().Be(name);

@@ -35,11 +35,11 @@ public partial class End2EndTest
     /// Führt Validierung (letztes SCM-Plugin), Persistenz des KI-Aktivierungsstatus und das
     /// Single-Plugin-Verhalten beim Aufgabenstart als drei Phasen derselben Aufgabe aus.
     /// </summary>
-    protected void PluginAktivierung_ValidierungPersistenzUndSinglePluginVerhalten_E2E(Window mainWindow)
+    protected void PluginActivation_ValidationPersistenceAndSinglePluginBehavior_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        SetupProjectMitNeuerAufgabe(mainWindow, "PluginAktivierung-Repo", "PluginAktivierung-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "PluginAktivierung-Repo", "PluginAktivierung-Projekt");
 
         // SetupProjectMitNeuerAufgabe legt die Aufgabe an und öffnet sie direkt im Edit-Panel der
         // TaskDetailView. Für die folgenden Phasen wird zur ProjectDetailView zurückgekehrt, damit
@@ -47,8 +47,8 @@ public partial class End2EndTest
         new TaskDetailView(mainWindow).GoBack();
         var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
-        var settings = DeaktivierenDesLetztenScmPlugins_ZeigtValidierungsfehler_E2E(mainWindow, projectDetail);
-        DeaktivierenVonDreiKiPlugins_PersistiertUndBlendetAuswahlAus_E2E(mainWindow, settings);
+        var settings = DeactivateOfLastScmPlugins_ShowsValidationerror_E2E(mainWindow, projectDetail);
+        DeactivateOfThreeAiPlugins_PersistedAndTogglesSelectionOut_E2E(mainWindow, settings);
     }
 
     /// <summary>
@@ -61,7 +61,7 @@ public partial class End2EndTest
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     /// <param name="projectDetail">Die Projektdetailansicht mit der neu angelegten Aufgabe in der Liste.</param>
     /// <returns>Die Settings-Ansicht (Plugins-Tab), bereit für Phase 2.</returns>
-    private SettingsView DeaktivierenDesLetztenScmPlugins_ZeigtValidierungsfehler_E2E(Window mainWindow, ProjectDetailView projectDetail)
+    private SettingsView DeactivateOfLastScmPlugins_ShowsValidationerror_E2E(Window mainWindow, ProjectDetailView projectDetail)
     {
         var settings = projectDetail.Menu.NavigateToSettings();
         settings.SwitchTab("Plugins");
@@ -86,7 +86,7 @@ public partial class End2EndTest
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     /// <param name="settings">Die Settings-Ansicht, aktuell im Plugins-Register.</param>
-    private void DeaktivierenVonDreiKiPlugins_PersistiertUndBlendetAuswahlAus_E2E(Window mainWindow, SettingsView settings)
+    private void DeactivateOfThreeAiPlugins_PersistedAndTogglesSelectionOut_E2E(Window mainWindow, SettingsView settings)
     {
         settings.SetPluginEnabled("Softwareschmiede.ClaudeCli", false);
         settings.SetPluginEnabled("Softwareschmiede.Codex", false);
@@ -102,8 +102,8 @@ public partial class End2EndTest
         Assert.False(settingsReloaded.IsPluginEnabled("Softwareschmiede.ClaudeCli"));
 
         // Zurück zur Aufgabe: bei genau einem aktiven KI-Plugin entfällt Selector und Auswahl-Dialog
-        var dashboardErneut = settingsReloaded.Menu.NavigateToDashboard();
-        var projectList = dashboardErneut.Menu.NavigateToProjects();
+        var dashboardAgain = settingsReloaded.Menu.NavigateToDashboard();
+        var projectList = dashboardAgain.Menu.NavigateToProjects();
         var projectDetail = projectList.OpenProject("PluginAktivierung-Projekt");
         var taskDetail = projectDetail.OpenTask("Neue Aufgabe");
 

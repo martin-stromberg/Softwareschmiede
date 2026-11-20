@@ -11,7 +11,7 @@ public sealed class TextDiffServiceTests
 
     /// <summary>Gleicher Alt-/Neu-Inhalt liefert ausschließlich Context-Zeilen.</summary>
     [Fact]
-    public void BuildDiff_IdentischerInhalt_LiefertNurContextZeilen()
+    public void BuildDiff_IdenticalContent_ReturnsOnlyContextLines()
     {
         const string content = "zeile1\nzeile2\nzeile3";
 
@@ -23,7 +23,7 @@ public sealed class TextDiffServiceTests
 
     /// <summary>Eine im Zielinhalt neu hinzugefügte Zeile liefert Added-Status mit NewLineNumber.</summary>
     [Fact]
-    public void BuildDiff_HinzugefuegteZeile_LiefertAddedStatus()
+    public void BuildDiff_AddedLine_ReturnsAddedStatus()
     {
         var original = "zeile1\nzeile2";
         var current = "zeile1\nzeile2\nzeile3";
@@ -38,7 +38,7 @@ public sealed class TextDiffServiceTests
 
     /// <summary>Eine im Zielinhalt fehlende Zeile liefert Removed-Status mit OldLineNumber.</summary>
     [Fact]
-    public void BuildDiff_GeloeschteZeile_LiefertRemovedStatus()
+    public void BuildDiff_DeletedLine_ReturnsRemovedStatus()
     {
         var original = "zeile1\nzeile2\nzeile3";
         var current = "zeile1\nzeile3";
@@ -53,7 +53,7 @@ public sealed class TextDiffServiceTests
 
     /// <summary>Eine geänderte Zeile liefert Modified-Status mit Inline-Segmenten, die nur den geänderten Wortteil markieren.</summary>
     [Fact]
-    public void BuildDiff_GeaenderteZeile_LiefertModifiedMitInlineSegmenten()
+    public void BuildDiff_ChangedLine_ReturnsModifiedWithInlineSegments()
     {
         var original = "hallo welt";
         var current = "hallo erde";
@@ -71,30 +71,30 @@ public sealed class TextDiffServiceTests
 
     /// <summary>Ein leerer Alt- oder Neu-Inhalt liefert einen korrekten Diff ohne Ausnahme.</summary>
     [Fact]
-    public void BuildDiff_LeererInhalt_KeineException()
+    public void BuildDiff_EmptyContent_NoException()
     {
-        var beideLeer = () => _sut.BuildDiff(string.Empty, string.Empty);
-        var altLeer = () => _sut.BuildDiff(null, "zeile1");
-        var neuLeer = () => _sut.BuildDiff("zeile1", null);
+        var bothEmpty = () => _sut.BuildDiff(string.Empty, string.Empty);
+        var altEmpty = () => _sut.BuildDiff(null, "zeile1");
+        var newEmpty = () => _sut.BuildDiff("zeile1", null);
 
-        beideLeer.Should().NotThrow();
-        altLeer.Should().NotThrow();
-        neuLeer.Should().NotThrow();
+        bothEmpty.Should().NotThrow();
+        altEmpty.Should().NotThrow();
+        newEmpty.Should().NotThrow();
 
         _sut.BuildDiff(string.Empty, string.Empty).Lines.Should().BeEmpty();
 
-        var nurNeu = _sut.BuildDiff(null, "zeile1");
-        nurNeu.Lines.Should().ContainSingle();
-        nurNeu.Lines[0].Status.Should().Be(DiffLineStatus.Added);
+        var onlyNew = _sut.BuildDiff(null, "zeile1");
+        onlyNew.Lines.Should().ContainSingle();
+        onlyNew.Lines[0].Status.Should().Be(DiffLineStatus.Added);
 
-        var nurAlt = _sut.BuildDiff("zeile1", null);
-        nurAlt.Lines.Should().ContainSingle();
-        nurAlt.Lines[0].Status.Should().Be(DiffLineStatus.Removed);
+        var onlyAlt = _sut.BuildDiff("zeile1", null);
+        onlyAlt.Lines.Should().ContainSingle();
+        onlyAlt.Lines[0].Status.Should().Be(DiffLineStatus.Removed);
     }
 
     /// <summary>Überschreitet die Zeilenanzahl die LCS-Obergrenze, weicht der Diff auf einen einfachen Blockdiff aus, statt die volle O(n·m)-Matrix zu allokieren.</summary>
     [Fact]
-    public void BuildDiff_ZeilenanzahlUeberSchwelle_LiefertBlockdiffOhneVolleLcsMatrix()
+    public void BuildDiff_LinecountOverThreshold_ReturnsBlockdiffWithoutFullLcsMatrix()
     {
         const int lineCount = 5_001;
         var original = string.Join('\n', Enumerable.Range(0, lineCount).Select(i => $"alt-{i}"));

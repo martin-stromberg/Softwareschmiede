@@ -21,7 +21,7 @@ public sealed class CliReplayExportServiceTests : IDisposable
     /// <summary>CliReplayExportServiceTests.</summary>
     public CliReplayExportServiceTests()
     {
-        _aiService = TestKiAusfuehrungsServiceFactory.Create();
+        _aiService = TestAiExecutionServiceFactory.Create();
         _sut = new CliReplayExportService(_aiService, _store, NullLogger<CliReplayExportService>.Instance);
     }
 
@@ -34,7 +34,7 @@ public sealed class CliReplayExportServiceTests : IDisposable
 
     /// <summary>Ohne aufgezeichnete Session schlägt der Export mit InvalidOperationException fehl.</summary>
     [Fact]
-    public async Task ExportCliReplayAsync_OhneAufzeichnung_WirftInvalidOperationException()
+    public async Task ExportCliReplayAsync_WithoutRecording_ThrowsInvalidOperationException()
     {
         var act = () => _sut.ExportCliReplayAsync(Guid.NewGuid(), Path.Combine(Path.GetTempPath(), "x.clireplay"));
 
@@ -44,12 +44,12 @@ public sealed class CliReplayExportServiceTests : IDisposable
     /// <summary><see cref="CliReplayExportService.HasRecording"/> spiegelt die Verfügbarkeit des
     /// Mitschnitts wider — false ohne Session-Start, true nach einem Start.</summary>
     [Fact]
-    public async Task HatAufzeichnung_SpiegeltVerfuegbarkeitDesMitschnitts()
+    public async Task HasRecording_MirrorsAvailabilityOfRecording()
     {
         var workItemId = Guid.NewGuid();
         _sut.HasRecording(workItemId).Should().BeFalse("ohne Session-Start liegt kein Mitschnitt vor");
 
-        var aiService = TestKiAusfuehrungsServiceFactory.Create(
+        var aiService = TestAiExecutionServiceFactory.Create(
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher([Encoding.UTF8.GetBytes("x")]));
         var sut = new CliReplayExportService(aiService, _store, NullLogger<CliReplayExportService>.Instance);
@@ -63,7 +63,7 @@ public sealed class CliReplayExportServiceTests : IDisposable
     /// <summary>Der Export schreibt den Mitschnitt der laufenden Session als .clireplay — inklusive
     /// Chunks, die vor der ersten BufferChanged-Beobachtung ankamen (Rekorder ab Session-Start).</summary>
     [Fact]
-    public async Task ExportCliReplayAsync_MitAufzeichnung_SchreibtLadbareReplayDatei()
+    public async Task ExportCliReplayAsync_WithRecording_WritesLoadableReplayFile()
     {
         var workItemId = Guid.NewGuid();
         var chunks = new[]
@@ -71,7 +71,7 @@ public sealed class CliReplayExportServiceTests : IDisposable
             Encoding.UTF8.GetBytes("chunk-eins"),
             Encoding.UTF8.GetBytes("\x1b[31mchunk-zwei"),
         };
-        var aiService = TestKiAusfuehrungsServiceFactory.Create(
+        var aiService = TestAiExecutionServiceFactory.Create(
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher(chunks));
         var sut = new CliReplayExportService(aiService, _store, NullLogger<CliReplayExportService>.Instance);
@@ -86,12 +86,12 @@ public sealed class CliReplayExportServiceTests : IDisposable
             await sut.ExportCliReplayAsync(workItemId, targetPath, TestContext.Current.CancellationToken);
 
             File.Exists(targetPath).Should().BeTrue();
-            var geladen = await _store.LoadAsync(targetPath, TestContext.Current.CancellationToken);
-            geladen.WorkItemId.Should().Be(workItemId);
-            geladen.PluginName.Should().Be("TestPlugin");
-            geladen.Chunks.Should().HaveCount(2);
-            geladen.Chunks[0].Data.Should().Equal(chunks[0]);
-            geladen.Chunks[1].Data.Should().Equal(chunks[1]);
+            var loaded = await _store.LoadAsync(targetPath, TestContext.Current.CancellationToken);
+            loaded.WorkItemId.Should().Be(workItemId);
+            loaded.PluginName.Should().Be("TestPlugin");
+            loaded.Chunks.Should().HaveCount(2);
+            loaded.Chunks[0].Data.Should().Equal(chunks[0]);
+            loaded.Chunks[1].Data.Should().Equal(chunks[1]);
         }
         finally
         {

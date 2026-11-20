@@ -80,7 +80,7 @@ public sealed class SettingsViewModelTests : IDisposable
         return mock;
     }
 
-    private static Mock<IAiPlugin> CreateKiPluginMock(
+    private static Mock<IAiPlugin> CreateAiPluginMock(
         string pluginName,
         IReadOnlyList<PluginSettingGroup>? groups = null,
         string? pluginPrefix = null)
@@ -95,7 +95,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>ScmPluginSelectedCommand lädt Setting-Groups des ausgewählten SCM-Plugins und füllt SelectedPluginSettings.</summary>
     [Fact]
-    public async Task ScmPluginSelectedCommand_LaeadtSettingsGroups_FuerAusgewaehltesPlugin()
+    public async Task ScmPluginSelectedCommand_LoadsSettingsGroups_ForSelectedPlugin()
     {
         var field = new PluginSettingField("token", "Token", PluginSettingFieldType.Secret);
         var group = new PluginSettingGroup("Authentifizierung", [field]);
@@ -140,11 +140,11 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>KiPluginSelectedCommand lädt Setting-Groups des ausgewählten KI-Plugins und füllt SelectedPluginSettings.</summary>
     [Fact]
-    public async Task KiPluginSelectedCommand_LaeadtSettingsGroups_FuerAusgewaehltesPlugin()
+    public async Task AiPluginSelectedCommand_LoadsSettingsGroups_ForSelectedPlugin()
     {
         var field = new PluginSettingField("model", "Modell", PluginSettingFieldType.Text);
         var group = new PluginSettingGroup("Modell-Konfiguration", [field]);
-        var plugin = CreateKiPluginMock("Claude", [group]).Object;
+        var plugin = CreateAiPluginMock("Claude", [group]).Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([plugin]);
         var sut = CreateSut();
@@ -163,12 +163,12 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>LadenAsync lädt die gespeicherten Default-Plugins. Die Settings selbst werden erst nach Auswahl eines Eintrags im Plugins-Register geladen (SelectedPluginSettings).</summary>
     [Fact]
-    public async Task LadenAsync_LaedtDefaultPlugine()
+    public async Task LoadAsync_LoadsDefaultPlugins()
     {
         var field = new PluginSettingField("token", "Token", PluginSettingFieldType.Secret);
         var group = new PluginSettingGroup("Auth", [field]);
         var scmPlugin = CreateScmPluginMock("GitHub", [group]).Object;
-        var aiPlugin = CreateKiPluginMock("Claude").Object;
+        var aiPlugin = CreateAiPluginMock("Claude").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _settingService.SetSettingAsync(AppSettingService.DefaultScmPluginKey, "GitHub", TestContext.Current.CancellationToken);
@@ -183,7 +183,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>LadenAsync verwendet erstes Plugin als Fallback, wenn der gespeicherte Name nicht existiert.</summary>
     [Fact]
-    public async Task LadenAsync_VerwendetErstesPlugin_WennGespeicherterNameNichtExistiert()
+    public async Task LoadAsync_UsesFirstPlugin_WhenSavedNameNotExists()
     {
         var scmPlugin = CreateScmPluginMock("GitHub").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
@@ -198,7 +198,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>SpeichernAsync speichert DefaultScmPlugin Name und alle SCM-Einstellungswerte.</summary>
     [Fact]
-    public async Task SpeichernAsync_SpeichertDefaultPlugine_Und_EinstellungswerteFuerScm()
+    public async Task SaveAsync_SavesDefaultPlugins_And_SettingsvaluesForScm()
     {
         var field = new PluginSettingField("api_key", "API Key", PluginSettingFieldType.Secret);
         var group = new PluginSettingGroup("Auth", [field]);
@@ -212,20 +212,20 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.SelectedPluginSettings[0].Entries[0].Value = "mein-token";
         await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        var gespeicherterWert = _pluginSettingsService.GetValue(scmPlugin, field);
-        gespeicherterWert.Should().Be("mein-token");
+        var savedValue = _pluginSettingsService.GetValue(scmPlugin, field);
+        savedValue.Should().Be("mein-token");
 
-        var gespeichertesPlugin = await _settingService.GetSettingAsync(AppSettingService.DefaultScmPluginKey, TestContext.Current.CancellationToken);
-        gespeichertesPlugin.Should().Be("GitHub");
+        var savedPlugin = await _settingService.GetSettingAsync(AppSettingService.DefaultScmPluginKey, TestContext.Current.CancellationToken);
+        savedPlugin.Should().Be("GitHub");
     }
 
     /// <summary>SpeichernAsync speichert DefaultAiPlugin Name und alle KI-Einstellungswerte.</summary>
     [Fact]
-    public async Task SpeichernAsync_SpeichertDefaultPlugine_Und_EinstellungswerteFuerKi()
+    public async Task SaveAsync_SavesDefaultPlugins_And_SettingsvaluesForAi()
     {
         var field = new PluginSettingField("model", "Modell", PluginSettingFieldType.Text);
         var group = new PluginSettingGroup("Konfiguration", [field]);
-        var aiPlugin = CreateKiPluginMock("Claude", [group]).Object;
+        var aiPlugin = CreateAiPluginMock("Claude", [group]).Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _settingService.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Claude", TestContext.Current.CancellationToken);
@@ -236,13 +236,13 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.SelectedPluginSettings[0].Entries[0].Value = "claude-opus";
         await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        var gespeicherterWert = _pluginSettingsService.GetValue(aiPlugin, field);
-        gespeicherterWert.Should().Be("claude-opus");
+        var savedValue = _pluginSettingsService.GetValue(aiPlugin, field);
+        savedValue.Should().Be("claude-opus");
     }
 
     /// <summary>Codex-CommandLineParameters übernehmen keinen automatischen Default als Anwenderwert.</summary>
     [Fact]
-    public async Task SpeichernAsync_PersistiertKeinenCodexCommandLineDefault_WennKeinAnwenderwertExistiert()
+    public async Task SaveAsync_PersistedNoCodexCommandLineDefault_WhenNoUservalueExists()
     {
         var field = new PluginSettingField(
             "CommandLineParameters",
@@ -250,7 +250,7 @@ public sealed class SettingsViewModelTests : IDisposable
             PluginSettingFieldType.CommandLineParameters,
             DefaultValue: "--auto-default");
         var group = new PluginSettingGroup("CLI-Konfiguration", [field]);
-        var aiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
+        var aiPlugin = CreateAiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _settingService.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
@@ -268,7 +268,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>Anwenderdefinierte Codex-CommandLineParameters bleiben nach Speichern und Neuladen unverändert.</summary>
     [Fact]
-    public async Task SpeichernAsync_ErhaeltGeaenderteCodexCommandLineParameters()
+    public async Task SaveAsync_ReceivesChangedCodexCommandLineParameter()
     {
         var field = new PluginSettingField(
             "CommandLineParameters",
@@ -276,7 +276,7 @@ public sealed class SettingsViewModelTests : IDisposable
             PluginSettingFieldType.CommandLineParameters,
             DefaultValue: "--auto-default");
         var group = new PluginSettingGroup("CLI-Konfiguration", [field]);
-        var aiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
+        var aiPlugin = CreateAiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _settingService.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
@@ -296,7 +296,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>Entfernte Codex-CommandLineParameters bleiben leer und fallen nicht auf Defaults zurück.</summary>
     [Fact]
-    public async Task SpeichernAsync_ErhaeltLeereCodexCommandLineParameters_NachEntfernung()
+    public async Task SaveAsync_ReceivesEmptyCodexCommandLineParameter_AfterRemoval()
     {
         var field = new PluginSettingField(
             "CommandLineParameters",
@@ -304,7 +304,7 @@ public sealed class SettingsViewModelTests : IDisposable
             PluginSettingFieldType.CommandLineParameters,
             DefaultValue: "--auto-default");
         var group = new PluginSettingGroup("CLI-Konfiguration", [field]);
-        var aiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
+        var aiPlugin = CreateAiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
         _credentialStore.SetCredential("Softwareschmiede.Codex.CommandLineParameters", "--auto-old");
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
@@ -324,7 +324,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>Der Hilfebutton verwendet das aktuell ausgewählte CLI-Plugin und nicht das gespeicherte Default-KI-Plugin.</summary>
     [Fact]
-    public async Task HilfeButtonResolver_VerwendetAusgewaehltesCliPlugin_StattDefaultKiPlugin()
+    public async Task HelpButtonResolver_UsesSelectedCliPlugin_InsteadDefaultAiPlugin()
     {
         var defaultPlugin = new TestCliPlugin("Codex CLI", "Softwareschmiede.Codex");
         var selectedPlugin = new TestCliPlugin("Devin CLI", "Softwareschmiede.Devin");
@@ -341,7 +341,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>SpeichernAsync zeigt Fehlermeldung wenn Pflichtfeld leer ist und speichert nicht.</summary>
     [Fact]
-    public async Task SpeichernAsync_ValidierungFehlgeschlagen_ZeigtFehlerMeldung()
+    public async Task SaveAsync_ValidationFailed_ShowsErrorMessage()
     {
         var field = new PluginSettingField("token", "Token", PluginSettingFieldType.Secret, IsRequired: true);
         var group = new PluginSettingGroup("Auth", [field]);
@@ -357,13 +357,13 @@ public sealed class SettingsViewModelTests : IDisposable
 
         sut.ErrorMessage.Should().NotBeNullOrEmpty();
         sut.SuccessMessage.Should().BeNull();
-        var gespeicherterWert = _pluginSettingsService.GetValue(scmPlugin, field);
-        gespeicherterWert.Should().BeNull();
+        var savedValue = _pluginSettingsService.GetValue(scmPlugin, field);
+        savedValue.Should().BeNull();
     }
 
     /// <summary>SpeichernAsync konvertiert Boolean-Werte korrekt zu "true"/"false" Strings.</summary>
     [Fact]
-    public async Task SpeichernAsync_BooleanFelder_KonvertiertCorrect()
+    public async Task SaveAsync_BooleanField_ConvertsCorrect()
     {
         var field = new PluginSettingField("debug", "Debug", PluginSettingFieldType.Boolean);
         var group = new PluginSettingGroup("Entwicklung", [field]);
@@ -377,13 +377,13 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.SelectedPluginSettings[0].Entries[0].BoolValue = true;
         await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        var gespeicherterWert = _pluginSettingsService.GetValue(scmPlugin, field);
-        gespeicherterWert.Should().Be("true");
+        var savedValue = _pluginSettingsService.GetValue(scmPlugin, field);
+        savedValue.Should().Be("true");
     }
 
     /// <summary>LadenAsync lädt Promptvorlagen in die editierbare Collection.</summary>
     [Fact]
-    public async Task LadenAsync_LaedtPromptVorlagen()
+    public async Task LoadAsync_LoadsPromptTemplates()
     {
         await _promptTemplatesService.CreateAsync("Vorlage", "Text", TestContext.Current.CancellationToken);
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
@@ -399,7 +399,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>SpeichernAsync persistiert neue und geänderte Promptvorlagen.</summary>
     [Fact]
-    public async Task SpeichernAsync_SpeichertPromptVorlagen()
+    public async Task SaveAsync_SavesPromptTemplates()
     {
         await _promptTemplatesService.CreateAsync("Alt", "Alter Text", TestContext.Current.CancellationToken);
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
@@ -422,7 +422,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>SpeichernAsync validiert leere Promptvorlagenfelder.</summary>
     [Fact]
-    public async Task SpeichernAsync_ValidiertLeerenPrompttext()
+    public async Task SaveAsync_ValidatesEmptyPrompttext()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -440,10 +440,10 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>LadenAsync befüllt die Aktivierungs-Collections mit dem aktuellen Status je Plugin.</summary>
     [Fact]
-    public async Task Laden_BefuelltAktivierungsCollections_MitStatus()
+    public async Task Load_PopulatesActivationCollections_WithStatus()
     {
         var scmPlugin = CreateScmPluginMock("GitHub").Object;
-        var aiPlugin = CreateKiPluginMock("Claude").Object;
+        var aiPlugin = CreateAiPluginMock("Claude").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _pluginActivationService.SetPluginEnabledAsync("github", false, TestContext.Current.CancellationToken);
@@ -461,7 +461,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>Umschalten eines Aktivierungsstatus und Speichern persistiert den Status über PluginActivationService.</summary>
     [Fact]
-    public async Task TogglePlugin_UndSpeichern_PersistiertStatus()
+    public async Task TogglePlugin_SaveAnd_PersistedStatus()
     {
         var scmPlugin1 = CreateScmPluginMock("GitHub").Object;
         var scmPlugin2 = CreateScmPluginMock("GitLab").Object;
@@ -473,13 +473,13 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.SourceCodeManagementPlugins.Single(p => p.PluginPrefix == "gitlab").IsEnabled = false;
         await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        var gespeichertesStatus = await _pluginActivationService.IsPluginEnabledAsync("gitlab", TestContext.Current.CancellationToken);
-        gespeichertesStatus.Should().BeFalse();
+        var savedStatus = await _pluginActivationService.IsPluginEnabledAsync("gitlab", TestContext.Current.CancellationToken);
+        savedStatus.Should().BeFalse();
     }
 
     /// <summary>SpeichernAsync verhindert das Deaktivieren des letzten aktiven Plugins einer Kategorie.</summary>
     [Fact]
-    public async Task Speichern_VerhindertDeaktivierenDesLetztenPlugins()
+    public async Task Save_PreventsDeactivateOfLastPlugins()
     {
         var scmPlugin = CreateScmPluginMock("GitHub").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
@@ -491,8 +491,8 @@ public sealed class SettingsViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         sut.ErrorMessage.Should().Contain("Mindestens ein");
-        var gespeichertesStatus = await _pluginActivationService.IsPluginEnabledAsync("github", TestContext.Current.CancellationToken);
-        gespeichertesStatus.Should().BeTrue();
+        var savedStatus = await _pluginActivationService.IsPluginEnabledAsync("github", TestContext.Current.CancellationToken);
+        savedStatus.Should().BeTrue();
     }
 
     /// <summary>LadenCommand fällt bei fehlenden oder unbekannten gespeicherten Update-Werten auf die Defaults zurück.</summary>
@@ -558,18 +558,18 @@ public sealed class SettingsViewModelTests : IDisposable
 
         sut.SelectedUpdateMode = UpdateModeOption.ForMode(mode);
         sut.SelectedUpdatePath = UpdatePathOption.ForPath(updatePath);
-        var erwarteterKanal = updatePath == UpdatePathChannelResolver.PrereleaseVersionsPath
+        var expectedChannel = updatePath == UpdatePathChannelResolver.PrereleaseVersionsPath
             ? UpdatePathText.ChannelReleaseCandidate
             : UpdatePathText.ChannelStable;
-        sut.DerivedUpdateChannel.Should().Be(erwarteterKanal);
+        sut.DerivedUpdateChannel.Should().Be(expectedChannel);
         await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         sut.ErrorMessage.Should().BeNull();
         published.Should().Be(new UpdateSettings(mode, updatePath),
             "das Event muss den tatsächlich gespeicherten Snapshot liefern");
 
-        var gespeichert = await _settingService.GetUpdateSettingsAsync(TestContext.Current.CancellationToken);
-        gespeichert.Should().Be(new UpdateSettings(mode, updatePath));
+        var saved = await _settingService.GetUpdateSettingsAsync(TestContext.Current.CancellationToken);
+        saved.Should().Be(new UpdateSettings(mode, updatePath));
 
         await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.SelectedUpdatePath.Should().Be(UpdatePathOption.ForPath(updatePath));
@@ -633,7 +633,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>LadenCommand füllt die SCM--Einstellungen mit den Defaults: Überwachung aktiv, Standard-Trigger.</summary>
     [Fact]
-    public async Task LadenCommand_LoadsScmMonitoringDefaults()
+    public async Task LoadCommand_LoadsScmMonitoringDefaults()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -647,7 +647,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>SpeichernCommand persistiert den Überwachungs-Schalter und das getrimmte Trigger-Keyword.</summary>
     [Fact]
-    public async Task SpeichernCommand_PersistsScmMonitoringSettings()
+    public async Task SaveCommand_PersistsScmMonitoringSettings()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -673,7 +673,7 @@ public sealed class SettingsViewModelTests : IDisposable
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task SpeichernCommand_RejectsEmptyScmTriggerKeyword(string keyword)
+    public async Task SaveCommand_RejectsEmptyScmTriggerKeyword(string keyword)
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -692,7 +692,7 @@ public sealed class SettingsViewModelTests : IDisposable
     /// <summary>Ein leeres Trigger-Keyword blockiert das Speichern nicht, solange das Feld nicht
     /// wirksam ist — bei deaktivierter Ereignisüberwachung ist der Bereich ausgeblendet.</summary>
     [Fact]
-    public async Task SpeichernCommand_EmptyTriggerKeyword_MonitoringDisabled_Saves()
+    public async Task SaveCommand_EmptyTriggerKeyword_MonitoringDisabled_Saves()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -710,7 +710,7 @@ public sealed class SettingsViewModelTests : IDisposable
     /// <summary>Im SeparatesKonto-Modus ist das Trigger-Keyword-Feld ausgeblendet; ein leerer
     /// Wert blockiert das Speichern daher nicht.</summary>
     [Fact]
-    public async Task SpeichernCommand_EmptyTriggerKeyword_SeparatesKonto_Saves()
+    public async Task SaveCommand_EmptyTriggerKeyword_SeparatesAccount_Saves()
     {
         var plugin = CreateGitHubPluginMock().Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
@@ -731,7 +731,7 @@ public sealed class SettingsViewModelTests : IDisposable
     /// Abschlussüberwachung deaktiviert ist — das Feld ist dann deaktiviert und nicht wirksam;
     /// der gespeicherte Wert bleibt unberührt.</summary>
     [Fact]
-    public async Task SpeichernCommand_InvalidWait_TaskCompletionDisabled_Saves()
+    public async Task SaveCommand_InvalidWait_TaskCompletionDisabled_Saves()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -753,7 +753,7 @@ public sealed class SettingsViewModelTests : IDisposable
     /// auch die abgeleiteten Anzeige-Properties (Sichtbarkeit, Enabled-Zustand, Panel-Status) —
     /// die UI bleibt nach dem Wiederherstellen konsistent.</summary>
     [Fact]
-    public async Task VerwerfenCommand_NotifiesDependentAnzeigeProperties()
+    public async Task DiscardCommand_NotifiesDependentDisplayProperties()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -786,7 +786,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>LadenCommand lädt den Backmerge-Modus; ohne gespeicherten Eintrag gilt „Deaktiviert“.</summary>
     [Fact]
-    public async Task LadenCommand_LoadsBackmergeModusDefaults()
+    public async Task LoadCommand_LoadsBackmergeModeDefaults()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -800,7 +800,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>SpeichernCommand persistiert den gewählten Backmerge-Modus und lädt ihn beim Neuladen zurück.</summary>
     [Fact]
-    public async Task SpeichernCommand_PersistsBackmergeModus()
+    public async Task SaveCommand_PersistsBackmergeMode()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -819,7 +819,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>LadenCommand füllt die fünf SCM-Prompt-Anhänge mit leeren Feldern, wenn nichts gespeichert ist.</summary>
     [Fact]
-    public async Task LadenCommand_LoadsScmPromptAppendixDefaults()
+    public async Task LoadCommand_LoadsScmPromptAppendixDefaults()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -837,7 +837,7 @@ public sealed class SettingsViewModelTests : IDisposable
     /// <summary>SpeichernCommand persistiert alle fünf SCM-Prompt-Anhänge (mehrzeilig möglich) und
     /// lädt sie nach einem Neuladen unverändert zurück.</summary>
     [Fact]
-    public async Task SpeichernCommand_PersistsAndReloadsScmPromptAppendices()
+    public async Task SaveCommand_PersistsAndReloadsScmPromptAppendices()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -876,7 +876,7 @@ public sealed class SettingsViewModelTests : IDisposable
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task SpeichernCommand_BlankScmPromptAppendix_StoresNoValue(string blank)
+    public async Task SaveCommand_BlankScmPromptAppendix_StoresNoValue(string blank)
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -913,7 +913,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>LadenCommand lädt den Konto-Modus; ohne Eintrag gilt „Benutzerkonto“.</summary>
     [Fact]
-    public async Task LadenCommand_LoadsKontoModusDefaults()
+    public async Task LoadCommand_LoadsAccountModeDefaults()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -927,7 +927,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>SpeichernCommand persistiert den gewählten Konto-Modus und lädt ihn beim Neuladen zurück.</summary>
     [Fact]
-    public async Task SpeichernCommand_PersistsKontoModus()
+    public async Task SaveCommand_PersistsAccountMode()
     {
         var plugin = CreateGitHubPluginMock().Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
@@ -948,7 +948,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>Eine fehlende Konto-Modus-Auswahl wird nicht gespeichert.</summary>
     [Fact]
-    public async Task SpeichernCommand_RejectsMissingKontoModus()
+    public async Task SaveCommand_RejectsMissingAccountMode()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -964,7 +964,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>SeparatesKonto ohne AgentToken wird abgelehnt — der Modus bleibt unpersistiert.</summary>
     [Fact]
-    public async Task SpeichernCommand_SeparatesKontoWithoutAgentToken_ShowsFehlerMeldung()
+    public async Task SaveCommand_SeparatesAccountWithoutAgentToken_ShowsErrorMessage()
     {
         var plugin = CreateGitHubPluginMock().Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
@@ -983,7 +983,7 @@ public sealed class SettingsViewModelTests : IDisposable
     /// <summary>Ein gerade im Formular eingetragener AgentToken-Wert zählt bereits bei der Pflichtprüfung —
     /// Token eintragen und Modus wählen gelingt in einem Speicherschritt.</summary>
     [Fact]
-    public async Task SpeichernCommand_SeparatesKonto_FormValueSatisfiesAgentTokenRequirement()
+    public async Task SaveCommand_SeparatesAccount_FormValueSatisfiesAgentTokenRequirement()
     {
         var plugin = CreateGitHubPluginMock().Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
@@ -1004,7 +1004,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>LadenCommand lädt den Prüfmodus der Abschlussüberwachung; ohne Eintrag gilt „Ereignisgesteuert“.</summary>
     [Fact]
-    public async Task LadenCommand_LoadsPruefmodusDefaults()
+    public async Task LoadCommand_LoadsCheckmodeDefaults()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -1018,7 +1018,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>SpeichernCommand persistiert den Prüfmodus und lädt ihn beim Neuladen zurück.</summary>
     [Fact]
-    public async Task SpeichernCommand_PersistsPruefmodus()
+    public async Task SaveCommand_PersistsCheckmode()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -1037,7 +1037,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>Eine fehlende Prüfmodus-Auswahl wird nicht gespeichert.</summary>
     [Fact]
-    public async Task SpeichernCommand_RejectsMissingPruefmodus()
+    public async Task SaveCommand_RejectsMissingCheckmode()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -1053,7 +1053,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>LadenCommand lädt die Backmerge-Optionen; ohne Eintrag sind beide deaktiviert.</summary>
     [Fact]
-    public async Task LadenCommand_LoadsBackmergeOptionenDefaults()
+    public async Task LoadCommand_LoadsBackmergeOptionsDefaults()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -1067,7 +1067,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>SpeichernCommand persistiert beide Backmerge-Optionen unabhängig voneinander und lädt sie zurück.</summary>
     [Fact]
-    public async Task SpeichernCommand_PersistsBackmergeOptionen()
+    public async Task SaveCommand_PersistsBackmergeOptions()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -1090,7 +1090,7 @@ public sealed class SettingsViewModelTests : IDisposable
     /// <summary>Der Überwachungsmodus ist nur bedienbar, Trigger-Keyword und Prompt-Anhänge nur sichtbar,
     /// solange die Ereignisüberwachung aktiviert ist.</summary>
     [Fact]
-    public async Task AufgabenAusfuehren_AbleitungenFolgenDemSchalter()
+    public async Task ExecuteWorkItems_DerivationsSequenceTheToggle()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -1115,7 +1115,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>Prüfmodus und Wartezeit folgen dem Abschlussüberwachungs-Schalter; der Status zeigt den Schaltzustand.</summary>
     [Fact]
-    public async Task AufgabenBeenden_AbleitungenFolgenDemSchalter()
+    public async Task EndWorkItems_DerivationsSequenceTheToggle()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -1132,7 +1132,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
     /// <summary>Die Backmerge-Optionen sind nur bedienbar, solange der Backmerge-Modus nicht „Deaktiviert“ ist.</summary>
     [Fact]
-    public async Task Prozessablaeufe_AbleitungenFolgenDemBackmergeModus()
+    public async Task Processflows_DerivationsSequenceTheBackmergeMode()
     {
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
@@ -1181,6 +1181,6 @@ internal sealed class TestCliPlugin : CliAiPluginBase
     public override bool SupportsSessionContinuation() => false;
     public override Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
 
-    protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
+    protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameter)
         => new("test") { WorkingDirectory = localRepoPath };
 }

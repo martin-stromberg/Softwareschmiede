@@ -9,7 +9,7 @@ public sealed class StatusChangeDetection
     /// <param name="workItemId">Die ID der Aufgabe.</param>
     /// <param name="newStatus">Der aktuell beobachtete Status.</param>
     /// <returns><c>false</c> bei Erstbeobachtung oder unverändertem Status, <c>true</c> bei einem echten Wechsel.</returns>
-    public bool HasSichChanged(Guid workItemId, string? newStatus)
+    public bool HasChanged(Guid workItemId, string? newStatus)
     {
         var hasSichChanged = _lastStatus.TryGetValue(workItemId, out var bisherigerStatus) && bisherigerStatus != newStatus;
         _lastStatus[workItemId] = newStatus;

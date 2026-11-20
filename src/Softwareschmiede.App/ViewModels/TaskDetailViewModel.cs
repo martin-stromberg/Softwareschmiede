@@ -577,7 +577,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public ICommand AssignIssueCommand { get; }
 
     /// <summary>Öffnet den Issue-Anlage-Dialog und weist das neu erstellte Issue der Aufgabe zu.</summary>
-    public ICommand IssueAnlegenCommand { get; }
+    public ICommand IssueCreateCommand { get; }
 
     /// <summary>Öffnet die Issue-URL im Standard-Browser.</summary>
     public ICommand OpenIssueBrowserCommand { get; }
@@ -702,7 +702,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         PullRequestViewCommand = new RelayCommand(SelectPullRequestView, () => ShowPullRequestPanel);
         BackCommand = new RelayCommand(() => BackAction?.Invoke());
         AssignIssueCommand = new AsyncRelayCommand(AssignIssueAsync, () => CanAssignIssue && !_isLoading);
-        IssueAnlegenCommand = new AsyncRelayCommand(IssueAnlegenAsync, () => CanCreateIssue);
+        IssueCreateCommand = new AsyncRelayCommand(IssueCreateAsync, () => CanCreateIssue);
         OpenIssueBrowserCommand = new RelayCommand(
             OpenIssueBrowser,
             () => CurrentIssueReference?.IssueUrl != null);
@@ -1287,7 +1287,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task IssueAnlegenAsync(CancellationToken ct)
+    private async Task IssueCreateAsync(CancellationToken ct)
     {
         if (_workItem == null)
             return;
@@ -2278,7 +2278,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             if (result is null)
                 return;
 
-            var pausedUntilUtc = result.Aufheben ? null : result.PausedUntilUtc;
+            var pausedUntilUtc = result.Lift ? null : result.PausedUntilUtc;
             await _workItemService.SetPauseAsync(_workItemId, pausedUntilUtc, ct);
             await LoadAsync(ct);
             _runDataChangedNotifier?.NotifyRunDataChanged(_workItemId);

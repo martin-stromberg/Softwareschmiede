@@ -45,10 +45,10 @@ internal static class MigrationTestSql
         cmd.CommandText = commandText;
         foreach (var (name, value) in parameters)
         {
-            var parameter = cmd.CreateParameter();
-            parameter.ParameterName = name;
-            parameter.Value = value ?? DBNull.Value;
-            cmd.Parameters.Add(parameter);
+            var p = cmd.CreateParameter();
+            p.ParameterName = name;
+            p.Value = value ?? DBNull.Value;
+            cmd.Parameters.Add(p);
         }
 
         if (cmd.Connection!.State != ConnectionState.Open)

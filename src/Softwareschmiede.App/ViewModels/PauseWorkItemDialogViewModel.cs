@@ -4,9 +4,9 @@ using Softwareschmiede.App.Services;
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>
-/// ViewModel für den Dialog zum Einstellen oder Aufheben einer Aufgaben-Pause.
+/// ViewModel für den Dialog zum Einstellen oder Lift einer Aufgaben-Pause.
 /// Bietet Datums-/Zeiteingabe (lokal), eine Anzeige der aktuell gesetzten Pause und
-/// das Ergebnis als <see cref="PauseWorkItemResult"/> (UTC-Zeitpunkt oder Aufheben).
+/// das Ergebnis als <see cref="PauseWorkItemResult"/> (UTC-Zeitpunkt oder Lift).
 /// </summary>
 public sealed class PauseWorkItemDialogViewModel : ViewModelBase
 {
@@ -25,7 +25,7 @@ public sealed class PauseWorkItemDialogViewModel : ViewModelBase
         SetDefaultPrefill();
 
         ConfirmCommand = new RelayCommand(Confirm, () => CanConfirm);
-        AufhebenCommand = new RelayCommand(Aufheben, () => IsCurrentlyPaused);
+        LiftCommand = new RelayCommand(Lift, () => IsCurrentlyPaused);
         CancelCommand = new RelayCommand(Cancel);
 
         UpdateValidation();
@@ -90,7 +90,7 @@ public sealed class PauseWorkItemDialogViewModel : ViewModelBase
     public ICommand ConfirmCommand { get; }
 
     /// <summary>Hebt eine bestehende Pause auf und schließt den Dialog.</summary>
-    public ICommand AufhebenCommand { get; }
+    public ICommand LiftCommand { get; }
 
     /// <summary>Bricht den Dialog ohne Änderung ab.</summary>
     public ICommand CancelCommand { get; }
@@ -184,13 +184,13 @@ public sealed class PauseWorkItemDialogViewModel : ViewModelBase
         if (pausedUntilUtc is null)
             return;
 
-        Result = new PauseWorkItemResult(pausedUntilUtc, Aufheben: false);
+        Result = new PauseWorkItemResult(pausedUntilUtc, Lift: false);
         CloseRequested?.Invoke(this, true);
     }
 
-    private void Aufheben()
+    private void Lift()
     {
-        Result = new PauseWorkItemResult(null, Aufheben: true);
+        Result = new PauseWorkItemResult(null, Lift: true);
         CloseRequested?.Invoke(this, true);
     }
 

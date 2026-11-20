@@ -87,7 +87,7 @@
                               IsEnabled="{Binding CanUseAi}" />
                     <Button Content="Ausfüllen"
                             AutomationProperties.Name="IssueAiFill"
-                            Command="{Binding AiAusfuellenCommand}"
+                            Command="{Binding AiFillCommand}"
                             Padding="10,6"
                             Margin="8,0,0,0" />
                 </StackPanel>

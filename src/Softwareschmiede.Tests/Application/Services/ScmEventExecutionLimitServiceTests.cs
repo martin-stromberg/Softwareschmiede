@@ -16,7 +16,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     private const string PrefixB = "Softwareschmiede.TestB";
 
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AppSettingService _einstellungen;
+    private readonly AppSettingService _settings;
     private readonly Mock<ICliExecutionLimitSource> _cli;
     private readonly ScmEventExecutionLimitService _sut;
     private readonly ScmStartSlotReservationPool _pool = new();
@@ -26,10 +26,10 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     public ScmEventExecutionLimitServiceTests()
     {
         _db = TestDbContextFactory.Create();
-        _einstellungen = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
+        _settings = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
         _cli = new Mock<ICliExecutionLimitSource>();
         _cli.Setup(x => x.GetRunningWorkItemIds()).Returns([]);
-        _sut = new ScmEventExecutionLimitService(_db, _einstellungen, _cli.Object, TimeProvider.System, _pool);
+        _sut = new ScmEventExecutionLimitService(_db, _settings, _cli.Object, TimeProvider.System, _pool);
 
         _db.Projects.Add(new Project
         {
@@ -47,7 +47,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         _db.Dispose();
     }
 
-    private async Task<Guid> LaufendeAufgabeAsync(string title, string? aiPluginPrefix,
+    private async Task<Guid> RunningWorkItemAsync(string title, string? aiPluginPrefix,
         Mock<IScmPromptSessionAdapter>? session = null, DateTimeOffset? pausedUntilUtc = null)
     {
         var workItem = new WorkItem
@@ -66,10 +66,10 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         return workItem.Id;
     }
 
-    private void SetzeLaufende(params Guid[] ids)
+    private void SetRunning(params Guid[] ids)
         => _cli.Setup(x => x.GetRunningWorkItemIds()).Returns(ids.ToList());
 
-    private static Mock<IScmPromptSessionAdapter> LebendeSession(string pluginPrefix)
+    private static Mock<IScmPromptSessionAdapter> LiveSession(string pluginPrefix)
     {
         var session = new Mock<IScmPromptSessionAdapter>();
         session.SetupGet(x => x.IsAlive).Returns(true);
@@ -79,9 +79,9 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
 
     /// <summary>Ohne gesetzte Grenzen ist jeder Start frei.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_OhneGrenzen_GibtNull()
+    public async Task GetStartBlockReasonAsync_WithoutBoundary_ReturnsNull()
     {
-        SetzeLaufende(await LaufendeAufgabeAsync("A", PrefixA));
+        SetRunning(await RunningWorkItemAsync("A", PrefixA));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
     }
@@ -91,21 +91,21 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     [InlineData("0")]
     [InlineData("-3")]
     [InlineData("abc")]
-    public async Task GetStartBlockReasonAsync_UngueltigeGrenze_GiltAlsUnbegrenzt(string value)
+    public async Task GetStartBlockReasonAsync_InvalidBoundary_AppliesAsUnlimited(string value)
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, value, TestContext.Current.CancellationToken);
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), value, TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("A", PrefixA));
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, value, TestContext.Current.CancellationToken);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), value, TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("A", PrefixA));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     /// <summary>Erreichtes globales Limit sperrt jeden Plugin-Prefix.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_GlobalesLimitErreicht_Sperrt()
+    public async Task GetStartBlockReasonAsync_GlobalLimitReaches_Locks()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("A", PrefixA));
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("A", PrefixA));
 
         var reason = await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken);
 
@@ -114,20 +114,20 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
 
     /// <summary>Unter dem globalen Limit bleibt der Start frei.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_GlobalesLimitNichtErreicht_GibtNull()
+    public async Task GetStartBlockReasonAsync_GlobalLimitNotReaches_ReturnsNull()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "2", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("A", PrefixA));
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "2", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("A", PrefixA));
 
         (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     /// <summary>Erreichtes Plugin-Limit sperrt nur dieses Plugin.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_PluginLimitErreicht_SperrtNurDiesesPlugin()
+    public async Task GetStartBlockReasonAsync_PluginLimitReaches_LocksOnlyThisPlugin()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("A", PrefixA));
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("A", PrefixA));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().Contain($"'{PrefixA}'");
         (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().BeNull();
@@ -135,39 +135,39 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
 
     /// <summary>Beide Grenzen wirken gleichzeitig; das globale Limit meldet zuerst.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_BeideLimitsErreicht_MeldetGlobalesLimit()
+    public async Task GetStartBlockReasonAsync_BothLimitReaches_ReportsGlobalLimit()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("A", PrefixA));
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("A", PrefixA));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().Contain("globale Limit");
     }
 
     /// <summary>Gemischte Plugins zählen getrennt: Fremde Läufe belegen kein Plugin-Limit.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_GemischtePlugins_ZaehltNurEigenenPrefix()
+    public async Task GetStartBlockReasonAsync_MixedPlugins_CountsOnlyOwnPrefix()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "2", TestContext.Current.CancellationToken);
-        SetzeLaufende(
-            await LaufendeAufgabeAsync("A1", PrefixA),
-            await LaufendeAufgabeAsync("B1", PrefixB),
-            await LaufendeAufgabeAsync("B2", PrefixB));
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "2", TestContext.Current.CancellationToken);
+        SetRunning(
+            await RunningWorkItemAsync("A1", PrefixA),
+            await RunningWorkItemAsync("B1", PrefixB),
+            await RunningWorkItemAsync("B2", PrefixB));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().NotBeNull();
     }
 
     /// <summary>Eine lebende SCM-Sitzung attribuiert zum tatsächlich gestarteten Plugin, nicht zum gespeicherten.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_LebendeSession_ZaehltTatsaechlichesPlugin()
+    public async Task GetStartBlockReasonAsync_LiveSession_CountsActualPlugin()
     {
         // Aufgabe hat PrefixA gespeichert, läuft aber tatsächlich mit PrefixB (Fallback).
-        var session = LebendeSession(PrefixB);
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixB), "1", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("A", PrefixA, session));
+        var session = LiveSession(PrefixB);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixB), "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("A", PrefixA, session));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
         (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().NotBeNull();
@@ -175,31 +175,31 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
 
     /// <summary>Beendete/entfernte SCM-Sitzungen fallen auf das gespeicherte Plugin der Aufgabe zurück.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_SessionTot_FaelltAufAufgabenPrefixZurueck()
+    public async Task GetStartBlockReasonAsync_SessionDead_FallsOnWorkItemsPrefixBack()
     {
         var session = new Mock<IScmPromptSessionAdapter>();
         session.SetupGet(x => x.IsAlive).Returns(false);
         session.SetupGet(x => x.PluginPrefix).Returns(PrefixB);
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("A", PrefixA, session));
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("A", PrefixA, session));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().NotBeNull();
     }
 
     /// <summary>Aufgaben ohne Plugin-Zuordnung zählen global, aber für kein Plugin-Limit.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_OhnePrefix_ZaehltNurGlobal()
+    public async Task GetStartBlockReasonAsync_WithoutPrefix_CountsOnlyGlobal()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "2", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("A", null));
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "2", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("A", null));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     /// <summary>Reine Auswertung: globales Limit schlägt Plugin-Limit; frei bei Platz.</summary>
     [Fact]
-    public void GetStartBlockReason_PrueftGlobalesVorPluginLimit()
+    public void GetStartBlockReason_ChecksGlobalBeforePluginLimit()
     {
         var occupancy = new CliExecutionOccupancy(2, new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
@@ -218,20 +218,20 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
 
     /// <summary>Die Plugin-Zählung ignoriert Groß-/Kleinschreibung des Prefix.</summary>
     [Fact]
-    public void FuerPlugin_IgnoriertGrossKleinschreibung()
+    public void ForPlugin_IgnoresLargeLowercase()
     {
         var occupancy = new CliExecutionOccupancy(1, new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             [PrefixA] = 1
         });
 
-        occupancy.FuerPlugin(PrefixA.ToLowerInvariant()).Should().Be(1);
-        occupancy.FuerPlugin("").Should().Be(0);
+        occupancy.ForPlugin(PrefixA.ToLowerInvariant()).Should().Be(1);
+        occupancy.ForPlugin("").Should().Be(0);
     }
 
     /// <summary>Bei unbegrenzter Konfiguration ist die Zulassung frei und belegt keinen Platz.</summary>
     [Fact]
-    public async Task PruefeUndReserviereStartPlatzAsync_OhneGrenzen_FreiOhneReservierung()
+    public async Task CheckAndReserveStartSlotAsync_WithoutBoundary_FreeWithoutReservation()
     {
         var admission = await _sut.CheckAndReserveStartSlotAsync(PrefixA, TestContext.Current.CancellationToken);
 
@@ -242,30 +242,30 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     /// <summary>Eine gehaltene Reservierung belegt den Platz: Der nächste Start wartet,
     /// die Freigabe gibt den Platz wieder frei — ohne dass je ein Prozess lief.</summary>
     [Fact]
-    public async Task PruefeUndReserviereStartPlatzAsync_Reservierung_BelegtGlobalenPlatz()
+    public async Task CheckAndReserveStartSlotAsync_Reservation_OccupiedGlobalSlot()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
 
-        var erste = await _sut.CheckAndReserveStartSlotAsync(PrefixA, TestContext.Current.CancellationToken);
-        erste.WaitReason.Should().BeNull();
-        erste.Reservation.Should().NotBeNull();
+        var first = await _sut.CheckAndReserveStartSlotAsync(PrefixA, TestContext.Current.CancellationToken);
+        first.WaitReason.Should().BeNull();
+        first.Reservation.Should().NotBeNull();
 
         // Die Reservierung zählt sofort als belegter Platz — auch für die reine Prüfung.
         (await _sut.CheckAndReserveStartSlotAsync(PrefixB, TestContext.Current.CancellationToken)).WaitReason.Should().Contain("globale Limit");
         (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().Contain("globale Limit");
 
-        erste.Reservation!.Dispose();
+        first.Reservation!.Dispose();
 
-        var dritte = await _sut.CheckAndReserveStartSlotAsync(PrefixB, TestContext.Current.CancellationToken);
-        dritte.WaitReason.Should().BeNull();
-        dritte.Reservation!.Dispose();
+        var third = await _sut.CheckAndReserveStartSlotAsync(PrefixB, TestContext.Current.CancellationToken);
+        third.WaitReason.Should().BeNull();
+        third.Reservation!.Dispose();
     }
 
     /// <summary>Plugin-Reservierungen belegen nur das eigene Plugin-Limit.</summary>
     [Fact]
-    public async Task PruefeUndReserviereStartPlatzAsync_Reservierung_BelegtNurEigenesPluginLimit()
+    public async Task CheckAndReserveStartSlotAsync_Reservation_OccupiedOnlyOwnPluginLimit()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
 
         var reservation = (await _sut.CheckAndReserveStartSlotAsync(PrefixA, TestContext.Current.CancellationToken)).Reservation;
         reservation.Should().NotBeNull();
@@ -281,30 +281,30 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     /// Service-Instanzen (eigene DbContexts wie in eigenen DI-Scopes) erhalten bei
     /// globalem Limit 1 genau eine Reservierung; alle übrigen warten mit Limit-Grund.</summary>
     [Fact]
-    public async Task PruefeUndReserviereStartPlatzAsync_ParalleleVersuche_NurEineReservierung()
+    public async Task CheckAndReserveStartSlotAsync_AttemptsParallel_OnlyAReservation()
     {
         const int attempt = 8;
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
         var services = Enumerable.Range(0, attempt).Select(_ =>
         {
             var db = TestDbContextFactory.Create();
             var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
             settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1").GetAwaiter().GetResult();
-            return (Dienst: new ScmEventExecutionLimitService(db, settings, _cli.Object, TimeProvider.System, _pool), Db: db);
+            return (Service: new ScmEventExecutionLimitService(db, settings, _cli.Object, TimeProvider.System, _pool), Db: db);
         }).ToList();
         try
         {
             var zulassungen = await Task.WhenAll(services.Select(x =>
-                Task.Run(() => x.Dienst.CheckAndReserveStartSlotAsync(PrefixA))));
+                Task.Run(() => x.Service.CheckAndReserveStartSlotAsync(PrefixA))));
 
             zulassungen.Count(x => x.Reservation is not null).Should().Be(1);
             zulassungen.Where(x => x.Reservation is null).Should().OnlyContain(x => x.WaitReason != null && x.WaitReason.Contains("globale Limit"));
 
             // Der vergebene Platz wird nach Freigabe wieder nutzbar.
             zulassungen.Single(x => x.Reservation is not null).Reservation!.Dispose();
-            var frei = await _sut.CheckAndReserveStartSlotAsync(PrefixA, TestContext.Current.CancellationToken);
-            frei.Reservation.Should().NotBeNull();
-            frei.Reservation!.Dispose();
+            var free = await _sut.CheckAndReserveStartSlotAsync(PrefixA, TestContext.Current.CancellationToken);
+            free.Reservation.Should().NotBeNull();
+            free.Reservation!.Dispose();
         }
         finally
         {
@@ -315,29 +315,29 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     /// <summary>Bleibt der Start hängen, verfällt die Reservierung nach ihrer Lebensdauer
     /// und der Platz wird ohne Freigabe wieder nutzbar.</summary>
     [Fact]
-    public async Task PruefeUndReserviereStartPlatzAsync_Reservierung_VerfaelltNachLebensdauer()
+    public async Task CheckAndReserveStartSlotAsync_Reservation_DecaysAfterLifetime()
     {
-        var zeit = new FakeTimeProvider();
-        var sut = new ScmEventExecutionLimitService(_db, _einstellungen, _cli.Object, zeit, _pool);
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        var time = new FakeTimeProvider();
+        var sut = new ScmEventExecutionLimitService(_db, _settings, _cli.Object, time, _pool);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
 
         var hängende = await sut.CheckAndReserveStartSlotAsync(PrefixA, TestContext.Current.CancellationToken);
         hängende.Reservation.Should().NotBeNull();
         (await sut.CheckAndReserveStartSlotAsync(PrefixB, TestContext.Current.CancellationToken)).WaitReason.Should().NotBeNull();
 
-        zeit.Advance(ScmEventExecutionLimitService.ReservationLifetime + TimeSpan.FromSeconds(1));
+        time.Advance(ScmEventExecutionLimitService.ReservationLifetime + TimeSpan.FromSeconds(1));
 
-        var frei = await sut.CheckAndReserveStartSlotAsync(PrefixB, TestContext.Current.CancellationToken);
-        frei.WaitReason.Should().BeNull();
-        frei.Reservation!.Dispose();
+        var free = await sut.CheckAndReserveStartSlotAsync(PrefixB, TestContext.Current.CancellationToken);
+        free.WaitReason.Should().BeNull();
+        free.Reservation!.Dispose();
     }
 
     /// <summary>Eine pausierte Aufgabe mit laufendem Prozess belegt keinen globalen Platz.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_PausierteAufgabe_GibtGlobalenPlatzFrei()
+    public async Task GetStartBlockReasonAsync_PausedWorkItem_ReturnsGlobalSlotFree()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("Pausiert", PrefixA,
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("Pausiert", PrefixA,
             pausedUntilUtc: DateTimeOffset.UtcNow.AddHours(1)));
 
         (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().BeNull();
@@ -345,10 +345,10 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
 
     /// <summary>Eine pausierte Aufgabe belegt auch das Plugin-Limit ihres Prefix nicht.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_PausierteAufgabe_GibtPluginPlatzFrei()
+    public async Task GetStartBlockReasonAsync_PausedWorkItem_ReturnsPluginSlotFree()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("Pausiert", PrefixA,
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("Pausiert", PrefixA,
             pausedUntilUtc: DateTimeOffset.UtcNow.AddHours(1)));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
@@ -357,10 +357,10 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     /// <summary>Eine pausierte Aufgabe ohne auflösbare Plugin-Attribution entfällt vollständig
     /// aus der Zählung — sie hinterlässt auch keinen Restbeleg im globalen Zähler.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_PausierteAufgabeOhnePrefix_EntfaelltAusBeidenZaehlern()
+    public async Task GetStartBlockReasonAsync_PausedWorkItemWithoutPrefix_OmittedOutBothCount()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("Pausiert", null,
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("Pausiert", null,
             pausedUntilUtc: DateTimeOffset.UtcNow.AddHours(1)));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
@@ -369,11 +369,11 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     /// <summary>Eine abgelaufene, aber noch gesetzte Pausenzeit zählt wieder als belegt —
     /// global und je Plugin (Fortsetzungs-Semantik: gesetzt markiert Fortsetzung, keine Pause).</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_AbgelaufenePause_ZaehltAlsBelegt()
+    public async Task GetStartBlockReasonAsync_ExpiredPause_CountsAsOccupied()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("Abgelaufen", PrefixA,
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("Abgelaufen", PrefixA,
             pausedUntilUtc: DateTimeOffset.UtcNow.AddMinutes(-5)));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().Contain("globale Limit");
@@ -382,38 +382,38 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     /// <summary>Gemischte Belegung: Die pausierte Aufgabe zählt nicht, die aktive weiterhin —
     /// bei globalem Limit 2 bleibt der Start frei, bei Limit 1 belegt die aktive den Platz.</summary>
     [Fact]
-    public async Task GetStartBlockReasonAsync_GemischtPausiertUndAktiv_ZaehltNurAktive()
+    public async Task GetStartBlockReasonAsync_MixedPausedAndActive_CountsOnlyActive()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "2", TestContext.Current.CancellationToken);
-        SetzeLaufende(
-            await LaufendeAufgabeAsync("Pausiert", PrefixA, pausedUntilUtc: DateTimeOffset.UtcNow.AddHours(1)),
-            await LaufendeAufgabeAsync("Aktiv", PrefixA));
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "2", TestContext.Current.CancellationToken);
+        SetRunning(
+            await RunningWorkItemAsync("Pausiert", PrefixA, pausedUntilUtc: DateTimeOffset.UtcNow.AddHours(1)),
+            await RunningWorkItemAsync("Aktiv", PrefixA));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
 
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().Contain("globale Limit");
     }
 
     /// <summary>Ein pausierter Lauf gibt den Handle-Platz frei, eine offene Reservierung
     /// belegt ihn aber weiterhin regulär — bis zu ihrer Freigabe.</summary>
     [Fact]
-    public async Task PruefeUndReserviereStartPlatzAsync_PausierterLaufUndOffeneReservierung_ReservierungBelegtPlatz()
+    public async Task CheckAndReserveStartSlotAsync_PausedRunAndOpenReservation_ReservationOccupiedSlot()
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
-        SetzeLaufende(await LaufendeAufgabeAsync("Pausiert", PrefixA,
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("Pausiert", PrefixA,
             pausedUntilUtc: DateTimeOffset.UtcNow.AddHours(1)));
 
-        var erste = await _sut.CheckAndReserveStartSlotAsync(PrefixA, TestContext.Current.CancellationToken);
-        erste.WaitReason.Should().BeNull();
-        erste.Reservation.Should().NotBeNull();
+        var first = await _sut.CheckAndReserveStartSlotAsync(PrefixA, TestContext.Current.CancellationToken);
+        first.WaitReason.Should().BeNull();
+        first.Reservation.Should().NotBeNull();
 
         (await _sut.CheckAndReserveStartSlotAsync(PrefixB, TestContext.Current.CancellationToken)).WaitReason.Should().Contain("globale Limit");
 
-        erste.Reservation!.Dispose();
+        first.Reservation!.Dispose();
 
-        var frei = await _sut.CheckAndReserveStartSlotAsync(PrefixB, TestContext.Current.CancellationToken);
-        frei.WaitReason.Should().BeNull();
-        frei.Reservation!.Dispose();
+        var free = await _sut.CheckAndReserveStartSlotAsync(PrefixB, TestContext.Current.CancellationToken);
+        free.WaitReason.Should().BeNull();
+        free.Reservation!.Dispose();
     }
 }
