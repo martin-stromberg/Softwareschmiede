@@ -8,7 +8,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests fuer <see cref="PullRequestReferenzService"/>.</summary>
+/// <summary>Tests fuer <see cref="PullRequestReferenceService"/>.</summary>
 public sealed class PullRequestReferenzServiceTests
 {
     /// <summary>SaveCreatedAsync persistiert eine neue PR-Referenz an der Aufgabe.</summary>
@@ -37,7 +37,7 @@ public sealed class PullRequestReferenzServiceTests
         Assert.Equal("abc123", saved.HeadSha);
         Assert.Equal(PullRequestMonitoringPhase.Created, saved.MonitoringPhase);
 
-        var loaded = await service.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        var loaded = await service.GetByWorkItemAsync(workItem.Id, TestContext.Current.CancellationToken);
         Assert.Single(loaded);
         Assert.Equal(project.Id, workItem.ProjectId);
     }
@@ -75,14 +75,14 @@ public sealed class PullRequestReferenzServiceTests
                 new PullRequestWorkflowRunInfo("2", "Test", null, "head", "feature/pr", WorkflowRunStatus.InProgress, WorkflowRunConclusion.Unknown, null, null, false)
             ], PullRequestMonitoringPhase.PreMergeRunning, TestContext.Current.CancellationToken);
 
-        var loaded = (await service.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken)).Single();
+        var loaded = (await service.GetByWorkItemAsync(workItem.Id, TestContext.Current.CancellationToken)).Single();
         Assert.Equal(2, loaded.WorkflowRuns.Count);
         Assert.Contains(loaded.WorkflowRuns, run => run.ProviderRunId == "1" && run.Name == "Build aktualisiert");
         Assert.Contains(loaded.WorkflowRuns, run => run.ProviderRunId == "2");
     }
 
-    private static PullRequestReferenzService CreateService(SoftwareschmiedeDbContext db)
-        => new(db, TimeProvider.System, NullLogger<PullRequestReferenzService>.Instance);
+    private static PullRequestReferenceService CreateService(SoftwareschmiedeDbContext db)
+        => new(db, TimeProvider.System, NullLogger<PullRequestReferenceService>.Instance);
 
     private static (Project Project, WorkItem WorkItem) AddAufgabe(SoftwareschmiedeDbContext db)
     {

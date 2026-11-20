@@ -93,7 +93,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(taskId8, item.WorkItemId);
         var reacted = Assert.Single(await db.ScmContentSnapshots.Where(x => x.ContentKey.EndsWith("C_7")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(ScmEventValidationService.BereitsReagiertRejection, reacted.Diagnostic);
+        Assert.Equal(ScmEventValidationService.AlreadyReactedRejection, reacted.Diagnostic);
         Assert.True(reacted.IdentityResolved);
         Assert.Contains(await db.ScmObservationCheckpoints.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             x => x.SourceKey.StartsWith("test-scm/github.com/R_1/Issue/7/IssueComment") && x.WatermarkUtc != null);
@@ -122,7 +122,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         var reacted = Assert.Single(await db.ScmContentSnapshots.Where(x => x.ContentKey.EndsWith("C_7")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(ScmEventValidationService.BereitsReagiertRejection, reacted.Diagnostic);
+        Assert.Equal(ScmEventValidationService.AlreadyReactedRejection, reacted.Diagnostic);
         Assert.Empty(fixture.Responses);
         Assert.Empty(fixture.Prompts);
     }
@@ -156,7 +156,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        await AddRepositoryAsync(fixture, "https://github.com/owner/inactive", aktiv: false);
+        await AddRepositoryAsync(fixture, "https://github.com/owner/inactive", active: false);
         await AddRepositoryAsync(fixture, "https://example.org/other/repo", pluginTyp: "Other.Plugin");
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
@@ -252,7 +252,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
     }
 
     private static async Task<Guid> AddRepositoryAsync(ScmDispatchFixture fixture,
-        string url = "https://github.com/owner/repo", bool aktiv = true, string? pluginTyp = null)
+        string url = "https://github.com/owner/repo", bool active = true, string? pluginTyp = null)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
@@ -264,7 +264,7 @@ public sealed class ScmEventMonitoringServiceTests_RepoWide
             RepositoryUrl = url,
             RepositoryName = "repo",
             PluginType = pluginTyp ?? fixture.Repository.ProviderPrefix,
-            Active = aktiv
+            Active = active
         };
         db.AddRange(project, repository);
         await db.SaveChangesAsync();

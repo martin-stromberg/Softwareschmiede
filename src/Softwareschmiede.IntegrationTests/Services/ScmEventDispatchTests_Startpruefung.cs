@@ -74,7 +74,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         {
             using (var scope = fixture.Services.CreateScope())
             {
-                await scope.ServiceProvider.GetRequiredService<AufgabeService>()
+                await scope.ServiceProvider.GetRequiredService<WorkItemService>()
                     .SetPauseAsync(firstTask, DateTimeOffset.UtcNow.AddMinutes(30), TestContext.Current.CancellationToken);
             }
 
@@ -99,7 +99,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         var (taskId, eventId) = await fixture.AddAsync(WorkItemStatus.Started, configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
-            await scope.ServiceProvider.GetRequiredService<AufgabeService>()
+            await scope.ServiceProvider.GetRequiredService<WorkItemService>()
                 .SetPauseAsync(taskId, DateTimeOffset.UtcNow.AddMinutes(10), TestContext.Current.CancellationToken);
         }
 
@@ -112,7 +112,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         {
             using (var scope = fixture.Services.CreateScope())
             {
-                await scope.ServiceProvider.GetRequiredService<AufgabeService>()
+                await scope.ServiceProvider.GetRequiredService<WorkItemService>()
                     .SetPauseAsync(taskId, null, TestContext.Current.CancellationToken);
             }
 
@@ -134,7 +134,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var angefordert = 0;
-        fixture.Ausloeser.Angefordert += () => angefordert++;
+        fixture.Trigger.Requested += () => angefordert++;
 
         var (taskId, _) = await fixture.AddAsync(configured: true, body: "$Softwareschmiede bitte #verzögert 2h");
 
@@ -146,7 +146,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         }
     }
 
-    /// <summary>Die Session-Limit-Pause des <see cref="KiPluginLimitService"/> ist ein
+    /// <summary>Die Session-Limit-Pause des <see cref="AiPluginLimitService"/> ist ein
     /// Pausen-Setzpfad und löst die Startprüfung aus.</summary>
     [Fact]
     public async Task StartPruefung_RateLimitPause_LoestSignalAus()
@@ -161,12 +161,12 @@ public sealed class ScmEventDispatchTests_Startpruefung
                 .ExecuteUpdateAsync(x => x.SetProperty(p => p.ExecutionStatus, WorkItemExecutionStatus.Active), cancellationToken: TestContext.Current.CancellationToken);
         }
         var angefordert = 0;
-        fixture.Ausloeser.Angefordert += () => angefordert++;
+        fixture.Trigger.Requested += () => angefordert++;
 
         using (var scope = fixture.Services.CreateScope())
         {
-            await scope.ServiceProvider.GetRequiredService<KiPluginLimitService>()
-                .VerarbeiteRateLimitAsync(taskId, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AiPluginLimitService>()
+                .ProcessRateLimitAsync(taskId, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
         }
 
         Assert.True(angefordert >= 1, "Die Session-Limit-Pause hat keinen Auslöser gemeldet.");
@@ -191,13 +191,13 @@ public sealed class ScmEventDispatchTests_Startpruefung
         Assert.Equal("Zugestellt", (await fixture.EventAsync(firstId)).Status);
 
         // Mehrere gleichzeitige Prüfungen bei weiterhin belegtem Platz.
-        fixture.Ausloeser.StartpruefungAnfordern();
-        fixture.Ausloeser.StartpruefungAnfordern();
+        fixture.Trigger.RequestStartCheck();
+        fixture.Trigger.RequestStartCheck();
         await Task.WhenAll(
             fixture.StartPruefung.RunOnceAsync(TestContext.Current.CancellationToken),
             fixture.StartPruefung.RunOnceAsync(TestContext.Current.CancellationToken),
             fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken));
-        fixture.Ausloeser.StartpruefungAnfordern();
+        fixture.Trigger.RequestStartCheck();
         await fixture.StartPruefung.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Single(fixture.Sessions);
@@ -213,10 +213,10 @@ public sealed class ScmEventDispatchTests_Startpruefung
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        await fixture.SetSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, "false");
+        await fixture.SetSettingAsync(AppSettingService.ScmMonitoringEnabledKey, "false");
         var (_, eventId) = await fixture.AddAsync(configured: true);
 
-        fixture.Ausloeser.StartpruefungAnfordern();
+        fixture.Trigger.RequestStartCheck();
         await fixture.StartPruefung.RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Empty(fixture.Sessions);
@@ -236,8 +236,8 @@ public sealed class ScmEventDispatchTests_Startpruefung
         var (_, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
-            await scope.ServiceProvider.GetRequiredService<EntwicklungsprozessService>()
-                .CliNeustartenAsync(nonScmTask, ScmDispatchFixture.KiPrefix, null, TestContext.Current.CancellationToken, strictPluginSelection: true);
+            await scope.ServiceProvider.GetRequiredService<DevelopmentProcessService>()
+                .RestartCliAsync(nonScmTask, ScmDispatchFixture.KiPrefix, null, TestContext.Current.CancellationToken, strictPluginSelection: true);
         }
         Assert.True(fixture.Cli.IsRunning(nonScmTask));
 

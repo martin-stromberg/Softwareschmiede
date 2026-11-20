@@ -11,7 +11,7 @@ namespace Softwareschmiede.App.Services.Testing;
 
 // Isolated E2E input only. Commands exercise real session services, never synthesize inbox state.
 internal sealed class ScmE2ERuntimeControl(ScmE2ETestConfiguration configuration, IServiceScopeFactory scopes,
-    KiAusfuehrungsService cli, IPluginManager plugins) : BackgroundService
+    AiExecutionService cli, IPluginManager plugins) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

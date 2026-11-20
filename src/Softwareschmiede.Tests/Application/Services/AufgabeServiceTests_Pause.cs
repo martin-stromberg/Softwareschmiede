@@ -8,18 +8,18 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für <see cref="AufgabeService.SetPauseAsync"/> und die Persistenz von <see cref="WorkItem.PausedUntilUtc"/> (Issue 151).</summary>
+/// <summary>Tests für <see cref="WorkItemService.SetPauseAsync"/> und die Persistenz von <see cref="WorkItem.PausedUntilUtc"/> (Issue 151).</summary>
 public sealed class AufgabeServiceTests_Pause : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AufgabeService _sut;
+    private readonly WorkItemService _sut;
     private readonly Guid _projektId = new Guid("22222222-2222-2222-2222-222222222222");
 
     /// <summary>AufgabeServiceTests_Pause.</summary>
     public AufgabeServiceTests_Pause()
     {
         _db = TestDbContextFactory.Create();
-        _sut = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _sut = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
 
         _db.Projects.Add(new Project
         {
@@ -39,18 +39,18 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
     public async Task SetPauseAsync_ShouldPersistPausiertBisUtc_AndWriteSystemLog()
     {
         var workItem = await _sut.CreateAsync(_projektId, "Pausierbare Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        var pausiertBis = DateTimeOffset.UtcNow.AddHours(2);
+        var pausedUntil = DateTimeOffset.UtcNow.AddHours(2);
 
-        await _sut.SetPauseAsync(workItem.Id, pausiertBis, TestContext.Current.CancellationToken);
+        await _sut.SetPauseAsync(workItem.Id, pausedUntil, TestContext.Current.CancellationToken);
 
         var geladen = await _db.WorkItems.AsNoTracking().SingleAsync(a => a.Id == workItem.Id, cancellationToken: TestContext.Current.CancellationToken);
         geladen.PausedUntilUtc.Should().NotBeNull();
-        geladen.PausedUntilUtc!.Value.Should().BeCloseTo(pausiertBis, TimeSpan.FromSeconds(5));
+        geladen.PausedUntilUtc!.Value.Should().BeCloseTo(pausedUntil, TimeSpan.FromSeconds(5));
 
-        var eintraege = await _db.LogEntries
+        var entries = await _db.LogEntries
             .Where(e => e.WorkItemId == workItem.Id && e.Type == LogEntryType.SystemMessage)
             .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-        eintraege.Should().ContainSingle(e => e.Content.Contains("pausiert", StringComparison.OrdinalIgnoreCase));
+        entries.Should().ContainSingle(e => e.Content.Contains("pausiert", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>SetPauseAsync mit null hebt eine bestehende Pause auf und protokolliert das Aufheben.</summary>
@@ -65,10 +65,10 @@ public sealed class AufgabeServiceTests_Pause : IDisposable
         var geladen = await _db.WorkItems.AsNoTracking().SingleAsync(a => a.Id == workItem.Id, cancellationToken: TestContext.Current.CancellationToken);
         geladen.PausedUntilUtc.Should().BeNull();
 
-        var eintraege = await _db.LogEntries
+        var entries = await _db.LogEntries
             .Where(e => e.WorkItemId == workItem.Id && e.Type == LogEntryType.SystemMessage)
             .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-        eintraege.Should().Contain(e => e.Content.Contains("aufgehoben", StringComparison.OrdinalIgnoreCase));
+        entries.Should().Contain(e => e.Content.Contains("aufgehoben", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>SetPauseAsync erlaubt die Stati Neu, Gestartet und Wartend.</summary>

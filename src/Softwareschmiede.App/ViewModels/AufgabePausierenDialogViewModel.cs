@@ -24,9 +24,9 @@ public sealed class AufgabePausierenDialogViewModel : ViewModelBase
 
         SetzeStandardVorbelegung();
 
-        BestaetigenCommand = new RelayCommand(Bestaetigen, () => KannBestaetigen);
-        AufhebenCommand = new RelayCommand(Aufheben, () => IstAktuellPausiert);
-        AbbrechenCommand = new RelayCommand(Abbrechen);
+        BestaetigenCommand = new RelayCommand(Confirm, () => KannBestaetigen);
+        AufhebenCommand = new RelayCommand(Aufheben, () => IsCurrentlyPaused);
+        AbbrechenCommand = new RelayCommand(Cancel);
 
         AktualisiereValidierung();
     }
@@ -74,7 +74,7 @@ public sealed class AufgabePausierenDialogViewModel : ViewModelBase
             : null;
 
     /// <summary>true, wenn aktuell eine aktive Pause gesetzt ist (Ende liegt in der Zukunft).</summary>
-    public bool IstAktuellPausiert => _aktuellePauseUtc > _timeProvider.GetUtcNow();
+    public bool IsCurrentlyPaused => _aktuellePauseUtc > _timeProvider.GetUtcNow();
 
     /// <summary>Aktueller Validierungsfehler der Eingabe, oder null wenn die Eingabe gültig ist.</summary>
     public string? ValidierungsFehler
@@ -96,7 +96,7 @@ public sealed class AufgabePausierenDialogViewModel : ViewModelBase
     public ICommand AbbrechenCommand { get; }
 
     /// <summary>Das Dialogergebnis; null solange der Anwender nicht bestätigt/aufgehoben hat.</summary>
-    public AufgabePausierenErgebnis? Ergebnis { get; private set; }
+    public AufgabePausierenErgebnis? Result { get; private set; }
 
     /// <summary>Initialisiert den Dialog mit der aktuell gesetzten Pause der Aufgabe.</summary>
     /// <param name="aktuellePauseUtc">Der aktuell persistierte Pause-Endzeitpunkt (UTC), oder null.</param>
@@ -121,7 +121,7 @@ public sealed class AufgabePausierenDialogViewModel : ViewModelBase
         OnPropertyChanged(nameof(PausiertStunde));
         OnPropertyChanged(nameof(PausiertMinute));
         OnPropertyChanged(nameof(AktuellePauseAnzeige));
-        OnPropertyChanged(nameof(IstAktuellPausiert));
+        OnPropertyChanged(nameof(IsCurrentlyPaused));
         AktualisiereValidierung();
     }
 
@@ -171,28 +171,28 @@ public sealed class AufgabePausierenDialogViewModel : ViewModelBase
         if (_pausiertMinute is not { } minute || minute is < 0 or > 59)
             return "Minute muss zwischen 0 und 59 liegen.";
 
-        var pausiertBisUtc = BerechnePausiertBisUtc();
-        if (pausiertBisUtc is null || pausiertBisUtc <= _timeProvider.GetUtcNow())
+        var pausedUntilUtc = BerechnePausiertBisUtc();
+        if (pausedUntilUtc is null || pausedUntilUtc <= _timeProvider.GetUtcNow())
             return "Der Zeitpunkt muss in der Zukunft liegen.";
 
         return null;
     }
 
-    private void Bestaetigen()
+    private void Confirm()
     {
-        var pausiertBisUtc = BerechnePausiertBisUtc();
-        if (pausiertBisUtc is null)
+        var pausedUntilUtc = BerechnePausiertBisUtc();
+        if (pausedUntilUtc is null)
             return;
 
-        Ergebnis = new AufgabePausierenErgebnis(pausiertBisUtc, Aufheben: false);
+        Result = new AufgabePausierenErgebnis(pausedUntilUtc, Aufheben: false);
         CloseRequested?.Invoke(this, true);
     }
 
     private void Aufheben()
     {
-        Ergebnis = new AufgabePausierenErgebnis(null, Aufheben: true);
+        Result = new AufgabePausierenErgebnis(null, Aufheben: true);
         CloseRequested?.Invoke(this, true);
     }
 
-    private void Abbrechen() => CloseRequested?.Invoke(this, false);
+    private void Cancel() => CloseRequested?.Invoke(this, false);
 }

@@ -200,7 +200,7 @@ public sealed class PseudoConsoleSession : ITerminalSession
     public void Dispose()
     {
         // Atomarer Check-and-Set statt eines einfachen bool-Felds: Process.Exited-Handler (Hintergrundthread)
-        // und ein expliziter Aufrufer (z. B. KiAusfuehrungsService.Dispose() beim App-Shutdown) können diese
+        // und ein expliziter Aufrufer (z. B. AiExecutionService.Dispose() beim App-Shutdown) können diese
         // Methode gleichzeitig aufrufen. Ohne Interlocked könnten beide Threads den Check bestehen, bevor einer
         // das Flag setzt, und dadurch die nativen ConPTY-/Pipe-Handles doppelt freigeben.
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
@@ -650,7 +650,7 @@ public sealed class PseudoConsoleSession : ITerminalSession
 public enum CliRuntimeStatus
 {
     /// <summary>Kein laufender CLI-Prozess ist aktiv.</summary>
-    Inaktiv,
+    Inactive,
     /// <summary>Die CLI laeuft und hat kuerzlich Ausgabe oder Eingabe verarbeitet.</summary>
     Running,
     /// <summary>Die CLI laeuft, erzeugt aber seit laengerer Zeit keine Ausgabe und wartet vermutlich auf Benutzereingabe.</summary>
@@ -691,7 +691,7 @@ public static class CliRuntimeStatusEvaluator
         TimeSpan waitingThreshold)
     {
         if (!isRunning)
-            return CliRuntimeStatus.Inaktiv;
+            return CliRuntimeStatus.Inactive;
 
         var lastActivityUtc = startedUtc;
         if (lastOutputUtc.HasValue && lastOutputUtc.Value > lastActivityUtc)

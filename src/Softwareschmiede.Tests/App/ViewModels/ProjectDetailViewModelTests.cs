@@ -17,8 +17,8 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class ProjectDetailViewModelTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly ProjektService _projektService;
-    private readonly AufgabeService _aufgabeService;
+    private readonly ProjectService _projektService;
+    private readonly WorkItemService _workItemService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IPluginManager> _pluginManagerMock;
@@ -27,8 +27,8 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     public ProjectDetailViewModelTests()
     {
         _db = TestDbContextFactory.Create();
-        _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _serviceProviderMock = new Mock<IServiceProvider>();
         _dialogServiceMock = new Mock<IDialogService>();
         _pluginManagerMock = new Mock<IPluginManager>();
@@ -46,7 +46,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     {
         var vm = new ProjectDetailViewModel(
             _projektService,
-            _aufgabeService,
+            _workItemService,
             _serviceProviderMock.Object,
             _dialogServiceMock.Object,
             _pluginManagerMock.Object,
@@ -59,7 +59,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     }
 
     private TaskDetailViewModel CreateTaskDetailViewModel() =>
-        TaskDetailViewModelTestFactory.Create(_db, _aufgabeService);
+        TaskDetailViewModelTestFactory.Create(_db, _workItemService);
 
     /// <summary>ProjektSpeichernAsync ruft CreateAsync auf und navigiert zurück, wenn die ID leer ist.</summary>
     [Fact]
@@ -282,10 +282,10 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         // Assert
         var detail = await _projektService.GetDetailAsync(project.Id, TestContext.Current.CancellationToken);
         var repository = detail!.Repositories.Single();
-        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
+        var startConfiguration = await _projektService.GetRepositoryStartConfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
 
-        startKonfiguration.Should().NotBeNull();
-        startKonfiguration!.WorkingDirectoryRelativePath.Should().Be("backend");
+        startConfiguration.Should().NotBeNull();
+        startConfiguration!.WorkingDirectoryRelativePath.Should().Be("backend");
     }
 
     /// <summary>RepositoryOeffnenCommand hat CanExecute false, wenn kein Repository geladen ist.</summary>
@@ -329,7 +329,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     {
         // Arrange
         var project = await _projektService.CreateAsync("Navigations-Test-Projekt", null, TestContext.Current.CancellationToken);
-        var workItem = await _aufgabeService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
 
         TaskDetailViewModel? navigiertesViewModel = null;
         var sut = CreateSut(navigateToTaskViewCallback: vm => navigiertesViewModel = vm);
@@ -353,7 +353,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     {
         // Arrange
         var project = await _projektService.CreateAsync("Navigations-Test-Projekt-2", null, TestContext.Current.CancellationToken);
-        var workItem = await _aufgabeService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
 
         TaskDetailViewModel? navigiertesViewModel = null;
         var sut = CreateSut(navigateToTaskViewCallback: vm => navigiertesViewModel = vm);
@@ -394,7 +394,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         // Assert
         navigiertesViewModel.Should().NotBeNull();
-        var workItems = await _aufgabeService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().ContainSingle(a => a.Status == WorkItemStatus.New);
     }
 
@@ -418,7 +418,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.AufgabeErstellenCommand).ExecuteAsync();
 
         // Assert
-        var workItems = await _aufgabeService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().ContainSingle(a => a.GitRepositoryId == repository.Id);
     }
 
@@ -428,8 +428,8 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     {
         // Arrange
         var project = await _projektService.CreateAsync("Reload-Test-Projekt", null, TestContext.Current.CancellationToken);
-        var aufgabe1 = await _aufgabeService.CreateAsync(project.Id, "Aufgabe 1", "Beschreibung 1", ct: TestContext.Current.CancellationToken);
-        var aufgabe2 = await _aufgabeService.CreateAsync(project.Id, "Aufgabe 2", "Beschreibung 2", ct: TestContext.Current.CancellationToken);
+        var aufgabe1 = await _workItemService.CreateAsync(project.Id, "Aufgabe 1", "Beschreibung 1", ct: TestContext.Current.CancellationToken);
+        var aufgabe2 = await _workItemService.CreateAsync(project.Id, "Aufgabe 2", "Beschreibung 2", ct: TestContext.Current.CancellationToken);
 
         TaskDetailViewModel? navigiertesViewModel = null;
         var sut = CreateSut(navigateToTaskViewCallback: vm => navigiertesViewModel = vm);
@@ -443,7 +443,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         sut.AufgabeOeffnenCommand.Execute(aufgabe1.Id);
 
         // Aufgabe 1 wird extern geändert (z. B. durch Speichern in TaskDetailView)
-        await _aufgabeService.UpdateAsync(aufgabe1.Id, "Aufgabe 1 - Geändert", "Beschreibung 1", ct: TestContext.Current.CancellationToken);
+        await _workItemService.UpdateAsync(aufgabe1.Id, "Aufgabe 1 - Geändert", "Beschreibung 1", ct: TestContext.Current.CancellationToken);
 
         // Act: Callback ausführen wie es TaskDetailViewModel nach dem Speichern tut
         await navigiertesViewModel!.AufgabeListeAktualisierenCallback!.Invoke();
@@ -460,16 +460,16 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     {
         // Arrange
         var project = await _projektService.CreateAsync("Status-Trennung-Projekt", null, TestContext.Current.CancellationToken);
-        var neu = await _aufgabeService.CreateAsync(project.Id, "Neu", null, ct: TestContext.Current.CancellationToken);
-        var gestartet = await _aufgabeService.CreateAsync(project.Id, "Gestartet", null, ct: TestContext.Current.CancellationToken);
-        var wartend = await _aufgabeService.CreateAsync(project.Id, "Wartend", null, ct: TestContext.Current.CancellationToken);
-        var beendet = await _aufgabeService.CreateAsync(project.Id, "Beendet", null, ct: TestContext.Current.CancellationToken);
-        var archiviert = await _aufgabeService.CreateAsync(project.Id, "Archiviert", null, ct: TestContext.Current.CancellationToken);
+        var neu = await _workItemService.CreateAsync(project.Id, "Neu", null, ct: TestContext.Current.CancellationToken);
+        var gestartet = await _workItemService.CreateAsync(project.Id, "Gestartet", null, ct: TestContext.Current.CancellationToken);
+        var waiting = await _workItemService.CreateAsync(project.Id, "Wartend", null, ct: TestContext.Current.CancellationToken);
+        var beendet = await _workItemService.CreateAsync(project.Id, "Beendet", null, ct: TestContext.Current.CancellationToken);
+        var archiviert = await _workItemService.CreateAsync(project.Id, "Archiviert", null, ct: TestContext.Current.CancellationToken);
 
-        await _aufgabeService.StatusSetzenAsync(gestartet.Id, WorkItemStatus.Started, TestContext.Current.CancellationToken);
-        await _aufgabeService.StatusSetzenAsync(wartend.Id, WorkItemStatus.Waiting, TestContext.Current.CancellationToken);
-        await _aufgabeService.StatusSetzenAsync(beendet.Id, WorkItemStatus.Completed, TestContext.Current.CancellationToken);
-        await _aufgabeService.StatusSetzenAsync(archiviert.Id, WorkItemStatus.Archived, TestContext.Current.CancellationToken);
+        await _workItemService.SetStatusUncheckedAsync(gestartet.Id, WorkItemStatus.Started, TestContext.Current.CancellationToken);
+        await _workItemService.SetStatusUncheckedAsync(waiting.Id, WorkItemStatus.Waiting, TestContext.Current.CancellationToken);
+        await _workItemService.SetStatusUncheckedAsync(beendet.Id, WorkItemStatus.Completed, TestContext.Current.CancellationToken);
+        await _workItemService.SetStatusUncheckedAsync(archiviert.Id, WorkItemStatus.Archived, TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
@@ -478,7 +478,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         // Assert
-        sut.NichtBeendeteAufgaben.Select(a => a.Id).Should().BeEquivalentTo([neu.Id, gestartet.Id, wartend.Id]);
+        sut.NichtBeendeteAufgaben.Select(a => a.Id).Should().BeEquivalentTo([neu.Id, gestartet.Id, waiting.Id]);
         sut.BeendeteAufgaben.Select(a => a.Id).Should().BeEquivalentTo([beendet.Id]);
         sut.NichtBeendeteAufgaben.Should().NotContain(a => a.Id == archiviert.Id);
         sut.BeendeteAufgaben.Should().NotContain(a => a.Id == archiviert.Id);
@@ -507,11 +507,11 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     {
         // Arrange
         var project = await _projektService.CreateAsync("Nur-Beendete-Projekt", null, TestContext.Current.CancellationToken);
-        var beendet1 = await _aufgabeService.CreateAsync(project.Id, "Beendet 1", null, ct: TestContext.Current.CancellationToken);
-        var beendet2 = await _aufgabeService.CreateAsync(project.Id, "Beendet 2", null, ct: TestContext.Current.CancellationToken);
+        var beendet1 = await _workItemService.CreateAsync(project.Id, "Beendet 1", null, ct: TestContext.Current.CancellationToken);
+        var beendet2 = await _workItemService.CreateAsync(project.Id, "Beendet 2", null, ct: TestContext.Current.CancellationToken);
 
-        await _aufgabeService.StatusSetzenAsync(beendet1.Id, WorkItemStatus.Completed, TestContext.Current.CancellationToken);
-        await _aufgabeService.StatusSetzenAsync(beendet2.Id, WorkItemStatus.Completed, TestContext.Current.CancellationToken);
+        await _workItemService.SetStatusUncheckedAsync(beendet1.Id, WorkItemStatus.Completed, TestContext.Current.CancellationToken);
+        await _workItemService.SetStatusUncheckedAsync(beendet2.Id, WorkItemStatus.Completed, TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
@@ -530,7 +530,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     {
         // Arrange
         var project = await _projektService.CreateAsync("Reload-Status-Projekt", null, TestContext.Current.CancellationToken);
-        var workItem = await _aufgabeService.CreateAsync(project.Id, "Statuswechsel", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Statuswechsel", null, ct: TestContext.Current.CancellationToken);
 
         TaskDetailViewModel? navigiertesViewModel = null;
         var sut = CreateSut(navigateToTaskViewCallback: vm => navigiertesViewModel = vm);
@@ -542,7 +542,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
             .Returns(() => CreateTaskDetailViewModel());
 
         sut.AufgabeOeffnenCommand.Execute(workItem.Id);
-        await _aufgabeService.StatusSetzenAsync(workItem.Id, WorkItemStatus.Completed, TestContext.Current.CancellationToken);
+        await _workItemService.SetStatusUncheckedAsync(workItem.Id, WorkItemStatus.Completed, TestContext.Current.CancellationToken);
 
         // Act
         await navigiertesViewModel!.AufgabeListeAktualisierenCallback!.Invoke();
@@ -555,15 +555,15 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
     // --- Issue-Laden ---
 
-    private static Issue ErstelleIssue(int nummer = 1, string titel = "Issue-Titel")
-        => new(nummer, titel, "Body", [], null, "https://github.com/test/repo/issues/" + nummer);
+    private static Issue ErstelleIssue(int nummer = 1, string title = "Issue-Titel")
+        => new(nummer, title, "Body", [], null, "https://github.com/test/repo/issues/" + nummer);
 
-    private static ScmAlert ErstelleAlert(int nummer = 7, string titel = "CodeQL Alert")
+    private static ScmAlert ErstelleAlert(int nummer = 7, string title = "CodeQL Alert")
         => new(
             nummer,
             $"github:code-scanning:test/repo:{nummer}",
             ScmAlertType.CodeScanning,
-            titel,
+            title,
             "Alert-Beschreibung",
             $"https://github.com/test/repo/security/code-scanning/{nummer}",
             "high",
@@ -659,7 +659,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         await _projektService.AddRepositoryAsync(project.Id, "SourceCodeManagement", "https://github.com/test/repo", "test-repo", ct: TestContext.Current.CancellationToken);
 
         var existingIssue = ErstelleIssue(1);
-        await _aufgabeService.CreateFromIssueAsync(project.Id, existingIssue, ct: TestContext.Current.CancellationToken);
+        await _workItemService.CreateFromIssueAsync(project.Id, existingIssue, ct: TestContext.Current.CancellationToken);
 
         SetupGitPlugin([ErstelleIssue(1), ErstelleIssue(2)]);
 
@@ -671,7 +671,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         // Assert: Issue #1 wurde gefiltert, nur Issue #2 bleibt
         sut.IssueVorschlaege.Should().HaveCount(1);
-        sut.IssueVorschlaege[0].Nummer.Should().Be(2);
+        sut.IssueVorschlaege[0].Number.Should().Be(2);
     }
 
     /// <summary>AufgabeAusIssueErstellenCommand erstellt Aufgabe, entfernt Issue aus Vorschlaegen und fügt sie zu Aufgaben hinzu.</summary>
@@ -696,7 +696,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         // Assert
         sut.IssueVorschlaege.Should().BeEmpty();
         sut.WorkItems.Should().Contain(a => a.Title == "Mein Issue");
-        var workItem = await _aufgabeService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItem.Should().Contain(a => a.Title == "Mein Issue");
     }
 
@@ -723,7 +723,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         // Assert: Keine Aufgabe erstellt, Vorschlage unverändert
         sut.IssueVorschlaege.Should().HaveCount(vorschlaegVorher);
-        var workItems = await _aufgabeService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().BeEmpty();
     }
 
@@ -734,7 +734,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         var project = await _projektService.CreateAsync("Alert-Laden-Projekt", null, TestContext.Current.CancellationToken);
         await _projektService.AddRepositoryAsync(project.Id, "SourceCodeManagement", "https://github.com/test/repo", "test/repo", ct: TestContext.Current.CancellationToken);
         var convertedAlert = ErstelleAlert(7);
-        await _aufgabeService.CreateFromAlertAsync(project.Id, convertedAlert, ErstelleIssue(77, "Created issue"), ct: TestContext.Current.CancellationToken);
+        await _workItemService.CreateFromAlertAsync(project.Id, convertedAlert, ErstelleIssue(77, "Created issue"), ct: TestContext.Current.CancellationToken);
         var plugin = new TestScmPlugin([ErstelleIssue(1)], [convertedAlert, ErstelleAlert(8, "Neuer Alert")]);
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin]);
 
@@ -743,9 +743,9 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.IssueVorschlaege.Should().ContainSingle(i => i.Nummer == 1);
+        sut.IssueVorschlaege.Should().ContainSingle(i => i.Number == 1);
         sut.OffeneAnforderungen.Should().HaveCount(2);
-        sut.OffeneAnforderungen.Any(a => a.Kind == ScmRequirementKind.Issue && a.Issue != null && a.Issue.Nummer == 1).Should().BeTrue();
+        sut.OffeneAnforderungen.Any(a => a.Kind == ScmRequirementKind.Issue && a.Issue != null && a.Issue.Number == 1).Should().BeTrue();
         sut.OffeneAnforderungen.Any(a => a.Kind == ScmRequirementKind.Alert && a.Alert != null && a.Alert.AlertNumber == 8).Should().BeTrue();
         sut.OffeneAnforderungen.Should().NotContain(a => a.SourceKey == convertedAlert.SourceKey);
     }
@@ -786,7 +786,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         plugin.CreateIssueCalls.Should().Be(1);
         sut.OffeneAnforderungen.Should().BeEmpty();
-        var workItem = (await _aufgabeService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken)).Single();
+        var workItem = (await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken)).Single();
         workItem.Title.Should().Be("Unsichere Abfrage");
         workItem.RequirementDescription.Should().Be(issueBody);
         workItem.IssueReference!.IssueNumber.Should().Be(200);
@@ -800,7 +800,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         var project = await _projektService.CreateAsync("Alert-Duplikat-Projekt", null, TestContext.Current.CancellationToken);
         await _projektService.AddRepositoryAsync(project.Id, "SourceCodeManagement", "https://github.com/test/repo", "test/repo", ct: TestContext.Current.CancellationToken);
         var alert = ErstelleAlert(9, "Unsichere Abfrage");
-        await _aufgabeService.CreateFromAlertAsync(project.Id, alert, new Issue(200, "Code scanning alert: Unsichere Abfrage", "Body", [], null, "https://github.com/test/repo/issues/200"), ct: TestContext.Current.CancellationToken);
+        await _workItemService.CreateFromAlertAsync(project.Id, alert, new Issue(200, "Code scanning alert: Unsichere Abfrage", "Body", [], null, "https://github.com/test/repo/issues/200"), ct: TestContext.Current.CancellationToken);
         var plugin = new TestScmPlugin([], [alert]);
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin]);
         _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
@@ -813,7 +813,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         plugin.CreateIssueCalls.Should().Be(0);
         sut.WorkItems.Count(a => a.AlertReference?.SourceKey == alert.SourceKey).Should().Be(1);
-        var workItems = await _aufgabeService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Count(a => a.AlertReference?.SourceKey == alert.SourceKey).Should().Be(1);
     }
 
@@ -839,7 +839,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         plugin.CreateIssueCalls.Should().Be(1);
         sut.FehlerMeldung.Should().Contain("permission denied");
-        var workItems = await _aufgabeService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().BeEmpty();
     }
 
@@ -860,7 +860,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         await sut.AufgabeAusAnforderungErstellenCommand.ExecuteAsync(sut.OffeneAnforderungen.Single());
 
         plugin.CreateIssueCalls.Should().Be(0);
-        var workItems = await _aufgabeService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjectAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().BeEmpty();
     }
 

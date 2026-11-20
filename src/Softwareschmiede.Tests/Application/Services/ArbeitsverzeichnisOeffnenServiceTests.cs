@@ -16,15 +16,15 @@ public sealed class ArbeitsverzeichnisOeffnenServiceTests
         Assert.SkipWhen(!OperatingSystem.IsWindows(), "Test gilt nur für Windows, siehe ArbeitsverzeichnisOeffnenService.ResolveOeffnenBefehl.");
 
         var prozessStarterMock = new Mock<IProcessStarter>();
-        var service = new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object);
-        var arbeitsverzeichnis = Path.GetTempPath();
+        var service = new WorkingDirectoryOpenService(prozessStarterMock.Object);
+        var workingDirectory = Path.GetTempPath();
 
-        service.Oeffne(arbeitsverzeichnis);
+        service.Open(workingDirectory);
 
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a =>
                 a.FileName == "explorer.exe" &&
-                a.Arguments == $"\"{arbeitsverzeichnis}\"" &&
+                a.Arguments == $"\"{workingDirectory}\"" &&
                 a.UseShellExecute == false)),
             Times.Once);
     }
@@ -36,27 +36,27 @@ public sealed class ArbeitsverzeichnisOeffnenServiceTests
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Test gilt nur für Nicht-Windows-Betriebssysteme, siehe ArbeitsverzeichnisOeffnenService.ResolveOeffnenBefehl.");
 
         var prozessStarterMock = new Mock<IProcessStarter>();
-        var service = new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object);
+        var service = new WorkingDirectoryOpenService(prozessStarterMock.Object);
 
-        var aufruf = () => service.Oeffne(Path.GetTempPath());
+        var call = () => service.Open(Path.GetTempPath());
 
-        aufruf.Should().Throw<PlatformNotSupportedException>();
+        call.Should().Throw<PlatformNotSupportedException>();
         prozessStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
     /// <summary>Prüft, dass Oeffne bei leerem/whitespace Arbeitsverzeichnis eine ArgumentException wirft, ohne IProzessStarter aufzurufen.</summary>
-    /// <param name="arbeitsverzeichnis">Der zu prüfende leere/whitespace Verzeichnispfad.</param>
+    /// <param name="workingDirectory">Der zu prüfende leere/whitespace Verzeichnispfad.</param>
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public void Oeffne_MitLeeremVerzeichnis_WirftArgumentException(string arbeitsverzeichnis)
+    public void Oeffne_MitLeeremVerzeichnis_WirftArgumentException(string workingDirectory)
     {
         var prozessStarterMock = new Mock<IProcessStarter>();
-        var service = new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object);
+        var service = new WorkingDirectoryOpenService(prozessStarterMock.Object);
 
-        var aufruf = () => service.Oeffne(arbeitsverzeichnis);
+        var call = () => service.Open(workingDirectory);
 
-        aufruf.Should().Throw<ArgumentException>();
+        call.Should().Throw<ArgumentException>();
         prozessStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
@@ -67,10 +67,10 @@ public sealed class ArbeitsverzeichnisOeffnenServiceTests
         var prozessStarterMock = new Mock<IProcessStarter>();
         var erwarteteAusnahme = new InvalidOperationException("Prozess konnte nicht gestartet werden.");
         prozessStarterMock.Setup(p => p.Start(It.IsAny<ProcessStartRequest>())).Throws(erwarteteAusnahme);
-        var service = new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object);
+        var service = new WorkingDirectoryOpenService(prozessStarterMock.Object);
 
-        var aufruf = () => service.Oeffne(Path.GetTempPath());
+        var call = () => service.Open(Path.GetTempPath());
 
-        aufruf.Should().Throw<InvalidOperationException>().Which.Should().BeSameAs(erwarteteAusnahme);
+        call.Should().Throw<InvalidOperationException>().Which.Should().BeSameAs(erwarteteAusnahme);
     }
 }

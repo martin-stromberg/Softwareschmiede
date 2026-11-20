@@ -684,14 +684,14 @@ public sealed partial class TerminalControlTests
                 System.Text.Encoding.UTF8.GetBytes(text)))
             .ToArray();
         return new TerminalReplaySession(
-            new CliOutputAufzeichnung
+            new CliOutputRecording
             {
                 WorkItemId = Guid.NewGuid(),
                 PluginName = "TestPlugin",
                 StartUtc = DateTimeOffset.UtcNow,
                 Cols = cols,
                 Rows = rows,
-                IstVollstaendig = true,
+                IsComplete = true,
                 Chunks = chunks,
             },
             new FakeTimeProvider());

@@ -28,15 +28,15 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         _db.SaveChanges();
     }
 
-    /// <summary><summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning.</summary>.</summary>
+    /// <summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning()
     {
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        await sut.RecoverManuellAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await sut.RecoverManuallyAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         var loaded = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         loaded!.Status.Should().Be(WorkItemStatus.Started);
@@ -44,15 +44,15 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         _db.LogEntries.Single(e => e.WorkItemId == workItem.Id).Content.Should().Contain("Manuelle Wiederherstellung");
     }
 
-    /// <summary><summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning.</summary>.</summary>
+    /// <summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning()
     {
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Waiting);
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        await sut.RecoverManuellAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await sut.RecoverManuallyAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         var loaded = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         loaded!.Status.Should().Be(WorkItemStatus.Started);
@@ -60,12 +60,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         _db.LogEntries.Count(e => e.WorkItemId == workItem.Id && e.Type == LogEntryType.StatusTransition).Should().Be(1);
     }
 
-    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
-    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
-    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
-    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
-    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
-    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
+    /// <summary>IsRecoveryStatus_ShouldMatchAllowedStates.</summary>
     [Theory]
     [InlineData(WorkItemStatus.Started, WorkItemExecutionStatus.Active, true)]
     [InlineData(WorkItemStatus.Waiting, WorkItemExecutionStatus.Active, true)]
@@ -76,46 +71,46 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [InlineData(WorkItemStatus.Completed, WorkItemExecutionStatus.Active, false)]
     public void IstRecoveryStatus_ShouldMatchAllowedStates(WorkItemStatus status, WorkItemExecutionStatus executionStatus, bool expected)
     {
-        AufgabeRecoveryService.IstRecoveryStatus(status, executionStatus).Should().Be(expected);
+        WorkItemRecoveryService.IsRecoveryStatus(status, executionStatus).Should().Be(expected);
     }
 
-    /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning.</summary>.</summary>
+    /// <summary>RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning()
     {
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var running = new FakeRunningAutomationStatusSource(true);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(workItem.Id);
+        var act = () => sut.RecoverManuallyAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Wiederherstellung nicht möglich, Verarbeitung läuft noch.");
     }
 
-    /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenStatusIsNotRecoverable.</summary>.</summary>
+    /// <summary>RecoverManuellAsync_ShouldThrow_WhenStatusIsNotRecoverable.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenStatusIsNotRecoverable()
     {
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.New);
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(workItem.Id);
+        var act = () => sut.RecoverManuallyAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Wiederherstellung für aktuellen Status nicht verfügbar.");
     }
 
-    /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails.</summary>.</summary>
+    /// <summary>RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails()
     {
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var running = new ThrowingRunningAutomationStatusSource();
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(workItem.Id);
+        var act = () => sut.RecoverManuallyAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Prüfung der Laufzeit war nicht möglich.");
@@ -188,17 +183,17 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         // Act
-        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
+        var candidates = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
 
         // Assert
-        kandidaten.Should().Contain(aufgabeAlt.Id);
-        kandidaten.Should().Contain(aufgabeWartend.Id);
-        kandidaten.Should().NotContain(aufgabeFrisch.Id);
-        kandidaten.Should().NotContain(aufgabeBeendeteAusfuehrung.Id);
-        kandidaten.Should().NotContain(aufgabeNeu.Id);
+        candidates.Should().Contain(aufgabeAlt.Id);
+        candidates.Should().Contain(aufgabeWartend.Id);
+        candidates.Should().NotContain(aufgabeFrisch.Id);
+        candidates.Should().NotContain(aufgabeBeendeteAusfuehrung.Id);
+        candidates.Should().NotContain(aufgabeNeu.Id);
     }
 
     /// <summary>ScanForRecoveryCandidates ignoriert Aufgaben, für die ein Prozess noch läuft.</summary>
@@ -219,11 +214,11 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(true);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
+        var candidates = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
 
-        kandidaten.Should().BeEmpty();
+        candidates.Should().BeEmpty();
     }
 
     /// <summary>ScanForRecoveryCandidatesAsync ignoriert pausierte Aufgaben (PausiertBisUtc in der Zukunft), auch bei abgelaufenem Heartbeat (Issue 151).</summary>
@@ -256,12 +251,12 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
+        var candidates = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
 
-        kandidaten.Should().NotContain(pausiert.Id, "eine aktiv pausierte Aufgabe ist kein Recovery-Kandidat");
-        kandidaten.Should().Contain(abgelaufenePause.Id, "eine abgelaufene Pause darf die Recovery-Erkennung nicht blockieren");
+        candidates.Should().NotContain(pausiert.Id, "eine aktiv pausierte Aufgabe ist kein Recovery-Kandidat");
+        candidates.Should().Contain(abgelaufenePause.Id, "eine abgelaufene Pause darf die Recovery-Erkennung nicht blockieren");
     }
 
     /// <summary>RecoverManuellAsync lehnt eine aktiv pausierte Aufgabe mit InvalidOperationException ab (Issue 151).</summary>
@@ -274,9 +269,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(workItem.Id);
+        var act = () => sut.RecoverManuallyAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*pausiert*");

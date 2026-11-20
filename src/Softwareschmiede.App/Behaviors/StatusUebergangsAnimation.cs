@@ -55,8 +55,8 @@ public static class StatusUebergangsAnimation
 
         RegistriereUnloadedBereinigung(element, workItemId.Value);
 
-        var neuerStatus = (string?)e.NewValue;
-        if (!AenderungsErkennung.HatSichGeaendert(workItemId.Value, neuerStatus))
+        var newStatus = (string?)e.NewValue;
+        if (!AenderungsErkennung.HatSichGeaendert(workItemId.Value, newStatus))
             return;
 
         var animation = new DoubleAnimation
@@ -76,6 +76,6 @@ public static class StatusUebergangsAnimation
             return;
 
         element.SetValue(UnloadedBereinigungRegistriertProperty, true);
-        element.Unloaded += (_, _) => AenderungsErkennung.Entfernen(workItemId);
+        element.Unloaded += (_, _) => AenderungsErkennung.Remove(workItemId);
     }
 }

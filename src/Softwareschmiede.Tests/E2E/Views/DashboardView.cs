@@ -42,11 +42,11 @@ public sealed class DashboardView : BaseWindowView
     /// 'DashboardAufgabenModus:{modus}'-Umschalter — ansichtsspezifischer Anker, da die
     /// Seitenleisten-Umschalter 'AufgabenModus:*' heißen).
     /// </summary>
-    /// <param name="modus">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
+    /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
     /// <returns>Diese Instanz.</returns>
-    public DashboardView SetzeAufgabenListenModus(string modus)
+    public DashboardView SetzeAufgabenListenModus(string mode)
     {
-        KlickeAufgabenModusUmschalter(AufgabenModusPraefix, modus);
+        KlickeAufgabenModusUmschalter(AufgabenModusPraefix, mode);
         return this;
     }
 

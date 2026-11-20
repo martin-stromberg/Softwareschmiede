@@ -55,17 +55,17 @@ public sealed class BenachrichtigungsServiceTests
     [InlineData(NotificationMode.Disabled)]
     [InlineData(NotificationMode.Banner)]
     [InlineData(NotificationMode.Sound)]
-    public void EachBenachrichtigungsModus_ShouldBeDefinedInEnum(NotificationMode modus)
+    public void EachBenachrichtigungsModus_ShouldBeDefinedInEnum(NotificationMode mode)
     {
-        Enum.IsDefined(modus).Should().BeTrue();
+        Enum.IsDefined(mode).Should().BeTrue();
     }
 
     /// <summary>Alle BenachrichtigungsKanal-Werte sind gültige Enums.</summary>
     [Theory]
     [InlineData(NotificationChannel.Banner)]
     [InlineData(NotificationChannel.Sound)]
-    public void EachBenachrichtigungsKanal_ShouldBeDefinedInEnum(NotificationChannel kanal)
+    public void EachBenachrichtigungsKanal_ShouldBeDefinedInEnum(NotificationChannel channel)
     {
-        Enum.IsDefined(kanal).Should().BeTrue();
+        Enum.IsDefined(channel).Should().BeTrue();
     }
 }

@@ -3,17 +3,17 @@ using Softwareschmiede.Application.Services;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für <see cref="KiAusfuehrungsStatusKlassifikation"/>.</summary>
+/// <summary>Tests für <see cref="AiExecutionStatusClassification"/>.</summary>
 public sealed class KiAusfuehrungsStatusKlassifikationTests
 {
     /// <summary>IstAktuellPausiert liefert true, wenn der Pausenzeitpunkt gesetzt ist und in der Zukunft liegt.</summary>
     [Fact]
     public void IstAktuellPausiert_ShouldReturnTrue_WhenPausiertBisInZukunft()
     {
-        var jetzt = DateTimeOffset.UtcNow;
-        DateTimeOffset? pausiertBisUtc = jetzt.AddMinutes(10);
+        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset? pausedUntilUtc = now.AddMinutes(10);
 
-        var result = pausiertBisUtc.IstAktuellPausiert(jetzt);
+        var result = pausedUntilUtc.IsCurrentlyPaused(now);
 
         result.Should().BeTrue();
     }
@@ -22,9 +22,9 @@ public sealed class KiAusfuehrungsStatusKlassifikationTests
     [Fact]
     public void IstAktuellPausiert_ShouldReturnFalse_WhenPausiertBisNull()
     {
-        DateTimeOffset? pausiertBisUtc = null;
+        DateTimeOffset? pausedUntilUtc = null;
 
-        var result = pausiertBisUtc.IstAktuellPausiert(DateTimeOffset.UtcNow);
+        var result = pausedUntilUtc.IsCurrentlyPaused(DateTimeOffset.UtcNow);
 
         result.Should().BeFalse();
     }
@@ -33,10 +33,10 @@ public sealed class KiAusfuehrungsStatusKlassifikationTests
     [Fact]
     public void IstAktuellPausiert_ShouldReturnFalse_WhenPausiertBisAbgelaufen()
     {
-        var jetzt = DateTimeOffset.UtcNow;
-        DateTimeOffset? pausiertBisUtc = jetzt.AddMinutes(-10);
+        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset? pausedUntilUtc = now.AddMinutes(-10);
 
-        var result = pausiertBisUtc.IstAktuellPausiert(jetzt);
+        var result = pausedUntilUtc.IsCurrentlyPaused(now);
 
         result.Should().BeFalse();
     }
@@ -45,10 +45,10 @@ public sealed class KiAusfuehrungsStatusKlassifikationTests
     [Fact]
     public void IstAktuellPausiert_ShouldReturnFalse_WhenPausiertBisGenauJetzt()
     {
-        var jetzt = DateTimeOffset.UtcNow;
-        DateTimeOffset? pausiertBisUtc = jetzt;
+        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset? pausedUntilUtc = now;
 
-        var result = pausiertBisUtc.IstAktuellPausiert(jetzt);
+        var result = pausedUntilUtc.IsCurrentlyPaused(now);
 
         result.Should().BeFalse();
     }

@@ -31,9 +31,9 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
     public GitOrchestrationServiceTests_WorkingDirectoryInSourceDirectory()
     {
         _db = TestDbContextFactory.Create();
-        var aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
-        var projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
-        var protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
+        var workItemService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
+        var projektService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
+        var logService = new LogService(_db, new Mock<ILogger<LogService>>().Object);
 
         var defaultPluginMock = new Mock<IGitPlugin>();
         defaultPluginMock.SetupGet(p => p.PluginName).Returns("Mock Git");
@@ -47,7 +47,7 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppSettingService(_db, NullLogger<AppSettingService>.Instance), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
@@ -55,9 +55,9 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
             new Mock<ILogger<PluginSelectionService>>().Object);
 
         _sut = new GitOrchestrationService(
-            aufgabeService,
+            workItemService,
             projektService,
-            protokollService,
+            logService,
             defaultPluginMock.Object,
             pluginSelectionService,
             new Mock<ILogger<GitOrchestrationService>>().Object);

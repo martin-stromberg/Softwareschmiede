@@ -11,7 +11,7 @@ using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>Unit-Tests für den Rohbyte-Mitschnitt (<see cref="CliOutputRecorder"/>) in
-/// <see cref="Softwareschmiede.Application.Services.KiAusfuehrungsService"/>: Recorder-Verdrahtung,
+/// <see cref="Softwareschmiede.Application.Services.AiExecutionService"/>: Recorder-Verdrahtung,
 /// Registry und Budget-Deaktivierung. Die Services werden bewusst nicht disposed — der
 /// deterministische Test-Launcher bindet <c>Process.GetCurrentProcess()</c> und
 /// <see cref="IDisposable.Dispose"/> würde den Testhost selbst beenden.</summary>
@@ -42,16 +42,16 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
 
         await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        var aufzeichnung = sut.GetCliAufzeichnung(workItemId);
-        aufzeichnung.Should().NotBeNull();
-        aufzeichnung!.WorkItemId.Should().Be(workItemId);
-        aufzeichnung.PluginName.Should().Be("TestPlugin");
-        aufzeichnung.Cols.Should().Be(new TerminalSessionOptions().DefaultCols);
-        aufzeichnung.Rows.Should().Be(new TerminalSessionOptions().DefaultRows);
-        aufzeichnung.IstVollstaendig.Should().BeTrue();
-        aufzeichnung.Chunks.Should().HaveCount(2);
-        aufzeichnung.Chunks[0].Data.Should().Equal(chunks[0]);
-        aufzeichnung.Chunks[1].Data.Should().Equal(chunks[1]);
+        var recording = sut.GetCliRecording(workItemId);
+        recording.Should().NotBeNull();
+        recording!.WorkItemId.Should().Be(workItemId);
+        recording.PluginName.Should().Be("TestPlugin");
+        recording.Cols.Should().Be(new TerminalSessionOptions().DefaultCols);
+        recording.Rows.Should().Be(new TerminalSessionOptions().DefaultRows);
+        recording.IsComplete.Should().BeTrue();
+        recording.Chunks.Should().HaveCount(2);
+        recording.Chunks[0].Data.Should().Equal(chunks[0]);
+        recording.Chunks[1].Data.Should().Equal(chunks[1]);
     }
 
     /// <summary>Ohne Session-Start liefert <c>GetCliAufzeichnung</c> null.</summary>
@@ -60,7 +60,7 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
     {
         var sut = TestKiAusfuehrungsServiceFactory.Create();
 
-        sut.GetCliAufzeichnung(Guid.NewGuid()).Should().BeNull();
+        sut.GetCliRecording(Guid.NewGuid()).Should().BeNull();
     }
 
     /// <summary>Mit <c>AufzeichnungByteBudget &lt;= 0</c> wird kein Recorder erstellt — die Senke des
@@ -72,14 +72,14 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
         var sut = TestKiAusfuehrungsServiceFactory.Create(
             new Mock<IServiceScopeFactory>().Object,
             launcher: launcher,
-            terminalOptions: new TerminalSessionOptions { AufzeichnungByteBudget = 0 });
+            terminalOptions: new TerminalSessionOptions { RecordingByteBudget = 0 });
         var workItemId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
         var handle = await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        sut.GetCliAufzeichnung(workItemId).Should().BeNull("bei deaktiviertem Budget wird kein Recorder erstellt");
-        handle.OutputSink.Should().BeOfType<CliOutputProtokollWriter>(
+        sut.GetCliRecording(workItemId).Should().BeNull("bei deaktiviertem Budget wird kein Recorder erstellt");
+        handle.OutputSink.Should().BeOfType<CliOutputLogWriter>(
             "ohne Recorder wird der Protokoll-Writer direkt als Senke übergeben");
     }
 
@@ -113,21 +113,21 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
         var sut = TestKiAusfuehrungsServiceFactory.Create(
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher(chunks),
-            terminalOptions: new TerminalSessionOptions { AufzeichnungByteBudget = 8 });
+            terminalOptions: new TerminalSessionOptions { RecordingByteBudget = 8 });
         var workItemId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
         await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        var aufzeichnung = sut.GetCliAufzeichnung(workItemId);
-        aufzeichnung.Should().NotBeNull();
-        aufzeichnung!.IstVollstaendig.Should().BeFalse();
-        aufzeichnung.Chunks.Should().HaveCount(1);
-        aufzeichnung.Chunks[0].Data.Should().Equal(chunks[0]);
+        var recording = sut.GetCliRecording(workItemId);
+        recording.Should().NotBeNull();
+        recording!.IsComplete.Should().BeFalse();
+        recording.Chunks.Should().HaveCount(1);
+        recording.Chunks[0].Data.Should().Equal(chunks[0]);
     }
 
     /// <summary>Die Aufzeichnungs-Registry ist auf die letzten
-    /// <see cref="Softwareschmiede.Application.Services.KiAusfuehrungsService.MaxAufzeichnungenAnzahl"/>
+    /// <see cref="Softwareschmiede.Application.Services.AiExecutionService.MaxRecordingCount"/>
     /// Aufgaben begrenzt — der älteste Mitschnitt wird verworfen, die jüngsten bleiben vorgehalten.</summary>
     [Fact]
     public async Task GetCliAufzeichnung_MehrAlsMaxAufzeichnungen_VerwirftAeltesteEintraege()
@@ -137,18 +137,18 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
             new Mock<IServiceScopeFactory>().Object,
             launcher: launcher);
         var pluginMock = CreatePlugin();
-        var aufgabeIds = Enumerable.Range(0, KiAusfuehrungsService.MaxAufzeichnungenAnzahl + 1)
+        var workItemIds = Enumerable.Range(0, AiExecutionService.MaxRecordingCount + 1)
             .Select(_ => Guid.NewGuid())
             .ToList();
 
-        foreach (var id in aufgabeIds)
+        foreach (var id in workItemIds)
             await sut.StartTerminalSessionAsync(id, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        sut.GetCliAufzeichnung(aufgabeIds[0]).Should().BeNull(
+        sut.GetCliRecording(workItemIds[0]).Should().BeNull(
             "der älteste Mitschnitt wird über der Retention-Grenze verworfen");
-        foreach (var id in aufgabeIds.Skip(1))
-            sut.GetCliAufzeichnung(id).Should().NotBeNull(
-                "die letzten {0} Mitschnitte bleiben vorgehalten", KiAusfuehrungsService.MaxAufzeichnungenAnzahl);
+        foreach (var id in workItemIds.Skip(1))
+            sut.GetCliRecording(id).Should().NotBeNull(
+                "die letzten {0} Mitschnitte bleiben vorgehalten", AiExecutionService.MaxRecordingCount);
     }
 
     /// <summary>Der übergebene TimeProvider liefert die Start- und Offset-Zeitstempel der Aufzeichnung.</summary>
@@ -165,9 +165,9 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
 
         await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        var aufzeichnung = sut.GetCliAufzeichnung(workItemId);
-        aufzeichnung.Should().NotBeNull();
-        aufzeichnung!.StartUtc.Should().Be(timeProvider.Start);
-        aufzeichnung.Chunks[0].Offset.Should().Be(TimeSpan.Zero);
+        var recording = sut.GetCliRecording(workItemId);
+        recording.Should().NotBeNull();
+        recording!.StartUtc.Should().Be(timeProvider.Start);
+        recording.Chunks[0].Offset.Should().Be(TimeSpan.Zero);
     }
 }

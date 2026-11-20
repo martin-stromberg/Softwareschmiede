@@ -40,9 +40,9 @@ public sealed class VisualStudioCodeIdePluginTests
     {
         var sut = CreateSut(VisualStudioCodeAvailability.NotAvailable);
 
-        var aufruf = async () => await sut.CheckCompatibilityAsync(null!);
+        var call = async () => await sut.CheckCompatibilityAsync(null!);
 
-        await aufruf.Should().ThrowAsync<ArgumentException>();
+        await call.Should().ThrowAsync<ArgumentException>();
     }
 
     /// <summary>Ein leerer Pfad wirft eine Exception.</summary>
@@ -51,9 +51,9 @@ public sealed class VisualStudioCodeIdePluginTests
     {
         var sut = CreateSut(VisualStudioCodeAvailability.NotAvailable);
 
-        var aufruf = async () => await sut.CheckCompatibilityAsync(string.Empty);
+        var call = async () => await sut.CheckCompatibilityAsync(string.Empty);
 
-        await aufruf.Should().ThrowAsync<ArgumentException>();
+        await call.Should().ThrowAsync<ArgumentException>();
     }
 
     /// <summary>FindEntryPointsAsync liefert für VS Code immer genau einen Einstiegspunkt: das Repository-Root selbst.</summary>
@@ -94,9 +94,9 @@ public sealed class VisualStudioCodeIdePluginTests
     {
         var sut = CreateSut(VisualStudioCodeAvailability.NotAvailable);
 
-        var aufruf = async () => await sut.OpenEntryPointAsync(new IdeEntryPoint(@"C:\repos\meinprojekt"));
+        var call = async () => await sut.OpenEntryPointAsync(new IdeEntryPoint(@"C:\repos\meinprojekt"));
 
-        await aufruf.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Visual Studio Code*");
+        await call.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Visual Studio Code*");
     }
 
     private static VisualStudioCodeIdePlugin CreateSut(VisualStudioCodeAvailability availability)

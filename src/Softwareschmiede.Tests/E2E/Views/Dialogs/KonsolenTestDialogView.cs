@@ -133,8 +133,8 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Diese Instanz.</returns>
     public KonsolenTestDialogView SetZeitrafferSchwelle(string text)
     {
-        var feld = WaitForElement(GetDialogWindow(), cf => cf.ByName("ZeitrafferSchwelle"), Short);
-        feld.AsTextBox().Text = text;
+        var field = WaitForElement(GetDialogWindow(), cf => cf.ByName("ZeitrafferSchwelle"), Short);
+        field.AsTextBox().Text = text;
         return this;
     }
 
@@ -171,7 +171,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// geladener Aufzeichnung, nicht unpausiert laufender Wiedergabe und Position &lt; Ende aktiv)
     /// und wendet den nächsten aufgezeichneten Chunk als Einzelschritt an.</summary>
     /// <returns>Diese Instanz.</returns>
-    public KonsolenTestDialogView SchrittVor()
+    public KonsolenTestDialogView StepForward()
     {
         WaitForEnabledElement(GetDialogWindow(), "SchrittVor", Medium).AsButton().ClickInForeground();
         return this;
@@ -181,7 +181,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// geladener Aufzeichnung, nicht unpausiert laufender Wiedergabe und Position &gt; 0 aktiv)
     /// und stellt den Zustand vor dem zuletzt angewendeten Chunk wieder her.</summary>
     /// <returns>Diese Instanz.</returns>
-    public KonsolenTestDialogView SchrittZurueck()
+    public KonsolenTestDialogView StepBackward()
     {
         WaitForEnabledElement(GetDialogWindow(), "SchrittZurueck", Medium).AsButton().ClickInForeground();
         return this;
@@ -201,12 +201,12 @@ public sealed class KonsolenTestDialogView : DialogView
     /// (Selektion = zuletzt angewendeter Chunk), oder <c>-1</c> bei leerer Selektion.</returns>
     public int GetSelektierterQuellEintragIndex()
     {
-        var liste = WaitForElement(GetDialogWindow(), cf => cf.ByName("QuellChunkListe"), Short);
-        var zeilen = liste.FindAllChildren(cf => cf.ByControlType(ControlType.DataItem)
+        var list = WaitForElement(GetDialogWindow(), cf => cf.ByName("QuellChunkListe"), Short);
+        var lines = list.FindAllChildren(cf => cf.ByControlType(ControlType.DataItem)
             .Or(cf.ByControlType(ControlType.ListItem)));
-        for (var i = 0; i < zeilen.Length; i++)
+        for (var i = 0; i < lines.Length; i++)
         {
-            var item = zeilen[i].Patterns.SelectionItem.PatternOrDefault;
+            var item = lines[i].Patterns.SelectionItem.PatternOrDefault;
             if (item is not null && item.IsSelected.TryGetValue(out var selected) && selected)
                 return i;
         }
@@ -477,8 +477,8 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Die Anzahl der in der Quell-Chunk-Liste dargestellten Einträge (GridView-Zeilen).</returns>
     public int GetQuellEintraegeCount()
     {
-        var liste = WaitForElement(GetDialogWindow(), cf => cf.ByName("QuellChunkListe"), Short);
-        return liste.FindAllChildren(cf => cf.ByControlType(ControlType.DataItem)
+        var list = WaitForElement(GetDialogWindow(), cf => cf.ByName("QuellChunkListe"), Short);
+        return list.FindAllChildren(cf => cf.ByControlType(ControlType.DataItem)
             .Or(cf.ByControlType(ControlType.ListItem))).Length;
     }
 
@@ -487,14 +487,14 @@ public sealed class KonsolenTestDialogView : DialogView
     /// <returns>Der gerenderte Quelltext des Eintrags.</returns>
     public string GetQuellEintragText(int index)
     {
-        var liste = WaitForElement(GetDialogWindow(), cf => cf.ByName("QuellChunkListe"), Short);
-        var zeilen = liste.FindAllChildren(cf => cf.ByControlType(ControlType.DataItem)
+        var list = WaitForElement(GetDialogWindow(), cf => cf.ByName("QuellChunkListe"), Short);
+        var lines = list.FindAllChildren(cf => cf.ByControlType(ControlType.DataItem)
             .Or(cf.ByControlType(ControlType.ListItem)));
-        if (index < 0 || index >= zeilen.Length)
+        if (index < 0 || index >= lines.Length)
             throw new ArgumentOutOfRangeException(nameof(index), index,
-                $"Quell-Eintrag {index} existiert nicht ({zeilen.Length} Einträge vorhanden).");
+                $"Quell-Eintrag {index} existiert nicht ({lines.Length} Einträge vorhanden).");
 
-        var zellen = zeilen[index].FindAllChildren();
+        var zellen = lines[index].FindAllChildren();
         return zellen.Length == 0 ? string.Empty : zellen[^1].Name;
     }
 
@@ -502,7 +502,7 @@ public sealed class KonsolenTestDialogView : DialogView
     /// kann verdeckt landen, wenn das nicht-modale Fenster hinter anderen Fenstern liegt) und
     /// wartet, bis das Fenster verschwindet.</summary>
     /// <returns>Diese Instanz.</returns>
-    public KonsolenTestDialogView Schliessen()
+    public KonsolenTestDialogView Close()
     {
         WaitForElement(GetDialogWindow(), cf => cf.ByName("KonsolenTestSchliessen"), Short).AsButton().Invoke();
         ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);

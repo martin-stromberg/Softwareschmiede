@@ -107,7 +107,7 @@ public sealed class ScmEventValidationServiceTests
         var observation = ObserveSeparate(body, "42", null, false);
         Assert.Equal(valid, ScmEventValidationService.GetRejection(observation) is null);
         Assert.Equal(!valid, ScmEventValidationService.GetRejection(observation)
-            is ScmEventValidationService.KeineErwaehnungRejection);
+            is ScmEventValidationService.NoMentionRejection);
     }
 
     /// <summary>Im SeparatesKonto gilt die Autor-/Editor-Prüfung gegen den Repository-Owner, nicht gegen den Bot-Viewer.</summary>
@@ -149,7 +149,7 @@ public sealed class ScmEventValidationServiceTests
     public void ViewerReaction_RejectsCommentKinds(ScmContentKind kind)
     {
         var observation = Observe("$Softwareschmiede bitte", "42", null, false, ["EYES"], kind);
-        Assert.Equal(ScmEventValidationService.BereitsReagiertRejection, ScmEventValidationService.GetRejection(observation));
+        Assert.Equal(ScmEventValidationService.AlreadyReactedRejection, ScmEventValidationService.GetRejection(observation));
     }
 
     /// <summary>Im SeparatesKonto bindet die Reaktion an das Bot-Konto; auch eine manuell gesetzte
@@ -158,7 +158,7 @@ public sealed class ScmEventValidationServiceTests
     public void SeparatesKonto_ViewerReaction_Rejects()
     {
         var observation = ObserveSeparate("@scm-bot bitte", "42", null, false, ["THUMBS_UP"]);
-        Assert.Equal(ScmEventValidationService.BereitsReagiertRejection, ScmEventValidationService.GetRejection(observation));
+        Assert.Equal(ScmEventValidationService.AlreadyReactedRejection, ScmEventValidationService.GetRejection(observation));
     }
 
     /// <summary>Die Reaktionsprüfung läuft erst nach dem Trigger: ein reagierter Kommentar ohne
@@ -167,7 +167,7 @@ public sealed class ScmEventValidationServiceTests
     public void ViewerReaction_CheckRunsAfterTrigger()
     {
         Assert.Equal("Kein Trigger", ScmEventValidationService.GetRejection(Observe("Nur Text", "42", null, false, ["EYES"])));
-        Assert.Equal(ScmEventValidationService.KeineErwaehnungRejection,
+        Assert.Equal(ScmEventValidationService.NoMentionRejection,
             ScmEventValidationService.GetRejection(ObserveSeparate("Nur Text", "42", null, false, ["EYES"])));
     }
 

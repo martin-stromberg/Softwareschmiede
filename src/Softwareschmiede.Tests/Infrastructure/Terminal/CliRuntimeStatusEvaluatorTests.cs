@@ -20,7 +20,7 @@ public sealed class CliRuntimeStatusEvaluatorTests
             now,
             TimeSpan.FromSeconds(4));
 
-        status.Should().Be(CliRuntimeStatus.Inaktiv);
+        status.Should().Be(CliRuntimeStatus.Inactive);
     }
 
     /// <summary>Frische Ausgabe ergibt Laeuft.</summary>

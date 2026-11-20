@@ -18,7 +18,7 @@ public sealed class PluginActivationServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var pluginManager = new Mock<IPluginManager>();
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
         var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.Unbekannt", TestContext.Current.CancellationToken);
@@ -34,7 +34,7 @@ public sealed class PluginActivationServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var pluginManager = new Mock<IPluginManager>();
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
         await sut.SetPluginEnabledAsync("Softwareschmiede.GitHub", false, TestContext.Current.CancellationToken);
@@ -54,7 +54,7 @@ public sealed class PluginActivationServiceTests
         var deaktiviertesPlugin = CreateGitPlugin("GitLab", "Softwareschmiede.GitLab");
         var pluginManager = new Mock<IPluginManager>();
         pluginManager.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
         await sut.SetPluginEnabledAsync("Softwareschmiede.GitLab", false, TestContext.Current.CancellationToken);
 
         // Act
@@ -75,7 +75,7 @@ public sealed class PluginActivationServiceTests
         var deaktiviertesPlugin = CreateKiPlugin("Copilot", "Softwareschmiede.Copilot");
         var pluginManager = new Mock<IPluginManager>();
         pluginManager.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
         await sut.SetPluginEnabledAsync("Softwareschmiede.Copilot", false, TestContext.Current.CancellationToken);
 
         // Act
@@ -96,7 +96,7 @@ public sealed class PluginActivationServiceTests
         var deaktiviertesPlugin = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode");
         var pluginManager = new Mock<IPluginManager>();
         pluginManager.Setup(m => m.GetIdePlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
         await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudioCode", false, TestContext.Current.CancellationToken);
 
         // Act
@@ -114,7 +114,7 @@ public sealed class PluginActivationServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var pluginManager = new Mock<IPluginManager>();
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
         var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
@@ -130,7 +130,7 @@ public sealed class PluginActivationServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var pluginManager = new Mock<IPluginManager>();
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
         await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false, TestContext.Current.CancellationToken);
@@ -149,7 +149,7 @@ public sealed class PluginActivationServiceTests
         var plugin = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio");
         var pluginManager = new Mock<IPluginManager>();
         pluginManager.Setup(m => m.GetIdePlugins()).Returns([plugin]);
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
         await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false, TestContext.Current.CancellationToken);
 
         // Act

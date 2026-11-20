@@ -23,7 +23,7 @@ public sealed class FileExplorerViewModelTests
 
         await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
-        sut.AktuellerModus.Should().Be(DateibrowserAnsichtsmodus.Standard);
+        sut.AktuellerModus.Should().Be(DateibrowserAnsichtsmodus.Default);
         sut.Wurzelknoten.Should().ContainSingle(node => node.Name == "a.txt");
         gitMock.Verify(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }

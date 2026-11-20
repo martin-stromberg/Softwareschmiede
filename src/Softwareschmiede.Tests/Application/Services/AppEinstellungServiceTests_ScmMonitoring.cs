@@ -6,15 +6,15 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für die SCM-Einstellungen (Überwachungs-Schalter und Trigger-Keyword) in <see cref="AppEinstellungService"/>.</summary>
+/// <summary>Tests für die SCM-Einstellungen (Überwachungs-Schalter und Trigger-Keyword) in <see cref="AppSettingService"/>.</summary>
 public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
 {
     private readonly SoftwareschmiedeDbContext _db = TestDbContextFactory.Create();
-    private readonly AppEinstellungService _sut;
+    private readonly AppSettingService _sut;
 
     /// <inheritdoc cref="AppEinstellungServiceTests_ScmMonitoring"/>
     public AppEinstellungServiceTests_ScmMonitoring()
-        => _sut = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        => _sut = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
 
     /// <summary>Räumt den InMemory-Datenbankkontext auf.</summary>
     public void Dispose() => _db.Dispose();
@@ -28,10 +28,10 @@ public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
     [Fact]
     public async Task GetScmMonitoringEnabledAsync_PersistedValue_IsHonored()
     {
-        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+        await _sut.SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
         (await _sut.GetScmMonitoringEnabledAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
 
-        await _sut.SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
+        await _sut.SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
         (await _sut.GetScmMonitoringEnabledAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
     }
 
@@ -46,7 +46,7 @@ public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
     [InlineData("   ")]
     public async Task GetScmTriggerKeywordAsync_InvalidStoredValue_FallsBackToDefault(string stored)
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, stored, TestContext.Current.CancellationToken);
+        await _sut.SetSettingAsync(AppSettingService.ScmTriggerKeywordKey, stored, TestContext.Current.CancellationToken);
 
         (await _sut.GetScmTriggerKeywordAsync(TestContext.Current.CancellationToken)).Should().Be(ScmEventValidationService.DefaultTriggerKeyword);
     }
@@ -55,7 +55,7 @@ public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
     [Fact]
     public async Task GetScmTriggerKeywordAsync_StoredValue_ReturnsTrimmed()
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "  !Bearbeite  ", TestContext.Current.CancellationToken);
+        await _sut.SetSettingAsync(AppSettingService.ScmTriggerKeywordKey, "  !Bearbeite  ", TestContext.Current.CancellationToken);
 
         (await _sut.GetScmTriggerKeywordAsync(TestContext.Current.CancellationToken)).Should().Be("!Bearbeite");
     }
@@ -71,7 +71,7 @@ public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
     [InlineData("   ")]
     public async Task GetScmDelayKeywordAsync_InvalidStoredValue_FallsBackToDefault(string stored)
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmDelayKeywordKey, stored, TestContext.Current.CancellationToken);
+        await _sut.SetSettingAsync(AppSettingService.ScmDelayKeywordKey, stored, TestContext.Current.CancellationToken);
 
         (await _sut.GetScmDelayKeywordAsync(TestContext.Current.CancellationToken)).Should().Be(ScmDelayDirective.DefaultDelayKeyword);
     }
@@ -80,7 +80,7 @@ public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
     [Fact]
     public async Task GetScmDelayKeywordAsync_StoredValue_ReturnsTrimmed()
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmDelayKeywordKey, "  #warte  ", TestContext.Current.CancellationToken);
+        await _sut.SetSettingAsync(AppSettingService.ScmDelayKeywordKey, "  #warte  ", TestContext.Current.CancellationToken);
 
         (await _sut.GetScmDelayKeywordAsync(TestContext.Current.CancellationToken)).Should().Be("#warte");
     }
@@ -94,16 +94,16 @@ public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
     [Fact]
     public async Task GetScmPromptAppendicesAsync_PersistedValues_AreReturned()
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "allgemein", TestContext.Current.CancellationToken);
-        await _sut.SetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestCommentKey, "pr-kommentar\nmehrzeilig", TestContext.Current.CancellationToken);
-        await _sut.SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "!Bearbeite", TestContext.Current.CancellationToken);
+        await _sut.SetSettingAsync(AppSettingService.ScmPromptAppendGeneralKey, "allgemein", TestContext.Current.CancellationToken);
+        await _sut.SetSettingAsync(AppSettingService.ScmPromptAppendPullRequestCommentKey, "pr-kommentar\nmehrzeilig", TestContext.Current.CancellationToken);
+        await _sut.SetSettingAsync(AppSettingService.ScmTriggerKeywordKey, "!Bearbeite", TestContext.Current.CancellationToken);
 
         var result = await _sut.GetScmPromptAppendicesAsync(TestContext.Current.CancellationToken);
 
         result.Should().HaveCount(2);
-        result[AppEinstellungService.ScmPromptAppendGeneralKey].Should().Be("allgemein");
-        result[AppEinstellungService.ScmPromptAppendPullRequestCommentKey].Should().Be("pr-kommentar\nmehrzeilig");
-        result.Should().NotContainKey(AppEinstellungService.ScmPromptAppendIssueKey);
-        result.Should().NotContainKey(AppEinstellungService.ScmTriggerKeywordKey);
+        result[AppSettingService.ScmPromptAppendGeneralKey].Should().Be("allgemein");
+        result[AppSettingService.ScmPromptAppendPullRequestCommentKey].Should().Be("pr-kommentar\nmehrzeilig");
+        result.Should().NotContainKey(AppSettingService.ScmPromptAppendIssueKey);
+        result.Should().NotContainKey(AppSettingService.ScmTriggerKeywordKey);
     }
 }

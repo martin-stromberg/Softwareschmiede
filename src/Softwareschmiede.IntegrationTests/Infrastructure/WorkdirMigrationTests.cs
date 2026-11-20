@@ -131,7 +131,7 @@ public sealed class WorkdirMigrationTests
         return null;
     }
 
-    private static async Task<string> InsertLegacyAufgabeAsync(DatabaseFixture db, string projectId, string status, string? aktiveRunId)
+    private static async Task<string> InsertLegacyAufgabeAsync(DatabaseFixture db, string projectId, string status, string? activeRunId)
     {
         var id = Guid.NewGuid().ToString();
         await ExecuteNonQueryAsync(
@@ -153,7 +153,7 @@ public sealed class WorkdirMigrationTests
             ("$titel", $"Alt-{status}-{id[..6]}"),
             ("$status", status),
             ("$erstellt", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
-            ("$aktiveRunId", aktiveRunId));
+            ("$aktiveRunId", activeRunId));
         return id;
     }
 

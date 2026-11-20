@@ -21,7 +21,7 @@ public sealed class DevinPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
     public override string PluginName => "Devin CLI";
 
     /// <inheritdoc/>
-    public override string ProviderDateiPraefix => "devin";
+    public override string ProviderFilePrefix => "devin";
 
     /// <inheritdoc/>
     public override string PluginPrefix => "Softwareschmiede.Devin";

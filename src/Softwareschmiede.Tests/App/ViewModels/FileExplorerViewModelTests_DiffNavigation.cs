@@ -18,11 +18,11 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
     public async Task NaechsteAenderungCommand_ErsterAufruf_SpringtZuErstemBlock()
     {
         var sut = await CreateSutMitDiffZeilenAsync(
-            Zeile(DiffLineStatus.Context),
-            Zeile(DiffLineStatus.Added),
-            Zeile(DiffLineStatus.Added),
-            Zeile(DiffLineStatus.Context),
-            Zeile(DiffLineStatus.Removed));
+            Line(DiffLineStatus.Context),
+            Line(DiffLineStatus.Added),
+            Line(DiffLineStatus.Added),
+            Line(DiffLineStatus.Context),
+            Line(DiffLineStatus.Removed));
 
         var fokussierteIndizes = new List<int>();
         sut.DiffZeileFokussiert += fokussierteIndizes.Add;
@@ -37,11 +37,11 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
     public async Task NaechsteAenderungCommand_MehrfachAufruf_SpringtDurchAlleBloeckeUndWrapt()
     {
         var sut = await CreateSutMitDiffZeilenAsync(
-            Zeile(DiffLineStatus.Context),
-            Zeile(DiffLineStatus.Added),
-            Zeile(DiffLineStatus.Context),
-            Zeile(DiffLineStatus.Removed),
-            Zeile(DiffLineStatus.Removed));
+            Line(DiffLineStatus.Context),
+            Line(DiffLineStatus.Added),
+            Line(DiffLineStatus.Context),
+            Line(DiffLineStatus.Removed),
+            Line(DiffLineStatus.Removed));
 
         var fokussierteIndizes = new List<int>();
         sut.DiffZeileFokussiert += fokussierteIndizes.Add;
@@ -58,9 +58,9 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
     public async Task VorherigeAenderungCommand_ErsterAufruf_SpringtZuLetztemBlock()
     {
         var sut = await CreateSutMitDiffZeilenAsync(
-            Zeile(DiffLineStatus.Added),
-            Zeile(DiffLineStatus.Context),
-            Zeile(DiffLineStatus.Modified));
+            Line(DiffLineStatus.Added),
+            Line(DiffLineStatus.Context),
+            Line(DiffLineStatus.Modified));
 
         var fokussierteIndizes = new List<int>();
         sut.DiffZeileFokussiert += fokussierteIndizes.Add;
@@ -83,7 +83,7 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
         ereignisAusgeloest.Should().BeFalse();
     }
 
-    private static TextDiffLine Zeile(DiffLineStatus status) => new("inhalt", status, 1, 1, []);
+    private static TextDiffLine Line(DiffLineStatus status) => new("inhalt", status, 1, 1, []);
 
     private static FileExplorerViewModel CreateSut()
     {
@@ -92,7 +92,7 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
         return new FileExplorerViewModel(gitMock.Object, diffMock.Object, NullLogger<FileExplorerViewModel>.Instance);
     }
 
-    private static async Task<FileExplorerViewModel> CreateSutMitDiffZeilenAsync(params TextDiffLine[] zeilen)
+    private static async Task<FileExplorerViewModel> CreateSutMitDiffZeilenAsync(params TextDiffLine[] lines)
     {
         var gitMock = new Mock<IGitWorkspaceBrowserService>();
         var diffMock = new Mock<ITextDiffService>();
@@ -104,10 +104,10 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
         var node = new WorkspaceFileNode { Name = "a.cs", RelativePath = "a.cs", CommitSha = "abc123" };
         var preview = new FilePreview("a.cs", null, false, false, false, "neu", "alt", null);
         gitMock.Setup(g => g.LoadCommitPreviewAsync(RepositoryPath, node, It.IsAny<CancellationToken>())).ReturnsAsync(preview);
-        diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(zeilen));
+        diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(lines));
 
         sut.AusgewaehlterKnoten = node;
-        await WaitForAsync(() => sut.DiffZeilen.Count == zeilen.Length);
+        await WaitForAsync(() => sut.DiffZeilen.Count == lines.Length);
 
         return sut;
     }

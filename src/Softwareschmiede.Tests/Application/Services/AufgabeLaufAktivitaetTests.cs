@@ -3,7 +3,7 @@ using Softwareschmiede.Application.Services;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für <see cref="AufgabeLaufAktivitaet"/>.</summary>
+/// <summary>Tests für <see cref="WorkItemRunActivity"/>.</summary>
 public sealed class AufgabeLaufAktivitaetTests
 {
     /// <summary>IstAktiv liefert true, wenn AktiveRunId gesetzt und der Heartbeat frisch ist.</summary>
@@ -13,7 +13,7 @@ public sealed class AufgabeLaufAktivitaetTests
         var nowUtc = DateTimeOffset.UtcNow;
         var lastHeartbeatUtc = nowUtc.AddSeconds(-5);
 
-        var result = AufgabeLaufAktivitaet.IstAktiv("run-1", lastHeartbeatUtc, nowUtc);
+        var result = WorkItemRunActivity.IsActive("run-1", lastHeartbeatUtc, nowUtc);
 
         result.Should().BeTrue();
     }
@@ -23,9 +23,9 @@ public sealed class AufgabeLaufAktivitaetTests
     public void IstAktiv_ShouldReturnFalse_WhenHeartbeatOlderThanTimeout()
     {
         var nowUtc = DateTimeOffset.UtcNow;
-        var lastHeartbeatUtc = nowUtc.AddMinutes(-(AufgabeRecoveryService.HeartbeatTimeoutMinutes + 1));
+        var lastHeartbeatUtc = nowUtc.AddMinutes(-(WorkItemRecoveryService.HeartbeatTimeoutMinutes + 1));
 
-        var result = AufgabeLaufAktivitaet.IstAktiv("run-1", lastHeartbeatUtc, nowUtc);
+        var result = WorkItemRunActivity.IsActive("run-1", lastHeartbeatUtc, nowUtc);
 
         result.Should().BeFalse();
     }
@@ -35,9 +35,9 @@ public sealed class AufgabeLaufAktivitaetTests
     public void IstAktiv_ShouldReturnFalse_WhenHeartbeatExactlyAtTimeout()
     {
         var nowUtc = DateTimeOffset.UtcNow;
-        var lastHeartbeatUtc = nowUtc.AddMinutes(-AufgabeRecoveryService.HeartbeatTimeoutMinutes);
+        var lastHeartbeatUtc = nowUtc.AddMinutes(-WorkItemRecoveryService.HeartbeatTimeoutMinutes);
 
-        var result = AufgabeLaufAktivitaet.IstAktiv("run-1", lastHeartbeatUtc, nowUtc);
+        var result = WorkItemRunActivity.IsActive("run-1", lastHeartbeatUtc, nowUtc);
 
         result.Should().BeFalse();
     }
@@ -46,7 +46,7 @@ public sealed class AufgabeLaufAktivitaetTests
     [Fact]
     public void IstAktiv_ShouldReturnFalse_WhenHeartbeatNull()
     {
-        var result = AufgabeLaufAktivitaet.IstAktiv("run-1", null, DateTimeOffset.UtcNow);
+        var result = WorkItemRunActivity.IsActive("run-1", null, DateTimeOffset.UtcNow);
 
         result.Should().BeFalse();
     }
@@ -58,7 +58,7 @@ public sealed class AufgabeLaufAktivitaetTests
         var nowUtc = DateTimeOffset.UtcNow;
         var lastHeartbeatUtc = nowUtc.AddSeconds(-5);
 
-        var result = AufgabeLaufAktivitaet.IstAktiv(null, lastHeartbeatUtc, nowUtc);
+        var result = WorkItemRunActivity.IsActive(null, lastHeartbeatUtc, nowUtc);
 
         result.Should().BeFalse();
     }

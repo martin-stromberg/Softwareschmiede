@@ -100,8 +100,8 @@ public sealed class ScmEventOrchestratorTests
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator", TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Simulator", TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Zugestellt", item.Status);
@@ -122,8 +122,8 @@ public sealed class ScmEventOrchestratorTests
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Nicht installiert", TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Nicht installiert", TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);
@@ -253,7 +253,7 @@ public sealed class ScmEventOrchestratorTests
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         await fixture.DispatchAsync(eventId);
-        var cli = fixture.Services.GetRequiredService<KiAusfuehrungsService>();
+        var cli = fixture.Services.GetRequiredService<AiExecutionService>();
         var adapter = cli.GetScmPromptSession(taskId)!;
         var channel = Path.Combine(adapter.WorkingDirectory, ScmEventExchangeProtocol.DirectoryName);
         Directory.CreateDirectory(channel);
@@ -287,7 +287,7 @@ public sealed class ScmEventOrchestratorTests
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         await fixture.DispatchAsync(eventId);
-        var cli = fixture.Services.GetRequiredService<KiAusfuehrungsService>();
+        var cli = fixture.Services.GetRequiredService<AiExecutionService>();
         var adapter = cli.GetScmPromptSession(taskId)!;
         Assert.Equal(ScmPromptReadyStatus.TrustPrompt, adapter.ReadyStatus);
         var item = await fixture.EventAsync(eventId);
@@ -316,7 +316,7 @@ public sealed class ScmEventOrchestratorTests
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         await fixture.DispatchAsync(eventId);
-        var cli = fixture.Services.GetRequiredService<KiAusfuehrungsService>();
+        var cli = fixture.Services.GetRequiredService<AiExecutionService>();
         var adapter = cli.GetScmPromptSession(taskId)!;
         using (var scope = fixture.Services.CreateScope())
         {
@@ -345,7 +345,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Contains("Promptformat", item.Reason);
         Assert.Contains("unbekannt", item.Reason);
         Assert.False(ScmCliWaitReason.IsConfirmable(item.Reason));
-        var adapter = fixture.Services.GetRequiredService<KiAusfuehrungsService>().GetScmPromptSession(taskId)!;
+        var adapter = fixture.Services.GetRequiredService<AiExecutionService>().GetScmPromptSession(taskId)!;
         Assert.Equal(ScmCliRecognitionState.Unknown, adapter.CliRecognition.State);
         using var scope = fixture.Services.CreateScope();
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -377,7 +377,7 @@ public sealed class ScmEventOrchestratorTests
             Assert.Contains("Devin CLI", waiting.Reason);
             Assert.Contains("v3001.0.0", waiting.Reason);
             Assert.Contains("nicht unterstützt", waiting.Reason);
-            var adapter = fixture.Services.GetRequiredService<KiAusfuehrungsService>().GetScmPromptSession(taskId)!;
+            var adapter = fixture.Services.GetRequiredService<AiExecutionService>().GetScmPromptSession(taskId)!;
             Assert.Equal(ScmCliRecognitionState.Unsupported, adapter.CliRecognition.State);
             using (var scope = fixture.Services.CreateScope())
                 await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"), TestContext.Current.CancellationToken);

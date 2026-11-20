@@ -21,21 +21,21 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     private const string KiPrefix = "Softwareschmiede.TestKi";
 
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AppEinstellungService _einstellungService;
-    private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
+    private readonly AppSettingService _settingService;
+    private readonly WorkingDirectorySettingsService _arbeitsverzeichnisService;
     private readonly DarkModeService _darkModeService;
     private readonly Mock<IPluginManager> _pluginManagerMock;
     private readonly PluginActivationService _pluginActivationService;
     private readonly InMemoryCredentialStoreForSettings _credentialStore;
     private readonly PluginSettingsService _pluginSettingsService;
-    private readonly PromptVorlagenService _promptVorlagenService;
+    private readonly PromptTemplateService _promptVorlagenService;
 
     /// <summary>SettingsViewModelTests_AusfuehrungsLimits.</summary>
     public SettingsViewModelTests_AusfuehrungsLimits()
     {
         _db = TestDbContextFactory.Create();
-        _einstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
-        _arbeitsverzeichnisService = new ArbeitsverzeichnisSettingsService(_db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
+        _arbeitsverzeichnisService = new WorkingDirectorySettingsService(_db, NullLogger<WorkingDirectorySettingsService>.Instance);
 
         var scopeMock = new Mock<IServiceScope>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
@@ -43,17 +43,17 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
 
         scopeFactoryMock.Setup(f => f.CreateScope()).Returns(scopeMock.Object);
         scopeMock.Setup(s => s.ServiceProvider).Returns(serviceProviderMock.Object);
-        serviceProviderMock.Setup(p => p.GetService(typeof(AppEinstellungService))).Returns(_einstellungService);
+        serviceProviderMock.Setup(p => p.GetService(typeof(AppSettingService))).Returns(_settingService);
 
         _darkModeService = new DarkModeService(scopeFactoryMock.Object, NullLogger<DarkModeService>.Instance);
         _pluginManagerMock = new Mock<IPluginManager>();
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([]);
-        _pluginActivationService = new PluginActivationService(_einstellungService, _pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        _pluginActivationService = new PluginActivationService(_settingService, _pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _credentialStore = new InMemoryCredentialStoreForSettings();
         _pluginSettingsService = new PluginSettingsService(_credentialStore, NullLogger<PluginSettingsService>.Instance);
-        _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
+        _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
@@ -61,14 +61,14 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
 
     private SettingsViewModel CreateSut() =>
         new(
-            _einstellungService,
+            _settingService,
             _arbeitsverzeichnisService,
             _darkModeService,
             _pluginManagerMock.Object,
             _pluginActivationService,
             _pluginSettingsService,
             _promptVorlagenService,
-            new ProjektService(_db, NullLogger<ProjektService>.Instance),
+            new ProjectService(_db, NullLogger<ProjectService>.Instance),
             NullLogger<SettingsViewModel>.Instance,
             new Mock<IDialogService>().Object,
             new Mock<IServiceProvider>().Object);
@@ -98,7 +98,7 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [Fact]
     public async Task LadenAsync_GlobalesLimitGespeichert_FeldGefuellt()
     {
-        await _einstellungService.SetIntSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, 3, TestContext.Current.CancellationToken);
+        await _settingService.SetIntSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, 3, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -111,9 +111,9 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [InlineData("0")]
     [InlineData("-2")]
     [InlineData("abc")]
-    public async Task LadenAsync_GlobalesLimitUngueltig_FeldLeer(string wert)
+    public async Task LadenAsync_GlobalesLimitUngueltig_FeldLeer(string value)
     {
-        await _einstellungService.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, wert, TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, value, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -132,7 +132,7 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _einstellungService.GetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, TestContext.Current.CancellationToken))
+        (await _settingService.GetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, TestContext.Current.CancellationToken))
             .Should().Be("2");
     }
 
@@ -140,7 +140,7 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [Fact]
     public async Task SpeichernAsync_GlobalesLimitLeer_PersistiertNull()
     {
-        await _einstellungService.SetIntSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, 4, TestContext.Current.CancellationToken);
+        await _settingService.SetIntSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, 4, TestContext.Current.CancellationToken);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         sut.MaxParalleleAusfuehrungen = "  ";
@@ -148,7 +148,7 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _einstellungService.GetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, TestContext.Current.CancellationToken))
+        (await _settingService.GetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, TestContext.Current.CancellationToken))
             .Should().BeNull();
     }
 
@@ -158,16 +158,16 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [InlineData("-1")]
     [InlineData("abc")]
     [InlineData("1,5")]
-    public async Task SpeichernAsync_GlobalesLimitUngueltig_Validierungsfehler(string wert)
+    public async Task SpeichernAsync_GlobalesLimitUngueltig_Validierungsfehler(string value)
     {
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.MaxParalleleAusfuehrungen = wert;
+        sut.MaxParalleleAusfuehrungen = value;
 
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().Contain("Limit paralleler CLI-Ausführungen");
-        (await _einstellungService.GetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, TestContext.Current.CancellationToken))
+        (await _settingService.GetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, TestContext.Current.CancellationToken))
             .Should().BeNull();
     }
 
@@ -175,19 +175,19 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [Fact]
     public async Task KiPluginSelected_ZeigtParallelLimitFeld()
     {
-        var kiPlugin = CreateKiPlugin();
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = CreateKiPlugin();
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
 
-        var gruppe = sut.SelectedPluginSettings.SingleOrDefault(g => g.GroupName == "Ausführungsbegrenzung");
-        gruppe.Should().NotBeNull();
-        gruppe!.Entries.Should().ContainSingle();
-        gruppe.Entries[0].Field.Key.Should().Be("ParallelLimit");
-        gruppe.Entries[0].Field.FieldType.Should().Be(PluginSettingFieldType.Integer);
-        gruppe.Entries[0].Value.Should().BeEmpty();
+        var group = sut.SelectedPluginSettings.SingleOrDefault(g => g.GroupName == "Ausführungsbegrenzung");
+        group.Should().NotBeNull();
+        group!.Entries.Should().ContainSingle();
+        group.Entries[0].Field.Key.Should().Be("ParallelLimit");
+        group.Entries[0].Field.FieldType.Should().Be(PluginSettingFieldType.Integer);
+        group.Entries[0].Value.Should().BeEmpty();
     }
 
     /// <summary>Für SCM-Plugins gibt es keine Limit-Gruppe.</summary>
@@ -212,24 +212,24 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [Fact]
     public async Task SpeichernAsync_PluginLimit_PersistiertInAppEinstellung()
     {
-        var kiPlugin = CreateKiPlugin();
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = CreateKiPlugin();
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
-        var eintrag = sut.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0];
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
+        var entry = sut.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0];
 
-        eintrag.Value = "2";
+        entry.Value = "2";
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _einstellungService.GetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(KiPrefix), TestContext.Current.CancellationToken))
+        (await _settingService.GetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(KiPrefix), TestContext.Current.CancellationToken))
             .Should().Be("2");
         _credentialStore.GetCredential($"{KiPrefix}.ParallelLimit").Should().BeNull();
 
         var neu = CreateSut();
         await ((AsyncRelayCommand)neu.LadenCommand).ExecuteAsync();
-        neu.KiPluginSelectedCommand.Execute(kiPlugin);
+        neu.KiPluginSelectedCommand.Execute(aiPlugin);
         neu.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0].Value
             .Should().Be("2");
     }
@@ -238,20 +238,20 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [Fact]
     public async Task SpeichernAsync_PluginLimitLeer_PersistiertNull()
     {
-        var kiPlugin = CreateKiPlugin();
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
-        await _einstellungService.SetIntSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(KiPrefix), 3, TestContext.Current.CancellationToken);
+        var aiPlugin = CreateKiPlugin();
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
+        await _settingService.SetIntSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(KiPrefix), 3, TestContext.Current.CancellationToken);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
-        var eintrag = sut.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0];
-        eintrag.Value.Should().Be("3");
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
+        var entry = sut.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0];
+        entry.Value.Should().Be("3");
 
-        eintrag.Value = "";
+        entry.Value = "";
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _einstellungService.GetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(KiPrefix), TestContext.Current.CancellationToken))
+        (await _settingService.GetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(KiPrefix), TestContext.Current.CancellationToken))
             .Should().BeNull();
     }
 
@@ -260,20 +260,20 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [InlineData("0")]
     [InlineData("-4")]
     [InlineData("text")]
-    public async Task SpeichernAsync_PluginLimitUngueltig_Validierungsfehler(string wert)
+    public async Task SpeichernAsync_PluginLimitUngueltig_Validierungsfehler(string value)
     {
-        var kiPlugin = CreateKiPlugin();
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = CreateKiPlugin();
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(kiPlugin);
-        var eintrag = sut.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0];
+        sut.KiPluginSelectedCommand.Execute(aiPlugin);
+        var entry = sut.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0];
 
-        eintrag.Value = wert;
+        entry.Value = value;
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().NotBeNull();
-        (await _einstellungService.GetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(KiPrefix), TestContext.Current.CancellationToken))
+        (await _settingService.GetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(KiPrefix), TestContext.Current.CancellationToken))
             .Should().BeNull();
     }
 }

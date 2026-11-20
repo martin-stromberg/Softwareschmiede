@@ -6,7 +6,7 @@ namespace Softwareschmiede.App.Services;
 
 /// <summary>
 /// Persistiert die Auto-Shutdown-Nebenwerte (Erzwingen-Flag und Toleranzzeit) über den scoped
-/// <see cref="AppEinstellungService"/> in eigenen DI-Scopes (Muster <see cref="AufgabenListenModusService"/>).
+/// <see cref="AppSettingService"/> in eigenen DI-Scopes (Muster <see cref="AufgabenListenModusService"/>).
 /// Der Aktivierungszustand des Auto-Shutdowns wird bewusst nicht persistiert.
 /// </summary>
 public sealed class AutoShutdownEinstellungenService
@@ -24,13 +24,13 @@ public sealed class AutoShutdownEinstellungenService
     /// <summary>Lädt die gespeicherten Auto-Shutdown-Nebenwerte (Erzwingen und Toleranzzeit).</summary>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Erzwingen-Flag und Toleranzzeit in Minuten mit den Service-Defaults, wenn nichts gespeichert ist.</returns>
-    public async Task<(bool Erzwingen, int ToleranzMinuten)> LadeAsync(CancellationToken ct = default)
+    public async Task<(bool Erzwingen, int ToleranzMinuten)> LoadAsync(CancellationToken ct = default)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-        var force = await einstellungService.GetAutoShutdownErzwingenAsync(ct);
-        var toleranz = await einstellungService.GetAutoShutdownToleranzMinutenAsync(ct);
-        return (force, toleranz);
+        var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+        var force = await settingService.GetAutoShutdownForceAsync(ct);
+        var tolerance = await settingService.GetAutoShutdownToleranceMinutesAsync(ct);
+        return (force, tolerance);
     }
 
     /// <summary>Speichert den Schalter "Herunterfahren erzwingen".</summary>
@@ -39,19 +39,19 @@ public sealed class AutoShutdownEinstellungenService
     public async Task SpeichereErzwingenAsync(bool force, CancellationToken ct = default)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-        await einstellungService.SetAutoShutdownErzwingenAsync(force, ct);
+        var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+        await settingService.SetAutoShutdownForceAsync(force, ct);
         _logger.LogDebug("Auto-Shutdown-Erzwingen '{Erzwingen}' gespeichert.", force);
     }
 
     /// <summary>Speichert die Toleranzzeit (Minuten) des Auto-Shutdown-Countdowns.</summary>
-    /// <param name="toleranzMinuten">Die zu speichernde Toleranzzeit in Minuten.</param>
+    /// <param name="toleranceMinutes">Die zu speichernde Toleranzzeit in Minuten.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    public async Task SpeichereToleranzMinutenAsync(int toleranzMinuten, CancellationToken ct = default)
+    public async Task SpeichereToleranzMinutenAsync(int toleranceMinutes, CancellationToken ct = default)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-        await einstellungService.SetAutoShutdownToleranzMinutenAsync(toleranzMinuten, ct);
-        _logger.LogDebug("Auto-Shutdown-Toleranz '{ToleranzMinuten}' Minuten gespeichert.", toleranzMinuten);
+        var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+        await settingService.SetAutoShutdownToleranceMinutesAsync(toleranceMinutes, ct);
+        _logger.LogDebug("Auto-Shutdown-Toleranz '{ToleranzMinuten}' Minuten gespeichert.", toleranceMinutes);
     }
 }

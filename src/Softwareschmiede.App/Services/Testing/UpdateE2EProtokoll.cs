@@ -106,36 +106,36 @@ public sealed class UpdateE2EProtokoll
     /// <inheritdoc cref="UpdateE2EProtokoll"/>
     /// <param name="dateiPfad">Pfad der JSONL-Protokolldatei.</param>
     /// <param name="szenarioId">Szenario-ID für jeden Eintrag.</param>
-    /// <param name="quelle">Quellkennung der Einträge (z. B. <c>app</c> oder <c>runner</c>).</param>
-    public UpdateE2EProtokoll(string dateiPfad, string szenarioId, string quelle = "app")
+    /// <param name="source">Quellkennung der Einträge (z. B. <c>app</c> oder <c>runner</c>).</param>
+    public UpdateE2EProtokoll(string dateiPfad, string szenarioId, string source = "app")
     {
         _dateiPfad = dateiPfad;
         _szenarioId = szenarioId;
-        _quelle = quelle;
-        _seq = ZaehleVorhandeneEintraege(dateiPfad, quelle);
+        _quelle = source;
+        _seq = ZaehleVorhandeneEintraege(dateiPfad, source);
     }
 
     /// <summary>Schreibt ein Protokollereignis als JSONL-Zeile.</summary>
-    /// <param name="ereignis">Der Ereignisname (siehe <see cref="UpdateE2EEreignisse"/>).</param>
-    /// <param name="daten">Optionale strukturierte Nutzdaten.</param>
-    public void Schreibe(string ereignis, object? daten = null)
+    /// <param name="evt">Der Ereignisname (siehe <see cref="UpdateE2EEreignisse"/>).</param>
+    /// <param name="data">Optionale strukturierte Nutzdaten.</param>
+    public void Schreibe(string evt, object? data = null)
     {
         lock (_lock)
         {
-            var eintrag = new UpdateE2EProtokollEintrag
+            var entry = new UpdateE2EProtokollEintrag
             {
                 Seq = ++_seq,
                 ProzessId = Environment.ProcessId,
                 SzenarioId = _szenarioId,
-                Ereignis = ereignis,
-                Daten = daten,
+                Event = evt,
+                Data = data,
                 Utc = DateTimeOffset.UtcNow,
-                Quelle = _quelle
+                Source = _quelle
             };
 
             AppendAllTextMitRetry(
                 _dateiPfad,
-                JsonSerializer.Serialize(eintrag, SerializerOptions) + Environment.NewLine);
+                JsonSerializer.Serialize(entry, SerializerOptions) + Environment.NewLine);
         }
     }
 
@@ -145,38 +145,38 @@ public sealed class UpdateE2EProtokoll
     /// </summary>
     /// <param name="dateiPfad">Pfad der JSONL-Protokolldatei.</param>
     /// <param name="szenarioId">Szenario-ID des Eintrags.</param>
-    /// <param name="ereignis">Der Ereignisname.</param>
-    /// <param name="daten">Optionale strukturierte Nutzdaten.</param>
-    /// <param name="quelle">Quellkennung des Eintrags.</param>
-    public static void Anfuegen(string dateiPfad, string szenarioId, string ereignis, object? daten = null, string quelle = "runner")
+    /// <param name="evt">Der Ereignisname.</param>
+    /// <param name="data">Optionale strukturierte Nutzdaten.</param>
+    /// <param name="source">Quellkennung des Eintrags.</param>
+    public static void Anfuegen(string dateiPfad, string szenarioId, string evt, object? data = null, string source = "runner")
     {
-        var seq = ZaehleVorhandeneEintraege(dateiPfad, quelle) + 1;
-        var eintrag = new UpdateE2EProtokollEintrag
+        var seq = ZaehleVorhandeneEintraege(dateiPfad, source) + 1;
+        var entry = new UpdateE2EProtokollEintrag
         {
             Seq = seq,
             ProzessId = Environment.ProcessId,
             SzenarioId = szenarioId,
-            Ereignis = ereignis,
-            Daten = daten,
+            Event = evt,
+            Data = data,
             Utc = DateTimeOffset.UtcNow,
-            Quelle = quelle
+            Source = source
         };
 
         AppendAllTextMitRetry(
             dateiPfad,
-            JsonSerializer.Serialize(eintrag, SerializerOptions) + Environment.NewLine);
+            JsonSerializer.Serialize(entry, SerializerOptions) + Environment.NewLine);
     }
 
     // App- und Runner-Prozess schreiben in dieselbe Datei; ein kurzer Retry fängt die
     // übliche Sharing-Verletzung bei zeitgleichem Append ab.
-    private static void AppendAllTextMitRetry(string dateiPfad, string zeile)
+    private static void AppendAllTextMitRetry(string dateiPfad, string line)
     {
         const int versuche = 5;
         for (var i = 1; ; i++)
         {
             try
             {
-                File.AppendAllText(dateiPfad, zeile);
+                File.AppendAllText(dateiPfad, line);
                 return;
             }
             catch (IOException) when (i < versuche)
@@ -186,7 +186,7 @@ public sealed class UpdateE2EProtokoll
         }
     }
 
-    private static long ZaehleVorhandeneEintraege(string dateiPfad, string quelle)
+    private static long ZaehleVorhandeneEintraege(string dateiPfad, string source)
     {
         if (!File.Exists(dateiPfad))
             return 0;
@@ -196,16 +196,16 @@ public sealed class UpdateE2EProtokoll
             using var stream = new FileStream(dateiPfad, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             using var reader = new StreamReader(stream);
             var letzteSeq = 0L;
-            while (reader.ReadLine() is { } zeile)
+            while (reader.ReadLine() is { } line)
             {
-                if (zeile.Contains($"\"quelle\":\"{quelle}\"", StringComparison.Ordinal)
-                    && zeile.Contains("\"seq\":", StringComparison.Ordinal))
+                if (line.Contains($"\"quelle\":\"{source}\"", StringComparison.Ordinal)
+                    && line.Contains("\"seq\":", StringComparison.Ordinal))
                 {
-                    var seqStart = zeile.IndexOf("\"seq\":", StringComparison.Ordinal) + 6;
+                    var seqStart = line.IndexOf("\"seq\":", StringComparison.Ordinal) + 6;
                     var seqEnd = seqStart;
-                    while (seqEnd < zeile.Length && char.IsDigit(zeile[seqEnd]))
+                    while (seqEnd < line.Length && char.IsDigit(line[seqEnd]))
                         seqEnd++;
-                    if (long.TryParse(zeile[seqStart..seqEnd], out var seq))
+                    if (long.TryParse(line[seqStart..seqEnd], out var seq))
                         letzteSeq = Math.Max(letzteSeq, seq);
                 }
             }
@@ -235,12 +235,12 @@ public sealed class UpdateE2EProtokollEintrag
     public string SzenarioId { get; set; } = string.Empty;
 
     /// <summary>Ereignisname (siehe <see cref="UpdateE2EEreignisse"/>).</summary>
-    [JsonPropertyName("event")]
-    public string Ereignis { get; set; } = string.Empty;
+    [JsonPropertyName("evt")]
+    public string Event { get; set; } = string.Empty;
 
     /// <summary>Optionale strukturierte Nutzdaten.</summary>
     [JsonPropertyName("data")]
-    public object? Daten { get; set; }
+    public object? Data { get; set; }
 
     /// <summary>UTC-Zeitpunkt des Ereignisses.</summary>
     [JsonPropertyName("utc")]
@@ -248,5 +248,5 @@ public sealed class UpdateE2EProtokollEintrag
 
     /// <summary>Quellkennung (<c>app</c> oder <c>runner</c>).</summary>
     [JsonPropertyName("quelle")]
-    public string Quelle { get; set; } = "app";
+    public string Source { get; set; } = "app";
 }

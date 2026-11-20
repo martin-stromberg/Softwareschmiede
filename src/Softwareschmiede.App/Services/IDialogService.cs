@@ -8,7 +8,7 @@ namespace Softwareschmiede.App.Services;
 public interface IDialogService
 {
     /// <summary>Zeigt eine Bestätigungsabfrage an und gibt zurück, ob der Benutzer bestätigt hat.</summary>
-    bool BestaetigenDialog(string nachricht, string titel);
+    bool BestaetigenDialog(string nachricht, string title);
 
     /// <summary>Öffnet den Repository-Zuweisungs-Dialog und gibt zurück, ob der Benutzer bestätigt hat.</summary>
     bool RepositoryZuweisenDialog(RepositoryAssignViewModel viewModel);

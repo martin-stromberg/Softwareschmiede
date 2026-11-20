@@ -101,8 +101,8 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
         var saved = await WaitForSavedInitialisierungsskriptAsync(RepoFolderName, UnbekanntesSkript);
         Assert.Equal(UnbekanntesSkript, saved);
 
-        var anzeige = WaitForElement(mainWindow, cf => cf.ByAutomationId("InitialisierungsskriptAnzeige"), Short);
-        Assert.Equal(UnbekanntesSkript, anzeige.Name);
+        var display = WaitForElement(mainWindow, cf => cf.ByAutomationId("InitialisierungsskriptAnzeige"), Short);
+        Assert.Equal(UnbekanntesSkript, display.Name);
     }
 
     /// <summary>
@@ -123,8 +123,8 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
         var abbrechenButton = WaitForElement(mainWindow, cf => cf.ByName("InitialisierungsskriptAbbrechen"), Short);
         abbrechenButton.AsButton().ClickInForeground();
 
-        var anzeige = WaitForElement(mainWindow, cf => cf.ByAutomationId("InitialisierungsskriptAnzeige"), Short);
-        Assert.Equal(UnbekanntesSkript, anzeige.Name);
+        var display = WaitForElement(mainWindow, cf => cf.ByAutomationId("InitialisierungsskriptAnzeige"), Short);
+        Assert.Equal(UnbekanntesSkript, display.Name);
 
         var saved = await WaitForSavedInitialisierungsskriptAsync(RepoFolderName, UnbekanntesSkript);
         Assert.Equal(UnbekanntesSkript, saved);

@@ -17,6 +17,6 @@ public interface IUpdateVersuchProtokoll
     /// <summary>Meldet den Abschluss eines Updateversuchs.</summary>
     /// <param name="art">Die Versuchsart.</param>
     /// <param name="updateVerfuegbar">Ob nach dem Versuch ein Updateangebot sichtbar ist.</param>
-    /// <param name="hinweis">Der aktuell angezeigte Update-Hinweis, falls vorhanden.</param>
-    void BeendeVersuch(string art, bool updateVerfuegbar, string? hinweis);
+    /// <param name="hint">Der aktuell angezeigte Update-Hinweis, falls vorhanden.</param>
+    void BeendeVersuch(string art, bool updateVerfuegbar, string? hint);
 }

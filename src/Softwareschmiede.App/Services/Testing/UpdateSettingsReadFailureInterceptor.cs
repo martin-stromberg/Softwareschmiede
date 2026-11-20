@@ -7,7 +7,7 @@ using Softwareschmiede.Application.Services;
 namespace Softwareschmiede.App.Services.Testing;
 
 /// <summary>
-/// EF-Core-Interceptor, der ausschließlich mit dem Abfragetag <see cref="AppEinstellungService.UpdateSettingsReadTag"/>
+/// EF-Core-Interceptor, der ausschließlich mit dem Abfragetag <see cref="AppSettingService.UpdateSettingsReadTag"/>
 /// markierte Lesebefehle der Update-Einstellungen gezielt mit einer kontrollierten Exception fehlschlagen lässt.
 /// Alle anderen Lese- und Schreibbefehle bleiben unberührt.
 /// </summary>
@@ -32,10 +32,10 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
     }
 
     /// <inheritdoc cref="UpdateSettingsReadFailureInterceptor"/>
-    /// <param name="kontext">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public UpdateSettingsReadFailureInterceptor(UpdateE2ETestKontext kontext)
+    /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
+    public UpdateSettingsReadFailureInterceptor(UpdateE2ETestKontext context)
     {
-        _kontext = kontext;
+        _kontext = context;
     }
 
     /// <summary>Wird ausgelöst, sobald ein markierter Update-Settings-Lesebefehl erreicht wird (vor einem etwaigen Fehler).</summary>
@@ -94,7 +94,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
     /// </summary>
     private Fehlerfall? PruefeMarkiertenRead(DbCommand command)
     {
-        if (!command.CommandText.Contains(AppEinstellungService.UpdateSettingsReadTag, StringComparison.Ordinal))
+        if (!command.CommandText.Contains(AppSettingService.UpdateSettingsReadTag, StringComparison.Ordinal))
             return null;
 
         Interlocked.Increment(ref _settingsReadCount);
@@ -122,7 +122,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
                 versuch,
                 versuchIndex,
                 ordinal,
-                grenze = lesefehler?.Grenze,
+                limit = lesefehler?.Limit,
                 fehlerAktiv = lesefehler?.Active == true || _failureEnabled
             });
 
@@ -142,20 +142,20 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
 
     private void WarteUndWirf(Fehlerfall fehlerfall, CancellationToken cancellationToken)
     {
-        var grund = "sofort";
+        var reason = "sofort";
         if (fehlerfall.Lesefehler.AufFreigabeWarten)
         {
             var freigegeben = _kontext!.WarteAufGate(
                 UpdateE2ETestKontext.LesefehlerGateName, cancellationToken, WarteTimeout(fehlerfall));
-            grund = ErmittleWarteGrund(freigegeben);
+            reason = ErmittleWarteGrund(freigegeben);
         }
 
-        ProtokolliereFehlerUndWirf(fehlerfall, grund);
+        ProtokolliereFehlerUndWirf(fehlerfall, reason);
     }
 
     private async Task WarteUndWirfAsync(Fehlerfall fehlerfall, CancellationToken cancellationToken)
     {
-        var grund = "sofort";
+        var reason = "sofort";
         if (fehlerfall.Lesefehler.AufFreigabeWarten)
         {
             bool freigegeben;
@@ -168,10 +168,10 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
             {
                 freigegeben = false;
             }
-            grund = ErmittleWarteGrund(freigegeben);
+            reason = ErmittleWarteGrund(freigegeben);
         }
 
-        ProtokolliereFehlerUndWirf(fehlerfall, grund);
+        ProtokolliereFehlerUndWirf(fehlerfall, reason);
     }
 
     /// <summary>Die konfigurierte Wartezeit des Lesefehlers, mindestens eine Sekunde.</summary>
@@ -189,7 +189,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
                 ? "abgebrochen"
                 : "timeout";
 
-    private void ProtokolliereFehlerUndWirf(Fehlerfall fehlerfall, string grund)
+    private void ProtokolliereFehlerUndWirf(Fehlerfall fehlerfall, string reason)
     {
         _kontext!.Protokoll.Schreibe(
             UpdateE2EEreignisse.UpdateSettingsReadFailed,
@@ -198,8 +198,8 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
                 versuch = fehlerfall.Versuch,
                 versuchIndex = fehlerfall.VersuchIndex,
                 ordinal = fehlerfall.Ordinal,
-                grenze = fehlerfall.Lesefehler.Grenze,
-                grund
+                limit = fehlerfall.Lesefehler.Limit,
+                reason
             });
 
         throw FailureException;

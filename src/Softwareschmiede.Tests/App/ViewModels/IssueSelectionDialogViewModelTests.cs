@@ -21,8 +21,8 @@ public sealed class IssueSelectionDialogViewModelTests
     private IssueSelectionDialogViewModel CreateSut()
         => new(_gitPluginMock.Object, NullLogger<IssueSelectionDialogViewModel>.Instance);
 
-    private static Issue ErstelleIssue(int nummer = 1, string titel = "Titel")
-        => new(nummer, titel, "Body", [], null, "https://github.com/test/repo/issues/" + nummer);
+    private static Issue ErstelleIssue(int nummer = 1, string title = "Titel")
+        => new(nummer, title, "Body", [], null, "https://github.com/test/repo/issues/" + nummer);
 
     /// <summary>LoadAsync füllt VerfuegbareIssues aus dem Plugin.</summary>
     [Fact]

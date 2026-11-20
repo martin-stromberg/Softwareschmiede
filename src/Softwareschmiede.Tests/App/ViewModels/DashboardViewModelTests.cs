@@ -17,19 +17,19 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class DashboardViewModelTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly ProjektService _projektService;
-    private readonly AufgabeService _aufgabeService;
-    private readonly AufgabeRecoveryService _recoveryService;
+    private readonly ProjectService _projektService;
+    private readonly WorkItemService _workItemService;
+    private readonly WorkItemRecoveryService _recoveryService;
     private readonly Guid _projektId = new Guid("33333333-3333-3333-3333-333333333333");
 
     /// <summary>DashboardViewModelTests.</summary>
     public DashboardViewModelTests()
     {
         _db = TestDbContextFactory.Create();
-        _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         var runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
-        _recoveryService = new AufgabeRecoveryService(_db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance);
+        _recoveryService = new WorkItemRecoveryService(_db, runningStatusSourceMock.Object, NullLogger<WorkItemRecoveryService>.Instance);
 
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
@@ -45,7 +45,7 @@ public sealed class DashboardViewModelTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     private DashboardViewModel CreateSut(AufgabenListenModusService? aufgabenListenModusService = null) =>
-        new(_projektService, _aufgabeService, _recoveryService, NullLogger<DashboardViewModel>.Instance,
+        new(_projektService, _workItemService, _recoveryService, NullLogger<DashboardViewModel>.Instance,
             aufgabenListenModusService);
 
     /// <summary>Initialize setzt AktiveAufgabenListe auf die übergebene Instanz, um die gemeinsame Datenquelle des MainWindowViewModel zu übernehmen.</summary>
@@ -68,8 +68,8 @@ public sealed class DashboardViewModelTests : IDisposable
     public async Task LadenAsync_ShouldNotModifyAktiveAufgabenListe_WhenCalled()
     {
         // Arrange
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Zu startende Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projektId, "Zu startende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         var geteilteListe = new ObservableCollection<AktiveAufgabePanelItem>();
         sut.Initialize(geteilteListe, _ => { });
@@ -127,13 +127,13 @@ public sealed class DashboardViewModelTests : IDisposable
     public void AufgabenListenModus_ShouldBeSettableAndRaisePropertyChanged()
     {
         var sut = CreateSut();
-        var geaendert = new List<string?>();
-        sut.PropertyChanged += (_, e) => geaendert.Add(e.PropertyName);
+        var changed = new List<string?>();
+        sut.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
         sut.AufgabenListenModus = AufgabenListenModus.Repository;
 
         sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Repository);
-        geaendert.Should().Contain(nameof(DashboardViewModel.AufgabenListenModus));
+        changed.Should().Contain(nameof(DashboardViewModel.AufgabenListenModus));
     }
 
     /// <summary>Ein persistierter Dashboard-Modus wird über GespeichertenAufgabenListenModusLadenAsync wiederhergestellt.</summary>
@@ -146,8 +146,8 @@ public sealed class DashboardViewModelTests : IDisposable
         {
             using (var scope = provider.CreateScope())
             {
-                var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-                await einstellungen.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey, "Ki", TestContext.Current.CancellationToken);
+                var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+                await settings.SetSettingAsync(AppSettingService.ActiveWorkItemsListModeDashboardKey, "Ki", TestContext.Current.CancellationToken);
             }
 
             var sut = CreateSut(modusService);
@@ -175,18 +175,18 @@ public sealed class DashboardViewModelTests : IDisposable
 
             // Assert (Polling, da das Speichern fire-and-forget läuft)
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-            string? wert = null;
+            string? value = null;
             string? menueWert = null;
-            while (DateTime.UtcNow < deadline && wert != "Repository")
+            while (DateTime.UtcNow < deadline && value != "Repository")
             {
                 using var scope = provider.CreateScope();
-                var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-                wert = await einstellungen.GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey, TestContext.Current.CancellationToken);
-                menueWert = await einstellungen.GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey, TestContext.Current.CancellationToken);
-                if (wert != "Repository")
+                var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+                value = await settings.GetSettingAsync(AppSettingService.ActiveWorkItemsListModeDashboardKey, TestContext.Current.CancellationToken);
+                menueWert = await settings.GetSettingAsync(AppSettingService.ActiveWorkItemsListModeKey, TestContext.Current.CancellationToken);
+                if (value != "Repository")
                     await Task.Delay(50, TestContext.Current.CancellationToken);
             }
-            wert.Should().Be("Repository");
+            value.Should().Be("Repository");
             menueWert.Should().BeNull("der Dashboard-Moduswechsel darf den Menü-Schlüssel nicht schreiben");
         }
     }

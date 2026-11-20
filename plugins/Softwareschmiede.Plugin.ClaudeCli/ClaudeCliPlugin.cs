@@ -17,7 +17,7 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase, IIssueTemplateTextGenerat
     public override string PluginName => "Claude CLI";
 
     /// <inheritdoc/>
-    public override string ProviderDateiPraefix => "claude";
+    public override string ProviderFilePrefix => "claude";
 
     /// <inheritdoc/>
     public override string PluginPrefix => "Softwareschmiede.ClaudeCli";

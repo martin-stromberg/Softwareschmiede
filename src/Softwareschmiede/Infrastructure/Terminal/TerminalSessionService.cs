@@ -20,7 +20,7 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
     /// <summary>Umgebungsvariable, die den E2E-Testmodus (Test-Datenbankpfad) kennzeichnet. Zentrale
     /// Definition — referenziert u. a. aus <c>App.xaml.cs</c> (IProzessStarter-Auswahl) und
     /// <see cref="Softwareschmiede.Infrastructure.Plugins.PluginManager"/>.</summary>
-    public const string TestDatenbankPfadVariable = "SOFTWARESCHMIEDE_TEST_DB_PATH";
+    public const string TestDatabasePathVariable = "SOFTWARESCHMIEDE_TEST_DB_PATH";
 
     private readonly IOptions<TerminalSessionOptions> _options;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -85,7 +85,7 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
                 $"Die CLI-Executable '{spec.FileName}' (Plugin '{spec.PluginName}') kann nicht gestartet werden: {resolution.Detail}");
         }
 
-        if (spec.Capabilities.HasFlag(TerminalProviderCapabilities.RequiresPty) && !preflight.PtyVerfuegbar)
+        if (spec.Capabilities.HasFlag(TerminalProviderCapabilities.RequiresPty) && !preflight.PtyAvailable)
         {
             WriteDiagnosis(outputSink, "Das Plugin erfordert ein Pseudo-Terminal (RequiresPty), das nicht verfügbar ist", preflight);
             throw new InvalidOperationException(
@@ -104,17 +104,17 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
     }
 
     /// <summary>Wählt das Backend: Der E2E-Testmodus erzwingt Pipe; ansonsten gilt die im Preflight
-    /// abgeleitete <see cref="TerminalPreflightResult.BackendEmpfehlung"/> (einzige Entscheidungslogik).
+    /// abgeleitete <see cref="TerminalPreflightResult.BackendRecommendation"/> (einzige Entscheidungslogik).
     /// Die Fehlerfälle (Executable nicht auflösbar, RequiresPty ohne PTY) wurden zuvor bereits abgefangen.</summary>
     private IPseudoConsoleProcessLauncher SelectBackend(TerminalSessionStartSpec spec, TerminalPreflightResult preflight, ITerminalOutputSink? outputSink)
     {
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(TestDatenbankPfadVariable)))
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(TestDatabasePathVariable)))
         {
             WriteDiagnosis(outputSink, "Pipe-Backend gewählt (E2E-Testmodus)", preflight);
             return _pipeLauncher;
         }
 
-        if (preflight.BackendEmpfehlung == TerminalBackendEmpfehlung.Pty)
+        if (preflight.BackendRecommendation == TerminalBackendRecommendation.Pty)
             return _ptyLauncher;
 
         WriteDiagnosis(
@@ -128,10 +128,10 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
 
     /// <summary>Schreibt eine <c>[Terminal-Diagnose]</c>-Markerzeile ausschließlich in die Protokoll-Senke
     /// (CliOutput-Protokoll — nicht in <c>TerminalReplayBuffer</c>/Terminal-Anzeige) und ins Log.</summary>
-    private void WriteDiagnosis(ITerminalOutputSink? outputSink, string grund, TerminalPreflightResult preflight)
+    private void WriteDiagnosis(ITerminalOutputSink? outputSink, string reason, TerminalPreflightResult preflight)
     {
         var checks = string.Join(", ", preflight.Checks.Select(c => $"{c.Name}={(c.Ok ? "OK" : "Fehler")}{(c.Detail is null ? string.Empty : $" [{c.Detail}]")}"));
-        var message = $"[Terminal-Diagnose] {grund} | PtyVerfuegbar={preflight.PtyVerfuegbar} | Checks: {checks}";
+        var message = $"[Terminal-Diagnose] {reason} | PtyVerfuegbar={preflight.PtyAvailable} | Checks: {checks}";
 
         if (preflight.Checks.Any(c => !c.Ok))
             _logger.LogWarning("{Message}", message);
@@ -143,8 +143,8 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
             var markerBytes = Encoding.UTF8.GetBytes(message + "\r\n");
             // Diagnose-Marker gehen über den eigenen Kanal an Senken, die ihn explizit verstehen —
             // byte-exakte Mitschnitt-Senken (CliOutputRecorder) bleiben frei von Artefakt-Zeilen.
-            if (outputSink is ITerminalDiagnoseSink diagnoseSink)
-                diagnoseSink.OnDiagnoseChunk(markerBytes);
+            if (outputSink is ITerminalDiagnosticsSink diagnosticsSink)
+                diagnosticsSink.OnDiagnosticsChunk(markerBytes);
             else
                 outputSink?.OnOutputChunk(markerBytes);
         }
@@ -159,9 +159,9 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
-            var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            var wert = await einstellungen.GetSettingAsync(ForcePtyUnavailableKey, ct).ConfigureAwait(false);
-            return string.Equals(wert, "true", StringComparison.OrdinalIgnoreCase);
+            var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+            var value = await settings.GetSettingAsync(ForcePtyUnavailableKey, ct).ConfigureAwait(false);
+            return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
         }
         catch (Exception ex)
         {

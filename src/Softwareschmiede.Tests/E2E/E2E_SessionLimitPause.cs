@@ -109,9 +109,9 @@ public partial class End2EndTest
         // Skip-Guard analog ZeitgesteuerterPrompt_NachPlanen_..._E2E: Zwischen 00:00 und 00:10 läge
         // "jetzt - 10 min" noch am Vortag; die App interpretiert die eingegebene Uhrzeit aber immer
         // als heutiges Datum — eine Zukunftszeit würde geplant statt gesendet.
-        var jetzt = DateTime.Now;
-        Assert.SkipWhen(jetzt.Hour == 0 && jetzt.Minute < 10, "Kurz nach Mitternacht: 'jetzt - 10 min' wäre als heutige Uhrzeit eine Zukunftszeit.");
-        var vergangen = jetzt.AddMinutes(-10);
+        var now = DateTime.Now;
+        Assert.SkipWhen(now.Hour == 0 && now.Minute < 10, "Kurz nach Mitternacht: 'jetzt - 10 min' wäre als heutige Uhrzeit eine Zukunftszeit.");
+        var vergangen = now.AddMinutes(-10);
 
         taskB.SetScheduledPromptTime(vergangen.Hour, vergangen.Minute);
         taskB.SelectPromptTemplate(MarkerVorlagenName);
@@ -135,7 +135,7 @@ public partial class End2EndTest
         {
             // Plugin-weit persistiertes Session-Limit.
             var limitEintrag = await db.AppSettings
-                .SingleOrDefaultAsync(e => e.Key == KiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
+                .SingleOrDefaultAsync(e => e.Key == AiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
             Assert.NotNull(limitEintrag);
             Assert.True(
                 DateTimeOffset.TryParse(limitEintrag!.Value, out var persistiertesLimit),
@@ -198,10 +198,10 @@ public partial class End2EndTest
         // Heartbeat-Bewertung wieder: die laufenden Simulator-Aufgaben sind wieder riskant.
         await using (var db = OpenTestDbContext())
         {
-            var eintrag = await db.AppSettings
-                .SingleAsync(e => e.Key == KiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
-            eintrag.Value = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
-            eintrag.UpdatedAt = DateTimeOffset.UtcNow;
+            var entry = await db.AppSettings
+                .SingleAsync(e => e.Key == AiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
+            entry.Value = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+            entry.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();
         }
 
@@ -226,15 +226,15 @@ public partial class End2EndTest
     /// die CLI mit dem KI-Simulator-Plugin (gleiches Muster wie
     /// <c>E2E_TaskWechselUeberMenue.ErstelleUndStarteAufgabe</c>).
     /// </summary>
-    private static TaskDetailView ErstelleUndStarteLimitAufgabe(ProjectDetailView projectDetail, string titel)
+    private static TaskDetailView ErstelleUndStarteLimitAufgabe(ProjectDetailView projectDetail, string title)
     {
         var task = projectDetail.CreateTask();
-        task.SetTaskTitle(titel);
+        task.SetTaskTitle(title);
         task.SaveTask();
         task.GoBack();
 
         var projectDetailAfterSave = Assert.IsType<ProjectDetailView>(task.Window.CurrentView());
-        var taskReopened = projectDetailAfterSave.OpenTask(titel);
+        var taskReopened = projectDetailAfterSave.OpenTask(title);
         taskReopened.Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
         taskReopened.WaitForCliRunning();
 
@@ -243,24 +243,24 @@ public partial class End2EndTest
 
     private static CliUpdateSafetyService ErstelleSafetyService(Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext db)
     {
-        var aufgabeService = new AufgabeService(
+        var workItemService = new WorkItemService(
             db,
-            NullLogger<AufgabeService>.Instance,
+            NullLogger<WorkItemService>.Instance,
             new TodoService(db, NullLogger<TodoService>.Instance));
-        var appEinstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        var limitService = new KiPluginLimitService(
+        var appSettingService = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        var limitService = new AiPluginLimitService(
             db,
-            appEinstellungService,
-            new AufgabeLaufdatenChangedNotifier(),
-            NullLogger<KiPluginLimitService>.Instance);
-        return new CliUpdateSafetyService(aufgabeService, limitService, NullLogger<CliUpdateSafetyService>.Instance);
+            appSettingService,
+            new WorkItemRunDataChangedNotifier(),
+            NullLogger<AiPluginLimitService>.Instance);
+        return new CliUpdateSafetyService(workItemService, limitService, NullLogger<CliUpdateSafetyService>.Instance);
     }
 
-    private static void AssertPausiertBisUtc(DateTimeOffset? pausiertBisUtc, DateTimeOffset erwartet, string titel)
+    private static void AssertPausiertBisUtc(DateTimeOffset? pausedUntilUtc, DateTimeOffset expected, string title)
     {
-        Assert.NotNull(pausiertBisUtc);
+        Assert.NotNull(pausedUntilUtc);
         Assert.True(
-            Math.Abs((pausiertBisUtc!.Value - erwartet).TotalSeconds) < 2,
-            $"PausiertBisUtc von '{titel}' ('{pausiertBisUtc:O}') weicht vom Marker-Zeitpunkt '{erwartet:O}' ab.");
+            Math.Abs((pausedUntilUtc!.Value - expected).TotalSeconds) < 2,
+            $"PausiertBisUtc von '{title}' ('{pausedUntilUtc:O}') weicht vom Marker-Zeitpunkt '{expected:O}' ab.");
     }
 }

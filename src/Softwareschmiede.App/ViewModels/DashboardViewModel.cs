@@ -10,9 +10,9 @@ namespace Softwareschmiede.App.ViewModels;
 /// <summary>ViewModel für das Dashboard mit Zusammenfassung aller Projekte und Aufgaben.</summary>
 public sealed class DashboardViewModel : ViewModelBase
 {
-    private readonly ProjektService _projektService;
-    private readonly AufgabeService _aufgabeService;
-    private readonly AufgabeRecoveryService _recoveryService;
+    private readonly ProjectService _projektService;
+    private readonly WorkItemService _workItemService;
+    private readonly WorkItemRecoveryService _recoveryService;
     private readonly AufgabenListenModusBindung _modusBindung;
     private readonly ILogger<DashboardViewModel> _logger;
 
@@ -20,7 +20,7 @@ public sealed class DashboardViewModel : ViewModelBase
     private int _aktiveAufgaben;
     private int _wartendAufgaben;
     private bool _isLoading;
-    private string? _fehlerMeldung;
+    private string? _errorMessage;
     private ObservableCollection<AktiveAufgabePanelItem> _aktiveAufgabenListe = new();
 
     /// <summary>Anzahl aller Projekte.</summary>
@@ -54,8 +54,8 @@ public sealed class DashboardViewModel : ViewModelBase
     /// <summary>Fehlermeldung bei Ladefehlern.</summary>
     public string? FehlerMeldung
     {
-        get => _fehlerMeldung;
-        private set => SetProperty(ref _fehlerMeldung, value);
+        get => _errorMessage;
+        private set => SetProperty(ref _errorMessage, value);
     }
 
     /// <summary>Liste von Recovery-Kandidaten.</summary>
@@ -96,14 +96,14 @@ public sealed class DashboardViewModel : ViewModelBase
 
     /// <inheritdoc cref="DashboardViewModel"/>
     public DashboardViewModel(
-        ProjektService projektService,
-        AufgabeService aufgabeService,
-        AufgabeRecoveryService recoveryService,
+        ProjectService projektService,
+        WorkItemService workItemService,
+        WorkItemRecoveryService recoveryService,
         ILogger<DashboardViewModel> logger,
         AufgabenListenModusService? aufgabenListenModusService = null)
     {
         _projektService = projektService;
-        _aufgabeService = aufgabeService;
+        _workItemService = workItemService;
         _recoveryService = recoveryService;
         _modusBindung = AufgabenListenModusBindung.FuerDashboard(aufgabenListenModusService, logger);
         _modusBindung.WertGeaendert += () => OnPropertyChanged(nameof(AufgabenListenModus));
@@ -125,15 +125,15 @@ public sealed class DashboardViewModel : ViewModelBase
             ProjektAnzahl = projects.Count;
 
             RecoveryKandidaten.Clear();
-            var kandidaten = await _recoveryService.ScanForRecoveryCandidatesAsync(ct);
-            foreach (var id in kandidaten)
+            var candidates = await _recoveryService.ScanForRecoveryCandidatesAsync(ct);
+            foreach (var id in candidates)
                 RecoveryKandidaten.Add(id);
 
             LetzteProjects.Clear();
             foreach (var project in projects.Take(5))
                 LetzteProjects.Add(project);
 
-            var (aktiveCount, wartendCount) = await _aufgabeService.GetAktiveUndWartendeCountAsync(ct);
+            var (aktiveCount, wartendCount) = await _workItemService.GetActiveAndWaitingCountAsync(ct);
             AktiveAufgaben = aktiveCount;
             WartendAufgaben = wartendCount;
         }

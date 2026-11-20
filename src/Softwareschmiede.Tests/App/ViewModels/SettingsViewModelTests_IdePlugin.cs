@@ -16,20 +16,20 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class SettingsViewModelTests_IdePlugin : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AppEinstellungService _einstellungService;
-    private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
+    private readonly AppSettingService _settingService;
+    private readonly WorkingDirectorySettingsService _arbeitsverzeichnisService;
     private readonly DarkModeService _darkModeService;
     private readonly Mock<IPluginManager> _pluginManagerMock;
     private readonly PluginActivationService _pluginActivationService;
     private readonly PluginSettingsService _pluginSettingsService;
-    private readonly PromptVorlagenService _promptVorlagenService;
+    private readonly PromptTemplateService _promptVorlagenService;
 
     /// <summary>SettingsViewModelTests_IdePlugin.</summary>
     public SettingsViewModelTests_IdePlugin()
     {
         _db = TestDbContextFactory.Create();
-        _einstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
-        _arbeitsverzeichnisService = new ArbeitsverzeichnisSettingsService(_db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
+        _arbeitsverzeichnisService = new WorkingDirectorySettingsService(_db, NullLogger<WorkingDirectorySettingsService>.Instance);
 
         var scopeMock = new Mock<IServiceScope>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
@@ -37,15 +37,15 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
 
         scopeFactoryMock.Setup(f => f.CreateScope()).Returns(scopeMock.Object);
         scopeMock.Setup(s => s.ServiceProvider).Returns(serviceProviderMock.Object);
-        serviceProviderMock.Setup(p => p.GetService(typeof(AppEinstellungService))).Returns(_einstellungService);
+        serviceProviderMock.Setup(p => p.GetService(typeof(AppSettingService))).Returns(_settingService);
 
         _darkModeService = new DarkModeService(scopeFactoryMock.Object, NullLogger<DarkModeService>.Instance);
         _pluginManagerMock = new Mock<IPluginManager>();
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        _pluginActivationService = new PluginActivationService(_einstellungService, _pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        _pluginActivationService = new PluginActivationService(_settingService, _pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _pluginSettingsService = new PluginSettingsService(new Mock<ICredentialStore>().Object, NullLogger<PluginSettingsService>.Instance);
-        _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
+        _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
@@ -53,14 +53,14 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
 
     private SettingsViewModel CreateSut() =>
         new(
-            _einstellungService,
+            _settingService,
             _arbeitsverzeichnisService,
             _darkModeService,
             _pluginManagerMock.Object,
             _pluginActivationService,
             _pluginSettingsService,
             _promptVorlagenService,
-            new ProjektService(_db, NullLogger<ProjektService>.Instance),
+            new ProjectService(_db, NullLogger<ProjectService>.Instance),
             NullLogger<SettingsViewModel>.Instance,
             new Mock<IDialogService>().Object,
             new Mock<IServiceProvider>().Object);
@@ -145,7 +145,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio");
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode");
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio, vsCode]);
-        await _einstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Unbekannt,Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Unbekannt,Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -160,7 +160,7 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio");
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode");
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio, vsCode]);
-        await _einstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -214,12 +214,12 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([visualStudio]);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        var eintrag = sut.DevelopmentEnvironmentPlugins.Single();
-        eintrag.IsEnabled.Should().BeTrue();
+        var entry = sut.DevelopmentEnvironmentPlugins.Single();
+        entry.IsEnabled.Should().BeTrue();
 
-        eintrag.IsEnabled = false;
+        entry.IsEnabled = false;
 
-        eintrag.IsEnabled.Should().BeTrue();
+        entry.IsEnabled.Should().BeTrue();
         sut.FehlerMeldung.Should().Contain("Mindestens ein IDE-Plugin");
     }
 

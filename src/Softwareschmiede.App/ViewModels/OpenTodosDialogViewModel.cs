@@ -9,7 +9,7 @@ public sealed class OpenTodosDialogViewModel : ViewModelBase
 {
     private readonly TodoService _todoService;
     private readonly ILogger<OpenTodosDialogViewModel> _logger;
-    private Guid _aufgabeId;
+    private Guid _workItemId;
     private string _aufgabenTitel = string.Empty;
 
     /// <inheritdoc cref="OpenTodosDialogViewModel"/>
@@ -22,8 +22,8 @@ public sealed class OpenTodosDialogViewModel : ViewModelBase
     /// <summary>Eindeutige ID der Aufgabe.</summary>
     public Guid WorkItemId
     {
-        get => _aufgabeId;
-        private set => SetProperty(ref _aufgabeId, value);
+        get => _workItemId;
+        private set => SetProperty(ref _workItemId, value);
     }
 
     /// <summary>Titel der Aufgabe.</summary>

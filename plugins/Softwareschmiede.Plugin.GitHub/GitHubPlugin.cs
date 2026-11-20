@@ -181,7 +181,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     /// ausschließlich als Prozessumgebung des CLI-Kindprozesses gesetzt — niemals in
     /// Prompts, Logs oder Persistenz.
     /// </remarks>
-    public Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(ScmKontoModus konto, string? repositoryUrl, CancellationToken ct = default)
+    public Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(ScmKontoModus account, string? repositoryUrl, CancellationToken ct = default)
     {
         var environment = new Dictionary<string, string?>
         {
@@ -189,7 +189,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             // statt die Agenten-Sitzung zu blockieren.
             ["GIT_TERMINAL_PROMPT"] = "0",
         };
-        var token = _credentialStore.GetCredential(CredentialKeyFor(konto));
+        var token = _credentialStore.GetCredential(CredentialKeyFor(account));
         if (!string.IsNullOrEmpty(token))
         {
             environment["GH_TOKEN"] = token;
@@ -1299,7 +1299,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             {
                 var status = await GetPullRequestStatusAsync(repositoryId, prNumber, ct);
                 return new PullRequest(
-                    status.Nummer,
+                    status.Number,
                     status.Title,
                     status.Url,
                     status.SourceBranch,

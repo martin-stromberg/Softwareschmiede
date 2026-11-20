@@ -15,13 +15,13 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProtokollService _protokollService;
+    private readonly WorkItemService _workItemService;
+    private readonly LogService _logService;
     private readonly TodoService _todoService;
-    private readonly KiAusfuehrungsService _kiService;
-    private readonly PromptVorlagenService _promptVorlagenService;
-    private readonly PromptVorlagenPlatzhalterService _promptVorlagenPlatzhalterService = new();
-    private readonly PromptZeitVersandService _promptZeitVersandService;
+    private readonly AiExecutionService _aiService;
+    private readonly PromptTemplateService _promptVorlagenService;
+    private readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService = new();
+    private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Guid _projektId = Guid.NewGuid();
 
@@ -29,12 +29,12 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     public TaskDetailViewModelTests_PluginAktivierung()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
-        _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
-        _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
-        _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
+        _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _dialogServiceMock = new Mock<IDialogService>();
 
         _db.Projects.Add(new Project
@@ -50,7 +50,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
     }
 
@@ -60,35 +60,35 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns(kiPlugins);
 
-        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        var appSettingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var pluginActivationService = new PluginActivationService(appEinstellungService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        var pluginActivationService = new PluginActivationService(appSettingService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
-        var entwicklungsprozessService = new EntwicklungsprozessService(
-            _aufgabeService,
-            _protokollService,
+        var entwicklungsprozessService = new DevelopmentProcessService(
+            _workItemService,
+            _logService,
             gitPluginMock.Object,
             pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: _kiService),
-            NullLogger<EntwicklungsprozessService>.Instance);
+            new DevelopmentProcessServiceOptions(AiExecutionService: _aiService),
+            NullLogger<DevelopmentProcessService>.Instance);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService();
         var serviceProviderMock = new Mock<IServiceProvider>();
 
         return new TaskDetailViewModel(
-            _aufgabeService,
-            _protokollService,
-            _kiService,
+            _workItemService,
+            _logService,
+            _aiService,
             entwicklungsprozessService,
             pluginSelectionService,
             _promptVorlagenService,
             _promptVorlagenPlatzhalterService,
-            _promptZeitVersandService,
+            _promptScheduleDispatchService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
             serviceProviderMock.Object,
@@ -100,7 +100,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     }
 
     private async Task<WorkItem> ErstelleAufgabe()
-        => await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
+        => await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
 
     private static Mock<IKiPlugin> CreateKiPluginMock(string name, string prefix)
     {

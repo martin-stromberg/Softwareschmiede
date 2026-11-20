@@ -26,7 +26,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// statt unter Category=OsInterface.
 ///
 /// Statt eines echten Prozessstarts wird <see cref="IProcessStarter"/> durch einen aufzeichnenden
-/// Test-Double ersetzt (analog zu <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/>,
+/// Test-Double ersetzt (analog zu <see cref="Softwareschmiede.Infrastructure.Services.RecordingProcessStarter"/>,
 /// der auch für echte FlaUI-E2E-Tests im Testmodus verwendet wird).
 /// </summary>
 public sealed class E2E_IdePluginSelection : IDisposable
@@ -47,9 +47,9 @@ public sealed class E2E_IdePluginSelection : IDisposable
 
         await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
-        processStarter.Aufrufe.Should().ContainSingle();
-        processStarter.Aufrufe[0].FileName.Should().Be(Path.Combine(repository, "Loesung.sln"));
-        processStarter.Aufrufe[0].UseShellExecute.Should().BeTrue();
+        processStarter.Calls.Should().ContainSingle();
+        processStarter.Calls[0].FileName.Should().Be(Path.Combine(repository, "Loesung.sln"));
+        processStarter.Calls[0].UseShellExecute.Should().BeTrue();
     }
 
     /// <summary>Ein Repository ohne .sln-Datei wird automatisch mit Visual Studio Code geöffnet (Fallback).</summary>
@@ -62,10 +62,10 @@ public sealed class E2E_IdePluginSelection : IDisposable
 
         await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
-        processStarter.Aufrufe.Should().ContainSingle();
-        processStarter.Aufrufe[0].FileName.Should().Be("code.cmd");
-        processStarter.Aufrufe[0].Arguments.Should().Be($"\"{repository}\"");
-        processStarter.Aufrufe[0].UseShellExecute.Should().BeFalse();
+        processStarter.Calls.Should().ContainSingle();
+        processStarter.Calls[0].FileName.Should().Be("code.cmd");
+        processStarter.Calls[0].Arguments.Should().Be($"\"{repository}\"");
+        processStarter.Calls[0].UseShellExecute.Should().BeFalse();
     }
 
     /// <summary>
@@ -83,9 +83,9 @@ public sealed class E2E_IdePluginSelection : IDisposable
 
         await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
-        processStarter.Aufrufe.Should().ContainSingle();
-        processStarter.Aufrufe[0].FileName.Should().Be("code.cmd");
-        processStarter.Aufrufe[0].UseShellExecute.Should().BeFalse();
+        processStarter.Calls.Should().ContainSingle();
+        processStarter.Calls[0].FileName.Should().Be("code.cmd");
+        processStarter.Calls[0].UseShellExecute.Should().BeFalse();
     }
 
     /// <summary>
@@ -126,23 +126,23 @@ public sealed class E2E_IdePluginSelection : IDisposable
             NullLogger<PluginManager>.Instance,
             Path.Combine(Path.GetTempPath(), $"e2e_ide_selection_keine_plugins_{Guid.NewGuid():N}"));
 
-        var appEinstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        var pluginActivationService = new PluginActivationService(appEinstellungService, pluginManager, NullLogger<PluginActivationService>.Instance);
+        var appSettingService = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        var pluginActivationService = new PluginActivationService(appSettingService, pluginManager, NullLogger<PluginActivationService>.Instance);
         var defaultSettingsService = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         var pluginSelectionService = new PluginSelectionService(
             pluginManager,
             defaultSettingsService,
             pluginActivationService,
             NullLogger<PluginSelectionService>.Instance,
-            appEinstellungService);
+            appSettingService);
 
         return (pluginSelectionService, processStarter, pluginActivationService);
     }
 
     private sealed class RecordingProzessStarter : IProcessStarter
     {
-        public List<ProcessStartRequest> Aufrufe { get; } = [];
+        public List<ProcessStartRequest> Calls { get; } = [];
 
-        public void Start(ProcessStartRequest request) => Aufrufe.Add(request);
+        public void Start(ProcessStartRequest request) => Calls.Add(request);
     }
 }

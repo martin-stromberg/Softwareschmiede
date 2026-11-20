@@ -51,7 +51,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
     {
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten =
+            Answer =
             [
                 new UpdateE2EAntwort
                 {
@@ -66,13 +66,13 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
             ],
         });
 
-        using var antwort = await _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken);
+        using var response = await _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
-        Assert.Equal("[{\"tag_name\":\"v1.3.0\"}]", await antwort.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("[{\"tag_name\":\"v1.3.0\"}]", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.Equal("<https://api.github.test/page2>; rel=\"next\"",
-            antwort.Headers.GetValues("Link").Single());
-        Assert.Equal("application/json", antwort.Content.Headers.ContentType?.MediaType);
+            response.Headers.GetValues("Link").Single());
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
         AssertProtokollEnthaelt(UpdateE2EEreignisse.HttpRequest);
         AssertProtokollEnthaelt(UpdateE2EEreignisse.HttpResponse);
     }
@@ -95,14 +95,14 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         var assetApiUrl = "https://api.github.com/repos/o/r/releases/assets/91001";
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten = [new UpdateE2EAntwort { Url = assetApiUrl, Content = "ok" }],
+            Answer = [new UpdateE2EAntwort { Url = assetApiUrl, Content = "ok" }],
         });
 
-        using var antwort = await _client.GetAsync(assetApiUrl, TestContext.Current.CancellationToken);
+        using var response = await _client.GetAsync(assetApiUrl, TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
-        var zeilen = File.ReadAllLines(_kontext.Konfiguration.ProtokollDateiPfad);
-        Assert.Contains(zeilen, z => z.Contains($"\"event\":\"{UpdateE2EEreignisse.HttpRequest}\"", StringComparison.Ordinal)
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var lines = File.ReadAllLines(_kontext.Configuration.ProtokollDateiPfad);
+        Assert.Contains(lines, z => z.Contains($"\"evt\":\"{UpdateE2EEreignisse.HttpRequest}\"", StringComparison.Ordinal)
             && z.Contains("\"art\":\"asset\"", StringComparison.Ordinal));
     }
 
@@ -113,14 +113,14 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         var manifestUrl = "https://e2e.invalid/szenario/update-1.3.0.json";
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten = [new UpdateE2EAntwort { Url = manifestUrl, Content = "{}" }],
+            Answer = [new UpdateE2EAntwort { Url = manifestUrl, Content = "{}" }],
         });
 
-        using var antwort = await _client.GetAsync(manifestUrl, TestContext.Current.CancellationToken);
+        using var response = await _client.GetAsync(manifestUrl, TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
-        var zeilen = File.ReadAllLines(_kontext.Konfiguration.ProtokollDateiPfad);
-        Assert.Contains(zeilen, z => z.Contains($"\"event\":\"{UpdateE2EEreignisse.HttpRequest}\"", StringComparison.Ordinal)
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var lines = File.ReadAllLines(_kontext.Configuration.ProtokollDateiPfad);
+        Assert.Contains(lines, z => z.Contains($"\"evt\":\"{UpdateE2EEreignisse.HttpRequest}\"", StringComparison.Ordinal)
             && z.Contains("\"art\":\"manifest\"", StringComparison.Ordinal));
     }
 
@@ -131,14 +131,14 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         var manifestApiUrl = "https://api.github.com/repos/o/r/releases/assets/91011";
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten = [new UpdateE2EAntwort { Url = manifestApiUrl, Content = "{}", Art = "manifest" }],
+            Answer = [new UpdateE2EAntwort { Url = manifestApiUrl, Content = "{}", Art = "manifest" }],
         });
 
-        using var antwort = await _client.GetAsync(manifestApiUrl, TestContext.Current.CancellationToken);
+        using var response = await _client.GetAsync(manifestApiUrl, TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
-        var zeilen = File.ReadAllLines(_kontext.Konfiguration.ProtokollDateiPfad);
-        Assert.Contains(zeilen, z => z.Contains($"\"event\":\"{UpdateE2EEreignisse.HttpRequest}\"", StringComparison.Ordinal)
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var lines = File.ReadAllLines(_kontext.Configuration.ProtokollDateiPfad);
+        Assert.Contains(lines, z => z.Contains($"\"evt\":\"{UpdateE2EEreignisse.HttpRequest}\"", StringComparison.Ordinal)
             && z.Contains("\"art\":\"manifest\"", StringComparison.Ordinal));
     }
 
@@ -148,7 +148,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
     {
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten = [new UpdateE2EAntwort { Url = ReleaseUrl, Fehler = true }],
+            Answer = [new UpdateE2EAntwort { Url = ReleaseUrl, Error = true }],
         });
 
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken));
@@ -161,7 +161,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
     {
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten = [new UpdateE2EAntwort { Url = ReleaseUrl, Content = "ok", Gate = "releaseApi" }],
+            Answer = [new UpdateE2EAntwort { Url = ReleaseUrl, Content = "ok", Gate = "releaseApi" }],
         });
 
         var request = _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken);
@@ -170,9 +170,9 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         AssertProtokollEnthaelt(UpdateE2EEreignisse.HttpRequestBlocked);
 
         File.WriteAllText(Path.Combine(_wurzel, "gates", "releaseApi.release"), string.Empty);
-        using var antwort = await request;
+        using var response = await request;
 
-        Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         AssertProtokollEnthaelt(UpdateE2EEreignisse.HttpRequestReleased);
     }
 
@@ -180,15 +180,15 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
     [Fact]
     public async Task SendAsync_StreamGate_LiefertTeilbytesUndBlockiertBeimNaechstenLesen()
     {
-        var inhalt = new string('x', 1000);
+        var content = new string('x', 1000);
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten =
+            Answer =
             [
                 new UpdateE2EAntwort
                 {
                     Url = ReleaseUrl,
-                    Content = inhalt,
+                    Content = content,
                     StreamGate = "download",
                     StreamGateBytes = 400,
                 },
@@ -196,28 +196,28 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         });
 
         await using var stream = await _client.GetStreamAsync(ReleaseUrl, TestContext.Current.CancellationToken);
-        var puffer = new byte[1000];
+        var buffer = new byte[1000];
         var gelesen = 0;
 
         // Erste Reads liefern genau die freien Bytes.
         while (gelesen < 400)
         {
-            var n = await stream.ReadAsync(puffer.AsMemory(gelesen), TestContext.Current.CancellationToken);
+            var n = await stream.ReadAsync(buffer.AsMemory(gelesen), TestContext.Current.CancellationToken);
             Assert.True(n > 0);
             gelesen += n;
         }
 
         // Der nächste Read blockiert bis zur Gate-Freigabe.
-        var blockierterRead = stream.ReadAsync(puffer.AsMemory(gelesen), TestContext.Current.CancellationToken).AsTask();
+        var blockierterRead = stream.ReadAsync(buffer.AsMemory(gelesen), TestContext.Current.CancellationToken).AsTask();
         await Task.Delay(400, TestContext.Current.CancellationToken);
         Assert.False(blockierterRead.IsCompleted, "Der Stream lieferte ohne Gate-Freigabe weitere Bytes.");
 
         File.WriteAllText(Path.Combine(_wurzel, "gates", "download.release"), string.Empty);
         var restGelesen = gelesen + await blockierterRead;
         while (restGelesen < 1000)
-            restGelesen += await stream.ReadAsync(puffer.AsMemory(restGelesen), TestContext.Current.CancellationToken);
+            restGelesen += await stream.ReadAsync(buffer.AsMemory(restGelesen), TestContext.Current.CancellationToken);
 
-        Assert.Equal(inhalt, System.Text.Encoding.UTF8.GetString(puffer));
+        Assert.Equal(content, System.Text.Encoding.UTF8.GetString(buffer));
     }
 
     /// <summary>Eine Antwortdatei außerhalb der Testwurzel wird mit HttpRequestException abgelehnt.</summary>
@@ -230,7 +230,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         {
             SchreibeSzenario(new UpdateE2ESzenario
             {
-                Antworten =
+                Answer =
                 [
                     new UpdateE2EAntwort
                     {
@@ -258,23 +258,23 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         await File.WriteAllBytesAsync(inhaltPfad, [0x50, 0x4B, 0x03, 0x04], TestContext.Current.CancellationToken);
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten = [new UpdateE2EAntwort { Url = ReleaseUrl, BodyDatei = "payloads/release.zip" }],
+            Answer = [new UpdateE2EAntwort { Url = ReleaseUrl, BodyDatei = "payloads/release.zip" }],
         });
 
-        using var antwort = await _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken);
+        using var response = await _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken);
 
-        Assert.Equal("application/zip", antwort.Content.Headers.ContentType?.MediaType);
-        Assert.Equal([0x50, 0x4B, 0x03, 0x04], await antwort.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("application/zip", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal([0x50, 0x4B, 0x03, 0x04], await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
     }
 
     private void SchreibeSzenario(UpdateE2ESzenario szenario)
         => File.WriteAllText(
-            _kontext.Konfiguration.SzenarioDateiPfad,
+            _kontext.Configuration.SzenarioDateiPfad,
             JsonSerializer.Serialize(szenario));
 
-    private void AssertProtokollEnthaelt(string ereignis)
+    private void AssertProtokollEnthaelt(string evt)
     {
-        var zeilen = File.ReadAllLines(_kontext.Konfiguration.ProtokollDateiPfad);
-        Assert.Contains(zeilen, z => z.Contains($"\"event\":\"{ereignis}\"", StringComparison.Ordinal));
+        var lines = File.ReadAllLines(_kontext.Configuration.ProtokollDateiPfad);
+        Assert.Contains(lines, z => z.Contains($"\"evt\":\"{evt}\"", StringComparison.Ordinal));
     }
 }

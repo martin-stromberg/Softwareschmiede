@@ -19,7 +19,7 @@ public sealed class PluginSettingsServiceIntegrationTests
         _sut = new PluginSettingsService(_credentialStore, NullLogger<PluginSettingsService>.Instance);
     }
 
-    /// <summary><summary>SetValue_SpeichertWert_UndGetValue_LaeadtIhn.</summary>.</summary>
+    /// <summary>SetValue_SpeichertWert_UndGetValue_LaeadtIhn.</summary>
     [Fact]
     public void SetValue_SpeichertWert_UndGetValue_LaeadtIhn()
     {
@@ -32,7 +32,7 @@ public sealed class PluginSettingsServiceIntegrationTests
         geladen.Should().Be("mein-api-schluessel");
     }
 
-    /// <summary><summary>HasValue_GibtFalse_OhneGespeichertenWert.</summary>.</summary>
+    /// <summary>HasValue_GibtFalse_OhneGespeichertenWert.</summary>
     [Fact]
     public void HasValue_GibtFalse_OhneGespeichertenWert()
     {
@@ -42,7 +42,7 @@ public sealed class PluginSettingsServiceIntegrationTests
         _sut.HasValue(plugin, field).Should().BeFalse();
     }
 
-    /// <summary><summary>HasValue_GibtTrue_NachSpeichern.</summary>.</summary>
+    /// <summary>HasValue_GibtTrue_NachSpeichern.</summary>
     [Fact]
     public void HasValue_GibtTrue_NachSpeichern()
     {
@@ -53,7 +53,7 @@ public sealed class PluginSettingsServiceIntegrationTests
         _sut.HasValue(plugin, field).Should().BeTrue();
     }
 
-    /// <summary><summary>DeleteValue_EntferntGespeichertenWert.</summary>.</summary>
+    /// <summary>DeleteValue_EntferntGespeichertenWert.</summary>
     [Fact]
     public void DeleteValue_EntferntGespeichertenWert()
     {
@@ -66,7 +66,7 @@ public sealed class PluginSettingsServiceIntegrationTests
         _sut.HasValue(plugin, field).Should().BeFalse();
     }
 
-    /// <summary><summary>GetValue_GibtNull_OhneGespeichertenWert.</summary>.</summary>
+    /// <summary>GetValue_GibtNull_OhneGespeichertenWert.</summary>
     [Fact]
     public void GetValue_GibtNull_OhneGespeichertenWert()
     {

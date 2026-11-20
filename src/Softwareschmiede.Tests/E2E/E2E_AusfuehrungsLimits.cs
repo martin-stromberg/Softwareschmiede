@@ -58,8 +58,8 @@ public partial class End2EndTest
             // Validierung: „0“ ist kein gültiges globales Limit → Fehler, nichts wird persistiert.
             settingsReopened.OpenAufgabenAusfuehren();
             settingsReopened.SetMaxParalleleAusfuehrungen("0");
-            var fehler = settingsReopened.SaveSettingsExpectError();
-            Assert.Contains("Limit paralleler CLI-Ausführungen", fehler);
+            var error = settingsReopened.SaveSettingsExpectError();
+            Assert.Contains("Limit paralleler CLI-Ausführungen", error);
             using (var db = OpenTestDbContext())
             {
                 Assert.Equal("1", db.AppSettings

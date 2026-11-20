@@ -94,7 +94,7 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Löscht die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/>, falls sie existiert.
+    /// Löscht die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.RecordingProcessStarter"/>, falls sie existiert.
     /// Verhindert, dass Einträge aus vorherigen Testläufen die Substring-Prüfungen von
     /// <see cref="WaitForProzessStartEintragAsync"/> verfälschen.
     /// </summary>
@@ -108,10 +108,10 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Löst den Pfad der Prozessstart-Logdatei für die Testdatenbank dieser Instanz auf.</summary>
     /// <returns>Der Pfad zur Prozessstart-Logdatei.</returns>
     protected string ResolveProzessStartLogPfad()
-        => AufzeichnenderProzessStarter.ResolveLogDateiPfad(_testDbPath);
+        => RecordingProcessStarter.ResolveLogFilePath(_testDbPath);
 
     /// <summary>
-    /// Löscht die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderSystemShutdownService"/>, falls sie existiert.
+    /// Löscht die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.RecordingSystemShutdownService"/>, falls sie existiert.
     /// Verhindert, dass Einträge aus vorherigen Testläufen die Substring-Prüfungen von
     /// <see cref="WaitForSystemShutdownEintragAsync"/> verfälschen.
     /// </summary>
@@ -125,13 +125,13 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Löst den Pfad der System-Shutdown-Logdatei für die Testdatenbank dieser Instanz auf.</summary>
     /// <returns>Der Pfad zur System-Shutdown-Logdatei.</returns>
     protected string ResolveSystemShutdownLogPfad()
-        => AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(_testDbPath);
+        => RecordingSystemShutdownService.ResolveLogFilePath(_testDbPath);
 
     /// <summary>
-    /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderSystemShutdownService"/> einen
+    /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.RecordingSystemShutdownService"/> einen
     /// Eintrag enthält, der <paramref name="substring"/> enthält. Voraussetzung: die App läuft im Testmodus
     /// (<see cref="LaunchApp"/> wurde aufgerufen), sodass <c>ISystemShutdownService</c> auf
-    /// <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderSystemShutdownService"/> zeigt.
+    /// <see cref="Softwareschmiede.Infrastructure.Services.RecordingSystemShutdownService"/> zeigt.
     /// </summary>
     /// <param name="substring">Der erwartete Teilstring innerhalb eines Logeintrags (z. B. <c>erzwingen=True</c>).</param>
     /// <param name="timeout">Maximale Wartezeit. Standard: <see cref="Short"/>.</param>
@@ -148,8 +148,8 @@ public abstract class WpfTestBase : IDisposable
             {
                 try
                 {
-                    var inhalt = await File.ReadAllTextAsync(path);
-                    if (inhalt.Contains(substring, StringComparison.Ordinal))
+                    var content = await File.ReadAllTextAsync(path);
+                    if (content.Contains(substring, StringComparison.Ordinal))
                         return;
                 }
                 catch (IOException)
@@ -166,10 +166,10 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/> einen
+    /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.RecordingProcessStarter"/> einen
     /// Eintrag enthält, der <paramref name="substring"/> enthält. Voraussetzung: die App läuft im Testmodus
     /// (<see cref="LaunchApp"/> wurde aufgerufen), sodass <c>IProzessStarter</c> auf
-    /// <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/> zeigt.
+    /// <see cref="Softwareschmiede.Infrastructure.Services.RecordingProcessStarter"/> zeigt.
     /// </summary>
     /// <param name="substring">Der erwartete Teilstring innerhalb eines Logeintrags.</param>
     /// <param name="timeout">Maximale Wartezeit. Standard: <see cref="Short"/>.</param>
@@ -192,9 +192,9 @@ public abstract class WpfTestBase : IDisposable
             {
                 try
                 {
-                    var inhalt = await File.ReadAllTextAsync(path);
-                    if (inhalt.Length > sinceContent.Length
-                        && inhalt[sinceContent.Length..].Contains(substring, StringComparison.Ordinal))
+                    var content = await File.ReadAllTextAsync(path);
+                    if (content.Length > sinceContent.Length
+                        && content[sinceContent.Length..].Contains(substring, StringComparison.Ordinal))
                         return;
                 }
                 catch (IOException)
@@ -270,12 +270,12 @@ public abstract class WpfTestBase : IDisposable
         startInfo.Environment["SOFTWARESCHMIEDE_TEST_DB_PATH"] = _testDbPath;
         if (umgebungsVariablen is not null)
         {
-            foreach (var (name, wert) in umgebungsVariablen)
+            foreach (var (name, value) in umgebungsVariablen)
             {
-                if (wert is null)
+                if (value is null)
                     startInfo.Environment.Remove(name);
                 else
-                    startInfo.Environment[name] = wert;
+                    startInfo.Environment[name] = value;
             }
         }
 
@@ -1126,13 +1126,13 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Ersetzt das "EditTitel"-Feld durch <paramref name="titel"/> und prüft dessen vollständigen Wert.
+    /// Ersetzt das "EditTitel"-Feld durch <paramref name="title"/> und prüft dessen vollständigen Wert.
     /// Voraussetzung: <c>TaskDetailView</c> im Edit-Modus sichtbar (z. B. nach <see cref="NeueAufgabeAnlegen"/>).
     /// </summary>
-    protected void AufgabeTitelSetzen(AutomationElement mainWindow, string titel)
+    protected void AufgabeTitelSetzen(AutomationElement mainWindow, string title)
     {
         var titelBox = WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
-        FeldInhaltErsetzen(titelBox, titel);
+        FeldInhaltErsetzen(titelBox, title);
     }
 
     /// <summary>
@@ -1206,14 +1206,14 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Sucht in der Aufgabenliste das ListItem mit dem angegebenen <paramref name="titel"/>, öffnet es
+    /// Sucht in der Aufgabenliste das ListItem mit dem angegebenen <paramref name="title"/>, öffnet es
     /// per Doppelklick und wartet auf den "Zurück"-Button (Bestätigung, dass die <c>TaskDetailView</c> geladen ist).
     /// </summary>
-    protected void AufgabeAusListeOeffnen(AutomationElement mainWindow, string titel)
+    protected void AufgabeAusListeOeffnen(AutomationElement mainWindow, string title)
     {
         var listenEintrag = WaitForElement(
             mainWindow,
-            cf => cf.ByName(titel).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem)),
+            cf => cf.ByName(title).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem)),
             Medium);
         listenEintrag.DoubleClickInForeground();
         WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);

@@ -38,40 +38,40 @@ public sealed class UpdateService : IUpdateService
         {
             var installed = await _versionProvider.GetInstalledVersionAsync(ct);
             if (installed is null)
-                return UpdateCheckResult.NichtPruefbar("Lokale Version ist nicht prüfbar.");
+                return UpdateCheckResult.NotCheckable("Lokale Version ist nicht prüfbar.");
 
             var lookup = await _releaseClient.GetLatestReleaseAsync(options, ct);
-            if (!lookup.Erfolg)
-                return UpdateCheckResult.NichtPruefbar("GitHub-Release ist nicht prüfbar.");
+            if (!lookup.Success)
+                return UpdateCheckResult.NotCheckable("GitHub-Release ist nicht prüfbar.");
 
             var latest = lookup.Release;
             if (latest is null)
-                return UpdateCheckResult.KeinUpdate("Kein Update verfügbar. Die installierte Version ist aktuell.");
+                return UpdateCheckResult.NoUpdate("Kein Update verfügbar. Die installierte Version ist aktuell.");
 
             // Defensiver Ausschluss: Ein Client-Ergebnis, das nicht zum gewählten Kanal passt
             // (Prerelease im Produktiv-Kanal oder Stabiles im RC-Kanal), ist eine
             // Vertragsverletzung und wird nicht angeboten.
-            if (latest.IsPrerelease != (options.Channel == UpdateKanal.ReleaseCandidate))
-                return UpdateCheckResult.NichtPruefbar("GitHub-Release ist nicht prüfbar.");
+            if (latest.IsPrerelease != (options.Channel == UpdateChannel.ReleaseCandidate))
+                return UpdateCheckResult.NotCheckable("GitHub-Release ist nicht prüfbar.");
 
             if (!UpdateVersionComparer.IsNewer(installed.Version, latest.Version))
-                return UpdateCheckResult.KeinUpdate("Kein Update verfügbar. Die installierte Version ist aktuell.");
+                return UpdateCheckResult.NoUpdate("Kein Update verfügbar. Die installierte Version ist aktuell.");
 
             // Konsistenzwarnung: Passt der Installationskanal nicht zum gewählten Kanal, wird
             // das Update trotzdem angeboten — der Konflikt reist als nicht-blockierender
             // Hinweis auf dem Ergebnis mit.
-            var installationsKanal = UpdatePfadKanalResolver.ErmittleKanalFuerTagName(installed.TagName);
-            if (installationsKanal != options.Channel)
+            var installationChannel = UpdatePathChannelResolver.ResolveChannelForTagName(installed.TagName);
+            if (installationChannel != options.Channel)
             {
                 _logger.LogWarning(
                     "Update-Kanal {GewaehlterKanal} passt nicht zum Kanal {InstallationsKanal} der installierten Version {TagName}.",
-                    options.Channel, installationsKanal, installed.TagName);
-                return UpdateCheckResult.UpdateVerfuegbar(
+                    options.Channel, installationChannel, installed.TagName);
+                return UpdateCheckResult.UpdateAvailable(
                     latest,
                     "Der gewählte Update-Pfad passt nicht zur installierten Version. Das Update wird trotzdem angeboten.");
             }
 
-            return UpdateCheckResult.UpdateVerfuegbar(latest);
+            return UpdateCheckResult.UpdateAvailable(latest);
         }
         catch (OperationCanceledException)
         {
@@ -80,7 +80,7 @@ public sealed class UpdateService : IUpdateService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Update-Prüfung ist fehlgeschlagen.");
-            return UpdateCheckResult.NichtPruefbar("Update-Prüfung ist fehlgeschlagen.");
+            return UpdateCheckResult.NotCheckable("Update-Prüfung ist fehlgeschlagen.");
         }
         finally
         {

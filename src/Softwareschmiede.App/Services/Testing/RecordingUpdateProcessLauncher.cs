@@ -14,30 +14,30 @@ public sealed class RecordingUpdateProcessLauncher : IUpdateProcessLauncher
     private readonly UpdateE2ETestKontext _kontext;
 
     /// <inheritdoc cref="RecordingUpdateProcessLauncher"/>
-    /// <param name="kontext">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public RecordingUpdateProcessLauncher(UpdateE2ETestKontext kontext)
+    /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
+    public RecordingUpdateProcessLauncher(UpdateE2ETestKontext context)
     {
-        _kontext = kontext;
+        _kontext = context;
     }
 
     /// <inheritdoc/>
     public bool Start(string fileName, IEnumerable<string> arguments, string workingDirectory, bool runElevated)
     {
-        var argumente = arguments.ToArray();
-        var ergebnis = _kontext.LeseSzenario()?.ProzessStart?.Ergebnis ?? "Erfolg";
+        var args = arguments.ToArray();
+        var result = _kontext.LeseSzenario()?.ProzessStart?.Result ?? "Erfolg";
 
         _kontext.Protokoll.Schreibe(
             UpdateE2EEreignisse.UpdateProcessStartRecorded,
             new
             {
                 fileName,
-                arguments = argumente,
+                arguments = args,
                 workingDirectory,
                 runElevated,
-                result = ergebnis
+                result = result
             });
 
-        return ergebnis switch
+        return result switch
         {
             "Fehler" => false,
             "Ausnahme" => throw new InvalidOperationException("Kontrollierter Update-E2E-Launcherfehler."),

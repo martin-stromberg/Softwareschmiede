@@ -12,10 +12,10 @@ public sealed class RecordingApplicationShutdownService : IApplicationShutdownSe
     private readonly UpdateE2ETestKontext _kontext;
 
     /// <inheritdoc cref="RecordingApplicationShutdownService"/>
-    /// <param name="kontext">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public RecordingApplicationShutdownService(UpdateE2ETestKontext kontext)
+    /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
+    public RecordingApplicationShutdownService(UpdateE2ETestKontext context)
     {
-        _kontext = kontext;
+        _kontext = context;
     }
 
     /// <inheritdoc/>

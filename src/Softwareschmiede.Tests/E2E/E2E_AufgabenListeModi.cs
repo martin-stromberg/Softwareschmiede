@@ -124,14 +124,14 @@ public partial class End2EndTest
 
         await using (var db = OpenTestDbContext())
         {
-            var eintraege = await db.AppSettings
-                .Where(e => e.Key == AppEinstellungService.AktiveAufgabenListenModusKey
-                            || e.Key == AppEinstellungService.AktiveAufgabenListenModusDashboardKey)
+            var entries = await db.AppSettings
+                .Where(e => e.Key == AppSettingService.ActiveWorkItemsListModeKey
+                            || e.Key == AppSettingService.ActiveWorkItemsListModeDashboardKey)
                 .ToDictionaryAsync(e => e.Key, e => e.Value);
-            Assert.Equal("Repository", eintraege[AppEinstellungService.AktiveAufgabenListenModusDashboardKey]);
+            Assert.Equal("Repository", entries[AppSettingService.ActiveWorkItemsListModeDashboardKey]);
             Assert.True(
-                !eintraege.ContainsKey(AppEinstellungService.AktiveAufgabenListenModusKey)
-                || eintraege[AppEinstellungService.AktiveAufgabenListenModusKey] == "Datum",
+                !entries.ContainsKey(AppSettingService.ActiveWorkItemsListModeKey)
+                || entries[AppSettingService.ActiveWorkItemsListModeKey] == "Datum",
                 "Der Dashboard-Moduswechsel darf den Menü-Schlüssel nicht verändern.");
         }
 
@@ -143,11 +143,11 @@ public partial class End2EndTest
         menu.WaitForAufgabenGruppe("modi-repo", Medium);
         await using (var db = OpenTestDbContext())
         {
-            var wert = await db.AppSettings
-                .Where(e => e.Key == AppEinstellungService.AktiveAufgabenListenModusKey)
+            var value = await db.AppSettings
+                .Where(e => e.Key == AppSettingService.ActiveWorkItemsListModeKey)
                 .Select(e => e.Value)
                 .FirstOrDefaultAsync();
-            Assert.Equal("Repository", wert);
+            Assert.Equal("Repository", value);
         }
 
         // Neustart mit gleicher DB: beide Ansichten stellen den gespeicherten Modus wieder her.

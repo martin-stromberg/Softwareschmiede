@@ -13,7 +13,7 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// Provider-spezifischer Bezeichner für Dateinamen.
     /// Beispiele: <c>copilot</c>, <c>claude</c>.
     /// </summary>
-    public abstract string ProviderDateiPraefix { get; }
+    public abstract string ProviderFilePrefix { get; }
 
     public abstract string PluginName { get; }
     public abstract string PluginPrefix { get; }
@@ -103,7 +103,7 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// Gibt <c>null</c> zurück bei Timeout, Prozessfehler oder fehlender CLI.
     /// </summary>
     public virtual Task<string?> GetCliHelpTextAsync(CancellationToken ct = default)
-        => RunHelpCommandAsync(ProviderDateiPraefix, ct);
+        => RunHelpCommandAsync(ProviderFilePrefix, ct);
 
     /// <summary>
     /// Führt <paramref name="fileName"/> mit <c>--help</c> aus und gibt die Ausgabe zurück.

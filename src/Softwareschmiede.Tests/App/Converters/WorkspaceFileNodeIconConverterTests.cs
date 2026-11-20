@@ -21,14 +21,14 @@ public sealed class WorkspaceFileNodeIconConverterTests
     }
 
     /// <summary>Für bekannte Dateitypen (hier: Quellcode) wird ein spezifisches statt des generischen Symbols geliefert.</summary>
-    /// <param name="dateiname">Der zu prüfende Dateiname mit Quellcode-Endung.</param>
+    /// <param name="fileName">Der zu prüfende Dateiname mit Quellcode-Endung.</param>
     [Theory]
     [InlineData("Program.cs")]
     [InlineData("View.xaml")]
-    public void Convert_QuellcodeDatei_LiefertSpezifischesSymbol(string dateiname)
+    public void Convert_QuellcodeDatei_LiefertSpezifischesSymbol(string fileName)
     {
         var converter = new WorkspaceFileNodeIconConverter();
-        var node = new WorkspaceFileNode { Name = dateiname, IsDirectory = false };
+        var node = new WorkspaceFileNode { Name = fileName, IsDirectory = false };
 
         var result = converter.Convert(node, typeof(string), null!, CultureInfo.InvariantCulture);
 

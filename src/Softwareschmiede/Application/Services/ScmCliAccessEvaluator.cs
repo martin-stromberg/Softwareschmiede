@@ -21,7 +21,7 @@ public enum ScmExchangeAccessStatus
 public sealed record ScmExchangeAccess(ScmExchangeAccessStatus Status, string Reason, string WorkingDirectory,
     Guid CliRunId, string ConfigurationFingerprint)
 {
-    /// <summary>Existing dedicated workspace capabilities verified by a file-tool channel probe, never arbitrary users or groups.</summary>
+    /// <summary>Vorhandene dedizierte Arbeitsbereich-Capabilities, verifiziert durch eine Dateitool-Kanalprobe — niemals beliebige Benutzer oder Gruppen.</summary>
     public IReadOnlyList<string> RestrictedWriteSids { get; init; } = [];
 }
 
@@ -144,7 +144,7 @@ public static class ScmCliAccessEvaluator
                         }
                         else if (section.StartsWith("[projects.", StringComparison.Ordinal))
                         {
-                            // Per-directory trust decisions never change the effective sandbox rights.
+                            // Pro-Verzeichnis-Trust-Entscheidungen ändern niemals die effektiven Sandbox-Rechte.
                             if (key != "trust_level" || value is not ("trusted" or "untrusted"))
                                 return Result(ScmExchangeAccessStatus.Unknown, "Codex-Projektvertrauen ist nicht sicher auflösbar.");
                         }
@@ -173,16 +173,17 @@ public static class ScmCliAccessEvaluator
                                 if (rule.Value.GetArrayLength() != 0)
                                     return Result(ScmExchangeAccessStatus.Denied, "Claude-Dateitoolzugriff ist durch Deny-/Ask-Regeln eingeschränkt.");
                             }
-                            else if (rule.Name == "allow") { /* acceptEdits still required; allow never cancels deny. */ }
+                            else if (rule.Name == "allow") { /* acceptEdits weiterhin erforderlich; allow hebt deny niemals auf. */ }
                             else return Result(ScmExchangeAccessStatus.Unknown, "Unbekannte Claude-Berechtigungsvorgabe.");
                         }
                     }
                 }
                 else
                 {
-                    // Devin: config.json has no fully documented schema and may hold free-form keys.
-                    // Only rights-relevant fields are evaluated; the file-tool probe remains the
-                    // actual proof, so tolerant unknown keys cannot widen the channel grant.
+                    // Devin: config.json hat kein vollständig dokumentiertes Schema und kann freie
+                    // Schlüssel enthalten. Nur rechtsrelevante Felder werden ausgewertet; die
+                    // Dateitool-Probe bleibt der eigentliche Nachweis, sodass tolerierte
+                    // unbekannte Schlüssel die Kanalfreigabe nicht erweitern können.
                     using var document = JsonDocument.Parse(file.Content!);
                     if (document.RootElement.ValueKind != JsonValueKind.Object)
                         return Result(ScmExchangeAccessStatus.Unknown, "Devin-Konfiguration ist nicht sicher auflösbar.");
@@ -243,8 +244,8 @@ public static class ScmCliAccessEvaluator
                     }
                     if (key == "--respect-workspace-trust")
                     {
-                        // The documented optional value is accepted only explicitly; a bare flag
-                        // leaves the effective trust handling unresolvable.
+                        // Der dokumentierte optionale Wert wird nur explizit akzeptiert; ein nacktes Flag
+                        // lässt die effektive Trust-Behandlung unauflösbar.
                         if (++index >= tokens.Count || tokens[index] is not ("true" or "false"))
                             return Result(ScmExchangeAccessStatus.Unknown, "Devin-Workspace-Trust-Parameter ist unvollständig.");
                         continue;
@@ -267,9 +268,9 @@ public static class ScmCliAccessEvaluator
             var supported = prefix switch
             {
                 "Softwareschmiede.Codex" => mode == "workspace-write",
-                // The classification only allows sending the content-free probe; the file tool
-                // must still prove actual channel I/O. accept-edits auto-approves workspace edits,
-                // dangerous/bypass additionally auto-approve other tools.
+                // Die Klassifikation erlaubt nur das Senden der inhaltsfreien Probe; das Dateitool
+                // muss weiterhin tatsächliche Kanal-I/O nachweisen. accept-edits bestätigt
+                // Arbeitsbereich-Edits automatisch, dangerous/bypass zusätzlich andere Tools.
                 "Softwareschmiede.Devin" => mode is "accept-edits" or "dangerous" or "bypass",
                 _ => mode == "acceptEdits",
             };

@@ -20,7 +20,7 @@ public sealed record UpdateDownloadRoute(Uri Primary, Uri? Fallback = null);
 /// <param name="Version">Semantische Release-Version ohne führendes <c>v</c>, inklusive Prerelease-Suffix und Build-Metadaten.</param>
 /// <param name="TagName">GitHub-Release-Tag.</param>
 /// <param name="AssetName">Name des Release-Assets.</param>
-/// <param name="PaketDownload">Download-Route des Release-Assets.</param>
+/// <param name="PackageDownload">Download-Route des Release-Assets.</param>
 /// <param name="PublishedAt">Optionaler Veröffentlichungszeitpunkt.</param>
 /// <param name="IsPrerelease">Gibt an, ob das Release als Prerelease klassifiziert ist (GitHub-Flag <c>prerelease</c> oder SemVer-Prerelease-Suffix).</param>
 /// <param name="ManifestDownload">Optionale Download-Route des Update-Manifests (<c>update.json</c>) für die SHA-256-Verifikation vor dem Entpacken.</param>
@@ -28,7 +28,7 @@ public sealed record UpdateInfo(
     string Version,
     string TagName,
     string AssetName,
-    UpdateDownloadRoute PaketDownload,
+    UpdateDownloadRoute PackageDownload,
     DateTimeOffset? PublishedAt,
     bool IsPrerelease,
     UpdateDownloadRoute? ManifestDownload = null);
@@ -37,20 +37,20 @@ public sealed record UpdateInfo(
 public enum UpdateMode
 {
     /// <summary>Update-Prüfung und -Installation sind deaktiviert.</summary>
-    Aus = 0,
+    Off = 0,
 
     /// <summary>Es wird nur auf Updates geprüft; ein gefundenes Update wird angeboten, aber nie automatisch installiert.</summary>
-    NurPruefen = 1,
+    CheckOnly = 1,
 
     /// <summary>Beim Programmstart wird geprüft und ein gefundenes Update automatisch installiert.</summary>
-    BeiProgrammstartPruefenUndAusfuehren = 2
+    CheckAndRunAtStartup = 2
 }
 
 /// <summary>Exklusiver Update-Kanal, der sich aus dem konfigurierten Update-Pfad ableitet.</summary>
-public enum UpdateKanal
+public enum UpdateChannel
 {
     /// <summary>Ausschließlich stabile Produktivversionen werden als Update-Kandidaten berücksichtigt.</summary>
-    Produktiv = 0,
+    Stable = 0,
 
     /// <summary>Ausschließlich Prerelease-Versionen (Release-Kandidaten) werden als Update-Kandidaten berücksichtigt.</summary>
     ReleaseCandidate = 1
@@ -58,15 +58,15 @@ public enum UpdateKanal
 
 /// <summary>Gemeinsam geladenes, unveränderliches Paar der Update-Einstellungen.</summary>
 /// <param name="Mode">Persistierter Update-Modus.</param>
-/// <param name="UpdatePfad">Persistierter Update-Pfad (Kanalselektor; siehe <see cref="UpdatePfadKanalResolver"/>).</param>
-public sealed record UpdateSettings(UpdateMode Mode, string UpdatePfad);
+/// <param name="UpdatePath">Persistierter Update-Pfad (Kanalselektor; siehe <see cref="UpdatePathChannelResolver"/>).</param>
+public sealed record UpdateSettings(UpdateMode Mode, string UpdatePath);
 
 /// <summary>Unveränderlicher Optionsvertrag einer Update-Prüfung für <see cref="IUpdateService"/> und <see cref="IUpdateReleaseClient"/>.</summary>
-/// <param name="UpdatePfad">Der konfigurierte Update-Pfad (Kanalselektor; siehe <see cref="UpdatePfadKanalResolver"/>).</param>
-public sealed record UpdateCheckOptions(string UpdatePfad)
+/// <param name="UpdatePath">Der konfigurierte Update-Pfad (Kanalselektor; siehe <see cref="UpdatePathChannelResolver"/>).</param>
+public sealed record UpdateCheckOptions(string UpdatePath)
 {
-    /// <summary>Der aus <see cref="UpdatePfad"/> abgeleitete exklusive Update-Kanal.</summary>
-    public UpdateKanal Channel => UpdatePfadKanalResolver.ErmittleKanal(UpdatePfad);
+    /// <summary>Der aus <see cref="UpdatePath"/> abgeleitete exklusive Update-Kanal.</summary>
+    public UpdateChannel Channel => UpdatePathChannelResolver.ResolveChannel(UpdatePath);
 }
 
 /// <summary>
@@ -76,14 +76,14 @@ public sealed record UpdateCheckOptions(string UpdatePfad)
 /// </summary>
 public sealed record UpdateReleaseLookupResult
 {
-    private UpdateReleaseLookupResult(bool erfolg, UpdateInfo? release)
+    private UpdateReleaseLookupResult(bool success, UpdateInfo? release)
     {
-        Erfolg = erfolg;
+        Success = success;
         Release = release;
     }
 
     /// <summary>Gibt an, ob die Release-Abfrage technisch erfolgreich war.</summary>
-    public bool Erfolg { get; }
+    public bool Success { get; }
 
     /// <summary>Das neueste zulässige Release oder <c>null</c>, wenn kein Kandidat gefunden wurde.</summary>
     public UpdateInfo? Release { get; }
@@ -92,24 +92,24 @@ public sealed record UpdateReleaseLookupResult
     public static UpdateReleaseLookupResult Failed { get; } = new(false, null);
 
     /// <summary>Die Release-Abfrage war erfolgreich, lieferte aber keinen passenden Kandidaten.</summary>
-    public static UpdateReleaseLookupResult KeinTreffer { get; } = new(true, null);
+    public static UpdateReleaseLookupResult NoMatch { get; } = new(true, null);
 
     /// <summary>Erzeugt ein erfolgreiches Ergebnis mit dem gefundenen Release.</summary>
     /// <param name="release">Das neueste zulässige Release.</param>
-    public static UpdateReleaseLookupResult Gefunden(UpdateInfo release) => new(true, release);
+    public static UpdateReleaseLookupResult Found(UpdateInfo release) => new(true, release);
 }
 
 /// <summary>Status einer Update-Prüfung.</summary>
 public enum UpdateCheckStatus
 {
     /// <summary>Es ist kein neueres Update verfügbar.</summary>
-    KeinUpdate,
+    NoUpdate,
 
     /// <summary>Ein neueres Update ist verfügbar.</summary>
-    UpdateVerfuegbar,
+    UpdateAvailable,
 
     /// <summary>Die Update-Prüfung konnte nicht zuverlässig durchgeführt werden.</summary>
-    NichtPruefbar
+    NotCheckable
 }
 
 /// <summary>Ergebnis einer Update-Prüfung.</summary>
@@ -119,13 +119,13 @@ public enum UpdateCheckStatus
 public sealed record UpdateCheckResult(UpdateCheckStatus Status, UpdateInfo? Update = null, string? Message = null)
 {
     /// <summary>Erzeugt ein Ergebnis ohne verfügbares Update.</summary>
-    public static UpdateCheckResult KeinUpdate(string? message = null) => new(UpdateCheckStatus.KeinUpdate, null, message);
+    public static UpdateCheckResult NoUpdate(string? message = null) => new(UpdateCheckStatus.NoUpdate, null, message);
 
     /// <summary>Erzeugt ein Ergebnis mit verfügbarem Update.</summary>
-    public static UpdateCheckResult UpdateVerfuegbar(UpdateInfo update, string? message = null) => new(UpdateCheckStatus.UpdateVerfuegbar, update, message);
+    public static UpdateCheckResult UpdateAvailable(UpdateInfo update, string? message = null) => new(UpdateCheckStatus.UpdateAvailable, update, message);
 
     /// <summary>Erzeugt ein Ergebnis für eine nicht prüfbare Situation.</summary>
-    public static UpdateCheckResult NichtPruefbar(string? message = null) => new(UpdateCheckStatus.NichtPruefbar, null, message);
+    public static UpdateCheckResult NotCheckable(string? message = null) => new(UpdateCheckStatus.NotCheckable, null, message);
 }
 
 /// <summary>Phase der Update-Vorbereitung.</summary>
@@ -135,13 +135,13 @@ public enum UpdatePreparationPhase
     Download,
 
     /// <summary>Das heruntergeladene Update-Paket wird gegen das Update-Manifest verifiziert.</summary>
-    Verifizieren,
+    Verify,
 
     /// <summary>Das Release-ZIP wird entpackt.</summary>
-    Entpacken,
+    Extract,
 
     /// <summary>Das externe Update-Skript wird vorbereitet.</summary>
-    UpdateVorbereiten
+    PrepareUpdate
 }
 
 /// <summary>Fortschrittsmeldung während der Update-Vorbereitung.</summary>

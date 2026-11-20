@@ -39,8 +39,8 @@ public sealed partial class SettingsView : UserControl
             case IGitPlugin gitPlugin:
                 vm.ScmPluginSelectedCommand.Execute(gitPlugin);
                 break;
-            case IKiPlugin kiPlugin:
-                vm.KiPluginSelectedCommand.Execute(kiPlugin);
+            case IKiPlugin aiPlugin:
+                vm.KiPluginSelectedCommand.Execute(aiPlugin);
                 break;
             case PluginActivationEntry entry:
                 vm.PluginSelectedCommand.Execute(entry);

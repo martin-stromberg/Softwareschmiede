@@ -161,8 +161,8 @@ public sealed class ScmEventDispatchTests
         var automatic = fixture.DispatchAsync(eventId);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         using var manualScope = fixture.Services.CreateScope();
-        var manual = manualScope.ServiceProvider.GetRequiredService<EntwicklungsprozessService>()
-            .ProzessStartenUndCliStartenAsync(taskId, "https://github.com/owner/repo", null, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
+        var manual = manualScope.ServiceProvider.GetRequiredService<DevelopmentProcessService>()
+            .StartProcessAndCliAsync(taskId, "https://github.com/owner/repo", null, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
         Assert.False(manual.IsCompleted);
         release.TrySetResult();
         await Task.WhenAll(automatic, manual).WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);

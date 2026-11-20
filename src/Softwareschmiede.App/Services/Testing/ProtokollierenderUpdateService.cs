@@ -17,11 +17,11 @@ public sealed class ProtokollierenderUpdateService : IUpdateService
 
     /// <inheritdoc cref="ProtokollierenderUpdateService"/>
     /// <param name="inner">Der echte Update-Service.</param>
-    /// <param name="kontext">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public ProtokollierenderUpdateService(IUpdateService inner, UpdateE2ETestKontext kontext)
+    /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
+    public ProtokollierenderUpdateService(IUpdateService inner, UpdateE2ETestKontext context)
     {
         _inner = inner;
-        _kontext = kontext;
+        _kontext = context;
     }
 
     /// <inheritdoc/>
@@ -29,21 +29,21 @@ public sealed class ProtokollierenderUpdateService : IUpdateService
     {
         _kontext.Protokoll.Schreibe(
             UpdateE2EEreignisse.UpdateCheckStarted,
-            new { updatePfad = options.UpdatePfad, kanal = options.Channel.ToString() });
+            new { updatePath = options.UpdatePath, channel = options.Channel.ToString() });
 
-        var ergebnis = await _inner.CheckForUpdateAsync(options, ct);
+        var result = await _inner.CheckForUpdateAsync(options, ct);
 
         _kontext.Protokoll.Schreibe(
             UpdateE2EEreignisse.UpdateCheckCompleted,
             new
             {
-                status = ergebnis.Status.ToString(),
-                version = ergebnis.Update?.Version,
-                isPrerelease = ergebnis.Update?.IsPrerelease,
-                message = ergebnis.Message
+                status = result.Status.ToString(),
+                version = result.Update?.Version,
+                isPrerelease = result.Update?.IsPrerelease,
+                message = result.Message
             });
 
-        return ergebnis;
+        return result;
     }
 
     /// <inheritdoc/>
@@ -61,17 +61,17 @@ public sealed class ProtokollierenderUpdateService : IUpdateService
 
         try
         {
-            var ergebnis = await _inner.PrepareUpdateAsync(update, protokollFortschritt, ct);
+            var result = await _inner.PrepareUpdateAsync(update, protokollFortschritt, ct);
             _kontext.Protokoll.Schreibe(
                 UpdateE2EEreignisse.PreparationCompleted,
                 new
                 {
-                    zipPath = ergebnis.ZipPath,
-                    extractedDirectory = ergebnis.ExtractedDirectory,
-                    scriptPath = ergebnis.ScriptPath,
-                    requiresElevation = ergebnis.RequiresElevation
+                    zipPath = result.ZipPath,
+                    extractedDirectory = result.ExtractedDirectory,
+                    scriptPath = result.ScriptPath,
+                    requiresElevation = result.RequiresElevation
                 });
-            return ergebnis;
+            return result;
         }
         catch (Exception ex)
         {
@@ -107,13 +107,13 @@ public sealed class ProtokollierenderUpdateService : IUpdateService
     /// </summary>
     private sealed class ProtokollierenderFortschritt(
         IProgress<UpdatePreparationProgress>? inner,
-        UpdateE2ETestKontext kontext) : IProgress<UpdatePreparationProgress>
+        UpdateE2ETestKontext context) : IProgress<UpdatePreparationProgress>
     {
         /// <inheritdoc/>
         public void Report(UpdatePreparationProgress value)
         {
             inner?.Report(value);
-            kontext.Protokoll.Schreibe(
+            context.Protokoll.Schreibe(
                 UpdateE2EEreignisse.PreparationPhase,
                 new { phase = value.Phase.ToString(), percent = value.Percent, message = value.Message });
         }

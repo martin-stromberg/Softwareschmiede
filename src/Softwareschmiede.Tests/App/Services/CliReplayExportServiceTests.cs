@@ -14,15 +14,15 @@ namespace Softwareschmiede.Tests.App.Services;
 /// <summary>Unit-Tests für <see cref="CliReplayExportService"/>.</summary>
 public sealed class CliReplayExportServiceTests : IDisposable
 {
-    private readonly KiAusfuehrungsService _kiService;
-    private readonly CliReplayAufzeichnungStore _store = new();
+    private readonly AiExecutionService _aiService;
+    private readonly CliReplayRecordingStore _store = new();
     private readonly CliReplayExportService _sut;
 
     /// <summary>CliReplayExportServiceTests.</summary>
     public CliReplayExportServiceTests()
     {
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
-        _sut = new CliReplayExportService(_kiService, _store, NullLogger<CliReplayExportService>.Instance);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
+        _sut = new CliReplayExportService(_aiService, _store, NullLogger<CliReplayExportService>.Instance);
     }
 
     /// <summary>Dispose — die KiAusfuehrungsService-Instanzen werden bewusst nicht disposed, weil der
@@ -80,13 +80,13 @@ public sealed class CliReplayExportServiceTests : IDisposable
 
         await kiService.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        var zielPfad = Path.Combine(Path.GetTempPath(), $"cli-replay-{Guid.NewGuid():N}.clireplay");
+        var targetPath = Path.Combine(Path.GetTempPath(), $"cli-replay-{Guid.NewGuid():N}.clireplay");
         try
         {
-            await sut.ExportCliReplayAsync(workItemId, zielPfad, TestContext.Current.CancellationToken);
+            await sut.ExportCliReplayAsync(workItemId, targetPath, TestContext.Current.CancellationToken);
 
-            File.Exists(zielPfad).Should().BeTrue();
-            var geladen = await _store.LadeAsync(zielPfad, TestContext.Current.CancellationToken);
+            File.Exists(targetPath).Should().BeTrue();
+            var geladen = await _store.LoadAsync(targetPath, TestContext.Current.CancellationToken);
             geladen.WorkItemId.Should().Be(workItemId);
             geladen.PluginName.Should().Be("TestPlugin");
             geladen.Chunks.Should().HaveCount(2);
@@ -95,8 +95,8 @@ public sealed class CliReplayExportServiceTests : IDisposable
         }
         finally
         {
-            if (File.Exists(zielPfad))
-                File.Delete(zielPfad);
+            if (File.Exists(targetPath))
+                File.Delete(targetPath);
         }
     }
 }

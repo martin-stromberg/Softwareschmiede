@@ -23,7 +23,7 @@ public sealed record MainWindowOptionaleDienste(
     Action<Action>? DispatcherInvoke = null,
     IDialogService? DialogService = null,
     IApplicationVersionProvider? VersionProvider = null,
-    AufgabeLaufdatenChangedNotifier? LaufdatenChangedNotifier = null,
+    WorkItemRunDataChangedNotifier? LaufdatenChangedNotifier = null,
     MainWindowUpdateDienste? UpdateDienste = null,
     AufgabenListenModusService? AufgabenListenModusService = null,
     IAutoShutdownOrchestrator? AutoShutdownOrchestrator = null,

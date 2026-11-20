@@ -15,7 +15,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>
 /// Regressionstests für Issue 108 (Kundenrückmeldung): <see cref="CliProcessManager"/> muss beim Start und
-/// Stopp eines CLI-Prozesses <see cref="WorkItem.ActiveRunId"/> über <see cref="AufgabeService"/> persistieren,
+/// Stopp eines CLI-Prozesses <see cref="WorkItem.ActiveRunId"/> über <see cref="WorkItemService"/> persistieren,
 /// damit der <c>KiAusfuehrungsStatusConverter</c> die Seitenleisten-Kachel korrekt auf "▶ Läuft" umschaltet.
 /// Vor dem Fix wurde <c>AktiveRunId</c> nirgends im Produktivcode gesetzt — der zugehörige E2E-Test simulierte
 /// den Heartbeat direkt in der Datenbank und deckte diese Lücke daher nicht auf.
@@ -24,19 +24,19 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
 {
     private readonly string _dbName = Guid.NewGuid().ToString();
     private readonly ServiceProvider _provider;
-    private readonly KiAusfuehrungsService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly CliProcessManager _sut;
-    private readonly AufgabeLaufdatenChangedNotifier _laufdatenChangedNotifier = new();
+    private readonly WorkItemRunDataChangedNotifier _runDataChangedNotifier = new();
     private readonly Guid _projektId = Guid.NewGuid();
-    private readonly Guid _aufgabeId = Guid.NewGuid();
+    private readonly Guid _workItemId = Guid.NewGuid();
 
     /// <summary>CliProcessManagerTests_AktiverLauf.</summary>
     public CliProcessManagerTests_AktiverLauf()
     {
         var services = new ServiceCollection();
         services.AddDbContext<SoftwareschmiedeDbContext>(options => options.UseInMemoryDatabase(_dbName));
-        services.AddScoped<AufgabeService>();
-        services.AddSingleton<ILogger<AufgabeService>>(NullLogger<AufgabeService>.Instance);
+        services.AddScoped<WorkItemService>();
+        services.AddSingleton<ILogger<WorkItemService>>(NullLogger<WorkItemService>.Instance);
         services.AddScoped<TodoService>();
         services.AddSingleton<ILogger<TodoService>>(NullLogger<TodoService>.Instance);
         _provider = services.BuildServiceProvider();
@@ -54,7 +54,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
             });
             db.WorkItems.Add(new WorkItem
             {
-                Id = _aufgabeId,
+                Id = _workItemId,
                 ProjectId = _projektId,
                 Title = "CLI-Prozess-Aufgabe",
                 Status = WorkItemStatus.Started,
@@ -65,19 +65,19 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
 
         var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
         var kiScopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = TestKiAusfuehrungsServiceFactory.Create(kiScopeFactoryMock.Object);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create(kiScopeFactoryMock.Object);
         _sut = new CliProcessManager(
-            _kiService,
+            _aiService,
             scopeFactory,
             NullLogger<CliProcessManager>.Instance,
-            _laufdatenChangedNotifier);
+            _runDataChangedNotifier);
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
         _sut.Dispose();
-        _kiService.Dispose();
+        _aiService.Dispose();
         _provider.Dispose();
     }
 
@@ -85,13 +85,13 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     {
         using var scope = _provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
-        return db.WorkItems.AsNoTracking().Single(a => a.Id == _aufgabeId);
+        return db.WorkItems.AsNoTracking().Single(a => a.Id == _workItemId);
     }
 
     private async Task RaiseStatusChangedAsync(CliProcessStatus status)
     {
         var method = typeof(CliProcessManager).GetMethod("OnCliProcessStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        method.Invoke(_sut, new object[] { _aufgabeId, status });
+        method.Invoke(_sut, new object[] { _workItemId, status });
 
         // OnCliProcessStatusChanged persistiert über SafeFireAndForget asynchron im Hintergrund;
         // kurze Wartezeit, bis der Fire-and-Forget-Task abgeschlossen ist.
@@ -120,7 +120,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         var vorStart = DateTimeOffset.UtcNow;
         // Laufendes Handle simulieren: Der Setzen-Pfad ist per laeuftGuard abgesichert und schreibt
         // nur, solange der Prozess nachweislich läuft (Issue 342, TOCTOU).
-        PlantLaufendesHandle(_aufgabeId);
+        PlantLaufendesHandle(_workItemId);
 
         await RaiseStatusChangedAsync(CliProcessStatus.Started);
 
@@ -131,17 +131,17 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     }
 
     /// <summary>
-    /// Beim regulären Stopp eines CLI-Prozesses (Status <c>Gestoppt</c>) muss CliProcessManager
+    /// Beim regulären Stopp eines CLI-Prozesses (Status <c>Stopped</c>) muss CliProcessManager
     /// <see cref="WorkItem.ActiveRunId"/> wieder entfernen, damit die Kachel nicht dauerhaft "▶ Läuft" zeigt.
     /// </summary>
     [Fact]
     public async Task OnCliProcessStatusChanged_WithGestoppt_EntferntAktiveRunId()
     {
-        PlantLaufendesHandle(_aufgabeId);
+        PlantLaufendesHandle(_workItemId);
         await RaiseStatusChangedAsync(CliProcessStatus.Started);
         LadeAufgabe().ActiveRunId.Should().NotBeNull();
 
-        await RaiseStatusChangedAsync(CliProcessStatus.Gestoppt);
+        await RaiseStatusChangedAsync(CliProcessStatus.Stopped);
 
         LadeAufgabe().ActiveRunId.Should().BeNull();
     }
@@ -154,19 +154,19 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     [Fact]
     public async Task OnCliProcessStatusChanged_WithFehler_EntferntAktiveRunId()
     {
-        PlantLaufendesHandle(_aufgabeId);
+        PlantLaufendesHandle(_workItemId);
         await RaiseStatusChangedAsync(CliProcessStatus.Started);
         LadeAufgabe().ActiveRunId.Should().NotBeNull();
 
-        await RaiseStatusChangedAsync(CliProcessStatus.Fehler);
+        await RaiseStatusChangedAsync(CliProcessStatus.Error);
 
         LadeAufgabe().ActiveRunId.Should().BeNull();
     }
 
     private void PlantLaufendesHandle(Guid workItemId)
     {
-        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
+        var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_aiService)!;
         handles[workItemId] = new CliProcessHandle(workItemId, System.Diagnostics.Process.GetCurrentProcess());
     }
 
@@ -178,13 +178,13 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     [Fact]
     public async Task CliLaufAktiv_StelltLaufdatenSicher_BeiWiederverwendung()
     {
-        PlantLaufendesHandle(_aufgabeId);
+        PlantLaufendesHandle(_workItemId);
         LadeAufgabe().ActiveRunId.Should().BeNull("Ausgangslage: keine persistierten Laufdaten");
 
         var notifierFired = new ManualResetEventSlim(false);
-        _laufdatenChangedNotifier.LaufdatenChanged += _ => notifierFired.Set();
+        _runDataChangedNotifier.RunDataChanged += _ => notifierFired.Set();
 
-        _kiService.NotifyLaufAktiv(_aufgabeId);
+        _aiService.NotifyRunActive(_workItemId);
 
         await PollUntilAsync(() => LadeAufgabe().ActiveRunId is not null);
         var workItem = LadeAufgabe();
@@ -203,7 +203,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     [Fact]
     public async Task AktualisierungAsync_HeiltGeloeschteLaufdaten_BeiLaufendemProzess()
     {
-        PlantLaufendesHandle(_aufgabeId);
+        PlantLaufendesHandle(_workItemId);
         await RaiseStatusChangedAsync(CliProcessStatus.Started);
         LadeAufgabe().ActiveRunId.Should().NotBeNull();
 
@@ -212,7 +212,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         using (var scope = _provider.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
-            var tracked = await db.WorkItems.FindAsync(new object?[] { _aufgabeId }, TestContext.Current.CancellationToken);
+            var tracked = await db.WorkItems.FindAsync(new object?[] { _workItemId }, TestContext.Current.CancellationToken);
             tracked!.ActiveRunId = null;
             tracked.LastHeartbeatUtc = null;
             tracked.RunStatus = null;
@@ -220,8 +220,8 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        var method = typeof(CliProcessManager).GetMethod("AktualisierungAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        await (Task)method.Invoke(_sut, new object[] { _aufgabeId })!;
+        var method = typeof(CliProcessManager).GetMethod("UpdateAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        await (Task)method.Invoke(_sut, new object[] { _workItemId })!;
 
         var workItem = LadeAufgabe();
         workItem.ActiveRunId.Should().NotBeNullOrEmpty("der Tick stellt die vollständigen Laufdaten wieder her");
@@ -236,10 +236,10 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     [Fact]
     public async Task AbgleichAsync_StelltLaufdatenSicher_FuerLaufendeAufgaben()
     {
-        PlantLaufendesHandle(_aufgabeId);
+        PlantLaufendesHandle(_workItemId);
         LadeAufgabe().ActiveRunId.Should().BeNull();
 
-        var method = typeof(CliProcessManager).GetMethod("AbgleichAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(CliProcessManager).GetMethod("ReconcileAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         await (Task)method.Invoke(_sut, Array.Empty<object>())!;
 
         var workItem = LadeAufgabe();
@@ -252,6 +252,6 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         // Session-lose Handle zählt hier der Timer-Nachweis.
         var heartbeatField = typeof(CliProcessManager).GetField("_heartbeatTimers", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var heartbeatTimers = (System.Collections.Concurrent.ConcurrentDictionary<Guid, Timer>)heartbeatField.GetValue(_sut)!;
-        heartbeatTimers.ContainsKey(_aufgabeId).Should().BeTrue("der Abgleich stellt die laufende Heartbeat-Beobachtung wieder her");
+        heartbeatTimers.ContainsKey(_workItemId).Should().BeTrue("der Abgleich stellt die laufende Heartbeat-Beobachtung wieder her");
     }
 }

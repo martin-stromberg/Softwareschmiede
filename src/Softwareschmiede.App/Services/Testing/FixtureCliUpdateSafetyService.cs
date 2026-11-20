@@ -16,10 +16,10 @@ public sealed class FixtureCliUpdateSafetyService : ICliUpdateSafetyService
     private readonly UpdateE2ETestKontext _kontext;
 
     /// <inheritdoc cref="FixtureCliUpdateSafetyService"/>
-    /// <param name="kontext">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public FixtureCliUpdateSafetyService(UpdateE2ETestKontext kontext)
+    /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
+    public FixtureCliUpdateSafetyService(UpdateE2ETestKontext context)
     {
-        _kontext = kontext;
+        _kontext = context;
     }
 
     /// <inheritdoc/>

@@ -12,14 +12,14 @@ namespace Softwareschmiede.Tests.Domain.Enums;
 public sealed class AufgabeStatusTransitionTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AufgabeService _sut;
+    private readonly WorkItemService _sut;
     private readonly Guid _projektId = Guid.NewGuid();
 
     /// <summary>AufgabeStatusTransitionTests.</summary>
     public AufgabeStatusTransitionTests()
     {
         _db = TestDbContextFactory.Create();
-        _sut = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
+        _sut = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
 
         _db.Projects.Add(new Project
         {

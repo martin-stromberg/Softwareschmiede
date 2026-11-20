@@ -37,7 +37,7 @@ public sealed class PluginManager : IPluginManager
     private readonly bool _applyTestModeFilter;
     private readonly object _sync = new();
     private readonly List<IGitPlugin> _gitPlugins = [];
-    private readonly List<IKiPlugin> _kiPlugins = [];
+    private readonly List<IKiPlugin> _aiPlugins = [];
     private readonly List<IIdePlugin> _idePlugins = [];
     private bool _initialized;
 
@@ -66,7 +66,7 @@ public sealed class PluginManager : IPluginManager
     public IReadOnlyList<IKiPlugin> GetDevelopmentAutomationPlugins()
     {
         EnsureInitialized();
-        return _kiPlugins;
+        return _aiPlugins;
     }
 
     /// <inheritdoc/>
@@ -81,16 +81,16 @@ public sealed class PluginManager : IPluginManager
     public IKiPlugin GetDefaultDevelopmentAutomationPlugin()
     {
         EnsureInitialized();
-        return _kiPlugins
-                   .OrderBy(GetKiPluginPriority)
+        return _aiPlugins
+                   .OrderBy(GetAiPluginPriority)
                    .ThenBy(p => p.PluginName, StringComparer.OrdinalIgnoreCase)
                    .FirstOrDefault()
                ?? throw new InvalidOperationException("Kein Development-Automation-Plugin verfügbar.");
     }
 
-    private static int GetKiPluginPriority(IKiPlugin plugin)
+    private static int GetAiPluginPriority(IKiPlugin plugin)
         => plugin is CliKiPluginBase cliPlugin
-           && string.Equals(cliPlugin.ProviderDateiPraefix, "copilot", StringComparison.OrdinalIgnoreCase)
+           && string.Equals(cliPlugin.ProviderFilePrefix, "copilot", StringComparison.OrdinalIgnoreCase)
             ? 0
             : 1;
 
@@ -129,7 +129,7 @@ public sealed class PluginManager : IPluginManager
     }
 
     private static bool IsTestMode()
-        => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Terminal.TerminalSessionService.TestDatenbankPfadVariable));
+        => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Terminal.TerminalSessionService.TestDatabasePathVariable));
 
     private static bool IsAllowedInTestMode(string dllFileName)
     {
@@ -145,7 +145,7 @@ public sealed class PluginManager : IPluginManager
     private void DiscoverPlugins()
     {
         _gitPlugins.Clear();
-        _kiPlugins.Clear();
+        _aiPlugins.Clear();
         _idePlugins.Clear();
 
         RegisterBuiltInIdePlugins();
@@ -176,7 +176,7 @@ public sealed class PluginManager : IPluginManager
         _logger.LogInformation(
             "Plugin-Discovery abgeschlossen. SCM={ScmCount}, DevelopmentAutomation={DevCount}, Ide={IdeCount}",
             _gitPlugins.Count,
-            _kiPlugins.Count,
+            _aiPlugins.Count,
             _idePlugins.Count);
     }
 
@@ -300,9 +300,9 @@ public sealed class PluginManager : IPluginManager
                     _logger.LogInformation("SCM-Plugin geladen: {PluginName} ({Type})", gitPlugin.PluginName, pluginType.FullName);
                     break;
 
-                case PluginType.DevelopmentAutomation when instance is IKiPlugin kiPlugin:
-                    _kiPlugins.Add(kiPlugin);
-                    _logger.LogInformation("Development-Automation-Plugin geladen: {PluginName} ({Type})", kiPlugin.PluginName, pluginType.FullName);
+                case PluginType.DevelopmentAutomation when instance is IKiPlugin aiPlugin:
+                    _aiPlugins.Add(aiPlugin);
+                    _logger.LogInformation("Development-Automation-Plugin geladen: {PluginName} ({Type})", aiPlugin.PluginName, pluginType.FullName);
                     break;
 
                 case PluginType.Ide when instance is IIdePlugin idePlugin:

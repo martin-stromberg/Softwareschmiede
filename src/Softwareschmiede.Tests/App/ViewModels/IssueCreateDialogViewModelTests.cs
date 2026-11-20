@@ -279,16 +279,16 @@ public sealed class IssueCreateDialogViewModelTests
     [Fact]
     public async Task KiAusfuellen_ShouldReplaceBodyWithGeneratedText()
     {
-        var kiPlugin = new FakeKiPlugin();
-        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = new FakeKiPlugin();
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
 
         await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
 
-        kiPlugin.ReceivedTemplateBody.Should().Be("Template");
-        kiPlugin.ReceivedOriginalRequirement.Should().Be("Original");
+        aiPlugin.ReceivedTemplateBody.Should().Be("Template");
+        aiPlugin.ReceivedOriginalRequirement.Should().Be("Original");
         sut.Body.Should().Be("KI-Ergebnis: Template / Original");
     }
 
@@ -297,8 +297,8 @@ public sealed class IssueCreateDialogViewModelTests
     public async Task KiAusfuellen_ShouldKeepGermanSpecialCharactersInBody()
     {
         var generatedBody = "KI-Ergebnis: plötzlich für Selbstwertgefühl, Größe, Straße, äöüß & €.";
-        var kiPlugin = new FakeKiPlugin(generatedBody);
-        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = new FakeKiPlugin(generatedBody);
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
@@ -359,10 +359,10 @@ public sealed class IssueCreateDialogViewModelTests
         var deaktiviertesPlugin = new FakeFailingKiPlugin();
         _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
         await using var db = Softwareschmiede.Tests.Helpers.TestDbContextFactory.Create();
-        var einstellungService = new Softwareschmiede.Application.Services.AppEinstellungService(
-            db, NullLogger<Softwareschmiede.Application.Services.AppEinstellungService>.Instance);
+        var settingService = new Softwareschmiede.Application.Services.AppSettingService(
+            db, NullLogger<Softwareschmiede.Application.Services.AppSettingService>.Instance);
         var activationService = new Softwareschmiede.Application.Services.PluginActivationService(
-            einstellungService, _pluginManagerMock.Object, NullLogger<Softwareschmiede.Application.Services.PluginActivationService>.Instance);
+            settingService, _pluginManagerMock.Object, NullLogger<Softwareschmiede.Application.Services.PluginActivationService>.Instance);
         await activationService.SetPluginEnabledAsync("FailKi", false, TestContext.Current.CancellationToken);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance, activationService);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
@@ -378,8 +378,8 @@ public sealed class IssueCreateDialogViewModelTests
     [Fact]
     public async Task KiAusfuellen_ShouldKeepBodyAndShowError_WhenGeneratorFails()
     {
-        var kiPlugin = new FakeFailingKiPlugin();
-        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = new FakeFailingKiPlugin();
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FailKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
@@ -395,8 +395,8 @@ public sealed class IssueCreateDialogViewModelTests
     [Fact]
     public async Task KiAusfuellen_ShouldKeepBodyAndResetGenerating_WhenCancelled()
     {
-        var kiPlugin = new FakeCancellingKiPlugin();
-        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = new FakeCancellingKiPlugin();
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "CancelKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");

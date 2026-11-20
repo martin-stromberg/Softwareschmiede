@@ -13,7 +13,7 @@ namespace Softwareschmiede.App.ViewModels;
 /// <summary>ViewModel für die Projektliste.</summary>
 public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 {
-    private readonly ProjektService _projektService;
+    private readonly ProjectService _projektService;
     private readonly IServiceProvider _serviceProvider;
     private readonly IPluginManager _pluginManager;
     private readonly ILogger<ProjectListViewModel> _logger;
@@ -22,7 +22,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     private Project? _selectedProjekt;
     private bool _isLoading;
     private bool _isLoadingRepositories;
-    private string? _fehlerMeldung;
+    private string? _errorMessage;
     private ViewModelBase? _detailViewModel;
     private ProjectDetailViewModel? _currentProjectDetailViewModel;
 
@@ -90,8 +90,8 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     /// <summary>Fehlermeldung bei Ladefehlern.</summary>
     public string? FehlerMeldung
     {
-        get => _fehlerMeldung;
-        private set => SetProperty(ref _fehlerMeldung, value);
+        get => _errorMessage;
+        private set => SetProperty(ref _errorMessage, value);
     }
 
     /// <summary>Lädt die Projektliste.</summary>
@@ -117,7 +117,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 
     /// <inheritdoc cref="ProjectListViewModel"/>
     public ProjectListViewModel(
-        ProjektService projektService,
+        ProjectService projektService,
         IServiceProvider serviceProvider,
         IPluginManager pluginManager,
         ILogger<ProjectListViewModel> logger)
@@ -167,7 +167,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden der Projekte.");
-            SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
+            SetFehler(ref _errorMessage, nameof(FehlerMeldung), ex);
         }
         finally
         {
@@ -219,7 +219,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Erstellen eines Projekts aus Repository '{RepositoryName}'.", repo.Name);
-            SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
+            SetFehler(ref _errorMessage, nameof(FehlerMeldung), ex);
         }
     }
 
@@ -253,7 +253,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 
         try
         {
-            await _projektService.ArchivierenAsync(SelectedProjekt.Id, ct);
+            await _projektService.ArchiveAsync(SelectedProjekt.Id, ct);
             Projects.Remove(SelectedProjekt);
             SelectedProjekt = null;
             DetailViewModel = null;
@@ -265,7 +265,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Archivieren des Projekts.");
-            SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
+            SetFehler(ref _errorMessage, nameof(FehlerMeldung), ex);
         }
     }
 

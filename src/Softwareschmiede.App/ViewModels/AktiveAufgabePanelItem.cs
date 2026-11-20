@@ -48,7 +48,7 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
     public WorkItemRunStatus? RunStatus { get; init; }
 
     /// <summary>Live-Substatus aus der Laufzeitquelle (<see cref="Domain.Interfaces.IRunningAutomationStatusSource.GetLiveRunStatus"/>); <c>null</c> = kein laufender gehandelter Prozess.</summary>
-    public WorkItemRunStatus? LiveLaufStatus { get; init; }
+    public WorkItemRunStatus? LiveRunStatus { get; init; }
 
     /// <summary>Aktueller Aufgabenstatus.</summary>
     public WorkItemStatus Status { get; init; }
@@ -69,7 +69,7 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
     public DateTimeOffset? PausedUntilUtc { get; init; }
 
     /// <summary>Gibt an, ob die Aufgabe aktuell pausiert ist (<see cref="PausedUntilUtc"/> liegt in der Zukunft).</summary>
-    public bool IstPausiert => PausedUntilUtc > DateTimeOffset.UtcNow;
+    public bool IsPaused => PausedUntilUtc > DateTimeOffset.UtcNow;
 
     /// <summary>Gibt an, ob für diese Aufgabe aktuell ein zeitgesteuerter Prompt in der Warteschlange steht.</summary>
     public bool HasScheduledPrompt { get; init; }

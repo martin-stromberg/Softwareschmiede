@@ -12,8 +12,8 @@ namespace Softwareschmiede.Infrastructure.Data;
 /// </summary>
 public static class DatabasePathResolver
 {
-    private const string DatenbankDateiname = "softwareschmiede.db";
-    private const string VersionsDateiname = "version.json";
+    private const string DatabaseFileName = "softwareschmiede.db";
+    private const string VersionsFileName = "version.json";
 
     /// <summary>
     /// Ermittelt den zu verwendenden Datenbankpfad.
@@ -34,24 +34,24 @@ public static class DatabasePathResolver
     /// Bei einer RC-Version (<c>tagName</c> enthält „-rc") oder einer versionslosen Version (keine
     /// oder keine gültige <c>version.json</c>) der Pfad <c>{baseDirectory}\softwareschmiede.db</c>.
     /// </returns>
-    public static string ErmittlePfad(string baseDirectory, string? testDbPathOverride)
+    public static string ResolvePath(string baseDirectory, string? testDbPathOverride)
     {
         if (!string.IsNullOrEmpty(testDbPathOverride))
         {
             return testDbPathOverride;
         }
 
-        return IstProduktiveVersion(baseDirectory)
+        return IsProductionVersion(baseDirectory)
             ? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "Softwareschmiede",
-                DatenbankDateiname)
-            : Path.Combine(baseDirectory, DatenbankDateiname);
+                DatabaseFileName)
+            : Path.Combine(baseDirectory, DatabaseFileName);
     }
 
-    private static bool IstProduktiveVersion(string baseDirectory)
+    private static bool IsProductionVersion(string baseDirectory)
     {
-        var versionPfad = Path.Combine(baseDirectory, VersionsDateiname);
+        var versionPfad = Path.Combine(baseDirectory, VersionsFileName);
         if (!File.Exists(versionPfad))
         {
             // Versionslos (z. B. Ausführung unter Visual Studio) → nicht produktiv.
@@ -67,7 +67,7 @@ public static class DatabasePathResolver
             // RC-Tags folgen dem Format "v{version}-rc.{n}" (siehe staging-ci.yml), produktive Tags
             // dem Format "v{version}" ohne "-rc"-Infix (siehe release.yml). Fehlende oder leere
             // Tags ordnet der Resolver konservativ dem RC-Kanal zu → nicht produktiv.
-            return UpdatePfadKanalResolver.ErmittleKanalFuerTagName(tagName) == UpdateKanal.Produktiv;
+            return UpdatePathChannelResolver.ResolveChannelForTagName(tagName) == UpdateChannel.Stable;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or FormatException)
         {

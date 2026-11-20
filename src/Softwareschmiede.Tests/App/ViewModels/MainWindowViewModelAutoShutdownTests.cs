@@ -26,9 +26,9 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     private readonly string _einstellungenDbPath =
         Path.Combine(Path.GetTempPath(), $"sw-vm-autoshutdown-{Guid.NewGuid():N}.db");
     private readonly ServiceProvider _einstellungenProvider;
-    private readonly AutoShutdownEinstellungenService _einstellungenService;
+    private readonly AutoShutdownEinstellungenService _settingsService;
     private readonly TodoService _todoService;
-    private readonly AufgabeService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IRunningAutomationStatusSource> _runningStatusSourceMock;
     private readonly Mock<IAutoShutdownOrchestrator> _orchestratorMock;
@@ -40,7 +40,7 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, _todoService);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, _todoService);
         _serviceProviderMock = new Mock<IServiceProvider>();
         _runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
         _orchestratorMock = new Mock<IAutoShutdownOrchestrator>();
@@ -62,24 +62,24 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
         });
         _db.SaveChanges();
 
-        var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
-        var recoveryService = new AufgabeRecoveryService(_db, _runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance);
+        var projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        var recoveryService = new WorkItemRecoveryService(_db, _runningStatusSourceMock.Object, NullLogger<WorkItemRecoveryService>.Instance);
         _serviceProviderMock
             .Setup(sp => sp.GetService(typeof(DashboardViewModel)))
-            .Returns(new DashboardViewModel(projektService, _aufgabeService, recoveryService, NullLogger<DashboardViewModel>.Instance));
+            .Returns(new DashboardViewModel(projektService, _workItemService, recoveryService, NullLogger<DashboardViewModel>.Instance));
 
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddDbContext<SoftwareschmiedeDbContext>(
             o => o.UseSqlite($"Data Source={_einstellungenDbPath};Pooling=False"));
-        services.AddScoped<AppEinstellungService>();
+        services.AddScoped<AppSettingService>();
         _einstellungenProvider = services.BuildServiceProvider();
         using (var initScope = _einstellungenProvider.CreateScope())
         {
             initScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().Database.EnsureCreated();
         }
 
-        _einstellungenService = new AutoShutdownEinstellungenService(
+        _settingsService = new AutoShutdownEinstellungenService(
             _einstellungenProvider.GetRequiredService<IServiceScopeFactory>(),
             NullLogger<AutoShutdownEinstellungenService>.Instance);
     }
@@ -94,39 +94,39 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
             File.Delete(_einstellungenDbPath);
     }
 
-    private MainWindowViewModel CreateSut(AutoShutdownEinstellungenService? einstellungenService = null)
+    private MainWindowViewModel CreateSut(AutoShutdownEinstellungenService? settingsService = null)
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var darkModeService = new DarkModeService(scopeFactoryMock.Object, NullLogger<DarkModeService>.Instance);
         var kiService = TestKiAusfuehrungsServiceFactory.Create();
-        var promptZeitVersandService = new PromptZeitVersandService(kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
+        var promptScheduleDispatchService = new PromptScheduleDispatchService(kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         return new MainWindowViewModel(
             darkModeService,
             _serviceProviderMock.Object,
-            _aufgabeService,
+            _workItemService,
             _todoService,
-            promptZeitVersandService,
+            promptScheduleDispatchService,
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
             new MainWindowOptionaleDienste(
                 DispatcherInvoke: action => action(),
                 AutoShutdownOrchestrator: _orchestratorMock.Object,
-                AutoShutdownEinstellungenService: einstellungenService ?? _einstellungenService,
+                AutoShutdownEinstellungenService: settingsService ?? _settingsService,
                 TimeProvider: _timeProvider));
     }
 
-    private async Task<Softwareschmiede.Domain.Entities.WorkItem> ErstelleGestarteteAufgabeAsync(string titel)
+    private async Task<Softwareschmiede.Domain.Entities.WorkItem> ErstelleGestarteteAufgabeAsync(string title)
     {
-        var workItem = await _aufgabeService.CreateAsync(_projektId, titel, null);
-        await _aufgabeService.StartenAsync(workItem.Id, $"feature/{Guid.NewGuid():N}", "/tmp/klon");
+        var workItem = await _workItemService.CreateAsync(_projektId, title, null);
+        await _workItemService.StartAsync(workItem.Id, $"feature/{Guid.NewGuid():N}", "/tmp/klon");
         return workItem;
     }
 
     private async Task<(bool Erzwingen, int ToleranzMinuten)> LeseEinstellungenAsync()
     {
         await using var db = TestDbContextFactory.CreateSqlite($"Data Source={_einstellungenDbPath};Pooling=False");
-        var service = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        return (await service.GetAutoShutdownErzwingenAsync(), await service.GetAutoShutdownToleranzMinutenAsync());
+        var service = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        return (await service.GetAutoShutdownForceAsync(), await service.GetAutoShutdownToleranceMinutesAsync());
     }
 
     /// <summary>Die fachliche Anzahl zählt nur als „Läuft" klassifizierte Aufgaben.</summary>
@@ -189,7 +189,7 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (DateTime.UtcNow < deadline)
         {
-            if (_orchestratorMock.Invocations.Any(i => i.Method.Name == nameof(IAutoShutdownOrchestrator.SetOptionen)))
+            if (_orchestratorMock.Invocations.Any(i => i.Method.Name == nameof(IAutoShutdownOrchestrator.SetOptions)))
                 return;
             await Task.Delay(25);
         }
@@ -202,8 +202,8 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     [Fact]
     public async Task AutoShutdownEinstellungenLaden_LaedtPersistierteWerteOhneAktivierung()
     {
-        await _einstellungenService.SpeichereErzwingenAsync(true, TestContext.Current.CancellationToken);
-        await _einstellungenService.SpeichereToleranzMinutenAsync(12, TestContext.Current.CancellationToken);
+        await _settingsService.SpeichereErzwingenAsync(true, TestContext.Current.CancellationToken);
+        await _settingsService.SpeichereToleranzMinutenAsync(12, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
@@ -213,7 +213,7 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
         sut.AutoShutdownErzwingen.Should().BeTrue();
         sut.AutoShutdownToleranzMinuten.Should().Be("12");
         sut.AutoShutdownAktiviert.Should().BeFalse("die Aktivierung ist Session-Zustand und wird nicht persistiert");
-        _orchestratorMock.Verify(o => o.SetOptionen(12, true), Times.Once);
+        _orchestratorMock.Verify(o => o.SetOptions(12, true), Times.Once);
         _orchestratorMock.Verify(o => o.SetEnabled(It.IsAny<bool>()), Times.Never);
     }
 
@@ -221,7 +221,7 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     [Fact]
     public async Task AutoShutdownEinstellungenLaden_LaedtNachFehlschlagErneut()
     {
-        await _einstellungenService.SpeichereToleranzMinutenAsync(9, TestContext.Current.CancellationToken);
+        await _settingsService.SpeichereToleranzMinutenAsync(9, TestContext.Current.CancellationToken);
         var einmaligFehlschlagenderService = new AutoShutdownEinstellungenService(
             new EinmaligFehlschlagendeScopeFactory(_einstellungenProvider.GetRequiredService<IServiceScopeFactory>()),
             NullLogger<AutoShutdownEinstellungenService>.Instance);
@@ -247,9 +247,9 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
         sut.AutoShutdownToleranzMinuten = "7";
 
         sut.AutoShutdownToleranzFehler.Should().BeNull();
-        _orchestratorMock.Verify(o => o.SetOptionen(7, false), Times.Once);
-        var (force, toleranz) = await LeseEinstellungenAsync();
-        toleranz.Should().Be(7);
+        _orchestratorMock.Verify(o => o.SetOptions(7, false), Times.Once);
+        var (force, tolerance) = await LeseEinstellungenAsync();
+        tolerance.Should().Be(7);
         force.Should().BeFalse();
     }
 
@@ -268,7 +268,7 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
         sut.AutoShutdownToleranzMinuten = eingabe;
 
         sut.AutoShutdownToleranzFehler.Should().NotBeNullOrEmpty();
-        _orchestratorMock.Verify(o => o.SetOptionen(It.IsAny<int>(), It.IsAny<bool>()), Times.Never);
+        _orchestratorMock.Verify(o => o.SetOptions(It.IsAny<int>(), It.IsAny<bool>()), Times.Never);
     }
 
     /// <summary>Der Erzwingen-Schalter wird persistiert und zusammen mit der aktuellen Toleranz weitergereicht.</summary>
@@ -282,19 +282,19 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
 
         sut.AutoShutdownErzwingen = true;
 
-        _orchestratorMock.Verify(o => o.SetOptionen(3, true), Times.Once);
+        _orchestratorMock.Verify(o => o.SetOptions(3, true), Times.Once);
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        (bool Erzwingen, int ToleranzMinuten) einstellungen;
+        (bool Erzwingen, int ToleranzMinuten) settings;
         do
         {
-            einstellungen = await LeseEinstellungenAsync();
-            if (einstellungen.Erzwingen)
+            settings = await LeseEinstellungenAsync();
+            if (settings.Erzwingen)
                 break;
             await Task.Delay(50, TestContext.Current.CancellationToken);
         }
         while (DateTime.UtcNow < deadline);
 
-        einstellungen.Erzwingen.Should().BeTrue();
+        settings.Erzwingen.Should().BeTrue();
     }
 
     /// <summary>Steht ein ungültiger Wert im Toleranzfeld, wird Erzwingen trotzdem mit der zuletzt gültigen Toleranz weitergereicht.</summary>
@@ -309,7 +309,7 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
 
         sut.AutoShutdownErzwingen = true;
 
-        _orchestratorMock.Verify(o => o.SetOptionen(3, true), Times.Once);
+        _orchestratorMock.Verify(o => o.SetOptions(3, true), Times.Once);
     }
 
     /// <summary>Armiert der Orchestrator einen Countdown, zeigt die UI den Restzeit-Text mit Einheit.</summary>
@@ -317,10 +317,10 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     public void ZustandGeaendert_MitCountdownEnde_ZeigtCountdownText()
     {
         var sut = CreateSut();
-        _orchestratorMock.SetupGet(o => o.CountdownEndeUtc)
+        _orchestratorMock.SetupGet(o => o.CountdownEndUtc)
             .Returns(_timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
 
-        _orchestratorMock.Raise(o => o.ZustandGeaendert += null);
+        _orchestratorMock.Raise(o => o.StateChanged += null);
 
         sut.AutoShutdownCountdownAktiv.Should().BeTrue();
         sut.AutoShutdownCountdownText.Should().Be("Herunterfahren in 5 Min. 0 Sek.");
@@ -332,10 +332,10 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     public void ZustandGeaendert_MitCountdownEndeUeberEinerStunde_ZeigtStundenFormat()
     {
         var sut = CreateSut();
-        _orchestratorMock.SetupGet(o => o.CountdownEndeUtc)
+        _orchestratorMock.SetupGet(o => o.CountdownEndUtc)
             .Returns(_timeProvider.GetUtcNow() + TimeSpan.FromMinutes(80));
 
-        _orchestratorMock.Raise(o => o.ZustandGeaendert += null);
+        _orchestratorMock.Raise(o => o.StateChanged += null);
 
         sut.AutoShutdownCountdownText.Should().Be("Herunterfahren in 1 Std. 20 Min.");
     }
@@ -345,12 +345,12 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     public void ZustandGeaendert_OhneCountdownEnde_LoeschtCountdownText()
     {
         var sut = CreateSut();
-        _orchestratorMock.SetupGet(o => o.CountdownEndeUtc)
+        _orchestratorMock.SetupGet(o => o.CountdownEndUtc)
             .Returns(_timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
-        _orchestratorMock.Raise(o => o.ZustandGeaendert += null);
+        _orchestratorMock.Raise(o => o.StateChanged += null);
 
-        _orchestratorMock.SetupGet(o => o.CountdownEndeUtc).Returns((DateTimeOffset?)null);
-        _orchestratorMock.Raise(o => o.ZustandGeaendert += null);
+        _orchestratorMock.SetupGet(o => o.CountdownEndUtc).Returns((DateTimeOffset?)null);
+        _orchestratorMock.Raise(o => o.StateChanged += null);
 
         sut.AutoShutdownCountdownAktiv.Should().BeFalse();
         sut.AutoShutdownCountdownText.Should().BeNull();

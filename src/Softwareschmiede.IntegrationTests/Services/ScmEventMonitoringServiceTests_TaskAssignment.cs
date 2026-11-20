@@ -267,7 +267,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var repositoryId = await AddRepositoryAsync(fixture);
-        var taskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, issueNummer: 9);
+        var taskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, issueNumber: 9);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5, body: "PR Beschreibung\n\nCloses #9");
@@ -317,7 +317,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.InitializeAsync();
         var repositoryId = await AddRepositoryAsync(fixture);
         await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, branchName: "feature/branch");
-        await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, issueNummer: 9);
+        await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, issueNumber: 9);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5, body: "PR Beschreibung\n\nCloses #9");
@@ -369,7 +369,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.InitializeAsync();
         var repositoryId = await AddRepositoryAsync(fixture);
         var taskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started,
-            branchName: "feature/branch", pausiertBisUtc: DateTimeOffset.UtcNow.AddHours(1));
+            branchName: "feature/branch", pausedUntilUtc: DateTimeOffset.UtcNow.AddHours(1));
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5);
@@ -419,7 +419,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
     }
 
     private static async Task<Guid> AddTaskAsync(ScmDispatchFixture fixture, Guid repositoryId,
-        WorkItemStatus status, string? branchName = null, DateTimeOffset? pausiertBisUtc = null, int? issueNummer = null)
+        WorkItemStatus status, string? branchName = null, DateTimeOffset? pausedUntilUtc = null, int? issueNumber = null)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
@@ -432,12 +432,12 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
             Title = "Kontextaufgabe",
             Status = status,
             BranchName = branchName,
-            PausedUntilUtc = pausiertBisUtc,
-            IssueReference = issueNummer is null ? null : new IssueReference
+            PausedUntilUtc = pausedUntilUtc,
+            IssueReference = issueNumber is null ? null : new IssueReference
             {
                 Id = Guid.NewGuid(),
-                IssueNumber = issueNummer,
-                Title = "Issue " + issueNummer
+                IssueNumber = issueNumber,
+                Title = "Issue " + issueNumber
             }
         };
         db.Add(task);

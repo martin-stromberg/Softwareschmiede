@@ -181,7 +181,7 @@ public sealed class DiffService
     /// <summary>
     /// Ruft alle Diffs für eine Aufgabe ab.
     /// </summary>
-    public async Task<IReadOnlyList<DiffResult>> GetDiffsByAufgabeAsync(
+    public async Task<IReadOnlyList<DiffResult>> GetDiffsByWorkItemAsync(
         Guid workItemId,
         int skip = 0,
         int take = 50,

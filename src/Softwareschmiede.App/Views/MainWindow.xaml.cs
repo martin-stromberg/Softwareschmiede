@@ -16,7 +16,7 @@ namespace Softwareschmiede.App.Views;
 /// <summary>Hauptfenster der Softwareschmiede-Desktopanwendung.</summary>
 public sealed partial class MainWindow : Window
 {
-    private readonly AppEinstellungService _einstellungService;
+    private readonly AppSettingService _settingService;
     private readonly DarkModeService _darkModeService;
     private readonly IApplicationVersionProvider _applicationVersionProvider;
     private readonly ILogger<MainWindow> _logger;
@@ -25,13 +25,13 @@ public sealed partial class MainWindow : Window
     /// <inheritdoc cref="MainWindow"/>
     public MainWindow(
         MainWindowViewModel viewModel,
-        AppEinstellungService einstellungService,
+        AppSettingService settingService,
         DarkModeService darkModeService,
         IApplicationVersionProvider applicationVersionProvider,
         ILogger<MainWindow> logger)
     {
         InitializeComponent();
-        _einstellungService = einstellungService;
+        _settingService = settingService;
         _darkModeService = darkModeService;
         _applicationVersionProvider = applicationVersionProvider;
         _logger = logger;
@@ -174,7 +174,7 @@ public sealed partial class MainWindow : Window
 
     private async Task RestoreWindowGeometryAsync()
     {
-        var geometry = await _einstellungService.GetWindowGeometryAsync();
+        var geometry = await _settingService.GetWindowGeometryAsync();
 
         if (geometry.X.HasValue && geometry.Y.HasValue)
         {
@@ -197,6 +197,6 @@ public sealed partial class MainWindow : Window
             (int)Width,
             (int)Height);
 
-        await _einstellungService.SetWindowGeometryAsync(geometry);
+        await _settingService.SetWindowGeometryAsync(geometry);
     }
 }

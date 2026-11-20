@@ -29,7 +29,7 @@ public sealed class DevinPluginTests
     {
         _sut.PluginName.Should().Be("Devin CLI");
         _sut.PluginPrefix.Should().Be("Softwareschmiede.Devin");
-        _sut.ProviderDateiPraefix.Should().Be("devin");
+        _sut.ProviderFilePrefix.Should().Be("devin");
         _sut.PluginType.Should().Be(PluginType.DevelopmentAutomation);
 
         var settings = _sut.GetSettingGroups();

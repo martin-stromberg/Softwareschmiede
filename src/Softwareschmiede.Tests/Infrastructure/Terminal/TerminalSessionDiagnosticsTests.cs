@@ -30,8 +30,8 @@ public sealed class TerminalSessionDiagnosticsTests
             CancellationToken.None);
 
         healthCheckCalled.Should().BeTrue();
-        result.BackendEmpfehlung.Should().Be(TerminalBackendEmpfehlung.Pty);
-        result.PtyVerfuegbar.Should().BeTrue();
+        result.BackendRecommendation.Should().Be(TerminalBackendRecommendation.Pty);
+        result.PtyAvailable.Should().BeTrue();
         result.Checks.Should().Contain(c => c.Name == "Executable" && c.Ok);
     }
 
@@ -46,9 +46,9 @@ public sealed class TerminalSessionDiagnosticsTests
             forcePtyUnavailable: true,
             CancellationToken.None);
 
-        result.PtyVerfuegbar.Should().BeFalse();
+        result.PtyAvailable.Should().BeFalse();
         result.Checks.Should().Contain(c => c.Name == "ConPTY-Verfügbarkeit" && !c.Ok);
-        result.BackendEmpfehlung.Should().Be(TerminalBackendEmpfehlung.Pipe);
+        result.BackendRecommendation.Should().Be(TerminalBackendRecommendation.Pipe);
     }
 
     /// <summary>Bei RequiresPty ohne PTY-Verfügbarkeit ist die Empfehlung Fehler.</summary>
@@ -64,7 +64,7 @@ public sealed class TerminalSessionDiagnosticsTests
             forcePtyUnavailable: true,
             CancellationToken.None);
 
-        result.BackendEmpfehlung.Should().Be(TerminalBackendEmpfehlung.Fehler);
+        result.BackendRecommendation.Should().Be(TerminalBackendRecommendation.Error);
     }
 
     /// <summary>Bei nicht auflösbarer Executable wird der Health-Check nicht aufgerufen und die Empfehlung ist Fehler.</summary>
@@ -89,7 +89,7 @@ public sealed class TerminalSessionDiagnosticsTests
 
         healthCheckCalled.Should().BeFalse();
         result.Checks.Should().Contain(c => c.Name == "Executable" && !c.Ok);
-        result.BackendEmpfehlung.Should().Be(TerminalBackendEmpfehlung.Fehler);
+        result.BackendRecommendation.Should().Be(TerminalBackendRecommendation.Error);
     }
 
     /// <summary>Ein Plugin ohne SupportsPty-Flag bekommt auch bei verfügbarer PTY die Empfehlung Pipe —
@@ -106,8 +106,8 @@ public sealed class TerminalSessionDiagnosticsTests
             forcePtyUnavailable: false,
             CancellationToken.None);
 
-        result.PtyVerfuegbar.Should().BeTrue();
-        result.BackendEmpfehlung.Should().Be(TerminalBackendEmpfehlung.Pipe);
+        result.PtyAvailable.Should().BeTrue();
+        result.BackendRecommendation.Should().Be(TerminalBackendRecommendation.Pipe);
     }
 
     /// <summary>Der Terminalgrößen-Check muss dieselbe Grenze wie die Hartvalidierung in
@@ -147,7 +147,7 @@ public sealed class TerminalSessionDiagnosticsTests
             CancellationToken.None);
 
         result.Checks.Should().Contain(c => c.Name == "CLI-Health" && !c.Ok);
-        result.BackendEmpfehlung.Should().Be(TerminalBackendEmpfehlung.Pty);
+        result.BackendRecommendation.Should().Be(TerminalBackendRecommendation.Pty);
     }
 
     /// <summary>Eine im Health-Check geworfene Exception wird als nicht-fataler Check-Eintrag abgefangen.</summary>
@@ -162,7 +162,7 @@ public sealed class TerminalSessionDiagnosticsTests
             CancellationToken.None);
 
         result.Checks.Should().Contain(c => c.Name == "CLI-Health" && !c.Ok);
-        result.BackendEmpfehlung.Should().Be(TerminalBackendEmpfehlung.Pty);
+        result.BackendRecommendation.Should().Be(TerminalBackendRecommendation.Pty);
     }
 
     private static TerminalSessionStartSpec CreateSpec()

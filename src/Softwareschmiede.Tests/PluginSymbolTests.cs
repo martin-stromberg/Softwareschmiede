@@ -42,8 +42,8 @@ public sealed class PluginSymbolTests
         var ctor = pluginTyp.GetConstructors()
             .OrderBy(c => c.GetParameters().Length)
             .First();
-        var argumente = ctor.GetParameters().Select(p => ErstelleArgument(p.ParameterType)).ToArray();
-        return (IPlugin)ctor.Invoke(argumente);
+        var arguments = ctor.GetParameters().Select(p => ErstelleArgument(p.ParameterType)).ToArray();
+        return (IPlugin)ctor.Invoke(arguments);
     }
 
     private static object ErstelleArgument(Type parameterTyp)

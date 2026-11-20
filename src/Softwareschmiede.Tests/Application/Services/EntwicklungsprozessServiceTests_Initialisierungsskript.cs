@@ -12,14 +12,14 @@ namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>
 /// Tests für die Ausführung des Repository-Initialisierungsskripts im Aufgaben-Lifecycle von
-/// <see cref="EntwicklungsprozessService"/>: Ausführung nach dem Klonen, Fehlertoleranz und Reihenfolge
+/// <see cref="DevelopmentProcessService"/>: Ausführung nach dem Klonen, Fehlertoleranz und Reihenfolge
 /// gegenüber dem Repository-Startskript.
 /// </summary>
 public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProtokollService _protokollService;
+    private readonly WorkItemService _workItemService;
+    private readonly LogService _logService;
     private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly Mock<IWorkingDirectoryResolver> _arbeitsverzeichnisResolverMock;
     private readonly PluginSelectionService _pluginSelectionService;
@@ -29,8 +29,8 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
     public EntwicklungsprozessServiceTests_Initialisierungsskript()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
-        _protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
+        _workItemService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
+        _logService = new LogService(_db, new Mock<ILogger<LogService>>().Object);
 
         _gitPluginMock = new Mock<IGitPlugin>();
         _gitPluginMock.SetupGet(p => p.PluginName).Returns("Mock Git");
@@ -44,7 +44,7 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppSettingService(_db, new Mock<ILogger<AppSettingService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         _pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
@@ -86,7 +86,7 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
 
     private async Task<GitRepository> CreateRepositoryAsync(
         RepositoryInitializationConfiguration? initialisierungKonfiguration = null,
-        RepositoryStartConfiguration? startKonfiguration = null)
+        RepositoryStartConfiguration? startConfiguration = null)
     {
         var repository = new GitRepository
         {
@@ -97,15 +97,15 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
             RepositoryName = "repo-init-script",
             Active = true,
             InitializationConfiguration = initialisierungKonfiguration,
-            StartConfiguration = startKonfiguration
+            StartConfiguration = startConfiguration
         };
         if (initialisierungKonfiguration != null)
         {
             initialisierungKonfiguration.GitRepository = repository;
         }
-        if (startKonfiguration != null)
+        if (startConfiguration != null)
         {
-            startKonfiguration.GitRepository = repository;
+            startConfiguration.GitRepository = repository;
         }
 
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
@@ -120,15 +120,15 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
         return repository;
     }
 
-    private EntwicklungsprozessService CreateSut(EntwicklungsprozessServiceOptions options)
+    private DevelopmentProcessService CreateSut(DevelopmentProcessServiceOptions options)
         => new(
-            _aufgabeService,
-            _protokollService,
+            _workItemService,
+            _logService,
             _gitPluginMock.Object,
             _pluginSelectionService,
             _arbeitsverzeichnisResolverMock.Object,
             options,
-            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+            new Mock<ILogger<DevelopmentProcessService>>().Object);
 
     /// <summary>Nach dem Klonen wird das konfigurierte Initialisierungsskript vor dem KI-Start ausgeführt.</summary>
     [Fact]
@@ -142,7 +142,7 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
             Active = true
         };
         var repository = await CreateRepositoryAsync(initialisierungKonfiguration);
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Initialisierungsskript nach Klon", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projektId, "Initialisierungsskript nach Klon", null, repository.Id, TestContext.Current.CancellationToken);
 
         var cliRunnerMock = new Mock<ICliRunner>();
         cliRunnerMock.Setup(runner => runner.RunAsync(
@@ -152,9 +152,9 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
                 It.IsAny<IDictionary<string, string>?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "ok", string.Empty));
-        var repositoryInitialisierungService = new RepositoryInitialisierungService(
+        var repositoryInitialisierungService = new RepositoryInitializationService(
             cliRunnerMock.Object,
-            new Mock<ILogger<RepositoryInitialisierungService>>().Object);
+            new Mock<ILogger<RepositoryInitializationService>>().Object);
 
         var clonePath = SetupCloneWithDirectoryCreation();
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -165,12 +165,12 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
                 File.WriteAllText(Path.Combine(scriptDirectory, "init.ps1"), "# init");
                 return Task.CompletedTask;
             });
-        var sut = CreateSut(new EntwicklungsprozessServiceOptions(RepositoryInitialisierungService: repositoryInitialisierungService));
+        var sut = CreateSut(new DevelopmentProcessServiceOptions(RepositoryInitializationService: repositoryInitialisierungService));
 
         try
         {
             // Act
-            await sut.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
+            await sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             cliRunnerMock.Verify(
@@ -181,7 +181,7 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
                     It.IsAny<IDictionary<string, string>?>(),
                     It.IsAny<CancellationToken>()),
                 Times.Once);
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+            var updatedAufgabe = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.Status.Should().Be(WorkItemStatus.Started);
         }
         finally
@@ -202,7 +202,7 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
             Active = true
         };
         var repository = await CreateRepositoryAsync(initialisierungKonfiguration);
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Initialisierungsskript schlägt fehl", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projektId, "Initialisierungsskript schlägt fehl", null, repository.Id, TestContext.Current.CancellationToken);
 
         var cliRunnerMock = new Mock<ICliRunner>();
         cliRunnerMock.Setup(runner => runner.RunAsync(
@@ -212,23 +212,23 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
                 It.IsAny<IDictionary<string, string>?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(1, string.Empty, "init failed"));
-        var repositoryInitialisierungService = new RepositoryInitialisierungService(
+        var repositoryInitialisierungService = new RepositoryInitializationService(
             cliRunnerMock.Object,
-            new Mock<ILogger<RepositoryInitialisierungService>>().Object);
+            new Mock<ILogger<RepositoryInitializationService>>().Object);
 
         var clonePath = SetupCloneWithDirectoryCreation();
-        var sut = CreateSut(new EntwicklungsprozessServiceOptions(RepositoryInitialisierungService: repositoryInitialisierungService));
+        var sut = CreateSut(new DevelopmentProcessServiceOptions(RepositoryInitializationService: repositoryInitialisierungService));
 
         try
         {
             // Act
-            await sut.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
+            await sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+            var updatedAufgabe = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.Status.Should().Be(WorkItemStatus.Started);
-            var protokoll = await _protokollService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
-            protokoll.Should().Contain(entry =>
+            var log = await _logService.GetByWorkItemAsync(workItem.Id, TestContext.Current.CancellationToken);
+            log.Should().Contain(entry =>
                 entry.Type == LogEntryType.GitAction
                 && entry.Content.Contains("Hinweis: Das Repository-Initialisierungsskript konnte nicht ausgeführt werden", StringComparison.Ordinal));
         }
@@ -249,14 +249,14 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
             InitializationScriptRelativePath = "scripts/init.ps1",
             Active = true
         };
-        var startKonfiguration = new RepositoryStartConfiguration
+        var startConfiguration = new RepositoryStartConfiguration
         {
             Id = Guid.NewGuid(),
             StartScriptRelativePath = "scripts/start.ps1",
             Active = true
         };
-        var repository = await CreateRepositoryAsync(initialisierungKonfiguration, startKonfiguration);
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Reihenfolge Init vor Start", null, repository.Id, TestContext.Current.CancellationToken);
+        var repository = await CreateRepositoryAsync(initialisierungKonfiguration, startConfiguration);
+        var workItem = await _workItemService.CreateAsync(_projektId, "Reihenfolge Init vor Start", null, repository.Id, TestContext.Current.CancellationToken);
 
         var ausfuehrungsReihenfolge = new List<string>();
         var cliRunnerMock = new Mock<ICliRunner>();
@@ -273,12 +273,12 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
                 return Task.FromResult(new CliResult(0, "ok", string.Empty));
             });
 
-        var repositoryInitialisierungService = new RepositoryInitialisierungService(
+        var repositoryInitialisierungService = new RepositoryInitializationService(
             cliRunnerMock.Object,
-            new Mock<ILogger<RepositoryInitialisierungService>>().Object);
-        var repositoryStartskriptService = new RepositoryStartskriptService(
+            new Mock<ILogger<RepositoryInitializationService>>().Object);
+        var repositoryStartskriptService = new RepositoryStartScriptService(
             cliRunnerMock.Object,
-            new Mock<ILogger<RepositoryStartskriptService>>().Object);
+            new Mock<ILogger<RepositoryStartScriptService>>().Object);
 
         var clonePath = SetupCloneWithDirectoryCreation();
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -290,14 +290,14 @@ public sealed class EntwicklungsprozessServiceTests_Initialisierungsskript : IDi
                 File.WriteAllText(Path.Combine(scriptDirectory, "start.ps1"), "# start");
                 return Task.CompletedTask;
             });
-        var sut = CreateSut(new EntwicklungsprozessServiceOptions(
-            RepositoryInitialisierungService: repositoryInitialisierungService,
-            RepositoryStartskriptService: repositoryStartskriptService));
+        var sut = CreateSut(new DevelopmentProcessServiceOptions(
+            RepositoryInitializationService: repositoryInitialisierungService,
+            RepositoryStartScriptService: repositoryStartskriptService));
 
         try
         {
             // Act
-            await sut.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
+            await sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             ausfuehrungsReihenfolge.Should().Equal("init", "start");

@@ -94,8 +94,8 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
             }
 
             return best is null
-                ? UpdateReleaseLookupResult.KeinTreffer
-                : UpdateReleaseLookupResult.Gefunden(best);
+                ? UpdateReleaseLookupResult.NoMatch
+                : UpdateReleaseLookupResult.Found(best);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -121,7 +121,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
         }
 
         var isPrerelease = release.Prerelease || parsed.IsPrerelease;
-        if (isPrerelease != (options.Channel == UpdateKanal.ReleaseCandidate))
+        if (isPrerelease != (options.Channel == UpdateChannel.ReleaseCandidate))
             return null;
 
         var asset = release.Assets.FirstOrDefault(a =>

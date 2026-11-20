@@ -106,6 +106,8 @@ public sealed class EnumLegacyConverterTests
 
     private static Dictionary<string, string> NotificationModeMap() => new()
     {
-        ["Disabled"] = "Deaktiviert", ["Banner"] = "Banner", ["Sound"] = "Ton"
+        ["Disabled"] = "Deaktiviert",
+        ["Banner"] = "Banner",
+        ["Sound"] = "Ton"
     };
 }

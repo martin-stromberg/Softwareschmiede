@@ -12,7 +12,7 @@ public sealed class CliChunkAnzeigeEintrag
     public required TimeSpan Offset { get; init; }
 
     /// <summary>Länge des Chunks in Bytes.</summary>
-    public required int Laenge { get; init; }
+    public required int Length { get; init; }
 
     /// <summary>Quelltext des Chunks mit sichtbar gemachten Steuersequenzen.</summary>
     public required string Quelltext { get; init; }

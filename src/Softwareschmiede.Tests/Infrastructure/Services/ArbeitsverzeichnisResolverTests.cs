@@ -10,16 +10,16 @@ namespace Softwareschmiede.Tests.Infrastructure.Services;
 /// <summary>ArbeitsverzeichnisResolverTests.</summary>
 public sealed class ArbeitsverzeichnisResolverTests
 {
-    /// <summary><summary>ResolveAsync_ShouldReturnConfiguredPath_WhenPathIsWritable.</summary>.</summary>
+    /// <summary>ResolveAsync_ShouldReturnConfiguredPath_WhenPathIsWritable.</summary>
     [Fact]
     public async Task ResolveAsync_ShouldReturnConfiguredPath_WhenPathIsWritable()
     {
         await using var db = TestDbContextFactory.Create();
-        var settings = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var settings = new WorkingDirectorySettingsService(db, NullLogger<WorkingDirectorySettingsService>.Instance);
         var configuredPath = Path.Combine(Path.GetTempPath(), $"resolver-ok-{Guid.NewGuid():N}");
-        await settings.SaveArbeitsverzeichnisAsync(configuredPath, TestContext.Current.CancellationToken);
+        await settings.SaveWorkingDirectoryAsync(configuredPath, TestContext.Current.CancellationToken);
 
-        var sut = new ArbeitsverzeichnisResolver(settings, NullLogger<ArbeitsverzeichnisResolver>.Instance);
+        var sut = new RuntimeWorkingDirectoryResolver(settings, NullLogger<RuntimeWorkingDirectoryResolver>.Instance);
 
         var result = await sut.ResolveAsync(TestContext.Current.CancellationToken);
 
@@ -32,13 +32,13 @@ public sealed class ArbeitsverzeichnisResolverTests
         }
     }
 
-    /// <summary><summary>ResolveAsync_ShouldFallbackToTemp_WhenNoConfigExists.</summary>.</summary>
+    /// <summary>ResolveAsync_ShouldFallbackToTemp_WhenNoConfigExists.</summary>
     [Fact]
     public async Task ResolveAsync_ShouldFallbackToTemp_WhenNoConfigExists()
     {
         await using var db = TestDbContextFactory.Create();
-        var settings = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
-        var sut = new ArbeitsverzeichnisResolver(settings, NullLogger<ArbeitsverzeichnisResolver>.Instance);
+        var settings = new WorkingDirectorySettingsService(db, NullLogger<WorkingDirectorySettingsService>.Instance);
+        var sut = new RuntimeWorkingDirectoryResolver(settings, NullLogger<RuntimeWorkingDirectoryResolver>.Instance);
 
         var result = await sut.ResolveAsync(TestContext.Current.CancellationToken);
 
@@ -47,24 +47,24 @@ public sealed class ArbeitsverzeichnisResolverTests
         result.ResolvedPath.Should().Be(Path.GetTempPath());
     }
 
-    /// <summary><summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsFile.</summary>.</summary>
+    /// <summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsFile.</summary>
     [Fact]
     public async Task ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsFile()
     {
         await using var db = TestDbContextFactory.Create();
-        var settings = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var settings = new WorkingDirectorySettingsService(db, NullLogger<WorkingDirectorySettingsService>.Instance);
         var filePath = Path.Combine(Path.GetTempPath(), $"resolver-file-{Guid.NewGuid():N}.txt");
         await File.WriteAllTextAsync(filePath, "file", TestContext.Current.CancellationToken);
         db.AppSettings.Add(new AppSetting
         {
             Id = Guid.NewGuid(),
-            Key = ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey,
+            Key = WorkingDirectorySettingsService.RepositoriesWorkdirKey,
             Value = filePath,
             UpdatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var sut = new ArbeitsverzeichnisResolver(settings, NullLogger<ArbeitsverzeichnisResolver>.Instance);
+        var sut = new RuntimeWorkingDirectoryResolver(settings, NullLogger<RuntimeWorkingDirectoryResolver>.Instance);
 
         var result = await sut.ResolveAsync(TestContext.Current.CancellationToken);
 
@@ -78,23 +78,23 @@ public sealed class ArbeitsverzeichnisResolverTests
         }
     }
 
-    /// <summary><summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsInvalid.</summary>.</summary>
+    /// <summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsInvalid.</summary>
     [Fact]
     public async Task ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsInvalid()
     {
         await using var db = TestDbContextFactory.Create();
-        var settings = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var settings = new WorkingDirectorySettingsService(db, NullLogger<WorkingDirectorySettingsService>.Instance);
         var invalidPath = $"invalid{Path.DirectorySeparatorChar}\0path";
         db.AppSettings.Add(new AppSetting
         {
             Id = Guid.NewGuid(),
-            Key = ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey,
+            Key = WorkingDirectorySettingsService.RepositoriesWorkdirKey,
             Value = invalidPath,
             UpdatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var sut = new ArbeitsverzeichnisResolver(settings, NullLogger<ArbeitsverzeichnisResolver>.Instance);
+        var sut = new RuntimeWorkingDirectoryResolver(settings, NullLogger<RuntimeWorkingDirectoryResolver>.Instance);
 
         var result = await sut.ResolveAsync(TestContext.Current.CancellationToken);
 

@@ -18,7 +18,7 @@ namespace Softwareschmiede.App.ViewModels;
 public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
 {
     private readonly IAutoShutdownOrchestrator? _orchestrator;
-    private readonly AutoShutdownEinstellungenService? _einstellungenService;
+    private readonly AutoShutdownEinstellungenService? _settingsService;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
     private readonly Action<Action> _dispatcherInvoke;
@@ -27,8 +27,8 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
     private bool _autoShutdownAktiviert;
     private bool _autoShutdownErzwingen;
     private string _autoShutdownToleranzMinuten =
-        AppEinstellungService.AutoShutdownDefaultToleranzMinuten.ToString(CultureInfo.InvariantCulture);
-    private int _letzteGueltigeAutoShutdownToleranzMinuten = AppEinstellungService.AutoShutdownDefaultToleranzMinuten;
+        AppSettingService.AutoShutdownDefaultToleranceMinutes.ToString(CultureInfo.InvariantCulture);
+    private int _letzteGueltigeAutoShutdownToleranzMinuten = AppSettingService.AutoShutdownDefaultToleranceMinutes;
     private string? _autoShutdownToleranzFehler;
     private string? _autoShutdownCountdownText;
     private DateTimeOffset? _autoShutdownCountdownEndeUtc;
@@ -37,19 +37,19 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
 
     /// <inheritdoc cref="MainWindowAutoShutdownFlow"/>
     /// <param name="orchestrator">Optionaler Orchestrator des automatischen OS-Shutdowns; <c>null</c> deaktiviert die Weitergabe.</param>
-    /// <param name="einstellungenService">Optionaler Persistenz-Service der Nebenwerte; <c>null</c> deaktiviert Laden und Speichern.</param>
+    /// <param name="settingsService">Optionaler Persistenz-Service der Nebenwerte; <c>null</c> deaktiviert Laden und Speichern.</param>
     /// <param name="timeProvider">Zeitgeber für den Countdown-Text (für Tests injizierbar).</param>
     /// <param name="logger">Logger für die Fire-and-Forget-Kontexte.</param>
     /// <param name="dispatcherInvoke">Abstraktion des UI-Dispatchers (Tests: synchron).</param>
     public MainWindowAutoShutdownFlow(
         IAutoShutdownOrchestrator? orchestrator,
-        AutoShutdownEinstellungenService? einstellungenService,
+        AutoShutdownEinstellungenService? settingsService,
         TimeProvider timeProvider,
         ILogger logger,
         Action<Action> dispatcherInvoke)
     {
         _orchestrator = orchestrator;
-        _einstellungenService = einstellungenService;
+        _settingsService = settingsService;
         _timeProvider = timeProvider;
         _logger = logger;
         _dispatcherInvoke = dispatcherInvoke;
@@ -62,7 +62,7 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
 
         if (_orchestrator is not null)
         {
-            _orchestrator.ZustandGeaendert += OnZustandGeaendert;
+            _orchestrator.StateChanged += OnZustandGeaendert;
         }
     }
 
@@ -92,18 +92,18 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
             if (SetProperty(ref _autoShutdownErzwingen, value))
             {
                 _autoShutdownEinstellungenVomBenutzerGeaendert = true;
-                _einstellungenService?.SpeichereErzwingenAsync(value, CancellationToken.None)
+                _settingsService?.SpeichereErzwingenAsync(value, CancellationToken.None)
                     .SafeFireAndForget(_logger, "Auto-Shutdown-Erzwingen speichern");
                 // Unbedingt weiterreichen — steht gerade ein ungültiger Wert im Toleranzfeld,
                 // gilt die zuletzt gültige Toleranz weiter.
-                _orchestrator?.SetOptionen(_letzteGueltigeAutoShutdownToleranzMinuten, value);
+                _orchestrator?.SetOptions(_letzteGueltigeAutoShutdownToleranzMinuten, value);
             }
         }
     }
 
     /// <summary>
     /// Toleranzzeit des Auto-Shutdown-Countdowns in Minuten als Texteingabe (persistiert,
-    /// gültig: ganzzahlig 0–<see cref="AppEinstellungService.AutoShutdownMaxToleranzMinuten"/>).
+    /// gültig: ganzzahlig 0–<see cref="AppSettingService.AutoShutdownMaxToleranceMinutes"/>).
     /// </summary>
     public string AutoShutdownToleranzMinuten
     {
@@ -113,18 +113,18 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
             if (SetProperty(ref _autoShutdownToleranzMinuten, value))
             {
                 _autoShutdownEinstellungenVomBenutzerGeaendert = true;
-                if (TryParseToleranzMinuten(out var toleranzMinuten))
+                if (TryParseToleranzMinuten(out var toleranceMinutes))
                 {
                     AutoShutdownToleranzFehler = null;
-                    _letzteGueltigeAutoShutdownToleranzMinuten = toleranzMinuten;
-                    _einstellungenService?.SpeichereToleranzMinutenAsync(toleranzMinuten, CancellationToken.None)
+                    _letzteGueltigeAutoShutdownToleranzMinuten = toleranceMinutes;
+                    _settingsService?.SpeichereToleranzMinutenAsync(toleranceMinutes, CancellationToken.None)
                         .SafeFireAndForget(_logger, "Auto-Shutdown-Toleranz speichern");
-                    _orchestrator?.SetOptionen(toleranzMinuten, _autoShutdownErzwingen);
+                    _orchestrator?.SetOptions(toleranceMinutes, _autoShutdownErzwingen);
                 }
                 else
                 {
                     AutoShutdownToleranzFehler =
-                        $"Wartezeit muss eine ganze Zahl zwischen 0 und {AppEinstellungService.AutoShutdownMaxToleranzMinuten} Minuten sein.";
+                        $"Wartezeit muss eine ganze Zahl zwischen 0 und {AppSettingService.AutoShutdownMaxToleranceMinutes} Minuten sein.";
                 }
             }
         }
@@ -159,13 +159,13 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
     public async Task EinstellungenLadenAsync(CancellationToken ct = default)
     {
-        if (_einstellungenService is null || _autoShutdownEinstellungenGeladen)
+        if (_settingsService is null || _autoShutdownEinstellungenGeladen)
             return;
 
-        (bool Erzwingen, int ToleranzMinuten) einstellungen;
+        (bool Erzwingen, int ToleranzMinuten) settings;
         try
         {
-            einstellungen = await _einstellungenService.LadeAsync(ct);
+            settings = await _settingsService.LoadAsync(ct);
             // Erst nach erfolgreichem Laden verbrauchen — ein Fehlschlag darf den
             // Einmal-Guard nicht konsumieren, sonst ist kein erneutes Laden möglich.
             _autoShutdownEinstellungenGeladen = true;
@@ -181,27 +181,27 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
             if (_autoShutdownEinstellungenVomBenutzerGeaendert)
                 return;
 
-            _autoShutdownErzwingen = einstellungen.Erzwingen;
+            _autoShutdownErzwingen = settings.Erzwingen;
             OnPropertyChanged(nameof(AutoShutdownErzwingen));
-            _autoShutdownToleranzMinuten = einstellungen.ToleranzMinuten.ToString(CultureInfo.InvariantCulture);
+            _autoShutdownToleranzMinuten = settings.ToleranzMinuten.ToString(CultureInfo.InvariantCulture);
             OnPropertyChanged(nameof(AutoShutdownToleranzMinuten));
-            _letzteGueltigeAutoShutdownToleranzMinuten = einstellungen.ToleranzMinuten;
+            _letzteGueltigeAutoShutdownToleranzMinuten = settings.ToleranzMinuten;
             AutoShutdownToleranzFehler = null;
-            _orchestrator?.SetOptionen(einstellungen.ToleranzMinuten, einstellungen.Erzwingen);
+            _orchestrator?.SetOptions(settings.ToleranzMinuten, settings.Erzwingen);
         });
     }
 
-    private bool TryParseToleranzMinuten(out int toleranzMinuten)
+    private bool TryParseToleranzMinuten(out int toleranceMinutes)
     {
         var gueltig = int.TryParse(
                 _autoShutdownToleranzMinuten,
                 NumberStyles.Integer,
                 CultureInfo.InvariantCulture,
-                out toleranzMinuten)
-            && toleranzMinuten is >= 0 and <= AppEinstellungService.AutoShutdownMaxToleranzMinuten;
+                out toleranceMinutes)
+            && toleranceMinutes is >= 0 and <= AppSettingService.AutoShutdownMaxToleranceMinutes;
         if (!gueltig)
         {
-            toleranzMinuten = 0;
+            toleranceMinutes = 0;
         }
 
         return gueltig;
@@ -220,7 +220,7 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
 
     private void CountdownAnzeigeAktualisieren()
     {
-        _autoShutdownCountdownEndeUtc = _orchestrator?.CountdownEndeUtc;
+        _autoShutdownCountdownEndeUtc = _orchestrator?.CountdownEndUtc;
 
         if (_autoShutdownCountdownEndeUtc is null)
         {
@@ -267,7 +267,7 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
         _countdownTimer.Tick -= OnCountdownTick;
         if (_orchestrator is not null)
         {
-            _orchestrator.ZustandGeaendert -= OnZustandGeaendert;
+            _orchestrator.StateChanged -= OnZustandGeaendert;
         }
     }
 }

@@ -35,8 +35,8 @@ public sealed record ScmBackmergeModusOption(ScmBackmergeMode Mode, string Label
     ];
 
     /// <summary>Liefert die Auswahloption zu einem gespeicherten Modus.</summary>
-    public static ScmBackmergeModusOption FuerModus(ScmBackmergeMode modus)
-        => All.First(o => o.Mode == modus);
+    public static ScmBackmergeModusOption FuerModus(ScmBackmergeMode mode)
+        => All.First(o => o.Mode == mode);
 
     /// <inheritdoc/>
     public override string ToString() => Label;

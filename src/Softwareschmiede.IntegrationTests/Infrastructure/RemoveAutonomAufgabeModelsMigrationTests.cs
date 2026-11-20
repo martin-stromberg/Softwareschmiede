@@ -25,26 +25,26 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         await db.Context.Database.MigrateAsync(PreviousMigration, cancellationToken: TestContext.Current.CancellationToken);
-        foreach (var tabelle in EntfernteTabellen)
+        foreach (var table in EntfernteTabellen)
         {
-            (await TableExistsAsync(db, tabelle)).Should().BeTrue($"Vorbedingung: {tabelle} existiert vor der Migration");
+            (await TableExistsAsync(db, table)).Should().BeTrue($"Vorbedingung: {table} existiert vor der Migration");
         }
 
         var projectId = await ErstelleProjektAsync(db);
         var workItemId = await ErstelleAufgabeAsync(db, projectId, "Neu", "NichtGestartet", laufzustand: null);
         await FuegeKonfigurationMitKindzeilenEinAsync(db, workItemId);
         await ErstelleEinstellungAsync(db, EntfernterEinstellungsSchluessel, "true");
-        await ErstelleEinstellungAsync(db, AppEinstellungService.ScmMonitoringEnabledKey, "false");
+        await ErstelleEinstellungAsync(db, AppSettingService.ScmMonitoringEnabledKey, "false");
 
         await db.Context.Database.MigrateAsync(RemoveMigration, cancellationToken: TestContext.Current.CancellationToken);
 
-        foreach (var tabelle in EntfernteTabellen)
+        foreach (var table in EntfernteTabellen)
         {
-            (await TableExistsAsync(db, tabelle)).Should().BeFalse($"{tabelle} muss durch die Migration entfernt werden");
+            (await TableExistsAsync(db, table)).Should().BeFalse($"{table} muss durch die Migration entfernt werden");
         }
 
         (await EinstellungExistiertAsync(db, EntfernterEinstellungsSchluessel)).Should().BeFalse();
-        (await EinstellungExistiertAsync(db, AppEinstellungService.ScmMonitoringEnabledKey)).Should().BeTrue();
+        (await EinstellungExistiertAsync(db, AppSettingService.ScmMonitoringEnabledKey)).Should().BeTrue();
     }
 
     /// <summary>Eine laufende Aufgabe mit Konfigurationszeile bleibt erhalten, ihr gesamter Laufzustand wird zurückgesetzt.</summary>
@@ -139,22 +139,22 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
 
         await db.Context.Database.MigrateAsync(PreviousMigration, cancellationToken: TestContext.Current.CancellationToken);
 
-        foreach (var tabelle in EntfernteTabellen)
+        foreach (var table in EntfernteTabellen)
         {
-            (await TableExistsAsync(db, tabelle)).Should().BeTrue($"{tabelle} muss durch Down() wiederhergestellt werden");
-            (await ZaehleZeilenAsync(db, tabelle)).Should().Be(0, $"{tabelle} darf nach Down() keine Daten enthalten");
+            (await TableExistsAsync(db, table)).Should().BeTrue($"{table} muss durch Down() wiederhergestellt werden");
+            (await ZaehleZeilenAsync(db, table)).Should().Be(0, $"{table} darf nach Down() keine Daten enthalten");
         }
     }
 
     private static Laufzustand ErstelleLaufzustand(string branchName)
     {
-        var jetzt = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.UtcNow;
         return new Laufzustand(
             "lauf-1",
             branchName,
-            jetzt.AddHours(2).ToUnixTimeMilliseconds(),
-            jetzt.AddMinutes(-1).ToUnixTimeMilliseconds(),
-            jetzt.AddMinutes(-5).ToUnixTimeMilliseconds(),
+            now.AddHours(2).ToUnixTimeMilliseconds(),
+            now.AddMinutes(-1).ToUnixTimeMilliseconds(),
+            now.AddMinutes(-5).ToUnixTimeMilliseconds(),
             "Laeuft");
     }
 
@@ -205,20 +205,20 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
         return id;
     }
 
-    private static async Task ErstelleEinstellungAsync(DatabaseFixture db, string schluessel, string wert)
+    private static async Task ErstelleEinstellungAsync(DatabaseFixture db, string key, string value)
         => await ExecuteNonQueryAsync(
             db,
             "INSERT INTO AppEinstellungen (Id, Schluessel, Wert, AktualisiertAm) VALUES ($id, $schluessel, $wert, $aktualisiert);",
             ("$id", NeueId()),
-            ("$schluessel", schluessel),
-            ("$wert", wert),
+            ("$schluessel", key),
+            ("$wert", value),
             ("$aktualisiert", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
 
-    private static async Task<bool> EinstellungExistiertAsync(DatabaseFixture db, string schluessel)
+    private static async Task<bool> EinstellungExistiertAsync(DatabaseFixture db, string key)
         => await ExecuteScalarAsync(
             db,
             "SELECT 1 FROM AppEinstellungen WHERE Schluessel = $schluessel LIMIT 1;",
-            ("$schluessel", schluessel)) is not null;
+            ("$schluessel", key)) is not null;
 
     private static async Task<AufgabeZeile?> LeseAufgabeAsync(DatabaseFixture db, string workItemId)
     {
@@ -238,16 +238,16 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
             (string?)await LeseSpalteAsync(db, workItemId, "LaufStatus"));
     }
 
-    private static async Task<object?> LeseSpalteAsync(DatabaseFixture db, string workItemId, string spalte)
+    private static async Task<object?> LeseSpalteAsync(DatabaseFixture db, string workItemId, string column)
     {
-        var wert = await ExecuteScalarAsync(db, $"SELECT [{spalte}] FROM Aufgaben WHERE Id = $id;", ("$id", workItemId));
-        return wert is DBNull ? null : wert;
+        var value = await ExecuteScalarAsync(db, $"SELECT [{column}] FROM Aufgaben WHERE Id = $id;", ("$id", workItemId));
+        return value is DBNull ? null : value;
     }
 
     private static async Task FuegeKonfigurationMitKindzeilenEinAsync(DatabaseFixture db, string workItemId)
     {
         var konfigurationId = NeueId();
-        var jetzt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         await ExecuteNonQueryAsync(
             db,
@@ -273,7 +273,7 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
             """,
             ("$id", NeueId()),
             ("$konfigurationId", konfigurationId),
-            ("$jetzt", jetzt));
+            ("$jetzt", now));
 
         await ExecuteNonQueryAsync(
             db,
@@ -284,7 +284,7 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
             """,
             ("$id", NeueId()),
             ("$konfigurationId", konfigurationId),
-            ("$jetzt", jetzt));
+            ("$jetzt", now));
 
         (await ZaehleZeilenAsync(db, "AutonomAufgabeKonfigurationen")).Should().BeGreaterThan(0, "Vorbedingung: Konfigurationszeile angelegt");
     }

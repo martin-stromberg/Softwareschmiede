@@ -17,9 +17,9 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly TodoService _todoService;
-    private readonly AufgabeService _aufgabeService;
-    private readonly KiAusfuehrungsService _kiService;
-    private readonly PromptZeitVersandService _promptZeitVersandService;
+    private readonly WorkItemService _workItemService;
+    private readonly AiExecutionService _aiService;
+    private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IRunningAutomationStatusSource> _runningStatusSourceMock;
     private readonly Guid _projektId = Guid.NewGuid();
@@ -29,9 +29,9 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, _todoService);
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
-        _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, _todoService);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _serviceProviderMock = new Mock<IServiceProvider>();
         _runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
 
@@ -40,9 +40,9 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         _serviceProviderMock.Setup(sp => sp.GetService(typeof(IPluginManager))).Returns(pluginManagerMock.Object);
 
-        var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
-        var recoveryService = new AufgabeRecoveryService(_db, _runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance);
-        var dashboardViewModel = new DashboardViewModel(projektService, _aufgabeService, recoveryService, NullLogger<DashboardViewModel>.Instance);
+        var projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        var recoveryService = new WorkItemRecoveryService(_db, _runningStatusSourceMock.Object, NullLogger<WorkItemRecoveryService>.Instance);
+        var dashboardViewModel = new DashboardViewModel(projektService, _workItemService, recoveryService, NullLogger<DashboardViewModel>.Instance);
         _serviceProviderMock.Setup(sp => sp.GetService(typeof(DashboardViewModel))).Returns(dashboardViewModel);
 
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
@@ -58,7 +58,7 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
     }
 
@@ -69,9 +69,9 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
         return new MainWindowViewModel(
             darkModeService,
             _serviceProviderMock.Object,
-            _aufgabeService,
+            _workItemService,
             _todoService,
-            _promptZeitVersandService,
+            _promptScheduleDispatchService,
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
             new MainWindowOptionaleDienste(DispatcherInvoke: action => action()));
@@ -82,9 +82,9 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task AktiveAufgabenAktualisierenAsync_MitGeplantemPrompt_SetztHasScheduledPrompt()
     {
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit geplantem Prompt", null, ct: TestContext.Current.CancellationToken);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
-        await _promptZeitVersandService.SchedulePromptAsync(workItem.Id, "Testprompt", DateTimeOffset.UtcNow.AddMinutes(5));
+        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe mit geplantem Prompt", null, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
+        await _promptScheduleDispatchService.SchedulePromptAsync(workItem.Id, "Testprompt", DateTimeOffset.UtcNow.AddMinutes(5));
 
         var sut = CreateSut();
         await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
@@ -96,8 +96,8 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task AktiveAufgabenAktualisierenAsync_OhneGeplantenPrompt_HasScheduledPromptBleibtFalse()
     {
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne geplanten Prompt", null, ct: TestContext.Current.CancellationToken);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe ohne geplanten Prompt", null, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);

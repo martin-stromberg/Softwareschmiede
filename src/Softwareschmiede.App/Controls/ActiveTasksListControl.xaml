@@ -98,7 +98,7 @@
                                         <!-- Abblendung pausierter Kacheln; der Pausiert:-Marker für E2E steckt im
                                              HelpText des 'AufgabeKachel:'-TextBlocks im Inhaltstemplate (der Border
                                              selbst erzeugt keinen AutomationPeer und ist per UIA unsichtbar). -->
-                                        <DataTrigger Binding="{Binding IstPausiert}" Value="True">
+                                        <DataTrigger Binding="{Binding IsPaused}" Value="True">
                                             <Setter Property="Opacity" Value="0.55" />
                                         </DataTrigger>
                                     </Style.Triggers>

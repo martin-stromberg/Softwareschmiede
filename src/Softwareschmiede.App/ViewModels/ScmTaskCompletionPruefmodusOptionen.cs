@@ -31,8 +31,8 @@ public sealed record ScmTaskCompletionPruefmodusOption(ScmTaskCompletionCheckMod
     ];
 
     /// <summary>Liefert die Auswahloption zu einem gespeicherten Modus.</summary>
-    public static ScmTaskCompletionPruefmodusOption FuerModus(ScmTaskCompletionCheckMode modus)
-        => All.First(o => o.Mode == modus);
+    public static ScmTaskCompletionPruefmodusOption FuerModus(ScmTaskCompletionCheckMode mode)
+        => All.First(o => o.Mode == mode);
 
     /// <inheritdoc/>
     public override string ToString() => Label;

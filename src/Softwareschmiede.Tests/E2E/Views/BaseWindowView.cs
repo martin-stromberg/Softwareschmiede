@@ -147,9 +147,9 @@ public abstract class BaseWindowView
     /// Seitenleiste ('AufgabenModus:*') und des Dashboards ('DashboardAufgabenModus:*').
     /// </summary>
     /// <param name="umschalterPraefix">Das ansichtsspezifische Namenspräfix inkl. Doppelpunkt (z. B. "AufgabenModus:").</param>
-    /// <param name="modus">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
-    protected void KlickeAufgabenModusUmschalter(string umschalterPraefix, string modus)
-        => WaitForElement(Window, cf => cf.ByName($"{umschalterPraefix}{modus}"), Medium).ClickInForeground();
+    /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
+    protected void KlickeAufgabenModusUmschalter(string umschalterPraefix, string mode)
+        => WaitForElement(Window, cf => cf.ByName($"{umschalterPraefix}{mode}"), Medium).ClickInForeground();
 
     /// <summary>
     /// Liest die Gruppennamen einer Aufgabenliste im gruppierten Modus (UIA-Namen
@@ -160,11 +160,11 @@ public abstract class BaseWindowView
     protected string[] GetAufgabenGruppenNamen(string listenAutomationId)
     {
         const string praefix = "AufgabenGruppe:";
-        var liste = Window.FindFirstDescendant(cf => cf.ByAutomationId(listenAutomationId));
-        if (liste is null)
+        var list = Window.FindFirstDescendant(cf => cf.ByAutomationId(listenAutomationId));
+        if (list is null)
             return [];
 
-        return liste.FindAllDescendants()
+        return list.FindAllDescendants()
             .Select(e => e.Name)
             .Where(n => n is not null && n.StartsWith(praefix, StringComparison.Ordinal))
             .Select(n => n![praefix.Length..])

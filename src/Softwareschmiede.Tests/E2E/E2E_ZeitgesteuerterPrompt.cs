@@ -39,13 +39,13 @@ public partial class End2EndTest
         // In der letzten Tagesminute (23:59:00-23:59:59) läge auch diese Begrenzung bereits in der
         // Vergangenheit, weshalb der Test in diesem terminalen 1-Minuten-Fenster übersprungen wird,
         // statt eine unerreichbare Zielzeit zu wählen.
-        var jetzt = DateTime.Now;
-        Assert.SkipWhen(jetzt.Hour == 23 && jetzt.Minute >= 59, "Letzte Tagesminute: Mitternachts-Guard würde eine bereits vergangene Zielzeit liefern.");
+        var now = DateTime.Now;
+        Assert.SkipWhen(now.Hour == 23 && now.Minute >= 59, "Letzte Tagesminute: Mitternachts-Guard würde eine bereits vergangene Zielzeit liefern.");
 
-        var zielzeitKandidat = jetzt.AddMinutes(5);
-        var zielzeit = zielzeitKandidat.Date == jetzt.Date
+        var zielzeitKandidat = now.AddMinutes(5);
+        var zielzeit = zielzeitKandidat.Date == now.Date
             ? zielzeitKandidat
-            : new DateTime(jetzt.Year, jetzt.Month, jetzt.Day, 23, 59, 0);
+            : new DateTime(now.Year, now.Month, now.Day, 23, 59, 0);
 
         taskDetail.SetScheduledPromptTime(zielzeit.Hour, zielzeit.Minute);
         taskDetail.SelectPromptTemplate("Weitermachen");
@@ -62,8 +62,8 @@ public partial class End2EndTest
         await using (var db = OpenTestDbContext())
         {
             var workItem = await db.WorkItems.SingleAsync();
-            var datensatz = await db.ScheduledPrompts.SingleOrDefaultAsync(z => z.WorkItemId == workItem.Id);
-            Assert.NotNull(datensatz);
+            var record = await db.ScheduledPrompts.SingleOrDefaultAsync(z => z.WorkItemId == workItem.Id);
+            Assert.NotNull(record);
         }
 
         // Wiederöffnen: Wartestellung und Storno-Button müssen weiterhin sichtbar sein.

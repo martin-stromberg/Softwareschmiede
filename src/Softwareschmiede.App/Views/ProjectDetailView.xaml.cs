@@ -34,10 +34,10 @@ public sealed partial class ProjectDetailView : UserControl
     {
         try
         {
-            if (sender is ListBoxItem { DataContext: ScmRequirement anforderung }
+            if (sender is ListBoxItem { DataContext: ScmRequirement requirement }
                 && DataContext is ProjectDetailViewModel vm)
             {
-                vm.AufgabeAusAnforderungErstellenCommand.ExecuteAsync(anforderung)
+                vm.AufgabeAusAnforderungErstellenCommand.ExecuteAsync(requirement)
                     .SafeFireAndForget(_logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
                         "ProjectDetailView.AufgabeAusAnforderungErstellenCommand");
             }

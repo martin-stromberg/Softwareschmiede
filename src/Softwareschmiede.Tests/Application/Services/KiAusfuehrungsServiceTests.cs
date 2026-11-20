@@ -18,7 +18,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Tests für den KiAusfuehrungsService.</summary>
 public sealed class KiAusfuehrungsServiceTests : IDisposable
 {
-    private readonly KiAusfuehrungsService _sut;
+    private readonly AiExecutionService _sut;
 
     /// <summary>KiAusfuehrungsServiceTests.</summary>
     public KiAusfuehrungsServiceTests()
@@ -154,7 +154,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         sut.CliProcessStatusChanged += (_, status) =>
         {
             statusEvents.Add(status);
-            if (status == CliProcessStatus.Fehler)
+            if (status == CliProcessStatus.Error)
             {
                 fehlerSignal.TrySetResult();
             }
@@ -165,7 +165,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var completed = await Task.WhenAny(fehlerSignal.Task, Task.Delay(TimeSpan.FromSeconds(10)));
         completed.Should().Be(fehlerSignal.Task, "der Exited-Handler sollte trotz disposed ScopeFactory ausgelöst werden, ohne die Anwendung zum Absturz zu bringen");
 
-        statusEvents.Should().Contain(CliProcessStatus.Fehler);
+        statusEvents.Should().Contain(CliProcessStatus.Error);
     }
 
     /// <summary>Natürliches Prozessende persistiert den Ausführungsstatus zentral als Beendet.</summary>
@@ -186,7 +186,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 UseShellExecute = false,
                 CreateNoWindow = true,
             },
-            CliProcessStatus.Gestoppt);
+            CliProcessStatus.Stopped);
 
         var geladen = await WaitForAufgabeStatusAsync(provider, workItemId, WorkItemExecutionStatus.Completed);
         geladen.Status.Should().Be(WorkItemStatus.Started);
@@ -213,7 +213,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 UseShellExecute = false,
                 CreateNoWindow = true,
             },
-            CliProcessStatus.Fehler);
+            CliProcessStatus.Error);
 
         var geladen = await WaitForAufgabeStatusAsync(provider, workItemId, WorkItemExecutionStatus.Completed);
         geladen.Status.Should().Be(WorkItemStatus.Started);
@@ -230,7 +230,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var gestoppt = new TaskCompletionSource();
         sut.CliProcessStatusChanged += (_, status) =>
         {
-            if (status == CliProcessStatus.Gestoppt)
+            if (status == CliProcessStatus.Stopped)
                 gestoppt.TrySetResult();
         };
 
@@ -312,12 +312,12 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// <param name="pseudoConsoleProcessLauncher">Optionaler Launcher für den PseudoConsole-Pfad, damit Tests keinen
     /// echten Win32-ConPTY-Launcher verwenden müssen.</param>
     private static async Task AssertSubscriberExceptionIsLoggedAsync(
-        Func<KiAusfuehrungsService, Guid, IKiPlugin, Task> startAsync,
+        Func<AiExecutionService, Guid, IKiPlugin, Task> startAsync,
         System.Diagnostics.ProcessStartInfo pluginProcessStartInfo,
         TimeSpan timeout,
         IPseudoConsoleProcessLauncher? pseudoConsoleProcessLauncher = null)
     {
-        var loggerMock = new Mock<ILogger<KiAusfuehrungsService>>();
+        var loggerMock = new Mock<ILogger<AiExecutionService>>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, loggerMock.Object, pseudoConsoleProcessLauncher);
 
@@ -338,7 +338,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             .Callback(() => errorLogged.TrySetResult());
         sut.CliProcessStatusChanged += (_, status) =>
         {
-            // Nur beim Exited-Handler werfen (Gestoppt/Fehler), nicht beim initialen Gestartet-Event,
+            // Nur beim Exited-Handler werfen (Stopped/Fehler), nicht beim initialen Gestartet-Event,
             // das außerhalb des try-catch-geschützten Exited-Handlers liegt.
             if (status != CliProcessStatus.Started)
                 throw new InvalidOperationException("Simulierter Subscriber-Fehler");
@@ -350,7 +350,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         finished.Should().Be(errorLogged.Task, "der Exited-Handler muss die Exception des werfenden Subscribers loggen, statt die Anwendung abstürzen zu lassen");
     }
 
-    /// <summary>Beendet der CLI-Prozess einer Terminal-Session (hier über <see cref="KiAusfuehrungsService.StopCliAsync"/>),
+    /// <summary>Beendet der CLI-Prozess einer Terminal-Session (hier über <see cref="AiExecutionService.StopCliAsync"/>),
     /// muss der Session-<c>Exited</c>-Handler die zugehörige <see cref="PseudoConsoleSession"/>
     /// disposen (Leseschleife wird abgebrochen, Streams werden geschlossen), bevor das Handle aus <c>_handles</c>
     /// entfernt wird. Nutzt den Pipe-basierten <see cref="SimulatedPseudoConsoleProcessLauncher"/> mit einem
@@ -373,20 +373,20 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var gestoppt = new TaskCompletionSource();
         sut.CliProcessStatusChanged += (_, status) =>
         {
-            if (status == CliProcessStatus.Gestoppt)
+            if (status == CliProcessStatus.Stopped)
                 gestoppt.TrySetResult();
         };
 
         await sut.StopCliAsync(workItemId);
 
         var finished = await Task.WhenAny(gestoppt.Task, Task.Delay(TimeSpan.FromSeconds(15)));
-        finished.Should().Be(gestoppt.Task, "StopCliAsync muss letztlich zu HandleProcessExited und damit zum Gestoppt-Status führen");
+        finished.Should().Be(gestoppt.Task, "StopCliAsync muss letztlich zu HandleProcessExited und damit zum Stopped-Status führen");
 
         AssertSessionDisposed(session!, "HandleProcessExited muss die PseudoConsoleSession disposen");
         sut.GetTerminalSession(workItemId).Should().BeNull("nach HandleProcessExited darf das Handle nicht mehr in _handles vorhanden sein");
     }
 
-    /// <summary>Ruft man <see cref="KiAusfuehrungsService.Dispose"/> auf, während noch eine Terminal-Session läuft,
+    /// <summary>Ruft man <see cref="AiExecutionService.Dispose"/> auf, während noch eine Terminal-Session läuft,
     /// müssen deren Prozess beendet und die zugehörige <see cref="PseudoConsoleSession"/> disposed werden (Leseschleife
     /// abgebrochen, Streams geschlossen) — keine verwaisten Leseschleifen nach dem Beenden des Service. Nutzt den
     /// Pipe-basierten <see cref="SimulatedPseudoConsoleProcessLauncher"/> mit einem echten <c>cmd.exe</c>.</summary>
@@ -423,7 +423,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
     /// <summary>
     /// Regressionstest für frühes Prozessende direkt nach dem Session-Start: Endet der Prozess (hier
-    /// deterministisch per <c>Kill</c> erzwungen) sofort nach <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/>,
+    /// deterministisch per <c>Kill</c> erzwungen) sofort nach <see cref="AiExecutionService.StartTerminalSessionAsync"/>,
     /// muss der Exited-Handler anlaufen und die Session sauber aufräumen — es darf gar keine
     /// <see cref="ObjectDisposedException"/> auftreten (unabhängig vom Log-Level, mit dem eine trotzdem
     /// auftretende ObjectDisposedException protokolliert würde). Historisch deckte dieser Test die
@@ -434,7 +434,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     [OsInterfaceFact]
     public async Task StartTerminalSessionAsync_FruehesProzessende_KeineWarnungWegenGeschlossenemStream()
     {
-        var loggerMock = new Mock<ILogger<KiAusfuehrungsService>>();
+        var loggerMock = new Mock<ILogger<AiExecutionService>>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var launcher = new SimulatedPseudoConsoleProcessLauncher(NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance, NullLoggerFactory.Instance, Options.Create(new TerminalSessionOptions()));
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, loggerMock.Object, launcher: launcher);
@@ -488,7 +488,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     }
 
     /// <summary>Wird ein <see cref="SimulatedPseudoConsoleProcessLauncher"/> injiziert, muss
-    /// <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/> ohne echtes ConPTY bis zum Status
+    /// <see cref="AiExecutionService.StartTerminalSessionAsync"/> ohne echtes ConPTY bis zum Status
     /// <see cref="CliProcessStatus.Started"/> gelangen (siehe docs/features/e2e-korrektur/requirement.md).</summary>
     [OsInterfaceFact]
     public async Task StartTerminalSessionAsync_MitInjiziertemFakeLauncher_ErreichtGestartet()
@@ -540,9 +540,9 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
         var handle = await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath());
 
-        var eintraege = await WaitForCliOutputAsync(provider, workItemId, expectedCount: 2);
-        eintraege.Select(e => e.Content).Should().Equal("erste zeile", "zweite zeile");
-        eintraege.All(e => e.Type == LogEntryType.CliOutput).Should().BeTrue();
+        var entries = await WaitForCliOutputAsync(provider, workItemId, expectedCount: 2);
+        entries.Select(e => e.Content).Should().Equal("erste zeile", "zweite zeile");
+        entries.All(e => e.Type == LogEntryType.CliOutput).Should().BeTrue();
 
         try
         {
@@ -599,9 +599,9 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
         var handle = await sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
-        var eintraege = await WaitForProtokollEntriesAsync(provider, workItemId, expectedCount: 2);
-        eintraege.Should().Contain(e => e.Type == LogEntryType.CliOutput && e.Content == marker);
-        eintraege.Should().Contain(e => e.Type == LogEntryType.RateLimit);
+        var entries = await WaitForProtokollEntriesAsync(provider, workItemId, expectedCount: 2);
+        entries.Should().Contain(e => e.Type == LogEntryType.CliOutput && e.Content == marker);
+        entries.Should().Contain(e => e.Type == LogEntryType.RateLimit);
 
         KillIfRunning(handle.Process);
     }
@@ -619,8 +619,8 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
         var handle = await sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
-        var eintraege = await WaitForCliOutputAsync(provider, workItemId, expectedCount: 1);
-        eintraege.Single().Content.Should().Be("letzte restzeile");
+        var entries = await WaitForCliOutputAsync(provider, workItemId, expectedCount: 1);
+        entries.Single().Content.Should().Be("letzte restzeile");
 
         KillIfRunning(handle.Process);
     }
@@ -638,19 +638,19 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
         await sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
-        var eintraege = await WaitForCliOutputAsync(provider, workItemId, expectedCount: 1);
-        eintraege.Single().Content.Should().Be("tail-output");
+        var entries = await WaitForCliOutputAsync(provider, workItemId, expectedCount: 1);
+        entries.Single().Content.Should().Be("tail-output");
     }
 
-    /// <summary>Regressionstest für den Early-Exit-Pfad in <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/>:
+    /// <summary>Regressionstest für den Early-Exit-Pfad in <see cref="AiExecutionService.StartTerminalSessionAsync"/>:
     /// Ist der Prozess bereits vor der Event-Verdrahtung beendet (das Session-<c>Exited</c> feuerte ohne
     /// Subscriber), muss der Exit-Code denselben Status-Mapping-Pfad wie ein reguläres Exited durchlaufen —
-    /// ExitCode != 0 → <see cref="CliProcessStatus.Fehler"/> inkl. SystemMeldung-Protokolleintrag,
-    /// ExitCode == 0 → <see cref="CliProcessStatus.Gestoppt"/>. Zuvor wurde auf diesem Pfad immer Gestoppt
+    /// ExitCode != 0 → <see cref="CliProcessStatus.Error"/> inkl. SystemMeldung-Protokolleintrag,
+    /// ExitCode == 0 → <see cref="CliProcessStatus.Stopped"/>. Zuvor wurde auf diesem Pfad immer Stopped
     /// gemeldet und weder der Fehlerstatus noch der Fehler-Protokolleintrag erzeugt.</summary>
     [OsInterfaceTheory]
-    [InlineData(0, CliProcessStatus.Gestoppt)]
-    [InlineData(1, CliProcessStatus.Fehler)]
+    [InlineData(0, CliProcessStatus.Stopped)]
+    [InlineData(1, CliProcessStatus.Error)]
     public async Task StartTerminalSessionAsync_ProzessVorVerdrahtungBeendet_MapptExitCodeAufStatus(
         int exitCode,
         CliProcessStatus erwarteterStatus)
@@ -672,10 +672,10 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             "der Early-Exit-Pfad muss denselben Endzustand wie ein reguläres Exited melden — ohne vorheriges Gestartet");
         sut.GetTerminalSession(workItemId).Should().BeNull("das Handle muss im Early-Exit-Pfad entfernt worden sein");
 
-        if (erwarteterStatus == CliProcessStatus.Fehler)
+        if (erwarteterStatus == CliProcessStatus.Error)
         {
-            var eintraege = await WaitForProtokollEntriesAsync(provider, workItemId, 1, LogEntryType.SystemMessage);
-            eintraege.Should().Contain(
+            var entries = await WaitForProtokollEntriesAsync(provider, workItemId, 1, LogEntryType.SystemMessage);
+            entries.Should().Contain(
                 e => e.Content.Contains($"ExitCode: {exitCode}"),
                 "der Fehler-Pfad muss den Exit-Code als SystemMeldung-Protokolleintrag persistieren");
         }
@@ -684,7 +684,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// <summary>Regressionstest für ein <see cref="ITerminalSession.Failed"/>, das zwischen Session-Erzeugung
     /// und Event-Verdrahtung feuert (Leseschleifen-Fehler bei noch laufendem Prozess): Der Fehlerzustand muss
     /// über <see cref="ITerminalSession.Failure"/> nachträglich erkannt und wie ein reguläres Failed behandelt
-    /// werden — Status <see cref="CliProcessStatus.Fehler"/>, Handle entfernt, Session disposed. Zuvor blieb
+    /// werden — Status <see cref="CliProcessStatus.Error"/>, Handle entfernt, Session disposed. Zuvor blieb
     /// das Handle mit toter Leseschleife als „Gestartet" hängen.</summary>
     [OsInterfaceFact]
     public async Task StartTerminalSessionAsync_FailedVorVerdrahtung_WirdErkanntUndAlsFehlerGemeldet()
@@ -704,13 +704,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         try
         {
             statusEvents.Should().Equal(
-                new[] { CliProcessStatus.Fehler },
+                new[] { CliProcessStatus.Error },
                 "das vor der Verdrahtung ausgelöste Failed muss erkannt und als Fehler gemeldet werden — kein Gestartet");
             sut.GetTerminalSession(workItemId).Should().BeNull("das Handle muss nach dem Session-Fehler entfernt worden sein");
             AssertSessionDisposed(handle.Session!, "der Fehler-Pfad muss die Session-Ressourcen aufräumen");
 
-            var eintraege = await WaitForProtokollEntriesAsync(provider, workItemId, 1, LogEntryType.SystemMessage);
-            eintraege.Should().Contain(
+            var entries = await WaitForProtokollEntriesAsync(provider, workItemId, 1, LogEntryType.SystemMessage);
+            entries.Should().Contain(
                 e => e.Content.Contains("Laufzeitfehler"),
                 "ein fataler Session-Fehler ohne Exit-Code muss als SystemMeldung-Protokolleintrag persistiert werden");
         }
@@ -722,8 +722,8 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
     /// <summary>Fehlschlägt die Leseschleife einer Terminal-Session zur Laufzeit (<see cref="ITerminalSession.Failed"/>
     /// nach der Event-Verdrahtung, Prozess läuft noch), muss der Dienst gemäß Plan
-    /// <see cref="CliProcessStatus.Fehler"/> melden — ein fataler Session-Fehler ist kein reguläres Prozessende
-    /// (zuvor wurde hier fälschlich Gestoppt gemeldet).</summary>
+    /// <see cref="CliProcessStatus.Error"/> melden — ein fataler Session-Fehler ist kein reguläres Prozessende
+    /// (zuvor wurde hier fälschlich Stopped gemeldet).</summary>
     [OsInterfaceFact]
     public async Task StartTerminalSessionAsync_SessionFailed_MeldetFehlerStattGestoppt()
     {
@@ -739,7 +739,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         sut.CliProcessStatusChanged += (_, status) =>
         {
             statusEvents.Add(status);
-            if (status == CliProcessStatus.Fehler)
+            if (status == CliProcessStatus.Error)
                 fehlerSignal.TrySetResult();
         };
 
@@ -753,13 +753,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
             var completed = await Task.WhenAny(fehlerSignal.Task, Task.Delay(TimeSpan.FromSeconds(10)));
             completed.Should().Be(fehlerSignal.Task,
-                "ein Laufzeitfehler der Leseschleife muss als Fehler gemeldet werden, nicht als Gestoppt");
+                "ein Laufzeitfehler der Leseschleife muss als Fehler gemeldet werden, nicht als Stopped");
 
-            statusEvents.Should().Equal(new[] { CliProcessStatus.Started, CliProcessStatus.Fehler });
+            statusEvents.Should().Equal(new[] { CliProcessStatus.Started, CliProcessStatus.Error });
             sut.GetTerminalSession(workItemId).Should().BeNull("das Handle muss nach dem Session-Fehler entfernt worden sein");
 
-            var eintraege = await WaitForProtokollEntriesAsync(provider, workItemId, 1, LogEntryType.SystemMessage);
-            eintraege.Should().Contain(
+            var entries = await WaitForProtokollEntriesAsync(provider, workItemId, 1, LogEntryType.SystemMessage);
+            entries.Should().Contain(
                 e => e.Content.Contains("Laufzeitfehler"),
                 "ein fataler Session-Fehler ohne Exit-Code muss als SystemMeldung-Protokolleintrag persistiert werden");
         }
@@ -784,7 +784,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             if (status == CliProcessStatus.Started)
                 gestartetCount++;
         };
-        _sut.CliLaufAktiv += _ => laufAktivCount++;
+        _sut.CliRunActive += _ => laufAktivCount++;
 
         var handle = await _sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         gestartetCount.Should().Be(1);
@@ -804,13 +804,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         var workItemId = Guid.NewGuid();
         var laufAktivCount = 0;
-        _sut.CliLaufAktiv += _ => laufAktivCount++;
+        _sut.CliRunActive += _ => laufAktivCount++;
 
-        _sut.NotifyLaufAktiv(workItemId);
+        _sut.NotifyRunActive(workItemId);
         laufAktivCount.Should().Be(0, "ohne laufendes Handle ist NotifyLaufAktiv ein No-Op");
 
         await _sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
-        _sut.NotifyLaufAktiv(workItemId);
+        _sut.NotifyRunActive(workItemId);
 
         laufAktivCount.Should().Be(1);
     }
@@ -854,13 +854,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         // Ein Process-Objekt ohne zugeordneten Prozess wirft bei HasExited — wird als nicht laufend gewertet.
         PlantHandle(nichtZugeordnet, new CliProcessHandle(nichtZugeordnet, new System.Diagnostics.Process()));
 
-        _sut.GetLaufendeAufgabenIds().Should().ContainSingle()
+        _sut.GetRunningWorkItemIds().Should().ContainSingle()
             .Which.Should().Be(laufend);
     }
 
     private void PlantHandle(Guid workItemId, CliProcessHandle handle)
     {
-        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var handlesField = typeof(AiExecutionService).GetField("_handles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_sut)!;
         handles[workItemId] = handle;
     }
@@ -879,9 +879,9 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         for (var i = 0; i < 50; i++)
         {
-            var eintraege = GetProtokollEntries(provider, workItemId, typ);
-            if (eintraege.Count >= expectedCount)
-                return eintraege;
+            var entries = GetProtokollEntries(provider, workItemId, typ);
+            if (entries.Count >= expectedCount)
+                return entries;
 
             await Task.Delay(100);
         }
@@ -912,8 +912,8 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var databaseName = Guid.NewGuid().ToString();
         return new ServiceCollection()
             .AddDbContext<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>(options => options.UseInMemoryDatabase(databaseName))
-            .AddScoped<ProtokollService>()
-            .AddSingleton<ILogger<ProtokollService>>(NullLogger<ProtokollService>.Instance)
+            .AddScoped<LogService>()
+            .AddSingleton<ILogger<LogService>>(NullLogger<LogService>.Instance)
             .BuildServiceProvider();
     }
 
@@ -947,11 +947,11 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         return new ServiceCollection()
             .AddDbContext<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>(options => options.UseInMemoryDatabase(databaseName))
             .AddScoped<TodoService>()
-            .AddScoped<AufgabeService>()
-            .AddScoped<ProtokollService>()
+            .AddScoped<WorkItemService>()
+            .AddScoped<LogService>()
             .AddSingleton<ILogger<TodoService>>(NullLogger<TodoService>.Instance)
-            .AddSingleton<ILogger<AufgabeService>>(NullLogger<AufgabeService>.Instance)
-            .AddSingleton<ILogger<ProtokollService>>(NullLogger<ProtokollService>.Instance)
+            .AddSingleton<ILogger<WorkItemService>>(NullLogger<WorkItemService>.Instance)
+            .AddSingleton<ILogger<LogService>>(NullLogger<LogService>.Instance)
             .BuildServiceProvider();
     }
 
@@ -969,16 +969,16 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         });
         await db.SaveChangesAsync();
 
-        var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
-        var workItem = await aufgabeService.CreateAsync(projectId, "Prozessende-Aufgabe", "Beschreibung");
-        await aufgabeService.StartenAsync(workItem.Id, "feature/prozessende", Path.GetTempPath());
-        await aufgabeService.AktivenLaufSetzenAsync(workItem.Id, "lauf-prozessende");
+        var workItemService = scope.ServiceProvider.GetRequiredService<WorkItemService>();
+        var workItem = await workItemService.CreateAsync(projectId, "Prozessende-Aufgabe", "Beschreibung");
+        await workItemService.StartAsync(workItem.Id, "feature/prozessende", Path.GetTempPath());
+        await workItemService.SetActiveRunAsync(workItem.Id, "lauf-prozessende");
 
         return (workItem.Id, projectId);
     }
 
     private static async Task StartAndWaitForExitAsync(
-        KiAusfuehrungsService sut,
+        AiExecutionService sut,
         Guid workItemId,
         System.Diagnostics.ProcessStartInfo processStartInfo,
         CliProcessStatus expectedStatus)
@@ -1153,7 +1153,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
     /// <summary>Launcher-Double, das einen bereits beendeten Prozess in die Session legt (wartet in
     /// <see cref="Start"/> synchron auf das Prozessende). Reproduziert deterministisch den Early-Exit-Pfad
-    /// in <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/>: Der Prozess ist bei der
+    /// in <see cref="AiExecutionService.StartTerminalSessionAsync"/>: Der Prozess ist bei der
     /// Event-Verdrahtung bereits beendet und das Session-Exited feuerte ohne Subscriber.</summary>
     private sealed class AlreadyExitedProcessLauncher : IPseudoConsoleProcessLauncher
     {
@@ -1197,7 +1197,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
     /// <summary>Launcher-Double, dessen Session-Leseschleife sofort mit einem IOException aussteigt, während
     /// der Prozess weiterläuft — reproduziert ein <see cref="ITerminalSession.Failed"/>, das bereits vor der
-    /// Event-Verdrahtung in <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/> ausgelöst wurde.
+    /// Event-Verdrahtung in <see cref="AiExecutionService.StartTerminalSessionAsync"/> ausgelöst wurde.
     /// <see cref="Start"/> wartet deterministisch auf <see cref="ITerminalSession.Failure"/>, damit das
     /// Timing garantiert ist und der Test nicht von zufälliger Scheduling-Reihenfolge abhängt.</summary>
     private sealed class FailingReadSessionLauncher : IPseudoConsoleProcessLauncher
@@ -1230,7 +1230,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
     /// <summary>Launcher-Double wie <see cref="FailingReadSessionLauncher"/>, bei dem der Lesefehler erst
     /// nach einer Verzögerung ausgelöst wird — damit das <see cref="ITerminalSession.Failed"/> erst
-    /// <em>nach</em> der Event-Verdrahtung in <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/>
+    /// <em>nach</em> der Event-Verdrahtung in <see cref="AiExecutionService.StartTerminalSessionAsync"/>
     /// feuert und der reguläre Failed-Ereignis-Pfad (statt des Failure-Rechecks) getroffen wird.</summary>
     private sealed class DelayedFailingReadSessionLauncher : IPseudoConsoleProcessLauncher
     {

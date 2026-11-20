@@ -17,7 +17,7 @@ public sealed partial class GitHubPlugin
         if (request.Kind == ScmResponseKind.Reaction && request.ContentKind == ScmContentKind.PullRequestReview)
             return await ReconcileReviewReactionAsync(request, ct);
         var repository = request.Reference.Repository;
-        var client = ClientFor(repository.Konto);
+        var client = ClientFor(repository.Account);
         var endpoint = request.Kind switch
         {
             ScmResponseKind.Comment => $"{RepositoryEndpoint(repository)}/issues/{request.Reference.Number}/comments?per_page=100",
@@ -44,10 +44,10 @@ public sealed partial class GitHubPlugin
     {
         ValidateResponse(request);
         var repository = request.Reference.Repository;
-        var client = ClientFor(repository.Konto);
+        var client = ClientFor(repository.Account);
         // A renamed/replaced repository or changed credential must not redirect a persisted answer.
         var current = await GetEventRepositoryAsync(new(Guid.NewGuid(), PluginPrefix,
-            $"https://{repository.Host}/{repository.Owner}/{repository.Name}", repository.Konto), ct);
+            $"https://{repository.Host}/{repository.Owner}/{repository.Name}", repository.Account), ct);
         if (current.RepositoryId != repository.RepositoryId || current.ViewerId != repository.ViewerId)
             throw new ScmProviderException(ScmProviderFailureKind.Permission, "Repository- oder Benutzeridentität hat sich geändert.");
         if (!current.CanWrite) throw new ScmProviderException(ScmProviderFailureKind.Permission, "GitHub-Schreibberechtigung fehlt.");
@@ -94,7 +94,7 @@ public sealed partial class GitHubPlugin
     private async Task<ScmResponseResult?> ReconcileIssueBodyAsync(ScmResponseRequest request, CancellationToken ct)
     {
         var repository = request.Reference.Repository;
-        var client = ClientFor(repository.Konto);
+        var client = ClientFor(repository.Account);
         var issue = await EventApiAsync(client, repository.Host, "GET",
             $"{RepositoryEndpoint(repository)}/issues/{request.Reference.Number}", null, false, ct);
         if (issue.ValueKind != JsonValueKind.Object) throw Permanent("Unvollständige GitHub-Antwort.");
@@ -106,7 +106,7 @@ public sealed partial class GitHubPlugin
     private async Task<ScmResponseResult?> ReconcileReviewReactionAsync(ScmResponseRequest request, CancellationToken ct)
     {
         var repository = request.Reference.Repository;
-        var client = ClientFor(repository.Konto);
+        var client = ClientFor(repository.Account);
         string? cursor = null;
         var visited = new HashSet<string>(StringComparer.Ordinal);
         ScmResponseResult? found = null;

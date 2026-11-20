@@ -76,11 +76,11 @@ public sealed class GitHubPluginTests
 
         // Assert
         result.Should().HaveCount(2);
-        result[0].Nummer.Should().Be(1);
+        result[0].Number.Should().Be(1);
         result[0].Title.Should().Be("Bug Fix");
         result[0].Labels.Should().BeEquivalentTo(new[] { "bug", "urgent" });
         result[0].Milestone.Should().Be("v1.0");
-        result[1].Nummer.Should().Be(2);
+        result[1].Number.Should().Be(2);
         result[1].Body.Should().BeNull();
     }
 
@@ -231,7 +231,7 @@ public sealed class GitHubPluginTests
         var result = await _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest("Titel", "Body"), TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
-        result.Issue!.Nummer.Should().Be(17);
+        result.Issue!.Number.Should().Be(17);
         result.Issue.Title.Should().Be("Titel");
         result.Issue.Body.Should().Be("Body");
         result.Issue.IssueUrl.Should().Be("https://github.com/owner/repo/issues/17");
@@ -343,7 +343,7 @@ public sealed class GitHubPluginTests
 
         result.Should().ContainSingle();
         result[0].RepositoryId.Should().Be("owner/repo");
-        result[0].Nummer.Should().Be(42);
+        result[0].Number.Should().Be(42);
         result[0].BranchName.Should().Be("dependabot/nuget/package-1.0.1");
         result[0].TargetBranch.Should().Be("main");
         result[0].Body.Should().Be("Dependabot updates the package dependency.");
@@ -671,7 +671,7 @@ public sealed class GitHubPluginTests
         var result = await _sut.CreatePullRequestAsync("owner/repo", "feature/branch", null, title: "My PR", body: "Body", ct: TestContext.Current.CancellationToken);
 
         // Assert
-        result.Nummer.Should().Be(42);
+        result.Number.Should().Be(42);
         result.Title.Should().Be("My PR");
         result.Url.Should().Be(prUrl);
         result.BranchName.Should().Be("feature/branch");
@@ -732,7 +732,7 @@ public sealed class GitHubPluginTests
         result.Should().BeFalse();
     }
 
-    /// <summary><summary>PluginMetadata_ShouldExposeExpectedValues.</summary>.</summary>
+    /// <summary>PluginMetadata_ShouldExposeExpectedValues.</summary>
     [Fact]
     public void PluginMetadata_ShouldExposeExpectedValues()
     {
@@ -1088,7 +1088,7 @@ public sealed class GitHubPluginTests
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary><summary>PushBranchAsync_ShouldThrow_WhenPushFails.</summary>.</summary>
+    /// <summary>PushBranchAsync_ShouldThrow_WhenPushFails.</summary>
     [Fact]
     public async Task PushBranchAsync_ShouldThrow_WhenPushFails()
     {
@@ -1239,7 +1239,7 @@ public sealed class GitHubPluginTests
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary><summary>PullAsync_ShouldThrow_WhenGitPullFails.</summary>.</summary>
+    /// <summary>PullAsync_ShouldThrow_WhenGitPullFails.</summary>
     [Fact]
     public async Task PullAsync_ShouldThrow_WhenGitPullFails()
     {
@@ -1327,7 +1327,7 @@ public sealed class GitHubPluginTests
         exception.Which.Message.Should().Contain("oauth2:***@");
     }
 
-    /// <summary><summary>ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided.</summary>.</summary>
+    /// <summary>ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided.</summary>
     [Fact]
     public async Task ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided()
     {
@@ -1344,7 +1344,7 @@ public sealed class GitHubPluginTests
         _cliRunnerMock.VerifyAll();
     }
 
-    /// <summary><summary>ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided.</summary>.</summary>
+    /// <summary>ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided.</summary>
     [Fact]
     public async Task ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided()
     {
@@ -1361,7 +1361,7 @@ public sealed class GitHubPluginTests
         _cliRunnerMock.VerifyAll();
     }
 
-    /// <summary><summary>GetRemoteBranchesAsync_ShouldParseAndSortBranches.</summary>.</summary>
+    /// <summary>GetRemoteBranchesAsync_ShouldParseAndSortBranches.</summary>
     [Fact]
     public async Task GetRemoteBranchesAsync_ShouldParseAndSortBranches()
     {
@@ -1384,7 +1384,7 @@ public sealed class GitHubPluginTests
         result.Should().Equal("feature/a", "feature/z", "main");
     }
 
-    /// <summary><summary>GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails.</summary>.</summary>
+    /// <summary>GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails.</summary>
     [Fact]
     public async Task GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails()
     {
@@ -1401,7 +1401,7 @@ public sealed class GitHubPluginTests
         result.Should().BeEmpty();
     }
 
-    /// <summary><summary>GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed.</summary>.</summary>
+    /// <summary>GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed.</summary>
     [Fact]
     public async Task GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed()
     {
@@ -1418,7 +1418,7 @@ public sealed class GitHubPluginTests
         result.Should().Be("master");
     }
 
-    /// <summary><summary>GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails.</summary>.</summary>
+    /// <summary>GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails.</summary>
     [Fact]
     public async Task GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails()
     {
@@ -1435,7 +1435,7 @@ public sealed class GitHubPluginTests
         result.Should().Be("main");
     }
 
-    /// <summary><summary>CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails.</summary>.</summary>
+    /// <summary>CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails.</summary>
     [Fact]
     public async Task CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails()
     {
@@ -1667,7 +1667,7 @@ public sealed class GitHubPluginTests
             .And.Contain("\"owner\":\"owner\"").And.Contain("\"name\":\"repo\"").And.Contain("\"number\":42");
         result.Status.Should().Be(PullRequestStatus.Open);
         result.MergeStatus.Should().Be(PullRequestMergeStatus.Mergeable);
-        result.Nummer.Should().Be(42);
+        result.Number.Should().Be(42);
         result.ProviderPullRequestId.Should().Be("PR_kw");
         result.SourceBranch.Should().Be("feature/pr");
         result.TargetBranch.Should().Be("main");

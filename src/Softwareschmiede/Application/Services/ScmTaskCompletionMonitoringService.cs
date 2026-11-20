@@ -33,23 +33,23 @@ public sealed class ScmTaskCompletionMonitoringService(
     {
         await startup.WaitAsync(ct);
         using var scope = scopes.CreateScope();
-        var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+        var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
         // Laufzeit-Schalter (Einstellungen → Automatisierung → Aufgaben beenden): Bei deaktivierter
         // Abschlussüberwachung wird weder beobachtet noch automatisch abgeschlossen; ein bereits
         // gesetzter Erkennungszeitpunkt bleibt persistiert bestehen.
-        if (!await einstellungen.GetScmTaskCompletionEnabledAsync(ct))
+        if (!await settings.GetScmTaskCompletionEnabledAsync(ct))
         {
             logger.LogDebug("SCM-Abschlussüberwachung ist deaktiviert; Durchlauf wird übersprungen.");
             return;
         }
-        var wait = TimeSpan.FromMinutes(await einstellungen.GetScmTaskCompletionWaitMinutesAsync(ct));
-        var pruefmodus = await einstellungen.GetScmTaskCompletionPruefmodusAsync(ct);
+        var wait = TimeSpan.FromMinutes(await settings.GetScmTaskCompletionWaitMinutesAsync(ct));
+        var checkMode = await settings.GetScmTaskCompletionCheckModeAsync(ct);
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         // Ereignisgesteuert = mindestens ein eingegangenes SCM-Ereignis; abgeschlossene Ereignisse
         // entscheiden die Referenzbeobachtung nicht vorzeitig — erst nach deren Abschluss.
         // Kandidaten brauchen immer eine SCM-Referenz (Issue oder Pull Request); Aufgaben ohne
         // Referenz werden nie beobachtet.
-        var candidates = pruefmodus == ScmTaskCompletionCheckMode.AllWorkItems
+        var candidates = checkMode == ScmTaskCompletionCheckMode.AllWorkItems
             ? await db.WorkItems
                 .Where(a => a.Status != WorkItemStatus.Completed && a.Status != WorkItemStatus.Archived
                     && (a.IssueReference != null || a.PullRequests.Any()))
@@ -93,7 +93,7 @@ public sealed class ScmTaskCompletionMonitoringService(
             return;
 
         var now = _time.GetUtcNow();
-        var protokoll = services.GetRequiredService<ProtokollService>();
+        var log = services.GetRequiredService<LogService>();
         var closedLabel = await DetermineClosureAsync(services, db, task, ct);
         if (closedLabel is null)
         {
@@ -104,7 +104,7 @@ public sealed class ScmTaskCompletionMonitoringService(
                 task.ScmCompletionDetectedUtc = null;
                 task.ScmCompletionReference = null;
                 await db.SaveChangesAsync(ct);
-                await protokoll.AddEintragAsync(taskId, LogEntryType.SystemMessage,
+                await log.AddEntryAsync(taskId, LogEntryType.SystemMessage,
                     $"{label} ist wieder offen; der automatische Abschluss wurde zurückgesetzt.", ct: ct);
             }
             return;
@@ -114,7 +114,7 @@ public sealed class ScmTaskCompletionMonitoringService(
             task.ScmCompletionDetectedUtc = now;
             task.ScmCompletionReference = closedLabel;
             await db.SaveChangesAsync(ct);
-            await protokoll.AddEintragAsync(taskId, LogEntryType.SystemMessage,
+            await log.AddEntryAsync(taskId, LogEntryType.SystemMessage,
                 $"{closedLabel} ist geschlossen/gemergt; die Aufgabe wird nach Ablauf der konfigurierten Wartezeit automatisch beendet.",
                 ct: ct);
             return;
@@ -135,8 +135,8 @@ public sealed class ScmTaskCompletionMonitoringService(
                 return;
             try
             {
-                await services.GetRequiredService<EntwicklungsprozessService>().AbschliessenAsync(taskId, ct);
-                await protokoll.AddEintragAsync(taskId, LogEntryType.SystemMessage,
+                await services.GetRequiredService<DevelopmentProcessService>().CompleteAsync(taskId, ct);
+                await log.AddEntryAsync(taskId, LogEntryType.SystemMessage,
                     $"Aufgabe automatisch beendet: {current.ScmCompletionReference} ist geschlossen/gemergt und die Abschluss-Wartezeit ist abgelaufen.",
                     ct: ct);
             }

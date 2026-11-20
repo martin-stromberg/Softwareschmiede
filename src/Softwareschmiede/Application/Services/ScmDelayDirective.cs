@@ -8,7 +8,7 @@ namespace Softwareschmiede.Application.Services;
 public static class ScmDelayDirective
 {
     /// <summary>Standard-Verzögerungs-Keyword, wenn kein abweichender Wert konfiguriert ist
-    /// (Einstellung <see cref="AppEinstellungService.ScmDelayKeywordKey"/>).</summary>
+    /// (Einstellung <see cref="AppSettingService.ScmDelayKeywordKey"/>).</summary>
     public const string DefaultDelayKeyword = "#verzögert";
 
     /// <summary>Maximal zulässige Verzögerung bis zum Zielzeitpunkt.</summary>

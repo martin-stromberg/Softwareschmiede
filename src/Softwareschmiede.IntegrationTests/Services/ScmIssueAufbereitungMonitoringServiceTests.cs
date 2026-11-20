@@ -12,7 +12,7 @@ using Softwareschmiede.TestSupport;
 namespace Softwareschmiede.IntegrationTests.Services;
 
 /// <summary>Modusunabhängiger Entdeckungszyklus der Issue-Aufbereitung
-/// (<see cref="ScmIssueAufbereitungMonitoringService"/>): freigeschaltete Repositories werden
+/// (<see cref="ScmIssuePreparationMonitoringService"/>): freigeschaltete Repositories werden
 /// kanonisch unter dem Benutzerkonto enumeriert; neu angelegte Issues werden über den
 /// Auswertungs-Checkpoint je Issue genau einmal eingelesen und als Zweck-Aufgabe samt internem,
 /// trigger-freiem Ereignis eingereiht. Der Dienst läuft unabhängig von der Ereignisüberwachung
@@ -29,8 +29,8 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
         await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
-        await fixture.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, "custom.auf");
-        var repositoryId = await AddRepositoryAsync(fixture, aufbereitung: true);
+        await fixture.SetSettingAsync(AppSettingService.ScmIssuePreparationPluginKey, "custom.auf");
+        var repositoryId = await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         fixture.ConfigureIssue();
 
@@ -49,7 +49,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var task = Assert.Single(await db.WorkItems.Include(x => x.IssueReference).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(ScmIssueAufbereitungsService.Purpose, task.Purpose);
+        Assert.Equal(ScmIssuePreparationService.Purpose, task.Purpose);
         Assert.Equal(repositoryId, task.GitRepositoryId);
         Assert.Equal("custom.auf", task.AiPluginPrefix);
         Assert.Equal(9, task.IssueReference!.IssueNumber);
@@ -57,7 +57,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         Assert.DoesNotContain("/Issue/9", task.IssueReference.SourceKey);
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(task.Id, item.WorkItemId);
-        Assert.Equal(ScmIssueAufbereitungsService.Purpose, item.Purpose);
+        Assert.Equal(ScmIssuePreparationService.Purpose, item.Purpose);
         Assert.EndsWith("/IssueAufbereitung", item.EventKey);
         Assert.Contains(await db.LogEntries.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             x => x.WorkItemId == task.Id && x.Type == LogEntryType.SystemMessage && x.Content.Contains("Issue-Aufbereitung"));
@@ -72,7 +72,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await AddRepositoryAsync(fixture, aufbereitung: true);
+        await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture,
             new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8),
             new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
@@ -109,7 +109,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await AddRepositoryAsync(fixture, aufbereitung: true);
+        await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         fixture.ConfigureIssue();
 
@@ -143,7 +143,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        await AddRepositoryAsync(fixture, aufbereitung: true);
+        await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         fixture.ConfigureIssue();
 
@@ -165,7 +165,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await AddRepositoryAsync(fixture, aufbereitung: false);
+        await AddRepositoryAsync(fixture, preparation: false);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         fixture.ConfigureIssue();
 
@@ -185,11 +185,11 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await AddRepositoryAsync(fixture, aufbereitung: true);
+        await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
 
         await AufbereitungMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -211,7 +211,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await AddRepositoryAsync(fixture, aufbereitung: true);
+        await AddRepositoryAsync(fixture, preparation: true);
         await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
         var contexts = new List<ScmRepositoryContext>();
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
@@ -225,7 +225,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await AufbereitungMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
         var context = Assert.Single(contexts);
-        Assert.Equal(ScmKontoModus.Benutzerkonto, context.Konto);
+        Assert.Equal(ScmKontoModus.Benutzerkonto, context.Account);
     }
 
     /// <summary>Die persistierte Referenz des internen Aufbereitungsereignisses trägt den
@@ -237,7 +237,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
         await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
-        await AddRepositoryAsync(fixture, aufbereitung: true);
+        await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         fixture.ConfigureIssue();
 
@@ -255,7 +255,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(ScmKontoModus.SeparatesKonto, ScmEventStore.Observation(item).Reference.Repository.Konto);
+        Assert.Equal(ScmKontoModus.SeparatesKonto, ScmEventStore.Observation(item).Reference.Repository.Account);
     }
 
     /// <summary>Lückenschluss: Wurde die Beschreibung eines neu angelegten Issues zuvor schon
@@ -268,7 +268,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
         await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
-        await AddRepositoryAsync(fixture, aufbereitung: true);
+        await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         fixture.ConfigureIssue();
 
@@ -289,7 +289,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var task = Assert.Single(await db.WorkItems.Include(x => x.IssueReference).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(ScmIssueAufbereitungsService.Purpose, task.Purpose);
+        Assert.Equal(ScmIssuePreparationService.Purpose, task.Purpose);
         Assert.Equal(9, task.IssueReference!.IssueNumber);
         Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
@@ -303,7 +303,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await AddRepositoryAsync(fixture, aufbereitung: true);
+        await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         fixture.ConfigureIssue();
 
@@ -348,8 +348,8 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await AddRepositoryAsync(fixture, aufbereitung: true);
-        await AddRepositoryAsync(fixture, aufbereitung: true, url: "https://github.com/other/repo2");
+        await AddRepositoryAsync(fixture, preparation: true);
+        await AddRepositoryAsync(fixture, preparation: true, url: "https://github.com/other/repo2");
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.Is<ScmRepositoryContext>(c => c.RepositoryId.Contains("other/repo2")), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ScmProviderException(ScmProviderFailureKind.Permanent, "nicht gefunden"));
@@ -376,7 +376,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await AddRepositoryAsync(fixture, aufbereitung: true);
+        await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
         fixture.ConfigureIssue();
 
@@ -400,7 +400,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await AddRepositoryAsync(fixture, aufbereitung: true);
+        await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         ConfigureDescriptions(fixture, request => DescriptionObservation(request, DateTimeOffset.UtcNow.AddDays(-1)));
         fixture.ConfigureIssue();
@@ -421,15 +421,15 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await AufbereitungMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
         fixture.Git.As<IScmEventSource>().Verify(x => x.ReadEventsAsync(
-            It.Is<ScmEventReadRequest>(r => r.Reference.Repository.Konto == ScmKontoModus.SeparatesKonto),
+            It.Is<ScmEventReadRequest>(r => r.Reference.Repository.Account == ScmKontoModus.SeparatesKonto),
             It.IsAny<CancellationToken>()), Times.Never);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var task = Assert.Single(await db.WorkItems.Include(x => x.IssueReference)
-            .Where(x => x.Purpose == ScmIssueAufbereitungsService.Purpose).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+            .Where(x => x.Purpose == ScmIssuePreparationService.Purpose).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(9, task.IssueReference!.IssueNumber);
         Assert.Single(await db.ScmIncomingEvents
-            .Where(x => x.Purpose == ScmIssueAufbereitungsService.Purpose).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+            .Where(x => x.Purpose == ScmIssuePreparationService.Purpose).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     /// <summary>Das eingereihte interne Ereignis wird noch im selben Zyklus zugestellt — auch bei
@@ -440,11 +440,11 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await fixture.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, "custom.auf");
+        await fixture.SetSettingAsync(AppSettingService.ScmIssuePreparationPluginKey, "custom.auf");
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
-        await AddRepositoryAsync(fixture, aufbereitung: true);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+        await AddRepositoryAsync(fixture, preparation: true);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
         fixture.ConfigureIssue();
 
@@ -462,19 +462,19 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(ScmIssueAufbereitungsService.Purpose, item.Purpose);
+        Assert.Equal(ScmIssuePreparationService.Purpose, item.Purpose);
         // „Aufgenommen" wäre der Zustand ohne den zyklusinternen Dispatch-Anstoß.
         Assert.Equal("Wartend", item.Status);
         Assert.Contains("custom.auf", item.Reason);
     }
 
-    private static ScmIssueAufbereitungMonitoringService AufbereitungMonitor(ScmDispatchFixture fixture)
-        => fixture.Services.GetRequiredService<ScmIssueAufbereitungMonitoringService>();
+    private static ScmIssuePreparationMonitoringService AufbereitungMonitor(ScmDispatchFixture fixture)
+        => fixture.Services.GetRequiredService<ScmIssuePreparationMonitoringService>();
 
     private static async Task EnableAsync(ScmDispatchFixture fixture)
-        => await fixture.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungEnabledKey, "true");
+        => await fixture.SetSettingAsync(AppSettingService.ScmIssuePreparationEnabledKey, "true");
 
-    private static async Task<Guid> AddRepositoryAsync(ScmDispatchFixture fixture, bool aufbereitung,
+    private static async Task<Guid> AddRepositoryAsync(ScmDispatchFixture fixture, bool preparation,
         string url = "https://github.com/owner/repo", string? pluginTyp = null)
     {
         using var scope = fixture.Services.CreateScope();
@@ -488,7 +488,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
             RepositoryName = "repo",
             PluginType = pluginTyp ?? fixture.Repository.ProviderPrefix,
             Active = true,
-            IssuePreparationEnabled = aufbereitung
+            IssuePreparationEnabled = preparation
         };
         db.AddRange(project, repository);
         await db.SaveChangesAsync();

@@ -31,14 +31,14 @@ public partial class End2EndTest
     protected async Task AufgabePausieren_DialogCountdownAbblendungUndAufheben_E2E(Window mainWindow)
     {
         var projektName = $"Pause-Projekt {Guid.NewGuid():N}"[..30];
-        var titel = $"Pause-Aufgabe {Guid.NewGuid():N}"[..30];
+        var title = $"Pause-Aufgabe {Guid.NewGuid():N}"[..30];
 
         // Projekt und Aufgabe über die UI anlegen; ein CLI-Start ist für die Pause nicht nötig.
         NavigateToProjects(mainWindow);
         CreateAndOpenProject(mainWindow, projektName);
         var projectDetail = new ProjectDetailView(mainWindow);
         var taskDetail = projectDetail.CreateTask();
-        taskDetail.SetTaskTitle(titel);
+        taskDetail.SetTaskTitle(title);
         taskDetail.SaveTask();
         taskDetail.WaitForPersisted();
 
@@ -46,7 +46,7 @@ public partial class End2EndTest
         // in der Seitenleiste erscheint (über die UI nicht abbildbar ohne echten CLI-Start).
         await using (var db = OpenTestDbContext())
         {
-            var workItem = await db.WorkItems.SingleAsync(a => a.Title == titel);
+            var workItem = await db.WorkItems.SingleAsync(a => a.Title == title);
             workItem.Status = WorkItemStatus.Started;
             workItem.ExecutionStatus = WorkItemExecutionStatus.Active;
             workItem.AiPluginPrefix = "Softwareschmiede.KiSimulator";
@@ -59,13 +59,13 @@ public partial class End2EndTest
         // ActiveTasksListControl-Instanzen; die Suche läuft gescoped unter 'AktiveAufgabenListeMenue'.
         WaitForElement(
             mainWindow,
-            cf => cf.ByName($"AufgabeNavigieren:{titel}"),
+            cf => cf.ByName($"AufgabeNavigieren:{title}"),
             Long);
 
         // Über die Seitenleiste in die (frisch geladene) Detailansicht wechseln. Als
         // Synchronisationssignal auf den „Zurück"-Button der TaskDetailView warten — der Aufgabentitel
         // allein wäre bereits über die Seitenleisten-Kachel im Automation-Baum auffindbar.
-        var detail = taskDetail.Menu.NavigateToTask(titel);
+        var detail = taskDetail.Menu.NavigateToTask(title);
         WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
 
         // Das Ribbon enthält nur die regulären Aufgabensteuerungen (Starten, Pause einstellen).
@@ -77,33 +77,33 @@ public partial class End2EndTest
         // Phase 1: Dialog öffnen — Vorbelegung muss ≈ dem aktuellen Zeitpunkt entsprechen.
         var pauseDialog = new AufgabePausierenDialogView(mainWindow).ForceShow();
         var (stunde, minute) = pauseDialog.GetVorbelegteZeit();
-        var jetzt = DateTime.Now;
+        var now = DateTime.Now;
         var vorbelegungMinuten = stunde * 60 + minute;
-        var jetztMinuten = jetzt.Hour * 60 + jetzt.Minute;
+        var jetztMinuten = now.Hour * 60 + now.Minute;
         var diffMinuten = Math.Abs(vorbelegungMinuten - jetztMinuten);
         Assert.True(
             Math.Min(diffMinuten, 24 * 60 - diffMinuten) <= 1,
-            $"Vorbelegung ({stunde:00}:{minute:00}) weicht zu stark vom aktuellen Zeitpunkt ({jetzt:HH:mm}) ab.");
+            $"Vorbelegung ({stunde:00}:{minute:00}) weicht zu stark vom aktuellen Zeitpunkt ({now:HH:mm}) ab.");
         Assert.False(pauseDialog.IsAufhebenEnabled(), "Ohne bestehende Pause muss 'Pause aufheben' deaktiviert sein.");
 
         // Phase 2: Zeitpunkt +2 h bestätigen → Pause wird persistiert und in der Kachel sichtbar.
-        var ziel = DateTime.Now.AddHours(2);
-        pauseDialog.SetzeZeitpunkt(ziel);
-        pauseDialog.Bestaetigen();
+        var target = DateTime.Now.AddHours(2);
+        pauseDialog.SetzeZeitpunkt(target);
+        pauseDialog.Confirm();
 
         await using (var db = OpenTestDbContext())
         {
-            var workItem = await db.WorkItems.SingleAsync(a => a.Title == titel);
+            var workItem = await db.WorkItems.SingleAsync(a => a.Title == title);
             Assert.NotNull(workItem.PausedUntilUtc);
             Assert.True(
-                Math.Abs((workItem.PausedUntilUtc.Value - new DateTimeOffset(ziel)).TotalMinutes) <= 1.5,
-                $"PausiertBisUtc '{workItem.PausedUntilUtc:O}' weicht vom erwarteten Ziel '{ziel:O}' ab.");
+                Math.Abs((workItem.PausedUntilUtc.Value - new DateTimeOffset(target)).TotalMinutes) <= 1.5,
+                $"PausiertBisUtc '{workItem.PausedUntilUtc:O}' weicht vom erwarteten Ziel '{target:O}' ab.");
         }
 
         // Kachel zeigt „⏸ Pausiert (noch …)" (HelpText des Status-Elements) und „Pausiert:True"
         // (HelpText des 'AufgabeKachel:'-Marker-Elements — E2E-Anker für die Opacity-Abblendung).
-        WarteAufKachelStatus(mainWindow, titel, status => status.StartsWith("⏸ Pausiert", StringComparison.Ordinal), Long);
-        WarteAufKachelPausiertMarker(mainWindow, titel, "Pausiert:True", Long);
+        WarteAufKachelStatus(mainWindow, title, status => status.StartsWith("⏸ Pausiert", StringComparison.Ordinal), Long);
+        WarteAufKachelPausiertMarker(mainWindow, title, "Pausiert:True", Long);
 
         // Phase 3: Dialog erneut öffnen — die bestehende Pause wird angezeigt, „Pause aufheben" ist aktiv.
         var pauseDialog2 = new AufgabePausierenDialogView(mainWindow).ForceShow();
@@ -115,12 +115,12 @@ public partial class End2EndTest
 
         await using (var db = OpenTestDbContext())
         {
-            var workItem = await db.WorkItems.SingleAsync(a => a.Title == titel);
+            var workItem = await db.WorkItems.SingleAsync(a => a.Title == title);
             Assert.Null(workItem.PausedUntilUtc);
         }
 
-        WarteAufKachelStatus(mainWindow, titel, status => !status.StartsWith("⏸ Pausiert", StringComparison.Ordinal), Long);
-        WarteAufKachelPausiertMarker(mainWindow, titel, "Pausiert:False", Long);
+        WarteAufKachelStatus(mainWindow, title, status => !status.StartsWith("⏸ Pausiert", StringComparison.Ordinal), Long);
+        WarteAufKachelPausiertMarker(mainWindow, title, "Pausiert:False", Long);
 
         // Aufräumen: Die Aufgabe hat keinen laufenden CLI-Prozess; das Projekt kann regulär gelöscht
         // werden. Die Detailansicht wurde über die Seitenleiste geöffnet — „Zurück" führt zum Dashboard.
@@ -137,27 +137,27 @@ public partial class End2EndTest
     /// gegebene Prädikat erfüllt (Polling, da die Seitenleiste sich über den 5-s-Timer bzw. den
     /// Laufdaten-Notifier aktualisiert).
     /// </summary>
-    private static void WarteAufKachelStatus(Window mainWindow, string titel, Func<string, bool> predikat, TimeSpan timeout)
-        => WarteAufElementHelpText(mainWindow, $"AufgabeStatus:{titel}", predikat, timeout, $"Statuskachel von '{titel}'");
+    private static void WarteAufKachelStatus(Window mainWindow, string title, Func<string, bool> predikat, TimeSpan timeout)
+        => WarteAufElementHelpText(mainWindow, $"AufgabeStatus:{title}", predikat, timeout, $"Statuskachel von '{title}'");
 
     /// <summary>
     /// Wartet, bis der <c>HelpText</c> des Marker-Elements <c>AufgabeKachel:{titel}</c> den erwarteten
     /// <c>Pausiert:…</c>-Marker enthält (E2E-Anker für die Opacity-Abblendung pausierter Kacheln —
     /// die Kachel-Border selbst erzeugt keinen AutomationPeer und ist per UIA unsichtbar).
     /// </summary>
-    private static void WarteAufKachelPausiertMarker(Window mainWindow, string titel, string erwarteterMarker, TimeSpan timeout)
+    private static void WarteAufKachelPausiertMarker(Window mainWindow, string title, string erwarteterMarker, TimeSpan timeout)
         => WarteAufElementHelpText(
             mainWindow,
-            $"AufgabeKachel:{titel}",
+            $"AufgabeKachel:{title}",
             h => h.Contains(erwarteterMarker, StringComparison.Ordinal),
             timeout,
-            $"Kachel von '{titel}' mit Marker '{erwarteterMarker}'");
+            $"Kachel von '{title}' mit Marker '{erwarteterMarker}'");
 
     /// <summary>
     /// Wartet per Polling, bis der <c>HelpText</c> des benannten Elements das gegebene Prädikat erfüllt
     /// (die Seitenleiste aktualisiert sich über den 5-s-Timer bzw. den Laufdaten-Notifier).
     /// </summary>
-    private static void WarteAufElementHelpText(Window mainWindow, string elementName, Func<string, bool> predikat, TimeSpan timeout, string beschreibung)
+    private static void WarteAufElementHelpText(Window mainWindow, string elementName, Func<string, bool> predikat, TimeSpan timeout, string description)
     {
         var deadline = DateTime.UtcNow + timeout;
         string? lastHelpText = null;
@@ -172,6 +172,6 @@ public partial class End2EndTest
         }
 
         throw new TimeoutException(
-            $"{beschreibung} erfüllte innerhalb von {timeout.TotalSeconds}s nicht das erwartete Prädikat. Zuletzt gesehen: '{lastHelpText}'.");
+            $"{description} erfüllte innerhalb von {timeout.TotalSeconds}s nicht das erwartete Prädikat. Zuletzt gesehen: '{lastHelpText}'.");
     }
 }

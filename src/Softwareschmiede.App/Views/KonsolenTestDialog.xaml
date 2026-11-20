@@ -172,7 +172,7 @@
                                         DisplayMemberBinding="{Binding Offset}"
                                         Width="110" />
                         <GridViewColumn Header="Bytes"
-                                        DisplayMemberBinding="{Binding Laenge}"
+                                        DisplayMemberBinding="{Binding Length}"
                                         Width="60" />
                         <GridViewColumn Header="Quelltext"
                                         DisplayMemberBinding="{Binding Quelltext}" />

@@ -18,16 +18,16 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProtokollService _protokollService;
+    private readonly WorkItemService _workItemService;
+    private readonly LogService _logService;
     private readonly TodoService _todoService;
-    private readonly KiAusfuehrungsService _kiService;
-    private readonly EntwicklungsprozessService _entwicklungsprozessService;
+    private readonly AiExecutionService _aiService;
+    private readonly DevelopmentProcessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
-    private readonly PromptVorlagenService _promptVorlagenService;
-    private readonly PromptVorlagenPlatzhalterService _promptVorlagenPlatzhalterService = new();
-    private readonly PromptZeitVersandService _promptZeitVersandService;
-    private readonly AppEinstellungService _appEinstellungService;
+    private readonly PromptTemplateService _promptVorlagenService;
+    private readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService = new();
+    private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
+    private readonly AppSettingService _appSettingService;
     private readonly FakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 7, 12, 10, 0, 0, TimeSpan.Zero));
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Guid _projektId = Guid.NewGuid();
@@ -36,33 +36,33 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     public TaskDetailViewModelTests_ZeitgesteuerterPrompt()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
-        _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
 
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
-        _promptZeitVersandService = new PromptZeitVersandService(_kiService, _timeProvider, NullLogger<PromptZeitVersandService>.Instance);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, _timeProvider, NullLogger<PromptScheduleDispatchService>.Instance);
 
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
-        _appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        _appSettingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var pluginActivationService = new PluginActivationService(_appEinstellungService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        var pluginActivationService = new PluginActivationService(_appSettingService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
-        _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
+        _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
-        _entwicklungsprozessService = new EntwicklungsprozessService(
-            _aufgabeService,
-            _protokollService,
+        _entwicklungsprozessService = new DevelopmentProcessService(
+            _workItemService,
+            _logService,
             gitPluginMock.Object,
             _pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: _kiService),
-            NullLogger<EntwicklungsprozessService>.Instance);
+            new DevelopmentProcessServiceOptions(AiExecutionService: _aiService),
+            NullLogger<DevelopmentProcessService>.Instance);
 
         _dialogServiceMock = new Mock<IDialogService>();
 
@@ -79,7 +79,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
     }
 
@@ -95,14 +95,14 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         var serviceProviderMock = new Mock<IServiceProvider>();
 
         return new TaskDetailViewModel(
-            _aufgabeService,
-            _protokollService,
-            _kiService,
+            _workItemService,
+            _logService,
+            _aiService,
             _entwicklungsprozessService,
             _pluginSelectionService,
             _promptVorlagenService,
             _promptVorlagenPlatzhalterService,
-            _promptZeitVersandService,
+            _promptScheduleDispatchService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
             serviceProviderMock.Object,
@@ -115,10 +115,10 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
 
     private async Task<WorkItem> ErstelleAufgabe(WorkItemStatus status = WorkItemStatus.New)
     {
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
+        var workItem = await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
         if (status != WorkItemStatus.New)
-            await _aufgabeService.StatusSetzenAsync(workItem.Id, status);
-        return await _aufgabeService.GetByIdAsync(workItem.Id) ?? workItem;
+            await _workItemService.SetStatusUncheckedAsync(workItem.Id, status);
+        return await _workItemService.GetByIdAsync(workItem.Id) ?? workItem;
     }
 
     private static void SetzeIsCliRunning(TaskDetailViewModel sut, bool value)
@@ -151,14 +151,14 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task SchedulePrompt_LeereFelder_KeinScheduling()
     {
-        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
+        var template = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         SetzeIsCliRunning(sut, true);
 
-        sut.SelectedPromptVorlage = vorlage;
+        sut.SelectedPromptVorlage = template;
 
         sut.KannPromptPlanen.Should().BeFalse("beide Zeitfelder sind leer");
         sut.SchedulePromptCommand.CanExecute(null).Should().BeFalse();
@@ -168,7 +168,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task SchedulePrompt_GueltigeZeit_RuftServiceAuf()
     {
-        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
+        var template = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -182,12 +182,12 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         var zielzeit = _timeProvider.GetLocalNow().AddMinutes(2);
         sut.ScheduledPromptTargetHours = zielzeit.Hour;
         sut.ScheduledPromptTargetMinutes = zielzeit.Minute;
-        sut.SelectedPromptVorlage = vorlage;
+        sut.SelectedPromptVorlage = template;
 
         await ((AsyncRelayCommand)sut.SchedulePromptCommand).ExecuteAsync();
 
         sut.ScheduledPromptStatus.Should().Be("Prompt in Wartestellung");
-        _promptZeitVersandService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull(
+        _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull(
             "SchedulePromptAsync des Service muss für die Aufgabe einen Eintrag angelegt haben");
         sut.ScheduledPromptTargetHours.Should().BeNull("die Zeitfelder werden nach dem Planen geleert");
         sut.ScheduledPromptTargetMinutes.Should().BeNull("die Zeitfelder werden nach dem Planen geleert");
@@ -197,7 +197,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task SchedulePrompt_UngueltigeStunde_SetztFehlerMeldung()
     {
-        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
+        var template = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -206,13 +206,13 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
 
         sut.ScheduledPromptTargetHours = 25;
         sut.ScheduledPromptTargetMinutes = 0;
-        sut.SelectedPromptVorlage = vorlage;
+        sut.SelectedPromptVorlage = template;
 
         await ((AsyncRelayCommand)sut.SchedulePromptCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().Be("Ungültige Stunde (0–23)");
         sut.ScheduledPromptStatus.Should().BeNull();
-        _promptZeitVersandService.GetScheduledPromptStatus(workItem.Id).Should().BeNull();
+        _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id).Should().BeNull();
     }
 
     /// <summary>Dispose lässt einen für die Aufgabe geplanten Prompt bestehen — der persistierte Plan überlebt das Verlassen der Detailansicht.</summary>
@@ -224,12 +224,12 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        await _promptZeitVersandService.SchedulePromptAsync(workItem.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(5));
-        _promptZeitVersandService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull();
+        await _promptScheduleDispatchService.SchedulePromptAsync(workItem.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(5));
+        _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull();
 
         sut.Dispose();
 
-        _promptZeitVersandService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull(
+        _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull(
             "Dispose darf den geplanten Prompt für die Aufgabe nicht mehr stornieren");
     }
 
@@ -242,13 +242,13 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        await _promptZeitVersandService.SchedulePromptAsync(workItem.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(5));
-        _promptZeitVersandService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull();
+        await _promptScheduleDispatchService.SchedulePromptAsync(workItem.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(5));
+        _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull();
 
         var method = typeof(TaskDetailViewModel).GetMethod("OnCliProcessStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        method.Invoke(sut, new object[] { workItem.Id, CliProcessStatus.Gestoppt });
+        method.Invoke(sut, new object[] { workItem.Id, CliProcessStatus.Stopped });
 
-        _promptZeitVersandService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull(
+        _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull(
             "ein CLI-Stopp darf den persistierten Plan nicht mehr stornieren");
     }
 
@@ -258,7 +258,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     {
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var zielzeit = _timeProvider.GetUtcNow().AddMinutes(5);
-        await _promptZeitVersandService.SchedulePromptAsync(workItem.Id, "Test", zielzeit);
+        await _promptScheduleDispatchService.SchedulePromptAsync(workItem.Id, "Test", zielzeit);
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -274,8 +274,8 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     {
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         // Vergangene Zielzeit + keine CLI-Session → Sofortversand schlägt fehl → Plan wartet auf Session.
-        await _promptZeitVersandService.SchedulePromptAsync(workItem.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(-1));
-        _promptZeitVersandService.GetScheduledPromptStatus(workItem.Id)!.WartetAufSession.Should().BeTrue();
+        await _promptScheduleDispatchService.SchedulePromptAsync(workItem.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(-1));
+        _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id)!.WaitingForSession.Should().BeTrue();
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -295,11 +295,11 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        await _promptZeitVersandService.SchedulePromptAsync(workItem.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(5));
+        await _promptScheduleDispatchService.SchedulePromptAsync(workItem.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(5));
         sut.ScheduledPromptStatus.Should().Be("Prompt in Wartestellung",
             "das Planen muss die Anzeige über ScheduledPromptChanged setzen");
 
-        await _promptZeitVersandService.CancelScheduledPromptAsync(workItem.Id);
+        await _promptScheduleDispatchService.CancelScheduledPromptAsync(workItem.Id);
         sut.ScheduledPromptStatus.Should().BeNull(
             "ein externes Storno muss die Anzeige über ScheduledPromptChanged leeren");
         sut.ScheduledPromptTimeDisplay.Should().BeNull();
@@ -314,14 +314,14 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        await _promptZeitVersandService.SchedulePromptAsync(workItem.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(5));
+        await _promptScheduleDispatchService.SchedulePromptAsync(workItem.Id, "Test", _timeProvider.GetUtcNow().AddMinutes(5));
         sut.ScheduledPromptStatus.Should().Be("Prompt in Wartestellung");
 
         await ((AsyncRelayCommand)sut.CancelScheduledPromptCommand).ExecuteAsync();
 
         sut.ScheduledPromptStatus.Should().BeNull();
         sut.ScheduledPromptTimeDisplay.Should().BeNull();
-        _promptZeitVersandService.GetScheduledPromptStatus(workItem.Id).Should().BeNull();
+        _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id).Should().BeNull();
     }
 
     /// <summary>KannPromptPlanen hängt auch von IsCliRunning ab; ein Wechsel des CLI-Laufstatus muss daher PropertyChanged für KannPromptPlanen auslösen.</summary>
@@ -346,7 +346,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task SelectedPromptVorlage_Aendert_LoestKannPromptPlanenPropertyChangedAus()
     {
-        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
+        var template = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter", TestContext.Current.CancellationToken);
         var workItem = await ErstelleAufgabe(WorkItemStatus.Started);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -356,7 +356,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         var geaenderteProperties = new List<string>();
         sut.PropertyChanged += (_, e) => geaenderteProperties.Add(e.PropertyName ?? string.Empty);
 
-        sut.SelectedPromptVorlage = vorlage;
+        sut.SelectedPromptVorlage = template;
 
         geaenderteProperties.Should().Contain(nameof(TaskDetailViewModel.KannPromptPlanen));
     }

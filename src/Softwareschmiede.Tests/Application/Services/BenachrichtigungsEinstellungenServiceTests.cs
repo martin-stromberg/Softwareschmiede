@@ -18,26 +18,26 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         return new SoftwareschmiedeDbContext(options);
     }
 
-    /// <summary><summary>SaveAsync_ShouldPersistModesPerUser.</summary>.</summary>
+    /// <summary>SaveAsync_ShouldPersistModesPerUser.</summary>
     [Fact]
     public async Task SaveAsync_ShouldPersistModesPerUser()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
 
-        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(NotificationMode.Disabled, NotificationMode.Sound), TestContext.Current.CancellationToken);
+        await sut.SaveAsync("user-a", new NotificationSettingsDto(NotificationMode.Disabled, NotificationMode.Sound), TestContext.Current.CancellationToken);
 
         var loaded = await sut.GetAsync("user-a", TestContext.Current.CancellationToken);
         loaded.BannerMode.Should().Be(NotificationMode.Disabled);
         loaded.SoundMode.Should().Be(NotificationMode.Sound);
     }
 
-    /// <summary><summary>GetAsync_ShouldReturnDefaults_WhenNoSettingsExist.</summary>.</summary>
+    /// <summary>GetAsync_ShouldReturnDefaults_WhenNoSettingsExist.</summary>
     [Fact]
     public async Task GetAsync_ShouldReturnDefaults_WhenNoSettingsExist()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
 
         var loaded = await sut.GetAsync("unknown-user", TestContext.Current.CancellationToken);
 
@@ -45,15 +45,15 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         loaded.SoundMode.Should().Be(NotificationMode.Disabled);
     }
 
-    /// <summary><summary>SaveAsync_ShouldUpsertExistingUserSettings.</summary>.</summary>
+    /// <summary>SaveAsync_ShouldUpsertExistingUserSettings.</summary>
     [Fact]
     public async Task SaveAsync_ShouldUpsertExistingUserSettings()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
 
-        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(NotificationMode.Disabled, NotificationMode.Sound), TestContext.Current.CancellationToken);
-        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(NotificationMode.Banner, NotificationMode.Disabled), TestContext.Current.CancellationToken);
+        await sut.SaveAsync("user-a", new NotificationSettingsDto(NotificationMode.Disabled, NotificationMode.Sound), TestContext.Current.CancellationToken);
+        await sut.SaveAsync("user-a", new NotificationSettingsDto(NotificationMode.Banner, NotificationMode.Disabled), TestContext.Current.CancellationToken);
 
         db.NotificationSettings.Should().ContainSingle(e => e.UserId == "user-a");
         var loaded = await sut.GetAsync("user-a", TestContext.Current.CancellationToken);
@@ -61,13 +61,13 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         loaded.SoundMode.Should().Be(NotificationMode.Disabled);
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldRejectOversizedFiles.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldRejectOversizedFiles.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldRejectOversizedFiles()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
-        var payload = new byte[BenachrichtigungsEinstellungenService.MaxAudioDateigroesseBytes + 1];
+        var sut = new NotificationSettingsService(db);
+        var payload = new byte[NotificationSettingsService.MaxAudioFileSizeBytes + 1];
 
         var action = () => sut.UploadAudioAsync("user-a", "test.mp3", "audio/mpeg", payload);
 
@@ -75,12 +75,12 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
             .WithMessage("*10 MB*");
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldRejectEmptyPayload.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldRejectEmptyPayload.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldRejectEmptyPayload()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
 
         var action = () => sut.UploadAudioAsync("user-a", "test.mp3", "audio/mpeg", []);
 
@@ -88,12 +88,12 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
             .WithMessage("*leer*");
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldRejectInvalidExtension.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldRejectInvalidExtension.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldRejectInvalidExtension()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
 
         var action = () => sut.UploadAudioAsync("user-a", "test.txt", "audio/mpeg", [0x49, 0x44, 0x33]);
 
@@ -101,12 +101,12 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
             .WithMessage("*Audioformat*");
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldRejectInvalidMimeType.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldRejectInvalidMimeType.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldRejectInvalidMimeType()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
 
         var action = () => sut.UploadAudioAsync("user-a", "test.mp3", "text/plain", [0x49, 0x44, 0x33]);
 
@@ -114,12 +114,12 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
             .WithMessage("*MIME-Typ*");
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldRejectWhenSignatureDoesNotMatchExtension.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldRejectWhenSignatureDoesNotMatchExtension.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldRejectWhenSignatureDoesNotMatchExtension()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
         var wavBytes = new byte[] { 0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45 };
 
         var action = () => sut.UploadAudioAsync("user-a", "test.mp3", "audio/mpeg", wavBytes);
@@ -128,12 +128,12 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
             .WithMessage("*Signatur*");
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldStoreAndResolveAudioPayload.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldStoreAndResolveAudioPayload.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldStoreAndResolveAudioPayload()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
         var mp3Bytes = new byte[] { 0x49, 0x44, 0x33, 0x04, 0x00, 0x00 };
 
         await sut.UploadAudioAsync("user-a", "alert.mp3", "audio/mpeg", mp3Bytes, TestContext.Current.CancellationToken);
@@ -141,47 +141,47 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         var payload = await sut.GetAudioPayloadAsync("user-a", TestContext.Current.CancellationToken);
         payload.Should().NotBeNull();
         payload!.MimeType.Should().Be("audio/mpeg");
-        payload.Base64Inhalt.Should().Be(Convert.ToBase64String(mp3Bytes));
+        payload.Base64Content.Should().Be(Convert.ToBase64String(mp3Bytes));
     }
 
-    /// <summary><summary>UploadAudioAsync_ShouldSanitizeFilenameAndInferMimeType_WhenMimeIsMissing.</summary>.</summary>
+    /// <summary>UploadAudioAsync_ShouldSanitizeFilenameAndInferMimeType_WhenMimeIsMissing.</summary>
     [Fact]
     public async Task UploadAudioAsync_ShouldSanitizeFilenameAndInferMimeType_WhenMimeIsMissing()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
         var wavBytes = new byte[] { 0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45 };
         var veryLongName = $"..\\evil\\{new string('a', 260)}.wav";
 
         await sut.UploadAudioAsync("user-a", veryLongName, null, wavBytes, TestContext.Current.CancellationToken);
 
         var info = await sut.GetAudioInfoAsync("user-a", TestContext.Current.CancellationToken);
-        info.HatBenutzerdefinierteDatei.Should().BeTrue();
-        info.Dateiname.Should().NotContain("\\");
-        info.Dateiname.Should().NotContain("/");
-        info.Dateiname.Should().StartWith("a");
-        info.Dateiname.Should().HaveLength(240);
+        info.HasCustomFile.Should().BeTrue();
+        info.FileName.Should().NotContain("\\");
+        info.FileName.Should().NotContain("/");
+        info.FileName.Should().StartWith("a");
+        info.FileName.Should().HaveLength(240);
         info.MimeType.Should().Be("audio/wav");
     }
 
-    /// <summary><summary>RemoveAudioAsync_ShouldDoNothing_WhenNoAudioExists.</summary>.</summary>
+    /// <summary>RemoveAudioAsync_ShouldDoNothing_WhenNoAudioExists.</summary>
     [Fact]
     public async Task RemoveAudioAsync_ShouldDoNothing_WhenNoAudioExists()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
 
         var act = () => sut.RemoveAudioAsync("missing-user");
 
         await act.Should().NotThrowAsync();
     }
 
-    /// <summary><summary>RemoveAudioAsync_ShouldDeleteStoredAudio.</summary>.</summary>
+    /// <summary>RemoveAudioAsync_ShouldDeleteStoredAudio.</summary>
     [Fact]
     public async Task RemoveAudioAsync_ShouldDeleteStoredAudio()
     {
         await using var db = CreateDb();
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
         var oggBytes = new byte[] { 0x4F, 0x67, 0x67, 0x53, 0x00 };
         await sut.UploadAudioAsync("user-a", "alarm.ogg", "audio/ogg", oggBytes, TestContext.Current.CancellationToken);
 
@@ -189,11 +189,11 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
         var info = await sut.GetAudioInfoAsync("user-a", TestContext.Current.CancellationToken);
         var payload = await sut.GetAudioPayloadAsync("user-a", TestContext.Current.CancellationToken);
-        info.HatBenutzerdefinierteDatei.Should().BeFalse();
+        info.HasCustomFile.Should().BeFalse();
         payload.Should().BeNull();
     }
 
-    /// <summary><summary>GetAudioPayloadAsync_ShouldReturnNull_WhenStoredAudioContentIsEmpty.</summary>.</summary>
+    /// <summary>GetAudioPayloadAsync_ShouldReturnNull_WhenStoredAudioContentIsEmpty.</summary>
     [Fact]
     public async Task GetAudioPayloadAsync_ShouldReturnNull_WhenStoredAudioContentIsEmpty()
     {
@@ -210,7 +210,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         });
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var sut = new BenachrichtigungsEinstellungenService(db);
+        var sut = new NotificationSettingsService(db);
         var payload = await sut.GetAudioPayloadAsync("user-a", TestContext.Current.CancellationToken);
 
         payload.Should().BeNull();

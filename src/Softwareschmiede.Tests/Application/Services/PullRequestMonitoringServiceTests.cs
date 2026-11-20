@@ -38,7 +38,7 @@ public sealed class PullRequestMonitoringServiceTests
         Assert.True(saved.NextCheckUtc > _timeProvider.GetUtcNow());
 
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
-        var due = await provider.GetRequiredService<PullRequestReferenzService>()
+        var due = await provider.GetRequiredService<PullRequestReferenceService>()
             .GetDueForMonitoringAsync(_timeProvider.GetUtcNow(), 10, TestContext.Current.CancellationToken);
         Assert.Contains(due, p => p.Id == pullRequest.Id);
     }
@@ -296,7 +296,7 @@ public sealed class PullRequestMonitoringServiceTests
         using var db = TestDbContextFactory.Create();
         var (_, workItem) = AddAufgabe(db);
         var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
-        var service = new PullRequestReferenzService(db, _timeProvider, NullLogger<PullRequestReferenzService>.Instance);
+        var service = new PullRequestReferenceService(db, _timeProvider, NullLogger<PullRequestReferenceService>.Instance);
 
         var due = await service.GetDueForMonitoringAsync(_timeProvider.GetUtcNow(), 10, TestContext.Current.CancellationToken);
 
@@ -320,7 +320,7 @@ public sealed class PullRequestMonitoringServiceTests
             ]);
         using var provider = BuildProvider(db, plugin.Object);
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshWorkItemAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestStatus.Merged, saved.Status);
@@ -352,7 +352,7 @@ public sealed class PullRequestMonitoringServiceTests
                 ["Softwareschmiede.GitHub.AutoCompletePullRequests"] = "true"
             });
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshWorkItemAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestStatus.Open, saved.Status);
@@ -383,9 +383,9 @@ public sealed class PullRequestMonitoringServiceTests
         services.AddSingleton(pluginManager.Object);
         services.AddSingleton(credentials.Object);
         services.AddSingleton(new PluginSettingsService(credentials.Object, NullLogger<PluginSettingsService>.Instance));
-        services.AddSingleton<Microsoft.Extensions.Logging.ILogger<PullRequestReferenzService>>(NullLogger<PullRequestReferenzService>.Instance);
-        services.AddScoped<PullRequestReferenzService>();
-        services.AddScoped<ProtokollService>(_ => new ProtokollService(db, NullLogger<ProtokollService>.Instance));
+        services.AddSingleton<Microsoft.Extensions.Logging.ILogger<PullRequestReferenceService>>(NullLogger<PullRequestReferenceService>.Instance);
+        services.AddScoped<PullRequestReferenceService>();
+        services.AddScoped<LogService>(_ => new LogService(db, NullLogger<LogService>.Instance));
         services.AddSingleton<Microsoft.Extensions.Logging.ILogger<PullRequestMonitoringService>>(NullLogger<PullRequestMonitoringService>.Instance);
         services.AddSingleton<PullRequestMonitoringService>();
         return services.BuildServiceProvider();

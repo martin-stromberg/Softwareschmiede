@@ -9,38 +9,38 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Orchestriert Git-Operationen für Aufgaben.</summary>
 public sealed class GitOrchestrationService
 {
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProjektService _projektService;
-    private readonly ProtokollService _protokollService;
+    private readonly WorkItemService _workItemService;
+    private readonly ProjectService _projektService;
+    private readonly LogService _logService;
     private readonly IGitPlugin _gitPlugin;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly ILogger<GitOrchestrationService> _logger;
     private readonly IGitWorkspaceBrowserService? _gitWorkspaceBrowserService;
-    private readonly PullRequestReferenzService? _pullRequestReferenzService;
+    private readonly PullRequestReferenceService? _pullRequestReferenceService;
 
     /// <inheritdoc cref="GitOrchestrationService"/>
     public GitOrchestrationService(
-        AufgabeService aufgabeService,
-        ProjektService projektService,
-        ProtokollService protokollService,
+        WorkItemService workItemService,
+        ProjectService projektService,
+        LogService logService,
         IGitPlugin gitPlugin,
         PluginSelectionService pluginSelectionService,
         ILogger<GitOrchestrationService> logger,
         IGitWorkspaceBrowserService? gitWorkspaceBrowserService = null,
-        PullRequestReferenzService? pullRequestReferenzService = null)
+        PullRequestReferenceService? pullRequestReferenceService = null)
     {
-        _aufgabeService = aufgabeService;
+        _workItemService = workItemService;
         _projektService = projektService;
-        _protokollService = protokollService;
+        _logService = logService;
         _gitPlugin = gitPlugin;
         _pluginSelectionService = pluginSelectionService;
         _logger = logger;
         _gitWorkspaceBrowserService = gitWorkspaceBrowserService;
-        _pullRequestReferenzService = pullRequestReferenzService;
+        _pullRequestReferenceService = pullRequestReferenceService;
     }
 
     /// <summary>Ruft Issues aus einem Repository ab.</summary>
-    public async Task<IEnumerable<Issue>> IssuesAbrufenAsync(string repositoryId, CancellationToken ct = default)
+    public async Task<IEnumerable<Issue>> FetchIssuesAsync(string repositoryId, CancellationToken ct = default)
     {
         _logger.LogInformation("Issues für Repository '{RepositoryId}' abrufen.", repositoryId);
         return await _gitPlugin.GetIssuesAsync(repositoryId, ct);
@@ -51,7 +51,7 @@ public sealed class GitOrchestrationService
     {
         _logger.LogInformation("Commit für Aufgabe {AufgabeId} durchführen.", workItemId);
 
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         if (string.IsNullOrEmpty(workItem.LocalClonePath))
@@ -60,7 +60,7 @@ public sealed class GitOrchestrationService
         var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
         await gitPlugin.CommitAsync(workItem.LocalClonePath, message, ct);
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
             $"Commit: {message}",
@@ -74,7 +74,7 @@ public sealed class GitOrchestrationService
     {
         _logger.LogInformation("Reset ({ResetType}) für Aufgabe {AufgabeId} durchführen.", resetType, workItemId);
 
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         if (string.IsNullOrEmpty(workItem.LocalClonePath))
@@ -83,11 +83,11 @@ public sealed class GitOrchestrationService
         var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
         await gitPlugin.ResetAsync(workItem.LocalClonePath, resetType, targetRef, ct);
 
-        var ziel = targetRef ?? "HEAD";
-        await _protokollService.AddEintragAsync(
+        var target = targetRef ?? "HEAD";
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
-            $"Reset ({resetType}) auf {ziel}",
+            $"Reset ({resetType}) auf {target}",
             ct: ct);
 
         _logger.LogInformation("Reset ({ResetType}) für Aufgabe {AufgabeId} durchgeführt.", resetType, workItemId);
@@ -98,7 +98,7 @@ public sealed class GitOrchestrationService
     {
         _logger.LogInformation("Push für Aufgabe {AufgabeId} durchführen.", workItemId);
 
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         if (string.IsNullOrEmpty(workItem.LocalClonePath))
@@ -110,7 +110,7 @@ public sealed class GitOrchestrationService
         var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
         await gitPlugin.PushBranchAsync(workItem.LocalClonePath, workItem.BranchName, ct);
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
             $"Push: Branch '{workItem.BranchName}' gepusht.",
@@ -124,7 +124,7 @@ public sealed class GitOrchestrationService
     {
         _logger.LogInformation("Pull für Aufgabe {AufgabeId} durchführen.", workItemId);
 
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         if (string.IsNullOrEmpty(workItem.LocalClonePath))
@@ -137,7 +137,7 @@ public sealed class GitOrchestrationService
             ? "Pull: Kein Merge durchgeführt. Arbeitsverzeichnis wurde per Dateisynchronisation aktualisiert."
             : "Pull: Änderungen vom Remote geholt.";
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
             pullLogText,
@@ -151,7 +151,7 @@ public sealed class GitOrchestrationService
     {
         _logger.LogInformation("Merge (Workspace -> Source) für Aufgabe {AufgabeId} durchführen.", workItemId);
 
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         if (string.IsNullOrEmpty(workItem.LocalClonePath))
@@ -160,7 +160,7 @@ public sealed class GitOrchestrationService
         var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
         await gitPlugin.MergeToSourceAsync(workItem.LocalClonePath, ct);
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
             "Merge: Änderungen aus dem Arbeitsverzeichnis ins Quellverzeichnis übernommen.",
@@ -172,7 +172,7 @@ public sealed class GitOrchestrationService
     /// <summary>Liefert die vom Plugin bereitgestellten Git-Aktions-Capabilities für die Aufgabe.</summary>
     public async Task<GitActionCapabilities> GetGitActionCapabilitiesAsync(Guid workItemId, CancellationToken ct = default)
     {
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
@@ -180,7 +180,7 @@ public sealed class GitOrchestrationService
     }
 
     /// <summary>Erstellt einen Pull Request und protokolliert die Aktion.</summary>
-    public async Task<PullRequest> PullRequestErstellenAsync(
+    public async Task<PullRequest> CreatePullRequestAsync(
         Guid workItemId,
         string? title = null,
         string? body = null,
@@ -188,7 +188,7 @@ public sealed class GitOrchestrationService
     {
         _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellen.", workItemId);
 
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         if (string.IsNullOrEmpty(workItem.BranchName))
@@ -198,7 +198,7 @@ public sealed class GitOrchestrationService
         var repositoryId = await ResolveRepositoryIdAsync(workItem, ct);
 
         var prTitle = title ?? workItem.Title;
-        var issueNummer = workItem.IssueReference?.IssueNumber;
+        var issueNumber = workItem.IssueReference?.IssueNumber;
 
         if (string.IsNullOrEmpty(workItem.LocalClonePath))
             throw new InvalidOperationException($"Aufgabe {workItemId} hat keinen lokalen Klonpfad.");
@@ -209,25 +209,25 @@ public sealed class GitOrchestrationService
         await gitPlugin.PushBranchAsync(workItem.LocalClonePath, workItem.BranchName, ct);
         var pullRequest = await gitPlugin.CreatePullRequestAsync(repositoryId, workItem.BranchName, baseBranch, prTitle, prBody, ct);
 
-        if (_pullRequestReferenzService is not null)
+        if (_pullRequestReferenceService is not null)
         {
-            await _pullRequestReferenzService.SaveCreatedAsync(workItemId, repositoryId, pullRequest, ct);
+            await _pullRequestReferenceService.SaveCreatedAsync(workItemId, repositoryId, pullRequest, ct);
         }
 
-        var issueLogSuffix = issueNummer is > 0
-            ? $" (Issue #{issueNummer.Value}, Auto-Close aktiv)"
+        var issueLogSuffix = issueNumber is > 0
+            ? $" (Issue #{issueNumber.Value}, Auto-Close aktiv)"
             : string.Empty;
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
             $"Push: Branch '{workItem.BranchName}' vor Pull-Request-Erstellung gepusht.",
             ct: ct);
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
-            $"Pull Request erstellt: #{pullRequest.Nummer} – {pullRequest.Title} ({pullRequest.Url}){issueLogSuffix}",
+            $"Pull Request erstellt: #{pullRequest.Number} – {pullRequest.Title} ({pullRequest.Url}){issueLogSuffix}",
             ct: ct);
 
         _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellt.", workItemId);
@@ -304,18 +304,18 @@ public sealed class GitOrchestrationService
         var project = await _projektService.GetDetailAsync(workItem.ProjectId, ct)
             ?? throw new InvalidOperationException($"Projekt {workItem.ProjectId} nicht gefunden.");
 
-        var aktiveRepositories = project.Repositories
+        var activeRepositories = project.Repositories
             .Where(repository => repository.Active)
             .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(repository => repository.Id)
             .ToList();
 
-        if (aktiveRepositories.Count == 1)
+        if (activeRepositories.Count == 1)
         {
-            return ExtractRepositoryIdFromUrl(aktiveRepositories[0].RepositoryUrl);
+            return ExtractRepositoryIdFromUrl(activeRepositories[0].RepositoryUrl);
         }
 
-        if (aktiveRepositories.Count == 0)
+        if (activeRepositories.Count == 0)
         {
             throw new InvalidOperationException(
                 $"Aufgabe {workItem.Id} kann keinen Pull Request erstellen, weil im Projekt '{project.Name}' kein aktives Repository vorhanden ist.");
@@ -349,23 +349,23 @@ public sealed class GitOrchestrationService
         var project = await _projektService.GetDetailAsync(workItem.ProjectId, ct)
             ?? throw new InvalidOperationException($"Projekt {workItem.ProjectId} nicht gefunden.");
 
-        var aktiveRepositories = project.Repositories
+        var activeRepositories = project.Repositories
             .Where(repository => repository.Active)
             .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(repository => repository.Id)
             .ToList();
 
-        if (aktiveRepositories.Count == 1 && !string.IsNullOrWhiteSpace(aktiveRepositories[0].PluginType))
+        if (activeRepositories.Count == 1 && !string.IsNullOrWhiteSpace(activeRepositories[0].PluginType))
         {
-            return aktiveRepositories[0].PluginType.Trim();
+            return activeRepositories[0].PluginType.Trim();
         }
 
-        if (aktiveRepositories.Count > 1)
+        if (activeRepositories.Count > 1)
         {
             _logger.LogWarning(
                 "Aufgabe {AufgabeId}: Mehrdeutige Plugin-Auflösung ({RepositoryCount} aktive Repositories). Es wird der konfigurierte Standard genutzt.",
                 workItem.Id,
-                aktiveRepositories.Count);
+                activeRepositories.Count);
         }
 
         return null;
@@ -382,21 +382,21 @@ public sealed class GitOrchestrationService
         var project = await _projektService.GetDetailAsync(workItem.ProjectId, ct)
             ?? throw new InvalidOperationException($"Projekt {workItem.ProjectId} nicht gefunden.");
 
-        var aktiveRepositories = project.Repositories
+        var activeRepositories = project.Repositories
             .Where(repository => repository.Active)
             .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(repository => repository.Id)
             .ToList();
 
-        if (aktiveRepositories.Count > 1)
+        if (activeRepositories.Count > 1)
         {
             _logger.LogWarning(
                 "Aufgabe {AufgabeId}: Mehrdeutige Basis-Branch-Auflösung ({RepositoryCount} aktive Repositories). Es wird kein Basis-Branch aufgelöst.",
                 workItem.Id,
-                aktiveRepositories.Count);
+                activeRepositories.Count);
         }
 
-        return aktiveRepositories.Count == 1 ? aktiveRepositories[0].DefaultSourceBranchName : null;
+        return activeRepositories.Count == 1 ? activeRepositories[0].DefaultSourceBranchName : null;
     }
 
     /// <summary>Extrahiert die Repository-ID (owner/repo) aus einer Repository-URL.</summary>

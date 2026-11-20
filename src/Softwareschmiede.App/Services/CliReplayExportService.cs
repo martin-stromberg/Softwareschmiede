@@ -9,10 +9,10 @@ public interface ICliReplayExportService
 {
     /// <summary>Schreibt die aufgezeichnete CLI-Ausgabe einer Aufgabe in die angegebene .clireplay-Datei.</summary>
     /// <param name="workItemId">ID der Aufgabe.</param>
-    /// <param name="zielPfad">Der Ziel-Dateipfad.</param>
+    /// <param name="targetPath">Der Ziel-Dateipfad.</param>
     /// <param name="ct">Abbruch-Token.</param>
     /// <exception cref="InvalidOperationException">Es liegt keine Aufzeichnung für die Aufgabe vor.</exception>
-    Task ExportCliReplayAsync(Guid workItemId, string zielPfad, CancellationToken ct = default);
+    Task ExportCliReplayAsync(Guid workItemId, string targetPath, CancellationToken ct = default);
 
     /// <summary>Prüft, ob für die Aufgabe ein Mitschnitt vorliegt (Vorab-Prüfung vor dem Speicherdialog).</summary>
     /// <param name="workItemId">ID der Aufgabe.</param>
@@ -20,17 +20,17 @@ public interface ICliReplayExportService
     bool HatAufzeichnung(Guid workItemId);
 }
 
-/// <summary>Implementierung des CLI-Replay-Exports über den im <see cref="KiAusfuehrungsService"/> gehaltenen Mitschnitt.</summary>
+/// <summary>Implementierung des CLI-Replay-Exports über den im <see cref="AiExecutionService"/> gehaltenen Mitschnitt.</summary>
 public sealed class CliReplayExportService : ICliReplayExportService
 {
-    private readonly KiAusfuehrungsService _kiAusfuehrungsService;
-    private readonly CliReplayAufzeichnungStore _store;
+    private readonly AiExecutionService _kiAusfuehrungsService;
+    private readonly CliReplayRecordingStore _store;
     private readonly ILogger<CliReplayExportService> _logger;
 
     /// <inheritdoc cref="CliReplayExportService"/>
     public CliReplayExportService(
-        KiAusfuehrungsService kiAusfuehrungsService,
-        CliReplayAufzeichnungStore store,
+        AiExecutionService kiAusfuehrungsService,
+        CliReplayRecordingStore store,
         ILogger<CliReplayExportService> logger)
     {
         _kiAusfuehrungsService = kiAusfuehrungsService;
@@ -39,20 +39,20 @@ public sealed class CliReplayExportService : ICliReplayExportService
     }
 
     /// <inheritdoc/>
-    public async Task ExportCliReplayAsync(Guid workItemId, string zielPfad, CancellationToken ct = default)
+    public async Task ExportCliReplayAsync(Guid workItemId, string targetPath, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(zielPfad);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
 
-        var aufzeichnung = _kiAusfuehrungsService.GetCliAufzeichnung(workItemId)
+        var recording = _kiAusfuehrungsService.GetCliRecording(workItemId)
             ?? throw new InvalidOperationException("Für diese Aufgabe liegt keine Aufzeichnung vor.");
 
         _logger.LogDebug(
             "Exportiere CLI-Aufzeichnung von Aufgabe {AufgabeId} ({ChunkCount} Chunks) nach {ZielPfad}.",
-            workItemId, aufzeichnung.Chunks.Count, zielPfad);
-        await _store.SpeichernAsync(zielPfad, aufzeichnung, ct);
+            workItemId, recording.Chunks.Count, targetPath);
+        await _store.SaveAsync(targetPath, recording, ct);
     }
 
     /// <inheritdoc/>
     public bool HatAufzeichnung(Guid workItemId)
-        => _kiAusfuehrungsService.GetCliAufzeichnung(workItemId) is not null;
+        => _kiAusfuehrungsService.GetCliRecording(workItemId) is not null;
 }

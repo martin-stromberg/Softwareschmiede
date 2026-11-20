@@ -10,10 +10,10 @@ namespace Softwareschmiede.App.ViewModels;
 public static class UpdatePfadTexte
 {
     /// <summary>Pfad-Label: ausschließlich stabile Produktivversionen.</summary>
-    public const string Produktivversionen = UpdatePfadKanalResolver.ProduktivversionenPfad;
+    public const string Produktivversionen = UpdatePathChannelResolver.StableVersionsPath;
 
     /// <summary>Pfad-Label: ausschließlich Vorabversionen (Release-Kandidaten).</summary>
-    public const string Vorabversionen = UpdatePfadKanalResolver.VorabversionenPfad;
+    public const string Vorabversionen = UpdatePathChannelResolver.PrereleaseVersionsPath;
 
     /// <summary>Kanal-Anzeigetext für den aus dem Pfad <see cref="Produktivversionen"/> resultierenden Kanal.</summary>
     public const string KanalProduktiv = "Produktiv (nur stabile Versionen)";
@@ -33,14 +33,14 @@ public sealed record UpdatePfadOption(string Path, string Label)
     /// <summary>Alle wählbaren Update-Pfade in Anzeigereihenfolge.</summary>
     public static IReadOnlyList<UpdatePfadOption> All { get; } =
     [
-        new(UpdatePfadKanalResolver.ProduktivversionenPfad, UpdatePfadTexte.Produktivversionen),
-        new(UpdatePfadKanalResolver.VorabversionenPfad, UpdatePfadTexte.Vorabversionen)
+        new(UpdatePathChannelResolver.StableVersionsPath, UpdatePfadTexte.Produktivversionen),
+        new(UpdatePathChannelResolver.PrereleaseVersionsPath, UpdatePfadTexte.Vorabversionen)
     ];
 
     /// <summary>Liefert die Auswahloption zu einem gespeicherten Pfad; unbekannte oder leere Werte fallen auf die Produktiv-Option zurück.</summary>
     public static UpdatePfadOption FuerPfad(string? path)
     {
-        var normalisiert = UpdatePfadKanalResolver.NormalisierePfad(path);
+        var normalisiert = UpdatePathChannelResolver.NormalizePath(path);
         return All.First(o => o.Path == normalisiert);
     }
 

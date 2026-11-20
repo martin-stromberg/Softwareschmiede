@@ -21,10 +21,10 @@ public static class AufgabenListenAnsicht
     /// Ende erscheint; <c>Titel</c> und <c>Id</c> dienen als stabile Tie-Breaker bei
     /// Zeitstempel-Gleichstand (identisch zur Datenquelle <c>GetAktiveAufgabenAsync</c>).
     /// </summary>
-    /// <param name="modus">Der anzuzeigende Modus.</param>
+    /// <param name="mode">Der anzuzeigende Modus.</param>
     /// <returns>Die anzuwendenden Sortierdeskriptoren.</returns>
-    public static IReadOnlyList<SortDescription> ErstelleSortierDeskriptoren(AufgabenListenModus modus)
-        => modus switch
+    public static IReadOnlyList<SortDescription> ErstelleSortierDeskriptoren(AufgabenListenModus mode)
+        => mode switch
         {
             AufgabenListenModus.Repository =>
             [
@@ -54,10 +54,10 @@ public static class AufgabenListenAnsicht
     /// Erzeugt den Gruppierungsdeskriptor für den gegebenen Modus oder <c>null</c> im Modus
     /// <see cref="AufgabenListenModus.Datum"/> (flache Liste ohne Gruppierung).
     /// </summary>
-    /// <param name="modus">Der anzuzeigende Modus.</param>
+    /// <param name="mode">Der anzuzeigende Modus.</param>
     /// <returns>Der Gruppierungsdeskriptor oder <c>null</c>.</returns>
-    public static PropertyGroupDescription? ErstelleGruppenDeskriptor(AufgabenListenModus modus)
-        => modus switch
+    public static PropertyGroupDescription? ErstelleGruppenDeskriptor(AufgabenListenModus mode)
+        => mode switch
         {
             AufgabenListenModus.Repository => new PropertyGroupDescription(nameof(AktiveAufgabePanelItem.RepositoryGruppenName)),
             AufgabenListenModus.Ki => new PropertyGroupDescription(nameof(AktiveAufgabePanelItem.KiGruppenName)),
@@ -66,21 +66,21 @@ public static class AufgabenListenAnsicht
 
     /// <summary>Wendet die zum Modus gehörigen Sort- und Gruppierungsdeskriptoren auf die View an.</summary>
     /// <param name="view">Die zu konfigurierende Collection-View.</param>
-    /// <param name="modus">Der anzuzeigende Modus.</param>
-    public static void Konfiguriere(ListCollectionView view, AufgabenListenModus modus)
+    /// <param name="mode">Der anzuzeigende Modus.</param>
+    public static void Konfiguriere(ListCollectionView view, AufgabenListenModus mode)
     {
         view.GroupDescriptions.Clear();
         view.SortDescriptions.Clear();
 
-        var gruppenDeskriptor = ErstelleGruppenDeskriptor(modus);
+        var gruppenDeskriptor = ErstelleGruppenDeskriptor(mode);
         if (gruppenDeskriptor is not null)
         {
             view.GroupDescriptions.Add(gruppenDeskriptor);
         }
 
-        foreach (var sortierung in ErstelleSortierDeskriptoren(modus))
+        foreach (var sortOrder in ErstelleSortierDeskriptoren(mode))
         {
-            view.SortDescriptions.Add(sortierung);
+            view.SortDescriptions.Add(sortOrder);
         }
     }
 }

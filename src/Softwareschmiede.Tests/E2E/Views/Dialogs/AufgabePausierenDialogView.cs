@@ -38,20 +38,20 @@ public sealed class AufgabePausierenDialogView : DialogView
     /// Trägt Datum, Stunde und Minute des angegebenen lokalen Zielzeitpunkts ein. Das Datum wird in das
     /// DatePicker-Textfeld getippt (lokales Kurzdatumsformat) und per Tab-Taste committed.
     /// </summary>
-    /// <param name="ziel">Der lokale Zielzeitpunkt (Datum + Uhrzeit).</param>
+    /// <param name="target">Der lokale Zielzeitpunkt (Datum + Uhrzeit).</param>
     /// <returns>Diese Instanz.</returns>
-    public AufgabePausierenDialogView SetzeZeitpunkt(DateTime ziel)
+    public AufgabePausierenDialogView SetzeZeitpunkt(DateTime target)
     {
         var dialog = GetDialogWindow();
 
         var datumPicker = WaitForElement(dialog, cf => cf.ByName("PausierenDatum"), Short);
         datumPicker.Click();
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
-        Keyboard.Type(ziel.ToString("d", CultureInfo.CurrentCulture));
+        Keyboard.Type(target.ToString("d", CultureInfo.CurrentCulture));
         Keyboard.Press(VirtualKeyShort.TAB);
 
-        SetTextBoxValue(dialog, "PausierenStunde", ziel.Hour.ToString("00", CultureInfo.InvariantCulture));
-        SetTextBoxValue(dialog, "PausierenMinute", ziel.Minute.ToString("00", CultureInfo.InvariantCulture));
+        SetTextBoxValue(dialog, "PausierenStunde", target.Hour.ToString("00", CultureInfo.InvariantCulture));
+        SetTextBoxValue(dialog, "PausierenMinute", target.Minute.ToString("00", CultureInfo.InvariantCulture));
 
         return this;
     }
@@ -73,7 +73,7 @@ public sealed class AufgabePausierenDialogView : DialogView
 
     /// <summary>Bestätigt den Dialog über „Übernehmen" und wartet, bis das Dialogfenster geschlossen ist.</summary>
     /// <returns>Die danach sichtbare Aufgabendetailansicht.</returns>
-    public TaskDetailView Bestaetigen()
+    public TaskDetailView Confirm()
     {
         WaitForElement(GetDialogWindow(), cf => cf.ByName("PausierenBestaetigen"), Short).AsButton().Click();
         ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
@@ -91,7 +91,7 @@ public sealed class AufgabePausierenDialogView : DialogView
 
     /// <summary>Bricht den Dialog über „Abbrechen" ab und wartet, bis das Dialogfenster geschlossen ist.</summary>
     /// <returns>Die danach sichtbare Aufgabendetailansicht.</returns>
-    public TaskDetailView Abbrechen()
+    public TaskDetailView Cancel()
     {
         WaitForElement(GetDialogWindow(), cf => cf.ByName("PausierenAbbrechen"), Short).AsButton().Click();
         ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);

@@ -6,7 +6,7 @@ using Softwareschmiede.IntegrationTests.Infrastructure;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>Integrationstests für <see cref="ProjektService"/> mit echter SQLite-Datenbank.</summary>
+/// <summary>Integrationstests für <see cref="ProjectService"/> mit echter SQLite-Datenbank.</summary>
 public sealed class ProjektServiceTests
 {
     /// <summary>
@@ -18,7 +18,7 @@ public sealed class ProjektServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var service = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
 
         // Act
         var created = await service.CreateAsync("Testprojekt Alpha", "Beschreibung des Testprojekts", TestContext.Current.CancellationToken);
@@ -41,7 +41,7 @@ public sealed class ProjektServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var service = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
 
         await service.CreateAsync("Zebra Projekt", null, TestContext.Current.CancellationToken);
         await service.CreateAsync("Alpha Projekt", null, TestContext.Current.CancellationToken);
@@ -65,7 +65,7 @@ public sealed class ProjektServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var service = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
 
         var project = await service.CreateAsync("Projekt mit Repos", null, TestContext.Current.CancellationToken);
         await service.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/repo", "test-repo", ct: TestContext.Current.CancellationToken);
@@ -88,11 +88,11 @@ public sealed class ProjektServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var service = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
         var project = await service.CreateAsync("Zu archivierendes Projekt", null, TestContext.Current.CancellationToken);
 
         // Act
-        await service.ArchivierenAsync(project.Id, TestContext.Current.CancellationToken);
+        await service.ArchiveAsync(project.Id, TestContext.Current.CancellationToken);
 
         // Assert – Persistenz via neuem Context prüfen
         await using var db2 = db.CreateNewContext();
@@ -109,12 +109,12 @@ public sealed class ProjektServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var projektService = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         var project = await projektService.CreateAsync("Zu löschendes Projekt", null, TestContext.Current.CancellationToken);
-        await aufgabeService.CreateAsync(project.Id, "Aufgabe 1", null, ct: TestContext.Current.CancellationToken);
-        await aufgabeService.CreateAsync(project.Id, "Aufgabe 2", null, ct: TestContext.Current.CancellationToken);
+        await workItemService.CreateAsync(project.Id, "Aufgabe 1", null, ct: TestContext.Current.CancellationToken);
+        await workItemService.CreateAsync(project.Id, "Aufgabe 2", null, ct: TestContext.Current.CancellationToken);
 
         // Act
         await projektService.DeleteAsync(project.Id, TestContext.Current.CancellationToken);
@@ -136,7 +136,7 @@ public sealed class ProjektServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var service = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
         var project = await service.CreateAsync("Projekt mit Repository", null, TestContext.Current.CancellationToken);
 
         // Act
@@ -162,7 +162,7 @@ public sealed class ProjektServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var service = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
         var project = await service.CreateAsync("Projekt mit lokalem Verzeichnis", null, TestContext.Current.CancellationToken);
         var sourceDirectory = @"C:\repos\integration-local";
 
@@ -190,7 +190,7 @@ public sealed class ProjektServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var service = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
         var project = await service.CreateAsync("Ursprünglicher Name", "Alt", TestContext.Current.CancellationToken);
 
         // Act
@@ -212,7 +212,7 @@ public sealed class ProjektServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var service = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
 
         // Act
         var result = await service.GetByIdAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
@@ -229,7 +229,7 @@ public sealed class ProjektServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var service = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
         var project = await service.CreateAsync("Projekt", null, TestContext.Current.CancellationToken);
         var repo = await service.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/x/y", "y", ct: TestContext.Current.CancellationToken);
 

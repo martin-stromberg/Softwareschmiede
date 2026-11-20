@@ -19,28 +19,28 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     protected readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
 
     /// <summary>_aufgabeService.</summary>
-    protected readonly AufgabeService _aufgabeService;
+    protected readonly WorkItemService _workItemService;
 
     /// <summary>_protokollService.</summary>
-    protected readonly ProtokollService _protokollService;
+    protected readonly LogService _logService;
 
     /// <summary>_todoService.</summary>
     protected readonly TodoService _todoService;
 
     /// <summary>_kiService.</summary>
-    protected readonly KiAusfuehrungsService _kiService;
+    protected readonly AiExecutionService _aiService;
 
     /// <summary>_promptVorlagenService.</summary>
-    protected readonly PromptVorlagenService _promptVorlagenService;
+    protected readonly PromptTemplateService _promptVorlagenService;
 
     /// <summary>_promptVorlagenPlatzhalterService.</summary>
-    protected readonly PromptVorlagenPlatzhalterService _promptVorlagenPlatzhalterService = new();
+    protected readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService = new();
 
     /// <summary>_promptZeitVersandService.</summary>
-    protected readonly PromptZeitVersandService _promptZeitVersandService;
+    protected readonly PromptScheduleDispatchService _promptScheduleDispatchService;
 
     /// <summary>_einstellungService.</summary>
-    protected readonly AppEinstellungService _einstellungService;
+    protected readonly AppSettingService _settingService;
 
     /// <summary>_dialogServiceMock.</summary>
     protected readonly Mock<IDialogService> _dialogServiceMock;
@@ -55,13 +55,13 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     protected TaskDetailViewModelTestsBase()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
-        _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
-        _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
-        _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
-        _einstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        _aiService = TestKiAusfuehrungsServiceFactory.Create();
+        _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
         _dialogServiceMock = new Mock<IDialogService>();
 
         _db.Projects.Add(new Project
@@ -77,7 +77,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
         _tempDirectoryFixture.Dispose();
     }
@@ -114,35 +114,35 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         pluginManagerMock.Setup(p => p.GetIdePlugins()).Returns(effectiveIdePlugins);
         pluginManagerMock.Setup(p => p.GetDefaultIdePlugin()).Returns(effectiveIdePlugins[0]);
 
-        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        var appSettingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var pluginActivationService = new PluginActivationService(appEinstellungService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
-        var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance, appEinstellungService);
+        var pluginActivationService = new PluginActivationService(appSettingService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance, appSettingService);
 
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
-        var entwicklungsprozessService = new EntwicklungsprozessService(
-            _aufgabeService,
-            _protokollService,
+        var entwicklungsprozessService = new DevelopmentProcessService(
+            _workItemService,
+            _logService,
             gitPluginMock.Object,
             pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: _kiService),
-            NullLogger<EntwicklungsprozessService>.Instance);
+            new DevelopmentProcessServiceOptions(AiExecutionService: _aiService),
+            NullLogger<DevelopmentProcessService>.Instance);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
         var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
 
         return new TaskDetailViewModel(
-            _aufgabeService,
-            _protokollService,
-            _kiService,
+            _workItemService,
+            _logService,
+            _aiService,
             entwicklungsprozessService,
             pluginSelectionService,
             _promptVorlagenService,
             _promptVorlagenPlatzhalterService,
-            _promptZeitVersandService,
+            _promptScheduleDispatchService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
             serviceProviderObj,
@@ -182,7 +182,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
 
         await _db.SaveChangesAsync();
 
-        return await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung", repository.Id);
+        return await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung", repository.Id);
     }
 
     /// <summary>Erstellt einen Test-IdeEntryPoint mit gesetztem DisplayName.</summary>

@@ -4,10 +4,10 @@ namespace Softwareschmiede.Domain.ValueObjects;
 
 /// <summary>Gesamtergebnis eines Testlaufs.</summary>
 /// <param name="Passed">Gibt an, ob alle Tests bestanden wurden.</param>
-/// <param name="Ergebnisse">Liste der einzelnen Testergebnisse.</param>
+/// <param name="Results">Liste der einzelnen Testergebnisse.</param>
 public sealed record TestRunResult(
     bool Passed,
-    IReadOnlyList<TestErgebnisInfo> Ergebnisse
+    IReadOnlyList<TestErgebnisInfo> Results
 );
 
 /// <summary>Ergebnis eines einzelnen Tests.</summary>
