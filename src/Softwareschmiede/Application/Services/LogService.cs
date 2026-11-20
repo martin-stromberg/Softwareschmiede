@@ -22,7 +22,7 @@ public sealed class LogService
     }
 
     /// <summary>Gibt alle Protokolleinträge einer Aufgabe chronologisch sortiert zurück (inkl. TestErgebnisse).</summary>
-    public async Task<IReadOnlyList<LogEntry>> GetByAufgabeAsync(Guid workItemId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<LogEntry>> GetByWorkItemAsync(Guid workItemId, CancellationToken ct = default)
     {
         _logger.LogInformation("Protokolleinträge für Aufgabe {AufgabeId} abrufen.", workItemId);
         return await _db.LogEntries
@@ -37,7 +37,7 @@ public sealed class LogService
     public async Task<LogEntry> AddEntryAsync(
         Guid workItemId,
         LogEntryType typ,
-        string inhalt,
+        string content,
         string? agentName = null,
         CancellationToken ct = default)
     {
@@ -48,7 +48,7 @@ public sealed class LogService
             Id = Guid.NewGuid(),
             WorkItemId = workItemId,
             Type = typ,
-            Content = inhalt,
+            Content = content,
             AgentName = agentName,
             Timestamp = DateTimeOffset.UtcNow
         };
@@ -101,21 +101,21 @@ public sealed class LogService
     }
 
     /// <summary>Erstellt einen Protokolleintrag für einen Statusübergang.</summary>
-    public async Task<LogEntry> AddStatusUebergangAsync(
+    public async Task<LogEntry> AddStatusTransitionAsync(
         Guid workItemId,
-        WorkItemStatus vonStatus,
+        WorkItemStatus fromStatus,
         WorkItemStatus nachStatus,
         CancellationToken ct = default)
     {
         _logger.LogInformation(
             "Statusübergang für Aufgabe {AufgabeId}: {VonStatus} → {NachStatus}.",
             workItemId,
-            vonStatus,
+            fromStatus,
             nachStatus);
 
-        var inhalt = $"Status geändert: {vonStatus.ToDisplayText()} → {nachStatus.ToDisplayText()}";
+        var content = $"Status geändert: {fromStatus.ToDisplayText()} → {nachStatus.ToDisplayText()}";
 
-        return await AddEntryAsync(workItemId, LogEntryType.StatusTransition, inhalt, null, ct);
+        return await AddEntryAsync(workItemId, LogEntryType.StatusTransition, content, null, ct);
     }
 
     private const string RateLimitMarkerPrefix = "[[SOFTWARESCHMIEDE_RATE_LIMIT";
@@ -140,7 +140,7 @@ public sealed class LogService
 
         if (TryParseRateLimitMarker(outputLine, out var resetUtc))
         {
-            var rateLimitInhalt = resetUtc.HasValue
+            var rateLimitContent = resetUtc.HasValue
                 ? $"Rate-Limit erkannt. Weiter ab: {resetUtc.Value:O}"
                 : "Rate-Limit erkannt (kein Zeitstempel).";
 
@@ -149,7 +149,7 @@ public sealed class LogService
                 Id = Guid.NewGuid(),
                 WorkItemId = workItemId,
                 Type = LogEntryType.RateLimit,
-                Content = rateLimitInhalt,
+                Content = rateLimitContent,
                 Timestamp = DateTimeOffset.UtcNow
             };
             _db.LogEntries.Add(rateLimitEntry);

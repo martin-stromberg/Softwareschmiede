@@ -180,7 +180,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
     [Fact]
     public async Task SendAsync_StreamGate_LiefertTeilbytesUndBlockiertBeimNaechstenLesen()
     {
-        var inhalt = new string('x', 1000);
+        var content = new string('x', 1000);
         SchreibeSzenario(new UpdateE2ESzenario
         {
             Answer =
@@ -188,7 +188,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
                 new UpdateE2EAntwort
                 {
                     Url = ReleaseUrl,
-                    Content = inhalt,
+                    Content = content,
                     StreamGate = "download",
                     StreamGateBytes = 400,
                 },
@@ -217,7 +217,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         while (restGelesen < 1000)
             restGelesen += await stream.ReadAsync(buffer.AsMemory(restGelesen), TestContext.Current.CancellationToken);
 
-        Assert.Equal(inhalt, System.Text.Encoding.UTF8.GetString(buffer));
+        Assert.Equal(content, System.Text.Encoding.UTF8.GetString(buffer));
     }
 
     /// <summary>Eine Antwortdatei außerhalb der Testwurzel wird mit HttpRequestException abgelehnt.</summary>

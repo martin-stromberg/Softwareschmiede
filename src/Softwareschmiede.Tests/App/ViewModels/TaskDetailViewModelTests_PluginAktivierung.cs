@@ -15,13 +15,13 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly LogService _logService;
     private readonly TodoService _todoService;
     private readonly AiExecutionService _kiService;
     private readonly PromptTemplateService _promptVorlagenService;
     private readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService = new();
-    private readonly PromptScheduleDispatchService _promptZeitVersandService;
+    private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Guid _projektId = Guid.NewGuid();
 
@@ -29,12 +29,12 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     public TaskDetailViewModelTests_PluginAktivierung()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
         _kiService = TestKiAusfuehrungsServiceFactory.Create();
         _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
-        _promptZeitVersandService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _dialogServiceMock = new Mock<IDialogService>();
 
         _db.Projects.Add(new Project
@@ -68,7 +68,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
         var entwicklungsprozessService = new DevelopmentProcessService(
-            _aufgabeService,
+            _workItemService,
             _logService,
             gitPluginMock.Object,
             pluginSelectionService,
@@ -81,14 +81,14 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         var serviceProviderMock = new Mock<IServiceProvider>();
 
         return new TaskDetailViewModel(
-            _aufgabeService,
+            _workItemService,
             _logService,
             _kiService,
             entwicklungsprozessService,
             pluginSelectionService,
             _promptVorlagenService,
             _promptVorlagenPlatzhalterService,
-            _promptZeitVersandService,
+            _promptScheduleDispatchService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
             serviceProviderMock.Object,
@@ -100,7 +100,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     }
 
     private async Task<WorkItem> ErstelleAufgabe()
-        => await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
+        => await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
 
     private static Mock<IKiPlugin> CreateKiPluginMock(string name, string prefix)
     {

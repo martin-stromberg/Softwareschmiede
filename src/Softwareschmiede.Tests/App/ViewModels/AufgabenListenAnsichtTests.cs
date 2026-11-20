@@ -79,7 +79,7 @@ public sealed class AufgabenListenAnsichtTests
 
         AufgabenListenAnsicht.Konfiguriere(view, AufgabenListenModus.Ki);
 
-        var titel = view.Cast<AktiveAufgabePanelItem>().Select(i => i.Title).ToArray();
-        titel.Should().Equal("Neu", "Mitte", "Alt");
+        var title = view.Cast<AktiveAufgabePanelItem>().Select(i => i.Title).ToArray();
+        title.Should().Equal("Neu", "Mitte", "Alt");
     }
 }

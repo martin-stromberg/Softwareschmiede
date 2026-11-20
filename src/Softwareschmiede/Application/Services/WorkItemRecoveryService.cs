@@ -42,7 +42,7 @@ public sealed class WorkItemRecoveryService
         // Pausierte Aufgaben (PausiertBisUtc in der Zukunft) sind keine „festhängenden" Kandidaten:
         // sie wurden bewusst bis zu einem bekannten Zeitpunkt angehalten (z. B. Session-Limit des
         // KI-Plugins) und tauchen nach Pausenende bei weiterhin abgelaufenem Heartbeat wieder auf.
-        var kandidaten = await _db.WorkItems
+        var candidates = await _db.WorkItems
             .AsNoTracking()
             .Where(a => WorkItemStatusExtensions.ActiveOrWaitingStatuses.Contains(a.Status)
                 && a.ExecutionStatus == WorkItemExecutionStatus.Active
@@ -52,7 +52,7 @@ public sealed class WorkItemRecoveryService
             .Select(a => a.Id)
             .ToListAsync(ct);
 
-        return kandidaten.Where(id => !_runningStatusSource.IsRunning(id));
+        return candidates.Where(id => !_runningStatusSource.IsRunning(id));
     }
 
     /// <summary>

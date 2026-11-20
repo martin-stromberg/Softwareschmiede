@@ -23,7 +23,7 @@ public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
     /// <summary>Ohne gespeicherten Eintrag ist der Backmerge-Modus deaktiviert.</summary>
     [Fact]
     public async Task GetScmBackmergeModusAsync_WithoutEntry_DefaultsToDeaktiviert()
-        => (await _sut.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeMode.Disabled);
+        => (await _sut.GetScmBackmergeModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeMode.Disabled);
 
     /// <summary>Ungültige gespeicherte Werte fallen auf „Deaktiviert“ zurück.</summary>
     [Theory]
@@ -32,7 +32,7 @@ public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
     public async Task GetScmBackmergeModusAsync_InvalidStoredValue_FallsBackToDeaktiviert(string stored)
     {
         await _sut.SetSettingAsync(AppSettingService.ScmBackmergeModeKey, stored, TestContext.Current.CancellationToken);
-        (await _sut.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeMode.Disabled);
+        (await _sut.GetScmBackmergeModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeMode.Disabled);
     }
 
     /// <summary>Der persistierte Modus gilt zur Laufzeit.</summary>
@@ -41,14 +41,14 @@ public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
     [InlineData(ScmBackmergeMode.ProjectScoped)]
     public async Task SetScmBackmergeModusAsync_PersistedValue_IsHonored(ScmBackmergeMode mode)
     {
-        await _sut.SetScmBackmergeModusAsync(mode, TestContext.Current.CancellationToken);
-        (await _sut.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(mode);
+        await _sut.SetScmBackmergeModeAsync(mode, TestContext.Current.CancellationToken);
+        (await _sut.GetScmBackmergeModeAsync(TestContext.Current.CancellationToken)).Should().Be(mode);
     }
 
     /// <summary>Ein nicht definierter Modus wird abgelehnt.</summary>
     [Fact]
     public async Task SetScmBackmergeModusAsync_UndefinedValue_Throws()
-        => await FluentActions.Invoking(() => _sut.SetScmBackmergeModusAsync((ScmBackmergeMode)42))
+        => await FluentActions.Invoking(() => _sut.SetScmBackmergeModeAsync((ScmBackmergeMode)42))
             .Should().ThrowAsync<ArgumentOutOfRangeException>();
 
     /// <summary>Die Projekt-Freigabe ist ohne Eintrag deaktiviert und projektbezogen gespeichert.</summary>
@@ -56,12 +56,12 @@ public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
     public async Task BackmergeProjektFlag_WithoutEntry_DefaultsFalseAndIsPerProject()
     {
         var projectId = Guid.NewGuid();
-        (await _sut.GetBackmergeProjektAktivAsync(projectId, TestContext.Current.CancellationToken)).Should().BeFalse();
+        (await _sut.GetBackmergeProjectEnabledAsync(projectId, TestContext.Current.CancellationToken)).Should().BeFalse();
 
-        await _sut.SetBackmergeProjektAktivAsync(projectId, true, TestContext.Current.CancellationToken);
+        await _sut.SetBackmergeProjectEnabledAsync(projectId, true, TestContext.Current.CancellationToken);
 
-        (await _sut.GetBackmergeProjektAktivAsync(projectId, TestContext.Current.CancellationToken)).Should().BeTrue();
-        (await _sut.GetBackmergeProjektAktivAsync(Guid.NewGuid(), TestContext.Current.CancellationToken)).Should().BeFalse("die Freigabe gilt je Projekt");
-        (await _sut.GetSettingAsync(AppSettingService.BackmergeProjektKey(projectId), TestContext.Current.CancellationToken)).Should().Be("True");
+        (await _sut.GetBackmergeProjectEnabledAsync(projectId, TestContext.Current.CancellationToken)).Should().BeTrue();
+        (await _sut.GetBackmergeProjectEnabledAsync(Guid.NewGuid(), TestContext.Current.CancellationToken)).Should().BeFalse("die Freigabe gilt je Projekt");
+        (await _sut.GetSettingAsync(AppSettingService.BackmergeProjectKey(projectId), TestContext.Current.CancellationToken)).Should().Be("True");
     }
 }

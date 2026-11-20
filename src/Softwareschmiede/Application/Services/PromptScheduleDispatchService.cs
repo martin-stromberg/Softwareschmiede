@@ -179,18 +179,18 @@ public sealed class PromptScheduleDispatchService : IDisposable
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var store = scope.ServiceProvider.GetService<ScheduledPromptStore>();
-            var aufgabeService = scope.ServiceProvider.GetService<WorkItemService>();
-            if (store is null || aufgabeService is null)
+            var workItemService = scope.ServiceProvider.GetService<WorkItemService>();
+            if (store is null || workItemService is null)
                 return;
 
-            var plaene = await store.GetAlleAsync();
+            var plaene = await store.GetAllAsync();
             foreach (var plan in plaene)
             {
                 // Fehler pro Datensatz isolieren: Ein einzelner defekter Plan darf die
                 // Wiederherstellung der übrigen Pläne nicht blockieren.
                 try
                 {
-                    var workItem = await aufgabeService.GetByIdAsync(plan.WorkItemId);
+                    var workItem = await workItemService.GetByIdAsync(plan.WorkItemId);
                     if (workItem is null)
                     {
                         // Verwaister Datensatz (dürfte durch FK-Cascade nicht vorkommen) — defensiv entfernen.
@@ -280,7 +280,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
     /// <returns><c>true</c>, wenn der Eintrag zurückgelegt wurde; <c>false</c>, wenn ein neuerer Eintrag die Markierung verweigerte.</returns>
     private bool MarkWaitingForSession(Guid workItemId, ScheduledPromptInfo info)
     {
-        var markiert = false;
+        var marked = false;
         lock (_lock)
         {
             if (!_scheduledPrompts.ContainsKey(workItemId))
@@ -291,13 +291,13 @@ public sealed class PromptScheduleDispatchService : IDisposable
                     Timer = null,
                     WaitingForSession = true
                 };
-                markiert = true;
+                marked = true;
             }
         }
 
-        if (markiert)
+        if (marked)
             ScheduledPromptChanged?.Invoke(workItemId);
-        return markiert;
+        return marked;
     }
 
     private void OnCliProcessStatusChanged(Guid workItemId, CliProcessStatus status)
@@ -314,14 +314,14 @@ public sealed class PromptScheduleDispatchService : IDisposable
         ScheduledPromptEntry entry;
         lock (_lock)
         {
-            if (!_scheduledPrompts.TryGetValue(workItemId, out var vorhanden))
+            if (!_scheduledPrompts.TryGetValue(workItemId, out var existing))
                 return;
 
-            if (!vorhanden.WaitingForSession && vorhanden.Info.TargetTime > _timeProvider.GetUtcNow())
+            if (!existing.WaitingForSession && existing.Info.TargetTime > _timeProvider.GetUtcNow())
                 return;
 
             _scheduledPrompts.Remove(workItemId);
-            entry = vorhanden;
+            entry = existing;
         }
 
         entry.Timer?.Dispose();
@@ -393,8 +393,8 @@ public sealed class PromptScheduleDispatchService : IDisposable
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
-            var aufgabeService = scope.ServiceProvider.GetRequiredService<WorkItemService>();
-            var workItem = await aufgabeService.GetByIdAsync(workItemId);
+            var workItemService = scope.ServiceProvider.GetRequiredService<WorkItemService>();
+            var workItem = await workItemService.GetByIdAsync(workItemId);
             return workItem?.PausedUntilUtc;
         }
         catch (Exception ex)
@@ -475,10 +475,10 @@ public sealed class PromptScheduleDispatchService : IDisposable
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var logService = scope.ServiceProvider.GetRequiredService<LogService>();
-            var inhalt = redelivery
+            var content = redelivery
                 ? "Zeitgesteuerter Prompt nach CLI-Start zugestellt."
                 : "Zeitgesteuerter Prompt versendet.";
-            await logService.AddEntryAsync(workItemId, LogEntryType.SystemMessage, inhalt);
+            await logService.AddEntryAsync(workItemId, LogEntryType.SystemMessage, content);
         }
         catch (Exception ex)
         {
@@ -503,7 +503,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
     /// </summary>
     private Task UpsertRecordIfCurrentAsync(Guid workItemId, ScheduledPromptInfo plan, ScheduledPromptInfo? expectedPredecessor)
         => MitStoreAsync(
-            store => store.UpsertWennUebereinstimmendAsync(workItemId, plan.PromptText, plan.TargetTime, expectedPredecessor),
+            store => store.UpsertIfMatchingAsync(workItemId, plan.PromptText, plan.TargetTime, expectedPredecessor),
             "Zeitgesteuerter Prompt für Aufgabe {AufgabeId} konnte nicht persistiert werden — der Plan bleibt sitzungsgebunden.",
             workItemId);
 
@@ -543,7 +543,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
             workItemId);
 
     /// <summary>Führt eine Store-Aktion in einem eigenen Scope aus; Fehler werden geloggt statt den Aufrufer zu brechen.</summary>
-    private async Task MitStoreAsync(Func<ScheduledPromptStore, Task> action, string fehlerText, params object[] argumente)
+    private async Task MitStoreAsync(Func<ScheduledPromptStore, Task> action, string fehlerText, params object[] arguments)
     {
         if (_scopeFactory is null)
             return;
@@ -558,7 +558,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, fehlerText, argumente);
+            _logger.LogWarning(ex, fehlerText, arguments);
         }
     }
 }

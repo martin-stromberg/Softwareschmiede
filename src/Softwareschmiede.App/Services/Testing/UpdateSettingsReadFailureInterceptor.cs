@@ -32,10 +32,10 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
     }
 
     /// <inheritdoc cref="UpdateSettingsReadFailureInterceptor"/>
-    /// <param name="kontext">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public UpdateSettingsReadFailureInterceptor(UpdateE2ETestKontext kontext)
+    /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
+    public UpdateSettingsReadFailureInterceptor(UpdateE2ETestKontext context)
     {
-        _kontext = kontext;
+        _kontext = context;
     }
 
     /// <summary>Wird ausgelöst, sobald ein markierter Update-Settings-Lesebefehl erreicht wird (vor einem etwaigen Fehler).</summary>

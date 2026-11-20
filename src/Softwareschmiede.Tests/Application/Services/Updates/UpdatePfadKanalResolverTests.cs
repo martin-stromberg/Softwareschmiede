@@ -18,7 +18,7 @@ public sealed class UpdatePfadKanalResolverTests
     [InlineData("   ", UpdateChannel.Stable)]
     [InlineData("unbekannter-pfad", UpdateChannel.Stable)]
     public void ErmittleKanal_LeitetKanalAusPfadAb(string? path, UpdateChannel expected)
-        => UpdatePathChannelResolver.ErmittleKanal(path).Should().Be(expected);
+        => UpdatePathChannelResolver.ResolveChannel(path).Should().Be(expected);
 
     /// <summary>Unbekannte, leere oder fehlende Pfadwerte werden auf Produktivversionen normalisiert; bekannte Werte auf ihre kanonische Form.</summary>
     [Theory]
@@ -43,7 +43,7 @@ public sealed class UpdatePfadKanalResolverTests
     [InlineData("   ", false)]
     [InlineData("unbekannter-pfad", false)]
     public void IstGueltigerPfad_AkzeptiertNurBekanntePfade(string? path, bool expected)
-        => UpdatePathChannelResolver.IstGueltigerPfad(path).Should().Be(expected);
+        => UpdatePathChannelResolver.IsValidPath(path).Should().Be(expected);
 
     /// <summary>Ein -rc-Infix im Tag ergibt den RC-Kanal; stabile Tags den Produktiv-Kanal; fehlende Tags konservativ den RC-Kanal.</summary>
     [Theory]
@@ -53,5 +53,5 @@ public sealed class UpdatePfadKanalResolverTests
     [InlineData(null, UpdateChannel.ReleaseCandidate)]
     [InlineData("", UpdateChannel.ReleaseCandidate)]
     public void ErmittleKanalFuerTagName_KlassifiziertInstallationsTags(string? tagName, UpdateChannel expected)
-        => UpdatePathChannelResolver.ErmittleKanalFuerTagName(tagName).Should().Be(expected);
+        => UpdatePathChannelResolver.ResolveChannelForTagName(tagName).Should().Be(expected);
 }

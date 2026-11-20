@@ -47,12 +47,12 @@ public sealed class GitHubReleaseClientTests
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release.Should().NotBeNull();
         result.Release!.Version.Should().Be("1.2.3");
         result.Release.IsPrerelease.Should().BeFalse();
-        result.Release.PaketDownload.Primary.Should().Be("https://example.invalid/release.zip");
-        result.Release.PaketDownload.Fallback.Should().Be(AssetApiUrl);
+        result.Release.PackageDownload.Primary.Should().Be("https://example.invalid/release.zip");
+        result.Release.PackageDownload.Fallback.Should().Be(AssetApiUrl);
         result.Release.ManifestDownload!.Primary.Should().Be("https://example.invalid/update.json");
         result.Release.ManifestDownload.Fallback.Should().Be(ManifestApiUrl);
     }
@@ -88,7 +88,7 @@ public sealed class GitHubReleaseClientTests
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release.Should().NotBeNull();
         result.Release!.ManifestDownload!.Primary.Should().Be("https://example.invalid/updates/update.json");
         result.Release.ManifestDownload.Fallback.Should().Be(ManifestApiUrl);
@@ -121,7 +121,7 @@ public sealed class GitHubReleaseClientTests
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release.Should().NotBeNull();
         result.Release!.ManifestDownload.Should().BeNull();
     }
@@ -158,9 +158,9 @@ public sealed class GitHubReleaseClientTests
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release.Should().NotBeNull();
-        result.Release!.PaketDownload.Fallback.Should().Be(AssetApiUrl);
+        result.Release!.PackageDownload.Fallback.Should().Be(AssetApiUrl);
     }
 
     /// <summary>Eine ungültige oder fremde API-Asset-URL führt zur ID-Ableitung; ohne ID entfällt der Fallback, das Release bleibt nutzbar.</summary>
@@ -187,12 +187,12 @@ public sealed class GitHubReleaseClientTests
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release.Should().NotBeNull();
         if (expectedFallbackUrl is null)
-            result.Release!.PaketDownload.Fallback.Should().BeNull();
+            result.Release!.PackageDownload.Fallback.Should().BeNull();
         else
-            result.Release!.PaketDownload.Fallback.Should().Be(expectedFallbackUrl);
+            result.Release!.PackageDownload.Fallback.Should().Be(expectedFallbackUrl);
     }
 
     /// <summary>Leere Listen und unbrauchbare Einträge gelten als erfolgreiche Abfrage ohne Kandidaten; HTTP-Fehler als fehlgeschlagene Abfrage.</summary>
@@ -209,7 +209,7 @@ public sealed class GitHubReleaseClientTests
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().Be(!expectFailure);
+        result.Success.Should().Be(!expectFailure);
         result.Release.Should().BeNull();
     }
 
@@ -223,7 +223,7 @@ public sealed class GitHubReleaseClientTests
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeFalse();
+        result.Success.Should().BeFalse();
         result.Release.Should().BeNull();
     }
 
@@ -236,7 +236,7 @@ public sealed class GitHubReleaseClientTests
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeFalse();
+        result.Success.Should().BeFalse();
         result.Release.Should().BeNull();
     }
 

@@ -55,18 +55,18 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
         AufzeichnungOeffnenCommand = new AsyncRelayCommand(OeffneAufzeichnungAsync);
-        WiedergabeStartenCommand = new RelayCommand(WiedergabeStarten, () => _replaySession is not null && !IstWiedergabeAktiv);
+        WiedergabeStartenCommand = new RelayCommand(StartPlayback, () => _replaySession is not null && !IstWiedergabeAktiv);
         // Aktiv während laufender Wiedergabe — und im reinen Schrittmodus (Position > 0
         // ohne gestartete Wiedergabe) als direkter Rückweg zu Position 0.
         WiedergabeNeustartenCommand = new RelayCommand(WiedergabeNeustarten,
-            () => _replaySession is not null && (IstWiedergabeAktiv || _replaySession.AktuellerChunkIndex > 0));
+            () => _replaySession is not null && (IstWiedergabeAktiv || _replaySession.CurrentChunkIndex > 0));
         WiedergabePausierenCommand = new RelayCommand(WiedergabePausierenToggle, () => IstWiedergabeAktiv);
         SchrittVorCommand = new RelayCommand(StepForward,
             () => _replaySession is not null && (!IstWiedergabeAktiv || IsPaused)
-                && _replaySession.AktuellerChunkIndex < QuellEintraege.Count);
+                && _replaySession.CurrentChunkIndex < QuellEintraege.Count);
         SchrittZurueckCommand = new RelayCommand(StepBackward,
             () => _replaySession is not null && (!IstWiedergabeAktiv || IsPaused)
-                && _replaySession.AktuellerChunkIndex > 0);
+                && _replaySession.CurrentChunkIndex > 0);
         SchliessenCommand = new RelayCommand(Close);
     }
 
@@ -317,7 +317,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     private void SetzeGeometrieText(CliOutputRecording recording)
         => GeometrieText = $"Aufzeichnung: {recording.Cols}×{recording.Rows}";
 
-    private void WiedergabeStarten()
+    private void StartPlayback()
     {
         if (_replaySession is null || _recording is null || IstWiedergabeAktiv)
             return;
@@ -328,7 +328,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         if (_wiedergabeBeendet)
             ErsetzeReplaySessionDurchFrische();
 
-        _replaySession.WiedergabeStarten();
+        _replaySession.StartPlayback();
         IstWiedergabeAktiv = true;
         IsPaused = false;
         StatusText = "Wiedergabe läuft.";
@@ -337,14 +337,14 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     private void WiedergabeNeustarten()
     {
         if (_replaySession is null || _recording is null
-            || (!IstWiedergabeAktiv && _replaySession.AktuellerChunkIndex == 0))
+            || (!IstWiedergabeAktiv && _replaySession.CurrentChunkIndex == 0))
             return;
 
         // Neustart mitten im Lauf (auch aus dem Pausiert-Zustand) oder aus dem
         // Schrittmodus: die Session verwerfen und dieselbe geladene Aufzeichnung
         // sofort wieder ab Position 0 abspielen.
         ErsetzeReplaySessionDurchFrische();
-        _replaySession.WiedergabeStarten();
+        _replaySession.StartPlayback();
         IstWiedergabeAktiv = true;
         IsPaused = false;
         StatusText = "Wiedergabe läuft.";
@@ -392,8 +392,8 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
 
         // Am Ende gilt der aus OnReplayExited gesetzte Text „Wiedergabe beendet." —
         // das Exited-Event läuft synchron über _dispatcherInvoke bereits durch.
-        if (_replaySession.AktuellerChunkIndex < QuellEintraege.Count)
-            StatusText = $"Einzelschritt — Chunk {_replaySession.AktuellerChunkIndex}/{QuellEintraege.Count} angewendet.";
+        if (_replaySession.CurrentChunkIndex < QuellEintraege.Count)
+            StatusText = $"Einzelschritt — Chunk {_replaySession.CurrentChunkIndex}/{QuellEintraege.Count} angewendet.";
     }
 
     private void StepBackward()
@@ -403,7 +403,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         if (_replaySession is null || (IstWiedergabeAktiv && !IsPaused))
             return;
 
-        var vorherigePosition = _replaySession.AktuellerChunkIndex;
+        var vorherigePosition = _replaySession.CurrentChunkIndex;
         if (!_replaySession.StepBackward())
             return;
 
@@ -433,7 +433,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
             if (!ReferenceEquals(session, _replaySession))
                 return;
 
-            var index = session.AktuellerChunkIndex;
+            var index = session.CurrentChunkIndex;
             PositionsText = $"Chunk {index}/{QuellEintraege.Count}";
             AktuellerQuellEintrag = index > 0 && index <= QuellEintraege.Count
                 ? QuellEintraege[index - 1]

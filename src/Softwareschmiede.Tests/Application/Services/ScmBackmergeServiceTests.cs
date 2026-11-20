@@ -97,7 +97,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_ModusGlobal_BackmergeWirdGemergt()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus();
         _plugin.Setup(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
                 It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()))
@@ -119,7 +119,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_EntscheidungNachWarten_LoeschtZwischenErrorCode()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus(mergeStatus: PullRequestMergeStatus.Blocked);
         await EvaluateAsync(Pr());
         var checkpoint = await _db.ScmObservationCheckpoints.FindAsync(new object?[] { ScmBackmergeService.CheckpointKey(_remote, 7) }, TestContext.Current.CancellationToken);
@@ -139,7 +139,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_ModusProjektbezogenOhneFlag_KeinMerge()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.ProjectScoped, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.ProjectScoped, TestContext.Current.CancellationToken);
         await EvaluateAsync(Pr());
         VerifyKeinProviderAufruf();
     }
@@ -148,8 +148,8 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_ModusProjektbezogenMitFlag_WirdGemergt()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.ProjectScoped, TestContext.Current.CancellationToken);
-        await _einstellungen.SetBackmergeProjektAktivAsync(_projektId, true, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.ProjectScoped, TestContext.Current.CancellationToken);
+        await _einstellungen.SetBackmergeProjectEnabledAsync(_projektId, true, TestContext.Current.CancellationToken);
         SetStatus();
         _plugin.Setup(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
                 It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()))
@@ -164,7 +164,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_KeinBackmergeMuster_KeinMerge()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus(source: "feature/x", target: "staging");
 
         await EvaluateAsync(Pr());
@@ -180,7 +180,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_FalschesZiel_KeinMerge()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus(source: "main", target: "main");
 
         await EvaluateAsync(Pr());
@@ -194,7 +194,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [InlineData(PullRequestStatus.Merged)]
     public async Task Evaluate_GeschlossenerPr_KeinMerge(PullRequestStatus status)
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus(status: status);
 
         await EvaluateAsync(Pr());
@@ -209,7 +209,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [InlineData(PullRequestMergeStatus.Unknown)]
     public async Task Evaluate_NichtMergebar_WartetUndPrueftErneut(PullRequestMergeStatus mergeStatus)
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus(mergeStatus: mergeStatus);
 
         await EvaluateAsync(Pr());
@@ -226,7 +226,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_OhneSchreibrecht_KeinMerge()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         var remoteOhneRecht = _remote with { CanWrite = false };
         await _sut.EvaluateDiscoveredReferencesAsync(_plugin.Object, remoteOhneRecht, [Pr()], [_lokal], TestContext.Current.CancellationToken);
         VerifyKeinProviderAufruf();
@@ -236,7 +236,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_InaktivesRepository_KeinMerge()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         _lokal.Active = false;
         await EvaluateAsync(Pr());
         VerifyKeinProviderAufruf();
@@ -246,7 +246,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_OhneBasisbranch_KeinMerge()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         _lokal.DefaultSourceBranchName = null;
         await EvaluateAsync(Pr());
         VerifyKeinProviderAufruf();
@@ -256,7 +256,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_MergeFehlgeschlagen_BackoffWiederholung()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus();
         _plugin.Setup(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
                 It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()))
@@ -275,7 +275,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_PermanenterProviderfehler_EndgueltigGesperrt()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         _plugin.Setup(x => x.GetPullRequestStatusAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ScmProviderException(ScmProviderFailureKind.Permission, "kein Zugriff"));
 
@@ -290,7 +290,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_CheckpointInWartezeit_KeineErneuteAbfrage()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus(mergeStatus: PullRequestMergeStatus.Blocked);
 
         await EvaluateAsync(Pr());
@@ -303,7 +303,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_IssueReferenz_WirdIgnoriert()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         await EvaluateAsync(new ScmEventReference(_remote, ScmReferenceKind.Issue, 7));
         VerifyKeinProviderAufruf();
     }
@@ -313,7 +313,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_DraftOhneAktivierung_WartetOhneReadyAufruf()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus(mergeStatus: PullRequestMergeStatus.Blocked, isDraft: true);
 
         await EvaluateAsync(Pr());
@@ -333,8 +333,8 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_DraftMitAktivierung_WirdBereitGemachtUndGemergt()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
-        await _einstellungen.SetScmBackmergeDraftAktivierungAsync(true, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeDraftActivationAsync(true, TestContext.Current.CancellationToken);
         var query = 0;
         _plugin.Setup(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => ++query == 1
@@ -361,8 +361,8 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_DraftAktivierungFehlgeschlagen_BackoffWiederholung()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
-        await _einstellungen.SetScmBackmergeDraftAktivierungAsync(true, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeDraftActivationAsync(true, TestContext.Current.CancellationToken);
         SetStatus(mergeStatus: PullRequestMergeStatus.Blocked, isDraft: true);
         _plugin.Setup(x => x.MarkPullRequestReadyAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
             .ReturnsAsync(PullRequestCompletionResult.Failed("kein Zugriff"));
@@ -385,7 +385,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_NurReviewBlockiert_GenehmigtUndMergedRegulaer()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         var query = 0;
         _plugin.Setup(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => ++query == 1
@@ -417,7 +417,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_NurReviewBlockiertMitAdminMerge_BypassFallback()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         await _einstellungen.SetScmBackmergeAdminMergeAsync(true, TestContext.Current.CancellationToken);
         SetStatus(mergeStatus: PullRequestMergeStatus.Blocked,
             review: PullRequestReviewDecision.ReviewRequired, checks: PullRequestChecksState.Success);
@@ -446,7 +446,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_ReviewBlockiertChecksPending_WartetOhneGenehmigung()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus(mergeStatus: PullRequestMergeStatus.Blocked,
             review: PullRequestReviewDecision.ReviewRequired, checks: PullRequestChecksState.Pending);
 
@@ -465,7 +465,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_GenehmigungGesendet_KeineErneuteGenehmigung()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus(mergeStatus: PullRequestMergeStatus.Blocked,
             review: PullRequestReviewDecision.ReviewRequired, checks: PullRequestChecksState.Success);
         _plugin.Setup(x => x.CompletePullRequestAsync("owner/repo", 7,
@@ -486,7 +486,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_AdminMergeFallback_ZweiterVersuchMitAdminRechten()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         await _einstellungen.SetScmBackmergeAdminMergeAsync(true, TestContext.Current.CancellationToken);
         SetStatus();
         _plugin.Setup(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
@@ -509,7 +509,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     [Fact]
     public async Task Evaluate_AdminMergeOhneOption_NurRegulaererVersuch()
     {
-        await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+        await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         SetStatus();
         _plugin.Setup(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
                 It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()))

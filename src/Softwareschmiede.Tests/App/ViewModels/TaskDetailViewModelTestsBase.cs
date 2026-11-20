@@ -19,7 +19,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     protected readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
 
     /// <summary>_aufgabeService.</summary>
-    protected readonly WorkItemService _aufgabeService;
+    protected readonly WorkItemService _workItemService;
 
     /// <summary>_protokollService.</summary>
     protected readonly LogService _logService;
@@ -37,7 +37,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     protected readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService = new();
 
     /// <summary>_promptZeitVersandService.</summary>
-    protected readonly PromptScheduleDispatchService _promptZeitVersandService;
+    protected readonly PromptScheduleDispatchService _promptScheduleDispatchService;
 
     /// <summary>_einstellungService.</summary>
     protected readonly AppSettingService _settingService;
@@ -55,12 +55,12 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     protected TaskDetailViewModelTestsBase()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
         _kiService = TestKiAusfuehrungsServiceFactory.Create();
         _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
-        _promptZeitVersandService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
         _dialogServiceMock = new Mock<IDialogService>();
 
@@ -122,7 +122,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
         var entwicklungsprozessService = new DevelopmentProcessService(
-            _aufgabeService,
+            _workItemService,
             _logService,
             gitPluginMock.Object,
             pluginSelectionService,
@@ -135,14 +135,14 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
 
         return new TaskDetailViewModel(
-            _aufgabeService,
+            _workItemService,
             _logService,
             _kiService,
             entwicklungsprozessService,
             pluginSelectionService,
             _promptVorlagenService,
             _promptVorlagenPlatzhalterService,
-            _promptZeitVersandService,
+            _promptScheduleDispatchService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
             serviceProviderObj,
@@ -182,7 +182,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
 
         await _db.SaveChangesAsync();
 
-        return await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung", repository.Id);
+        return await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung", repository.Id);
     }
 
     /// <summary>Erstellt einen Test-IdeEntryPoint mit gesetztem DisplayName.</summary>

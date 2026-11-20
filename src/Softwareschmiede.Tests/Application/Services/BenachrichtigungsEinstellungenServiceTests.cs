@@ -141,7 +141,7 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         var payload = await sut.GetAudioPayloadAsync("user-a", TestContext.Current.CancellationToken);
         payload.Should().NotBeNull();
         payload!.MimeType.Should().Be("audio/mpeg");
-        payload.Base64Inhalt.Should().Be(Convert.ToBase64String(mp3Bytes));
+        payload.Base64Content.Should().Be(Convert.ToBase64String(mp3Bytes));
     }
 
     /// <summary><summary>UploadAudioAsync_ShouldSanitizeFilenameAndInferMimeType_WhenMimeIsMissing.</summary>.</summary>

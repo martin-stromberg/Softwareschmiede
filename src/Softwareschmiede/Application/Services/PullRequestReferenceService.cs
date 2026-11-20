@@ -43,7 +43,7 @@ public sealed class PullRequestReferenceService
             .FirstOrDefaultAsync(
                 p => p.Provider == provider
                      && p.RepositoryId == normalizedRepositoryId
-                     && p.PullRequestNumber == pullRequest.Nummer,
+                     && p.PullRequestNumber == pullRequest.Number,
                 ct);
 
         if (entity is null)
@@ -55,7 +55,7 @@ public sealed class PullRequestReferenceService
                 Provider = provider,
                 Role = PullRequestReferenzRolle.CreatedByTask,
                 RepositoryId = normalizedRepositoryId,
-                PullRequestNumber = pullRequest.Nummer,
+                PullRequestNumber = pullRequest.Number,
                 CreatedUtc = now,
                 MonitoringPhase = PullRequestMonitoringPolicy.GetInitialPhase(provider),
                 NextCheckUtc = PullRequestMonitoringPolicy.GetInitialPhase(provider) == PullRequestMonitoringPhase.NotMonitored ? null : now
@@ -149,7 +149,7 @@ public sealed class PullRequestReferenceService
     }
 
     /// <summary>Liefert Pull Requests einer Aufgabe inklusive Workflow-Runs.</summary>
-    public async Task<IReadOnlyList<PullRequestReference>> GetByAufgabeAsync(Guid workItemId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<PullRequestReference>> GetByWorkItemAsync(Guid workItemId, CancellationToken ct = default)
         => await _db.PullRequestReferences
             .AsNoTracking()
             .Include(p => p.WorkflowRuns.OrderBy(w => w.IsPostMerge).ThenBy(w => w.Name))
@@ -173,7 +173,7 @@ public sealed class PullRequestReferenceService
             .ToListAsync(ct);
 
     /// <summary>Liefert alle PRs einer Aufgabe fuer einen expliziten Refresh.</summary>
-    public async Task<IReadOnlyList<PullRequestReference>> GetRefreshableByAufgabeAsync(Guid workItemId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<PullRequestReference>> GetRefreshableByWorkItemAsync(Guid workItemId, CancellationToken ct = default)
         => await _db.PullRequestReferences
             .Include(p => p.WorkflowRuns)
             .Where(p => p.WorkItemId == workItemId

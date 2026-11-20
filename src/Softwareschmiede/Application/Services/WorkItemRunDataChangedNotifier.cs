@@ -4,12 +4,12 @@ namespace Softwareschmiede.Application.Services;
 public sealed class WorkItemRunDataChangedNotifier
 {
     /// <summary>Wird ausgeloest, nachdem Laufdaten einer Aufgabe erfolgreich persistiert wurden.</summary>
-    public event Action<Guid>? LaufdatenChanged;
+    public event Action<Guid>? RunDataChanged;
 
     /// <summary>Meldet geaenderte Laufdaten fuer die angegebene Aufgabe.</summary>
     /// <param name="workItemId">ID der Aufgabe mit geaenderten Laufdaten.</param>
-    public void NotifyLaufdatenChanged(Guid workItemId)
+    public void NotifyRunDataChanged(Guid workItemId)
     {
-        LaufdatenChanged?.Invoke(workItemId);
+        RunDataChanged?.Invoke(workItemId);
     }
 }

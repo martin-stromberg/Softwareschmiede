@@ -25,7 +25,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
         var workingDirectory = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(workingDirectory, "backend"));
         var workItem = await ErstelleAufgabeMitRepositoryAsync("backend");
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
@@ -49,7 +49,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
     {
         var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
@@ -72,7 +72,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
     {
         var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable);
@@ -97,7 +97,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
         Directory.CreateDirectory(unterverzeichnis);
 
         var workItem = await ErstelleAufgabeMitRepositoryAsync("backend");
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));

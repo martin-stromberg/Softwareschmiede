@@ -148,8 +148,8 @@ public abstract class WpfTestBase : IDisposable
             {
                 try
                 {
-                    var inhalt = await File.ReadAllTextAsync(path);
-                    if (inhalt.Contains(substring, StringComparison.Ordinal))
+                    var content = await File.ReadAllTextAsync(path);
+                    if (content.Contains(substring, StringComparison.Ordinal))
                         return;
                 }
                 catch (IOException)
@@ -192,9 +192,9 @@ public abstract class WpfTestBase : IDisposable
             {
                 try
                 {
-                    var inhalt = await File.ReadAllTextAsync(path);
-                    if (inhalt.Length > sinceContent.Length
-                        && inhalt[sinceContent.Length..].Contains(substring, StringComparison.Ordinal))
+                    var content = await File.ReadAllTextAsync(path);
+                    if (content.Length > sinceContent.Length
+                        && content[sinceContent.Length..].Contains(substring, StringComparison.Ordinal))
                         return;
                 }
                 catch (IOException)
@@ -270,12 +270,12 @@ public abstract class WpfTestBase : IDisposable
         startInfo.Environment["SOFTWARESCHMIEDE_TEST_DB_PATH"] = _testDbPath;
         if (umgebungsVariablen is not null)
         {
-            foreach (var (name, wert) in umgebungsVariablen)
+            foreach (var (name, value) in umgebungsVariablen)
             {
-                if (wert is null)
+                if (value is null)
                     startInfo.Environment.Remove(name);
                 else
-                    startInfo.Environment[name] = wert;
+                    startInfo.Environment[name] = value;
             }
         }
 
@@ -1126,13 +1126,13 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Ersetzt das "EditTitel"-Feld durch <paramref name="titel"/> und prüft dessen vollständigen Wert.
+    /// Ersetzt das "EditTitel"-Feld durch <paramref name="title"/> und prüft dessen vollständigen Wert.
     /// Voraussetzung: <c>TaskDetailView</c> im Edit-Modus sichtbar (z. B. nach <see cref="NeueAufgabeAnlegen"/>).
     /// </summary>
-    protected void AufgabeTitelSetzen(AutomationElement mainWindow, string titel)
+    protected void AufgabeTitelSetzen(AutomationElement mainWindow, string title)
     {
         var titelBox = WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
-        FeldInhaltErsetzen(titelBox, titel);
+        FeldInhaltErsetzen(titelBox, title);
     }
 
     /// <summary>
@@ -1206,14 +1206,14 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Sucht in der Aufgabenliste das ListItem mit dem angegebenen <paramref name="titel"/>, öffnet es
+    /// Sucht in der Aufgabenliste das ListItem mit dem angegebenen <paramref name="title"/>, öffnet es
     /// per Doppelklick und wartet auf den "Zurück"-Button (Bestätigung, dass die <c>TaskDetailView</c> geladen ist).
     /// </summary>
-    protected void AufgabeAusListeOeffnen(AutomationElement mainWindow, string titel)
+    protected void AufgabeAusListeOeffnen(AutomationElement mainWindow, string title)
     {
         var listenEintrag = WaitForElement(
             mainWindow,
-            cf => cf.ByName(titel).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem)),
+            cf => cf.ByName(title).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem)),
             Medium);
         listenEintrag.DoubleClickInForeground();
         WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);

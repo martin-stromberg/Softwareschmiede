@@ -193,12 +193,12 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
 
         sut.VerfuegbaresUpdate.Should().BeNull("das verzögerte Ergebnis stammt aus der alten Einstellungs-Generation");
         sut.UpdateAvailable.Should().BeFalse();
-        eingecheckteOptionen[0].UpdatePfad.Should().Be(UpdatePathChannelResolver.PrereleaseVersionsPath);
+        eingecheckteOptionen[0].UpdatePath.Should().Be(UpdatePathChannelResolver.PrereleaseVersionsPath);
 
         // Folgeprüfung verwendet die aktuelle Einstellung (Update-Pfad jetzt auf Produktivversionen)
         await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
         eingecheckteOptionen.Should().HaveCount(2);
-        eingecheckteOptionen[1].UpdatePfad.Should().Be(UpdatePathChannelResolver.StableVersionsPath);
+        eingecheckteOptionen[1].UpdatePath.Should().Be(UpdatePathChannelResolver.StableVersionsPath);
         sut.UpdateAvailable.Should().BeFalse();
 
         // b) Einstellungsänderung während der Vorbereitung stoppt vor dem Updater-Start

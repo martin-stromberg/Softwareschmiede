@@ -10,10 +10,10 @@ public sealed class KiAusfuehrungsStatusKlassifikationTests
     [Fact]
     public void IstAktuellPausiert_ShouldReturnTrue_WhenPausiertBisInZukunft()
     {
-        var jetzt = DateTimeOffset.UtcNow;
-        DateTimeOffset? pausedUntilUtc = jetzt.AddMinutes(10);
+        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset? pausedUntilUtc = now.AddMinutes(10);
 
-        var result = pausedUntilUtc.IsCurrentlyPaused(jetzt);
+        var result = pausedUntilUtc.IsCurrentlyPaused(now);
 
         result.Should().BeTrue();
     }
@@ -33,10 +33,10 @@ public sealed class KiAusfuehrungsStatusKlassifikationTests
     [Fact]
     public void IstAktuellPausiert_ShouldReturnFalse_WhenPausiertBisAbgelaufen()
     {
-        var jetzt = DateTimeOffset.UtcNow;
-        DateTimeOffset? pausedUntilUtc = jetzt.AddMinutes(-10);
+        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset? pausedUntilUtc = now.AddMinutes(-10);
 
-        var result = pausedUntilUtc.IsCurrentlyPaused(jetzt);
+        var result = pausedUntilUtc.IsCurrentlyPaused(now);
 
         result.Should().BeFalse();
     }
@@ -45,10 +45,10 @@ public sealed class KiAusfuehrungsStatusKlassifikationTests
     [Fact]
     public void IstAktuellPausiert_ShouldReturnFalse_WhenPausiertBisGenauJetzt()
     {
-        var jetzt = DateTimeOffset.UtcNow;
-        DateTimeOffset? pausedUntilUtc = jetzt;
+        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset? pausedUntilUtc = now;
 
-        var result = pausedUntilUtc.IsCurrentlyPaused(jetzt);
+        var result = pausedUntilUtc.IsCurrentlyPaused(now);
 
         result.Should().BeFalse();
     }

@@ -18,10 +18,10 @@ public sealed class WpfDialogService : IDialogService
     }
 
     /// <inheritdoc/>
-    public bool BestaetigenDialog(string nachricht, string titel)
+    public bool BestaetigenDialog(string nachricht, string title)
         => MessageBox.Show(
             nachricht,
-            titel,
+            title,
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning) == MessageBoxResult.Yes;
 

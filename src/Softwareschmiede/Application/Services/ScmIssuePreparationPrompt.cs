@@ -14,9 +14,9 @@ namespace Softwareschmiede.Application.Services;
 public static class ScmIssuePreparationPrompt
 {
     /// <summary>Baut den Analyse-Prompt für ein beobachtetes Issue.</summary>
-    /// <param name="titel">Der Issue-Titel (persistiert, unverändert).</param>
+    /// <param name="title">Der Issue-Titel (persistiert, unverändert).</param>
     /// <param name="description">Die Issue-Beschreibung zum Erkennungszeitpunkt.</param>
-    public static string Build(string? titel, string? description)
+    public static string Build(string? title, string? description)
     {
         var sb = new StringBuilder();
         sb.AppendLine("Du analysierst und verbesserst ein neu angelegtes Issue. Lies Titel und");
@@ -42,7 +42,7 @@ public static class ScmIssuePreparationPrompt
         sb.AppendLine("- eine \"comment\"-Aktion mit der Analyse-Dokumentation in \"body\".");
         sb.AppendLine();
         sb.AppendLine("=== Issue-Titel ===");
-        sb.AppendLine(string.IsNullOrWhiteSpace(titel) ? "(kein Titel)" : titel.Trim());
+        sb.AppendLine(string.IsNullOrWhiteSpace(title) ? "(kein Titel)" : title.Trim());
         sb.AppendLine();
         sb.AppendLine("=== Issue-Beschreibung ===");
         sb.AppendLine(string.IsNullOrWhiteSpace(description) ? "(leer)" : description.Trim());

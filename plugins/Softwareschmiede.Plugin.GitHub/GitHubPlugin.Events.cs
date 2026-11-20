@@ -163,7 +163,7 @@ public sealed partial class GitHubPlugin
         var element = await EventApiAsync(ClientFor(repository.Account), repository.Host, "GET", $"{RepositoryEndpoint(repository)}/pulls/{reference.Number}", null, false, ct);
         if (element.ValueKind != JsonValueKind.Object) throw Permanent("Unvollständige GitHub-Antwort.");
         var pullRequest = ParsePullRequest(element, repositoryId);
-        return pullRequest is not null && pullRequest.Nummer == reference.Number ? pullRequest : null;
+        return pullRequest is not null && pullRequest.Number == reference.Number ? pullRequest : null;
     }
 
     /// <inheritdoc />

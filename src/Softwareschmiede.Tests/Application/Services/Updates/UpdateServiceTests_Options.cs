@@ -19,9 +19,9 @@ public sealed class UpdateServiceTests_Options
             .ReturnsAsync(new InstalledVersionInfo("1.2.0", "v1.2.0-rc.1", null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.Channel == UpdateChannel.ReleaseCandidate), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(prerelease));
+            .ReturnsAsync(UpdateReleaseLookupResult.Found(prerelease));
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.Channel == UpdateChannel.Stable), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(stable));
+            .ReturnsAsync(UpdateReleaseLookupResult.Found(stable));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
         var rcKanal = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
@@ -33,8 +33,8 @@ public sealed class UpdateServiceTests_Options
         produktivKanal.Status.Should().Be(UpdateCheckStatus.UpdateAvailable);
         produktivKanal.Update.Should().Be(stable);
         produktivKanal.Update!.IsPrerelease.Should().BeFalse();
-        releaseClient.Verify(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.UpdatePfad == UpdatePathChannelResolver.PrereleaseVersionsPath), It.IsAny<CancellationToken>()), Times.Once);
-        releaseClient.Verify(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.UpdatePfad == UpdatePathChannelResolver.StableVersionsPath), It.IsAny<CancellationToken>()), Times.Once);
+        releaseClient.Verify(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.UpdatePath == UpdatePathChannelResolver.PrereleaseVersionsPath), It.IsAny<CancellationToken>()), Times.Once);
+        releaseClient.Verify(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.UpdatePath == UpdatePathChannelResolver.StableVersionsPath), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>Ein Client-Ergebnis, das nicht zum gewählten Kanal passt, wird defensiv in beiden Richtungen nicht angeboten.</summary>
@@ -51,7 +51,7 @@ public sealed class UpdateServiceTests_Options
             .ReturnsAsync(new InstalledVersionInfo("1.2.0", "v1.2.0", null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(gefundenes));
+            .ReturnsAsync(UpdateReleaseLookupResult.Found(gefundenes));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
         var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(updatePath), TestContext.Current.CancellationToken);

@@ -109,9 +109,9 @@ public partial class End2EndTest
         // Skip-Guard analog ZeitgesteuerterPrompt_NachPlanen_..._E2E: Zwischen 00:00 und 00:10 läge
         // "jetzt - 10 min" noch am Vortag; die App interpretiert die eingegebene Uhrzeit aber immer
         // als heutiges Datum — eine Zukunftszeit würde geplant statt gesendet.
-        var jetzt = DateTime.Now;
-        Assert.SkipWhen(jetzt.Hour == 0 && jetzt.Minute < 10, "Kurz nach Mitternacht: 'jetzt - 10 min' wäre als heutige Uhrzeit eine Zukunftszeit.");
-        var vergangen = jetzt.AddMinutes(-10);
+        var now = DateTime.Now;
+        Assert.SkipWhen(now.Hour == 0 && now.Minute < 10, "Kurz nach Mitternacht: 'jetzt - 10 min' wäre als heutige Uhrzeit eine Zukunftszeit.");
+        var vergangen = now.AddMinutes(-10);
 
         taskB.SetScheduledPromptTime(vergangen.Hour, vergangen.Minute);
         taskB.SelectPromptTemplate(MarkerVorlagenName);
@@ -226,15 +226,15 @@ public partial class End2EndTest
     /// die CLI mit dem KI-Simulator-Plugin (gleiches Muster wie
     /// <c>E2E_TaskWechselUeberMenue.ErstelleUndStarteAufgabe</c>).
     /// </summary>
-    private static TaskDetailView ErstelleUndStarteLimitAufgabe(ProjectDetailView projectDetail, string titel)
+    private static TaskDetailView ErstelleUndStarteLimitAufgabe(ProjectDetailView projectDetail, string title)
     {
         var task = projectDetail.CreateTask();
-        task.SetTaskTitle(titel);
+        task.SetTaskTitle(title);
         task.SaveTask();
         task.GoBack();
 
         var projectDetailAfterSave = Assert.IsType<ProjectDetailView>(task.Window.CurrentView());
-        var taskReopened = projectDetailAfterSave.OpenTask(titel);
+        var taskReopened = projectDetailAfterSave.OpenTask(title);
         taskReopened.Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
         taskReopened.WaitForCliRunning();
 
@@ -243,7 +243,7 @@ public partial class End2EndTest
 
     private static CliUpdateSafetyService ErstelleSafetyService(Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext db)
     {
-        var aufgabeService = new WorkItemService(
+        var workItemService = new WorkItemService(
             db,
             NullLogger<WorkItemService>.Instance,
             new TodoService(db, NullLogger<TodoService>.Instance));
@@ -253,14 +253,14 @@ public partial class End2EndTest
             appSettingService,
             new WorkItemRunDataChangedNotifier(),
             NullLogger<AiPluginLimitService>.Instance);
-        return new CliUpdateSafetyService(aufgabeService, limitService, NullLogger<CliUpdateSafetyService>.Instance);
+        return new CliUpdateSafetyService(workItemService, limitService, NullLogger<CliUpdateSafetyService>.Instance);
     }
 
-    private static void AssertPausiertBisUtc(DateTimeOffset? pausedUntilUtc, DateTimeOffset expected, string titel)
+    private static void AssertPausiertBisUtc(DateTimeOffset? pausedUntilUtc, DateTimeOffset expected, string title)
     {
         Assert.NotNull(pausedUntilUtc);
         Assert.True(
             Math.Abs((pausedUntilUtc!.Value - expected).TotalSeconds) < 2,
-            $"PausiertBisUtc von '{titel}' ('{pausedUntilUtc:O}') weicht vom Marker-Zeitpunkt '{expected:O}' ab.");
+            $"PausiertBisUtc von '{title}' ('{pausedUntilUtc:O}') weicht vom Marker-Zeitpunkt '{expected:O}' ab.");
     }
 }

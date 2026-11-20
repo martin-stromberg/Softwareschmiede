@@ -40,14 +40,14 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         Todos
     }
 
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly LogService _logService;
     private readonly AiExecutionService _kiService;
     private readonly DevelopmentProcessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly PromptTemplateService _promptVorlagenService;
     private readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService;
-    private readonly PromptScheduleDispatchService _promptZeitVersandService;
+    private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
     private readonly IDialogService _dialogService;
     private readonly IPluginManager _pluginManager;
     private readonly IServiceProvider _serviceProvider;
@@ -58,7 +58,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly TimeProvider _timeProvider;
     private readonly ICliRawExportService _cliRawExportService;
     private readonly ICliReplayExportService _cliReplayExportService;
-    private readonly WorkItemRunDataChangedNotifier? _laufdatenChangedNotifier;
+    private readonly WorkItemRunDataChangedNotifier? _runDataChangedNotifier;
     private readonly Action<Action> _dispatcherInvoke;
 
     private Guid _aufgabeId;
@@ -629,14 +629,14 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <inheritdoc cref="TaskDetailViewModel"/>
     public TaskDetailViewModel(
-        WorkItemService aufgabeService,
+        WorkItemService workItemService,
         LogService logService,
         AiExecutionService kiService,
         DevelopmentProcessService entwicklungsprozessService,
         PluginSelectionService pluginSelectionService,
         PromptTemplateService promptVorlagenService,
         PromptTemplatePlaceholderService promptVorlagenPlatzhalterService,
-        PromptScheduleDispatchService promptZeitVersandService,
+        PromptScheduleDispatchService promptScheduleDispatchService,
         IDialogService dialogService,
         IPluginManager pluginManager,
         IServiceProvider serviceProvider,
@@ -648,16 +648,16 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         Action<Action>? dispatcherInvoke = null,
         ICliRawExportService? cliRawExportService = null,
         ICliReplayExportService? cliReplayExportService = null,
-        WorkItemRunDataChangedNotifier? laufdatenChangedNotifier = null)
+        WorkItemRunDataChangedNotifier? runDataChangedNotifier = null)
     {
-        _aufgabeService = aufgabeService;
+        _workItemService = workItemService;
         _logService = logService;
         _kiService = kiService;
         _entwicklungsprozessService = entwicklungsprozessService;
         _pluginSelectionService = pluginSelectionService;
         _promptVorlagenService = promptVorlagenService;
         _promptVorlagenPlatzhalterService = promptVorlagenPlatzhalterService;
-        _promptZeitVersandService = promptZeitVersandService;
+        _promptScheduleDispatchService = promptScheduleDispatchService;
         _dialogService = dialogService;
         _pluginManager = pluginManager;
         _serviceProvider = serviceProvider;
@@ -668,20 +668,20 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _timeProvider = timeProvider;
         _cliRawExportService = cliRawExportService ?? new CliRawExportService(logService, NullLogger<CliRawExportService>.Instance);
         _cliReplayExportService = cliReplayExportService ?? new CliReplayExportService(kiService, new CliReplayRecordingStore(), NullLogger<CliReplayExportService>.Instance);
-        _laufdatenChangedNotifier = laufdatenChangedNotifier;
+        _runDataChangedNotifier = runDataChangedNotifier;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
-        _promptZeitVersandService.PromptSent += OnPromptSent;
-        _promptZeitVersandService.ScheduledPromptChanged += OnScheduledPromptChanged;
+        _promptScheduleDispatchService.PromptSent += OnPromptSent;
+        _promptScheduleDispatchService.ScheduledPromptChanged += OnScheduledPromptChanged;
         _todoListViewModel.AnsichtAktivierenCallback = () => WaehleAnsicht(DetailAnsicht.Todos);
         _todoListViewModel.FehlerCallback = message => FehlerMeldung = message;
 
         LadenCommand = new AsyncRelayCommand(ct => LadenAsync(ct));
         CliStoppenCommand = new AsyncRelayCommand(CliStoppenAsync, () => KannCliStoppen);
-        CliNeustartenCommand = new AsyncRelayCommand(CliNeustartenAsync, () => KannCliNeuStarten);
+        CliNeustartenCommand = new AsyncRelayCommand(RestartCliAsync, () => KannCliNeuStarten);
         StartenCommand = new AsyncRelayCommand(
-            StartenAsync,
+            StartAsync,
             () => _aufgabe?.ExecutionStatus.MayStartExecution(_aufgabe.Status) == true
                 && !_isCliRunning
                 && !IsPaused);
@@ -713,7 +713,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             PromptVorlageAuswaehlenAsync,
             template => template is not null && KannPromptVorlageSenden);
         SchedulePromptCommand = new AsyncRelayCommand(SchedulePromptAsync, () => KannPromptPlanen);
-        CancelScheduledPromptCommand = new AsyncRelayCommand(ct => _promptZeitVersandService.CancelScheduledPromptAsync(_aufgabeId));
+        CancelScheduledPromptCommand = new AsyncRelayCommand(ct => _promptScheduleDispatchService.CancelScheduledPromptAsync(_aufgabeId));
         OeffneArbeitsverzeichnisCommand = new AsyncRelayCommand(OeffneArbeitsverzeichnisAsync, () => ShowFileExplorerPanel);
         OeffneIdeCommand = new AsyncRelayCommand(OeffneIdeAsync, () => KannIdeOeffnen);
         OeffneIdeAuswahlCommand = new AsyncRelayCommand(OeffneIdeAuswahlAsync, () => KannIdeOeffnen);
@@ -729,7 +729,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            WorkItem = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
+            WorkItem = await _workItemService.GetDetailAsync(_aufgabeId, ct);
             var darfCliAnzeigen = WorkItem?.ExecutionStatus.ShouldShowCli(WorkItem.Status) == true;
             IsCliRunning = darfCliAnzeigen && _kiService.IsRunning(_aufgabeId);
 
@@ -790,7 +790,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private async Task LadeProtokolleAsync(CancellationToken ct)
     {
         LogEntries.Clear();
-        var protokolleintraege = await _logService.GetByAufgabeAsync(_aufgabeId, ct);
+        var protokolleintraege = await _logService.GetByWorkItemAsync(_aufgabeId, ct);
         foreach (var entry in protokolleintraege)
             LogEntries.Add(entry);
     }
@@ -828,7 +828,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var pullRequests = await pullRequestService.GetByAufgabeAsync(_aufgabeId, ct);
+        var pullRequests = await pullRequestService.GetByWorkItemAsync(_aufgabeId, ct);
         foreach (var pullRequest in pullRequests)
         {
             PullRequests.Add(pullRequest);
@@ -853,7 +853,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             var monitoringService = _serviceProvider.GetService<PullRequestMonitoringService>();
             if (monitoringService is not null)
             {
-                await monitoringService.RefreshAufgabeAsync(_aufgabeId, ct);
+                await monitoringService.RefreshWorkItemAsync(_aufgabeId, ct);
             }
 
             await LadePullRequestsAsync(ct);
@@ -928,7 +928,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            await _aufgabeService.EndActiveRunAsync(_aufgabeId, ct);
+            await _workItemService.EndActiveRunAsync(_aufgabeId, ct);
             _dispatcherInvoke(() =>
             {
                 IsCliRunning = false;
@@ -954,7 +954,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task CliNeustartenAsync(CancellationToken ct)
+    private async Task RestartCliAsync(CancellationToken ct)
     {
         if (_aufgabeId == Guid.Empty || _aufgabe is null)
             return;
@@ -1093,13 +1093,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            if (!await _aufgabeService.CanCompleteTaskAsync(_aufgabeId, ct))
+            if (!await _workItemService.CanCompleteTaskAsync(_aufgabeId, ct))
             {
                 FehlerMeldung = string.Format(WorkItemService.OpenTodosErrorMessageFormat, _todoListViewModel.OffeneTodoCount);
                 return;
             }
 
-            await _entwicklungsprozessService.AbschliessenAsync(_aufgabeId, ct);
+            await _entwicklungsprozessService.CompleteAsync(_aufgabeId, ct);
             await LadenAsync(ct);
         }
         catch (OperationCanceledException)
@@ -1123,7 +1123,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            await _aufgabeService.UpdateAsync(_aufgabeId, _editTitel ?? string.Empty, _editAnforderungsBeschreibung, null, ct);
+            await _workItemService.UpdateAsync(_aufgabeId, _editTitel ?? string.Empty, _editAnforderungsBeschreibung, null, ct);
             await LadenAsync(ct);
 
             try
@@ -1165,7 +1165,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            await _aufgabeService.DeleteAsync(_aufgabeId, ct);
+            await _workItemService.DeleteAsync(_aufgabeId, ct);
 
             try
             {
@@ -1273,7 +1273,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            await _aufgabeService.UpdateIssueReferenzAsync(_aufgabeId, selectedIssue, ct);
+            await _workItemService.UpdateIssueReferenceAsync(_aufgabeId, selectedIssue, ct);
             await LadenAsync(ct);
         }
         catch (OperationCanceledException)
@@ -1292,7 +1292,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (_aufgabe == null)
             return;
 
-        var aktuellerStand = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
+        var aktuellerStand = await _workItemService.GetDetailAsync(_aufgabeId, ct);
         if (aktuellerStand?.IssueReference is not null)
         {
             WorkItem = aktuellerStand;
@@ -1324,7 +1324,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             _aufgabe.RequirementDescription,
             preferredKiPluginPrefix,
             () => _aufgabe?.IssueReference is not null,
-            async token => (await _aufgabeService.GetDetailAsync(_aufgabeId, token))?.IssueReference is not null,
+            async token => (await _workItemService.GetDetailAsync(_aufgabeId, token))?.IssueReference is not null,
             ct);
 
         var dialogResult = await _dialogService.ShowIssueCreateDialogAsync(dialogVm, ct);
@@ -1337,7 +1337,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var standVorZuordnung = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
+            var standVorZuordnung = await _workItemService.GetDetailAsync(_aufgabeId, ct);
             if (standVorZuordnung?.IssueReference is not null)
             {
                 WorkItem = standVorZuordnung;
@@ -1351,14 +1351,14 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                     : dialogResult.LocalBody ?? string.Empty
                 : null;
 
-            if (!await _aufgabeService.TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(
+            if (!await _workItemService.TryAssignIssueReferenceAndUpdateDescriptionIfNoneAsync(
                     _aufgabeId,
                     createdIssue,
                     dialogResult.UpdateTaskDescription,
                     neueAnforderungsBeschreibung,
                     ct))
             {
-                var standNachFehlgeschlagenerZuordnung = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
+                var standNachFehlgeschlagenerZuordnung = await _workItemService.GetDetailAsync(_aufgabeId, ct);
                 if (standNachFehlgeschlagenerZuordnung is not null)
                 {
                     WorkItem = standNachFehlgeschlagenerZuordnung;
@@ -1409,7 +1409,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             return issue.IssueUrl;
         }
 
-        return issue.Nummer > 0 ? $"#{issue.Nummer}" : issue.Title;
+        return issue.Number > 0 ? $"#{issue.Number}" : issue.Title;
     }
 
     private void IssueBrowserOeffnen()
@@ -1575,8 +1575,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _disposed = true;
 
         _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
-        _promptZeitVersandService.PromptSent -= OnPromptSent;
-        _promptZeitVersandService.ScheduledPromptChanged -= OnScheduledPromptChanged;
+        _promptScheduleDispatchService.PromptSent -= OnPromptSent;
+        _promptScheduleDispatchService.ScheduledPromptChanged -= OnScheduledPromptChanged;
         // Kein CancelScheduledPrompt mehr: Ein persistierter Plan überlebt das Verlassen der Ansicht.
         AttachCliStatusSession(null);
         _ladenCts?.Cancel();
@@ -1587,7 +1587,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _protokollLadenCts = null;
     }
 
-    private async Task StartenAsync(CancellationToken ct)
+    private async Task StartAsync(CancellationToken ct)
     {
         if (_aufgabeId == Guid.Empty || _aufgabe is null)
             return;
@@ -1709,12 +1709,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         AktiverCliName = ResolveKiPluginName(pluginPrefix) ?? pluginPrefix;
         try
         {
-            await _entwicklungsprozessService.CliNeustartenAsync(_aufgabeId, pluginPrefix, optionalParameters, ct);
+            await _entwicklungsprozessService.RestartCliAsync(_aufgabeId, pluginPrefix, optionalParameters, ct);
 
             SelectedKiPluginPrefix = pluginPrefix;
             if (!_kiService.IsRunning(_aufgabeId))
             {
-                await _aufgabeService.EndActiveRunAsync(_aufgabeId, ct);
+                await _workItemService.EndActiveRunAsync(_aufgabeId, ct);
                 IsCliRunning = false;
                 AktiverCliName = null;
                 return;
@@ -1727,12 +1727,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             // innerhalb der serialisierten Schreibphase erneut ausgewertet: Endet der Prozess zwischen
             // dem IsRunning-Check oben und der Persistenz, wird kein Phantom-Lauf geschrieben, und der
             // geschriebene Substatus ist der frischeste Session-Stand (TOCTOU-/Stale-Write-Fix).
-            await _aufgabeService.EnsureActiveRunAsync(
+            await _workItemService.EnsureActiveRunAsync(
                 _aufgabeId,
-                laufStatusProvider: () => _kiService.GetTerminalSession(_aufgabeId)?.RuntimeStatus.ToAufgabeLaufStatus(),
+                runStatusProvider: () => _kiService.GetTerminalSession(_aufgabeId)?.RuntimeStatus.ToWorkItemRunStatus(),
                 ct,
-                laeuftGuard: () => _kiService.IsRunning(_aufgabeId));
-            _laufdatenChangedNotifier?.NotifyLaufdatenChanged(_aufgabeId);
+                runningGuard: () => _kiService.IsRunning(_aufgabeId));
+            _runDataChangedNotifier?.NotifyRunDataChanged(_aufgabeId);
 
             var session = _kiService.GetTerminalSession(_aufgabeId);
             if (session != null)
@@ -1754,11 +1754,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (VerfuegbareKiPlugins.Count == 1)
         {
             var einzigesPluginPrefix = VerfuegbareKiPlugins[0];
-            await _aufgabeService.UpdateAsync(_aufgabeId, workItem.Title, workItem.RequirementDescription, einzigesPluginPrefix, ct);
+            await _workItemService.UpdateAsync(_aufgabeId, workItem.Title, workItem.RequirementDescription, einzigesPluginPrefix, ct);
             workItem.AiPluginPrefix = einzigesPluginPrefix;
             SelectedKiPluginPrefix = einzigesPluginPrefix;
             SetAktiverCliName(einzigesPluginPrefix);
-            _laufdatenChangedNotifier?.NotifyLaufdatenChanged(_aufgabeId);
+            _runDataChangedNotifier?.NotifyRunDataChanged(_aufgabeId);
             return einzigesPluginPrefix;
         }
 
@@ -1775,11 +1775,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             await _pluginSelectionService.SaveProjectDefaultPluginPrefixAsync(workItem.ProjectId, PluginType.DevelopmentAutomation, dialogResult.SelectedPluginPrefix, ct);
         }
 
-        await _aufgabeService.UpdateAsync(_aufgabeId, workItem.Title, workItem.RequirementDescription, dialogResult.SelectedPluginPrefix, ct);
+        await _workItemService.UpdateAsync(_aufgabeId, workItem.Title, workItem.RequirementDescription, dialogResult.SelectedPluginPrefix, ct);
         workItem.AiPluginPrefix = dialogResult.SelectedPluginPrefix;
         SelectedKiPluginPrefix = dialogResult.SelectedPluginPrefix;
         SetAktiverCliName(dialogResult.SelectedPluginPrefix);
-        _laufdatenChangedNotifier?.NotifyLaufdatenChanged(_aufgabeId);
+        _runDataChangedNotifier?.NotifyRunDataChanged(_aufgabeId);
 
         return dialogResult.SelectedPluginPrefix;
     }
@@ -1788,7 +1788,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     {
         if (ReferenceEquals(_cliStatusSession, session))
         {
-            UpdateCliStatusText(session?.RuntimeStatus ?? CliRuntimeStatus.Inaktiv);
+            UpdateCliStatusText(session?.RuntimeStatus ?? CliRuntimeStatus.Inactive);
             return;
         }
 
@@ -1804,7 +1804,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
         else
         {
-            UpdateCliStatusText(CliRuntimeStatus.Inaktiv);
+            UpdateCliStatusText(CliRuntimeStatus.Inactive);
         }
     }
 
@@ -1819,7 +1819,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             CliRuntimeStatus.Running => "CLI-Status: Ausführung läuft",
             CliRuntimeStatus.WaitingForInput => "CLI-Status: Wartet auf Eingabe",
-            CliRuntimeStatus.Inaktiv => "CLI inaktiv",
+            CliRuntimeStatus.Inactive => "CLI inaktiv",
             _ => "CLI-Status: unbekannt"
         };
 
@@ -1850,16 +1850,16 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         FehlerMeldung = null;
 
-        var jetzt = _timeProvider.GetLocalNow();
+        var now = _timeProvider.GetLocalNow();
         var stunde = _scheduledPromptTargetHours ?? 0;
         var minute = _scheduledPromptTargetMinutes ?? 0;
-        var targetTime = new DateTimeOffset(new DateTime(jetzt.Year, jetzt.Month, jetzt.Day, stunde, minute, 0), jetzt.Offset);
+        var targetTime = new DateTimeOffset(new DateTime(now.Year, now.Month, now.Day, stunde, minute, 0), now.Offset);
 
         var prompt = _promptVorlagenPlatzhalterService.Resolve(_selectedPromptVorlage.PromptText, _aufgabe);
         if (string.IsNullOrWhiteSpace(prompt))
             return;
 
-        await _promptZeitVersandService.SchedulePromptAsync(_aufgabeId, prompt, targetTime);
+        await _promptScheduleDispatchService.SchedulePromptAsync(_aufgabeId, prompt, targetTime);
 
         // targetTime kann bereits erreicht/vergangen sein (z. B. Uhrzeit des heutigen Tages liegt vor "jetzt")
         // oder vom Service auf ein Pausenende verschoben worden sein — die Anzeige wird daher immer aus
@@ -1895,7 +1895,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Spiegelt den Wartestellungs-Zustand des <see cref="PromptScheduleDispatchService"/> in die Statusanzeige.</summary>
     private void AktualisiereWartestellungsAnzeige()
     {
-        if (_promptZeitVersandService.GetScheduledPromptStatus(_aufgabeId) is { } status)
+        if (_promptScheduleDispatchService.GetScheduledPromptStatus(_aufgabeId) is { } status)
         {
             if (status.WaitingForSession)
             {
@@ -2279,9 +2279,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 return;
 
             var pausedUntilUtc = result.Aufheben ? null : result.PausedUntilUtc;
-            await _aufgabeService.SetPauseAsync(_aufgabeId, pausedUntilUtc, ct);
+            await _workItemService.SetPauseAsync(_aufgabeId, pausedUntilUtc, ct);
             await LadenAsync(ct);
-            _laufdatenChangedNotifier?.NotifyLaufdatenChanged(_aufgabeId);
+            _runDataChangedNotifier?.NotifyRunDataChanged(_aufgabeId);
         }
         catch (OperationCanceledException)
         {

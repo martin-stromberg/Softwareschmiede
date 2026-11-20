@@ -82,11 +82,11 @@ public sealed class ScmIssuePreparationService(
     /// jetzt) und markiert die zum Beobachtungsbeginn bereits bekannten Issue-Referenzen ohne
     /// Beschreibungs-Read als ausgewertet (Endzustand) — kein retroaktiver Scan des Bestands.</summary>
     /// <param name="repository">Die kanonische Ereignis-Identität des Repositorys.</param>
-    /// <param name="ausgewertet">Bereits zum Beobachtungsbeginn bekannte Issue-Referenzen
+    /// <param name="evaluated">Bereits zum Beobachtungsbeginn bekannte Issue-Referenzen
     /// (leer, wenn nur die Baseline angelegt wird).</param>
     /// <param name="ct">Abbruchtoken.</param>
-    internal async Task BaselineAnlegenAsync(ScmEventRepository repository,
-        IReadOnlyList<ScmEventReference> ausgewertet, CancellationToken ct)
+    internal async Task CreateBaselineAsync(ScmEventRepository repository,
+        IReadOnlyList<ScmEventReference> evaluated, CancellationToken ct)
     {
         var baselineKey = BaselineKey(repository);
         db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
@@ -94,7 +94,7 @@ public sealed class ScmIssuePreparationService(
             SourceKey = baselineKey,
             WatermarkUtc = time.GetUtcNow().ToUnixTimeMilliseconds()
         });
-        foreach (var issue in ausgewertet)
+        foreach (var issue in evaluated)
             db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
             {
                 SourceKey = EvaluationCheckpointKey(issue),
@@ -142,23 +142,23 @@ public sealed class ScmIssuePreparationService(
     /// Provider-Repository auflösen; nur <see cref="GitRepository.IssuePreparationEnabled"/>
     /// freigeschaltete erzeugen Aufbereitungsaufträge.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    public async Task ErkennenUndEinreihenAsync(IScmEventSource source, ScmEventReference reference,
+    public async Task DetectAndEnqueueAsync(IScmEventSource source, ScmEventReference reference,
         ScmEventBatch batch, IReadOnlyList<GitRepository> repositories, CancellationToken ct = default)
     {
-        var freigeschaltet = repositories.Where(x => x.IssuePreparationEnabled)
+        var unlocked = repositories.Where(x => x.IssuePreparationEnabled)
             .OrderBy(x => x.RepositoryUrl, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Id).ToList();
-        if (freigeschaltet.Count == 0 || batch.Observations.Count == 0)
+        if (unlocked.Count == 0 || batch.Observations.Count == 0)
             return;
         var baseline = await db.ScmObservationCheckpoints.FindAsync([BaselineKey(reference.Repository)], ct);
         if (baseline is null)
         {
             // Erstbeobachtung der Quelle: Baseline ohne Auslösung — kein retroaktiver Scan des
             // Bestands. Jede beobachtete Beobachtung hat zwangsläufig CreatedAt <= jetzt.
-            await BaselineAnlegenAsync(reference.Repository, [], ct);
+            await CreateBaselineAsync(reference.Repository, [], ct);
             return;
         }
         var baselineUtc = baseline.WatermarkUtc ?? 0;
-        var repository = freigeschaltet[0];
+        var repository = unlocked[0];
         if (await SkipEvaluationAsync(reference, ct))
             return; // Bereits ausgewertet bzw. Fehler-Backoff noch nicht erreicht.
         foreach (var observation in batch.Observations)
@@ -186,7 +186,7 @@ public sealed class ScmIssuePreparationService(
                 ObservationJson = JsonSerializer.Serialize(observation, ScmEventStore.JsonOptions),
                 ReceivedUtc = time.GetUtcNow().ToUnixTimeMilliseconds(),
                 Purpose = Purpose,
-                Reason = $"Interner Aufbereitungsauftrag für Issue #{issue.Nummer}."
+                Reason = $"Interner Aufbereitungsauftrag für Issue #{issue.Number}."
             };
             db.ScmIncomingEvents.Add(item);
             db.LogEntries.Add(new LogEntry
@@ -194,7 +194,7 @@ public sealed class ScmIssuePreparationService(
                 Id = Guid.NewGuid(),
                 WorkItemId = task.Id,
                 Type = LogEntryType.SystemMessage,
-                Content = $"Issue-Aufbereitung für Issue #{issue.Nummer} eingereiht (interner, trigger-freier Auftrag).",
+                Content = $"Issue-Aufbereitung für Issue #{issue.Number} eingereiht (interner, trigger-freier Auftrag).",
                 Timestamp = time.GetUtcNow()
             });
             try

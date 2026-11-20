@@ -12,11 +12,11 @@ public sealed class ScmEventValidationService
 
     /// <summary>Ablehnungsgrund, wenn im Modus <see cref="ScmKontoModus.SeparatesKonto"/> keine frei
     /// stehende Erwähnung des separaten Kontos vorliegt.</summary>
-    public const string KeineErwaehnungRejection = "Keine Erwähnung des separaten Kontos";
+    public const string NoMentionRejection = "Keine Erwähnung des separaten Kontos";
 
     /// <summary>Ablehnungsgrund, wenn das aktive Ereignis-Konto auf den beobachteten Kommentar
     /// bereits remote reagiert hat (instanzübergreifende Duplikaterkennung).</summary>
-    public const string BereitsReagiertRejection = "Bereits mit dem Konto reagiert";
+    public const string AlreadyReactedRejection = "Bereits mit dem Konto reagiert";
 
     private const string QuoteChars = "'\"`´‚‘’„“”«»";
 
@@ -39,20 +39,20 @@ public sealed class ScmEventValidationService
     public static string? GetRejection(ScmEventObservation observation, string? triggerKeyword = null)
     {
         var repository = observation.Reference.Repository;
-        var separat = repository.Account == ScmKontoModus.SeparatesKonto;
+        var separate = repository.Account == ScmKontoModus.SeparatesKonto;
         // Trigger je Modus: Benutzerkonto = konfiguriertes Keyword, SeparatesKonto = frei stehende
         // Erwähnung des separaten Kontos (Viewer = Bot-Identität).
-        if (separat
+        if (separate
                 ? !HasFreeStandingTrigger(observation.Body, "@" + repository.ViewerLogin)
                 : !HasFreeStandingTrigger(observation.Body, NormalizeTriggerKeyword(triggerKeyword)))
-            return separat ? KeineErwaehnungRejection : "Kein Trigger";
+            return separate ? NoMentionRejection : "Kein Trigger";
         // Eine Kontoreaktion am Kommentar bedeutet: eine andere Instanz (oder dieser Kommentar
         // zuvor) hat die Verarbeitung bereits quittiert — keine erneute Aufnahme. Beschränkt auf
         // Kommentar-Arten, weil nur diese remote eine Empfangsreaktion tragen können.
         if (observation.ContentKind is (ScmContentKind.IssueComment or ScmContentKind.ReviewComment
                 or ScmContentKind.PullRequestReview) && observation.ViewerHasReacted)
-            return BereitsReagiertRejection;
-        if (!separat && !SameIdentity(repository.OwnerId, repository.Owner, repository.ViewerId, repository.ViewerLogin))
+            return AlreadyReactedRejection;
+        if (!separate && !SameIdentity(repository.OwnerId, repository.Owner, repository.ViewerId, repository.ViewerLogin))
             return "Angemeldeter Benutzer ist nicht Repository-Owner";
         var edited = observation.LastEditedAt is not null;
         var actorId = edited ? observation.EditorId : observation.AuthorId;

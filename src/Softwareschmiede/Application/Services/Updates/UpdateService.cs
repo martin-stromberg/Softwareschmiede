@@ -41,7 +41,7 @@ public sealed class UpdateService : IUpdateService
                 return UpdateCheckResult.NotCheckable("Lokale Version ist nicht prüfbar.");
 
             var lookup = await _releaseClient.GetLatestReleaseAsync(options, ct);
-            if (!lookup.Erfolg)
+            if (!lookup.Success)
                 return UpdateCheckResult.NotCheckable("GitHub-Release ist nicht prüfbar.");
 
             var latest = lookup.Release;
@@ -60,12 +60,12 @@ public sealed class UpdateService : IUpdateService
             // Konsistenzwarnung: Passt der Installationskanal nicht zum gewählten Kanal, wird
             // das Update trotzdem angeboten — der Konflikt reist als nicht-blockierender
             // Hinweis auf dem Ergebnis mit.
-            var installationsKanal = UpdatePathChannelResolver.ErmittleKanalFuerTagName(installed.TagName);
-            if (installationsKanal != options.Channel)
+            var installationChannel = UpdatePathChannelResolver.ResolveChannelForTagName(installed.TagName);
+            if (installationChannel != options.Channel)
             {
                 _logger.LogWarning(
                     "Update-Kanal {GewaehlterKanal} passt nicht zum Kanal {InstallationsKanal} der installierten Version {TagName}.",
-                    options.Channel, installationsKanal, installed.TagName);
+                    options.Channel, installationChannel, installed.TagName);
                 return UpdateCheckResult.UpdateAvailable(
                     latest,
                     "Der gewählte Update-Pfad passt nicht zur installierten Version. Das Update wird trotzdem angeboten.");

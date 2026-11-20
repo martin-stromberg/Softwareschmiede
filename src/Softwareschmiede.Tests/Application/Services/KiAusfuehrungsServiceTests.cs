@@ -784,7 +784,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             if (status == CliProcessStatus.Started)
                 gestartetCount++;
         };
-        _sut.CliLaufAktiv += _ => laufAktivCount++;
+        _sut.CliRunActive += _ => laufAktivCount++;
 
         var handle = await _sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         gestartetCount.Should().Be(1);
@@ -804,13 +804,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         var workItemId = Guid.NewGuid();
         var laufAktivCount = 0;
-        _sut.CliLaufAktiv += _ => laufAktivCount++;
+        _sut.CliRunActive += _ => laufAktivCount++;
 
-        _sut.NotifyLaufAktiv(workItemId);
+        _sut.NotifyRunActive(workItemId);
         laufAktivCount.Should().Be(0, "ohne laufendes Handle ist NotifyLaufAktiv ein No-Op");
 
         await _sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
-        _sut.NotifyLaufAktiv(workItemId);
+        _sut.NotifyRunActive(workItemId);
 
         laufAktivCount.Should().Be(1);
     }
@@ -854,7 +854,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         // Ein Process-Objekt ohne zugeordneten Prozess wirft bei HasExited — wird als nicht laufend gewertet.
         PlantHandle(nichtZugeordnet, new CliProcessHandle(nichtZugeordnet, new System.Diagnostics.Process()));
 
-        _sut.GetLaufendeAufgabenIds().Should().ContainSingle()
+        _sut.GetRunningWorkItemIds().Should().ContainSingle()
             .Which.Should().Be(laufend);
     }
 
@@ -969,10 +969,10 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         });
         await db.SaveChangesAsync();
 
-        var aufgabeService = scope.ServiceProvider.GetRequiredService<WorkItemService>();
-        var workItem = await aufgabeService.CreateAsync(projectId, "Prozessende-Aufgabe", "Beschreibung");
-        await aufgabeService.StartenAsync(workItem.Id, "feature/prozessende", Path.GetTempPath());
-        await aufgabeService.SetActiveRunAsync(workItem.Id, "lauf-prozessende");
+        var workItemService = scope.ServiceProvider.GetRequiredService<WorkItemService>();
+        var workItem = await workItemService.CreateAsync(projectId, "Prozessende-Aufgabe", "Beschreibung");
+        await workItemService.StartAsync(workItem.Id, "feature/prozessende", Path.GetTempPath());
+        await workItemService.SetActiveRunAsync(workItem.Id, "lauf-prozessende");
 
         return (workItem.Id, projectId);
     }

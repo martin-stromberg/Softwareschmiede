@@ -227,7 +227,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
 
         sut.WiedergabeStartenCommand.Execute(null);
         var replay = (TerminalReplaySession)sut.Session!;
-        await WarteBisAsync(() => replay.AktuellerChunkIndex >= 1);
+        await WarteBisAsync(() => replay.CurrentChunkIndex >= 1);
 
         sut.WiedergabePausierenCommand.Execute(null);
         sut.IsPaused.Should().BeTrue();
@@ -237,7 +237,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         // Pausiert-Zustand ab, ohne dass der Chunk angewendet wird.
         _timeProvider.Advance(TimeSpan.FromMinutes(10));
         await Task.Delay(150, TestContext.Current.CancellationToken);
-        replay.AktuellerChunkIndex.Should().Be(1,
+        replay.CurrentChunkIndex.Should().Be(1,
             "während der Pausierung darf kein weiterer Chunk angewendet werden");
 
         sut.WiedergabePausierenCommand.Execute(null);
@@ -252,7 +252,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             _timeProvider.Advance(TimeSpan.FromMinutes(10));
             return sut.StatusText == "Wiedergabe beendet.";
         }, TimeSpan.FromSeconds(15));
-        replay.AktuellerChunkIndex.Should().Be(2);
+        replay.CurrentChunkIndex.Should().Be(2);
     }
 
     /// <summary>Nach einem beendeten Durchlauf startet „Abspielen" die Aufzeichnung echt erneut
@@ -280,7 +280,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             "ein erneutes Abspielen erzeugt eine frische Session ab Position 0");
 
         await WarteBisAsync(() => sut.StatusText == "Wiedergabe beendet.");
-        zweiteSession.AktuellerChunkIndex.Should().Be(2,
+        zweiteSession.CurrentChunkIndex.Should().Be(2,
             "die zweite Wiedergabe muss die Aufzeichnung tatsächlich nochmals durchlaufen");
         sut.AktuellerQuellEintrag.Should().BeSameAs(sut.QuellEintraege[1]);
     }
@@ -387,7 +387,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             "ohne laufende Wiedergabe ist der Neustart-Command deaktiviert");
 
         sut.WiedergabeStartenCommand.Execute(null);
-        await WarteBisAsync(() => erste.AktuellerChunkIndex >= 1);
+        await WarteBisAsync(() => erste.CurrentChunkIndex >= 1);
         sut.WiedergabePausierenCommand.Execute(null);
         sut.IsPaused.Should().BeTrue();
 
@@ -401,7 +401,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.IstWiedergabeAktiv.Should().BeTrue();
         sut.StatusText.Should().Be("Wiedergabe läuft.");
 
-        await WarteBisAsync(() => zweite.AktuellerChunkIndex >= 1);
+        await WarteBisAsync(() => zweite.CurrentChunkIndex >= 1);
         // Die nächste Inter-Chunk-Pause (5 min → 1-s-Schwelle) wird ggf. erst nach dem
         // Index-Update auf der Schleife angelegt — wiederholte Advances decken die
         // Registrierungsreihenfolge ab.
@@ -410,7 +410,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             _timeProvider.Advance(TimeSpan.FromMinutes(10));
             return sut.StatusText == "Wiedergabe beendet.";
         });
-        zweite.AktuellerChunkIndex.Should().Be(2,
+        zweite.CurrentChunkIndex.Should().Be(2,
             "der Neustart muss die Aufzeichnung tatsächlich nochmals vollständig durchlaufen");
     }
 
@@ -523,7 +523,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
 
         // Laufend unpausiert (die Schleife parkt im Delay des zweiten Chunks): beide inaktiv.
         sut.WiedergabeStartenCommand.Execute(null);
-        await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
+        await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
         sut.IstWiedergabeAktiv.Should().BeTrue();
         sut.IsPaused.Should().BeFalse();
         sut.SchrittVorCommand.CanExecute(null).Should().BeFalse(
@@ -576,14 +576,14 @@ public sealed class KonsolenTestViewModelTests : IDisposable
 
         // Laufend unpausiert: die Schleife parkt im Delay des zweiten Chunks.
         sut.WiedergabeStartenCommand.Execute(null);
-        await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
+        await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
         sut.IstWiedergabeAktiv.Should().BeTrue();
         sut.IsPaused.Should().BeFalse();
 
         sut.SchrittVorCommand.Execute(null);
         sut.SchrittZurueckCommand.Execute(null);
 
-        session.AktuellerChunkIndex.Should().Be(1,
+        session.CurrentChunkIndex.Should().Be(1,
             "programmatische Schritte während unpausierter Wiedergabe dürfen die Position nicht verändern");
         sut.PositionsText.Should().Be("Chunk 1/2");
         sut.StatusText.Should().Be("Wiedergabe läuft.");
@@ -626,7 +626,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.StatusText.Should().BeOneOf("Wiedergabe läuft.", "Wiedergabe beendet.");
 
         await WarteBisAsync(() => sut.StatusText == "Wiedergabe beendet.");
-        zweiteSession.AktuellerChunkIndex.Should().Be(3,
+        zweiteSession.CurrentChunkIndex.Should().Be(3,
             "der Neustart muss die Aufzeichnung tatsächlich von vorn durchlaufen");
     }
 
@@ -660,7 +660,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.Session.Should().BeSameAs(session,
             "nach einem Rückwärtsschritt aus dem Beendet-Zustand darf keine frische Session erzeugt werden");
         await WarteBisAsync(() => sut.StatusText == "Wiedergabe beendet.");
-        session.AktuellerChunkIndex.Should().Be(3,
+        session.CurrentChunkIndex.Should().Be(3,
             "die Wiedergabe setzt an der Schrittposition fort und wendet nur den fehlenden Chunk an");
     }
 
@@ -692,7 +692,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var session = (TerminalReplaySession)sut.Session!;
 
         sut.WiedergabeStartenCommand.Execute(null);
-        await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
+        await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
         sut.WiedergabePausierenCommand.Execute(null);
         sut.IsPaused.Should().BeTrue();
 
@@ -710,13 +710,13 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         await WarteBisAsync(() =>
         {
             _timeProvider.Advance(TimeSpan.FromMinutes(10));
-            return session.AktuellerChunkIndex >= 2;
+            return session.CurrentChunkIndex >= 2;
         });
         await WarteBisAsync(() =>
         {
             _timeProvider.Advance(TimeSpan.FromMinutes(10));
             return sut.StatusText == "Wiedergabe beendet.";
         });
-        session.AktuellerChunkIndex.Should().Be(3);
+        session.CurrentChunkIndex.Should().Be(3);
     }
 }

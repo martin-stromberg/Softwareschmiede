@@ -11,7 +11,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly LogService _logService;
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly ProjectService _projektService;
     private Guid _aufgabeId;
 
@@ -20,7 +20,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
-        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
     }
 
@@ -30,7 +30,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
     private async Task SeedAufgabeAsync()
     {
         var project = await _projektService.CreateAsync("Log-Projekt", null);
-        var workItem = await _aufgabeService.CreateAsync(project.Id, "Log-Aufgabe", null);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Log-Aufgabe", null);
         _aufgabeId = workItem.Id;
     }
 
@@ -43,7 +43,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
         await _logService.AddCliOutputAsync(_aufgabeId, "Zeile 1 der Ausgabe", TestContext.Current.CancellationToken);
         await _logService.AddCliOutputAsync(_aufgabeId, "Zeile 2 der Ausgabe", TestContext.Current.CancellationToken);
 
-        var entries = await _logService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
+        var entries = await _logService.GetByWorkItemAsync(_aufgabeId, TestContext.Current.CancellationToken);
         entries.Should().HaveCount(2);
         entries.All(e => e.Type == LogEntryType.CliOutput).Should().BeTrue();
     }
@@ -58,7 +58,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
         foreach (var line in lines)
             await _logService.AddCliOutputAsync(_aufgabeId, line, TestContext.Current.CancellationToken);
 
-        var entries = await _logService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
+        var entries = await _logService.GetByWorkItemAsync(_aufgabeId, TestContext.Current.CancellationToken);
         entries.Should().HaveCount(5);
         for (var i = 0; i < lines.Count; i++)
             entries[i].Content.Should().Be(lines[i]);
@@ -70,9 +70,9 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
     {
         await SeedAufgabeAsync();
 
-        await _logService.AddStatusUebergangAsync(_aufgabeId, WorkItemStatus.New, WorkItemStatus.Started, TestContext.Current.CancellationToken);
+        await _logService.AddStatusTransitionAsync(_aufgabeId, WorkItemStatus.New, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
-        var entries = await _logService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
+        var entries = await _logService.GetByWorkItemAsync(_aufgabeId, TestContext.Current.CancellationToken);
         entries.Should().HaveCount(1);
         entries[0].Type.Should().Be(LogEntryType.StatusTransition);
         entries[0].Content.Should().Contain("Gestartet");

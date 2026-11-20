@@ -240,7 +240,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         await SetModusAsync(fixture, ScmBackmergeMode.Global);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppSettingService>()
-                .SetScmBackmergeDraftAktivierungAsync(true, TestContext.Current.CancellationToken);
+                .SetScmBackmergeDraftActivationAsync(true, TestContext.Current.CancellationToken);
         fixture.Git.As<IScmEventSource>().Setup(x => x.EnumerateReferencesAsync(
                 It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5)]);
@@ -303,14 +303,14 @@ public sealed class ScmBackmergeMonitoringServiceTests
     {
         using var scope = fixture.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AppSettingService>()
-            .SetScmBackmergeModusAsync(mode);
+            .SetScmBackmergeModeAsync(mode);
     }
 
-    private static async Task SetProjektFlagAsync(ScmDispatchFixture fixture, Guid projectId, bool aktiv)
+    private static async Task SetProjektFlagAsync(ScmDispatchFixture fixture, Guid projectId, bool active)
     {
         using var scope = fixture.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AppSettingService>()
-            .SetBackmergeProjektAktivAsync(projectId, aktiv);
+            .SetBackmergeProjectEnabledAsync(projectId, active);
     }
 
     /// <summary>Konfiguriert Enumeration, Hauptbranch und PR-Status als mergebaren Backmerge (main → staging).</summary>

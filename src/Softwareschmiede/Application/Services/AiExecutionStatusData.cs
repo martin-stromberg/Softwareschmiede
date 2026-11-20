@@ -9,7 +9,7 @@ namespace Softwareschmiede.Application.Services;
 /// <param name="ActiveRunId">Aktive Lauf-ID der KI-Ausführung.</param>
 /// <param name="LastHeartbeatUtc">Zeitstempel des letzten Heartbeats einer aktiven Ausführung.</param>
 /// <param name="RunStatus">Persistierter Laufzeit-Substatus der aktiven CLI-Ausführung.</param>
-/// <param name="LiveLaufStatus">Live-Substatus aus der Laufzeitquelle (<c>null</c> = kein laufender gehandelter Prozess).</param>
+/// <param name="LiveRunStatus">Live-Substatus aus der Laufzeitquelle (<c>null</c> = kein laufender gehandelter Prozess).</param>
 /// <param name="HasScheduledPrompt">Gibt an, ob ein zeitgesteuerter Prompt in der Warteschlange steht.</param>
 /// <param name="PausedUntilUtc">UTC-Zeitpunkt, bis zu dem die Aufgabe pausiert ist (null oder Vergangenheit = nicht pausiert).</param>
 public sealed record AiExecutionStatusData(
@@ -18,7 +18,7 @@ public sealed record AiExecutionStatusData(
     string? ActiveRunId,
     DateTimeOffset? LastHeartbeatUtc,
     WorkItemRunStatus? RunStatus,
-    WorkItemRunStatus? LiveLaufStatus,
+    WorkItemRunStatus? LiveRunStatus,
     bool HasScheduledPrompt,
     DateTimeOffset? PausedUntilUtc)
 {
@@ -28,11 +28,11 @@ public sealed record AiExecutionStatusData(
     /// auf die positionsabhängige Parameterliste mappen.
     /// </summary>
     /// <param name="workItem">Quell-Entität.</param>
-    /// <param name="liveLaufStatus">Live-Substatus aus der Laufzeitquelle (<c>null</c> = kein laufender gehandelter Prozess).</param>
+    /// <param name="liveRunStatus">Live-Substatus aus der Laufzeitquelle (<c>null</c> = kein laufender gehandelter Prozess).</param>
     /// <param name="hasScheduledPrompt">Gibt an, ob ein zeitgesteuerter Prompt in der Warteschlange steht.</param>
-    public static AiExecutionStatusData VonAufgabe(
+    public static AiExecutionStatusData FromWorkItem(
         WorkItem workItem,
-        WorkItemRunStatus? liveLaufStatus,
+        WorkItemRunStatus? liveRunStatus,
         bool hasScheduledPrompt)
         => new(
             workItem.Status,
@@ -40,7 +40,7 @@ public sealed record AiExecutionStatusData(
             workItem.ActiveRunId,
             workItem.LastHeartbeatUtc,
             workItem.RunStatus,
-            liveLaufStatus,
+            liveRunStatus,
             hasScheduledPrompt,
             workItem.PausedUntilUtc);
 }

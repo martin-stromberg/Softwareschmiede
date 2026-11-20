@@ -496,17 +496,17 @@ public sealed class SettingsView : BaseWindowView
     /// <returns><c>true</c>, wenn das Element (und damit der Bereich) sichtbar ist.</returns>
     private bool IsBereichSichtbar(string automationName)
     {
-        var vorhanden = Window.FindFirstDescendant(cf => cf.ByName(automationName)) is not null;
+        var existing = Window.FindFirstDescendant(cf => cf.ByName(automationName)) is not null;
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
         while (DateTime.UtcNow < deadline)
         {
             Thread.Sleep(100);
             var aktuell = Window.FindFirstDescendant(cf => cf.ByName(automationName)) is not null;
-            if (aktuell == vorhanden)
+            if (aktuell == existing)
                 return aktuell;
-            vorhanden = aktuell;
+            existing = aktuell;
         }
-        return vorhanden;
+        return existing;
     }
 
     /// <summary>Liest, ob die Checkbox "Aufgaben automatisch starten" gesetzt ist.</summary>

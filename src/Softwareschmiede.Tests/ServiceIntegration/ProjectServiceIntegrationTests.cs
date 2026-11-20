@@ -11,14 +11,14 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly ProjectService _projektService;
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
 
     /// <summary>ProjectServiceIntegrationTests.</summary>
     public ProjectServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
-        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
     }
 
     /// <summary>Dispose.</summary>
@@ -32,7 +32,7 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
         project.Id.Should().NotBeEmpty();
         project.Name.Should().Be("Neues Projekt");
 
-        var workItem = await _aufgabeService.CreateAsync(project.Id, "Erste Aufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Erste Aufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
         workItem.Id.Should().NotBeEmpty();
         workItem.ProjectId.Should().Be(project.Id);
         workItem.Status.Should().Be(WorkItemStatus.New);
@@ -54,10 +54,10 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
     public async Task Aufgabe_KannInProjektGeladen_Werden()
     {
         var project = await _projektService.CreateAsync("Test Projekt", null, TestContext.Current.CancellationToken);
-        await _aufgabeService.CreateAsync(project.Id, "Aufgabe 1", null, ct: TestContext.Current.CancellationToken);
-        await _aufgabeService.CreateAsync(project.Id, "Aufgabe 2", null, ct: TestContext.Current.CancellationToken);
+        await _workItemService.CreateAsync(project.Id, "Aufgabe 1", null, ct: TestContext.Current.CancellationToken);
+        await _workItemService.CreateAsync(project.Id, "Aufgabe 2", null, ct: TestContext.Current.CancellationToken);
 
-        var workItems = await _aufgabeService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
+        var workItems = await _workItemService.GetByProjektAsync(project.Id, TestContext.Current.CancellationToken);
         workItems.Should().HaveCount(2);
         workItems.All(a => a.ProjectId == project.Id).Should().BeTrue();
     }

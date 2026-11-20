@@ -24,10 +24,10 @@ public sealed class EntwicklungsprozessServiceTests
         string aufgabeTitel = "Entwicklungsaufgabe")
     {
         var projektService = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
-        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         var project = await projektService.CreateAsync("Entwicklungstestprojekt", null);
-        var workItem = await aufgabeService.CreateAsync(project.Id, aufgabeTitel, "Mach etwas Tolles");
+        var workItem = await workItemService.CreateAsync(project.Id, aufgabeTitel, "Mach etwas Tolles");
         return (project.Id, workItem.Id);
     }
 
@@ -38,14 +38,14 @@ public sealed class EntwicklungsprozessServiceTests
         Mock<IKiPlugin> kiMock,
         IWorkingDirectoryResolver? workingDirectoryResolver = null)
     {
-        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var logService = new LogService(db.Context, NullLogger<LogService>.Instance);
         workingDirectoryResolver ??= new RuntimeWorkingDirectoryResolver(
             new WorkingDirectorySettingsService(db.Context, NullLogger<WorkingDirectorySettingsService>.Instance),
             NullLogger<RuntimeWorkingDirectoryResolver>.Instance);
 
         return new DevelopmentProcessService(
-            aufgabeService,
+            workItemService,
             logService,
             gitMock.Object,
             CreatePluginSelectionService(db, gitMock.Object, kiMock.Object),
@@ -109,10 +109,10 @@ public sealed class EntwicklungsprozessServiceTests
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektService = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
-        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var project = await projektService.CreateAsync("Issue-Branch-Projekt", null, TestContext.Current.CancellationToken);
         var issue = new Issue(55, "Issue-basierte Aufgabe", "Beschreibung", ["feature"], null, "https://github.com/test/repo/issues/55");
-        var workItem = await aufgabeService.CreateFromIssueAsync(project.Id, issue, ct: TestContext.Current.CancellationToken);
+        var workItem = await workItemService.CreateFromIssueAsync(project.Id, issue, ct: TestContext.Current.CancellationToken);
 
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -172,8 +172,8 @@ public sealed class EntwicklungsprozessServiceTests
         var (_, workItemId) = await CreateTestDataAsync(db);
 
         // Aufgabe zuerst starten
-        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        await aufgabeService.StartenAsync(workItemId, "task/test-branch", @"C:\nicht\vorhanden\pfad", ct: TestContext.Current.CancellationToken);
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        await workItemService.StartAsync(workItemId, "task/test-branch", @"C:\nicht\vorhanden\pfad", ct: TestContext.Current.CancellationToken);
 
         var gitMock = new Mock<IGitPlugin>();
         var kiMock = new Mock<IKiPlugin>();
@@ -181,7 +181,7 @@ public sealed class EntwicklungsprozessServiceTests
         var service = CreateService(db, gitMock, kiMock);
 
         // Act
-        await service.AbschliessenAsync(workItemId, TestContext.Current.CancellationToken);
+        await service.CompleteAsync(workItemId, TestContext.Current.CancellationToken);
 
         // Assert – Status und Protokolleintrag
         await using var db2 = db.CreateNewContext();

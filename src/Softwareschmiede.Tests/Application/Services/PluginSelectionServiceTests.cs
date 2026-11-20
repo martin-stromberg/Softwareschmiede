@@ -42,9 +42,9 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var aktiv = CreateKiPlugin("Aktiv", "Softwareschmiede.Aktiv");
+        var active = CreateKiPlugin("Aktiv", "Softwareschmiede.Aktiv");
         var deaktiviert = CreateKiPlugin("Deaktiviert", "Softwareschmiede.Deaktiviert");
-        var pluginManager = CreatePluginManager([aktiv, deaktiviert]);
+        var pluginManager = CreatePluginManager([active, deaktiviert]);
         var activationService = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
         await activationService.SetPluginEnabledAsync("Softwareschmiede.Deaktiviert", false, TestContext.Current.CancellationToken);
         var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);

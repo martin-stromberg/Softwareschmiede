@@ -1299,7 +1299,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
             {
                 var status = await GetPullRequestStatusAsync(repositoryId, prNumber, ct);
                 return new PullRequest(
-                    status.Nummer,
+                    status.Number,
                     status.Title,
                     status.Url,
                     status.SourceBranch,

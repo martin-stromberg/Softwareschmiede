@@ -103,8 +103,8 @@ public sealed partial class App : System.Windows.Application
         // das die Tabelle neu erzeugt, darf der Zugriff nicht vor der Migration erfolgen.
         try
         {
-            var promptZeitVersandService = _host.Services.GetRequiredService<PromptScheduleDispatchService>();
-            await promptZeitVersandService.RestoreScheduledPromptsAsync();
+            var promptScheduleDispatchService = _host.Services.GetRequiredService<PromptScheduleDispatchService>();
+            await promptScheduleDispatchService.RestoreScheduledPromptsAsync();
         }
         catch (Exception ex)
         {
@@ -177,7 +177,7 @@ public sealed partial class App : System.Windows.Application
     private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
     {
         var testDatenbankPfad = Environment.GetEnvironmentVariable(UpdateE2ETestConfiguration.TestDatenbankUmgebungsVariable);
-        var dbPath = DatabasePathResolver.ErmittlePfad(
+        var dbPath = DatabasePathResolver.ResolvePath(
             AppContext.BaseDirectory,
             testDatenbankPfad);
 
@@ -278,7 +278,7 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<IUpdateService, UpdateService>();
 
         // Infrastructure Services
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(TerminalSessionService.TestDatenbankPfadVariable)))
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(TerminalSessionService.TestDatabasePathVariable)))
         {
             services.AddSingleton<IProcessStarter>(sp => new RecordingProcessStarter(
                 sp.GetRequiredService<ILogger<RecordingProcessStarter>>(),
@@ -419,14 +419,14 @@ public sealed partial class App : System.Windows.Application
         // (UpdateService, Release-Auswahl, Paket-/Skript-Pipeline, ViewModel-Ablauf) bleibt echt.
         if (updateTestKontext is not null)
         {
-            var kontext = updateTestKontext;
-            var testwurzel = kontext.Configuration.Testwurzel;
+            var updateContext = updateTestKontext;
+            var testwurzel = updateContext.Configuration.Testwurzel;
 
             services.AddSingleton<IApplicationVersionProvider>(sp => new ApplicationVersionProvider(
-                kontext.Configuration.InstallationsVerzeichnis,
+                updateContext.Configuration.InstallationsVerzeichnis,
                 sp.GetRequiredService<ILogger<ApplicationVersionProvider>>()));
 
-            services.AddSingleton(sp => new HttpClient(new UpdateFixtureHttpMessageHandler(kontext)));
+            services.AddSingleton(sp => new HttpClient(new UpdateFixtureHttpMessageHandler(updateContext)));
             services.AddSingleton<IUpdateScriptService>(sp => new UpdateScriptService(
                 sp.GetRequiredService<IUpdateProcessLauncher>(),
                 sp.GetRequiredService<IOptions<UpdateOptions>>(),
@@ -438,12 +438,12 @@ public sealed partial class App : System.Windows.Application
                 sp.GetRequiredService<IOptions<UpdateOptions>>(),
                 sp.GetRequiredService<ILogger<UpdatePackageService>>(),
                 testwurzel));
-            services.AddSingleton<IUpdateProcessLauncher>(_ => new RecordingUpdateProcessLauncher(kontext));
-            services.AddSingleton<IApplicationShutdownService>(_ => new RecordingApplicationShutdownService(kontext));
-            services.AddScoped<ICliUpdateSafetyService>(_ => new FixtureCliUpdateSafetyService(kontext));
+            services.AddSingleton<IUpdateProcessLauncher>(_ => new RecordingUpdateProcessLauncher(updateContext));
+            services.AddSingleton<IApplicationShutdownService>(_ => new RecordingApplicationShutdownService(updateContext));
+            services.AddScoped<ICliUpdateSafetyService>(_ => new FixtureCliUpdateSafetyService(updateContext));
             services.AddSingleton<UpdateService>();
             services.AddSingleton<IUpdateService>(sp => new ProtokollierenderUpdateService(
-                sp.GetRequiredService<UpdateService>(), kontext));
+                sp.GetRequiredService<UpdateService>(), updateContext));
         }
     }
 }

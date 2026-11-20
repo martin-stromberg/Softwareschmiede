@@ -6,6 +6,6 @@ namespace Softwareschmiede.Application.Services;
 public sealed record AiWorkItemCompletionEvent(
     Guid EventId,
     Guid WorkItemId,
-    string Aufgabentitel,
+    string WorkItemTitle,
     WorkItemStatus CompletionStatus,
     DateTimeOffset Timestamp);

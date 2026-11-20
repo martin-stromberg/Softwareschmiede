@@ -38,11 +38,11 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 5, force: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
 
-        sut.CountdownEndeUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
-        sut.IstAktiviert.Should().BeTrue();
+        sut.CountdownEndUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
+        sut.IsEnabled.Should().BeTrue();
         shutdownService.RequestCount.Should().Be(0);
     }
 
@@ -56,7 +56,7 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 5, force: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
 
         timeProvider.Advance(TimeSpan.FromMinutes(4).Add(TimeSpan.FromSeconds(59)));
@@ -76,7 +76,7 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 2, force: true);
+        sut.SetOptions(toleranceMinutes: 2, force: true);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(2));
 
@@ -94,15 +94,15 @@ public sealed class AutoShutdownOrchestratorTests
         var notifier = new WorkItemRunDataChangedNotifier();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider, notifier);
 
-        sut.SetOptionen(toleranceMinutes: 5, force: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
-        var urspruenglichesEnde = sut.CountdownEndeUtc;
+        var urspruenglichesEnde = sut.CountdownEndUtc;
 
         timeProvider.Advance(TimeSpan.FromMinutes(2));
         runningSource.Raise(previous: 0, current: 0);
-        notifier.NotifyLaufdatenChanged(Guid.NewGuid());
+        notifier.NotifyRunDataChanged(Guid.NewGuid());
 
-        sut.CountdownEndeUtc.Should().Be(urspruenglichesEnde);
+        sut.CountdownEndUtc.Should().Be(urspruenglichesEnde);
         shutdownService.RequestCount.Should().Be(0);
     }
 
@@ -116,14 +116,14 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 5, force: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(1));
 
         count.Count = 1;
         runningSource.Raise(previous: 0, current: 1);
 
-        sut.CountdownEndeUtc.Should().BeNull();
+        sut.CountdownEndUtc.Should().BeNull();
         timeProvider.Advance(TimeSpan.FromMinutes(10));
         shutdownService.RequestCount.Should().Be(0);
     }
@@ -138,7 +138,7 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 5, force: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
 
         count.Count = 1;
@@ -148,7 +148,7 @@ public sealed class AutoShutdownOrchestratorTests
         count.Count = 0;
         runningSource.Raise(previous: 1, current: 0);
 
-        sut.CountdownEndeUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
+        sut.CountdownEndUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
 
         timeProvider.Advance(TimeSpan.FromMinutes(4).Add(TimeSpan.FromSeconds(59)));
         shutdownService.RequestCount.Should().Be(0);
@@ -166,12 +166,12 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 5, force: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
         sut.SetEnabled(false);
 
-        sut.CountdownEndeUtc.Should().BeNull();
-        sut.IstAktiviert.Should().BeFalse();
+        sut.CountdownEndUtc.Should().BeNull();
+        sut.IsEnabled.Should().BeFalse();
         timeProvider.Advance(TimeSpan.FromMinutes(10));
         shutdownService.RequestCount.Should().Be(0);
     }
@@ -192,7 +192,7 @@ public sealed class AutoShutdownOrchestratorTests
 
         runningSource.Raise(previous: 0, current: 1);
         runningSource.Raise(previous: 1, current: 0);
-        notifier.NotifyLaufdatenChanged(Guid.NewGuid());
+        notifier.NotifyRunDataChanged(Guid.NewGuid());
         timeProvider.Advance(TimeSpan.FromMinutes(10));
         await Task.Delay(100, TestContext.Current.CancellationToken);
 
@@ -220,13 +220,13 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 5, force: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(4));
 
-        sut.SetOptionen(toleranceMinutes: 2, force: false);
+        sut.SetOptions(toleranceMinutes: 2, force: false);
 
-        sut.CountdownEndeUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(2));
+        sut.CountdownEndUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(2));
         timeProvider.Advance(TimeSpan.FromMinutes(2));
         shutdownService.RequestCount.Should().Be(1);
     }
@@ -241,7 +241,7 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 5, force: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
 
         // Anzahl wird erst unmittelbar vor dem Ablauf positiv (Final-Recheck / Sicherheits-Tick).
@@ -249,7 +249,7 @@ public sealed class AutoShutdownOrchestratorTests
         timeProvider.Advance(TimeSpan.FromMinutes(5));
 
         shutdownService.RequestCount.Should().Be(0);
-        sut.CountdownEndeUtc.Should().BeNull();
+        sut.CountdownEndUtc.Should().BeNull();
     }
 
     /// <summary>Der Shutdown wird pro Null-Phase hoechstens einmal angefordert.</summary>
@@ -262,7 +262,7 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 1, force: false);
+        sut.SetOptions(toleranceMinutes: 1, force: false);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(1));
         shutdownService.RequestCount.Should().Be(1);
@@ -284,7 +284,7 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 1, force: false);
+        sut.SetOptions(toleranceMinutes: 1, force: false);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(1));
         shutdownService.RequestCount.Should().Be(1);
@@ -312,12 +312,12 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 5, force: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(5));
 
         shutdownService.RequestCount.Should().Be(1);
-        sut.CountdownEndeUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5),
+        sut.CountdownEndUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5),
             "ein fehlgeschlagener Shutdown-Aufruf darf das Feature nicht für den Rest der Null-Phase blockieren");
 
         shutdownService.ThrowOnRequest = false;
@@ -337,7 +337,7 @@ public sealed class AutoShutdownOrchestratorTests
 
         var act = () => sut.SetEnabled(true);
         act.Should().NotThrow();
-        sut.CountdownEndeUtc.Should().BeNull();
+        sut.CountdownEndUtc.Should().BeNull();
         shutdownService.RequestCount.Should().Be(0);
     }
 
@@ -354,19 +354,19 @@ public sealed class AutoShutdownOrchestratorTests
         var timeProvider = new FakeTimeProvider();
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranceMinutes: 5, force: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
 
         count.ThrowOnZaehlen = true;
         timeProvider.Advance(TimeSpan.FromMinutes(5));
 
-        sut.CountdownEndeUtc.Should().BeNull("der abgelaufene One-Shot-Timer darf keinen toten Countdown hinterlassen");
+        sut.CountdownEndUtc.Should().BeNull("der abgelaufene One-Shot-Timer darf keinen toten Countdown hinterlassen");
         shutdownService.RequestCount.Should().Be(0);
 
         count.ThrowOnZaehlen = false;
         timeProvider.Advance(TimeSpan.FromSeconds(5));
 
-        sut.CountdownEndeUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
+        sut.CountdownEndUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
 
         timeProvider.Advance(TimeSpan.FromMinutes(5));
         shutdownService.RequestCount.Should().Be(1);
@@ -410,7 +410,7 @@ public sealed class AutoShutdownOrchestratorTests
         await Task.Delay(100, TestContext.Current.CancellationToken);
 
         count.ZaehleAufrufe.Should().Be(2, "zwei Trigger während der Blockade ergeben genau einen koaleszierten Nachlauf");
-        sut.CountdownEndeUtc.Should().NotBeNull();
+        sut.CountdownEndUtc.Should().NotBeNull();
     }
 
     /// <summary>ZustandGeaendert feuert bei Optionswechsel, Armierung und Disarmierung.</summary>
@@ -424,9 +424,9 @@ public sealed class AutoShutdownOrchestratorTests
         using var sut = ErstelleOrchestrator(runningSource, count, shutdownService, timeProvider);
 
         var eventCount = 0;
-        sut.ZustandGeaendert += () => eventCount++;
+        sut.StateChanged += () => eventCount++;
 
-        sut.SetOptionen(toleranceMinutes: 7, force: true);
+        sut.SetOptions(toleranceMinutes: 7, force: true);
         eventCount.Should().BeGreaterThanOrEqualTo(1);
 
         var vorher = eventCount;
@@ -456,7 +456,7 @@ public sealed class AutoShutdownOrchestratorTests
 
         runningSource.SubscriberCount.Should().Be(0);
         runningSource.Raise(previous: 1, current: 0);
-        notifier.NotifyLaufdatenChanged(Guid.NewGuid());
+        notifier.NotifyRunDataChanged(Guid.NewGuid());
         timeProvider.Advance(TimeSpan.FromMinutes(10));
         shutdownService.RequestCount.Should().Be(0);
     }
@@ -479,11 +479,11 @@ public sealed class AutoShutdownOrchestratorTests
         sut.Dispose();
 
         var actEnabled = () => sut.SetEnabled(false);
-        var actOptionen = () => sut.SetOptionen(3, true);
+        var actOptionen = () => sut.SetOptions(3, true);
 
         actEnabled.Should().NotThrow();
         actOptionen.Should().NotThrow();
-        sut.IstAktiviert.Should().BeTrue("der Zustand wird nach Dispose nicht mehr verändert");
+        sut.IsEnabled.Should().BeTrue("der Zustand wird nach Dispose nicht mehr verändert");
         shutdownService.RequestCount.Should().Be(0);
     }
 

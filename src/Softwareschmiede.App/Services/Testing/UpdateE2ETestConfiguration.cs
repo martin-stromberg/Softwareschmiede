@@ -16,7 +16,7 @@ public sealed class UpdateE2ETestConfiguration
     public const string UmgebungsVariable = "SOFTWARESCHMIEDE_UPDATE_TEST_CONFIG";
 
     /// <summary>Name der Prozess-Umgebungsvariable mit dem Pfad der Test-SQLite-Datenbank.</summary>
-    public const string TestDatenbankUmgebungsVariable = Infrastructure.Terminal.TerminalSessionService.TestDatenbankPfadVariable;
+    public const string TestDatenbankUmgebungsVariable = Infrastructure.Terminal.TerminalSessionService.TestDatabasePathVariable;
 
     /// <summary>Wurzelverzeichnis des Tests; alle Fixture-Dateien und geschriebenen Update-Artefakte liegen darunter.</summary>
     [JsonPropertyName("testRoot")]

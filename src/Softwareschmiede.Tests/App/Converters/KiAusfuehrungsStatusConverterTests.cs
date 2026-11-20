@@ -168,7 +168,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
     }
 
     /// <summary>
-    /// Live-Zweig (Issue 342): Zeigt <see cref="AktiveAufgabePanelItem.LiveLaufStatus"/> einen laufenden
+    /// Live-Zweig (Issue 342): Zeigt <see cref="AktiveAufgabePanelItem.LiveRunStatus"/> einen laufenden
     /// Prozess an, zeigt die Kachel "▶ Läuft" — selbst ohne persistierte Laufdaten (AktiveRunId null)
     /// und selbst wenn der persistierte Ausführungsstatus noch Beendet lautet.
     /// </summary>
@@ -183,7 +183,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
             ExecutionStatus = WorkItemExecutionStatus.Completed,
             ActiveRunId = null,
             LastHeartbeatUtc = null,
-            LiveLaufStatus = WorkItemRunStatus.Running
+            LiveRunStatus = WorkItemRunStatus.Running
         };
 
         var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
@@ -201,7 +201,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
             Title = "Aufgabe mit wartender Live-CLI",
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Completed,
-            LiveLaufStatus = WorkItemRunStatus.WaitingForInput
+            LiveRunStatus = WorkItemRunStatus.WaitingForInput
         };
 
         var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
@@ -222,7 +222,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
             Title = "Pausierte Aufgabe mit Live-Prozess",
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Active,
-            LiveLaufStatus = WorkItemRunStatus.Running,
+            LiveRunStatus = WorkItemRunStatus.Running,
             PausedUntilUtc = DateTimeOffset.UtcNow.AddMinutes(30)
         };
         var wartestellung = new AktiveAufgabePanelItem
@@ -231,7 +231,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
             Title = "Aufgabe mit Prompt-Wartestellung",
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Active,
-            LiveLaufStatus = WorkItemRunStatus.Running,
+            LiveRunStatus = WorkItemRunStatus.Running,
             HasScheduledPrompt = true
         };
 
@@ -242,7 +242,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
     }
 
     /// <summary>
-    /// Live-Zweig (Issue 342): <see cref="AktiveAufgabePanelItem.LiveLaufStatus"/> == null darf die
+    /// Live-Zweig (Issue 342): <see cref="AktiveAufgabePanelItem.LiveRunStatus"/> == null darf die
     /// bisherige persistenzbasierte Bewertung nicht verändern — keine erzwungene Beendigung.
     /// </summary>
     [Fact]
@@ -254,7 +254,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
             Title = "Beendete Aufgabe ohne Live-Prozess",
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Completed,
-            LiveLaufStatus = null
+            LiveRunStatus = null
         };
 
         var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);

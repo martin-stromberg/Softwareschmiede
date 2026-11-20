@@ -23,7 +23,7 @@ public static class UpdatePathChannelResolver
     /// </summary>
     /// <param name="updatePath">Der konfigurierte Update-Pfad.</param>
     /// <returns>Der abgeleitete exklusive Update-Kanal.</returns>
-    public static UpdateChannel ErmittleKanal(string? updatePath)
+    public static UpdateChannel ResolveChannel(string? updatePath)
         => IsPath(updatePath, PrereleaseVersionsPath)
             ? UpdateChannel.ReleaseCandidate
             : UpdateChannel.Stable;
@@ -45,7 +45,7 @@ public static class UpdatePathChannelResolver
     /// </summary>
     /// <param name="updatePath">Der zu prüfende Pfadwert.</param>
     /// <returns><c>true</c>, wenn der Wert ein bekannter Update-Pfad ist.</returns>
-    public static bool IstGueltigerPfad(string? updatePath)
+    public static bool IsValidPath(string? updatePath)
         => IsPath(updatePath, StableVersionsPath) || IsPath(updatePath, PrereleaseVersionsPath);
 
     /// <summary>
@@ -53,11 +53,11 @@ public static class UpdatePathChannelResolver
     /// „-rc"-Infix (OrdinalIgnoreCase) kennzeichnet <see cref="UpdateChannel.ReleaseCandidate"/>.
     /// Fehlende oder leere Tag-Namen werden konservativ dem RC-Kanal zugeordnet.
     /// Diese Klassifikationsregel ist die einzige Quelle und wird auch von
-    /// <c>DatenbankPfadResolver</c> für die Wahl des Datenbankpfads wiederverwendet.
+    /// <c>DatabasePathResolver</c> für die Wahl des Datenbankpfads wiederverwendet.
     /// </summary>
     /// <param name="tagName">Der Release-Tag der installierten <c>version.json</c>.</param>
     /// <returns>Der Kanal der installierten Version.</returns>
-    public static UpdateChannel ErmittleKanalFuerTagName(string? tagName)
+    public static UpdateChannel ResolveChannelForTagName(string? tagName)
     {
         if (string.IsNullOrWhiteSpace(tagName))
             return UpdateChannel.ReleaseCandidate;

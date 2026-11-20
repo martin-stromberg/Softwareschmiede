@@ -93,12 +93,12 @@ public partial class End2EndTest
 
     /// <summary>Setzt oder löscht den Test-Override <see cref="TerminalSessionService.ForcePtyUnavailableKey"/>
     /// direkt in der laufenden Test-Datenbank.</summary>
-    private async Task SetForcePtyUnavailableAsync(bool? wert)
+    private async Task SetForcePtyUnavailableAsync(bool? value)
     {
         await using var db = OpenTestDbContext();
         var entry = await db.AppSettings
             .FirstOrDefaultAsync(e => e.Key == TerminalSessionService.ForcePtyUnavailableKey);
-        if (wert is null)
+        if (value is null)
         {
             if (entry is not null)
             {
@@ -117,7 +117,7 @@ public partial class End2EndTest
             };
             db.AppSettings.Add(entry);
         }
-        entry.Value = wert.Value ? "true" : "false";
+        entry.Value = value.Value ? "true" : "false";
         entry.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
     }

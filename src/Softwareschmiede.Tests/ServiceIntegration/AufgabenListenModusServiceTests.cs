@@ -57,7 +57,7 @@ public sealed class AufgabenListenModusServiceTests : IDisposable
         using (var scope = _provider.CreateScope())
         {
             var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
-            await settingService.SetSettingAsync(AppSettingService.AktiveAufgabenListenModusKey, "UnbekannterModus", TestContext.Current.CancellationToken);
+            await settingService.SetSettingAsync(AppSettingService.ActiveWorkItemsListModeKey, "UnbekannterModus", TestContext.Current.CancellationToken);
         }
 
         var geladen = await _sut.LadeMenueModusAsync(TestContext.Current.CancellationToken);
@@ -71,7 +71,7 @@ public sealed class AufgabenListenModusServiceTests : IDisposable
         using (var scope = _provider.CreateScope())
         {
             var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
-            await settingService.SetSettingAsync(AppSettingService.AktiveAufgabenListenModusDashboardKey, string.Empty, TestContext.Current.CancellationToken);
+            await settingService.SetSettingAsync(AppSettingService.ActiveWorkItemsListModeDashboardKey, string.Empty, TestContext.Current.CancellationToken);
         }
 
         var geladen = await _sut.LadeDashboardModusAsync(TestContext.Current.CancellationToken);

@@ -129,7 +129,7 @@ public sealed class PluginManager : IPluginManager
     }
 
     private static bool IsTestMode()
-        => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Terminal.TerminalSessionService.TestDatenbankPfadVariable));
+        => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Terminal.TerminalSessionService.TestDatabasePathVariable));
 
     private static bool IsAllowedInTestMode(string dllFileName)
     {

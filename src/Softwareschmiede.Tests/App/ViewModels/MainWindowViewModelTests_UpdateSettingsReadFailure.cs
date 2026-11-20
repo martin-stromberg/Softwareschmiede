@@ -120,7 +120,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
 
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(
-                It.Is<UpdateCheckOptions>(o => o.UpdatePfad == UpdatePathChannelResolver.PrereleaseVersionsPath), It.IsAny<CancellationToken>()),
+                It.Is<UpdateCheckOptions>(o => o.UpdatePath == UpdatePathChannelResolver.PrereleaseVersionsPath), It.IsAny<CancellationToken>()),
             Times.Once, "die Folgeprüfung muss die aktuelle Update-Pfad-Einstellung übergeben");
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),

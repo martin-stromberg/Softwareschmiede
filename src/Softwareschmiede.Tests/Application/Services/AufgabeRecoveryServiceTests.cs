@@ -191,14 +191,14 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         // Act
-        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
+        var candidates = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
 
         // Assert
-        kandidaten.Should().Contain(aufgabeAlt.Id);
-        kandidaten.Should().Contain(aufgabeWartend.Id);
-        kandidaten.Should().NotContain(aufgabeFrisch.Id);
-        kandidaten.Should().NotContain(aufgabeBeendeteAusfuehrung.Id);
-        kandidaten.Should().NotContain(aufgabeNeu.Id);
+        candidates.Should().Contain(aufgabeAlt.Id);
+        candidates.Should().Contain(aufgabeWartend.Id);
+        candidates.Should().NotContain(aufgabeFrisch.Id);
+        candidates.Should().NotContain(aufgabeBeendeteAusfuehrung.Id);
+        candidates.Should().NotContain(aufgabeNeu.Id);
     }
 
     /// <summary>ScanForRecoveryCandidates ignoriert Aufgaben, für die ein Prozess noch läuft.</summary>
@@ -221,9 +221,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var running = new FakeRunningAutomationStatusSource(true);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
+        var candidates = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
 
-        kandidaten.Should().BeEmpty();
+        candidates.Should().BeEmpty();
     }
 
     /// <summary>ScanForRecoveryCandidatesAsync ignoriert pausierte Aufgaben (PausiertBisUtc in der Zukunft), auch bei abgelaufenem Heartbeat (Issue 151).</summary>
@@ -258,10 +258,10 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
+        var candidates = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
 
-        kandidaten.Should().NotContain(pausiert.Id, "eine aktiv pausierte Aufgabe ist kein Recovery-Kandidat");
-        kandidaten.Should().Contain(abgelaufenePause.Id, "eine abgelaufene Pause darf die Recovery-Erkennung nicht blockieren");
+        candidates.Should().NotContain(pausiert.Id, "eine aktiv pausierte Aufgabe ist kein Recovery-Kandidat");
+        candidates.Should().Contain(abgelaufenePause.Id, "eine abgelaufene Pause darf die Recovery-Erkennung nicht blockieren");
     }
 
     /// <summary>RecoverManuellAsync lehnt eine aktiv pausierte Aufgabe mit InvalidOperationException ab (Issue 151).</summary>

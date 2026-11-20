@@ -27,14 +27,14 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         List<WorkItem> workItems,
         IRunningAutomationStatusSource statusSource,
         out ServiceProvider provider,
-        out PromptScheduleDispatchService promptZeitVersandService)
-        => ErstelleZaehlung(workItems, statusSource, out provider, out promptZeitVersandService, out _);
+        out PromptScheduleDispatchService promptScheduleDispatchService)
+        => ErstelleZaehlung(workItems, statusSource, out provider, out promptScheduleDispatchService, out _);
 
     private static RunningAutomationsCount ErstelleZaehlung(
         List<WorkItem> workItems,
         IRunningAutomationStatusSource statusSource,
         out ServiceProvider provider,
-        out PromptScheduleDispatchService promptZeitVersandService,
+        out PromptScheduleDispatchService promptScheduleDispatchService,
         out SoftwareschmiedeDbContext db)
     {
         var services = new ServiceCollection();
@@ -43,7 +43,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         provider = services.BuildServiceProvider();
 
         var kiService = TestKiAusfuehrungsServiceFactory.Create();
-        promptZeitVersandService = new PromptScheduleDispatchService(
+        promptScheduleDispatchService = new PromptScheduleDispatchService(
             kiService,
             TimeProvider.System,
             NullLogger<PromptScheduleDispatchService>.Instance);
@@ -51,7 +51,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
         return new RunningAutomationsCount(
             provider.GetRequiredService<IServiceScopeFactory>(),
             statusSource,
-            promptZeitVersandService);
+            promptScheduleDispatchService);
     }
 
     private static WorkItem ErstelleLaufendeAufgabe() => new()
@@ -176,9 +176,9 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
     public async Task ZaehleAsync_ZaehltNicht_BeiPromptInWartestellung()
     {
         var workItem = ErstelleLaufendeAufgabe();
-        var sut = ErstelleZaehlung([workItem], new FakeStatusSource(), out var provider, out var promptZeitVersandService);
+        var sut = ErstelleZaehlung([workItem], new FakeStatusSource(), out var provider, out var promptScheduleDispatchService);
         using var _ = provider;
-        using var promptService = promptZeitVersandService;
+        using var promptService = promptScheduleDispatchService;
 
         await promptService.SchedulePromptAsync(workItem.Id, "spaeter senden", DateTimeOffset.UtcNow.AddMinutes(10));
         promptService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull();
@@ -252,7 +252,7 @@ public sealed class LaufendeAutomatisierungenZaehlungTests
 
     private sealed class FakeAktiveAufgabenService(List<WorkItem> workItems) : IActiveWorkItemsService
     {
-        public Task<List<WorkItem>> GetAktiveAufgabenAsync(CancellationToken ct = default)
+        public Task<List<WorkItem>> GetActiveWorkItemsAsync(CancellationToken ct = default)
             => Task.FromResult(workItems);
     }
 

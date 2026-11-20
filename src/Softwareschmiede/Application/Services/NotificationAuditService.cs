@@ -26,7 +26,7 @@ public sealed class NotificationAuditService
         Guid eventId,
         Guid workItemId,
         string benutzerId,
-        NotificationChannel kanal,
+        NotificationChannel channel,
         NotificationMode mode,
         NotificationDecision entscheidung,
         string grund,
@@ -38,7 +38,7 @@ public sealed class NotificationAuditService
             EventId = eventId,
             WorkItemId = workItemId,
             UserId = benutzerId,
-            Channel = kanal,
+            Channel = channel,
             Mode = mode,
             Decision = entscheidung,
             Reason = grund,
@@ -52,7 +52,7 @@ public sealed class NotificationAuditService
         }
         catch (DbUpdateException ex)
         {
-            _logger.LogDebug(ex, "Dispatch-Audit bereits vorhanden für Ereignis {EreignisId}, Kanal {Kanal}.", eventId, kanal);
+            _logger.LogDebug(ex, "Dispatch-Audit bereits vorhanden für Ereignis {EreignisId}, Kanal {Kanal}.", eventId, channel);
         }
     }
 }

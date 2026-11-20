@@ -23,7 +23,7 @@ public sealed record ScmExchangeRequest(
 /// <summary>Ein arbeitsbereichslokaler, an einen konkreten CLI-Lauf gebundener Versuch.</summary>
 public sealed record ScmExchangeAttempt(ScmExchangeRequest Request, string DirectoryPath)
 {
-    /// <summary>Dedicated workspace capabilities verified by the bound CLI file-tool probe.</summary>
+    /// <summary>Dedizierte Arbeitsbereich-Fähigkeiten, die durch die gebundene CLI-Dateitool-Probe verifiziert werden.</summary>
     public IReadOnlyList<string> RestrictedWriteSids { get; init; } = [];
     /// <summary>
     /// Optionaler, vom Anwender konfigurierter Anhang (<see cref="ScmPromptAppendix"/>), der nur im
@@ -156,11 +156,11 @@ public sealed record ScmAttachmentCollection(IReadOnlyList<ScmCollectedAttachmen
 public sealed record ScmExchangeAccessProbe(Guid CliRunId, string Nonce, string ConfigurationFingerprint,
     string DirectoryPath, IReadOnlyList<string> RestrictedWriteSids)
 {
-    /// <summary>The random challenge is intentionally read from disk, never included in the prompt.</summary>
+    /// <summary>Die Zufalls-Challenge wird bewusst von der Platte gelesen und niemals in den Prompt aufgenommen.</summary>
     public string ChallengePath => Path.Combine(DirectoryPath, "challenge.json");
-    /// <summary>Renaming the challenge also exercises the actual tool's directory mutation rights.</summary>
+    /// <summary>Das Umbenennen der Challenge prüft zugleich die Verzeichnis-Änderungsrechte des echten Tools.</summary>
     public string ReadChallengePath => Path.Combine(DirectoryPath, "challenge-read.json");
-    /// <summary>File-tool-generated acknowledgement, separate from event acceptance.</summary>
+    /// <summary>Vom Dateitool erzeugte Bestätigung, getrennt von der Ereignis-Annahme.</summary>
     public string ProofPath => Path.Combine(DirectoryPath, "proof.json");
 }
 
@@ -197,7 +197,7 @@ public sealed class ScmEventExchangeProtocol
         MaxDepth = 16,
     };
 
-    /// <summary>Creates a harmless challenge with exactly the same ACL contract as later event attempts.</summary>
+    /// <summary>Erzeugt eine harmlose Challenge mit exakt demselben ACL-Vertrag wie spätere Ereignisversuche.</summary>
     public async Task<ScmExchangeAccessProbe> PrepareAccessProbeAsync(Guid runId, string fingerprint,
         string workingDirectory, IReadOnlyList<string> restrictedWriteSids, CancellationToken ct = default)
     {
@@ -217,7 +217,7 @@ public sealed class ScmEventExchangeProtocol
         finally { PreparationLock.Release(); }
     }
 
-    /// <summary>Requires read, write and rename evidence produced by the CLI's normal file tool.</summary>
+    /// <summary>Verlangt Lese-, Schreib- und Umbenennen-Nachweise aus dem normalen Dateitool der CLI.</summary>
     public async Task<bool> ReadAccessProbeAsync(ScmExchangeAccessProbe probe, CancellationToken ct = default)
     {
         EnsureSafePath(probe.DirectoryPath);
@@ -234,7 +234,7 @@ public sealed class ScmEventExchangeProtocol
         return true;
     }
 
-    /// <summary>Requests only a local probe, never SCM processing, credentials or broader permissions.
+    /// <summary>Fordert nur eine lokale Probe an — niemals SCM-Verarbeitung, Anmeldedaten oder weitergehende Berechtigungen.
     /// <paramref name="sessionName"/> (der Aufgabentitel) steht vorn, damit die CLI die Sitzung eindeutig
     /// danach benennt statt nach dem generischen Probeauftrag; er ist reiner Datenwert, keine Anweisung.</summary>
     /// <param name="probe">Die vorbereitete rungebundene Dateitool-Probe.</param>
@@ -294,7 +294,7 @@ public sealed class ScmEventExchangeProtocol
             var attempt = new ScmExchangeAttempt(request, attemptDirectory) { RestrictedWriteSids = allowedSids, PromptSuffix = promptSuffix };
             var bytes = JsonSerializer.SerializeToUtf8Bytes(request, Json);
             if (bytes.Length > MaximumMessageBytes) throw new IOException("SCM-Auftrag überschreitet das Dateigrößenlimit.");
-            // Atomic publication exercises rename in the exact channel before any event prompt.
+            // Die atomare Veröffentlichung übt das Umbenennen im exakten Kanal vor jedem Ereignis-Prompt.
             var temporary = Path.Combine(attemptDirectory, ".request.tmp");
             await WriteNewAsync(temporary, bytes, ct).ConfigureAwait(false);
             File.Move(temporary, attempt.RequestPath, overwrite: false);
@@ -545,7 +545,7 @@ public sealed class ScmEventExchangeProtocol
         {
             var previous = JsonSerializer.Deserialize<ScmExchangeActionResult>(await ReadBoundedAsync(path, ct).ConfigureAwait(false), Json);
             if (previous == result) return;
-            // A failed action can be retried by the host; successful results are immutable.
+            // Eine fehlgeschlagene Aktion kann der Host wiederholen; erfolgreiche Ergebnisse sind unveränderlich.
             if (previous?.Success != false) throw new IOException("Ein bestätigtes Aktionsresultat darf nicht verändert werden.");
         }
         var temporary = Path.Combine(attempt.DirectoryPath, "results", "." + Guid.NewGuid().ToString("N") + ".tmp");
@@ -626,8 +626,8 @@ public sealed class ScmEventExchangeProtocol
         var same = _lastReads.TryGetValue(path, out var previous) && previous == hash;
         _lastReads[path] = hash;
         if (!same) return null;
-        // The first observation never executes a partial Write. A stable invalid message must be
-        // visible as a protocol failure, rather than leaving the event silently pending forever.
+        // Die erste Beobachtung führt niemals ein partielles Write aus. Eine stabil ungültige Nachricht
+        // muss als Protokollfehler sichtbar werden, statt das Ereignis still ausstehend zu lassen.
         return JsonSerializer.Deserialize<T>(bytes, Json)
             ?? throw new IOException("Leere JSON-Nachricht im Antwortkanal.");
     }

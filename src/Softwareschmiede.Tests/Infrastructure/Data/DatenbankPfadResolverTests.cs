@@ -14,7 +14,7 @@ public sealed class DatenbankPfadResolverTests
         using var temp = new TempDirectory();
         var overridePfad = Path.Combine(temp.Path, "custom.db");
 
-        var result = DatabasePathResolver.ErmittlePfad(temp.Path, overridePfad);
+        var result = DatabasePathResolver.ResolvePath(temp.Path, overridePfad);
 
         result.Should().Be(overridePfad);
     }
@@ -27,7 +27,7 @@ public sealed class DatenbankPfadResolverTests
         SchreibeVersionJson(temp.Path, "v1.2.3");
         var overridePfad = Path.Combine(temp.Path, "custom.db");
 
-        var result = DatabasePathResolver.ErmittlePfad(temp.Path, overridePfad);
+        var result = DatabasePathResolver.ResolvePath(temp.Path, overridePfad);
 
         result.Should().Be(overridePfad);
     }
@@ -38,7 +38,7 @@ public sealed class DatenbankPfadResolverTests
     {
         using var temp = new TempDirectory();
 
-        var result = DatabasePathResolver.ErmittlePfad(temp.Path, testDbPathOverride: null);
+        var result = DatabasePathResolver.ResolvePath(temp.Path, testDbPathOverride: null);
 
         result.Should().Be(Path.Combine(temp.Path, "softwareschmiede.db"));
     }
@@ -53,7 +53,7 @@ public sealed class DatenbankPfadResolverTests
         using var temp = new TempDirectory();
         SchreibeVersionJson(temp.Path, tagName);
 
-        var result = DatabasePathResolver.ErmittlePfad(temp.Path, testDbPathOverride: null);
+        var result = DatabasePathResolver.ResolvePath(temp.Path, testDbPathOverride: null);
 
         result.Should().Be(Path.Combine(temp.Path, "softwareschmiede.db"));
     }
@@ -65,7 +65,7 @@ public sealed class DatenbankPfadResolverTests
         using var temp = new TempDirectory();
         SchreibeVersionJson(temp.Path, "v1.2.3");
 
-        var result = DatabasePathResolver.ErmittlePfad(temp.Path, testDbPathOverride: null);
+        var result = DatabasePathResolver.ResolvePath(temp.Path, testDbPathOverride: null);
 
         var erwarteterPfad = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -84,7 +84,7 @@ public sealed class DatenbankPfadResolverTests
         using var temp = new TempDirectory();
         File.WriteAllText(Path.Combine(temp.Path, "version.json"), json);
 
-        var result = DatabasePathResolver.ErmittlePfad(temp.Path, testDbPathOverride: null);
+        var result = DatabasePathResolver.ResolvePath(temp.Path, testDbPathOverride: null);
 
         result.Should().Be(Path.Combine(temp.Path, "softwareschmiede.db"));
     }
@@ -96,7 +96,7 @@ public sealed class DatenbankPfadResolverTests
         using var temp = new TempDirectory();
         File.WriteAllText(Path.Combine(temp.Path, "version.json"), """{ "version": "1.2.3" }""");
 
-        var result = DatabasePathResolver.ErmittlePfad(temp.Path, testDbPathOverride: null);
+        var result = DatabasePathResolver.ResolvePath(temp.Path, testDbPathOverride: null);
 
         result.Should().Be(Path.Combine(temp.Path, "softwareschmiede.db"));
     }

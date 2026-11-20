@@ -11,22 +11,22 @@ internal static class PullRequestBodyBuilder
     public static string Build(WorkItem workItem, string? body)
     {
         var prBody = body ?? $"Automatisch erstellt für Aufgabe: {workItem.Title}";
-        var issueNummer = workItem.IssueReference?.IssueNumber;
+        var issueNumber = workItem.IssueReference?.IssueNumber;
 
-        if (issueNummer is not > 0)
+        if (issueNumber is not > 0)
         {
             return prBody;
         }
 
-        if (ContainsClosingDirectiveForIssue(prBody, issueNummer.Value))
+        if (ContainsClosingDirectiveForIssue(prBody, issueNumber.Value))
         {
             return prBody;
         }
 
         var trimmedBody = prBody.TrimEnd();
         return string.IsNullOrWhiteSpace(trimmedBody)
-            ? $"Closes #{issueNummer.Value}"
-            : $"{trimmedBody}{Environment.NewLine}{Environment.NewLine}Closes #{issueNummer.Value}";
+            ? $"Closes #{issueNumber.Value}"
+            : $"{trimmedBody}{Environment.NewLine}{Environment.NewLine}Closes #{issueNumber.Value}";
     }
 
     /// <summary>Baut einen Pull-Request-Body aus den Commits des Aufgabenbranches.</summary>
@@ -70,8 +70,8 @@ internal static class PullRequestBodyBuilder
         return numbers;
     }
 
-    private static bool ContainsClosingDirectiveForIssue(string body, int issueNummer)
-        => ExtractClosingIssueNumbers(body).Contains(issueNummer);
+    private static bool ContainsClosingDirectiveForIssue(string body, int issueNumber)
+        => ExtractClosingIssueNumbers(body).Contains(issueNumber);
 
     private static string ResolveShortSha(BranchCommit commit)
     {

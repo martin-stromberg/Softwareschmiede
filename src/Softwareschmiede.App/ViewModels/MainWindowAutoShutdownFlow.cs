@@ -62,7 +62,7 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
 
         if (_orchestrator is not null)
         {
-            _orchestrator.ZustandGeaendert += OnZustandGeaendert;
+            _orchestrator.StateChanged += OnZustandGeaendert;
         }
     }
 
@@ -96,7 +96,7 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
                     .SafeFireAndForget(_logger, "Auto-Shutdown-Erzwingen speichern");
                 // Unbedingt weiterreichen — steht gerade ein ungültiger Wert im Toleranzfeld,
                 // gilt die zuletzt gültige Toleranz weiter.
-                _orchestrator?.SetOptionen(_letzteGueltigeAutoShutdownToleranzMinuten, value);
+                _orchestrator?.SetOptions(_letzteGueltigeAutoShutdownToleranzMinuten, value);
             }
         }
     }
@@ -119,7 +119,7 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
                     _letzteGueltigeAutoShutdownToleranzMinuten = toleranceMinutes;
                     _settingsService?.SpeichereToleranzMinutenAsync(toleranceMinutes, CancellationToken.None)
                         .SafeFireAndForget(_logger, "Auto-Shutdown-Toleranz speichern");
-                    _orchestrator?.SetOptionen(toleranceMinutes, _autoShutdownErzwingen);
+                    _orchestrator?.SetOptions(toleranceMinutes, _autoShutdownErzwingen);
                 }
                 else
                 {
@@ -187,7 +187,7 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(AutoShutdownToleranzMinuten));
             _letzteGueltigeAutoShutdownToleranzMinuten = settings.ToleranzMinuten;
             AutoShutdownToleranzFehler = null;
-            _orchestrator?.SetOptionen(settings.ToleranzMinuten, settings.Erzwingen);
+            _orchestrator?.SetOptions(settings.ToleranzMinuten, settings.Erzwingen);
         });
     }
 
@@ -220,7 +220,7 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
 
     private void CountdownAnzeigeAktualisieren()
     {
-        _autoShutdownCountdownEndeUtc = _orchestrator?.CountdownEndeUtc;
+        _autoShutdownCountdownEndeUtc = _orchestrator?.CountdownEndUtc;
 
         if (_autoShutdownCountdownEndeUtc is null)
         {
@@ -267,7 +267,7 @@ public sealed class MainWindowAutoShutdownFlow : ViewModelBase, IDisposable
         _countdownTimer.Tick -= OnCountdownTick;
         if (_orchestrator is not null)
         {
-            _orchestrator.ZustandGeaendert -= OnZustandGeaendert;
+            _orchestrator.StateChanged -= OnZustandGeaendert;
         }
     }
 }

@@ -22,17 +22,17 @@ public sealed class ScheduledPromptStore
     }
 
     /// <summary>Liefert alle persistierten geplanten Prompts.</summary>
-    public async Task<IReadOnlyList<ScheduledPrompt>> GetAlleAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<ScheduledPrompt>> GetAllAsync(CancellationToken ct = default)
         => await _db.ScheduledPrompts.AsNoTracking().ToListAsync(ct);
 
     /// <summary>Schreibt den geplanten Prompt der Aufgabe oder ersetzt einen vorhandenen Datensatz (Ersetzungsregel).</summary>
     public async Task UpsertAsync(Guid workItemId, string promptText, DateTimeOffset targetTimeUtc, CancellationToken ct = default)
     {
-        var vorhanden = await _db.ScheduledPrompts
+        var existing = await _db.ScheduledPrompts
             .FirstOrDefaultAsync(z => z.WorkItemId == workItemId, ct);
-        var jetzt = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.UtcNow;
 
-        if (vorhanden is null)
+        if (existing is null)
         {
             _db.ScheduledPrompts.Add(new ScheduledPrompt
             {
@@ -40,15 +40,15 @@ public sealed class ScheduledPromptStore
                 WorkItemId = workItemId,
                 PromptText = promptText,
                 TargetTimeUtc = targetTimeUtc,
-                CreatedAtUtc = jetzt,
-                UpdatedAtUtc = jetzt
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
             });
         }
         else
         {
-            vorhanden.PromptText = promptText;
-            vorhanden.TargetTimeUtc = targetTimeUtc;
-            vorhanden.UpdatedAtUtc = jetzt;
+            existing.PromptText = promptText;
+            existing.TargetTimeUtc = targetTimeUtc;
+            existing.UpdatedAtUtc = now;
         }
 
         await _db.SaveChangesAsync(ct);
@@ -57,12 +57,12 @@ public sealed class ScheduledPromptStore
     /// <summary>Entfernt den persistierten Plan der Aufgabe, falls vorhanden.</summary>
     public async Task DeleteAsync(Guid workItemId, CancellationToken ct = default)
     {
-        var vorhanden = await _db.ScheduledPrompts
+        var existing = await _db.ScheduledPrompts
             .FirstOrDefaultAsync(z => z.WorkItemId == workItemId, ct);
-        if (vorhanden is null)
+        if (existing is null)
             return;
 
-        _db.ScheduledPrompts.Remove(vorhanden);
+        _db.ScheduledPrompts.Remove(existing);
         await _db.SaveChangesAsync(ct);
         _logger.LogDebug("Persistierter zeitgesteuerter Prompt für Aufgabe {AufgabeId} gelöscht.", workItemId);
     }
@@ -75,20 +75,20 @@ public sealed class ScheduledPromptStore
     /// persistiert, bleibt dessen Datensatz erhalten statt vom alten Plan überschrieben zu werden.
     /// </summary>
     /// <returns><c>true</c>, wenn der Datensatz geschrieben wurde; <c>false</c>, wenn ein abweichender Datensatz den Schreibzugriff verweigerte.</returns>
-    public async Task<bool> UpsertWennUebereinstimmendAsync(Guid workItemId, string promptText, DateTimeOffset targetTimeUtc, ScheduledPromptInfo? expected, CancellationToken ct = default)
+    public async Task<bool> UpsertIfMatchingAsync(Guid workItemId, string promptText, DateTimeOffset targetTimeUtc, ScheduledPromptInfo? expected, CancellationToken ct = default)
     {
-        var vorhanden = await _db.ScheduledPrompts
+        var existing = await _db.ScheduledPrompts
             .FirstOrDefaultAsync(z => z.WorkItemId == workItemId, ct);
 
         // ZielZeitpunktUtc wird als Unix-Millisekunden persistiert — den Vergleich auf dieselbe
         // Granularität normieren, sonst scheitert er an der Sub-Millisekunden-Genauigkeit.
-        var stimmtUeberein = vorhanden is null
+        var matches = existing is null
             ? expected is null
             : expected is not null
-                && vorhanden.PromptText == expected.PromptText
-                && vorhanden.TargetTimeUtc.ToUnixTimeMilliseconds() == expected.TargetTime.ToUnixTimeMilliseconds();
+                && existing.PromptText == expected.PromptText
+                && existing.TargetTimeUtc.ToUnixTimeMilliseconds() == expected.TargetTime.ToUnixTimeMilliseconds();
 
-        if (!stimmtUeberein)
+        if (!matches)
         {
             _logger.LogWarning(
                 "Persistierter zeitgesteuerter Prompt für Aufgabe {AufgabeId} wird nicht mit dem Alt-Plan \"{AltText}\" ({AltZiel} UTC) überschrieben — der Datensatz wurde zwischenzeitlich durch einen neueren Plan ersetzt.",
@@ -114,40 +114,40 @@ public sealed class ScheduledPromptStore
     /// </summary>
     public async Task DeleteAfterDispatchAsync(Guid workItemId, string promptText, DateTimeOffset targetTimeUtc, bool newerScheduleActive, CancellationToken ct = default)
     {
-        var vorhanden = await _db.ScheduledPrompts
+        var existing = await _db.ScheduledPrompts
             .FirstOrDefaultAsync(z => z.WorkItemId == workItemId, ct);
-        if (vorhanden is null)
+        if (existing is null)
             return;
 
         // ZielZeitpunktUtc wird als Unix-Millisekunden persistiert — den Vergleich auf dieselbe
         // Granularität normieren, sonst scheitert er an der Sub-Millisekunden-Genauigkeit.
-        var stimmtUeberein = vorhanden.PromptText == promptText
-            && vorhanden.TargetTimeUtc.ToUnixTimeMilliseconds() == targetTimeUtc.ToUnixTimeMilliseconds();
+        var matches = existing.PromptText == promptText
+            && existing.TargetTimeUtc.ToUnixTimeMilliseconds() == targetTimeUtc.ToUnixTimeMilliseconds();
 
-        if (!stimmtUeberein && newerScheduleActive)
+        if (!matches && newerScheduleActive)
         {
             _logger.LogWarning(
                 "Persistierter zeitgesteuerter Prompt für Aufgabe {AufgabeId} weicht vom versendeten Plan ab (Datensatz: \"{DatensatzText}\" / {DatensatzZiel} UTC, versendet: \"{VersendeterText}\" / {VersendetZiel} UTC) und bleibt erhalten — ein neuerer Plan ist aktiv.",
                 workItemId,
-                vorhanden.PromptText,
-                vorhanden.TargetTimeUtc,
+                existing.PromptText,
+                existing.TargetTimeUtc,
                 promptText,
                 targetTimeUtc);
             return;
         }
 
-        if (!stimmtUeberein)
+        if (!matches)
         {
             _logger.LogWarning(
                 "Persistierter zeitgesteuerter Prompt für Aufgabe {AufgabeId} weicht vom versendeten Plan ab (Datensatz: \"{DatensatzText}\" / {DatensatzZiel} UTC, versendet: \"{VersendeterText}\" / {VersendetZiel} UTC) und wird trotzdem gelöscht — ohne aktiven Plan kann er nur eine Leiche des versendeten Plans sein.",
                 workItemId,
-                vorhanden.PromptText,
-                vorhanden.TargetTimeUtc,
+                existing.PromptText,
+                existing.TargetTimeUtc,
                 promptText,
                 targetTimeUtc);
         }
 
-        _db.ScheduledPrompts.Remove(vorhanden);
+        _db.ScheduledPrompts.Remove(existing);
         await _db.SaveChangesAsync(ct);
         _logger.LogDebug("Persistierter zeitgesteuerter Prompt für Aufgabe {AufgabeId} gelöscht.", workItemId);
     }
@@ -155,13 +155,13 @@ public sealed class ScheduledPromptStore
     /// <summary>Aktualisiert den Zielzeitpunkt des persistierten Plans (z. B. Pausenverschiebung), falls vorhanden.</summary>
     public async Task UpdateTargetTimeAsync(Guid workItemId, DateTimeOffset targetTimeUtc, CancellationToken ct = default)
     {
-        var vorhanden = await _db.ScheduledPrompts
+        var existing = await _db.ScheduledPrompts
             .FirstOrDefaultAsync(z => z.WorkItemId == workItemId, ct);
-        if (vorhanden is null)
+        if (existing is null)
             return;
 
-        vorhanden.TargetTimeUtc = targetTimeUtc;
-        vorhanden.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        existing.TargetTimeUtc = targetTimeUtc;
+        existing.UpdatedAtUtc = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
     }
 }

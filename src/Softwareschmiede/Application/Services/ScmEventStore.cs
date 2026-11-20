@@ -65,7 +65,7 @@ public sealed class ScmEventStore(SoftwareschmiedeDbContext db, ScmEventChangeNo
             .Select(Uri.EscapeDataString)) + "/";
         var sourceSnapshots = await db.ScmContentSnapshots.Where(x => x.ContentKey.StartsWith(contentPrefix)).ToListAsync(ct);
         var unassignedDiagnostic = unassigned ? UnassignedDiagnostic : AmbiguousAssignmentDiagnostic;
-        var pauseGesetzt = false;
+        var pauseSet = false;
         foreach (var observation in batch.Observations.OrderBy(x => x.Revision).ThenBy(x => x.EventKey, StringComparer.Ordinal))
         {
             var snapshot = await db.ScmContentSnapshots.FindAsync([observation.ContentKey], ct);
@@ -103,7 +103,7 @@ public sealed class ScmEventStore(SoftwareschmiedeDbContext db, ScmEventChangeNo
                 item.Reason = $"Verzögerte Ausführung bis {delay.TargetUtc.ToLocalTime():g} ('{delay.Argument}').";
                 EnqueueDelayComment(item, observation,
                     $"Die Anfrage wurde empfangen und wird verzögert bis {delay.TargetUtc.ToLocalTime():g} verarbeitet.");
-                pauseGesetzt |= await PauseForDelayAsync(workItemId.Value, delay.TargetUtc, ct);
+                pauseSet |= await PauseForDelayAsync(workItemId.Value, delay.TargetUtc, ct);
             }
             else if (delay.Kind is ScmDelayDirective.ResultKind.Invalid)
             {
@@ -125,7 +125,7 @@ public sealed class ScmEventStore(SoftwareschmiedeDbContext db, ScmEventChangeNo
         if (visibleChange || checkpoint.Diagnostic is not null) notifier.Notify();
         // Pausen-Setzpfad der SCM-Startprüfung: erst nach dem Commit auslösen, damit die
         // Prüfung den persistierten Pausenzustand sieht.
-        if (pauseGesetzt) startCheckTrigger?.RequestStartCheck();
+        if (pauseSet) startCheckTrigger?.RequestStartCheck();
     }
 
     /// <summary>Legt den Empfangskommentar einer verzögerten oder verworfenen Direktive als

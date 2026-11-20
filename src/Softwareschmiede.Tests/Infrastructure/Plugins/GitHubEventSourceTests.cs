@@ -1060,7 +1060,7 @@ public sealed class GitHubEventSourceTests
         });
         var result = await Plugin(api).ReadIssueAsync(Issue, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
-        Assert.Equal(7, result!.Nummer);
+        Assert.Equal(7, result!.Number);
         Assert.Equal("Fehler im Import", result.Title);
         Assert.Equal("Beschreibung", result.Body);
         Assert.Equal(new[] { "bug", "prio" }, result.Labels);
@@ -1097,7 +1097,7 @@ public sealed class GitHubEventSourceTests
         });
         var result = await Plugin(api).ReadPullRequestAsync(PullRequest, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
-        Assert.Equal(8, result!.Nummer);
+        Assert.Equal(8, result!.Number);
         Assert.Equal("feature/x", result.BranchName);
         Assert.Equal("main", result.TargetBranch);
         Assert.Equal("abc", result.HeadSha);

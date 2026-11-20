@@ -74,7 +74,7 @@ public sealed class ProtokollServiceTests : IDisposable
         await _sut.AddEntryAsync(_aufgabeId, LogEntryType.AiResponse, "Zweiter Eintrag", "Agent", TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
+        var result = await _sut.GetByWorkItemAsync(_aufgabeId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(2);
@@ -129,7 +129,7 @@ public sealed class ProtokollServiceTests : IDisposable
     public async Task AddStatusUebergangAsync_ShouldCreateStatusUebergangEintrag_WhenCalled()
     {
         // Arrange & Act
-        var result = await _sut.AddStatusUebergangAsync(_aufgabeId, WorkItemStatus.New, WorkItemStatus.Started, TestContext.Current.CancellationToken);
+        var result = await _sut.AddStatusTransitionAsync(_aufgabeId, WorkItemStatus.New, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
         // Assert
         result.Type.Should().Be(LogEntryType.StatusTransition);
@@ -250,7 +250,7 @@ public sealed class ProtokollServiceTests : IDisposable
 
         await _sut.AddCliOutputAsync(_aufgabeId, markerLine, TestContext.Current.CancellationToken);
 
-        var entries = await _sut.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
+        var entries = await _sut.GetByWorkItemAsync(_aufgabeId, TestContext.Current.CancellationToken);
         entries.Should().HaveCount(2);
         entries.Should().Contain(e => e.Type == LogEntryType.CliOutput);
         entries.Should().Contain(e => e.Type == LogEntryType.RateLimit);
@@ -262,7 +262,7 @@ public sealed class ProtokollServiceTests : IDisposable
     {
         await _sut.AddCliOutputAsync(_aufgabeId, "normale Ausgabe", TestContext.Current.CancellationToken);
 
-        var entries = await _sut.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
+        var entries = await _sut.GetByWorkItemAsync(_aufgabeId, TestContext.Current.CancellationToken);
         entries.Should().HaveCount(1);
         entries[0].Type.Should().Be(LogEntryType.CliOutput);
         entries[0].Content.Should().Be("normale Ausgabe");

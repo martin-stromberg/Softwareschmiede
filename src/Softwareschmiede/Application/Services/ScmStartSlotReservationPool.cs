@@ -25,11 +25,11 @@ public sealed class ScmStartSlotReservationPool
 
     /// <summary>Legt eine neue Reservierung an und trägt sie in den Bestand ein.</summary>
     /// <param name="pluginPrefix">KI-Plugin-Prefix des reservierten Starts.</param>
-    /// <param name="gueltigBisUtcMs">Verfallzeitpunkt (Unix-Millisekunden UTC).</param>
+    /// <param name="validUntilUtcMs">Verfallzeitpunkt (Unix-Millisekunden UTC).</param>
     /// <returns>Die eingetragene Reservierung; <see cref="IDisposable.Dispose"/> gibt den Platz frei.</returns>
-    internal StartSlotReservation Reserve(string pluginPrefix, long gueltigBisUtcMs)
+    internal StartSlotReservation Reserve(string pluginPrefix, long validUntilUtcMs)
     {
-        var reservation = new StartSlotReservation(this, pluginPrefix, gueltigBisUtcMs);
+        var reservation = new StartSlotReservation(this, pluginPrefix, validUntilUtcMs);
         lock (_sync)
             _reservations[reservation.Id] = reservation;
         return reservation;
@@ -37,12 +37,12 @@ public sealed class ScmStartSlotReservationPool
 
     /// <summary>Liefert die noch gültigen Reservierungen; verfallene Einträge werden
     /// dabei aus dem Bestand entfernt.</summary>
-    /// <param name="jetztUtcMs">Aktueller Zeitpunkt (Unix-Millisekunden UTC).</param>
-    internal List<StartSlotReservation> ActiveReservations(long jetztUtcMs)
+    /// <param name="nowUtcMs">Aktueller Zeitpunkt (Unix-Millisekunden UTC).</param>
+    internal List<StartSlotReservation> ActiveReservations(long nowUtcMs)
     {
         lock (_sync)
         {
-            foreach (var id in _reservations.Where(x => x.Value.GueltigBisUtcMs <= jetztUtcMs).Select(x => x.Key).ToList())
+            foreach (var id in _reservations.Where(x => x.Value.ValidUntilUtcMs <= nowUtcMs).Select(x => x.Key).ToList())
                 _reservations.Remove(id);
             return _reservations.Values.ToList();
         }
@@ -51,11 +51,11 @@ public sealed class ScmStartSlotReservationPool
     /// <summary>Reservierter Startplatz; die Freigabe über <see cref="Dispose"/> entfernt den
     /// Platz aus der Zählung, sobald die echte Laufzählung ihn übernommen hat oder der Start
     /// fehlgeschlagen ist. Die Freigabe ist bewusst non-blocking (kurzer Lock, kein Warten).</summary>
-    internal sealed class StartSlotReservation(ScmStartSlotReservationPool pool, string pluginPrefix, long gueltigBisUtcMs) : IDisposable
+    internal sealed class StartSlotReservation(ScmStartSlotReservationPool pool, string pluginPrefix, long validUntilUtcMs) : IDisposable
     {
         public Guid Id { get; } = Guid.NewGuid();
         public string PluginPrefix { get; } = pluginPrefix;
-        public long GueltigBisUtcMs { get; } = gueltigBisUtcMs;
+        public long ValidUntilUtcMs { get; } = validUntilUtcMs;
 
         public void Dispose()
         {

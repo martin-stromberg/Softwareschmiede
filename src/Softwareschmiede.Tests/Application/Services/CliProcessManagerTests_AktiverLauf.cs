@@ -26,7 +26,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     private readonly ServiceProvider _provider;
     private readonly AiExecutionService _kiService;
     private readonly CliProcessManager _sut;
-    private readonly WorkItemRunDataChangedNotifier _laufdatenChangedNotifier = new();
+    private readonly WorkItemRunDataChangedNotifier _runDataChangedNotifier = new();
     private readonly Guid _projektId = Guid.NewGuid();
     private readonly Guid _aufgabeId = Guid.NewGuid();
 
@@ -70,7 +70,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
             _kiService,
             scopeFactory,
             NullLogger<CliProcessManager>.Instance,
-            _laufdatenChangedNotifier);
+            _runDataChangedNotifier);
     }
 
     /// <summary>Dispose.</summary>
@@ -182,9 +182,9 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         LadeAufgabe().ActiveRunId.Should().BeNull("Ausgangslage: keine persistierten Laufdaten");
 
         var notifierFired = new ManualResetEventSlim(false);
-        _laufdatenChangedNotifier.LaufdatenChanged += _ => notifierFired.Set();
+        _runDataChangedNotifier.RunDataChanged += _ => notifierFired.Set();
 
-        _kiService.NotifyLaufAktiv(_aufgabeId);
+        _kiService.NotifyRunActive(_aufgabeId);
 
         await PollUntilAsync(() => LadeAufgabe().ActiveRunId is not null);
         var workItem = LadeAufgabe();

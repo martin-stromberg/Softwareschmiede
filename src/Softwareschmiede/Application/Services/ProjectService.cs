@@ -209,15 +209,15 @@ public sealed class ProjectService
     /// <summary>Setzt das Issue-Aufbereitungs-Flag eines Repositories (wirkt nur gemeinsam mit
     /// dem globalen Funktionsschalter <c>scm.issueaufbereitung.enabled</c>).</summary>
     /// <param name="repositoryId">Die Repository-ID.</param>
-    /// <param name="aktiv">Der neue Flag-Wert.</param>
+    /// <param name="active">Der neue Flag-Wert.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    public async Task SetIssuePreparationEnabledAsync(Guid repositoryId, bool aktiv, CancellationToken ct = default)
+    public async Task SetIssuePreparationEnabledAsync(Guid repositoryId, bool active, CancellationToken ct = default)
     {
         var repository = await _db.GitRepositories.FindAsync([repositoryId], ct)
             ?? throw new InvalidOperationException("Repository nicht gefunden.");
-        repository.IssuePreparationEnabled = aktiv;
+        repository.IssuePreparationEnabled = active;
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Issue-Aufbereitung für Repository {RepositoryId} auf {Aktiv} gesetzt.", repositoryId, aktiv);
+        _logger.LogInformation("Issue-Aufbereitung für Repository {RepositoryId} auf {Aktiv} gesetzt.", repositoryId, active);
     }
 
     /// <summary>Gibt alle unzugeordneten Repositories aus allen SCM-Plugins zurück, sortiert nach UpdatedAt absteigend, dann Name aufsteigend.</summary>
@@ -272,7 +272,7 @@ public sealed class ProjectService
     public async Task<RepositoryStartConfiguration> SaveRepositoryStartConfigurationAsync(
         Guid repositoryId,
         string startScriptRelativePath,
-        bool aktiv,
+        bool active,
         CancellationToken ct = default)
     {
         _logger.LogInformation("Startkonfiguration für Repository {RepositoryId} speichern.", repositoryId);
@@ -291,7 +291,7 @@ public sealed class ProjectService
         };
 
         configuration.StartScriptRelativePath = NormalizeRequiredValue(startScriptRelativePath, nameof(startScriptRelativePath));
-        configuration.Active = aktiv;
+        configuration.Active = active;
 
         if (repository.StartConfiguration is null)
         {

@@ -12,7 +12,7 @@ namespace Softwareschmiede.Application.Services;
 
 /// <summary>Eigenständiger Entdeckungszyklus der Issue-Aufbereitung („Issue erstellt“): enumeriert
 /// freigeschaltete Projekt-Repositories repository-weit und reiht neu angelegte Issues über
-/// <see cref="ScmIssuePreparationService.ErkennenUndEinreihenAsync"/> ein. Läuft unabhängig vom
+/// <see cref="ScmIssuePreparationService.DetectAndEnqueueAsync"/> ein. Läuft unabhängig vom
 /// konfigurierten Überwachungsmodus und immer unter dem Benutzerkonto
 /// (<see cref="ScmKontoModus.Benutzerkonto"/>), damit die Entdeckung auch im SeparatesKonto-Modus
 /// funktioniert, in dem die Notifications-Inbox die Enumeration der Ereignisüberwachung ersetzt.</summary>
@@ -105,7 +105,7 @@ public sealed class ScmIssuePreparationMonitoringService(
             var enumerated = new HashSet<string>(StringComparer.Ordinal);
             foreach (var repository in repositoriesForEnumeration)
             {
-                var lokale = localRepositories.TryGetValue(repository, out var kandidaten) ? kandidaten : new List<GitRepository>();
+                var lokale = localRepositories.TryGetValue(repository, out var candidates) ? candidates : new List<GitRepository>();
                 await ScmCheckpointSupport.EnumerateRepositoryAsync(
                     scopes, _time, options.Value.PollInterval, source, repository,
                     "issueaufbereitung-enumeration", enumerated,
@@ -136,7 +136,7 @@ public sealed class ScmIssuePreparationMonitoringService(
     /// danach werden nicht ausgewertete Issue-Referenzen einzeln gelesen und eingereiht.</summary>
     private async Task EvaluateDiscoveredIssuesAsync(
         IScmEventSource source, ScmEventRepository repository,
-        IReadOnlyList<ScmEventReference> discovered, IReadOnlyList<GitRepository> lokaleRepositories,
+        IReadOnlyList<ScmEventReference> discovered, IReadOnlyList<GitRepository> localRepositories,
         ScmKontoModus accountMode, CancellationToken ct)
     {
         var issues = discovered.Where(x => x.Kind == ScmReferenceKind.Issue).ToList();
@@ -148,14 +148,14 @@ public sealed class ScmIssuePreparationMonitoringService(
             // Erstlauf: Beobachtungsbeginn festlegen und alle enumerierten Issue-Referenzen als
             // ausgewertet markieren — kein Retro-Scan, keine Beschreibungs-Reads.
             await scope.ServiceProvider.GetRequiredService<ScmIssuePreparationService>()
-                .BaselineAnlegenAsync(repository, issues, ct);
+                .CreateBaselineAsync(repository, issues, ct);
             return;
         }
         foreach (var issue in issues)
         {
             try
             {
-                await EvaluateIssueAsync(source, issue, lokaleRepositories, accountMode, ct);
+                await EvaluateIssueAsync(source, issue, localRepositories, accountMode, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex)
@@ -170,11 +170,11 @@ public sealed class ScmIssuePreparationMonitoringService(
     }
 
     /// <summary>Liest die Beschreibung einer nicht ausgewerteten Issue-Referenz und übergibt sie an
-    /// <see cref="ScmIssuePreparationService.ErkennenUndEinreihenAsync"/>; danach steht der
+    /// <see cref="ScmIssuePreparationService.DetectAndEnqueueAsync"/>; danach steht der
     /// Auswertungs-Checkpoint auf Endzustand.</summary>
     private async Task EvaluateIssueAsync(
         IScmEventSource source, ScmEventReference issue,
-        IReadOnlyList<GitRepository> lokaleRepositories, ScmKontoModus accountMode, CancellationToken ct)
+        IReadOnlyList<GitRepository> localRepositories, ScmKontoModus accountMode, CancellationToken ct)
     {
         using var scope = scopes.CreateScope();
         var preparation = scope.ServiceProvider.GetRequiredService<ScmIssuePreparationService>();
@@ -187,7 +187,7 @@ public sealed class ScmIssuePreparationMonitoringService(
         var tagged = issue with { Repository = issue.Repository with { Account = accountMode } };
         var batch = await source.ReadEventsAsync(
             new ScmEventReadRequest(tagged, ScmContentKind.Description, null, _time.GetUtcNow()), ct);
-        await preparation.ErkennenUndEinreihenAsync(source, tagged, batch, lokaleRepositories, ct);
+        await preparation.DetectAndEnqueueAsync(source, tagged, batch, localRepositories, ct);
         // Endzustand je Issue: Folgezyklen überspringen die Referenz ohne Beschreibungs-Read.
         await preparation.CompleteEvaluationAsync(tagged, ct);
     }

@@ -134,7 +134,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var angefordert = 0;
-        fixture.Trigger.Angefordert += () => angefordert++;
+        fixture.Trigger.Requested += () => angefordert++;
 
         var (taskId, _) = await fixture.AddAsync(configured: true, body: "$Softwareschmiede bitte #verzögert 2h");
 
@@ -161,7 +161,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
                 .ExecuteUpdateAsync(x => x.SetProperty(p => p.ExecutionStatus, WorkItemExecutionStatus.Active), cancellationToken: TestContext.Current.CancellationToken);
         }
         var angefordert = 0;
-        fixture.Trigger.Angefordert += () => angefordert++;
+        fixture.Trigger.Requested += () => angefordert++;
 
         using (var scope = fixture.Services.CreateScope())
         {
@@ -237,7 +237,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         using (var scope = fixture.Services.CreateScope())
         {
             await scope.ServiceProvider.GetRequiredService<DevelopmentProcessService>()
-                .CliNeustartenAsync(nonScmTask, ScmDispatchFixture.KiPrefix, null, TestContext.Current.CancellationToken, strictPluginSelection: true);
+                .RestartCliAsync(nonScmTask, ScmDispatchFixture.KiPrefix, null, TestContext.Current.CancellationToken, strictPluginSelection: true);
         }
         Assert.True(fixture.Cli.IsRunning(nonScmTask));
 

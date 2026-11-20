@@ -201,9 +201,9 @@ public sealed class AufgabeRecoveryServiceTests
     {
         var project = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
         var projektEntity = await project.CreateAsync("Recovery-Parallel", null);
-        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        var workItem = await aufgabeService.CreateAsync(projektEntity.Id, "Festhängende Aufgabe", "test");
-        await aufgabeService.StatusSetzenAsync(workItem.Id, status);
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var workItem = await workItemService.CreateAsync(projektEntity.Id, "Festhängende Aufgabe", "test");
+        await workItemService.SetStatusUncheckedAsync(workItem.Id, status);
         if (status.IsActiveOrWaiting())
         {
             // Aktiven Ausführungsstatus direkt auf der Entity setzen (das frühere

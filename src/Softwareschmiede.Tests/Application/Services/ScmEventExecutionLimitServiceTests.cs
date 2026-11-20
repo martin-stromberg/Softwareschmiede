@@ -28,7 +28,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         _db = TestDbContextFactory.Create();
         _einstellungen = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
         _cli = new Mock<ICliExecutionLimitSource>();
-        _cli.Setup(x => x.GetLaufendeAufgabenIds()).Returns([]);
+        _cli.Setup(x => x.GetRunningWorkItemIds()).Returns([]);
         _sut = new ScmEventExecutionLimitService(_db, _einstellungen, _cli.Object, TimeProvider.System, _pool);
 
         _db.Projects.Add(new Project
@@ -47,17 +47,17 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         _db.Dispose();
     }
 
-    private async Task<Guid> LaufendeAufgabeAsync(string titel, string? kiPluginPrefix,
+    private async Task<Guid> LaufendeAufgabeAsync(string title, string? aiPluginPrefix,
         Mock<IScmPromptSessionAdapter>? session = null, DateTimeOffset? pausedUntilUtc = null)
     {
         var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Title = titel,
+            Title = title,
             ProjectId = _projektId,
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Active,
-            AiPluginPrefix = kiPluginPrefix,
+            AiPluginPrefix = aiPluginPrefix,
             PausedUntilUtc = pausedUntilUtc
         };
         _db.WorkItems.Add(workItem);
@@ -67,7 +67,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     }
 
     private void SetzeLaufende(params Guid[] ids)
-        => _cli.Setup(x => x.GetLaufendeAufgabenIds()).Returns(ids.ToList());
+        => _cli.Setup(x => x.GetRunningWorkItemIds()).Returns(ids.ToList());
 
     private static Mock<IScmPromptSessionAdapter> LebendeSession(string pluginPrefix)
     {
@@ -91,10 +91,10 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     [InlineData("0")]
     [InlineData("-3")]
     [InlineData("abc")]
-    public async Task GetStartBlockReasonAsync_UngueltigeGrenze_GiltAlsUnbegrenzt(string wert)
+    public async Task GetStartBlockReasonAsync_UngueltigeGrenze_GiltAlsUnbegrenzt(string value)
     {
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, wert, TestContext.Current.CancellationToken);
-        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), wert, TestContext.Current.CancellationToken);
+        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, value, TestContext.Current.CancellationToken);
+        await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), value, TestContext.Current.CancellationToken);
         SetzeLaufende(await LaufendeAufgabeAsync("A", PrefixA));
 
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();

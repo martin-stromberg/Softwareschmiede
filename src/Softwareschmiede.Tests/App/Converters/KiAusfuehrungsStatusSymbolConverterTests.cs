@@ -81,7 +81,7 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
             Title = "Aufgabe mit wartender Live-CLI",
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Completed,
-            LiveLaufStatus = WorkItemRunStatus.WaitingForInput
+            LiveRunStatus = WorkItemRunStatus.WaitingForInput
         };
 
         var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);

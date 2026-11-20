@@ -20,7 +20,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         var workingDirectory = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(workingDirectory, "backend"));
         var workItem = await ErstelleAufgabeMitRepositoryAsync("backend");
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
@@ -41,7 +41,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
     {
         var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
@@ -61,7 +61,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
     {
         var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync("does-not-exist");
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
@@ -85,7 +85,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         File.WriteAllText(solutionPath, string.Empty);
 
         var workItem = await ErstelleAufgabeMitRepositoryAsync(Path.Combine("src", "solutions"));
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);

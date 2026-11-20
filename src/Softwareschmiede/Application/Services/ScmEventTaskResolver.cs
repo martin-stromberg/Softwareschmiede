@@ -53,10 +53,10 @@ public sealed class ScmEventTaskResolver(
         ScmEventObservation trigger, IReadOnlyList<GitRepository> repositories, CancellationToken ct)
     {
         var issue = await source.ReadIssueAsync(reference, ct);
-        if (issue is null || issue.Nummer != reference.Number)
+        if (issue is null || issue.Number != reference.Number)
         {
             if (issue is not null)
-                logger.LogWarning("Issue-Anlagedaten von {Number} weichen von der Referenz {Reference} ab.", issue.Nummer, reference.Number);
+                logger.LogWarning("Issue-Anlagedaten von {Number} weichen von der Referenz {Reference} ab.", issue.Number, reference.Number);
             return ScmTaskResolution.Unassigned;
         }
         var repositoryIds = repositories.Select(x => (Guid?)x.Id).ToArray();
@@ -78,10 +78,10 @@ public sealed class ScmEventTaskResolver(
         ScmEventObservation trigger, IReadOnlyList<GitRepository> repositories, CancellationToken ct)
     {
         var pullRequest = await source.ReadPullRequestAsync(reference, ct);
-        if (pullRequest is null || pullRequest.Nummer != reference.Number)
+        if (pullRequest is null || pullRequest.Number != reference.Number)
         {
             if (pullRequest is not null)
-                logger.LogWarning("Pull-Request-Anlagedaten von {Number} weichen von der Referenz {Reference} ab.", pullRequest.Nummer, reference.Number);
+                logger.LogWarning("Pull-Request-Anlagedaten von {Number} weichen von der Referenz {Reference} ab.", pullRequest.Number, reference.Number);
             return ScmTaskResolution.Unassigned;
         }
         var repositoryId = PullRequestRepositoryId.Normalize(pullRequest.Provider,
@@ -145,13 +145,13 @@ public sealed class ScmEventTaskResolver(
             .Select(a => a.Id).Distinct().ToList();
     }
 
-    private static bool MatchesBranch(PullRequest pullRequest, string repositoryId, ContextCandidate kandidat)
+    private static bool MatchesBranch(PullRequest pullRequest, string repositoryId, ContextCandidate candidate)
         => !string.IsNullOrWhiteSpace(pullRequest.BranchName)
             && string.Equals(pullRequest.SourceRepositoryId, repositoryId, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(kandidat.BranchName, pullRequest.BranchName, StringComparison.OrdinalIgnoreCase);
+            && string.Equals(candidate.BranchName, pullRequest.BranchName, StringComparison.OrdinalIgnoreCase);
 
-    private static bool MatchesClosingIssue(IReadOnlyCollection<int> closingNumbers, ContextCandidate kandidat)
-        => kandidat.IssueNumber is { } issueNummer && closingNumbers.Contains(issueNummer);
+    private static bool MatchesClosingIssue(IReadOnlyCollection<int> closingNumbers, ContextCandidate candidate)
+        => candidate.IssueNumber is { } issueNumber && closingNumbers.Contains(issueNumber);
 
     private static GitRepository ChooseRepository(IReadOnlyList<GitRepository> repositories)
         => repositories.OrderBy(x => x.RepositoryUrl, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Id).FirstOrDefault()

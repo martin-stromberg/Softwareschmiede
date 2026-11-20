@@ -18,7 +18,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly ProjectService _projektService;
     private readonly LogService _logService;
     private readonly Mock<IGitPlugin> _gitPluginMock;
@@ -31,7 +31,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
     public EntwicklungsprozessServiceTests_WorkingDirectoryValidation()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
+        _workItemService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
         _projektService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
         _logService = new LogService(_db, new Mock<ILogger<LogService>>().Object);
 
@@ -57,7 +57,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
             new Mock<ILogger<PluginSelectionService>>().Object);
 
         _gitOrchestrationService = new GitOrchestrationService(
-            _aufgabeService,
+            _workItemService,
             _projektService,
             _logService,
             _gitPluginMock.Object,
@@ -67,7 +67,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         _arbeitsverzeichnisResolverMock = new Mock<IWorkingDirectoryResolver>();
 
         _sut = new DevelopmentProcessService(
-            _aufgabeService,
+            _workItemService,
             _logService,
             _gitPluginMock.Object,
             pluginSelectionService,
@@ -148,7 +148,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
     {
         // Arrange
         var repository = await CreateRepositoryWithWorkingDirectoryAsync("does-not-exist");
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Arbeitsverzeichnis fehlt", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projektId, "Arbeitsverzeichnis fehlt", null, repository.Id, TestContext.Current.CancellationToken);
         var clonePath = SetupCloneWithDirectoryCreation();
 
         try
@@ -176,7 +176,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
     {
         // Arrange
         var repository = await CreateRepositoryWithWorkingDirectoryAsync("backend");
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Arbeitsverzeichnis vorhanden", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projektId, "Arbeitsverzeichnis vorhanden", null, repository.Id, TestContext.Current.CancellationToken);
         var clonePath = SetupCloneWithDirectoryCreation();
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns((string _, string path, CancellationToken _) =>
@@ -191,7 +191,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
             await _sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+            var updatedAufgabe = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.Status.Should().Be(WorkItemStatus.Started);
         }
         finally
@@ -210,11 +210,11 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
     {
         // Arrange
         var repository = await CreateRepositoryWithWorkingDirectoryAsync("does-not-exist");
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Ohne GitOrchestrationService", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projektId, "Ohne GitOrchestrationService", null, repository.Id, TestContext.Current.CancellationToken);
         var clonePath = SetupCloneWithDirectoryCreation();
 
         var sutOhneValidation = new DevelopmentProcessService(
-            _aufgabeService,
+            _workItemService,
             _logService,
             _gitPluginMock.Object,
             new PluginSelectionService(
@@ -232,7 +232,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
             await sutOhneValidation.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
-            var updatedAufgabe = await _aufgabeService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+            var updatedAufgabe = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
             updatedAufgabe!.Status.Should().Be(WorkItemStatus.Started);
         }
         finally

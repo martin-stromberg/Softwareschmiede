@@ -408,7 +408,7 @@ public sealed class ScmEventQueueViewModelTests
         {
             var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
             await settings.SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
-            await settings.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+            await settings.SetScmBackmergeModeAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         }
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
 

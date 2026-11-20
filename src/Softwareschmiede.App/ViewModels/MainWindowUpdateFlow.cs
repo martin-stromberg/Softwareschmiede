@@ -170,7 +170,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         await FuehreUpdateVersuchAsync("startup", vorbereitend: false, async (settings, generation, token) =>
         {
             token.ThrowIfCancellationRequested();
-            var result = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.UpdatePfad), token);
+            var result = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.UpdatePath), token);
             if (!IstUpdateVersuchAktuell(generation))
                 return;
 
@@ -195,7 +195,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         return FuehreUpdateVersuchAsync("pruefen", vorbereitend: false, async (settings, generation, token) =>
         {
             token.ThrowIfCancellationRequested();
-            var result = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.UpdatePfad), token);
+            var result = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.UpdatePath), token);
             if (!IstUpdateVersuchAktuell(generation))
                 return;
 
@@ -209,7 +209,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
     /// verwendet.
     /// </summary>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    public Task StartenAsync(CancellationToken ct)
+    public Task StartAsync(CancellationToken ct)
     {
         if (_updateService is null || _cliUpdateSafetyService is null || _updateProgressDialogService is null || _dialogService is null)
             return Task.CompletedTask;
@@ -217,7 +217,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         return FuehreUpdateVersuchAsync("starten", vorbereitend: true, async (settings, generation, token) =>
         {
             token.ThrowIfCancellationRequested();
-            var checkResult = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.UpdatePfad), token);
+            var checkResult = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(settings.UpdatePath), token);
             if (!IstUpdateVersuchAktuell(generation))
                 return;
 

@@ -91,10 +91,10 @@ public sealed class AppSettingService
     public const string UpdateSettingsReadTag = "UpdateSettings.Read";
 
     /// <summary>Schlüssel für den Anzeigemodus der Aufgabenliste in der Seitenleiste (<c>AufgabenListenModus</c>-Name).</summary>
-    public const string AktiveAufgabenListenModusKey = "aktiveaufgaben.listenmodus";
+    public const string ActiveWorkItemsListModeKey = "aktiveaufgaben.listenmodus";
 
     /// <summary>Schlüssel für den Anzeigemodus der Aufgabenliste im Dashboard (<c>AufgabenListenModus</c>-Name).</summary>
-    public const string AktiveAufgabenListenModusDashboardKey = "aktiveaufgaben.listenmodus.dashboard";
+    public const string ActiveWorkItemsListModeDashboardKey = "aktiveaufgaben.listenmodus.dashboard";
 
     /// <summary>Schlüssel für den Backmerge-Aktivierungsmodus (<see cref="ScmBackmergeMode"/>-Wert als Zahl gespeichert).</summary>
     public const string ScmBackmergeModeKey = "scm.backmerge.mode";
@@ -103,7 +103,7 @@ public sealed class AppSettingService
     public const string ScmTaskCompletionCheckModeKey = "scm.taskcompletion.scope";
 
     /// <summary>Schlüssel für die automatische Aktivierung von Draft-Backmerge-PRs.</summary>
-    public const string ScmBackmergeDraftAktivierungKey = "scm.backmerge.draft_activation";
+    public const string ScmBackmergeDraftActivationKey = "scm.backmerge.draft_activation";
 
     /// <summary>Schlüssel für die Admin-Merge-Fallback-Option des Backmerge-Dienstes.</summary>
     public const string ScmBackmergeAdminMergeKey = "scm.backmerge.admin_merge";
@@ -112,7 +112,7 @@ public sealed class AppSettingService
     public const string ScmAccountModeKey = "scm.monitoring.accountmode";
 
     /// <summary>Schlüsselpräfix für die projektbezogene Backmerge-Freigabe; der vollständige Schlüssel ist <c>plugins.backmerge.project.{projektId}</c>.</summary>
-    public const string BackmergeProjektKeyPrefix = "plugins.backmerge.project.";
+    public const string BackmergeProjectKeyPrefix = "plugins.backmerge.project.";
 
     /// <summary>Schlüssel für den Schalter "Herunterfahren erzwingen" des automatischen OS-Shutdowns.</summary>
     public const string AutoShutdownErzwingenKey = "autoshutdown.force";
@@ -151,8 +151,8 @@ public sealed class AppSettingService
     /// <summary>Liest den Wert einer Einstellung als <see cref="int"/>. Gibt <c>null</c> zurück, wenn kein Wert gespeichert ist oder der Wert kein gültiger Integer ist.</summary>
     public async Task<int?> GetIntSettingAsync(string schluessel, CancellationToken ct = default)
     {
-        var wert = await GetSettingAsync(schluessel, ct);
-        if (int.TryParse(wert, out var result))
+        var value = await GetSettingAsync(schluessel, ct);
+        if (int.TryParse(value, out var result))
             return result;
         return null;
     }
@@ -160,14 +160,14 @@ public sealed class AppSettingService
     /// <summary>Liest den Wert einer Einstellung als <see cref="bool"/>. Gibt <c>null</c> zurück, wenn kein Wert gespeichert ist oder der Wert kein gültiger Boolean ist.</summary>
     public async Task<bool?> GetBoolSettingAsync(string schluessel, CancellationToken ct = default)
     {
-        var wert = await GetSettingAsync(schluessel, ct);
-        if (bool.TryParse(wert, out var result))
+        var value = await GetSettingAsync(schluessel, ct);
+        if (bool.TryParse(value, out var result))
             return result;
         return null;
     }
 
     /// <summary>Speichert oder überschreibt eine Einstellung. Übergibt man <c>null</c>, wird der Wert auf null gesetzt (nicht gelöscht).</summary>
-    public async Task SetSettingAsync(string schluessel, string? wert, CancellationToken ct = default)
+    public async Task SetSettingAsync(string schluessel, string? value, CancellationToken ct = default)
     {
         var setting = await _db.AppSettings
             .FirstOrDefaultAsync(s => s.Key == schluessel, ct);
@@ -182,7 +182,7 @@ public sealed class AppSettingService
             _db.AppSettings.Add(setting);
         }
 
-        setting.Value = wert;
+        setting.Value = value;
         setting.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);
@@ -190,12 +190,12 @@ public sealed class AppSettingService
     }
 
     /// <summary>Speichert eine Ganzzahl-Einstellung.</summary>
-    public Task SetIntSettingAsync(string schluessel, int wert, CancellationToken ct = default)
-        => SetSettingAsync(schluessel, wert.ToString(), ct);
+    public Task SetIntSettingAsync(string schluessel, int value, CancellationToken ct = default)
+        => SetSettingAsync(schluessel, value.ToString(), ct);
 
     /// <summary>Speichert eine Boolean-Einstellung.</summary>
-    public Task SetBoolSettingAsync(string schluessel, bool wert, CancellationToken ct = default)
-        => SetSettingAsync(schluessel, wert.ToString(), ct);
+    public Task SetBoolSettingAsync(string schluessel, bool value, CancellationToken ct = default)
+        => SetSettingAsync(schluessel, value.ToString(), ct);
 
     /// <summary>
     /// Ermittelt, ob die SCM-Ereignisüberwachung aktuell aktiv ist. Der über
@@ -227,8 +227,8 @@ public sealed class AppSettingService
     /// <returns>Der Plugin-Prefix oder <see langword="null"/> für den Standard-Fallback.</returns>
     public async Task<string?> GetScmIssuePreparationPluginPrefixAsync(CancellationToken ct = default)
     {
-        var wert = await GetSettingAsync(ScmIssuePreparationPluginKey, ct);
-        return string.IsNullOrWhiteSpace(wert) ? null : wert.Trim();
+        var value = await GetSettingAsync(ScmIssuePreparationPluginKey, ct);
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     /// <summary>
@@ -243,7 +243,7 @@ public sealed class AppSettingService
     /// <summary>Bildet den Einstellungsschlüssel der projektbezogenen Backmerge-Freigabe.</summary>
     /// <param name="projectId">Die Projekt-ID.</param>
     /// <returns>Den vollständigen Einstellungsschlüssel <c>plugins.backmerge.project.{projektId}</c>.</returns>
-    public static string BackmergeProjektKey(Guid projectId) => $"{BackmergeProjektKeyPrefix}{projectId}";
+    public static string BackmergeProjectKey(Guid projectId) => $"{BackmergeProjectKeyPrefix}{projectId}";
 
     /// <summary>
     /// Liest den Backmerge-Aktivierungsmodus unter <see cref="ScmBackmergeModeKey"/>.
@@ -252,10 +252,10 @@ public sealed class AppSettingService
     /// </summary>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Der effektive Backmerge-Modus.</returns>
-    public async Task<ScmBackmergeMode> GetScmBackmergeModusAsync(CancellationToken ct = default)
+    public async Task<ScmBackmergeMode> GetScmBackmergeModeAsync(CancellationToken ct = default)
     {
-        var wert = await GetSettingAsync(ScmBackmergeModeKey, ct);
-        return int.TryParse(wert, out var mode) && Enum.IsDefined((ScmBackmergeMode)mode)
+        var value = await GetSettingAsync(ScmBackmergeModeKey, ct);
+        return int.TryParse(value, out var mode) && Enum.IsDefined((ScmBackmergeMode)mode)
             ? (ScmBackmergeMode)mode
             : ScmBackmergeMode.Disabled;
     }
@@ -264,7 +264,7 @@ public sealed class AppSettingService
     /// <param name="mode">Der zu speichernde Modus.</param>
     /// <param name="ct">Abbruchtoken.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="mode"/> ist kein definierter <see cref="ScmBackmergeMode"/>-Wert.</exception>
-    public Task SetScmBackmergeModusAsync(ScmBackmergeMode mode, CancellationToken ct = default)
+    public Task SetScmBackmergeModeAsync(ScmBackmergeMode mode, CancellationToken ct = default)
     {
         if (!Enum.IsDefined(mode))
             throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unbekannter Backmerge-Modus.");
@@ -281,8 +281,8 @@ public sealed class AppSettingService
     /// <returns>Der effektive Kontomodus.</returns>
     public async Task<ScmKontoModus> GetScmAccountModeAsync(CancellationToken ct = default)
     {
-        var wert = await GetSettingAsync(ScmAccountModeKey, ct);
-        return int.TryParse(wert, out var mode) && Enum.IsDefined((ScmKontoModus)mode)
+        var value = await GetSettingAsync(ScmAccountModeKey, ct);
+        return int.TryParse(value, out var mode) && Enum.IsDefined((ScmKontoModus)mode)
             ? (ScmKontoModus)mode
             : ScmKontoModus.Benutzerkonto;
     }
@@ -303,30 +303,30 @@ public sealed class AppSettingService
     /// <param name="projectId">Die Projekt-ID.</param>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns><see langword="true"/>, wenn Backmerge-PRs für dieses Projekt automatisch gemergt werden dürfen.</returns>
-    public async Task<bool> GetBackmergeProjektAktivAsync(Guid projectId, CancellationToken ct = default)
-        => await GetBoolSettingAsync(BackmergeProjektKey(projectId), ct) ?? false;
+    public async Task<bool> GetBackmergeProjectEnabledAsync(Guid projectId, CancellationToken ct = default)
+        => await GetBoolSettingAsync(BackmergeProjectKey(projectId), ct) ?? false;
 
     /// <summary>Setzt die projektbezogene Backmerge-Freigabe für das Projekt.</summary>
     /// <param name="projectId">Die Projekt-ID.</param>
-    /// <param name="aktiv">Der zu speichernde Schalter.</param>
+    /// <param name="active">Der zu speichernde Schalter.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    public Task SetBackmergeProjektAktivAsync(Guid projectId, bool aktiv, CancellationToken ct = default)
-        => SetBoolSettingAsync(BackmergeProjektKey(projectId), aktiv, ct);
+    public Task SetBackmergeProjectEnabledAsync(Guid projectId, bool active, CancellationToken ct = default)
+        => SetBoolSettingAsync(BackmergeProjectKey(projectId), active, ct);
 
     /// <summary>
     /// Ermittelt, ob Draft-Backmerge-Pull-Requests vor dem Merge automatisch aktiviert werden
-    /// (<see cref="ScmBackmergeDraftAktivierungKey"/>). Standard: <see langword="false"/>.
+    /// (<see cref="ScmBackmergeDraftActivationKey"/>). Standard: <see langword="false"/>.
     /// </summary>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns><see langword="true"/>, wenn Draft-Backmerge-PRs automatisch aktiviert werden.</returns>
-    public async Task<bool> GetScmBackmergeDraftAktivierungAsync(CancellationToken ct = default)
-        => await GetBoolSettingAsync(ScmBackmergeDraftAktivierungKey, ct) ?? false;
+    public async Task<bool> GetScmBackmergeDraftActivationAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(ScmBackmergeDraftActivationKey, ct) ?? false;
 
-    /// <summary>Setzt die automatische Aktivierung von Draft-Backmerge-Pull-Requests (<see cref="ScmBackmergeDraftAktivierungKey"/>).</summary>
-    /// <param name="aktiv">Der zu speichernde Schalter.</param>
+    /// <summary>Setzt die automatische Aktivierung von Draft-Backmerge-Pull-Requests (<see cref="ScmBackmergeDraftActivationKey"/>).</summary>
+    /// <param name="active">Der zu speichernde Schalter.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    public Task SetScmBackmergeDraftAktivierungAsync(bool aktiv, CancellationToken ct = default)
-        => SetBoolSettingAsync(ScmBackmergeDraftAktivierungKey, aktiv, ct);
+    public Task SetScmBackmergeDraftActivationAsync(bool active, CancellationToken ct = default)
+        => SetBoolSettingAsync(ScmBackmergeDraftActivationKey, active, ct);
 
     /// <summary>
     /// Ermittelt, ob der Backmerge-Dienst nach einem blockierten regulären Merge einen
@@ -339,10 +339,10 @@ public sealed class AppSettingService
         => await GetBoolSettingAsync(ScmBackmergeAdminMergeKey, ct) ?? false;
 
     /// <summary>Setzt die Admin-Merge-Fallback-Option des Backmerge-Dienstes (<see cref="ScmBackmergeAdminMergeKey"/>).</summary>
-    /// <param name="aktiv">Der zu speichernde Schalter.</param>
+    /// <param name="active">Der zu speichernde Schalter.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    public Task SetScmBackmergeAdminMergeAsync(bool aktiv, CancellationToken ct = default)
-        => SetBoolSettingAsync(ScmBackmergeAdminMergeKey, aktiv, ct);
+    public Task SetScmBackmergeAdminMergeAsync(bool active, CancellationToken ct = default)
+        => SetBoolSettingAsync(ScmBackmergeAdminMergeKey, active, ct);
 
     /// <summary>
     /// Ermittelt, ob die SCM-Abschlussüberwachung ereignisgesteuerter Aufgaben aktiv ist. Der über
@@ -365,8 +365,8 @@ public sealed class AppSettingService
     /// <returns>Die wirksame Wartezeit in Minuten.</returns>
     public async Task<int> GetScmTaskCompletionWaitMinutesAsync(CancellationToken ct = default)
     {
-        var wert = await GetIntSettingAsync(ScmTaskCompletionWaitMinutesKey, ct);
-        return wert is null ? ScmTaskCompletionDefaultWaitMinutes : Math.Clamp(wert.Value, 0, 43200);
+        var value = await GetIntSettingAsync(ScmTaskCompletionWaitMinutesKey, ct);
+        return value is null ? ScmTaskCompletionDefaultWaitMinutes : Math.Clamp(value.Value, 0, 43200);
     }
 
     /// <summary>
@@ -378,8 +378,8 @@ public sealed class AppSettingService
     /// <returns>Der effektive Prüfmodus.</returns>
     public async Task<ScmTaskCompletionCheckMode> GetScmTaskCompletionCheckModeAsync(CancellationToken ct = default)
     {
-        var wert = await GetSettingAsync(ScmTaskCompletionCheckModeKey, ct);
-        return int.TryParse(wert, out var mode) && Enum.IsDefined((ScmTaskCompletionCheckMode)mode)
+        var value = await GetSettingAsync(ScmTaskCompletionCheckModeKey, ct);
+        return int.TryParse(value, out var mode) && Enum.IsDefined((ScmTaskCompletionCheckMode)mode)
             ? (ScmTaskCompletionCheckMode)mode
             : ScmTaskCompletionCheckMode.EventDriven;
     }
@@ -488,11 +488,11 @@ public sealed class AppSettingService
             .Where(s => keys.Contains(s.Key))
             .ToDictionaryAsync(s => s.Key, ct);
 
-        foreach (var (schluessel, wert) in updates)
+        foreach (var (schluessel, value) in updates)
         {
             if (bestehende.TryGetValue(schluessel, out var setting))
             {
-                setting.Value = wert;
+                setting.Value = value;
                 setting.UpdatedAt = DateTimeOffset.UtcNow;
             }
             else
@@ -501,7 +501,7 @@ public sealed class AppSettingService
                 {
                     Id = Guid.NewGuid(),
                     Key = schluessel,
-                    Value = wert,
+                    Value = value,
                     UpdatedAt = DateTimeOffset.UtcNow
                 });
             }
@@ -556,13 +556,13 @@ public sealed class AppSettingService
         if (!Enum.IsDefined(settings.Mode))
             throw new ArgumentOutOfRangeException(nameof(settings), settings.Mode, "Unbekannter Update-Modus.");
 
-        if (!UpdatePathChannelResolver.IstGueltigerPfad(settings.UpdatePfad))
-            throw new ArgumentOutOfRangeException(nameof(settings), settings.UpdatePfad, "Unbekannter Update-Pfad.");
+        if (!UpdatePathChannelResolver.IsValidPath(settings.UpdatePath))
+            throw new ArgumentOutOfRangeException(nameof(settings), settings.UpdatePath, "Unbekannter Update-Pfad.");
 
         var updates = new[]
         {
             (UpdateModeKey, ((int)settings.Mode).ToString()),
-            (UpdatePfadKey, UpdatePathChannelResolver.NormalizePath(settings.UpdatePfad)),
+            (UpdatePfadKey, UpdatePathChannelResolver.NormalizePath(settings.UpdatePath)),
         };
 
         var keys = updates.Select(u => u.Item1).ToArray();
@@ -571,11 +571,11 @@ public sealed class AppSettingService
             .Where(s => keys.Contains(s.Key))
             .ToDictionaryAsync(s => s.Key, ct);
 
-        foreach (var (schluessel, wert) in updates)
+        foreach (var (schluessel, value) in updates)
         {
             if (bestehende.TryGetValue(schluessel, out var setting))
             {
-                setting.Value = wert;
+                setting.Value = value;
                 setting.UpdatedAt = DateTimeOffset.UtcNow;
             }
             else
@@ -584,7 +584,7 @@ public sealed class AppSettingService
                 {
                     Id = Guid.NewGuid(),
                     Key = schluessel,
-                    Value = wert,
+                    Value = value,
                     UpdatedAt = DateTimeOffset.UtcNow
                 });
             }
@@ -619,8 +619,8 @@ public sealed class AppSettingService
     /// <returns>Die wirksame Toleranzzeit in Minuten.</returns>
     public async Task<int> GetAutoShutdownToleranceMinutesAsync(CancellationToken ct = default)
     {
-        var wert = await GetIntSettingAsync(AutoShutdownToleranceMinutesKey, ct);
-        return wert is null ? AutoShutdownDefaultToleranceMinutes : Math.Clamp(wert.Value, 0, AutoShutdownMaxToleranceMinutes);
+        var value = await GetIntSettingAsync(AutoShutdownToleranceMinutesKey, ct);
+        return value is null ? AutoShutdownDefaultToleranceMinutes : Math.Clamp(value.Value, 0, AutoShutdownMaxToleranceMinutes);
     }
 
     /// <summary>Speichert die Toleranzzeit (Minuten) des Auto-Shutdown-Countdowns (<see cref="AutoShutdownToleranceMinutesKey"/>).</summary>

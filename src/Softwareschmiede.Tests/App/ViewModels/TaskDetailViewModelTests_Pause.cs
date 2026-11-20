@@ -16,7 +16,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class TaskDetailViewModelTests_Pause : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly LogService _logService;
     private readonly TodoService _todoService;
     private readonly AiExecutionService _kiService;
@@ -24,22 +24,22 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly PromptTemplateService _promptVorlagenService;
     private readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService = new();
-    private readonly PromptScheduleDispatchService _promptZeitVersandService;
+    private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
     private readonly AppSettingService _appSettingService;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
-    private readonly WorkItemRunDataChangedNotifier _laufdatenChangedNotifier;
+    private readonly WorkItemRunDataChangedNotifier _runDataChangedNotifier;
     private readonly Guid _projektId = Guid.NewGuid();
 
     /// <summary>TaskDetailViewModelTests_Pause.</summary>
     public TaskDetailViewModelTests_Pause()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
         _kiService = TestKiAusfuehrungsServiceFactory.Create();
-        _promptZeitVersandService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _appSettingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
 
         var pluginManagerMock = new Mock<IPluginManager>();
@@ -54,7 +54,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
         _entwicklungsprozessService = new DevelopmentProcessService(
-            _aufgabeService,
+            _workItemService,
             _logService,
             gitPluginMock.Object,
             _pluginSelectionService,
@@ -67,7 +67,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         _serviceProviderMock
             .Setup(sp => sp.GetService(typeof(AufgabePausierenDialogViewModel)))
             .Returns(new AufgabePausierenDialogViewModel());
-        _laufdatenChangedNotifier = new WorkItemRunDataChangedNotifier();
+        _runDataChangedNotifier = new WorkItemRunDataChangedNotifier();
 
         _db.Projects.Add(new Project
         {
@@ -94,14 +94,14 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         pluginManagerMock.Setup(p => p.GetIdePlugins()).Returns([]);
 
         return new TaskDetailViewModel(
-            _aufgabeService,
+            _workItemService,
             _logService,
             _kiService,
             _entwicklungsprozessService,
             _pluginSelectionService,
             _promptVorlagenService,
             _promptVorlagenPlatzhalterService,
-            _promptZeitVersandService,
+            _promptScheduleDispatchService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
             _serviceProviderMock.Object,
@@ -110,7 +110,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
             TaskDetailViewModelTestFactory.CreateStub(),
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(),
-            laufdatenChangedNotifier: _laufdatenChangedNotifier);
+            runDataChangedNotifier: _runDataChangedNotifier);
     }
 
     private async Task<TaskDetailViewModel> LadeSutAsync(WorkItem workItem)
@@ -123,10 +123,10 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
     private async Task<WorkItem> ErstelleAufgabeAsync(WorkItemStatus status = WorkItemStatus.New)
     {
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
+        var workItem = await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
         if (status != WorkItemStatus.New)
-            await _aufgabeService.StatusSetzenAsync(workItem.Id, status);
-        return (await _aufgabeService.GetByIdAsync(workItem.Id))!;
+            await _workItemService.SetStatusUncheckedAsync(workItem.Id, status);
+        return await _workItemService.GetByIdAsync(workItem.Id) ?? workItem;
     }
 
     private async Task<WorkItem> ErstelleAufgabeMitAusfuehrungsStatusAsync(WorkItemStatus status, WorkItemExecutionStatus executionStatus)
@@ -173,7 +173,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
     public async Task IstPausiert_UndPauseAnzeigeText_ReflektierenGeladenenWert()
     {
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
-        await _aufgabeService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
+        await _workItemService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
         var sut = await LadeSutAsync(workItem);
 
         sut.IsPaused.Should().BeTrue();
@@ -189,7 +189,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         var sut = await LadeSutAsync(workItem);
         sut.StartenCommand.CanExecute(null).Should().BeTrue("ohne Pause ist der Start erlaubt");
 
-        await _aufgabeService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
+        await _workItemService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.StartenCommand.CanExecute(null).Should().BeFalse("eine pausierte Aufgabe darf nicht gestartet werden");
@@ -203,7 +203,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         var sut = await LadeSutAsync(workItem);
         sut.KannCliNeuStarten.Should().BeTrue("ohne Pause ist der CLI-Neustart bei beendeter Ausführung erlaubt");
 
-        await _aufgabeService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
+        await _workItemService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.KannCliNeuStarten.Should().BeFalse("eine pausierte Aufgabe darf nicht neu gestartet werden");
@@ -225,7 +225,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         sut.KannPromptVorlageSenden.Should().BeTrue();
         sut.KannPromptPlanen.Should().BeTrue();
 
-        await _aufgabeService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
+        await _workItemService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         // LadenAsync setzt IsCliRunning aus dem KiService neu — für die Guard-Prüfung erneut
@@ -247,7 +247,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
             .Setup(d => d.ShowAufgabePausierenDialogAsync(It.IsAny<AufgabePausierenDialogViewModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AufgabePausierenErgebnis(pausedUntil, Aufheben: false));
         var notified = new List<Guid>();
-        _laufdatenChangedNotifier.LaufdatenChanged += id => notified.Add(id);
+        _runDataChangedNotifier.RunDataChanged += id => notified.Add(id);
 
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var sut = await LadeSutAsync(workItem);
@@ -272,7 +272,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
             .ReturnsAsync(new AufgabePausierenErgebnis(null, Aufheben: true));
 
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
-        await _aufgabeService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
+        await _workItemService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
         var sut = await LadeSutAsync(workItem);
         sut.IsPaused.Should().BeTrue();
 

@@ -48,7 +48,7 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
     public WorkItemRunStatus? RunStatus { get; init; }
 
     /// <summary>Live-Substatus aus der Laufzeitquelle (<see cref="Domain.Interfaces.IRunningAutomationStatusSource.GetLiveRunStatus"/>); <c>null</c> = kein laufender gehandelter Prozess.</summary>
-    public WorkItemRunStatus? LiveLaufStatus { get; init; }
+    public WorkItemRunStatus? LiveRunStatus { get; init; }
 
     /// <summary>Aktueller Aufgabenstatus.</summary>
     public WorkItemStatus Status { get; init; }

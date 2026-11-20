@@ -16,10 +16,10 @@ public sealed class ProtokollServiceTests
     private static async Task<Guid> CreateTestAufgabeAsync(DatabaseFixture db)
     {
         var projektService = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
-        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         var project = await projektService.CreateAsync("Testprojekt Protokoll", null);
-        var workItem = await aufgabeService.CreateAsync(project.Id, "Testaufgabe Protokoll", null);
+        var workItem = await workItemService.CreateAsync(project.Id, "Testaufgabe Protokoll", null);
         return workItem.Id;
     }
 
@@ -66,7 +66,7 @@ public sealed class ProtokollServiceTests
         await service.AddEntryAsync(workItemId, LogEntryType.StatusTransition, "Dritter Eintrag", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var result = await service.GetByAufgabeAsync(workItemId, TestContext.Current.CancellationToken);
+        var result = await service.GetByWorkItemAsync(workItemId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(3);
@@ -203,7 +203,7 @@ public sealed class ProtokollServiceTests
         var service = new LogService(db.Context, NullLogger<LogService>.Instance);
 
         // Act
-        var entry = await service.AddStatusUebergangAsync(workItemId, WorkItemStatus.New, WorkItemStatus.Started, TestContext.Current.CancellationToken);
+        var entry = await service.AddStatusTransitionAsync(workItemId, WorkItemStatus.New, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
@@ -237,7 +237,7 @@ public sealed class ProtokollServiceTests
         await service.AddTestResultsAsync(workItemId, testResult, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await service.GetByAufgabeAsync(workItemId, TestContext.Current.CancellationToken);
+        var result = await service.GetByWorkItemAsync(workItemId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(1);

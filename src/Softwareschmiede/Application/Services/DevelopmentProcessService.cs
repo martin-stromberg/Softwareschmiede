@@ -31,7 +31,7 @@ public sealed record DevelopmentProcessServiceOptions(
 /// </summary>
 public sealed class DevelopmentProcessService
 {
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly LogService _logService;
     private readonly IGitPlugin _gitPlugin;
     private readonly PluginSelectionService _pluginSelectionService;
@@ -43,14 +43,14 @@ public sealed class DevelopmentProcessService
 
     /// <inheritdoc cref="DevelopmentProcessService"/>
     public DevelopmentProcessService(
-        WorkItemService aufgabeService,
+        WorkItemService workItemService,
         LogService logService,
         IGitPlugin gitPlugin,
         PluginSelectionService pluginSelectionService,
         IWorkingDirectoryResolver workingDirectoryResolver,
         ILogger<DevelopmentProcessService> logger)
         : this(
-            aufgabeService,
+            workItemService,
             logService,
             gitPlugin,
             pluginSelectionService,
@@ -62,7 +62,7 @@ public sealed class DevelopmentProcessService
 
     /// <inheritdoc cref="DevelopmentProcessService"/>
     public DevelopmentProcessService(
-        WorkItemService aufgabeService,
+        WorkItemService workItemService,
         LogService logService,
         IGitPlugin gitPlugin,
         PluginSelectionService pluginSelectionService,
@@ -70,7 +70,7 @@ public sealed class DevelopmentProcessService
         DevelopmentProcessServiceOptions options,
         ILogger<DevelopmentProcessService> logger)
     {
-        _aufgabeService = aufgabeService;
+        _workItemService = workItemService;
         _logService = logService;
         _gitPlugin = gitPlugin;
         _pluginSelectionService = pluginSelectionService;
@@ -102,7 +102,7 @@ public sealed class DevelopmentProcessService
     {
         _logger.LogInformation("Repository-Setup für Aufgabe {AufgabeId} starten.", workItemId);
 
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
         ThrowIfPaused(workItem);
         if (!string.IsNullOrWhiteSpace(workItem.LocalClonePath)) return;
@@ -119,7 +119,7 @@ public sealed class DevelopmentProcessService
     /// <param name="workItemId">ID der zu startenden Aufgabe.</param>
     /// <param name="repositoryUrl">URL des zu klonenden Repositories.</param>
     /// <param name="basisBranchName">Optionaler Basis-Branch.</param>
-    /// <param name="kiPluginPrefix">Optionaler Prefix des zu verwendenden KI-Plugins.</param>
+    /// <param name="aiPluginPrefix">Optionaler Prefix des zu verwendenden KI-Plugins.</param>
     /// <param name="ct">Abbruch-Token.</param>
     /// <param name="strictPluginSelection">Verhindert Ersatzplugins bei automatischer SCM-Zustellung.</param>
     /// <param name="optionalParameters">Explizite Startparameter des gewählten Plugins.</param>
@@ -127,49 +127,49 @@ public sealed class DevelopmentProcessService
         Guid workItemId,
         string repositoryUrl,
         string? basisBranchName,
-        string? kiPluginPrefix,
+        string? aiPluginPrefix,
         CancellationToken ct = default,
         bool strictPluginSelection = false,
         string? optionalParameters = null)
         => ScmTaskCoordinator.Shared.RunAsync(workItemId,
-            () => ProcessAndCliCoordinatedAsync(workItemId, repositoryUrl, basisBranchName, kiPluginPrefix, ct, strictPluginSelection, optionalParameters), ct);
+            () => ProcessAndCliCoordinatedAsync(workItemId, repositoryUrl, basisBranchName, aiPluginPrefix, ct, strictPluginSelection, optionalParameters), ct);
 
     private async Task ProcessAndCliCoordinatedAsync(Guid workItemId, string repositoryUrl,
-        string? basisBranchName, string? kiPluginPrefix, CancellationToken ct, bool strictPluginSelection, string? optionalParameters)
+        string? basisBranchName, string? aiPluginPrefix, CancellationToken ct, bool strictPluginSelection, string? optionalParameters)
     {
         if (_options.AiExecutionService is null)
         {
-            throw new InvalidOperationException("KiAusfuehrungsService ist nicht konfiguriert.");
+            throw new InvalidOperationException("AiExecutionService ist nicht konfiguriert.");
         }
 
         // Der Pausen-Guard steht bewusst VOR dem try-Block: Ein InvalidOperationException-Wurf
         // innerhalb von try würde den Rollback-Pfad auslösen (Klon löschen + Status-Reset), obwohl
         // die Aufgabe bei aktiver Pause gar nicht angefasst werden soll.
-        var vorabAufgabe = await _aufgabeService.GetByIdAsync(workItemId, ct)
+        var prerequisiteWorkItem = await _workItemService.GetByIdAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
-        ThrowIfPaused(vorabAufgabe);
-        if (vorabAufgabe.Status is WorkItemStatus.Completed or WorkItemStatus.Archived)
+        ThrowIfPaused(prerequisiteWorkItem);
+        if (prerequisiteWorkItem.Status is WorkItemStatus.Completed or WorkItemStatus.Archived)
             throw new InvalidOperationException("Beendete oder archivierte Aufgaben können nicht gestartet werden.");
         // A competing automatic/manual start may have completed while we waited for the task gate.
         // Reuse that workspace before entering setup or its rollback scope.
-        if (!string.IsNullOrWhiteSpace(vorabAufgabe.LocalClonePath))
+        if (!string.IsNullOrWhiteSpace(prerequisiteWorkItem.LocalClonePath))
         {
-            await CliNeustartenAsync(workItemId, kiPluginPrefix, optionalParameters, ct, strictPluginSelection);
+            await RestartCliAsync(workItemId, aiPluginPrefix, optionalParameters, ct, strictPluginSelection);
             return;
         }
-        var previousClone = vorabAufgabe.LocalClonePath;
-        var previousStatus = vorabAufgabe.Status;
+        var previousClone = prerequisiteWorkItem.LocalClonePath;
+        var previousStatus = prerequisiteWorkItem.Status;
         var strictPlugin = strictPluginSelection
-            ? await _pluginSelectionService.ResolveDevelopmentAutomationPluginStrictAsync(kiPluginPrefix!, ct)
+            ? await _pluginSelectionService.ResolveDevelopmentAutomationPluginStrictAsync(aiPluginPrefix!, ct)
             : null;
 
         try
         {
-            var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+            var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
                 ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
             var (repository, gitPlugin) = await StartProcessCoreAsync(workItemId, workItem, repositoryUrl, basisBranchName, null, ct, strictPluginSelection);
 
-            workItem = await _aufgabeService.GetByIdAsync(workItemId, ct)
+            workItem = await _workItemService.GetByIdAsync(workItemId, ct)
                 ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
             if (string.IsNullOrEmpty(workItem.LocalClonePath))
@@ -179,8 +179,8 @@ public sealed class DevelopmentProcessService
 
             var kiPlugin = strictPlugin is not null
                 ? await _pluginSelectionService.ResolveDevelopmentAutomationPluginStrictAsync(strictPlugin.PluginPrefix, ct)
-                : await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
-            await _aufgabeService.UpdateAsync(
+                : await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(aiPluginPrefix, ct);
+            await _workItemService.UpdateAsync(
                 workItemId,
                 workItem.Title,
                 workItem.RequirementDescription,
@@ -233,24 +233,24 @@ public sealed class DevelopmentProcessService
     }
 
     /// <summary>Startet die KI-CLI erneut im bereits vorbereiteten Klon einer Aufgabe.</summary>
-    public Task CliNeustartenAsync(
+    public Task RestartCliAsync(
         Guid workItemId,
-        string? kiPluginPrefix,
+        string? aiPluginPrefix,
         string? optionalParameters,
         CancellationToken ct = default,
         bool strictPluginSelection = false)
         => ScmTaskCoordinator.Shared.RunAsync(workItemId,
-            () => CliNeustartenCoordinatedAsync(workItemId, kiPluginPrefix, optionalParameters, ct, strictPluginSelection), ct);
+            () => RestartCliCoordinatedAsync(workItemId, aiPluginPrefix, optionalParameters, ct, strictPluginSelection), ct);
 
-    private async Task CliNeustartenCoordinatedAsync(Guid workItemId, string? kiPluginPrefix,
+    private async Task RestartCliCoordinatedAsync(Guid workItemId, string? aiPluginPrefix,
         string? optionalParameters, CancellationToken ct, bool strictPluginSelection)
     {
         if (_options.AiExecutionService is null)
         {
-            throw new InvalidOperationException("KiAusfuehrungsService ist nicht konfiguriert.");
+            throw new InvalidOperationException("AiExecutionService ist nicht konfiguriert.");
         }
 
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         if (workItem.Status is WorkItemStatus.Completed or WorkItemStatus.Archived)
@@ -270,7 +270,7 @@ public sealed class DevelopmentProcessService
                 {
                     // Lebende Session wird wiederverwendet: kein Gestartet-Ereignis — stattdessen das
                     // dedizierte CliLaufAktiv-Signal, damit die Laufdaten-Persistenz nachgezogen wird.
-                    _options.AiExecutionService.NotifyLaufAktiv(workItemId);
+                    _options.AiExecutionService.NotifyRunActive(workItemId);
                     return;
                 }
             }
@@ -283,9 +283,9 @@ public sealed class DevelopmentProcessService
         }
 
         var kiPlugin = strictPluginSelection
-            ? await _pluginSelectionService.ResolveDevelopmentAutomationPluginStrictAsync(kiPluginPrefix!, ct)
-            : await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
-        await _aufgabeService.UpdateAsync(
+            ? await _pluginSelectionService.ResolveDevelopmentAutomationPluginStrictAsync(aiPluginPrefix!, ct)
+            : await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(aiPluginPrefix, ct);
+        await _workItemService.UpdateAsync(
             workItemId,
             workItem.Title,
             workItem.RequirementDescription,
@@ -403,24 +403,24 @@ public sealed class DevelopmentProcessService
     {
         _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellen.", workItemId);
 
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         if (string.IsNullOrEmpty(workItem.BranchName))
             throw new InvalidOperationException($"Aufgabe {workItemId} hat keinen Branch-Namen.");
 
         var prBody = PullRequestBodyBuilder.Build(workItem, body);
-        var issueNummer = workItem.IssueReference?.IssueNumber;
+        var issueNumber = workItem.IssueReference?.IssueNumber;
         var pullRequest = await _gitPlugin.CreatePullRequestAsync(repositoryId, workItem.BranchName, null, title, prBody, ct);
 
-        var issueLogSuffix = issueNummer is > 0
-            ? $" (Issue #{issueNummer.Value}, Auto-Close aktiv)"
+        var issueLogSuffix = issueNumber is > 0
+            ? $" (Issue #{issueNumber.Value}, Auto-Close aktiv)"
             : string.Empty;
 
         await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
-            $"Pull Request erstellt: #{pullRequest.Nummer} – {pullRequest.Title} ({pullRequest.Url}){issueLogSuffix}",
+            $"Pull Request erstellt: #{pullRequest.Number} – {pullRequest.Title} ({pullRequest.Url}){issueLogSuffix}",
             ct: ct);
 
         return pullRequest;
@@ -433,11 +433,11 @@ public sealed class DevelopmentProcessService
     /// </summary>
     /// <param name="workItemId">ID der Aufgabe.</param>
     /// <param name="ct">Abbruch-Token.</param>
-    public Task AbschliessenAsync(Guid workItemId, CancellationToken ct = default)
+    public Task CompleteAsync(Guid workItemId, CancellationToken ct = default)
         => ScmTaskCoordinator.Shared.RunAsync(workItemId,
-            () => AbschliessenCoordinatedAsync(workItemId, ct), ct);
+            () => CompleteCoordinatedAsync(workItemId, ct), ct);
 
-    private async Task AbschliessenCoordinatedAsync(Guid workItemId, CancellationToken ct)
+    private async Task CompleteCoordinatedAsync(Guid workItemId, CancellationToken ct)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} abschließen.", workItemId);
 
@@ -451,17 +451,17 @@ public sealed class DevelopmentProcessService
             await _options.PromptScheduleDispatchService.CancelScheduledPromptAsync(workItemId);
         }
 
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
-        if (!await _aufgabeService.CanCompleteTaskAsync(workItemId, ct))
+        if (!await _workItemService.CanCompleteTaskAsync(workItemId, ct))
         {
             var offeneTodoCount = workItem.Todos.Count(t => t.IstOffen);
             throw new InvalidOperationException(
                 string.Format(WorkItemService.OpenTodosErrorMessageFormat, offeneTodoCount));
         }
 
-        var vonStatus = workItem.Status;
+        var fromStatus = workItem.Status;
 
         if (!string.IsNullOrEmpty(workItem.LocalClonePath) && Directory.Exists(workItem.LocalClonePath))
         {
@@ -469,8 +469,8 @@ public sealed class DevelopmentProcessService
             DeleteDirectoryForce(workItem.LocalClonePath);
         }
 
-        await _aufgabeService.AbschliessenAsync(workItemId, ct);
-        await _logService.AddStatusUebergangAsync(workItemId, vonStatus, WorkItemStatus.Completed, ct);
+        await _workItemService.CompleteAsync(workItemId, ct);
+        await _logService.AddStatusTransitionAsync(workItemId, fromStatus, WorkItemStatus.Completed, ct);
 
         _logger.LogInformation("Aufgabe {AufgabeId} erfolgreich abgeschlossen.", workItemId);
     }
@@ -497,7 +497,7 @@ public sealed class DevelopmentProcessService
             return "Startskript-Dienst ist nicht konfiguriert.";
         }
 
-        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+        var workItem = await _workItemService.GetDetailAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         if (string.IsNullOrEmpty(workItem.LocalClonePath))
@@ -518,7 +518,7 @@ public sealed class DevelopmentProcessService
 
     private async Task RollbackStartAsync(Guid workItemId, CancellationToken ct, string? previousClone = null, WorkItemStatus? previousStatus = null)
     {
-        var workItem = await _aufgabeService.GetByIdAsync(workItemId, ct);
+        var workItem = await _workItemService.GetByIdAsync(workItemId, ct);
         if (workItem is null)
         {
             return;
@@ -529,9 +529,9 @@ public sealed class DevelopmentProcessService
             DeleteDirectoryForce(workItem.LocalClonePath);
         }
 
-        await _aufgabeService.StartZuruecksetzenAsync(workItemId, ct);
+        await _workItemService.ResetStartAsync(workItemId, ct);
         if (previousStatus is not null && previousStatus != WorkItemStatus.New)
-            await _aufgabeService.SetStatusAsync(workItemId, previousStatus.Value, ct);
+            await _workItemService.SetStatusAsync(workItemId, previousStatus.Value, ct);
     }
 
     private async Task<IGitPlugin> ResolvePluginAsync(
@@ -712,7 +712,7 @@ public sealed class DevelopmentProcessService
         await CreateIssueFileAsync(localClonePath, workItem, branchName, repository.StartConfiguration, ct);
         await UpdateGitignoreAsync(localClonePath, repository.StartConfiguration, ct);
 
-        await _aufgabeService.StartenAsync(workItemId, branchName, localClonePath, basisBranch, ct);
+        await _workItemService.StartAsync(workItemId, branchName, localClonePath, basisBranch, ct);
 
         var logMessage = nutzeExistierendenBranch
             ? $"Klon angelegt, vorhandener Branch ausgecheckt: {branchName} in {localClonePath}"
@@ -823,7 +823,7 @@ public sealed class DevelopmentProcessService
 
     private async Task<WorkItem> GetWorkItemWithClonePathAsync(Guid workItemId, CancellationToken ct)
     {
-        var workItem = await _aufgabeService.GetByIdAsync(workItemId, ct)
+        var workItem = await _workItemService.GetByIdAsync(workItemId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         if (string.IsNullOrWhiteSpace(workItem.LocalClonePath))
@@ -834,17 +834,17 @@ public sealed class DevelopmentProcessService
 
     private static string CreateTaskBranchName(WorkItem workItem)
     {
-        var titelSlug = CreateTitleSlug(workItem.Title);
-        var issueNummer = workItem.IssueReference?.IssueNumber;
+        var titleSlug = CreateTitleSlug(workItem.Title);
+        var issueNumber = workItem.IssueReference?.IssueNumber;
 
-        return issueNummer is > 0
-            ? $"task/issue-{issueNummer.Value}-{workItem.Id:N}-{titelSlug}"
-            : $"task/{workItem.Id:N}-{titelSlug}";
+        return issueNumber is > 0
+            ? $"task/issue-{issueNumber.Value}-{workItem.Id:N}-{titleSlug}"
+            : $"task/{workItem.Id:N}-{titleSlug}";
     }
 
-    private static string CreateTitleSlug(string titel)
+    private static string CreateTitleSlug(string title)
     {
-        var slug = titel.ToLowerInvariant()
+        var slug = title.ToLowerInvariant()
             .Replace(' ', '-')
             .Replace("ä", "ae")
             .Replace("ö", "oe")
@@ -880,14 +880,14 @@ public sealed class DevelopmentProcessService
                 **Erstellt:** {workItem.CreatedAt:yyyy-MM-dd}
                 """;
 
-            var issueSection = workItem.IssueReference is { IssueNumber: > 0 } referenz
+            var issueSection = workItem.IssueReference is { IssueNumber: > 0 } reference
                 ? $"""
 
 
                     ## Verknüpftes Issue
 
-                    **Kennung:** #{referenz.IssueNumber}
-                    **Titel:** {referenz.Title}
+                    **Kennung:** #{reference.IssueNumber}
+                    **Titel:** {reference.Title}
                     """
                 : string.Empty;
 
@@ -899,12 +899,12 @@ public sealed class DevelopmentProcessService
                 {description}
                 """;
 
-            var inhalt = metaDaten + issueSection + requirementSection;
+            var content = metaDaten + issueSection + requirementSection;
 
             var effectiveDirectory = EnsureEffectiveWorkingDirectory(localClonePath, startConfiguration);
 
             var issueFilePath = Path.Combine(effectiveDirectory, "issue.md");
-            await File.WriteAllTextAsync(issueFilePath, inhalt, ct);
+            await File.WriteAllTextAsync(issueFilePath, content, ct);
             _logger.LogInformation("issue.md für Aufgabe {AufgabeId} erfolgreich erstellt.", workItem.Id);
         }
         catch (OperationCanceledException)

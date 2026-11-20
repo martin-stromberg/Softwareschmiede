@@ -16,7 +16,7 @@ public sealed class ProjectListViewModelTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly ProjectService _projektService;
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IPluginManager> _pluginManagerMock;
@@ -31,7 +31,7 @@ public sealed class ProjectListViewModelTests : IDisposable
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
         _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance, _pluginManagerMock.Object);
-        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
     }
 
     /// <summary>Dispose.</summary>
@@ -50,7 +50,7 @@ public sealed class ProjectListViewModelTests : IDisposable
     {
         return new ProjectDetailViewModel(
             _projektService,
-            _aufgabeService,
+            _workItemService,
             _serviceProviderMock.Object,
             _dialogServiceMock.Object,
             _pluginManagerMock.Object,
@@ -58,7 +58,7 @@ public sealed class ProjectListViewModelTests : IDisposable
     }
 
     private TaskDetailViewModel CreateTaskDetailViewModel() =>
-        TaskDetailViewModelTestFactory.Create(_db, _aufgabeService);
+        TaskDetailViewModelTestFactory.Create(_db, _workItemService);
 
     private static Mock<IGitPlugin> CreatePluginMockWithRepositories(params AvailableRepository[] repositories)
     {
@@ -153,7 +153,7 @@ public sealed class ProjectListViewModelTests : IDisposable
             .Setup(sp => sp.GetService(typeof(TaskDetailViewModel)))
             .Returns(() => CreateTaskDetailViewModel());
 
-        var workItem = await _aufgabeService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
 
         var repo = new AvailableRepository("reload-repo", DateTime.UtcNow, "owner/reload-repo", "https://github.com/owner/reload-repo");
         var tcs = new TaskCompletionSource<IEnumerable<AvailableRepository>>();
@@ -196,7 +196,7 @@ public sealed class ProjectListViewModelTests : IDisposable
         sut.SelectedProjekt = project;
         var projectDetailViewModel = (ProjectDetailViewModel)sut.DetailViewModel!;
 
-        var workItem = await _aufgabeService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
 
         // Act
         projectDetailViewModel.AufgabeOeffnenCommand.Execute(workItem.Id);
@@ -222,7 +222,7 @@ public sealed class ProjectListViewModelTests : IDisposable
         sut.SelectedProjekt = project;
         var projectDetailViewModel = (ProjectDetailViewModel)sut.DetailViewModel!;
 
-        var workItem = await _aufgabeService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
         projectDetailViewModel.AufgabeOeffnenCommand.Execute(workItem.Id);
         var taskDetailViewModel = (TaskDetailViewModel)sut.DetailViewModel!;
 

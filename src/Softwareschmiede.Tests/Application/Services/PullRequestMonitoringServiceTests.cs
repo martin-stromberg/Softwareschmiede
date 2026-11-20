@@ -320,7 +320,7 @@ public sealed class PullRequestMonitoringServiceTests
             ]);
         using var provider = BuildProvider(db, plugin.Object);
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshWorkItemAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestStatus.Merged, saved.Status);
@@ -352,7 +352,7 @@ public sealed class PullRequestMonitoringServiceTests
                 ["Softwareschmiede.GitHub.AutoCompletePullRequests"] = "true"
             });
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshWorkItemAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestStatus.Open, saved.Status);

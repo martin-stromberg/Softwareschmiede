@@ -20,7 +20,7 @@ public sealed record UpdateDownloadRoute(Uri Primary, Uri? Fallback = null);
 /// <param name="Version">Semantische Release-Version ohne führendes <c>v</c>, inklusive Prerelease-Suffix und Build-Metadaten.</param>
 /// <param name="TagName">GitHub-Release-Tag.</param>
 /// <param name="AssetName">Name des Release-Assets.</param>
-/// <param name="PaketDownload">Download-Route des Release-Assets.</param>
+/// <param name="PackageDownload">Download-Route des Release-Assets.</param>
 /// <param name="PublishedAt">Optionaler Veröffentlichungszeitpunkt.</param>
 /// <param name="IsPrerelease">Gibt an, ob das Release als Prerelease klassifiziert ist (GitHub-Flag <c>prerelease</c> oder SemVer-Prerelease-Suffix).</param>
 /// <param name="ManifestDownload">Optionale Download-Route des Update-Manifests (<c>update.json</c>) für die SHA-256-Verifikation vor dem Entpacken.</param>
@@ -28,7 +28,7 @@ public sealed record UpdateInfo(
     string Version,
     string TagName,
     string AssetName,
-    UpdateDownloadRoute PaketDownload,
+    UpdateDownloadRoute PackageDownload,
     DateTimeOffset? PublishedAt,
     bool IsPrerelease,
     UpdateDownloadRoute? ManifestDownload = null);
@@ -58,15 +58,15 @@ public enum UpdateChannel
 
 /// <summary>Gemeinsam geladenes, unveränderliches Paar der Update-Einstellungen.</summary>
 /// <param name="Mode">Persistierter Update-Modus.</param>
-/// <param name="UpdatePfad">Persistierter Update-Pfad (Kanalselektor; siehe <see cref="UpdatePathChannelResolver"/>).</param>
-public sealed record UpdateSettings(UpdateMode Mode, string UpdatePfad);
+/// <param name="UpdatePath">Persistierter Update-Pfad (Kanalselektor; siehe <see cref="UpdatePathChannelResolver"/>).</param>
+public sealed record UpdateSettings(UpdateMode Mode, string UpdatePath);
 
 /// <summary>Unveränderlicher Optionsvertrag einer Update-Prüfung für <see cref="IUpdateService"/> und <see cref="IUpdateReleaseClient"/>.</summary>
-/// <param name="UpdatePfad">Der konfigurierte Update-Pfad (Kanalselektor; siehe <see cref="UpdatePathChannelResolver"/>).</param>
-public sealed record UpdateCheckOptions(string UpdatePfad)
+/// <param name="UpdatePath">Der konfigurierte Update-Pfad (Kanalselektor; siehe <see cref="UpdatePathChannelResolver"/>).</param>
+public sealed record UpdateCheckOptions(string UpdatePath)
 {
-    /// <summary>Der aus <see cref="UpdatePfad"/> abgeleitete exklusive Update-Kanal.</summary>
-    public UpdateChannel Channel => UpdatePathChannelResolver.ErmittleKanal(UpdatePfad);
+    /// <summary>Der aus <see cref="UpdatePath"/> abgeleitete exklusive Update-Kanal.</summary>
+    public UpdateChannel Channel => UpdatePathChannelResolver.ResolveChannel(UpdatePath);
 }
 
 /// <summary>
@@ -76,14 +76,14 @@ public sealed record UpdateCheckOptions(string UpdatePfad)
 /// </summary>
 public sealed record UpdateReleaseLookupResult
 {
-    private UpdateReleaseLookupResult(bool erfolg, UpdateInfo? release)
+    private UpdateReleaseLookupResult(bool success, UpdateInfo? release)
     {
-        Erfolg = erfolg;
+        Success = success;
         Release = release;
     }
 
     /// <summary>Gibt an, ob die Release-Abfrage technisch erfolgreich war.</summary>
-    public bool Erfolg { get; }
+    public bool Success { get; }
 
     /// <summary>Das neueste zulässige Release oder <c>null</c>, wenn kein Kandidat gefunden wurde.</summary>
     public UpdateInfo? Release { get; }
@@ -96,7 +96,7 @@ public sealed record UpdateReleaseLookupResult
 
     /// <summary>Erzeugt ein erfolgreiches Ergebnis mit dem gefundenen Release.</summary>
     /// <param name="release">Das neueste zulässige Release.</param>
-    public static UpdateReleaseLookupResult Gefunden(UpdateInfo release) => new(true, release);
+    public static UpdateReleaseLookupResult Found(UpdateInfo release) => new(true, release);
 }
 
 /// <summary>Status einer Update-Prüfung.</summary>

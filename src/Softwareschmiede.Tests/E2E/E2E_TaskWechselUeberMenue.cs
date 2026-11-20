@@ -120,17 +120,17 @@ public partial class End2EndTest
 
     /// <summary>Legt eine neue Aufgabe im übergebenen Projekt an, benennt sie um, öffnet sie erneut und startet die CLI mit dem KI-Simulator-Plugin.</summary>
     /// <param name="projectDetail">Die Projektdetailansicht, in der die Aufgabe angelegt wird.</param>
-    /// <param name="titel">Der Titel, auf den die neue Aufgabe umbenannt werden soll.</param>
+    /// <param name="title">Der Titel, auf den die neue Aufgabe umbenannt werden soll.</param>
     /// <returns>Die Aufgabendetailansicht der gestarteten Aufgabe.</returns>
-    private TaskDetailView ErstelleUndStarteAufgabe(ProjectDetailView projectDetail, string titel)
+    private TaskDetailView ErstelleUndStarteAufgabe(ProjectDetailView projectDetail, string title)
     {
         var task = projectDetail.CreateTask();
-        task.SetTaskTitle(titel);
+        task.SetTaskTitle(title);
         task.SaveTask();
         task.GoBack();
 
         var projectDetailAfterSave = Assert.IsType<ProjectDetailView>(task.Window.CurrentView());
-        var taskReopened = projectDetailAfterSave.OpenTask(titel);
+        var taskReopened = projectDetailAfterSave.OpenTask(title);
         taskReopened.Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
         taskReopened.WaitForCliRunning();
 

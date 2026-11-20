@@ -44,11 +44,11 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
     }
 
     /// <summary>Aktualisiert alle noch laufenden Pull Requests einer Aufgabe sofort, unabhaengig vom naechsten Polling-Zeitpunkt.</summary>
-    public async Task RefreshAufgabeAsync(Guid workItemId, CancellationToken ct = default)
+    public async Task RefreshWorkItemAsync(Guid workItemId, CancellationToken ct = default)
     {
         using var scope = _scopeFactory.CreateScope();
         var references = scope.ServiceProvider.GetRequiredService<PullRequestReferenceService>();
-        var pullRequests = await references.GetRefreshableByAufgabeAsync(workItemId, ct);
+        var pullRequests = await references.GetRefreshableByWorkItemAsync(workItemId, ct);
 
         foreach (var pullRequest in pullRequests)
         {

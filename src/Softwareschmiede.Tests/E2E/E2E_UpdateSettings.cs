@@ -1340,14 +1340,14 @@ public partial class End2EndTest
             e => e.Event == UpdateE2EEreignisse.UpdateProcessStartRecorded);
         Assert.Equal("Erfolg", DatenText(launcher, "result"));
         Assert.Equal(fixture.Testwurzel, DatenText(launcher, "workingDirectory"));
-        var argumente = UpdateE2EFixture.Data(launcher) is { } launcherDaten
+        var arguments = UpdateE2EFixture.Data(launcher) is { } launcherDaten
             && launcherDaten.TryGetProperty("arguments", out var argsElement)
                 ? argsElement.EnumerateArray().Select(a => a.GetString()).ToList()
                 : [];
-        var dirIndex = argumente.IndexOf("-ExtractedDirectory");
-        Assert.True(dirIndex >= 0 && dirIndex + 1 < argumente.Count,
+        var dirIndex = arguments.IndexOf("-ExtractedDirectory");
+        Assert.True(dirIndex >= 0 && dirIndex + 1 < arguments.Count,
             "Launcher-Argumente enthalten kein -ExtractedDirectory.");
-        Assert.Equal(extractedDirectory, argumente[dirIndex + 1]);
+        Assert.Equal(extractedDirectory, arguments[dirIndex + 1]);
 
         Assert.Single(entries, e => e.Event == UpdateE2EEreignisse.UpdateStartAttempt);
         Assert.Single(entries, e => e.Event == UpdateE2EEreignisse.UpdateStartSucceeded);

@@ -17,10 +17,10 @@ namespace Softwareschmiede.Application.Services;
 public sealed class ScmStartCheckTrigger
 {
     /// <summary>Eine Startprüfung wurde angefordert.</summary>
-    public event Action? Angefordert;
+    public event Action? Requested;
 
     /// <summary>Fordert eine Startprüfung an (non-blocking; Häufungen werden zusammengefasst).</summary>
-    public void RequestStartCheck() => Angefordert?.Invoke();
+    public void RequestStartCheck() => Requested?.Invoke();
 }
 
 /// <summary>
@@ -70,7 +70,7 @@ public sealed class ScmStartCheckService : BackgroundService
         _startup = startup;
         _time = time;
         _logger = logger;
-        trigger.Angefordert += OnAngefordert;
+        trigger.Requested += OnRequested;
         runCounter.RunningCountChanged += OnRunningCountChanged;
     }
 
@@ -141,13 +141,13 @@ public sealed class ScmStartCheckService : BackgroundService
     /// <inheritdoc/>
     public override void Dispose()
     {
-        _trigger.Angefordert -= OnAngefordert;
+        _trigger.Requested -= OnRequested;
         _runCounter.RunningCountChanged -= OnRunningCountChanged;
         _signal.Dispose();
         base.Dispose();
     }
 
-    private void OnAngefordert()
+    private void OnRequested()
     {
         try { _signal.Release(); }
         // Bereits ein Durchlauf eingereiht: Häufungen werden zu einer Prüfung zusammengefasst.
@@ -163,6 +163,6 @@ public sealed class ScmStartCheckService : BackgroundService
         // Zählungen sind kein Auslöser. Nicht-SCM-Ausführungen lösen ebenfalls aus —
         // die Zählung bleibt davon unberührt.
         if (currentCount < previousCount)
-            OnAngefordert();
+            OnRequested();
     }
 }

@@ -19,10 +19,10 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
     private readonly UpdateE2ETestKontext _kontext;
 
     /// <inheritdoc cref="UpdateFixtureHttpMessageHandler"/>
-    /// <param name="kontext">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public UpdateFixtureHttpMessageHandler(UpdateE2ETestKontext kontext)
+    /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
+    public UpdateFixtureHttpMessageHandler(UpdateE2ETestKontext context)
     {
-        _kontext = kontext;
+        _kontext = context;
     }
 
     /// <inheritdoc/>
@@ -63,16 +63,16 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
             _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpRequestReleased, new { url, gate = e2eResponse.Gate });
         }
 
-        var inhalt = LadeAntwortInhalt(e2eResponse);
+        var content = LadeAntwortInhalt(e2eResponse);
         var contentType = e2eResponse.ContentType
             ?? (e2eResponse.BodyDatei?.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) == true
                 ? "application/zip"
                 : "application/json");
 
-        Stream stream = new MemoryStream(inhalt, writable: false);
+        Stream stream = new MemoryStream(content, writable: false);
         if (!string.IsNullOrEmpty(e2eResponse.StreamGate))
         {
-            var freieBytes = e2eResponse.StreamGateBytes ?? inhalt.Length / 2;
+            var freieBytes = e2eResponse.StreamGateBytes ?? content.Length / 2;
             stream = new GateBlockierterStream(stream, freieBytes, e2eResponse.StreamGate, _kontext);
         }
 
@@ -82,14 +82,14 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
             Content = new StreamContent(stream)
         };
         response.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-        response.Content.Headers.ContentLength = inhalt.Length;
+        response.Content.Headers.ContentLength = content.Length;
 
         if (e2eResponse.Header is not null)
         {
-            foreach (var (name, wert) in e2eResponse.Header)
+            foreach (var (name, value) in e2eResponse.Header)
             {
-                if (!response.Headers.TryAddWithoutValidation(name, wert))
-                    response.Content.Headers.TryAddWithoutValidation(name, wert);
+                if (!response.Headers.TryAddWithoutValidation(name, value))
+                    response.Content.Headers.TryAddWithoutValidation(name, value);
             }
         }
 
@@ -146,12 +146,12 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
         private long _position;
         private bool _gateErfuellt;
 
-        public GateBlockierterStream(Stream inner, long freieBytes, string gate, UpdateE2ETestKontext kontext)
+        public GateBlockierterStream(Stream inner, long freieBytes, string gate, UpdateE2ETestKontext context)
         {
             _inner = inner;
             _freieBytes = freieBytes;
             _gate = gate;
-            _kontext = kontext;
+            _kontext = context;
         }
 
         /// <inheritdoc/>

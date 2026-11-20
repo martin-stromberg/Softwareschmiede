@@ -17,7 +17,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly LogService _logService;
     private readonly TodoService _todoService;
     private readonly AiExecutionService _kiService;
@@ -25,7 +25,7 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly PromptTemplateService _promptVorlagenService;
     private readonly PromptTemplatePlaceholderService _promptVorlagenPlatzhalterService = new();
-    private readonly PromptScheduleDispatchService _promptZeitVersandService;
+    private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
     private readonly AppSettingService _appSettingService;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<ICliReplayExportService> _exportServiceMock = new();
@@ -35,7 +35,7 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
     public TaskDetailViewModelTests_CliReplayExport()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
         _kiService = TestKiAusfuehrungsServiceFactory.Create();
@@ -48,12 +48,12 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
         var pluginActivationService = new PluginActivationService(_appSettingService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
         _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
-        _promptZeitVersandService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
         _entwicklungsprozessService = new DevelopmentProcessService(
-            _aufgabeService,
+            _workItemService,
             _logService,
             gitPluginMock.Object,
             _pluginSelectionService,
@@ -93,14 +93,14 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
         var serviceProvider = new Mock<IServiceProvider>().Object;
 
         return new TaskDetailViewModel(
-            _aufgabeService,
+            _workItemService,
             _logService,
             _kiService,
             _entwicklungsprozessService,
             _pluginSelectionService,
             _promptVorlagenService,
             _promptVorlagenPlatzhalterService,
-            _promptZeitVersandService,
+            _promptScheduleDispatchService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
             serviceProvider,
@@ -114,10 +114,10 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
 
     private async Task<WorkItem> ErstelleAufgabeAsync(WorkItemStatus status = WorkItemStatus.New)
     {
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Replayexport-Aufgabe", "Beschreibung");
+        var workItem = await _workItemService.CreateAsync(_projektId, "Replayexport-Aufgabe", "Beschreibung");
         if (status != WorkItemStatus.New)
-            await _aufgabeService.StatusSetzenAsync(workItem.Id, status);
-        return await _aufgabeService.GetByIdAsync(workItem.Id) ?? workItem;
+            await _workItemService.SetStatusUncheckedAsync(workItem.Id, status);
+        return await _workItemService.GetByIdAsync(workItem.Id) ?? workItem;
     }
 
     private void SetupSaveDialog(string? path)

@@ -134,8 +134,8 @@ internal static class KiAusfuehrungsStatusAdapter
 
         var status = value switch
         {
-            WorkItem workItem => AiExecutionStatusData.VonAufgabe(workItem, liveLaufStatus: null, hasScheduledPrompt: false),
-            AktiveAufgabePanelItem item => new AiExecutionStatusData(item.Status, item.ExecutionStatus, item.ActiveRunId, item.LastHeartbeatUtc, item.RunStatus, item.LiveLaufStatus, item.HasScheduledPrompt, item.PausedUntilUtc),
+            WorkItem workItem => AiExecutionStatusData.FromWorkItem(workItem, liveRunStatus: null, hasScheduledPrompt: false),
+            AktiveAufgabePanelItem item => new AiExecutionStatusData(item.Status, item.ExecutionStatus, item.ActiveRunId, item.LastHeartbeatUtc, item.RunStatus, item.LiveRunStatus, item.HasScheduledPrompt, item.PausedUntilUtc),
             _ => null
         };
 

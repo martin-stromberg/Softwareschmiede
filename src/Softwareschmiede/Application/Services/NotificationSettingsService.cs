@@ -111,10 +111,10 @@ public sealed class NotificationSettingsService
         string benutzerId,
         string fileName,
         string? mimeType,
-        byte[] inhalt,
+        byte[] content,
         CancellationToken ct = default)
     {
-        ValidateAudioFile(fileName, mimeType, inhalt);
+        ValidateAudioFile(fileName, mimeType, content);
 
         var existing = await _db.NotificationAudioFiles
             .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
@@ -131,8 +131,8 @@ public sealed class NotificationSettingsService
 
         existing.OriginalFileName = SanitizeFileName(fileName);
         existing.MimeType = NormalizeMimeType(mimeType, fileName);
-        existing.SizeBytes = inhalt.Length;
-        existing.Content = inhalt;
+        existing.SizeBytes = content.Length;
+        existing.Content = content;
         existing.UploadedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
     }
@@ -151,14 +151,14 @@ public sealed class NotificationSettingsService
         await _db.SaveChangesAsync(ct);
     }
 
-    private static void ValidateAudioFile(string fileName, string? mimeType, byte[] inhalt)
+    private static void ValidateAudioFile(string fileName, string? mimeType, byte[] content)
     {
-        if (inhalt.Length == 0)
+        if (content.Length == 0)
         {
             throw new ArgumentException("Die Datei ist leer.");
         }
 
-        if (inhalt.Length > MaxAudioFileSizeBytes)
+        if (content.Length > MaxAudioFileSizeBytes)
         {
             throw new ArgumentException("Die Datei überschreitet das Limit von 10 MB.");
         }
@@ -174,7 +174,7 @@ public sealed class NotificationSettingsService
             throw new ArgumentException("Ungültiger MIME-Typ für Audio-Datei.");
         }
 
-        if (!HasValidFileSignature(extension, inhalt))
+        if (!HasValidFileSignature(extension, content))
         {
             throw new ArgumentException("Die Datei-Signatur passt nicht zum gewählten Audioformat.");
         }
@@ -207,13 +207,13 @@ public sealed class NotificationSettingsService
         };
     }
 
-    private static bool HasValidFileSignature(string extension, byte[] inhalt)
+    private static bool HasValidFileSignature(string extension, byte[] content)
     {
         return extension.ToLowerInvariant() switch
         {
-            ".mp3" => IsMp3(inhalt),
-            ".wav" => IsWav(inhalt),
-            ".ogg" => IsOgg(inhalt),
+            ".mp3" => IsMp3(content),
+            ".wav" => IsWav(content),
+            ".ogg" => IsOgg(content),
             _ => false
         };
     }

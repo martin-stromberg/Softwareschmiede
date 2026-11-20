@@ -50,7 +50,7 @@ public sealed class GitHubReleaseClientTests_Filters
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(updatePath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release.Should().NotBeNull();
         result.Release!.Version.Should().Be(expectedVersion);
         result.Release.IsPrerelease.Should().Be(expectedIsPrerelease);
@@ -86,7 +86,7 @@ public sealed class GitHubReleaseClientTests_Filters
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(updatePath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release.Should().NotBeNull();
         result.Release!.Version.Should().Be(expectedVersion);
         result.Release.IsPrerelease.Should().Be(expectedIsPrerelease);
@@ -122,7 +122,7 @@ public sealed class GitHubReleaseClientTests_Filters
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(updatePath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release.Should().NotBeNull();
         result.Release!.Version.Should().Be(expectedVersion);
         result.Release.IsPrerelease.Should().Be(expectedIsPrerelease);
@@ -194,7 +194,7 @@ public sealed class GitHubReleaseClientTests_Filters
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release.Should().NotBeNull();
         result.Release!.Version.Should().Be("1.5.0");
         result.Release.AssetName.Should().Be("RELEASE.ZIP");
@@ -221,12 +221,12 @@ public sealed class GitHubReleaseClientTests_Filters
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release.Should().NotBeNull();
         result.Release!.Version.Should().Be("1.3.0-rc.1");
         result.Release.TagName.Should().Be("v1.3.0-rc.1");
         result.Release.IsPrerelease.Should().BeTrue();
-        result.Release.PaketDownload.Primary.Should().Be("https://example.invalid/release-1.3.0-rc.1.zip");
+        result.Release.PackageDownload.Primary.Should().Be("https://example.invalid/release-1.3.0-rc.1.zip");
     }
 
     private static GitHubReleaseClient CreateSut(HttpClient httpClient)

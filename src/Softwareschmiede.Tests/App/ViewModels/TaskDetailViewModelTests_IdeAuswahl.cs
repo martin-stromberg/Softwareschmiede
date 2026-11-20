@@ -30,7 +30,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         File.WriteAllText(ersteSolution, string.Empty);
         File.WriteAllText(zweiteSolution, string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -76,7 +76,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var workingDirectory = CreateTempDirectory();
         File.WriteAllText(Path.Combine(workingDirectory, "Einzige.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var visualStudioPlugin = new VisualStudioIdePlugin(new Mock<IProcessStarter>().Object);
         var sut = CreateSut(idePlugins: [visualStudioPlugin]);
@@ -96,7 +96,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         File.WriteAllText(Path.Combine(workingDirectory, "Erste.sln"), string.Empty);
         File.WriteAllText(Path.Combine(workingDirectory, "Zweite.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -120,7 +120,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         File.WriteAllText(Path.Combine(workingDirectory, "Erste.sln"), string.Empty);
         File.WriteAllText(Path.Combine(workingDirectory, "Zweite.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
@@ -142,7 +142,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var workingDirectory = CreateTempDirectory();
         File.WriteAllText(Path.Combine(workingDirectory, "Einzige.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var visualStudioPlugin = new VisualStudioIdePlugin(new Mock<IProcessStarter>().Object);
         var sut = CreateSut(idePlugins: [visualStudioPlugin]);
@@ -158,7 +158,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     {
         var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut(visualStudioCodeLocator: new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
         sut.WorkItemId = workItem.Id;
@@ -174,7 +174,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     {
         var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut(visualStudioCodeLocator: new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
         sut.WorkItemId = workItem.Id;
@@ -196,7 +196,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         File.WriteAllText(ersteSolution, string.Empty);
         File.WriteAllText(zweiteSolution, string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -227,7 +227,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         File.WriteAllText(Path.Combine(workingDirectory, "Erste.sln"), string.Empty);
         File.WriteAllText(Path.Combine(workingDirectory, "Zweite.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -256,7 +256,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
             .Returns(Task.CompletedTask);
 
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -293,7 +293,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
             .ThrowsAsync(new InvalidOperationException("IDE-Prozess konnte nicht gestartet werden."));
 
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut(idePlugins: [idePluginMock.Object]);
         sut.WorkItemId = workItem.Id;
@@ -311,7 +311,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     {
         var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(
@@ -337,7 +337,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var workingDirectory = CreateTempDirectory();
         File.WriteAllText(Path.Combine(workingDirectory, "MyProject.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -367,7 +367,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var workingDirectory = CreateTempDirectory();
         File.WriteAllText(Path.Combine(workingDirectory, "MyProject.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -396,7 +396,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var workingDirectory = CreateTempDirectory();
         File.WriteAllText(Path.Combine(workingDirectory, "MyProject.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var visualStudioCodePlugin = new VisualStudioCodeIdePlugin(
@@ -429,7 +429,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var workingDirectory = CreateTempDirectory();
         File.WriteAllText(Path.Combine(workingDirectory, "MyProject.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         IReadOnlyList<string>? angezeigteWerte = null;
         _dialogServiceMock
@@ -453,7 +453,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var workingDirectory = CreateTempDirectory();
         File.WriteAllText(Path.Combine(workingDirectory, "MyProject.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         IReadOnlyList<string>? angezeigteWerte = null;
         _dialogServiceMock
@@ -468,7 +468,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
 
         angezeigteWerte.Should().Contain("Visual Studio Code");
-        angezeigteWerte!.Should().NotContain(wert => wert.StartsWith("Visual Studio Code:", StringComparison.Ordinal));
+        angezeigteWerte!.Should().NotContain(value => value.StartsWith("Visual Studio Code:", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -482,7 +482,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var workingDirectory = CreateTempDirectory();
         File.WriteAllText(Path.Combine(workingDirectory, "Einzige.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;

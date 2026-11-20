@@ -25,33 +25,33 @@ public sealed class AufgabenListenModusService
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Den gespeicherten Modus oder <see cref="AufgabenListenModus.Datum"/>, wenn kein gültiger Wert gespeichert ist.</returns>
     public Task<AufgabenListenModus> LadeMenueModusAsync(CancellationToken ct = default)
-        => LadeModusAsync(AppSettingService.AktiveAufgabenListenModusKey, ct);
+        => LadeModusAsync(AppSettingService.ActiveWorkItemsListModeKey, ct);
 
     /// <summary>Lädt den gespeicherten Anzeigemodus der Dashboard-Aufgabenliste.</summary>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Den gespeicherten Modus oder <see cref="AufgabenListenModus.Datum"/>, wenn kein gültiger Wert gespeichert ist.</returns>
     public Task<AufgabenListenModus> LadeDashboardModusAsync(CancellationToken ct = default)
-        => LadeModusAsync(AppSettingService.AktiveAufgabenListenModusDashboardKey, ct);
+        => LadeModusAsync(AppSettingService.ActiveWorkItemsListModeDashboardKey, ct);
 
     /// <summary>Speichert den Anzeigemodus der Seitenleisten-Aufgabenliste.</summary>
     /// <param name="mode">Der zu speichernde Modus.</param>
     /// <param name="ct">Abbruchtoken.</param>
     public Task SpeichereMenueModusAsync(AufgabenListenModus mode, CancellationToken ct = default)
-        => SpeichereModusAsync(AppSettingService.AktiveAufgabenListenModusKey, mode, ct);
+        => SpeichereModusAsync(AppSettingService.ActiveWorkItemsListModeKey, mode, ct);
 
     /// <summary>Speichert den Anzeigemodus der Dashboard-Aufgabenliste.</summary>
     /// <param name="mode">Der zu speichernde Modus.</param>
     /// <param name="ct">Abbruchtoken.</param>
     public Task SpeichereDashboardModusAsync(AufgabenListenModus mode, CancellationToken ct = default)
-        => SpeichereModusAsync(AppSettingService.AktiveAufgabenListenModusDashboardKey, mode, ct);
+        => SpeichereModusAsync(AppSettingService.ActiveWorkItemsListModeDashboardKey, mode, ct);
 
     private async Task<AufgabenListenModus> LadeModusAsync(string schluessel, CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
         var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
-        var wert = await settingService.GetSettingAsync(schluessel, ct);
+        var value = await settingService.GetSettingAsync(schluessel, ct);
 
-        if (Enum.TryParse<AufgabenListenModus>(wert, ignoreCase: true, out var mode)
+        if (Enum.TryParse<AufgabenListenModus>(value, ignoreCase: true, out var mode)
             && Enum.IsDefined(mode))
         {
             return mode;

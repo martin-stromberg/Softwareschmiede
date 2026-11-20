@@ -23,16 +23,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private readonly DarkModeService _darkModeService;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IActiveWorkItemsService _aufgabeService;
+    private readonly IActiveWorkItemsService _workItemService;
     private readonly TodoService _todoService;
-    private readonly PromptScheduleDispatchService _promptZeitVersandService;
+    private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IRunningAutomationStatusSource _runningStatusSource;
     private readonly MainWindowUpdateFlow _updateFlow;
     private readonly IDialogService? _dialogService;
     private readonly IApplicationVersionProvider? _versionProvider;
     private readonly IPluginManager? _pluginManager;
-    private readonly WorkItemRunDataChangedNotifier? _laufdatenChangedNotifier;
+    private readonly WorkItemRunDataChangedNotifier? _runDataChangedNotifier;
     private readonly AufgabenListenModusBindung _modusBindung;
     private readonly Action<Action> _dispatcherInvoke;
     private readonly DispatcherTimer _aktualisierungsTimer;
@@ -212,23 +212,23 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public MainWindowViewModel(
         DarkModeService darkModeService,
         IServiceProvider serviceProvider,
-        IActiveWorkItemsService aufgabeService,
+        IActiveWorkItemsService workItemService,
         TodoService todoService,
-        PromptScheduleDispatchService promptZeitVersandService,
+        PromptScheduleDispatchService promptScheduleDispatchService,
         ILogger<MainWindowViewModel> logger,
         IRunningAutomationStatusSource runningStatusSource,
         MainWindowOptionaleDienste? optionaleDienste = null)
     {
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
-        _aufgabeService = aufgabeService;
+        _workItemService = workItemService;
         _todoService = todoService;
-        _promptZeitVersandService = promptZeitVersandService;
+        _promptScheduleDispatchService = promptScheduleDispatchService;
         _logger = logger;
         _runningStatusSource = runningStatusSource;
         _dialogService = optionaleDienste?.DialogService;
         _versionProvider = optionaleDienste?.VersionProvider;
-        _laufdatenChangedNotifier = optionaleDienste?.LaufdatenChangedNotifier;
+        _runDataChangedNotifier = optionaleDienste?.LaufdatenChangedNotifier;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
         _scmNotifier = serviceProvider.GetService<ScmEventChangeNotifier>();
         _dispatcherInvoke = DispatcherInvokeFactory.Create(optionaleDienste?.DispatcherInvoke);
@@ -265,13 +265,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         ToggleNavigationCommand = new RelayCommand(() => IsNavigationExpanded = !IsNavigationExpanded);
         NavigateZuAufgabeCommand = new RelayCommand<Guid>(NavigateZuAufgabe);
         UpdatePruefenCommand = new AsyncRelayCommand(_updateFlow.PruefenAsync, _updateFlow.KannPruefen);
-        UpdateStartenCommand = new AsyncRelayCommand(_updateFlow.StartenAsync, _updateFlow.KannStarten);
+        UpdateStartenCommand = new AsyncRelayCommand(_updateFlow.StartAsync, _updateFlow.KannStarten);
 
         _runningStatusSource.RunningCountChanged += OnRunningCountChanged;
         if (_scmNotifier is not null) _scmNotifier.Changed += OnScmChanged;
-        if (_laufdatenChangedNotifier is not null)
+        if (_runDataChangedNotifier is not null)
         {
-            _laufdatenChangedNotifier.LaufdatenChanged += OnLaufdatenChanged;
+            _runDataChangedNotifier.RunDataChanged += OnRunDataChanged;
         }
 
         _aktualisierungsTimer = new DispatcherTimer
@@ -422,7 +422,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var workItems = await _aufgabeService.GetAktiveAufgabenAsync(ct);
+            var workItems = await _workItemService.GetActiveWorkItemsAsync(ct);
             var offeneTodoCounts = await _todoService.GetOpenTodoCountsAsync(workItems.Select(a => a.Id), ct);
             AktiveAufgabenListe.ReplaceAll(workItems.Select(a => MapAktiveAufgabePanelItem(a, offeneTodoCounts)));
             LaufendeAutomatisierungenAnzahl = AktiveAufgabenListe.Count(item =>
@@ -498,11 +498,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             ActiveRunId = workItem.ActiveRunId,
             LastHeartbeatUtc = workItem.LastHeartbeatUtc,
             RunStatus = workItem.RunStatus,
-            LiveLaufStatus = _runningStatusSource.GetLiveRunStatus(workItem.Id),
+            LiveRunStatus = _runningStatusSource.GetLiveRunStatus(workItem.Id),
             LastCliStartUtc = workItem.LastCliStartUtc,
             PausedUntilUtc = workItem.PausedUntilUtc,
             IsAktiv = GetAktiveAufgabeId() == workItem.Id,
-            HasScheduledPrompt = _promptZeitVersandService.GetScheduledPromptStatus(workItem.Id) is not null,
+            HasScheduledPrompt = _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id) is not null,
             OffeneTodoCount = offeneTodoCount,
             OffeneTodosAnzeigenCommand = offeneTodosCommand
         };
@@ -552,7 +552,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _dispatcherInvoke(AktiveAufgabenImHintergrundAktualisieren);
     }
 
-    private void OnLaufdatenChanged(Guid workItemId)
+    private void OnRunDataChanged(Guid workItemId)
     {
         _dispatcherInvoke(AktiveAufgabenImHintergrundAktualisieren);
     }
@@ -589,9 +589,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _runningStatusSource.RunningCountChanged -= OnRunningCountChanged;
         if (_scmNotifier is not null) _scmNotifier.Changed -= OnScmChanged;
         _scmQueue?.Dispose();
-        if (_laufdatenChangedNotifier is not null)
+        if (_runDataChangedNotifier is not null)
         {
-            _laufdatenChangedNotifier.LaufdatenChanged -= OnLaufdatenChanged;
+            _runDataChangedNotifier.RunDataChanged -= OnRunDataChanged;
         }
 
         if (_settingsViewModel is not null)

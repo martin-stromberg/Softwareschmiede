@@ -110,11 +110,11 @@ public sealed class ProjektServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektService = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
-        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         var project = await projektService.CreateAsync("Zu löschendes Projekt", null, TestContext.Current.CancellationToken);
-        await aufgabeService.CreateAsync(project.Id, "Aufgabe 1", null, ct: TestContext.Current.CancellationToken);
-        await aufgabeService.CreateAsync(project.Id, "Aufgabe 2", null, ct: TestContext.Current.CancellationToken);
+        await workItemService.CreateAsync(project.Id, "Aufgabe 1", null, ct: TestContext.Current.CancellationToken);
+        await workItemService.CreateAsync(project.Id, "Aufgabe 2", null, ct: TestContext.Current.CancellationToken);
 
         // Act
         await projektService.DeleteAsync(project.Id, TestContext.Current.CancellationToken);

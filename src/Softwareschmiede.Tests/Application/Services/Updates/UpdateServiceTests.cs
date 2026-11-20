@@ -18,7 +18,7 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(update));
+            .ReturnsAsync(UpdateReleaseLookupResult.Found(update));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
         var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
@@ -100,7 +100,7 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(new InstalledVersionInfo("1.2.0", installierterTag, null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(update));
+            .ReturnsAsync(UpdateReleaseLookupResult.Found(update));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
         var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(updatePath), TestContext.Current.CancellationToken);

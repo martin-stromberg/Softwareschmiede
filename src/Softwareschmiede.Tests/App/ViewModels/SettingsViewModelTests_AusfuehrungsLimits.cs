@@ -111,9 +111,9 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [InlineData("0")]
     [InlineData("-2")]
     [InlineData("abc")]
-    public async Task LadenAsync_GlobalesLimitUngueltig_FeldLeer(string wert)
+    public async Task LadenAsync_GlobalesLimitUngueltig_FeldLeer(string value)
     {
-        await _settingService.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, wert, TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, value, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -158,11 +158,11 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [InlineData("-1")]
     [InlineData("abc")]
     [InlineData("1,5")]
-    public async Task SpeichernAsync_GlobalesLimitUngueltig_Validierungsfehler(string wert)
+    public async Task SpeichernAsync_GlobalesLimitUngueltig_Validierungsfehler(string value)
     {
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.MaxParalleleAusfuehrungen = wert;
+        sut.MaxParalleleAusfuehrungen = value;
 
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
@@ -260,7 +260,7 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
     [InlineData("0")]
     [InlineData("-4")]
     [InlineData("text")]
-    public async Task SpeichernAsync_PluginLimitUngueltig_Validierungsfehler(string wert)
+    public async Task SpeichernAsync_PluginLimitUngueltig_Validierungsfehler(string value)
     {
         var kiPlugin = CreateKiPlugin();
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
@@ -269,7 +269,7 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
         sut.KiPluginSelectedCommand.Execute(kiPlugin);
         var entry = sut.SelectedPluginSettings.Single(g => g.GroupName == "Ausführungsbegrenzung").Entries[0];
 
-        entry.Value = wert;
+        entry.Value = value;
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().NotBeNull();

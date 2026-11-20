@@ -56,23 +56,23 @@ public sealed class AppEinstellungServiceTests_Automatisierung : IDisposable
     [Fact]
     public async Task BackmergeOptionen_WithoutEntry_DefaultFalseAndPersistIndependently()
     {
-        (await _sut.GetScmBackmergeDraftAktivierungAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
+        (await _sut.GetScmBackmergeDraftActivationAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
         (await _sut.GetScmBackmergeAdminMergeAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
 
-        await _sut.SetScmBackmergeDraftAktivierungAsync(true, TestContext.Current.CancellationToken);
+        await _sut.SetScmBackmergeDraftActivationAsync(true, TestContext.Current.CancellationToken);
 
-        (await _sut.GetScmBackmergeDraftAktivierungAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
+        (await _sut.GetScmBackmergeDraftActivationAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
         (await _sut.GetScmBackmergeAdminMergeAsync(TestContext.Current.CancellationToken)).Should().BeFalse("die Optionen sind unabhängig voneinander");
-        (await _sut.GetSettingAsync(AppSettingService.ScmBackmergeDraftAktivierungKey, TestContext.Current.CancellationToken)).Should().Be("True");
+        (await _sut.GetSettingAsync(AppSettingService.ScmBackmergeDraftActivationKey, TestContext.Current.CancellationToken)).Should().Be("True");
 
         await _sut.SetScmBackmergeAdminMergeAsync(true, TestContext.Current.CancellationToken);
 
         (await _sut.GetScmBackmergeAdminMergeAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
         (await _sut.GetSettingAsync(AppSettingService.ScmBackmergeAdminMergeKey, TestContext.Current.CancellationToken)).Should().Be("True");
 
-        await _sut.SetScmBackmergeDraftAktivierungAsync(false, TestContext.Current.CancellationToken);
+        await _sut.SetScmBackmergeDraftActivationAsync(false, TestContext.Current.CancellationToken);
 
-        (await _sut.GetScmBackmergeDraftAktivierungAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
+        (await _sut.GetScmBackmergeDraftActivationAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
         (await _sut.GetScmBackmergeAdminMergeAsync(TestContext.Current.CancellationToken)).Should().BeTrue("das Zurücksetzen der einen Option lässt die andere unberührt");
     }
 }

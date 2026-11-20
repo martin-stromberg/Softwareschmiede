@@ -5,17 +5,17 @@ namespace Softwareschmiede.Application.Services.Updates;
 /// <summary>Prüft aktive CLI-Aufgaben vor dem Start eines Programmupdates.</summary>
 public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
 {
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly AiPluginLimitService _kiPluginLimitService;
     private readonly ILogger<CliUpdateSafetyService> _logger;
 
     /// <inheritdoc cref="CliUpdateSafetyService"/>
     public CliUpdateSafetyService(
-        WorkItemService aufgabeService,
+        WorkItemService workItemService,
         AiPluginLimitService kiPluginLimitService,
         ILogger<CliUpdateSafetyService> logger)
     {
-        _aufgabeService = aufgabeService;
+        _workItemService = workItemService;
         _kiPluginLimitService = kiPluginLimitService;
         _logger = logger;
     }
@@ -23,7 +23,7 @@ public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
     /// <inheritdoc/>
     public async Task<CliUpdateSafetyResult> CheckAsync(CancellationToken ct = default)
     {
-        var activeTasks = await _aufgabeService.GetAktiveAufgabenAsync(ct);
+        var activeTasks = await _workItemService.GetActiveWorkItemsAsync(ct);
 
         var prefixes = activeTasks
             .Select(a => a.AiPluginPrefix)

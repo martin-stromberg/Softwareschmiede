@@ -332,14 +332,14 @@ public sealed class UpdateE2EFixture : IDisposable
             return [];
 
         var entries = new List<UpdateE2EProtokollEintrag>();
-        string inhalt;
+        string content;
         using (var stream = new FileStream(ProtokollDateiPfad, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
         using (var reader = new StreamReader(stream))
         {
-            inhalt = reader.ReadToEnd();
+            content = reader.ReadToEnd();
         }
 
-        foreach (var line in inhalt.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        foreach (var line in content.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             var entry = JsonSerializer.Deserialize<UpdateE2EProtokollEintrag>(line.Trim());
             if (entry is not null)

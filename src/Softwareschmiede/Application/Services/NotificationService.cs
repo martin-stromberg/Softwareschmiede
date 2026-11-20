@@ -13,7 +13,7 @@ public sealed class NotificationService
     private readonly NotificationAuditService _auditService;
     private readonly INotificationAudioService? _audioService;
     private readonly INotificationBannerService? _bannerService;
-    private readonly IUserContextService _benutzerkontextService;
+    private readonly IUserContextService _userContextService;
     private readonly ILogger<NotificationService> _logger;
 
     /// <inheritdoc cref="NotificationService"/>
@@ -27,7 +27,7 @@ public sealed class NotificationService
     {
         _settingsService = settingsService;
         _auditService = auditService;
-        _benutzerkontextService = benutzerkontextService;
+        _userContextService = benutzerkontextService;
         _logger = logger;
         _audioService = audioService;
         _bannerService = bannerService;
@@ -42,11 +42,11 @@ public sealed class NotificationService
         WorkItemStatus neuerStatus,
         CancellationToken ct = default)
     {
-        var benutzerId = _benutzerkontextService.GetUserId();
+        var benutzerId = _userContextService.GetUserId();
         var settings = await _settingsService.GetAsync(benutzerId, ct);
         var eventId = Guid.NewGuid();
 
-        await DispatchFuerKanalAsync(
+        await DispatchForChannelAsync(
             eventId,
             workItemId,
             benutzerId,
@@ -55,7 +55,7 @@ public sealed class NotificationService
             neuerStatus,
             ct);
 
-        await DispatchFuerKanalAsync(
+        await DispatchForChannelAsync(
             eventId,
             workItemId,
             benutzerId,
@@ -115,11 +115,11 @@ public sealed class NotificationService
         }
     }
 
-    private async Task DispatchFuerKanalAsync(
+    private async Task DispatchForChannelAsync(
         Guid eventId,
         Guid workItemId,
         string benutzerId,
-        NotificationChannel kanal,
+        NotificationChannel channel,
         NotificationMode mode,
         WorkItemStatus neuerStatus,
         CancellationToken ct)
@@ -130,7 +130,7 @@ public sealed class NotificationService
                 eventId,
                 workItemId,
                 benutzerId,
-                kanal,
+                channel,
                 mode,
                 NotificationDecision.Suppressed,
                 "Modus ist Deaktiviert.",
@@ -140,7 +140,7 @@ public sealed class NotificationService
 
         try
         {
-            switch (kanal)
+            switch (channel)
             {
                 case NotificationChannel.Banner:
                     await ShowBannerAsync(
@@ -152,16 +152,16 @@ public sealed class NotificationService
                     var audio = await _settingsService.GetAudioPayloadAsync(benutzerId, ct);
                     if (audio is not null)
                     {
-                        var tempPfad = await WriteTemporaryAudioFileAsync(audio.Base64Inhalt, audio.MimeType, ct);
-                        if (tempPfad is not null)
+                        var tempPath = await WriteTemporaryAudioFileAsync(audio.Base64Content, audio.MimeType, ct);
+                        if (tempPath is not null)
                         {
                             try
                             {
-                                await PlayAudioAsync(tempPfad, ct);
+                                await PlayAudioAsync(tempPath, ct);
                             }
                             finally
                             {
-                                DeleteFileSafely(tempPfad);
+                                DeleteFileSafely(tempPath);
                             }
                         }
                     }
@@ -177,7 +177,7 @@ public sealed class NotificationService
                 eventId,
                 workItemId,
                 benutzerId,
-                kanal,
+                channel,
                 mode,
                 NotificationDecision.Sent,
                 $"Status: {neuerStatus.ToDisplayText()}",
@@ -192,14 +192,14 @@ public sealed class NotificationService
             _logger.LogError(
                 ex,
                 "Fehler beim Versenden der {Kanal}-Benachrichtigung für Aufgabe {AufgabeId}.",
-                kanal,
+                channel,
                 workItemId);
 
             await _auditService.LogAsync(
                 eventId,
                 workItemId,
                 benutzerId,
-                kanal,
+                channel,
                 mode,
                 NotificationDecision.Failed,
                 ex.Message,
@@ -231,10 +231,10 @@ public sealed class NotificationService
                 _ => ".bin"
             };
 
-            var tempPfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede-audio-{Guid.NewGuid():N}{extension}");
+            var tempPath = Path.Combine(Path.GetTempPath(), $"softwareschmiede-audio-{Guid.NewGuid():N}{extension}");
             var bytes = Convert.FromBase64String(base64);
-            await File.WriteAllBytesAsync(tempPfad, bytes, ct);
-            return tempPfad;
+            await File.WriteAllBytesAsync(tempPath, bytes, ct);
+            return tempPath;
         }
         catch
         {

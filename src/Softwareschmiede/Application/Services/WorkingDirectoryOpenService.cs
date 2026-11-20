@@ -14,9 +14,9 @@ public sealed class WorkingDirectoryOpenService(IProcessStarter processStarter)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
 
-        var (fileName, argumente) = ResolveOpenCommand(workingDirectory);
+        var (fileName, arguments) = ResolveOpenCommand(workingDirectory);
 
-        processStarter.Start(new ProcessStartRequest(fileName, argumente, UseShellExecute: false));
+        processStarter.Start(new ProcessStartRequest(fileName, arguments, UseShellExecute: false));
     }
 
     private static (string FileName, string Arguments) ResolveOpenCommand(string workingDirectory)

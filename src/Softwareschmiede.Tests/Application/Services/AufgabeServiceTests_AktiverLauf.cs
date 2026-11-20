@@ -130,7 +130,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         var workItem = await _sut.CreateAsync(_projektId, "Guard-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.EnsureActiveRunAsync(workItem.Id, laeuftGuard: () => false, ct: TestContext.Current.CancellationToken);
+        await _sut.EnsureActiveRunAsync(workItem.Id, runningGuard: () => false, ct: TestContext.Current.CancellationToken);
 
         // Assert
         var geladen = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -203,7 +203,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         try
         {
             // Act
-            sicherstellenTask = _sut.EnsureActiveRunAsync(workItem.Id, laufStatusProvider: () =>
+            sicherstellenTask = _sut.EnsureActiveRunAsync(workItem.Id, runStatusProvider: () =>
                 {
                     providerAusgewertet = true;
                     return WorkItemRunStatus.WaitingForInput;

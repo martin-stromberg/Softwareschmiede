@@ -19,7 +19,7 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly ProjectService _projektService;
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IPluginManager> _pluginManagerMock;
@@ -31,7 +31,7 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
     {
         _db = TestDbContextFactory.Create();
         _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
-        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _serviceProviderMock = new Mock<IServiceProvider>();
         _dialogServiceMock = new Mock<IDialogService>();
         _pluginManagerMock = new Mock<IPluginManager>();
@@ -50,7 +50,7 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
     private ProjectDetailViewModel CreateSut() =>
         new(
             _projektService,
-            _aufgabeService,
+            _workItemService,
             _serviceProviderMock.Object,
             _dialogServiceMock.Object,
             _pluginManagerMock.Object,

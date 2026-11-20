@@ -15,7 +15,7 @@ public sealed class CliProcessManager : IDisposable
     private readonly AiExecutionService _kiService;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<CliProcessManager> _logger;
-    private readonly WorkItemRunDataChangedNotifier _laufdatenChangedNotifier;
+    private readonly WorkItemRunDataChangedNotifier _runDataChangedNotifier;
 
     private readonly ConcurrentDictionary<Guid, Timer> _heartbeatTimers = new();
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
@@ -23,11 +23,11 @@ public sealed class CliProcessManager : IDisposable
     // Letztes Sicherheitsnetz der Laufdaten-Selbstheilung: unabhängig von jeglicher Event-Zustellung
     // wird periodisch geprüft, ob für jeden laufenden Prozess die Laufdaten persistiert sind.
     private static readonly TimeSpan ReconcileInterval = HeartbeatInterval;
-    private readonly Timer _abgleichTimer;
+    private readonly Timer _reconcileTimer;
 
     // Überlappungsschutz für den periodischen Abgleich: dauert ein Abgleich-Durchlauf länger als
     // das Timer-Intervall, werden weitere Ticks übersprungen statt sich aufzustauen (fire-and-forget).
-    private int _abgleichLaeuft;
+    private int _reconcileRunning;
 
     // Serialisiert alle mutierenden Zugriffe auf _heartbeatTimers, _updateSemaphores und
     // _runtimeStatusSubscriptions: Die Check-then-act-Sequenzen in StartHeartbeat/
@@ -49,7 +49,7 @@ public sealed class CliProcessManager : IDisposable
     // Hält pro Aufgabe die ITerminalSession und den dafür registrierten Event-Handler, damit
     // RuntimeStatusChanged beim Stopp/Fehler wieder sauber abgemeldet werden kann (siehe
     // UnsubscribeRuntimeStatus). Ohne dieses Tracking müsste GetTerminalSession(aufgabeId) erneut
-    // abgefragt werden — das Handle ist zu diesem Zeitpunkt aber bereits aus KiAusfuehrungsService._handles
+    // abgefragt werden — das Handle ist zu diesem Zeitpunkt aber bereits aus AiExecutionService._handles
     // entfernt (siehe HandleProcessExited), sodass die Session dort nicht mehr auffindbar wäre.
     private readonly ConcurrentDictionary<Guid, (ITerminalSession Session, EventHandler<CliRuntimeStatusChangedEventArgs> Handler)> _runtimeStatusSubscriptions = new();
 
@@ -63,18 +63,18 @@ public sealed class CliProcessManager : IDisposable
         AiExecutionService kiService,
         IServiceScopeFactory scopeFactory,
         ILogger<CliProcessManager> logger,
-        WorkItemRunDataChangedNotifier laufdatenChangedNotifier)
+        WorkItemRunDataChangedNotifier runDataChangedNotifier)
     {
         _kiService = kiService;
         _scopeFactory = scopeFactory;
         _logger = logger;
-        _laufdatenChangedNotifier = laufdatenChangedNotifier;
+        _runDataChangedNotifier = runDataChangedNotifier;
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
-        _kiService.CliLaufAktiv += OnCliLaufAktiv;
+        _kiService.CliRunActive += OnCliRunActive;
 
-        _abgleichTimer = new Timer(
-            _ => ReconcileTickAsync().SafeFireAndForget(_logger, "CliProcessManager.AbgleichTickAsync"),
+        _reconcileTimer = new Timer(
+            _ => ReconcileTickAsync().SafeFireAndForget(_logger, "CliProcessManager.ReconcileTickAsync"),
             null,
             ReconcileInterval,
             ReconcileInterval);
@@ -112,7 +112,7 @@ public sealed class CliProcessManager : IDisposable
         _updateSemaphores[workItemId] = new SemaphoreSlim(1, 1);
 
         var timer = new Timer(
-            _ => UpdateAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.AktualisierungAsync"),
+            _ => UpdateAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.UpdateAsync"),
             null,
             HeartbeatInterval,
             HeartbeatInterval);
@@ -185,21 +185,21 @@ public sealed class CliProcessManager : IDisposable
                     // AktiveRunId muss sofort persistiert werden (nicht erst beim ersten periodischen
                     // Heartbeat nach 30s) — sonst zeigt die Seitenleisten-Kachel (KiAusfuehrungsStatusConverter,
                     // Issue 108) für bis zu 30s nach dem Start weiterhin "✓ Bereit" statt "▶ Läuft" an.
-                    SetActiveRunAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.AktivenLaufSetzenAsync");
+                    SetActiveRunAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.SetActiveRunAsync");
                     SubscribeRuntimeStatus(workItemId);
                     break;
                 case CliProcessStatus.Gestoppt:
                 case CliProcessStatus.Error:
                     StopHeartbeat(workItemId);
                     UnsubscribeRuntimeStatus(workItemId);
-                    EndActiveRunAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.AktivenLaufBeendenAsync");
+                    EndActiveRunAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.EndActiveRunAsync");
                     break;
             }
         }
         catch (Exception ex)
         {
             // Ein Fehler beim Start/Stop des Heartbeat-Timers darf die Multicast-Invoke-Kette von
-            // KiAusfuehrungsService.CliProcessStatusChanged nicht abbrechen, sonst würde der zweite
+            // AiExecutionService.CliProcessStatusChanged nicht abbrechen, sonst würde der zweite
             // Abonnent (TaskDetailViewModel.OnCliProcessStatusChanged) nicht mehr benachrichtigt.
             _logger.LogError(ex, "Fehler bei der Verarbeitung des CLI-Prozess-Status {Status} für Aufgabe {AufgabeId}.", status, workItemId);
         }
@@ -215,10 +215,10 @@ public sealed class CliProcessManager : IDisposable
         await ExecuteWithWorkItemServiceAsync(
             workItemId,
             "Setzen des aktiven Laufs",
-            aufgabeService => aufgabeService.SetActiveRunAsync(
+            workItemService => workItemService.SetActiveRunAsync(
                 workItemId,
                 Guid.NewGuid().ToString("N"),
-                laeuftGuard: () => _kiService.IsRunning(workItemId))).ConfigureAwait(false);
+                runningGuard: () => _kiService.IsRunning(workItemId))).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -231,7 +231,7 @@ public sealed class CliProcessManager : IDisposable
         await ExecuteWithWorkItemServiceAsync(
             workItemId,
             "Beenden des aktiven Laufs",
-            aufgabeService => aufgabeService.EndActiveRunAsync(workItemId)).ConfigureAwait(false);
+            workItemService => workItemService.EndActiveRunAsync(workItemId)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -308,7 +308,7 @@ public sealed class CliProcessManager : IDisposable
 
     /// <summary>
     /// Übersetzt einen <see cref="CliRuntimeStatus"/>-Wechsel der <see cref="PseudoConsoleSession"/> in den
-    /// Domain-Substatus <see cref="WorkItemRunStatus"/> und persistiert ihn. <see cref="CliRuntimeStatus.Inaktiv"/>
+    /// Domain-Substatus <see cref="WorkItemRunStatus"/> und persistiert ihn. <see cref="CliRuntimeStatus.Inactive"/>
     /// wird ignoriert: Das Beenden des Laufs (inkl. Zurücksetzen von <see cref="Domain.Entities.WorkItem.RunStatus"/>)
     /// übernimmt bereits <see cref="EndActiveRunAsync"/> über das separate <see cref="CliProcessStatus.Gestoppt"/>-
     /// bzw. <see cref="CliProcessStatus.Error"/>-Ereignis.
@@ -317,25 +317,25 @@ public sealed class CliProcessManager : IDisposable
     /// <param name="status">Der neue Laufzeitstatus der CLI-Sitzung.</param>
     private void OnRuntimeStatusChanged(Guid workItemId, CliRuntimeStatus status)
     {
-        if (status == CliRuntimeStatus.Inaktiv)
+        if (status == CliRuntimeStatus.Inactive)
             return;
 
-        EnsureRunDataAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.LaufdatenSicherstellenAsync");
+        EnsureRunDataAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.EnsureRunDataAsync");
     }
 
-    /// <summary>Behandelt das <see cref="AiExecutionService.CliLaufAktiv"/>-Signal: ein laufender
+    /// <summary>Behandelt das <see cref="AiExecutionService.CliRunActive"/>-Signal: ein laufender
     /// Prozess ohne Gestartet-Ereignis (Wiederverwendungs-/Early-Return-Pfad) löst dieselbe
     /// Laufdaten-Sicherstellung aus wie ein regulärer Start.</summary>
     /// <param name="workItemId">ID der Aufgabe, deren Lauf als aktiv gemeldet wurde.</param>
-    private void OnCliLaufAktiv(Guid workItemId)
-        => EnsureRunDataAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.LaufdatenSicherstellenAsync");
+    private void OnCliRunActive(Guid workItemId)
+        => EnsureRunDataAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.EnsureRunDataAsync");
 
     /// <summary>
     /// Zentraler Selbstheilungspunkt: Stellt für einen nachweislich laufenden Prozess die vollständige
     /// Beobachtungs- und Persistenzkette wieder her — Heartbeat-Timer (nur falls noch keiner läuft;
     /// atomar unter <c>_lifecycleLock</c>), RuntimeStatus-Subscription (idempotent, atomar) und
     /// Laufdaten via <see cref="WorkItemService.EnsureActiveRunAsync"/> mit dem aktuellen
-    /// Live-Substatus (<see cref="CliRuntimeStatusExtensions.ToAufgabeLaufStatus"/>).
+    /// Live-Substatus (<see cref="CliRuntimeStatusExtensions.ToWorkItemRunStatus"/>).
     /// Läuft kein Prozess, ist der Aufruf eine No-Op — verwaiste oder beendete Zustände werden nie
     /// wieder als aktiv geschrieben.
     /// </summary>
@@ -379,17 +379,17 @@ public sealed class CliProcessManager : IDisposable
         await ExecuteWithWorkItemServiceAsync(
             workItemId,
             "Sicherstellen der Laufdaten",
-            aufgabeService => aufgabeService.EnsureActiveRunAsync(
+            workItemService => workItemService.EnsureActiveRunAsync(
                 workItemId,
-                laufStatusProvider: () => _kiService.GetTerminalSession(workItemId)?.RuntimeStatus.ToAufgabeLaufStatus(),
-                laeuftGuard: () => _kiService.IsRunning(workItemId))).ConfigureAwait(false);
+                runStatusProvider: () => _kiService.GetTerminalSession(workItemId)?.RuntimeStatus.ToWorkItemRunStatus(),
+                runningGuard: () => _kiService.IsRunning(workItemId))).ConfigureAwait(false);
     }
 
     /// <summary>Tick-Wrapper des <c>_abgleichTimer</c>: stellt sicher, dass sich bei einem
     /// über das Intervall hinaus laufenden Abgleich keine Durchläufe überlappen (fire-and-forget).</summary>
     private async Task ReconcileTickAsync()
     {
-        if (Interlocked.Exchange(ref _abgleichLaeuft, 1) != 0)
+        if (Interlocked.Exchange(ref _reconcileRunning, 1) != 0)
         {
             return;
         }
@@ -400,16 +400,16 @@ public sealed class CliProcessManager : IDisposable
         }
         finally
         {
-            Interlocked.Exchange(ref _abgleichLaeuft, 0);
+            Interlocked.Exchange(ref _reconcileRunning, 0);
         }
     }
 
     /// <summary>Periodischer Abgleich aller laufenden Aufgaben: iteriert
-    /// <see cref="AiExecutionService.GetLaufendeAufgabenIds"/> und stellt pro Aufgabe die
+    /// <see cref="AiExecutionService.GetRunningWorkItemIds"/> und stellt pro Aufgabe die
     /// Laufdaten sicher (fehlerisoliert — einzelne Fehlschläge werden nur geloggt).</summary>
     private async Task ReconcileAsync()
     {
-        foreach (var workItemId in _kiService.GetLaufendeAufgabenIds())
+        foreach (var workItemId in _kiService.GetRunningWorkItemIds())
         {
             try
             {
@@ -430,9 +430,9 @@ public sealed class CliProcessManager : IDisposable
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
-            var aufgabeService = scope.ServiceProvider.GetRequiredService<WorkItemService>();
-            await action(aufgabeService).ConfigureAwait(false);
-            _laufdatenChangedNotifier.NotifyLaufdatenChanged(workItemId);
+            var workItemService = scope.ServiceProvider.GetRequiredService<WorkItemService>();
+            await action(workItemService).ConfigureAwait(false);
+            _runDataChangedNotifier.NotifyRunDataChanged(workItemId);
         }
         catch (ObjectDisposedException ex)
         {
@@ -455,10 +455,10 @@ public sealed class CliProcessManager : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        _abgleichTimer.Dispose();
+        _reconcileTimer.Dispose();
 
         _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
-        _kiService.CliLaufAktiv -= OnCliLaufAktiv;
+        _kiService.CliRunActive -= OnCliRunActive;
 
         lock (_lifecycleLock)
         {

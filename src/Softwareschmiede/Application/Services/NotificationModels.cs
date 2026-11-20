@@ -22,7 +22,7 @@ public sealed record NotificationAudioInfoDto(
 
 /// <summary>Base64-kodierter Audio-Payload für die Wiedergabe im Client.</summary>
 /// <param name="MimeType">MIME-Typ der Audio-Datei.</param>
-/// <param name="Base64Inhalt">Base64-kodierter Inhalt der Audio-Datei.</param>
+/// <param name="Base64Content">Base64-kodierter Inhalt der Audio-Datei.</param>
 public sealed record NotificationAudioPayload(
     string MimeType,
-    string Base64Inhalt);
+    string Base64Content);

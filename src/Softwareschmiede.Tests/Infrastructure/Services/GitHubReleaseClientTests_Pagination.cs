@@ -82,7 +82,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(updatePath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release.Should().NotBeNull();
         result.Release!.Version.Should().Be(expectedVersion);
         result.Release.IsPrerelease.Should().Be(expectedIsPrerelease);
@@ -100,7 +100,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeFalse();
+        result.Success.Should().BeFalse();
         result.Release.Should().BeNull();
         handler.RequestedUrls.Should().Equal(Page1Url, Page2Url);
     }
@@ -116,7 +116,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeFalse();
+        result.Success.Should().BeFalse();
         result.Release.Should().BeNull();
     }
 
@@ -135,7 +135,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeFalse();
+        result.Success.Should().BeFalse();
         result.Release.Should().BeNull();
     }
 
@@ -150,7 +150,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeFalse();
+        result.Success.Should().BeFalse();
         result.Release.Should().BeNull();
     }
 
@@ -169,7 +169,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeFalse();
+        result.Success.Should().BeFalse();
         result.Release.Should().BeNull();
         handler.RequestedUrls.Should().Equal(Page1Url);
     }
@@ -196,7 +196,7 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Erfolg.Should().BeTrue();
+        result.Success.Should().BeTrue();
         result.Release!.Version.Should().Be("1.5.0-rc.1");
         handler.RequestedUrls.Should().Equal(Page1Url, numericPage2Url);
     }

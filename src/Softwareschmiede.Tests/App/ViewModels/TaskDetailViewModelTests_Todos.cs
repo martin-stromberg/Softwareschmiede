@@ -12,7 +12,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class TaskDetailViewModelTests_Todos : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly TodoService _todoService;
     private readonly Guid _projektId = Guid.NewGuid();
 
@@ -21,7 +21,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, _todoService);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, _todoService);
 
         _db.Projects.Add(new Project
         {
@@ -36,14 +36,14 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    private TaskDetailViewModel CreateSut() => TaskDetailViewModelTestFactory.Create(_db, _aufgabeService);
+    private TaskDetailViewModel CreateSut() => TaskDetailViewModelTestFactory.Create(_db, _workItemService);
 
     private async Task<WorkItem> ErstelleAufgabe(WorkItemStatus status = WorkItemStatus.New)
     {
-        var workItem = await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
+        var workItem = await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
         if (status != WorkItemStatus.New)
-            await _aufgabeService.StatusSetzenAsync(workItem.Id, status);
-        return await _aufgabeService.GetByIdAsync(workItem.Id) ?? workItem;
+            await _workItemService.SetStatusUncheckedAsync(workItem.Id, status);
+        return await _workItemService.GetByIdAsync(workItem.Id) ?? workItem;
     }
 
     /// <summary>LadenAsync lädt die Todos der Aufgabe in die Todos-Collection des TodoListViewModel.</summary>
@@ -145,7 +145,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
         await ((AsyncRelayCommand)sut.AufgabeAbschliessenCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().Contain("1 offene To-Do(s)");
-        var aktualisiert = await _aufgabeService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        var aktualisiert = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         aktualisiert!.Status.Should().Be(WorkItemStatus.Started);
     }
 
@@ -163,7 +163,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
         await ((AsyncRelayCommand)sut.AufgabeAbschliessenCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNullOrEmpty();
-        var aktualisiert = await _aufgabeService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        var aktualisiert = await _workItemService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         aktualisiert!.Status.Should().Be(WorkItemStatus.Completed);
     }
 }

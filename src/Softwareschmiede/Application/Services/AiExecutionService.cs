@@ -70,7 +70,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     /// <summary>
     /// Wird ausgelöst, wenn eine Startanforderung einen bereits laufenden Prozess zurückgibt
     /// (Early-Return ohne <see cref="CliProcessStatus.Started"/>-Ereignis) bzw. ein laufender
-    /// Prozess über <see cref="NotifyLaufAktiv"/> bestätigt wird. Abonnenten können damit die
+    /// Prozess über <see cref="NotifyRunActive"/> bestätigt wird. Abonnenten können damit die
     /// Laufdaten-Persistenz für laufende Prozesse ohne Gestartet-Ereignis sicherstellen.
     /// </summary>
     /// <remarks>
@@ -79,7 +79,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     /// und dürfen nicht reentrant <see cref="StartCliAsync"/>/<see cref="StartTerminalSessionAsync"/>
     /// aufrufen — sonst blockieren/deadlocken sie sämtliche Prozessstarts aller Aufgaben.
     /// </remarks>
-    public event Action<Guid>? CliLaufAktiv;
+    public event Action<Guid>? CliRunActive;
 
     /// <inheritdoc/>
     public event Action<int, int>? RunningCountChanged;
@@ -116,23 +116,23 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
         });
 
     /// <summary>
-    /// Feuert <see cref="CliLaufAktiv"/> für eine Aufgabe, sofern für sie ein Prozess läuft —
+    /// Feuert <see cref="CliRunActive"/> für eine Aufgabe, sofern für sie ein Prozess läuft —
     /// sonst No-Op. Für Aufrufer außerhalb des Service, die einen laufenden Prozess bestätigt
     /// haben (z. B. der Session-Alive-Early-Return in <c>EntwicklungsprozessService</c>).
     /// </summary>
     /// <param name="workItemId">ID der Aufgabe.</param>
-    public void NotifyLaufAktiv(Guid workItemId)
+    public void NotifyRunActive(Guid workItemId)
     {
         if (IsRunning(workItemId))
         {
-            CliLaufAktiv?.Invoke(workItemId);
+            CliRunActive?.Invoke(workItemId);
         }
     }
 
     /// <summary>Liefert die IDs aller Aufgaben mit einem laufenden Handle (<c>!HasExited</c>,
     /// Exception-tolerant wie <see cref="GetRunningCount"/>).</summary>
     /// <returns>Die Aufgaben-IDs mit nachweislich laufendem Prozess.</returns>
-    public IReadOnlyCollection<Guid> GetLaufendeAufgabenIds()
+    public IReadOnlyCollection<Guid> GetRunningWorkItemIds()
         => _handles
             .Where(pair =>
             {
@@ -153,7 +153,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
         // Abweichung bewusst explizit: Der Live-Substatus kennt kein "null bei Inaktiv/keiner Session"
         // — ein nachweislich laufender Prozess ohne Wartet-Meldung ist fachlich "Läuft" (Issue 342:
         // Live-Zweig des Klassifikators darf nie auf Bereit zurückfallen, solange ein Handle lebt).
-        return GetTerminalSession(workItemId)?.RuntimeStatus.ToAufgabeLaufStatus()
+        return GetTerminalSession(workItemId)?.RuntimeStatus.ToWorkItemRunStatus()
             ?? WorkItemRunStatus.Running;
     }
 
@@ -197,7 +197,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
                 if (istNochAktiv)
                 {
                     _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", workItemId);
-                    CliLaufAktiv?.Invoke(workItemId);
+                    CliRunActive?.Invoke(workItemId);
                     return existing;
                 }
             }
@@ -219,7 +219,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
             var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
             var handle = new CliProcessHandle(workItemId, process);
 
-            process.Exited += (_, _) => HandleProcessExitedAsync(workItemId, process, handle, "Standard").SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleProcessExitedAsync");
+            process.Exited += (_, _) => HandleProcessExitedAsync(workItemId, process, handle, "Standard").SafeFireAndForget(_logger, "AiExecutionService.HandleProcessExitedAsync");
 
             // Handle VOR process.Start() eintragen, damit der Exited-Handler
             // das Handle immer vorfindet (Race-Condition bei sehr kurzlebigen Prozessen).
@@ -297,7 +297,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
                 if (istNochAktiv)
                 {
                     _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", workItemId);
-                    CliLaufAktiv?.Invoke(workItemId);
+                    CliRunActive?.Invoke(workItemId);
                     return existing;
                 }
             }
@@ -378,8 +378,8 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
                 spec, session, scmConfiguration, () => _handles.TryGetValue(workItemId, out var active) && ReferenceEquals(active, handle), _timeProvider);
             session.InputStarted = handle.ScmPromptSession.MarkInputStarted;
 
-            session.Exited += (_, e) => HandleSessionEndedAsync(workItemId, handle, e.ExitCode, "Terminal").SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionEndedAsync");
-            session.Failed += (_, e) => HandleSessionFailedAsync(workItemId, handle, e).SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionFailedAsync");
+            session.Exited += (_, e) => HandleSessionEndedAsync(workItemId, handle, e.ExitCode, "Terminal").SafeFireAndForget(_logger, "AiExecutionService.HandleSessionEndedAsync");
+            session.Failed += (_, e) => HandleSessionFailedAsync(workItemId, handle, e).SafeFireAndForget(_logger, "AiExecutionService.HandleSessionFailedAsync");
 
             // Ein vor der Verdrahtung ausgelöstes Failed (z. B. Leseschleifen-Fehler bei noch
             // laufendem Prozess) ist ohne Subscriber verlorengegangen — über den auf der Session
@@ -594,7 +594,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
         _startLock.Dispose();
     }
 
-    private async Task PersistFehlgeschlagenAsync(Guid workItemId, int? exitCode)
+    private async Task PersistFailureAsync(Guid workItemId, int? exitCode)
     {
         if (_isDisposed)
         {
@@ -646,11 +646,11 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     /// <param name="workItemId">ID der Aufgabe.</param>
     /// <param name="process">Der beendete Prozess.</param>
     /// <param name="handle">Das zugehörige <see cref="CliProcessHandle"/>.</param>
-    /// <param name="logKontext">Bezeichnung des Start-Modus für die Log-Ausgabe (z. B. "Standard" oder "ConPTY").</param>
+    /// <param name="logContext">Bezeichnung des Start-Modus für die Log-Ausgabe (z. B. "Standard" oder "ConPTY").</param>
     /// <param name="preCleanupAsync">Optionale zusätzliche Aufräumlogik (z. B. Drain und Dispose der Session), die nach der Handle-Entfernung, aber vor der Statusermittlung ausgeführt wird.</param>
-    private async Task HandleProcessExitedAsync(Guid workItemId, Process process, CliProcessHandle handle, string logKontext, Func<Task>? preCleanupAsync = null)
+    private async Task HandleProcessExitedAsync(Guid workItemId, Process process, CliProcessHandle handle, string logContext, Func<Task>? preCleanupAsync = null)
     {
-        await HandleExitedCoreAsync(workItemId, handle, TryGetExitCode(process), logKontext, preCleanupAsync).ConfigureAwait(false);
+        await HandleExitedCoreAsync(workItemId, handle, TryGetExitCode(process), logContext, preCleanupAsync).ConfigureAwait(false);
     }
 
     /// <summary>Behandelt das <see cref="ITerminalSession.Exited"/>-Ereignis einer Terminal-Session:
@@ -659,13 +659,13 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     /// <param name="workItemId">ID der Aufgabe.</param>
     /// <param name="handle">Das zugehörige <see cref="CliProcessHandle"/>.</param>
     /// <param name="exitCode">Der ermittelte Exit-Code, oder <c>null</c>, wenn keiner bekannt ist.</param>
-    /// <param name="logKontext">Bezeichnung des Kontexts für die Log-Ausgabe (z. B. "Terminal").</param>
-    /// <param name="istFehlerhaftesEnde"><c>true</c>, wenn das Ende auf einem fatalen
+    /// <param name="logContext">Bezeichnung des Kontexts für die Log-Ausgabe (z. B. "Terminal").</param>
+    /// <param name="isErrorEnd"><c>true</c>, wenn das Ende auf einem fatalen
     /// Laufzeitfehler der Session beruht (<see cref="ITerminalSession.Failed"/>) — dann wird auch ohne
     /// bekannten Exit-Code der Status <see cref="CliProcessStatus.Error"/> gemeldet.</param>
-    private async Task HandleSessionEndedAsync(Guid workItemId, CliProcessHandle handle, int? exitCode, string logKontext, bool istFehlerhaftesEnde = false)
+    private async Task HandleSessionEndedAsync(Guid workItemId, CliProcessHandle handle, int? exitCode, string logContext, bool isErrorEnd = false)
     {
-        await HandleExitedCoreAsync(workItemId, handle, exitCode, logKontext, () => DisposeSessionResourcesAsync(handle), istFehlerhaftesEnde).ConfigureAwait(false);
+        await HandleExitedCoreAsync(workItemId, handle, exitCode, logContext, () => DisposeSessionResourcesAsync(handle), isErrorEnd).ConfigureAwait(false);
     }
 
     /// <summary>Behandelt das <see cref="ITerminalSession.Failed"/>-Ereignis einer Terminal-Session:
@@ -675,10 +675,10 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     private async Task HandleSessionFailedAsync(Guid workItemId, CliProcessHandle handle, TerminalSessionFailedEventArgs args)
     {
         _logger.LogError(args.Error, "Terminal-Session für Aufgabe {AufgabeId} fehlgeschlagen (Phase: {Phase}).", workItemId, args.Phase);
-        await HandleSessionEndedAsync(workItemId, handle, handle.Session?.ExitCode ?? TryGetExitCode(handle.Process), "Terminal-Fehler", istFehlerhaftesEnde: true).ConfigureAwait(false);
+        await HandleSessionEndedAsync(workItemId, handle, handle.Session?.ExitCode ?? TryGetExitCode(handle.Process), "Terminal-Fehler", isErrorEnd: true).ConfigureAwait(false);
     }
 
-    private async Task HandleExitedCoreAsync(Guid workItemId, CliProcessHandle handle, int? exitCode, string logKontext, Func<Task>? preCleanupAsync, bool istFehlerhaftesEnde = false)
+    private async Task HandleExitedCoreAsync(Guid workItemId, CliProcessHandle handle, int? exitCode, string logContext, Func<Task>? preCleanupAsync, bool isErrorEnd = false)
     {
         try
         {
@@ -703,7 +703,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
 
             _logger.LogInformation(
                 "CLI-Prozess ({LogKontext}) für Aufgabe {AufgabeId} beendet (ExitCode: {ExitCode}).",
-                logKontext,
+                logContext,
                 workItemId,
                 exitCode);
 
@@ -714,10 +714,10 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
             {
                 status = CliProcessStatus.Gestoppt;
             }
-            else if (istFehlerhaftesEnde || (exitCode.HasValue && exitCode.Value != 0))
+            else if (isErrorEnd || (exitCode.HasValue && exitCode.Value != 0))
             {
                 status = CliProcessStatus.Error;
-                PersistFehlgeschlagenAsync(workItemId, exitCode).SafeFireAndForget(_logger, "KiAusfuehrungsService.PersistFehlgeschlagenAsync");
+                PersistFailureAsync(workItemId, exitCode).SafeFireAndForget(_logger, "AiExecutionService.PersistFailureAsync");
             }
             else
             {
@@ -729,7 +729,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler im Exited-Handler ({LogKontext}) für Aufgabe {AufgabeId}.", logKontext, workItemId);
+            _logger.LogError(ex, "Fehler im Exited-Handler ({LogKontext}) für Aufgabe {AufgabeId}.", logContext, workItemId);
         }
     }
 
@@ -755,8 +755,8 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
                 return;
             }
 
-            var aufgabeService = scope.ServiceProvider.GetRequiredService<WorkItemService>();
-            await aufgabeService.EndActiveRunAsync(workItemId).ConfigureAwait(false);
+            var workItemService = scope.ServiceProvider.GetRequiredService<WorkItemService>();
+            await workItemService.EndActiveRunAsync(workItemId).ConfigureAwait(false);
         }
         catch (ObjectDisposedException ex)
         {

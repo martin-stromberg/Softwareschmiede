@@ -811,7 +811,7 @@ public sealed class SettingsViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _settingService.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeMode.ProjectScoped);
+        (await _settingService.GetScmBackmergeModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeMode.ProjectScoped);
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         sut.SelectedBackmergeModus.Should().Be(ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.ProjectScoped));
@@ -1079,7 +1079,7 @@ public sealed class SettingsViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _settingService.GetScmBackmergeDraftAktivierungAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
+        (await _settingService.GetScmBackmergeDraftActivationAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
         (await _settingService.GetScmBackmergeAdminMergeAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();

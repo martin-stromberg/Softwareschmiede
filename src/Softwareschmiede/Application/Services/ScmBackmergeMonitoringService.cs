@@ -36,7 +36,7 @@ public sealed class ScmBackmergeMonitoringService(
         var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
         // Laufzeit-Schalter (Einstellungen → Automatisierung → Prozessabläufe): Bei deaktiviertem
         // Backmerge-Modus wird nicht enumeriert. Die Ereignisüberwachung ist davon unabhängig.
-        if (await settings.GetScmBackmergeModusAsync(ct) == ScmBackmergeMode.Disabled)
+        if (await settings.GetScmBackmergeModeAsync(ct) == ScmBackmergeMode.Disabled)
         {
             logger.LogDebug("Backmerge-Automatisierung ist deaktiviert; Durchlauf wird übersprungen.");
             return;
@@ -100,7 +100,7 @@ public sealed class ScmBackmergeMonitoringService(
             {
                 using var enumerationScope = scopes.CreateScope();
                 var backmerge = enumerationScope.ServiceProvider.GetRequiredService<ScmBackmergeService>();
-                var lokale = localRepositories.TryGetValue(repository, out var kandidaten) ? kandidaten : new List<GitRepository>();
+                var lokale = localRepositories.TryGetValue(repository, out var candidates) ? candidates : new List<GitRepository>();
                 await ScmCheckpointSupport.EnumerateRepositoryAsync(
                     scopes, _time, options.Value.PollInterval, source, repository,
                     "backmerge-enumeration", enumerated,

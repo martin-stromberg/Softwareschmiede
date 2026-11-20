@@ -352,14 +352,14 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         await fixture.WaitEventAsync(6, "Verarbeitet", 603);
         await fixture.WaitForDatabaseAsync(async db =>
             await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_602")
-                    && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection)
+                    && x.Diagnostic == ScmEventValidationService.AlreadyReactedRejection)
                 && await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_2201")
                     && x.Diagnostic == ScmEventStore.UnassignedDiagnostic),
             "Snapshot-Diagnosen für Kommentare 602/2201 fehlen", TimeSpan.FromSeconds(90));
         await using (var db = fixture.OpenDatabase())
         {
             Assert.True(await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_602")
-                && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection, cancellationToken: TestContext.Current.CancellationToken));
+                && x.Diagnostic == ScmEventValidationService.AlreadyReactedRejection, cancellationToken: TestContext.Current.CancellationToken));
             Assert.True(await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_2201")
                 && x.Diagnostic == ScmEventStore.UnassignedDiagnostic, cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal(events6Before + 1, await db.ScmIncomingEvents.CountAsync(x => x.WorkItemId == task6, cancellationToken: TestContext.Current.CancellationToken));
@@ -434,12 +434,12 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.AddNotification(18);
         await fixture.WaitForDatabaseAsync(async db =>
             await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_1802")
-                && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection),
+                && x.Diagnostic == ScmEventValidationService.AlreadyReactedRejection),
             "Snapshot-Diagnose für Kommentar 1802 fehlt");
         await using (var db = fixture.OpenDatabase())
         {
             Assert.True(await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_1802")
-                && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection));
+                && x.Diagnostic == ScmEventValidationService.AlreadyReactedRejection));
             Assert.Equal(botEventsBefore, await db.ScmIncomingEvents.CountAsync(x => x.WorkItemId == botTask.Id));
         }
         output.WriteLine("Bot: reagierter Mention-Kommentar erzeugt kein Inbox-Ereignis, Snapshot-Diagnose gesetzt.");

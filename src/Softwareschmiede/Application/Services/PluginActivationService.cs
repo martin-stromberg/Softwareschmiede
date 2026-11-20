@@ -29,8 +29,8 @@ public sealed class PluginActivationService
     /// <returns><c>true</c>, wenn das Plugin aktiviert ist oder kein Eintrag existiert; sonst <c>false</c>.</returns>
     public async Task<bool> IsPluginEnabledAsync(string pluginPrefix, CancellationToken ct = default)
     {
-        var wert = await _settingService.GetSettingAsync(BuildKey(pluginPrefix), ct);
-        return IsEnabledValue(wert);
+        var value = await _settingService.GetSettingAsync(BuildKey(pluginPrefix), ct);
+        return IsEnabledValue(value);
     }
 
     /// <summary>Speichert den Aktivierungsstatus für das Plugin mit dem angegebenen Prefix.</summary>
@@ -79,12 +79,12 @@ public sealed class PluginActivationService
             .ToList();
     }
 
-    private static bool IsEnabledValue(string? wert)
+    private static bool IsEnabledValue(string? value)
     {
-        if (string.IsNullOrWhiteSpace(wert))
+        if (string.IsNullOrWhiteSpace(value))
             return true;
 
-        return !bool.TryParse(wert, out var enabled) || enabled;
+        return !bool.TryParse(value, out var enabled) || enabled;
     }
 
     private static string BuildKey(string pluginPrefix) => $"{EnabledKeyPrefix}{pluginPrefix}";

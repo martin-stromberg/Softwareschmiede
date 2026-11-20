@@ -25,10 +25,10 @@ public sealed record ScmRequirement(
     };
 
     /// <summary>Issue- oder Pull-Request-Nummer.</summary>
-    public int? Nummer => Issue?.Nummer ?? PullRequest?.Nummer;
+    public int? Number => Issue?.Number ?? PullRequest?.Number;
 
     /// <summary>Anzeige der Issue- oder Pull-Request-Nummer.</summary>
-    public string NummerText => Nummer is null ? string.Empty : $"#{Nummer}";
+    public string NummerText => Number is null ? string.Empty : $"#{Number}";
 
     /// <summary>Stabile sichtbare Providerbezeichnung fuer Pull Requests.</summary>
     public string ProviderText => PullRequest is null

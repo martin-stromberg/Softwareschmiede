@@ -179,8 +179,8 @@ public sealed class ScmEventExecutionLimitService(
         return new(occupancy.Global + aktive.Count, proPlugin);
     }
 
-    private static int? ParseLimit(string? wert)
-        => int.TryParse(wert, out var limit) && limit >= 1 ? limit : null;
+    private static int? ParseLimit(string? value)
+        => int.TryParse(value, out var limit) && limit >= 1 ? limit : null;
 
     /// <summary>Zählt die laufenden CLI-Handles global und je Plugin. Pausierte Aufgaben
     /// (<c>PausiertBisUtc</c> in der Zukunft — ihr Prozess läuft bewusst weiter) belegen keinen
@@ -188,15 +188,15 @@ public sealed class ScmEventExecutionLimitService(
     /// abgelaufene oder fehlende Pausenzeiten sowie Handles ohne Aufgabenzeile zählen voll.</summary>
     private async Task<CliExecutionOccupancy> GetOccupancyAsync(CancellationToken ct)
     {
-        var laufendeIds = cli.GetLaufendeAufgabenIds();
-        if (laufendeIds.Count == 0)
+        var runningIds = cli.GetRunningWorkItemIds();
+        if (runningIds.Count == 0)
             return new(0, new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
         var workItems = await db.WorkItems.AsNoTracking()
-            .Where(x => laufendeIds.Contains(x.Id))
+            .Where(x => runningIds.Contains(x.Id))
             .Select(x => new { x.Id, x.AiPluginPrefix, x.PausedUntilUtc })
             .ToListAsync(ct);
-        var jetzt = time.GetUtcNow();
-        var aktive = workItems.Where(x => !x.PausedUntilUtc.IsCurrentlyPaused(jetzt)).ToList();
+        var now = time.GetUtcNow();
+        var aktive = workItems.Where(x => !x.PausedUntilUtc.IsCurrentlyPaused(now)).ToList();
         var proPlugin = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var workItem in aktive)
         {
@@ -210,6 +210,6 @@ public sealed class ScmEventExecutionLimitService(
         }
         // Global = aktive Aufgaben plus laufende Handles ohne auflösbare Aufgabenzeile
         // (letztere haben kein PausiertBisUtc und zählen bewusst weiterhin voll).
-        return new(aktive.Count + (laufendeIds.Count - workItems.Count), proPlugin);
+        return new(aktive.Count + (runningIds.Count - workItems.Count), proPlugin);
     }
 }

@@ -25,7 +25,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
     // Sicherstellen/Beenden sowie die laufdatenrücksetzenden Lebenszyklus-Pfade Starten/
     // Abschliessen/StartZuruecksetzen). AufgabeService-Instanzen sind scoped, die Schreibpfade
     // konvergieren aber aus mehreren Quellen (CliProcessManager-Selbstheilung,
-    // KiAusfuehrungsService-Exit-Pfad, ViewModel-Aufrufe) in unterschiedlichen DbContexts auf
+    // AiExecutionService-Exit-Pfad, ViewModel-Aufrufe) in unterschiedlichen DbContexts auf
     // derselben Row: ohne gemeinsame Sperre kann ein Sicherstellen-Save nach dem Beenden-Save
     // landen und einen Phantom-Lauf wiederbeleben (Issue 342). Einträge werden bewusst nie
     // entfernt — das Entfernen während wartender Aufrufer wäre selbst eine Race-Bedingung, und
@@ -91,9 +91,9 @@ public sealed class WorkItemService : IActiveWorkItemsService
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
-        var aktiv = counts.FirstOrDefault(c => c.Status == WorkItemStatus.Started)?.Count ?? 0;
+        var active = counts.FirstOrDefault(c => c.Status == WorkItemStatus.Started)?.Count ?? 0;
         var waiting = counts.FirstOrDefault(c => c.Status == WorkItemStatus.Waiting)?.Count ?? 0;
-        return (aktiv, waiting);
+        return (active, waiting);
     }
 
     /// <summary>Gibt eine Aufgabe anhand ihrer ID zurück.</summary>
@@ -199,19 +199,19 @@ public sealed class WorkItemService : IActiveWorkItemsService
     /// <summary>Erstellt eine neue Aufgabe mit Status <see cref="WorkItemStatus.New"/>.</summary>
     public async Task<WorkItem> CreateAsync(
         Guid projectId,
-        string titel,
+        string title,
         string? requirementDescription,
         Guid? gitRepositoryId = null,
         CancellationToken ct = default)
     {
-        _logger.LogInformation("Aufgabe '{Titel}' für Projekt {ProjektId} erstellen.", titel, projectId);
+        _logger.LogInformation("Aufgabe '{Titel}' für Projekt {ProjektId} erstellen.", title, projectId);
 
         var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
             ProjectId = projectId,
             GitRepositoryId = gitRepositoryId,
-            Title = titel,
+            Title = title,
             RequirementDescription = requirementDescription,
             Status = WorkItemStatus.New,
             ExecutionStatus = WorkItemExecutionStatus.NotStarted,
@@ -221,7 +221,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
         _db.WorkItems.Add(workItem);
         await _db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Aufgabe '{Titel}' mit ID {AufgabeId} erstellt.", titel, workItem.Id);
+        _logger.LogInformation("Aufgabe '{Titel}' mit ID {AufgabeId} erstellt.", title, workItem.Id);
         return workItem;
     }
 
@@ -232,7 +232,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
         Guid? gitRepositoryId = null,
         CancellationToken ct = default)
     {
-        _logger.LogInformation("Aufgabe aus Issue #{IssueNummer} für Projekt {ProjektId} erstellen.", issue.Nummer, projectId);
+        _logger.LogInformation("Aufgabe aus Issue #{IssueNummer} für Projekt {ProjektId} erstellen.", issue.Number, projectId);
 
         var workItem = new WorkItem
         {
@@ -246,11 +246,11 @@ public sealed class WorkItemService : IActiveWorkItemsService
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        var issueReferenz = new IssueReference
+        var issueReference = new IssueReference
         {
             Id = Guid.NewGuid(),
             WorkItemId = workItem.Id,
-            IssueNumber = issue.Nummer,
+            IssueNumber = issue.Number,
             Title = issue.Title,
             Body = issue.Body,
             LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels),
@@ -258,12 +258,12 @@ public sealed class WorkItemService : IActiveWorkItemsService
             IssueUrl = issue.IssueUrl
         };
 
-        workItem.IssueReference = issueReferenz;
+        workItem.IssueReference = issueReference;
 
         _db.WorkItems.Add(workItem);
         await _db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Aufgabe aus Issue #{IssueNummer} mit ID {AufgabeId} erstellt.", issue.Nummer, workItem.Id);
+        _logger.LogInformation("Aufgabe aus Issue #{IssueNummer} mit ID {AufgabeId} erstellt.", issue.Number, workItem.Id);
         return workItem;
     }
 
@@ -275,9 +275,9 @@ public sealed class WorkItemService : IActiveWorkItemsService
     /// <param name="gitRepositoryId">ID des lokalen Git-Repositorys.</param>
     /// <param name="sourceKey">Der deduplizierende Quellenschlüssel der Aufgabenreferenz.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    /// <param name="zweck">Optionale Zweck-Markierung der Aufgabe (siehe <see cref="WorkItem.Purpose"/>);
+    /// <param name="purpose">Optionale Zweck-Markierung der Aufgabe (siehe <see cref="WorkItem.Purpose"/>);
     /// <see langword="null"/> legt eine reguläre Arbeitsaufgabe an.</param>
-    /// <param name="kiPluginPrefix">Optionaler Plugin-Prefix für die funktionale Plugin-Zuordnung
+    /// <param name="aiPluginPrefix">Optionaler Plugin-Prefix für die funktionale Plugin-Zuordnung
     /// (siehe <see cref="WorkItem.AiPluginPrefix"/>).</param>
     public async Task<WorkItem> CreateFromIssueEventAsync(
         Guid projectId,
@@ -285,8 +285,8 @@ public sealed class WorkItemService : IActiveWorkItemsService
         Guid gitRepositoryId,
         string sourceKey,
         CancellationToken ct = default,
-        string? zweck = null,
-        string? kiPluginPrefix = null)
+        string? purpose = null,
+        string? aiPluginPrefix = null)
     {
         ArgumentNullException.ThrowIfNull(issue);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceKey);
@@ -314,13 +314,13 @@ public sealed class WorkItemService : IActiveWorkItemsService
             Status = WorkItemStatus.New,
             ExecutionStatus = WorkItemExecutionStatus.NotStarted,
             CreatedAt = DateTimeOffset.UtcNow,
-            Purpose = zweck,
-            AiPluginPrefix = kiPluginPrefix
+            Purpose = purpose,
+            AiPluginPrefix = aiPluginPrefix
         };
 
-        var issueReferenz = CreateIssueReferenz(workItem.Id, issue);
-        issueReferenz.SourceKey = sourceKey;
-        workItem.IssueReference = issueReferenz;
+        var issueReference = CreateIssueReference(workItem.Id, issue);
+        issueReference.SourceKey = sourceKey;
+        workItem.IssueReference = issueReference;
 
         _db.WorkItems.Add(workItem);
 
@@ -359,7 +359,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
         ArgumentNullException.ThrowIfNull(pullRequest);
         ArgumentNullException.ThrowIfNull(repositoryContext);
 
-        if (pullRequest.Nummer <= 0)
+        if (pullRequest.Number <= 0)
             throw new InvalidOperationException("Der Pull Request besitzt keine gueltige Nummer.");
         if (string.IsNullOrWhiteSpace(pullRequest.BranchName))
             throw new InvalidOperationException("Der Pull Request besitzt keinen Quell-Branch.");
@@ -387,7 +387,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
             .AsNoTracking()
             .AnyAsync(p => p.Provider == provider
                            && p.RepositoryId == repositoryId
-                           && p.PullRequestNumber == pullRequest.Nummer,
+                           && p.PullRequestNumber == pullRequest.Number,
                 ct);
         if (alreadyLinked)
             throw new InvalidOperationException("Dieser Pull Request ist bereits einer Aufgabe zugeordnet.");
@@ -413,7 +413,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
             Provider = provider,
             Role = PullRequestReferenzRolle.ReviewSource,
             RepositoryId = repositoryId,
-            PullRequestNumber = pullRequest.Nummer,
+            PullRequestNumber = pullRequest.Number,
             ProviderPullRequestId = pullRequest.ProviderPullRequestId,
             Url = pullRequest.Url,
             Title = pullRequest.Title,
@@ -444,7 +444,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
                 .AsNoTracking()
                 .AnyAsync(p => p.Provider == provider
                                && p.RepositoryId == repositoryId
-                               && p.PullRequestNumber == pullRequest.Nummer,
+                               && p.PullRequestNumber == pullRequest.Number,
                     ct);
             if (concurrentlyLinked)
                 throw new InvalidOperationException("Dieser Pull Request ist bereits einer Aufgabe zugeordnet.", ex);
@@ -535,7 +535,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        workItem.IssueReference = CreateIssueReferenz(workItem.Id, createdIssue);
+        workItem.IssueReference = CreateIssueReference(workItem.Id, createdIssue);
         workItem.AlertReference = new AlertReference
         {
             Id = Guid.NewGuid(),
@@ -582,9 +582,9 @@ public sealed class WorkItemService : IActiveWorkItemsService
     /// <summary>Aktualisiert Titel, Beschreibung und KI-Plugin-Prefix einer Aufgabe.</summary>
     public async Task UpdateAsync(
         Guid id,
-        string titel,
+        string title,
         string? requirementDescription,
-        string? kiPluginPrefix = null,
+        string? aiPluginPrefix = null,
         CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} aktualisieren.", id);
@@ -592,16 +592,16 @@ public sealed class WorkItemService : IActiveWorkItemsService
         var workItem = await _db.WorkItems.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        workItem.Title = titel;
+        workItem.Title = title;
         workItem.RequirementDescription = requirementDescription;
-        workItem.AiPluginPrefix = kiPluginPrefix;
+        workItem.AiPluginPrefix = aiPluginPrefix;
 
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Aufgabe {AufgabeId} aktualisiert.", id);
     }
 
     /// <summary>Setzt die IssueReferenz einer Aufgabe. Übergabe von null entfernt die bestehende Referenz.</summary>
-    public async Task UpdateIssueReferenzAsync(Guid id, Issue? issue, CancellationToken ct = default)
+    public async Task UpdateIssueReferenceAsync(Guid id, Issue? issue, CancellationToken ct = default)
     {
         _logger.LogInformation("IssueReferenz für Aufgabe {AufgabeId} aktualisieren.", id);
 
@@ -620,7 +620,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
         {
             if (workItem.IssueReference != null)
             {
-                workItem.IssueReference.IssueNumber = issue.Nummer;
+                workItem.IssueReference.IssueNumber = issue.Number;
                 workItem.IssueReference.Title = issue.Title;
                 workItem.IssueReference.Body = issue.Body;
                 workItem.IssueReference.LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels);
@@ -629,19 +629,19 @@ public sealed class WorkItemService : IActiveWorkItemsService
             }
             else
             {
-                var neueReferenz = new IssueReference
+                var newReference = new IssueReference
                 {
                     Id = Guid.NewGuid(),
                     WorkItemId = workItem.Id,
-                    IssueNumber = issue.Nummer,
+                    IssueNumber = issue.Number,
                     Title = issue.Title,
                     Body = issue.Body,
                     LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels),
                     Milestone = issue.Milestone,
                     IssueUrl = issue.IssueUrl
                 };
-                workItem.IssueReference = neueReferenz;
-                _db.IssueReferences.Add(neueReferenz);
+                workItem.IssueReference = newReference;
+                _db.IssueReferences.Add(newReference);
             }
         }
 
@@ -654,15 +654,15 @@ public sealed class WorkItemService : IActiveWorkItemsService
     /// Weist einer Aufgabe eine IssueReferenz nur dann zu, wenn noch keine Referenz existiert.
     /// Gibt false zurück, wenn die Aufgabe bereits eine Referenz besitzt oder parallel eine Referenz gesetzt wurde.
     /// </summary>
-    public async Task<bool> TryAssignIssueReferenzIfNoneAsync(Guid id, Issue issue, CancellationToken ct = default)
-        => await TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(id, issue, false, null, ct);
+    public async Task<bool> TryAssignIssueReferenceIfNoneAsync(Guid id, Issue issue, CancellationToken ct = default)
+        => await TryAssignIssueReferenceAndUpdateDescriptionIfNoneAsync(id, issue, false, null, ct);
 
     /// <summary>
     /// Weist einer Aufgabe eine IssueReferenz nur dann zu, wenn noch keine Referenz existiert,
     /// und aktualisiert optional die Aufgabenbeschreibung im selben Speichervorgang.
     /// Gibt false zurück, wenn die Aufgabe bereits eine Referenz besitzt oder parallel eine Referenz gesetzt wurde.
     /// </summary>
-    public async Task<bool> TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(
+    public async Task<bool> TryAssignIssueReferenceAndUpdateDescriptionIfNoneAsync(
         Guid id,
         Issue issue,
         bool updateRequirementDescription,
@@ -673,10 +673,10 @@ public sealed class WorkItemService : IActiveWorkItemsService
 
         _logger.LogInformation("IssueReferenz für Aufgabe {AufgabeId} zuweisen, falls noch keine Referenz existiert.", id);
 
-        var aufgabeExists = await _db.WorkItems
+        var workItemExists = await _db.WorkItems
             .AsNoTracking()
             .AnyAsync(a => a.Id == id, ct);
-        if (!aufgabeExists)
+        if (!workItemExists)
         {
             throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
         }
@@ -694,7 +694,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
             workItem.RequirementDescription = requirementDescription;
         }
 
-        _db.IssueReferences.Add(CreateIssueReferenz(id, issue));
+        _db.IssueReferences.Add(CreateIssueReference(id, issue));
 
         try
         {
@@ -717,11 +717,11 @@ public sealed class WorkItemService : IActiveWorkItemsService
         }
     }
 
-    private static IssueReference CreateIssueReferenz(Guid workItemId, Issue issue) => new()
+    private static IssueReference CreateIssueReference(Guid workItemId, Issue issue) => new()
     {
         Id = Guid.NewGuid(),
         WorkItemId = workItemId,
-        IssueNumber = issue.Nummer,
+        IssueNumber = issue.Number,
         Title = issue.Title,
         Body = issue.Body,
         LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels),
@@ -794,7 +794,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
     }
 
     /// <summary>Startet eine Aufgabe: Status → Gestartet, Branch und Arbeitsverzeichnis setzen.</summary>
-    public async Task StartenAsync(Guid id, string branchName, string localClonePath, string? basisBranchName = null, CancellationToken ct = default)
+    public async Task StartAsync(Guid id, string branchName, string localClonePath, string? basisBranchName = null, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} starten (Branch: {BranchName}).", id, branchName);
 
@@ -919,7 +919,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
     }
 
     /// <summary>Schließt eine Aufgabe ab: Status → Beendet, AbschlussDatum setzen, Branch- und Klonpfad-Felder leeren.</summary>
-    public async Task AbschliessenAsync(Guid id, CancellationToken ct = default)
+    public async Task CompleteAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} abschließen.", id);
 
@@ -966,7 +966,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
     }
 
     /// <summary>Setzt den Status einer Aufgabe generisch (ohne Transitions-Validierung).</summary>
-    public async Task StatusSetzenAsync(Guid id, WorkItemStatus status, CancellationToken ct = default)
+    public async Task SetStatusUncheckedAsync(Guid id, WorkItemStatus status, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId}: Status auf {Status} setzen.", id, status);
 
@@ -980,7 +980,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
     }
 
     /// <summary>Setzt eine fehlgeschlagene Startvorbereitung vollständig auf den Neuzustand zurück.</summary>
-    public async Task StartZuruecksetzenAsync(Guid id, CancellationToken ct = default)
+    public async Task ResetStartAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId}: Start zurücksetzen.", id);
 
@@ -1014,22 +1014,22 @@ public sealed class WorkItemService : IActiveWorkItemsService
     /// Wird von <c>CliProcessManager</c> beim Start eines CLI-Prozesses aufgerufen.
     /// </summary>
     /// <param name="id">ID der Aufgabe.</param>
-    /// <param name="laufId">Eindeutige ID des aktiven Laufs.</param>
+    /// <param name="runId">Eindeutige ID des aktiven Laufs.</param>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    /// <param name="laeuftGuard">
+    /// <param name="runningGuard">
     /// Optionaler Guard, der innerhalb der serialisierten Schreibphase (siehe <c>LaufGates</c>)
     /// ausgewertet wird: liefert er <c>false</c> (z. B. weil der Prozess zwischen dem Ereignis und dem
     /// Eintritt in die Sperre bereits beendet wurde), wird nichts geschrieben — so kann kein
     /// Phantom-Lauf nach einem bereits erfolgten <see cref="EndActiveRunAsync"/> wiederbelebt
     /// werden (Issue 342, TOCTOU).
     /// </param>
-    public async Task SetActiveRunAsync(Guid id, string laufId, CancellationToken ct = default, Func<bool>? laeuftGuard = null)
+    public async Task SetActiveRunAsync(Guid id, string runId, CancellationToken ct = default, Func<bool>? runningGuard = null)
     {
         var gate = RunGates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(ct);
         try
         {
-            if (laeuftGuard?.Invoke() == false)
+            if (runningGuard?.Invoke() == false)
             {
                 _logger.LogDebug(
                     "Setzen des aktiven Laufs für Aufgabe {AufgabeId} übersprungen (Prozess nicht mehr aktiv).",
@@ -1047,7 +1047,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
             }
 
             workItem.ExecutionStatus = WorkItemExecutionStatus.Active;
-            workItem.ActiveRunId = laufId;
+            workItem.ActiveRunId = runId;
             workItem.LastHeartbeatUtc = now;
             workItem.LastCliStartUtc = now;
             // LaufStatus startet mit Laeuft (Standardwert von PseudoConsoleSession.RuntimeStatus beim Start),
@@ -1106,9 +1106,9 @@ public sealed class WorkItemService : IActiveWorkItemsService
     /// Heartbeat-Tick, periodischer Abgleich) aufgerufen.
     /// </summary>
     /// <param name="id">ID der Aufgabe.</param>
-    /// <param name="laufStatusProvider">
+    /// <param name="runStatusProvider">
     /// Optionaler Provider für den Laufzeit-Substatus (Live-Status der Session); wird — ebenso wie
-    /// <paramref name="laeuftGuard"/> — erst innerhalb der serialisierten Schreibphase ausgewertet,
+    /// <paramref name="runningGuard"/> — erst innerhalb der serialisierten Schreibphase ausgewertet,
     /// damit beim Schreiben der frischeste Session-Stand gilt und nicht ein vor dem Sperreintritt
     /// gelesener, möglicherweise veralteter Wert als letzter Schreiber landet (Issue 342,
     /// Stale-Write). Liefert er <c>null</c> (oder fehlt er), wird bei neu angelegtem Lauf
@@ -1116,21 +1116,21 @@ public sealed class WorkItemService : IActiveWorkItemsService
     /// verändert.
     /// </param>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    /// <param name="laeuftGuard">
+    /// <param name="runningGuard">
     /// Optionaler Guard, der innerhalb der serialisierten Schreibphase (siehe <c>LaufGates</c>)
     /// ausgewertet wird: liefert er <c>false</c> (z. B. weil der Prozess zwischen dem Aufruf-Check
     /// und dem Eintritt in die Sperre bereits beendet wurde), wird nichts geschrieben — so kann kein
     /// Phantom-Lauf nach einem bereits erfolgten <see cref="EndActiveRunAsync"/> wiederbelebt
     /// werden (Issue 342, TOCTOU). Aufrufer aus den Selbstheilungspfaden übergeben
-    /// <c>KiAusfuehrungsService.IsRunning</c>.
+    /// <c>AiExecutionService.IsRunning</c>.
     /// </param>
-    public async Task EnsureActiveRunAsync(Guid id, Func<WorkItemRunStatus?>? laufStatusProvider = null, CancellationToken ct = default, Func<bool>? laeuftGuard = null)
+    public async Task EnsureActiveRunAsync(Guid id, Func<WorkItemRunStatus?>? runStatusProvider = null, CancellationToken ct = default, Func<bool>? runningGuard = null)
     {
         var gate = RunGates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(ct);
         try
         {
-            if (laeuftGuard?.Invoke() == false)
+            if (runningGuard?.Invoke() == false)
             {
                 _logger.LogDebug(
                     "Laufdaten-Sicherstellung für Aufgabe {AufgabeId} übersprungen (Prozess nicht mehr aktiv).",
@@ -1138,7 +1138,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
                 return;
             }
 
-            var runStatus = laufStatusProvider?.Invoke();
+            var runStatus = runStatusProvider?.Invoke();
 
             var workItem = await _db.WorkItems.FindAsync([id], ct)
                 ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
@@ -1198,7 +1198,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
     /// <summary>Gibt alle aktiven Aufgaben (Status Gestartet oder Wartend) zurück, sortiert nach letztem CLI-Start.</summary>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
     /// <returns>Die aktiven Aufgaben, absteigend nach letztem CLI-Start sortiert (maximal 20).</returns>
-    public async Task<List<WorkItem>> GetAktiveAufgabenAsync(CancellationToken ct = default)
+    public async Task<List<WorkItem>> GetActiveWorkItemsAsync(CancellationToken ct = default)
     {
         return await _db.WorkItems
             .AsNoTracking()

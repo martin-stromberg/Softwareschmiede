@@ -148,13 +148,13 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
 
     private static Laufzustand ErstelleLaufzustand(string branchName)
     {
-        var jetzt = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.UtcNow;
         return new Laufzustand(
             "lauf-1",
             branchName,
-            jetzt.AddHours(2).ToUnixTimeMilliseconds(),
-            jetzt.AddMinutes(-1).ToUnixTimeMilliseconds(),
-            jetzt.AddMinutes(-5).ToUnixTimeMilliseconds(),
+            now.AddHours(2).ToUnixTimeMilliseconds(),
+            now.AddMinutes(-1).ToUnixTimeMilliseconds(),
+            now.AddMinutes(-5).ToUnixTimeMilliseconds(),
             "Laeuft");
     }
 
@@ -205,13 +205,13 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
         return id;
     }
 
-    private static async Task ErstelleEinstellungAsync(DatabaseFixture db, string schluessel, string wert)
+    private static async Task ErstelleEinstellungAsync(DatabaseFixture db, string schluessel, string value)
         => await ExecuteNonQueryAsync(
             db,
             "INSERT INTO AppEinstellungen (Id, Schluessel, Wert, AktualisiertAm) VALUES ($id, $schluessel, $wert, $aktualisiert);",
             ("$id", NeueId()),
             ("$schluessel", schluessel),
-            ("$wert", wert),
+            ("$wert", value),
             ("$aktualisiert", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
 
     private static async Task<bool> EinstellungExistiertAsync(DatabaseFixture db, string schluessel)
@@ -240,14 +240,14 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
 
     private static async Task<object?> LeseSpalteAsync(DatabaseFixture db, string workItemId, string column)
     {
-        var wert = await ExecuteScalarAsync(db, $"SELECT [{column}] FROM Aufgaben WHERE Id = $id;", ("$id", workItemId));
-        return wert is DBNull ? null : wert;
+        var value = await ExecuteScalarAsync(db, $"SELECT [{column}] FROM Aufgaben WHERE Id = $id;", ("$id", workItemId));
+        return value is DBNull ? null : value;
     }
 
     private static async Task FuegeKonfigurationMitKindzeilenEinAsync(DatabaseFixture db, string workItemId)
     {
         var konfigurationId = NeueId();
-        var jetzt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         await ExecuteNonQueryAsync(
             db,
@@ -273,7 +273,7 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
             """,
             ("$id", NeueId()),
             ("$konfigurationId", konfigurationId),
-            ("$jetzt", jetzt));
+            ("$jetzt", now));
 
         await ExecuteNonQueryAsync(
             db,
@@ -284,7 +284,7 @@ public sealed class RemoveAutonomAufgabeModelsMigrationTests
             """,
             ("$id", NeueId()),
             ("$konfigurationId", konfigurationId),
-            ("$jetzt", jetzt));
+            ("$jetzt", now));
 
         (await ZaehleZeilenAsync(db, "AutonomAufgabeKonfigurationen")).Should().BeGreaterThan(0, "Vorbedingung: Konfigurationszeile angelegt");
     }

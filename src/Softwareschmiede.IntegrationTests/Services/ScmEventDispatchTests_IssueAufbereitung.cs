@@ -153,7 +153,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
         fixture.ConfigureIssue();
-        var (_, eventId) = await AddAufbereitungAsync(fixture, kiPluginPrefix: null);
+        var (_, eventId) = await AddAufbereitungAsync(fixture, aiPluginPrefix: null);
 
         await fixture.DispatchAsync(eventId);
 
@@ -175,7 +175,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         await EnableAsync(fixture);
         await fixture.SetSettingAsync(AppSettingService.ScmIssuePreparationPluginKey, "custom.auf");
         fixture.ConfigureIssue();
-        var (_, eventId) = await AddAufbereitungAsync(fixture, kiPluginPrefix: null);
+        var (_, eventId) = await AddAufbereitungAsync(fixture, aiPluginPrefix: null);
 
         await fixture.DispatchAsync(eventId);
 
@@ -345,7 +345,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
     /// <summary>Legt die Schritt-5-Artefakte direkt an: Zweck-markierte Aufgabe mit
     /// IssueReferenz und internem, sofort fälligem Aufbereitungsereignis.</summary>
     private static async Task<(Guid TaskId, Guid EventId)> AddAufbereitungAsync(ScmDispatchFixture fixture,
-        string? kiPluginPrefix, bool issuePreparationEnabled = true)
+        string? aiPluginPrefix, bool issuePreparationEnabled = true)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
@@ -367,9 +367,9 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
             ProjectId = project.Id,
             GitRepositoryId = repository.Id,
             Purpose = ScmIssuePreparationService.Purpose,
-            AiPluginPrefix = kiPluginPrefix
+            AiPluginPrefix = aiPluginPrefix
         };
-        var referenz = new IssueReference
+        var reference = new IssueReference
         {
             Id = Guid.NewGuid(),
             WorkItemId = task.Id,
@@ -392,7 +392,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
             Purpose = ScmIssuePreparationService.Purpose,
             Reason = "Interner Aufbereitungsauftrag für Issue #9."
         };
-        db.AddRange(project, repository, task, referenz, item);
+        db.AddRange(project, repository, task, reference, item);
         await db.SaveChangesAsync();
         return (task.Id, item.Id);
     }

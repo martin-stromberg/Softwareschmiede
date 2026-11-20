@@ -6,14 +6,14 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Gemeinsame Hilfsmethode zum Klonen eines Git-Repositories, sofern das Zielverzeichnis noch nicht existiert oder leer ist.</summary>
 internal static class GitCloneHelper
 {
-    /// <summary>Klont <paramref name="quellPfad"/> nach <paramref name="targetPath"/> (optional auf einen bestimmten Branch), sofern das Zielverzeichnis nicht bereits einen Klon enthält.</summary>
+    /// <summary>Klont <paramref name="sourcePath"/> nach <paramref name="targetPath"/> (optional auf einen bestimmten Branch), sofern das Zielverzeichnis nicht bereits einen Klon enthält.</summary>
     public static async Task CloneIfMissingAsync(
         ICliRunner cliRunner,
-        string quellPfad,
+        string sourcePath,
         string targetPath,
         string? branch,
         ILogger logger,
-        string fehlerKontext,
+        string errorContext,
         CancellationToken ct)
     {
         if (Directory.Exists(targetPath) && Directory.EnumerateFileSystemEntries(targetPath).Any())
@@ -28,14 +28,14 @@ internal static class GitCloneHelper
             Directory.CreateDirectory(targetParentPath);
         }
 
-        string[] argumente = branch is null
-            ? ["clone", quellPfad, targetPath]
-            : ["clone", "--branch", branch, quellPfad, targetPath];
+        string[] arguments = branch is null
+            ? ["clone", sourcePath, targetPath]
+            : ["clone", "--branch", branch, sourcePath, targetPath];
 
-        var result = await cliRunner.RunAsync("git", argumente, null, null, ct);
+        var result = await cliRunner.RunAsync("git", arguments, null, null, ct);
         if (!result.IsSuccess)
         {
-            throw new InvalidOperationException($"{fehlerKontext}: {result.StdErr}");
+            throw new InvalidOperationException($"{errorContext}: {result.StdErr}");
         }
     }
 }

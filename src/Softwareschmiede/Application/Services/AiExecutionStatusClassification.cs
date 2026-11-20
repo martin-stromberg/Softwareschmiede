@@ -16,10 +16,10 @@ public static class AiExecutionStatusClassification
     /// als nicht pausiert.
     /// </summary>
     /// <param name="pausedUntilUtc">UTC-Pausenende der Aufgabe (<see cref="Domain.Entities.WorkItem.PausedUntilUtc"/>).</param>
-    /// <param name="jetzt">Der als „jetzt" zu verwendende Zeitpunkt in UTC.</param>
+    /// <param name="now">Der als „jetzt" zu verwendende Zeitpunkt in UTC.</param>
     /// <returns><c>true</c>, wenn die Aufgabe aktuell pausiert ist, sonst <c>false</c>.</returns>
-    public static bool IsCurrentlyPaused(this DateTimeOffset? pausedUntilUtc, DateTimeOffset jetzt)
-        => pausedUntilUtc > jetzt;
+    public static bool IsCurrentlyPaused(this DateTimeOffset? pausedUntilUtc, DateTimeOffset now)
+        => pausedUntilUtc > now;
 
     /// <summary>
     /// Klassifiziert die in <paramref name="status"/> gebündelten Aufgabendaten in einen
@@ -35,10 +35,10 @@ public static class AiExecutionStatusClassification
 
         // Der Pausiert-Zweig steht bewusst vor allen übrigen Anzeigen: Eine aktive Pause überlagert
         // den Laufzeitstatus (die Kachel zeigt den Countdown statt "Läuft"/"Prompt in Wartestellung").
-        var jetzt = DateTimeOffset.UtcNow;
-        if (status.PausedUntilUtc is { } pausedUntil && status.PausedUntilUtc.IsCurrentlyPaused(jetzt))
+        var now = DateTimeOffset.UtcNow;
+        if (status.PausedUntilUtc is { } pausedUntil && status.PausedUntilUtc.IsCurrentlyPaused(now))
         {
-            pauseRemaining = pausedUntil - jetzt;
+            pauseRemaining = pausedUntil - now;
             return AiExecutionState.Paused;
         }
 
@@ -51,9 +51,9 @@ public static class AiExecutionStatusClassification
         // Live-Substatus vor der Auswertung der persistierten Laufdaten immer auf Laeuft/Wartet
         // durch — niemals auf Bereit (Issue 342: Fußzeile und Kachel speisen sich aus getrennten
         // Quellen, die ohne diesen Zweig divergieren können).
-        if (status.LiveLaufStatus is { } liveLaufStatus)
+        if (status.LiveRunStatus is { } liveRunStatus)
         {
-            return liveLaufStatus == WorkItemRunStatus.WaitingForInput
+            return liveRunStatus == WorkItemRunStatus.WaitingForInput
                 ? AiExecutionState.Waiting
                 : AiExecutionState.Running;
         }
@@ -63,7 +63,7 @@ public static class AiExecutionStatusClassification
             return AiExecutionState.Ready;
         }
 
-        if (WorkItemRunActivity.IstAktiv(status.ActiveRunId, status.LastHeartbeatUtc, jetzt))
+        if (WorkItemRunActivity.IstAktiv(status.ActiveRunId, status.LastHeartbeatUtc, now))
         {
             // LaufStatus bildet den Laufzeit-Substatus der CLI ab (siehe PseudoConsoleSession.RuntimeStatus,
             // persistiert über CliProcessManager/AufgabeService.AktivenLaufSicherstellenAsync). Ohne diesen

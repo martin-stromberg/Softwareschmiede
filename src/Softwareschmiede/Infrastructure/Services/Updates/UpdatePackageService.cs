@@ -103,7 +103,7 @@ public sealed class UpdatePackageService : IUpdatePackageService
         IProgress<UpdatePreparationProgress>? progress,
         CancellationToken ct)
     {
-        var response = await SendWithFallbackAsync(update.PaketDownload, "Update-Download", ct);
+        var response = await SendWithFallbackAsync(update.PackageDownload, "Update-Download", ct);
         using (response)
         {
             response.EnsureSuccessStatusCode();

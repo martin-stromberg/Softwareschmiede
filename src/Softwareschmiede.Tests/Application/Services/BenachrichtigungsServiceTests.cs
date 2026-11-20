@@ -64,8 +64,8 @@ public sealed class BenachrichtigungsServiceTests
     [Theory]
     [InlineData(NotificationChannel.Banner)]
     [InlineData(NotificationChannel.Sound)]
-    public void EachBenachrichtigungsKanal_ShouldBeDefinedInEnum(NotificationChannel kanal)
+    public void EachBenachrichtigungsKanal_ShouldBeDefinedInEnum(NotificationChannel channel)
     {
-        Enum.IsDefined(kanal).Should().BeTrue();
+        Enum.IsDefined(channel).Should().BeTrue();
     }
 }

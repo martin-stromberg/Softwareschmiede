@@ -12,7 +12,7 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 public sealed class RecoveryServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly ProjectService _projektService;
     private readonly Guid _projektId;
 
@@ -20,7 +20,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
     public RecoveryServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
 
         var project = _projektService.CreateAsync("Recovery-Projekt", null).GetAwaiter().GetResult();
@@ -40,9 +40,9 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
+        var candidates = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
-        kandidaten.Should().Contain(workItem.Id);
+        candidates.Should().Contain(workItem.Id);
     }
 
     /// <summary><summary>ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat.</summary>.</summary>
@@ -55,9 +55,9 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
+        var candidates = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
-        kandidaten.Should().NotContain(workItem.Id);
+        candidates.Should().NotContain(workItem.Id);
     }
 
     /// <summary><summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend.</summary>.</summary>
@@ -70,9 +70,9 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         var running = new E2EFakeRunningStatusSource(false);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
+        var candidates = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
-        kandidaten.Should().Contain(workItem.Id);
+        candidates.Should().Contain(workItem.Id);
     }
 
     /// <summary><summary>ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben.</summary>.</summary>
@@ -85,9 +85,9 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         var running = new E2EFakeRunningStatusSource(isRunning: true);
         var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
+        var candidates = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
-        kandidaten.Should().NotContain(workItem.Id);
+        candidates.Should().NotContain(workItem.Id);
     }
 
     /// <summary><summary>RecoverManuellAsync_Setzt_StatusAufGestartet.</summary>.</summary>

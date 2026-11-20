@@ -17,7 +17,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     private static readonly TimeSpan SicherheitsTickIntervall = TimeSpan.FromSeconds(5);
 
     private readonly IRunningAutomationStatusSource _runningAutomationStatusSource;
-    private readonly WorkItemRunDataChangedNotifier _laufdatenChangedNotifier;
+    private readonly WorkItemRunDataChangedNotifier _runDataChangedNotifier;
     private readonly IRunningAutomationsCount _count;
     private readonly ISystemShutdownService _systemShutdownService;
     private readonly TimeProvider _timeProvider;
@@ -38,21 +38,21 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     /// <summary>Erstellt eine neue Instanz von <see cref="AutoShutdownOrchestrator"/>.</summary>
     public AutoShutdownOrchestrator(
         IRunningAutomationStatusSource runningAutomationStatusSource,
-        WorkItemRunDataChangedNotifier laufdatenChangedNotifier,
+        WorkItemRunDataChangedNotifier runDataChangedNotifier,
         IRunningAutomationsCount count,
         ISystemShutdownService systemShutdownService,
         TimeProvider timeProvider,
         ILogger<AutoShutdownOrchestrator> logger)
     {
         _runningAutomationStatusSource = runningAutomationStatusSource;
-        _laufdatenChangedNotifier = laufdatenChangedNotifier;
+        _runDataChangedNotifier = runDataChangedNotifier;
         _count = count;
         _systemShutdownService = systemShutdownService;
         _timeProvider = timeProvider;
         _logger = logger;
 
         _countdownTimer = _timeProvider.CreateTimer(
-            _ => OnCountdownAbgelaufenAsync().SafeFireAndForget(_logger, "AutoShutdownOrchestrator.OnCountdownAbgelaufenAsync"),
+            _ => OnCountdownElapsedAsync().SafeFireAndForget(_logger, "AutoShutdownOrchestrator.OnCountdownAbgelaufenAsync"),
             null,
             Timeout.InfiniteTimeSpan,
             Timeout.InfiniteTimeSpan);
@@ -63,14 +63,14 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
             Timeout.InfiniteTimeSpan);
 
         _runningAutomationStatusSource.RunningCountChanged += OnRunningCountChanged;
-        _laufdatenChangedNotifier.LaufdatenChanged += OnLaufdatenChanged;
+        _runDataChangedNotifier.RunDataChanged += OnRunDataChanged;
     }
 
     /// <inheritdoc/>
-    public event Action? ZustandGeaendert;
+    public event Action? StateChanged;
 
     /// <inheritdoc/>
-    public DateTimeOffset? CountdownEndeUtc
+    public DateTimeOffset? CountdownEndUtc
     {
         get
         {
@@ -82,7 +82,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     }
 
     /// <inheritdoc/>
-    public bool IstAktiviert
+    public bool IsEnabled
     {
         get
         {
@@ -128,19 +128,19 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
 
         if (geaendert)
         {
-            ZustandGeaendert?.Invoke();
+            StateChanged?.Invoke();
         }
 
         if (enabled)
         {
-            TriggerEvaluierung();
+            TriggerEvaluation();
         }
     }
 
     /// <inheritdoc/>
-    public void SetOptionen(int toleranceMinutes, bool force)
+    public void SetOptions(int toleranceMinutes, bool force)
     {
-        var zustandGeaendert = false;
+        var stateChanged = false;
         var newTolerance = Math.Max(0, toleranceMinutes);
 
         lock (_syncLock)
@@ -153,7 +153,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
             if (_toleranceMinutes != newTolerance)
             {
                 _toleranceMinutes = newTolerance;
-                zustandGeaendert = true;
+                stateChanged = true;
 
                 if (_countdownEndeUtc is not null)
                 {
@@ -166,26 +166,26 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
             if (_erzwingen != force)
             {
                 _erzwingen = force;
-                zustandGeaendert = true;
+                stateChanged = true;
             }
         }
 
-        if (zustandGeaendert)
+        if (stateChanged)
         {
-            ZustandGeaendert?.Invoke();
+            StateChanged?.Invoke();
         }
     }
 
     private void OnRunningCountChanged(int previousCount, int currentCount)
-        => TriggerEvaluierung();
+        => TriggerEvaluation();
 
-    private void OnLaufdatenChanged(Guid workItemId)
-        => TriggerEvaluierung();
+    private void OnRunDataChanged(Guid workItemId)
+        => TriggerEvaluation();
 
     private void OnSicherheitsTick()
-        => TriggerEvaluierung();
+        => TriggerEvaluation();
 
-    private void TriggerEvaluierung()
+    private void TriggerEvaluation()
         => EvaluiereAsync().SafeFireAndForget(_logger, "AutoShutdownOrchestrator.EvaluiereAsync");
 
     /// <summary>
@@ -271,7 +271,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
             return;
         }
 
-        var zustandGeaendert = false;
+        var stateChanged = false;
         lock (_syncLock)
         {
             // Eine zum Dispose-Zeitpunkt in-flight befindliche Auswertung darf nach
@@ -289,7 +289,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
                 {
                     _countdownEndeUtc = null;
                     _countdownTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-                    zustandGeaendert = true;
+                    stateChanged = true;
                 }
             }
             else if (_enabled && !_shutdownAusgeloest && _countdownEndeUtc is null)
@@ -297,13 +297,13 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
                 var end = _timeProvider.GetUtcNow() + TimeSpan.FromMinutes(_toleranceMinutes);
                 _countdownEndeUtc = end;
                 ArmiereCountdownTimerUnterLock(end);
-                zustandGeaendert = true;
+                stateChanged = true;
             }
         }
 
-        if (zustandGeaendert)
+        if (stateChanged)
         {
-            ZustandGeaendert?.Invoke();
+            StateChanged?.Invoke();
         }
     }
 
@@ -317,7 +317,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     /// Countdown-Ende: Final-Recheck — ist der Auto-Shutdown noch aktiviert und die fachliche
     /// Anzahl weiterhin 0, wird der Shutdown einmalig angefordert; sonst erneute Auswertung.
     /// </summary>
-    private async Task OnCountdownAbgelaufenAsync()
+    private async Task OnCountdownElapsedAsync()
     {
         try
         {
@@ -338,7 +338,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
                     _countdownEndeUtc = null;
                 }
 
-                ZustandGeaendert?.Invoke();
+                StateChanged?.Invoke();
                 await EvaluiereAsync();
                 return;
             }
@@ -361,7 +361,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
                 return;
             }
 
-            ZustandGeaendert?.Invoke();
+            StateChanged?.Invoke();
 
             bool force;
             lock (_syncLock)
@@ -388,7 +388,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
                     _shutdownAusgeloest = false;
                 }
 
-                ZustandGeaendert?.Invoke();
+                StateChanged?.Invoke();
                 await EvaluiereAsync();
             }
         }
@@ -412,7 +412,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
         }
 
         _runningAutomationStatusSource.RunningCountChanged -= OnRunningCountChanged;
-        _laufdatenChangedNotifier.LaufdatenChanged -= OnLaufdatenChanged;
+        _runDataChangedNotifier.RunDataChanged -= OnRunDataChanged;
         _countdownTimer.Dispose();
         _sicherheitsTimer.Dispose();
     }

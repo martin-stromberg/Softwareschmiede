@@ -112,7 +112,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Schreibgeschützter Anzeigetext des aus der Pfad-Auswahl resultierenden exklusiven Update-Kanals.</summary>
     public string AbgeleiteterUpdateKanal
-        => UpdatePathChannelResolver.ErmittleKanal(SelectedUpdatePfad?.Path) == UpdateChannel.ReleaseCandidate
+        => UpdatePathChannelResolver.ResolveChannel(SelectedUpdatePfad?.Path) == UpdateChannel.ReleaseCandidate
             ? UpdatePfadTexte.KanalReleaseCandidate
             : UpdatePfadTexte.KanalProduktiv;
 
@@ -650,17 +650,17 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             // Die öffentlichen Setter benachrichtigen die abgeleiteten Anzeige-Properties
             // (Sichtbarkeit, Enabled, Panel-Status) — nach „Verwerfen“ bleibt die UI sonst
             // auf dem Stand der verworfenen Auswahl.
-            SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(await _settingService.GetScmBackmergeModusAsync(ct));
+            SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(await _settingService.GetScmBackmergeModeAsync(ct));
             SelectedKontoModus = ScmKontoModusOption.FuerModus(await _settingService.GetScmAccountModeAsync(ct));
             SelectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(
                 await _settingService.GetScmTaskCompletionCheckModeAsync(ct));
-            IsScmBackmergeDraftAktivierung = await _settingService.GetScmBackmergeDraftAktivierungAsync(ct);
+            IsScmBackmergeDraftAktivierung = await _settingService.GetScmBackmergeDraftActivationAsync(ct);
             IsScmBackmergeAdminMerge = await _settingService.GetScmBackmergeAdminMergeAsync(ct);
 
             var updateSettings = await _settingService.GetUpdateSettingsAsync(ct);
             _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Mode);
             OnPropertyChanged(nameof(SelectedUpdateMode));
-            SelectedUpdatePfad = UpdatePfadOption.FuerPfad(updateSettings.UpdatePfad);
+            SelectedUpdatePfad = UpdatePfadOption.FuerPfad(updateSettings.UpdatePath);
         }
         catch (OperationCanceledException)
         {
@@ -774,10 +774,10 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 ct);
             foreach (var repositoryEntry in IssueAufbereitungRepositories)
                 await _projektService.SetIssuePreparationEnabledAsync(repositoryEntry.Repository.Id, repositoryEntry.IsSelected, ct);
-            await _settingService.SetScmBackmergeModusAsync(backmergeModus, ct);
+            await _settingService.SetScmBackmergeModeAsync(backmergeModus, ct);
             await _settingService.SetScmAccountModeAsync(accountMode, ct);
             await _settingService.SetScmTaskCompletionCheckModeAsync(checkMode, ct);
-            await _settingService.SetScmBackmergeDraftAktivierungAsync(IsScmBackmergeDraftAktivierung, ct);
+            await _settingService.SetScmBackmergeDraftActivationAsync(IsScmBackmergeDraftAktivierung, ct);
             await _settingService.SetScmBackmergeAdminMergeAsync(IsScmBackmergeAdminMerge, ct);
             await _settingService.SetSettingAsync(
                 AppSettingService.ScmPromptAppendGeneralKey,
@@ -994,10 +994,10 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             {
                 if (ReferenceEquals(entry.Field, HostParallelLimitField))
                 {
-                    var wert = NullWennLeer(entry.Value.Trim());
+                    var value = NullWennLeer(entry.Value.Trim());
                     await _settingService.SetSettingAsync(
-                        ScmEventExecutionLimitService.PluginLimitKey(plugin.PluginPrefix), wert, ct);
-                    _kiPluginParallelLimits[plugin.PluginPrefix] = wert;
+                        ScmEventExecutionLimitService.PluginLimitKey(plugin.PluginPrefix), value, ct);
+                    _kiPluginParallelLimits[plugin.PluginPrefix] = value;
                     continue;
                 }
                 _pluginSettingsService.SetValue(plugin, entry.Field, entry.Value);
@@ -1067,9 +1067,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     /// <summary>Das globale Parallel-Limit ist entweder leer (unbegrenzt) oder eine Ganzzahl ≥ 1.</summary>
     private bool ValidiereMaxParalleleAusfuehrungen()
     {
-        var wert = MaxParalleleAusfuehrungen?.Trim();
-        if (!string.IsNullOrEmpty(wert)
-            && (!int.TryParse(wert, System.Globalization.NumberStyles.Integer,
+        var value = MaxParalleleAusfuehrungen?.Trim();
+        if (!string.IsNullOrEmpty(value)
+            && (!int.TryParse(value, System.Globalization.NumberStyles.Integer,
                     System.Globalization.CultureInfo.InvariantCulture, out var limit) || limit < 1))
         {
             FehlerMeldung = "Das globale Limit paralleler CLI-Ausführungen muss leer (unbegrenzt) oder eine Ganzzahl größer oder gleich 1 sein.";
@@ -1080,7 +1080,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Leere oder nur aus Leerraum bestehende Prompt-Anhänge werden nicht gespeichert (leer = nichts anhängen).</summary>
-    private static string? NullWennLeer(string? wert) => string.IsNullOrWhiteSpace(wert) ? null : wert;
+    private static string? NullWennLeer(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     /// <summary>Das Trigger-Keyword darf nicht leer sein; der Dienst fällt sonst auf den Standard
     /// zurück. Das Feld ist nur wirksam, wenn es auch sichtbar ist (aktive Überwachung im

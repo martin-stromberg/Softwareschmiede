@@ -9,7 +9,7 @@ public interface ICliExecutionLimitSource
 {
     /// <summary>Gibt die Aufgaben-IDs mit aktuell laufendem CLI-Prozess-Handle zurück.</summary>
     /// <returns>Aufgaben-IDs laufender CLI-Ausführungen (höchstens ein Eintrag je Aufgabe).</returns>
-    IReadOnlyCollection<Guid> GetLaufendeAufgabenIds();
+    IReadOnlyCollection<Guid> GetRunningWorkItemIds();
 
     /// <summary>Gibt die für eine Aufgabe registrierte SCM-Promptsitzung zurück, sofern vorhanden.</summary>
     /// <param name="workItemId">Aufgaben-ID.</param>

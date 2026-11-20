@@ -42,12 +42,12 @@ public sealed class TerminalReplaySessionTests
         var beendet = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         replay.Exited += (_, _) => beendet.TrySetResult();
 
-        replay.WiedergabeStarten();
+        replay.StartPlayback();
         await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         BufferAlsText(replay.Buffer).Should().Be(liveText,
             "die Wiedergabe derselben Roh-Chunks muss denselben Bufferzustand wie die Live-Session ergeben");
-        replay.AktuellerChunkIndex.Should().Be(chunks.Length);
+        replay.CurrentChunkIndex.Should().Be(chunks.Length);
     }
 
     /// <summary>Wiedergabe hält die realen Chunk-Pausen ein (über den TimeProvider) — mit
@@ -69,18 +69,18 @@ public sealed class TerminalReplaySessionTests
         var beendet = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         session.Exited += (_, _) => beendet.TrySetResult();
 
-        session.WiedergabeStarten();
-        await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
+        session.StartPlayback();
+        await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
 
         // 30 s reale Pause sind durch die 50-ms-Schwelle verkürzt: nach 40 ms noch kein zweiter Chunk.
         timeProvider.Advance(TimeSpan.FromMilliseconds(40));
         await Task.Delay(150, TestContext.Current.CancellationToken);
-        session.AktuellerChunkIndex.Should().Be(1);
+        session.CurrentChunkIndex.Should().Be(1);
 
         // Großzügiger Advance deckt auch einen erst nach dem ersten Advance angelegten Delay-Timer ab.
         timeProvider.Advance(TimeSpan.FromSeconds(30));
         await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        session.AktuellerChunkIndex.Should().Be(2);
+        session.CurrentChunkIndex.Should().Be(2);
     }
 
     /// <summary><see cref="TerminalReplaySession.Pause"/> hält die Wiedergabe vor dem nächsten
@@ -97,8 +97,8 @@ public sealed class TerminalReplaySessionTests
         var beendet = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         session.Exited += (_, _) => beendet.TrySetResult();
 
-        session.WiedergabeStarten();
-        await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
+        session.StartPlayback();
+        await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
 
         session.Pause();
         session.IsPaused.Should().BeTrue();
@@ -108,7 +108,7 @@ public sealed class TerminalReplaySessionTests
         // unabhängig davon, ob die Schleife bereits im Delay oder noch am Pause-Gate parkt.
         timeProvider.Advance(TimeSpan.FromMinutes(1));
         await Task.Delay(150, TestContext.Current.CancellationToken);
-        session.AktuellerChunkIndex.Should().Be(1,
+        session.CurrentChunkIndex.Should().Be(1,
             "während der Pausierung darf kein weiterer Chunk angewendet werden");
 
         session.Resume();
@@ -120,7 +120,7 @@ public sealed class TerminalReplaySessionTests
             timeProvider.Advance(TimeSpan.FromMinutes(1));
             return beendet.Task.IsCompleted;
         });
-        session.AktuellerChunkIndex.Should().Be(2);
+        session.CurrentChunkIndex.Should().Be(2);
     }
 
     /// <summary><see cref="TerminalReplaySession.RebuildBufferFromReplay"/> baut den Buffer aus den
@@ -134,8 +134,8 @@ public sealed class TerminalReplaySessionTests
             TimeSpan.FromHours(1));
         using var session = new TerminalReplaySession(recording, timeProvider);
 
-        session.WiedergabeStarten();
-        await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
+        session.StartPlayback();
+        await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
 
         // Explizit zerstören und neu aufbauen: nur der bereits gespielte Chunk darf erscheinen.
         session.Buffer.Reset();
@@ -147,7 +147,7 @@ public sealed class TerminalReplaySessionTests
     }
 
     /// <summary>Am Ende der Aufzeichnung feuert <see cref="ITerminalSession.Exited"/> mit
-    /// <c>ExitCode = null</c> und der RuntimeStatus kehrt zu <see cref="CliRuntimeStatus.Inaktiv"/> zurück.</summary>
+    /// <c>ExitCode = null</c> und der RuntimeStatus kehrt zu <see cref="CliRuntimeStatus.Inactive"/> zurück.</summary>
     [Fact]
     public async Task Wiedergabe_AmEnde_FeuertExitedUndWechseltAufInaktiv()
     {
@@ -157,14 +157,14 @@ public sealed class TerminalReplaySessionTests
         var exitedArgs = new TaskCompletionSource<TerminalSessionExitedEventArgs>(TaskCreationOptions.RunContinuationsAsynchronously);
         session.Exited += (_, e) => exitedArgs.TrySetResult(e);
 
-        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inaktiv, "vor der Wiedergabe ist die Session inaktiv");
-        session.WiedergabeStarten();
+        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inactive, "vor der Wiedergabe ist die Session inaktiv");
+        session.StartPlayback();
         session.RuntimeStatus.Should().Be(CliRuntimeStatus.Running);
 
         var args = await exitedArgs.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         args.ExitCode.Should().BeNull("die Replay-Session hat keinen echten Prozess-Exit-Code");
         session.ExitCode.Should().BeNull();
-        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inaktiv, "nach der Wiedergabe ist die Session wieder inaktiv");
+        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inactive, "nach der Wiedergabe ist die Session wieder inaktiv");
     }
 
     /// <summary><see cref="ITerminalSession.OutputChunk"/> liefert die Rohbytes der Aufzeichnung
@@ -182,7 +182,7 @@ public sealed class TerminalReplaySessionTests
         session.OutputChunk += (_, e) => receive.Add(e.Data.ToArray());
         session.Exited += (_, _) => beendet.TrySetResult();
 
-        session.WiedergabeStarten();
+        session.StartPlayback();
         await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         receive.Should().HaveCount(2);
@@ -226,7 +226,7 @@ public sealed class TerminalReplaySessionTests
         session.RebuildBufferFromReplay(); // darf auf leerem gespieltem Präfix nicht werfen
     }
 
-    /// <summary><see cref="TerminalReplaySession.WiedergabeStarten"/> ist idempotent: ein zweiter
+    /// <summary><see cref="TerminalReplaySession.StartPlayback"/> ist idempotent: ein zweiter
     /// Aufruf startet keinen zweiten Durchlauf.</summary>
     [Fact]
     public async Task WiedergabeStarten_ZweiterAufruf_IstNoOp()
@@ -242,8 +242,8 @@ public sealed class TerminalReplaySessionTests
             beendet.TrySetResult();
         };
 
-        session.WiedergabeStarten();
-        session.WiedergabeStarten();
+        session.StartPlayback();
+        session.StartPlayback();
         await beendet.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await Task.Delay(100, TestContext.Current.CancellationToken);
 
@@ -263,14 +263,14 @@ public sealed class TerminalReplaySessionTests
         var exited = false;
         session.Exited += (_, _) => exited = true;
 
-        session.WiedergabeStarten();
-        await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
+        session.StartPlayback();
+        await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
         session.Dispose();
         timeProvider.Advance(TimeSpan.FromHours(2));
         await Task.Delay(150, TestContext.Current.CancellationToken);
 
         exited.Should().BeFalse("nach Dispose darf kein Exited mehr gefeuert werden");
-        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inaktiv);
+        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inactive);
     }
 
     /// <summary>Nach <see cref="TerminalReplaySession.Dispose"/> darf die Wiedergabe-Schleife bei
@@ -307,7 +307,7 @@ public sealed class TerminalReplaySessionTests
 
         try
         {
-            session.WiedergabeStarten();
+            session.StartPlayback();
             ersterChunkErreicht.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).Should().BeTrue(
                 "die Wiedergabe-Schleife muss den ersten Chunk erreicht haben");
             session.Dispose();
@@ -321,7 +321,7 @@ public sealed class TerminalReplaySessionTests
         }
 
         await Task.Delay(200, TestContext.Current.CancellationToken);
-        session.AktuellerChunkIndex.Should().BeLessThan(chunkCount,
+        session.CurrentChunkIndex.Should().BeLessThan(chunkCount,
             "nach dem Abbruch dürfen die restlichen Chunks nicht mehr angewendet werden");
     }
 
@@ -338,13 +338,13 @@ public sealed class TerminalReplaySessionTests
         using var session = new TerminalReplaySession(recording, timeProvider);
 
         session.StepForward().Should().BeTrue();
-        session.AktuellerChunkIndex.Should().Be(1);
+        session.CurrentChunkIndex.Should().Be(1);
         ZeilenText(session.Buffer, 0).TrimEnd().Should().Be("A");
 
         session.StepForward().Should().BeTrue();
-        session.AktuellerChunkIndex.Should().Be(2);
+        session.CurrentChunkIndex.Should().Be(2);
         ZeilenText(session.Buffer, 0).TrimEnd().Should().Be("AB");
-        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inaktiv,
+        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inactive,
             "reines Schreiten ohne gestartete Wiedergabe bleibt inaktiv");
     }
 
@@ -396,7 +396,7 @@ public sealed class TerminalReplaySessionTests
 
         exitedCount.Should().Be(1);
         exitedArgs[0].ExitCode.Should().BeNull();
-        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inaktiv);
+        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inactive);
 
         session.StepForward().Should().BeFalse("am Ende ist der Vorwärtsschritt ein No-Op");
         session.StepForward().Should().BeFalse();
@@ -413,11 +413,11 @@ public sealed class TerminalReplaySessionTests
         var chunk2 = Encoding.UTF8.GetBytes("\x1b[2J\x1b[H");
         var recording = CreateAufzeichnung([chunk1, chunk2], TimeSpan.Zero);
         using var session = new TerminalReplaySession(recording, new FakeTimeProvider());
-        using var referenz = new TerminalReplaySession(recording, new FakeTimeProvider());
+        using var reference = new TerminalReplaySession(recording, new FakeTimeProvider());
         var outputCount = 0;
         session.OutputChunk += (_, _) => outputCount++;
 
-        referenz.StepForward();
+        reference.StepForward();
         session.StepForward();
         session.StepForward();
         ZeilenText(session.Buffer, 0).TrimEnd().Should().BeEmpty(
@@ -425,8 +425,8 @@ public sealed class TerminalReplaySessionTests
 
         session.StepBackward().Should().BeTrue();
 
-        session.AktuellerChunkIndex.Should().Be(1);
-        BufferAlsText(session.Buffer).Should().Be(BufferAlsText(referenz.Buffer),
+        session.CurrentChunkIndex.Should().Be(1);
+        BufferAlsText(session.Buffer).Should().Be(BufferAlsText(reference.Buffer),
             "der Rebuild aus dem Präfix muss denselben Buffer ergeben wie ein Schritt-Lauf bis dahin");
         ZeilenText(session.Buffer, 0).TrimEnd().Should().Be("TEXT",
             "die Bildschirm-Löschung des zurückgenommenen Chunks darf keine Restwirkung haben");
@@ -444,10 +444,10 @@ public sealed class TerminalReplaySessionTests
         var chunk2 = Encoding.UTF8.GetBytes("mROT");
         var recording = CreateAufzeichnung([chunk1, chunk2], TimeSpan.Zero);
         using var session = new TerminalReplaySession(recording, new FakeTimeProvider());
-        using var referenz = new TerminalReplaySession(recording, new FakeTimeProvider());
+        using var reference = new TerminalReplaySession(recording, new FakeTimeProvider());
 
-        referenz.StepForward();
-        referenz.StepForward();
+        reference.StepForward();
+        reference.StepForward();
 
         session.StepForward();
         session.StepForward();
@@ -456,7 +456,7 @@ public sealed class TerminalReplaySessionTests
 
         ZeilenText(session.Buffer, 0).TrimEnd().Should().Be("ROT",
             "nach dem Rebuild muss der Parser die geteilte Sequenz korrekt fortsetzen");
-        BufferAlsText(session.Buffer).Should().Be(BufferAlsText(referenz.Buffer));
+        BufferAlsText(session.Buffer).Should().Be(BufferAlsText(reference.Buffer));
     }
 
     /// <summary><see cref="TerminalReplaySession.StepBackward"/> an Position 0 ist ein No-Op:
@@ -472,7 +472,7 @@ public sealed class TerminalReplaySessionTests
         session.StepBackward().Should().BeFalse();
 
         bufferChangedCount.Should().Be(0);
-        session.AktuellerChunkIndex.Should().Be(0);
+        session.CurrentChunkIndex.Should().Be(0);
         ZeilenText(session.Buffer, 0).TrimEnd().Should().BeEmpty();
     }
 
@@ -493,22 +493,22 @@ public sealed class TerminalReplaySessionTests
         session.OutputChunk += (_, e) => receive.Add(e.Data.ToArray());
         session.Exited += (_, _) => beendet.TrySetResult();
 
-        session.WiedergabeStarten();
-        await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
+        session.StartPlayback();
+        await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
         // Der Schleife Zeit geben, im Delay des zweiten Chunks zu parken (30 s auf der
         // Fake-Zeit) — danach ist der Parkpunkt deterministisch.
         await Task.Delay(150, TestContext.Current.CancellationToken);
 
         session.Pause();
         session.StepBackward().Should().BeTrue();
-        session.AktuellerChunkIndex.Should().Be(0);
+        session.CurrentChunkIndex.Should().Be(0);
 
         session.Resume();
         // Der bereits angelegte Delay der alten Position läuft erst noch ab — danach erkennt
         // der Positions-Re-Check den Rückwärtsschritt und die Iteration beginnt neu: Chunk A
         // (Offset 0) wird ohne weiteres Delay erneut angewendet.
         timeProvider.Advance(TimeSpan.FromSeconds(30));
-        await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
+        await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
         receive.Should().HaveCount(2);
         receive[0].Should().Equal(chunkA);
         receive[1].Should().Equal(chunkA, "der zurückgenommene Chunk wird erneut angewendet");
@@ -518,7 +518,7 @@ public sealed class TerminalReplaySessionTests
         await WarteBisAsync(() =>
         {
             timeProvider.Advance(TimeSpan.FromSeconds(30));
-            return session.AktuellerChunkIndex >= 2;
+            return session.CurrentChunkIndex >= 2;
         });
         await WarteBisAsync(() =>
         {
@@ -529,7 +529,7 @@ public sealed class TerminalReplaySessionTests
         receive.Should().HaveCount(4);
         receive[2].Should().Equal(chunkB);
         receive[3].Should().Equal(chunkC);
-        session.AktuellerChunkIndex.Should().Be(3);
+        session.CurrentChunkIndex.Should().Be(3);
     }
 
     /// <summary>Erreicht <see cref="TerminalReplaySession.StepForward"/> bei einer pausiert parkenden
@@ -549,12 +549,12 @@ public sealed class TerminalReplaySessionTests
         // Vor dem Start pausieren: die Schleife parkt dadurch deterministisch am Pause-Gate
         // (Position 0, kein anhängiger Delay) — kein Raten des Parkpunkts nötig.
         session.Pause();
-        session.WiedergabeStarten();
+        session.StartPlayback();
         session.RuntimeStatus.Should().Be(CliRuntimeStatus.Running);
 
         session.StepForward().Should().BeTrue();
         session.StepForward().Should().BeTrue();
-        session.AktuellerChunkIndex.Should().Be(2);
+        session.CurrentChunkIndex.Should().Be(2);
         await WarteBisAsync(() => exitedCount == 1);
 
         // Die vom Ende-Schritt geweckte Schleife sieht Position == Count und terminiert ohne
@@ -566,7 +566,7 @@ public sealed class TerminalReplaySessionTests
         // Rückwärtsschritt + erneutes Starten: ein neuer Durchlauf setzt an der
         // Schrittposition fort und feuert am Ende erneut Exited.
         session.StepBackward().Should().BeTrue();
-        session.WiedergabeStarten();
+        session.StartPlayback();
         session.RuntimeStatus.Should().Be(CliRuntimeStatus.Running,
             "die terminierte Schleife muss das Lauf-Flag freigegeben haben");
         // Der Delay der neuen Schleife wird erst nach dem Task-Start angelegt — wiederholte
@@ -576,7 +576,7 @@ public sealed class TerminalReplaySessionTests
             timeProvider.Advance(TimeSpan.FromSeconds(60));
             return exitedCount == 2;
         });
-        session.AktuellerChunkIndex.Should().Be(2);
+        session.CurrentChunkIndex.Should().Be(2);
     }
 
     /// <summary>Race-Schutz: erreicht <see cref="TerminalReplaySession.StepForward"/> das Ende,
@@ -607,11 +607,11 @@ public sealed class TerminalReplaySessionTests
 
         // Vor dem Start pausieren: die Schleife parkt deterministisch am Pause-Gate.
         session.Pause();
-        session.WiedergabeStarten();
+        session.StartPlayback();
 
         session.StepForward().Should().BeTrue();
         session.StepForward().Should().BeTrue();
-        session.AktuellerChunkIndex.Should().Be(1,
+        session.CurrentChunkIndex.Should().Be(1,
             "der Rückwärtsschritt im Exited-Handler hat den letzten Chunk zurückgenommen");
         exitedCount.Should().Be(1);
 
@@ -623,14 +623,14 @@ public sealed class TerminalReplaySessionTests
         // Auch nach großzügigem Zeitsprung darf nichts mehr angewendet oder signalisiert werden.
         timeProvider.Advance(TimeSpan.FromMinutes(5));
         await Task.Delay(150, TestContext.Current.CancellationToken);
-        session.AktuellerChunkIndex.Should().Be(1,
+        session.CurrentChunkIndex.Should().Be(1,
             "die terminierte Schleife darf keine Chunks mehr anwenden");
         receive.Should().HaveCount(2, "nur die beiden Schritt-Chunks wurden angewendet");
         exitedCount.Should().Be(1, "eine Geister-Wiedergabe würde am Ende erneut Exited feuern");
     }
 
     /// <summary>Nach einem beendeten Durchlauf und einem Rückwärtsschritt startet
-    /// <see cref="TerminalReplaySession.WiedergabeStarten"/> eine neue Schleife, die nur die
+    /// <see cref="TerminalReplaySession.StartPlayback"/> eine neue Schleife, die nur die
     /// fehlenden Chunks ab der Schrittposition anwendet und erneut Exited feuert.</summary>
     [Fact]
     public async Task WiedergabeStarten_NachEndeUndSchrittZurueck_SetztAnPositionFort()
@@ -649,25 +649,25 @@ public sealed class TerminalReplaySessionTests
         session.OutputChunk += (_, e) => receive.Add(e.Data.ToArray());
         session.Exited += (_, _) => Interlocked.Increment(ref exitedCount);
 
-        session.WiedergabeStarten();
+        session.StartPlayback();
         await WarteBisAsync(() => exitedCount == 1);
-        session.AktuellerChunkIndex.Should().Be(3);
+        session.CurrentChunkIndex.Should().Be(3);
         // Das Lauf-Flag wird erst im finally der Schleife freigegeben — der Task-Abschluss
         // ist der deterministische Wartepunkt für die Re-Armierung.
         await GetPlaybackTask(session)!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         session.StepBackward().Should().BeTrue();
-        session.AktuellerChunkIndex.Should().Be(2);
+        session.CurrentChunkIndex.Should().Be(2);
 
-        session.WiedergabeStarten();
+        session.StartPlayback();
         await WarteBisAsync(() => exitedCount == 2);
 
-        session.AktuellerChunkIndex.Should().Be(3);
+        session.CurrentChunkIndex.Should().Be(3);
         receive.Should().HaveCount(4, "nur der fehlende letzte Chunk wird erneut angewendet");
         receive[3].Should().Equal(chunkC);
     }
 
-    /// <summary>Rest-Race-Regression: trifft <see cref="TerminalReplaySession.WiedergabeStarten"/>
+    /// <summary>Rest-Race-Regression: trifft <see cref="TerminalReplaySession.StartPlayback"/>
     /// auf eine noch lebende, aber vom SchrittVor-Endpfad zum Abbruch verurteilte Schleife (CAS
     /// schlägt fehl, Terminations-Flag gesetzt), darf der Aufruf nicht wirkungslos returnen —
     /// die sterbende Schleife feuert bei Position &lt; Count kein Exited und der Aufrufer bliebe
@@ -687,8 +687,8 @@ public sealed class TerminalReplaySessionTests
         var exitedCount = 0;
         session.Exited += (_, _) => Interlocked.Increment(ref exitedCount);
 
-        session.WiedergabeStarten();
-        await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
+        session.StartPlayback();
+        await WarteBisAsync(() => session.CurrentChunkIndex >= 1);
         // Der Schleife Zeit geben, im 30-s-Fake-Delay des zweiten Chunks zu parken — bis zum
         // nächsten Advance kann sie das Terminations-Flag nicht lesen (Delays sind nicht
         // ge-gatet; das Fenster entspricht dem realen bis zur ZeitrafferSchwelle).
@@ -701,11 +701,11 @@ public sealed class TerminalReplaySessionTests
         session.StepForward().Should().BeTrue();
         await WarteBisAsync(() => exitedCount == 1);
         session.StepBackward().Should().BeTrue();
-        session.AktuellerChunkIndex.Should().Be(2);
+        session.CurrentChunkIndex.Should().Be(2);
 
         // „Abspielen": die Schleife schläft noch im Fake-Delay — der CAS schlägt garantiert
         // fehl. Ohne Widerruf/Neustart stürbe die Schleife beim nächsten Advance lautlos.
-        session.WiedergabeStarten();
+        session.StartPlayback();
         await WarteBisAsync(() => session.RuntimeStatus == CliRuntimeStatus.Running);
 
         // Nach Zeitsprüngen muss die Wiedergabe an der Schrittposition fortsetzen — über die
@@ -716,8 +716,8 @@ public sealed class TerminalReplaySessionTests
             timeProvider.Advance(TimeSpan.FromSeconds(30));
             return exitedCount == 2;
         });
-        session.AktuellerChunkIndex.Should().Be(3);
-        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inaktiv);
+        session.CurrentChunkIndex.Should().Be(3);
+        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inactive);
     }
 
     /// <summary>Nach <see cref="TerminalReplaySession.Dispose"/> sind beide Schritt-Methoden
@@ -741,7 +741,7 @@ public sealed class TerminalReplaySessionTests
 
         session.StepForward().Should().BeFalse();
         session.StepBackward().Should().BeFalse();
-        session.AktuellerChunkIndex.Should().Be(1);
+        session.CurrentChunkIndex.Should().Be(1);
         events.Should().Be(0, "nach Dispose dürfen keine Events mehr feuern");
     }
 
@@ -788,7 +788,7 @@ public sealed class TerminalReplaySessionTests
     /// <summary>Bewusster Trade-off: koppelt die Tests an das private Feld
     /// <c>_playbackTask</c> (bricht bei Umbenennung ohne Funktionsänderung). Öffentliches
     /// Verhalten bietet hier keinen gleichwertigen Wartepunkt — <c>Exited</c> feuert vor
-    /// der Lauf-Flag-Freigabe im <c>finally</c>, und ein poller-<see cref="TerminalReplaySession.WiedergabeStarten"/>
+    /// der Lauf-Flag-Freigabe im <c>finally</c>, und ein poller-<see cref="TerminalReplaySession.StartPlayback"/>
     /// kann erst durchgreifen, wenn die alte Schleife wirklich terminiert ist; davor darf
     /// die Position nicht verändert werden, sonst setzt die alte Schleife selbst an der
     /// Schrittposition fort statt zu enden. Der Task-Abschluss ist der einzige

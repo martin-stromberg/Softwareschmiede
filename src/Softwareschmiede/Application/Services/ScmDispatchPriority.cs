@@ -47,12 +47,12 @@ public static class ScmDispatchPriority
 
     /// <summary>Ordnet einen Batch von Ereignissen in die Dispatch-Reihenfolge.</summary>
     /// <param name="items">Kandidaten-Ereignisse des Batches.</param>
-    /// <param name="aufgabenZustaende">Zustand je Aufgaben-ID (fehlende Einträge werden wie unbekannt behandelt).</param>
+    /// <param name="workItemStates">Zustand je Aufgaben-ID (fehlende Einträge werden wie unbekannt behandelt).</param>
     /// <returns>Priorisiert geordnete Liste (stabil nach <see cref="EventSelection.Sequence"/>).</returns>
     public static IReadOnlyList<EventSelection> OrderForDispatch(IReadOnlyList<EventSelection> items,
-        IReadOnlyDictionary<Guid, WorkItemState> aufgabenZustaende)
+        IReadOnlyDictionary<Guid, WorkItemState> workItemStates)
         => items.Select(x => (Item: x, Class: PriorityClass(x,
-                    aufgabenZustaende.TryGetValue(x.WorkItemId, out var z) ? z : null)))
+                    workItemStates.TryGetValue(x.WorkItemId, out var z) ? z : null)))
             .OrderBy(t => t.Class)
             .ThenBy(t => t.Class == 2 ? t.Item.NextAttemptUtc ?? long.MaxValue : 0)
             .ThenBy(t => t.Item.Sequence)

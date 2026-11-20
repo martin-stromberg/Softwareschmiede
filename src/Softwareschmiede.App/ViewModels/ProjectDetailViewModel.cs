@@ -19,7 +19,7 @@ namespace Softwareschmiede.App.ViewModels;
 public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 {
     private readonly ProjectService _projektService;
-    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemService _workItemService;
     private readonly IServiceProvider _serviceProvider;
     private readonly IDialogService _dialogService;
     private readonly IPluginManager _pluginManager;
@@ -352,7 +352,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <inheritdoc cref="ProjectDetailViewModel"/>
     public ProjectDetailViewModel(
         ProjectService projektService,
-        WorkItemService aufgabeService,
+        WorkItemService workItemService,
         IServiceProvider serviceProvider,
         IDialogService dialogService,
         IPluginManager pluginManager,
@@ -360,7 +360,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         DirectoryStructureBrowserService? directoryStructureService = null)
     {
         _projektService = projektService;
-        _aufgabeService = aufgabeService;
+        _workItemService = workItemService;
         _serviceProvider = serviceProvider;
         _dialogService = dialogService;
         _pluginManager = pluginManager;
@@ -405,7 +405,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         try
         {
             Project = await _projektService.GetDetailAsync(_projektId, ct);
-            var workItems = await _aufgabeService.GetByProjektAsync(_projektId, ct);
+            var workItems = await _workItemService.GetByProjektAsync(_projektId, ct);
             WorkItems.Clear();
             foreach (var workItem in workItems)
                 WorkItems.Add(workItem);
@@ -424,8 +424,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             {
                 using var einstellungenScope = _serviceProvider.CreateScope();
                 var settings = einstellungenScope.ServiceProvider.GetRequiredService<AppSettingService>();
-                _isBackmergeModusProjektbezogen = await settings.GetScmBackmergeModusAsync(ct) == ScmBackmergeMode.ProjectScoped;
-                _isBackmergeAutoMergeEnabled = await settings.GetBackmergeProjektAktivAsync(_projektId, ct);
+                _isBackmergeModusProjektbezogen = await settings.GetScmBackmergeModeAsync(ct) == ScmBackmergeMode.ProjectScoped;
+                _isBackmergeAutoMergeEnabled = await settings.GetBackmergeProjectEnabledAsync(_projektId, ct);
             }
             catch (OperationCanceledException)
             {
@@ -462,7 +462,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var workItem = await _aufgabeService.CreateAsync(
+            var workItem = await _workItemService.CreateAsync(
                 _projektId,
                 "Neue Aufgabe",
                 string.Empty,
@@ -740,14 +740,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Persistiert die projektbezogene Backmerge-Freigabe sofort beim Umschalten der Option.</summary>
-    private async Task SpeichereBackmergeAktivAsync(bool aktiv)
+    private async Task SpeichereBackmergeAktivAsync(bool active)
     {
         if (_projektId == Guid.Empty)
             return;
 
         using var scope = _serviceProvider.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AppSettingService>()
-            .SetBackmergeProjektAktivAsync(_projektId, aktiv, CancellationToken.None);
+            .SetBackmergeProjectEnabledAsync(_projektId, active, CancellationToken.None);
     }
 
     private void CancelSourceBranchEdit()
@@ -865,7 +865,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
     private async Task ReloadAufgabenListAsync()
     {
-        var aktualisiert = await _aufgabeService.GetByIdAsync(_aktuelleAufgabeId);
+        var aktualisiert = await _workItemService.GetByIdAsync(_aktuelleAufgabeId);
         if (aktualisiert is null)
             return;
 
@@ -950,7 +950,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             var issues = await gitPlugin.GetIssuesAsync(repository.RepositoryUrl, ct);
             foreach (var issue in issues)
             {
-                if (!bereitsKonvertierteNummern.Contains(issue.Nummer))
+                if (!bereitsKonvertierteNummern.Contains(issue.Number))
                 {
                     IssueVorschlaege.Add(issue);
                     OffeneAnforderungen.Add(ScmRequirement.FromIssue(issue, repositoryContext));
@@ -964,10 +964,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 if (!PullRequestRepositoryId.TryNormalize(pullRequest.Provider, repositoryId, out var normalizedRepositoryId))
                     continue;
 
-                var alreadyLinked = await _aufgabeService.IsPullRequestLinkedAsync(
+                var alreadyLinked = await _workItemService.IsPullRequestLinkedAsync(
                     pullRequest.Provider,
                     normalizedRepositoryId,
-                    pullRequest.Nummer,
+                    pullRequest.Number,
                     ct);
                 if (!alreadyLinked)
                 {
@@ -1037,7 +1037,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var workItem = await _aufgabeService.CreateFromPullRequestAsync(
+            var workItem = await _workItemService.CreateFromPullRequestAsync(
                 _projektId,
                 pullRequest,
                 repositoryContext,
@@ -1046,7 +1046,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             var zuEntfernen = OffeneAnforderungen.FirstOrDefault(a =>
                 a.Kind == ScmRequirementKind.PullRequest
                 && a.PullRequest?.Provider == pullRequest.Provider
-                && a.PullRequest?.Nummer == pullRequest.Nummer
+                && a.PullRequest?.Number == pullRequest.Number
                 && string.Equals(a.RepositoryContext?.RepositoryId, repositoryContext.RepositoryId, StringComparison.OrdinalIgnoreCase));
             if (zuEntfernen != null)
                 OffeneAnforderungen.Remove(zuEntfernen);
@@ -1061,7 +1061,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Pull Request #{PullRequestNumber}.", pullRequest.Nummer);
+            _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Pull Request #{PullRequestNumber}.", pullRequest.Number);
             SetFehler(ex);
         }
     }
@@ -1078,16 +1078,16 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var workItem = await _aufgabeService.CreateFromIssueAsync(
+            var workItem = await _workItemService.CreateFromIssueAsync(
                 _projektId,
                 issue,
                 _selectedRepository?.Id,
                 ct);
 
-            var zuEntfernen = IssueVorschlaege.FirstOrDefault(i => i.Nummer == issue.Nummer);
+            var zuEntfernen = IssueVorschlaege.FirstOrDefault(i => i.Number == issue.Number);
             if (zuEntfernen != null)
                 IssueVorschlaege.Remove(zuEntfernen);
-            var requirement = OffeneAnforderungen.FirstOrDefault(a => a.Kind == ScmRequirementKind.Issue && a.Issue?.Nummer == issue.Nummer);
+            var requirement = OffeneAnforderungen.FirstOrDefault(a => a.Kind == ScmRequirementKind.Issue && a.Issue?.Number == issue.Number);
             if (requirement != null)
                 OffeneAnforderungen.Remove(requirement);
 
@@ -1100,7 +1100,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Issue #{IssueNummer}.", issue.Nummer);
+            _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Issue #{IssueNummer}.", issue.Number);
             SetFehler(ex);
         }
     }
@@ -1124,7 +1124,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             if (!konvertierungRegistriert)
                 return;
 
-            var existing = await _aufgabeService.GetByAlertSourceKeyAsync(alert.SourceKey, ct);
+            var existing = await _workItemService.GetByAlertSourceKeyAsync(alert.SourceKey, ct);
             if (existing != null)
             {
                 EntferneOffeneAnforderung(alert.SourceKey);
@@ -1156,7 +1156,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            var workItem = await _aufgabeService.CreateFromAlertAsync(
+            var workItem = await _workItemService.CreateFromAlertAsync(
                 _projektId,
                 alert,
                 createdIssueResult.Issue,

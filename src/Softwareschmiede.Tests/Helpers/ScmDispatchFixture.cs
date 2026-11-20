@@ -206,13 +206,13 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
 
     internal async Task<(Guid TaskId, Guid EventId)> AddAsync(WorkItemStatus status = WorkItemStatus.New, bool configured = false, bool cloned = true,
         ScmReferenceKind referenceKind = ScmReferenceKind.Issue, ScmContentKind contentKind = ScmContentKind.IssueComment, string body = "$Softwareschmiede test",
-        ScmEventRepository? eventRepository = null, string? authorId = "U_1", string? authorLogin = "owner", string? kiPluginPrefix = null)
+        ScmEventRepository? eventRepository = null, string? authorId = "U_1", string? authorLogin = "owner", string? aiPluginPrefix = null)
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var project = new Project { Id = Guid.NewGuid(), Name = "SCM" };
         var repository = new GitRepository { Id = Guid.NewGuid(), ProjectId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginType = Repository.ProviderPrefix, RepositoryName = "repo" };
-        var task = new WorkItem { Id = Guid.NewGuid(), Title = "SCM task", ProjectId = project.Id, GitRepositoryId = repository.Id, Status = status, AiPluginPrefix = configured ? (kiPluginPrefix ?? KiProfile.Prefix) : null };
+        var task = new WorkItem { Id = Guid.NewGuid(), Title = "SCM task", ProjectId = project.Id, GitRepositoryId = repository.Id, Status = status, AiPluginPrefix = configured ? (aiPluginPrefix ?? KiProfile.Prefix) : null };
         if (cloned) { task.LocalClonePath = Path.Combine(Root, task.Id.ToString("N")); InitGit(task.LocalClonePath); }
         db.AddRange(project, repository, task);
         await db.SaveChangesAsync();
@@ -270,10 +270,10 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     }
 
     /// <summary>Schreibt eine generische Anwendungseinstellung (z. B. Ausführungslimits).</summary>
-    internal async Task SetSettingAsync(string schluessel, string? wert)
+    internal async Task SetSettingAsync(string schluessel, string? value)
     {
         using var scope = Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppSettingService>().SetSettingAsync(schluessel, wert);
+        await scope.ServiceProvider.GetRequiredService<AppSettingService>().SetSettingAsync(schluessel, value);
     }
 
     /// <summary>Der Singleton-Prozessverwalter der Fixture (für Start/Stop-Prüfungen).</summary>

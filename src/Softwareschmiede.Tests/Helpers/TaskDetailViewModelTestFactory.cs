@@ -16,9 +16,9 @@ public static class TaskDetailViewModelTestFactory
 {
     /// <summary>Erstellt ein TaskDetailViewModel mit Mock-Abhängigkeiten und dem übergebenen DbContext/AufgabeService.</summary>
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
-    /// <param name="aufgabeService">Der zu verwendende AufgabeService.</param>
+    /// <param name="workItemService">Der zu verwendende AufgabeService.</param>
     /// <returns>Ein vollständig konfiguriertes TaskDetailViewModel.</returns>
-    public static TaskDetailViewModel Create(SoftwareschmiedeDbContext db, WorkItemService aufgabeService)
+    public static TaskDetailViewModel Create(SoftwareschmiedeDbContext db, WorkItemService workItemService)
     {
         var dialogServiceMock = new Mock<IDialogService>();
         dialogServiceMock
@@ -37,16 +37,16 @@ public static class TaskDetailViewModelTestFactory
         var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
         var promptVorlagenService = new PromptTemplateService(db, NullLogger<PromptTemplateService>.Instance);
         var promptVorlagenPlatzhalterService = new PromptTemplatePlaceholderService();
-        var promptZeitVersandService = new PromptScheduleDispatchService(kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+        var promptScheduleDispatchService = new PromptScheduleDispatchService(kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
         var entwicklungsprozessService = new DevelopmentProcessService(
-            aufgabeService,
+            workItemService,
             logService,
             gitPluginMock.Object,
             pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            new DevelopmentProcessServiceOptions(AiExecutionService: kiService, PromptScheduleDispatchService: promptZeitVersandService),
+            new DevelopmentProcessServiceOptions(AiExecutionService: kiService, PromptScheduleDispatchService: promptScheduleDispatchService),
             NullLogger<DevelopmentProcessService>.Instance);
 
         var serviceProviderMock = new Mock<IServiceProvider>();
@@ -57,14 +57,14 @@ public static class TaskDetailViewModelTestFactory
         var arbeitsverzeichnisOeffnenService = CreateArbeitsverzeichnisOeffnenService();
 
         return new TaskDetailViewModel(
-            aufgabeService,
+            workItemService,
             logService,
             kiService,
             entwicklungsprozessService,
             pluginSelectionService,
             promptVorlagenService,
             promptVorlagenPlatzhalterService,
-            promptZeitVersandService,
+            promptScheduleDispatchService,
             dialogServiceMock.Object,
             pluginManagerMock.Object,
             serviceProviderMock.Object,

@@ -204,7 +204,7 @@ public sealed class ScmEventMonitoringService(
                             && localRepositories.TryGetValue(reference.Repository, out var preparationRepositories))
                         {
                             await batchScope.ServiceProvider.GetRequiredService<ScmIssuePreparationService>()
-                                .ErkennenUndEinreihenAsync(source, reference, batch, preparationRepositories, ct);
+                                .DetectAndEnqueueAsync(source, reference, batch, preparationRepositories, ct);
                         }
                         await batchScope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(
                             workItemId, sourceKey, batch, unassigned, triggerKeyword, delayKeyword, ct);

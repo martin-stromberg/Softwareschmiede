@@ -21,27 +21,27 @@ public sealed class AiPluginLimitService
 
     private readonly SoftwareschmiedeDbContext _db;
     private readonly AppSettingService _appSettingService;
-    private readonly WorkItemRunDataChangedNotifier _laufdatenChangedNotifier;
+    private readonly WorkItemRunDataChangedNotifier _runDataChangedNotifier;
     private readonly ILogger<AiPluginLimitService> _logger;
     private readonly ScmStartCheckTrigger? _startCheckTrigger;
 
     /// <inheritdoc cref="AiPluginLimitService"/>
     /// <param name="db">Datenbankkontext.</param>
     /// <param name="appSettingService">Dienst für Anwendungseinstellungen.</param>
-    /// <param name="laufdatenChangedNotifier">Benachrichtigt über geänderte Laufdaten.</param>
+    /// <param name="runDataChangedNotifier">Benachrichtigt über geänderte Laufdaten.</param>
     /// <param name="logger">Logger.</param>
     /// <param name="startCheckTrigger">Optionaler Auslöser der SCM-Startprüfung;
     /// wird benachrichtigt, wenn das Session-Limit Aufgaben pausiert.</param>
     public AiPluginLimitService(
         SoftwareschmiedeDbContext db,
         AppSettingService appSettingService,
-        WorkItemRunDataChangedNotifier laufdatenChangedNotifier,
+        WorkItemRunDataChangedNotifier runDataChangedNotifier,
         ILogger<AiPluginLimitService> logger,
         ScmStartCheckTrigger? startCheckTrigger = null)
     {
         _db = db;
         _appSettingService = appSettingService;
-        _laufdatenChangedNotifier = laufdatenChangedNotifier;
+        _runDataChangedNotifier = runDataChangedNotifier;
         _logger = logger;
         _startCheckTrigger = startCheckTrigger;
     }
@@ -88,13 +88,13 @@ public sealed class AiPluginLimitService
             return;
         }
 
-        var kandidaten = await _db.WorkItems
+        var candidates = await _db.WorkItems
             .Where(a => WorkItemStatusExtensions.ActiveOrWaitingStatuses.Contains(a.Status)
                 && a.ExecutionStatus == WorkItemExecutionStatus.Active
                 && a.AiPluginPrefix != null)
             .ToListAsync(ct);
 
-        var betroffene = kandidaten
+        var betroffene = candidates
             .Where(a => string.Equals(a.AiPluginPrefix, prefix, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
@@ -111,8 +111,8 @@ public sealed class AiPluginLimitService
         {
             // Max-Semantik: Eine manuell gesetzte, später endende Pause darf durch einen
             // früheren Session-Limit-Reset nicht verkürzt werden.
-            var effektiv = workItem.PausedUntilUtc is { } vorhanden && vorhanden > resetUtcNormalized
-                ? vorhanden
+            var effektiv = workItem.PausedUntilUtc is { } existing && existing > resetUtcNormalized
+                ? existing
                 : resetUtcNormalized;
             workItem.PausedUntilUtc = effektiv;
             _db.LogEntries.Add(new LogEntry
@@ -135,7 +135,7 @@ public sealed class AiPluginLimitService
 
         foreach (var workItem in betroffene)
         {
-            _laufdatenChangedNotifier.NotifyLaufdatenChanged(workItem.Id);
+            _runDataChangedNotifier.NotifyRunDataChanged(workItem.Id);
         }
 
         // Pausen-Setzpfad der SCM-Startprüfung: Die Prüfung bewertet Priorisierung/Freigabe
@@ -169,9 +169,9 @@ public sealed class AiPluginLimitService
         var settings = await _appSettingService.GetSettingsAsync(keys, ct);
         var now = DateTimeOffset.UtcNow;
 
-        foreach (var (schluessel, wert) in settings)
+        foreach (var (schluessel, value) in settings)
         {
-            if (TryParseLimitWert(wert, now, out var limit))
+            if (TryParseLimitValue(value, now, out var limit))
             {
                 result[schluessel[SessionLimitKeyPrefix.Length..]] = limit;
             }
@@ -180,12 +180,12 @@ public sealed class AiPluginLimitService
         return result;
     }
 
-    private static bool TryParseLimitWert(string? wert, DateTimeOffset now, out DateTimeOffset limit)
+    private static bool TryParseLimitValue(string? value, DateTimeOffset now, out DateTimeOffset limit)
     {
         limit = default;
-        if (string.IsNullOrWhiteSpace(wert)
+        if (string.IsNullOrWhiteSpace(value)
             || !DateTimeOffset.TryParse(
-                wert,
+                value,
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
                 out var parsed)

@@ -33,7 +33,7 @@ public sealed class AufgabenListenModusBindung
     /// <c>null</c> deaktiviert die Persistenz.
     /// </param>
     /// <param name="logger">Logger für die Fire-and-Forget-Kontexte.</param>
-    /// <param name="logKontext">Kontextpräfix für die Fire-and-Forget-Protokollierung (z. B. "Aufgabenlisten-Modus").</param>
+    /// <param name="logContext">Kontextpräfix für die Fire-and-Forget-Protokollierung (z. B. "Aufgabenlisten-Modus").</param>
     /// <param name="dispatch">
     /// Optionaler Dispatcher für die Wiederherstellung (z. B. UI-Thread des Hauptfensters);
     /// <c>null</c> führt die Wiederherstellung direkt auf dem Fortsetzungskontext aus.
@@ -42,13 +42,13 @@ public sealed class AufgabenListenModusBindung
         Func<CancellationToken, Task<AufgabenListenModus>>? ladeModusAsync,
         Func<AufgabenListenModus, CancellationToken, Task>? speichereModusAsync,
         ILogger logger,
-        string logKontext,
+        string logContext,
         Action<Action>? dispatch = null)
     {
         _ladeModusAsync = ladeModusAsync;
         _speichereModusAsync = speichereModusAsync;
         _logger = logger;
-        _logKontext = logKontext;
+        _logKontext = logContext;
         _dispatch = dispatch ?? (a => a());
     }
 

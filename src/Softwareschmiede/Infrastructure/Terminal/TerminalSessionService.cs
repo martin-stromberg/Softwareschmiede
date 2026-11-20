@@ -20,7 +20,7 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
     /// <summary>Umgebungsvariable, die den E2E-Testmodus (Test-Datenbankpfad) kennzeichnet. Zentrale
     /// Definition — referenziert u. a. aus <c>App.xaml.cs</c> (IProzessStarter-Auswahl) und
     /// <see cref="Softwareschmiede.Infrastructure.Plugins.PluginManager"/>.</summary>
-    public const string TestDatenbankPfadVariable = "SOFTWARESCHMIEDE_TEST_DB_PATH";
+    public const string TestDatabasePathVariable = "SOFTWARESCHMIEDE_TEST_DB_PATH";
 
     private readonly IOptions<TerminalSessionOptions> _options;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -108,7 +108,7 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
     /// Die Fehlerfälle (Executable nicht auflösbar, RequiresPty ohne PTY) wurden zuvor bereits abgefangen.</summary>
     private IPseudoConsoleProcessLauncher SelectBackend(TerminalSessionStartSpec spec, TerminalPreflightResult preflight, ITerminalOutputSink? outputSink)
     {
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(TestDatenbankPfadVariable)))
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(TestDatabasePathVariable)))
         {
             WriteDiagnosis(outputSink, "Pipe-Backend gewählt (E2E-Testmodus)", preflight);
             return _pipeLauncher;
@@ -160,8 +160,8 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
-            var wert = await settings.GetSettingAsync(ForcePtyUnavailableKey, ct).ConfigureAwait(false);
-            return string.Equals(wert, "true", StringComparison.OrdinalIgnoreCase);
+            var value = await settings.GetSettingAsync(ForcePtyUnavailableKey, ct).ConfigureAwait(false);
+            return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
         }
         catch (Exception ex)
         {

@@ -48,7 +48,7 @@
                   Margin="0,0,0,16">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="#"
-                                    Binding="{Binding Nummer}"
+                                    Binding="{Binding Number}"
                                     Width="50" />
                 <DataGridTextColumn Header="Titel"
                                     Binding="{Binding Title}"

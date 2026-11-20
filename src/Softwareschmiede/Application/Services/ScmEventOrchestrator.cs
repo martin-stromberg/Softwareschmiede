@@ -17,7 +17,7 @@ public sealed class ScmEventOrchestrator(
     IPluginManager plugins, PluginSelectionService selection, DevelopmentProcessService development,
     WorkItemService tasks, AiExecutionService cli, ScmEventExchangeProtocol exchange,
     ScmEventChangeNotifier notifier, IServiceScopeFactory scopes, TimeProvider time, IOptions<ScmEventOptions> options,
-    AppSettingService settings, PullRequestReferenceService pullRequestReferenzen,
+    AppSettingService settings, PullRequestReferenceService pullRequestReferences,
     LogService log, ScmEventExecutionLimitService executionLimits,
     ILogger<ScmEventOrchestrator> logger, ScmStartCheckTrigger? startCheckTrigger = null)
 {
@@ -51,13 +51,13 @@ public sealed class ScmEventOrchestrator(
             afterSequence = batch[^1].Sequence;
             // Priorisierter Zugriff auf die begrenzten Ausführungsplätze: Fortsetzungen vor
             // fälligen Verzögerungen (zeitaufsteigend) vor der Eingangsreihenfolge.
-            var batchAufgabeIds = batch.Select(x => x.WorkItemId).Distinct().ToList();
-            var aufgabenZustaende = await db.WorkItems.AsNoTracking()
-                .Where(x => batchAufgabeIds.Contains(x.Id))
+            var batchWorkItemIds = batch.Select(x => x.WorkItemId).Distinct().ToList();
+            var workItemStates = await db.WorkItems.AsNoTracking()
+                .Where(x => batchWorkItemIds.Contains(x.Id))
                 .Select(x => new { x.Id, x.Status, x.ExecutionStatus, x.PausedUntilUtc })
                 .ToDictionaryAsync(x => x.Id,
                     x => new ScmDispatchPriority.WorkItemState(x.Status, x.ExecutionStatus, x.PausedUntilUtc), ct);
-            foreach (var item in ScmDispatchPriority.OrderForDispatch(batch, aufgabenZustaende))
+            foreach (var item in ScmDispatchPriority.OrderForDispatch(batch, workItemStates))
             {
                 using var dispatchScope = scopes.CreateScope();
                 await dispatchScope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(item.Id, ct: ct);
@@ -203,9 +203,9 @@ public sealed class ScmEventOrchestrator(
                 // Eine gespeicherte Beobachtung mit Kontoreaktion erreicht die Inbox produktiv
                 // nie (Eingangsablehnung); Altbestand oder Eingriffe werden sicherheitshalber
                 // nicht zugestellt, sondern zur Klärung vorgelegt.
-                if (revalidation == ScmEventValidationService.BereitsReagiertRejection)
+                if (revalidation == ScmEventValidationService.AlreadyReactedRejection)
                 { await WaitAsync(item, "Auf diese Textversion wurde bereits mit dem Ereignis-Konto reagiert; die Verarbeitung erfolgt vermutlich durch eine zweite Installation.", ct); return; }
-                if (revalidation is not null && revalidation != "Kein Trigger" && revalidation != ScmEventValidationService.KeineErwaehnungRejection)
+                if (revalidation is not null && revalidation != "Kein Trigger" && revalidation != ScmEventValidationService.NoMentionRejection)
                 { await WaitAsync(item, "Angemeldeter Benutzer ist nicht mehr der bestätigte Repository-Owner.", ct); return; }
                 if (task.Status == WorkItemStatus.New) await tasks.SetStatusAsync(task.Id, WorkItemStatus.Started, ct);
                 var adapter = cli.GetScmPromptSession(task.Id);
@@ -259,7 +259,7 @@ public sealed class ScmEventOrchestrator(
                             await development.StartProcessAndCliAsync(task.Id, task.GitRepository!.RepositoryUrl,
                                 task.BaseBranchName, prefix, ct, strictPluginSelection: true, optionalParameters: parameters);
                         else
-                            await development.CliNeustartenAsync(task.Id, prefix, parameters, ct, strictPluginSelection: true);
+                            await development.RestartCliAsync(task.Id, prefix, parameters, ct, strictPluginSelection: true);
                     }
                     adapter = cli.GetScmPromptSession(task.Id);
                 }
@@ -667,7 +667,7 @@ public sealed class ScmEventOrchestrator(
                 item.Reason = null;
                 await db.SaveChangesAsync(ct);
                 await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
-                    $"Issue #{issue.Nummer} ist bereits geschlossen; die Aufbereitung wurde ohne Änderung abgeschlossen.", ct: ct);
+                    $"Issue #{issue.Number} ist bereits geschlossen; die Aufbereitung wurde ohne Änderung abgeschlossen.", ct: ct);
                 return;
             }
             if (task.Status == WorkItemStatus.New) await tasks.SetStatusAsync(task.Id, WorkItemStatus.Started, ct);
@@ -719,7 +719,7 @@ public sealed class ScmEventOrchestrator(
                         await development.StartProcessAndCliAsync(task.Id, task.GitRepository!.RepositoryUrl,
                             task.BaseBranchName, prefix, ct, strictPluginSelection: true, optionalParameters: parameters);
                     else
-                        await development.CliNeustartenAsync(task.Id, prefix, parameters, ct, strictPluginSelection: true);
+                        await development.RestartCliAsync(task.Id, prefix, parameters, ct, strictPluginSelection: true);
                 }
                 adapter = cli.GetScmPromptSession(task.Id);
             }
@@ -981,7 +981,7 @@ public sealed class ScmEventOrchestrator(
             ?? PullRequestProvider.GitHub;
         var repositoryId = PullRequestRepositoryId.Normalize(provider, $"{repository.Owner}/{repository.Name}");
         var url = $"https://{repository.Host}/{repository.Owner}/{repository.Name}/pull/{pullRequestNumber}";
-        var linked = await pullRequestReferenzen.SaveReportedAsync(
+        var linked = await pullRequestReferences.SaveReportedAsync(
             item.WorkItemId, repository.ProviderPrefix, repositoryId, pullRequestNumber, url, ct);
         await log.AddEntryAsync(item.WorkItemId, LogEntryType.GitAction,
             linked is not null

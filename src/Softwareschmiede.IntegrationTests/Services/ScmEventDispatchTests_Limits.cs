@@ -67,7 +67,7 @@ public sealed class ScmEventDispatchTests_Limits
         await fixture.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(ScmDispatchFixture.KiPrefix), "1");
         var (_, firstId) = await fixture.AddAsync(configured: true);
         var (_, secondId) = await fixture.AddAsync(configured: true);
-        var (thirdTask, thirdId) = await fixture.AddAsync(configured: true, kiPluginPrefix: fixture.Ki2Profile!.Prefix);
+        var (thirdTask, thirdId) = await fixture.AddAsync(configured: true, aiPluginPrefix: fixture.Ki2Profile!.Prefix);
 
         await fixture.DispatchAsync(firstId);
         Assert.Equal("Zugestellt", (await fixture.EventAsync(firstId)).Status);
@@ -94,7 +94,7 @@ public sealed class ScmEventDispatchTests_Limits
         await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
         await fixture.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(fixture.Ki2Profile!.Prefix), "5");
         var (_, firstId) = await fixture.AddAsync(configured: true);
-        var (_, secondId) = await fixture.AddAsync(configured: true, kiPluginPrefix: fixture.Ki2Profile.Prefix);
+        var (_, secondId) = await fixture.AddAsync(configured: true, aiPluginPrefix: fixture.Ki2Profile.Prefix);
 
         await fixture.DispatchAsync(firstId);
         await fixture.DispatchAsync(secondId);

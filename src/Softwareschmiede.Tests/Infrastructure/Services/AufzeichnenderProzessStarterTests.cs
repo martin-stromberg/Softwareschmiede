@@ -35,9 +35,9 @@ public sealed class AufzeichnenderProzessStarterTests : IDisposable
         starter.Start(request);
 
         File.Exists(logFilePath).Should().BeTrue();
-        var inhalt = File.ReadAllText(logFilePath);
-        inhalt.Should().Contain("explorer.exe");
-        inhalt.Should().Contain(@"C:\Temp\Arbeitsverzeichnis");
+        var content = File.ReadAllText(logFilePath);
+        content.Should().Contain("explorer.exe");
+        content.Should().Contain(@"C:\Temp\Arbeitsverzeichnis");
     }
 
     /// <summary>Prüft, dass Starten die Zeile exakt im Format "DateiName|Argumente|ShellAusfuehren" gefolgt von einem Zeilenumbruch schreibt.</summary>
@@ -50,7 +50,7 @@ public sealed class AufzeichnenderProzessStarterTests : IDisposable
 
         starter.Start(request);
 
-        var inhalt = File.ReadAllText(logFilePath);
-        inhalt.Should().Be($@"explorer.exe|C:\Temp\Arbeitsverzeichnis|True{Environment.NewLine}");
+        var content = File.ReadAllText(logFilePath);
+        content.Should().Be($@"explorer.exe|C:\Temp\Arbeitsverzeichnis|True{Environment.NewLine}");
     }
 }

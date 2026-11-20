@@ -54,7 +54,7 @@ internal static class RepositoryScriptExecutor
     /// Ausführungsprogramm aus (unterstützt werden .ps1, .cmd, .bat, .exe und .sh).
     /// </summary>
     /// <param name="repositoryRootPath">Wurzelverzeichnis des Repositories.</param>
-    /// <param name="aktiv">Gibt an, ob die Konfiguration aktiv ist; bei <c>false</c> wird nichts ausgeführt.</param>
+    /// <param name="active">Gibt an, ob die Konfiguration aktiv ist; bei <c>false</c> wird nichts ausgeführt.</param>
     /// <param name="relativePath">Relativer Pfad zum Skript innerhalb des Repositories.</param>
     /// <param name="scriptLabel">Sprechender Name des Skripts für Log- und Fehlermeldungen (z. B. "Startskript").</param>
     /// <param name="cliRunner">CLI-Runner zur Ausführung des Skripts.</param>
@@ -71,7 +71,7 @@ internal static class RepositoryScriptExecutor
     /// </param>
     public static async Task RunAsync(
         string repositoryRootPath,
-        bool aktiv,
+        bool active,
         string relativePath,
         string scriptLabel,
         ICliRunner cliRunner,
@@ -80,7 +80,7 @@ internal static class RepositoryScriptExecutor
         Func<string, string?>? getEnvironmentVariable = null,
         Func<string, bool>? fileExists = null)
     {
-        if (!aktiv)
+        if (!active)
         {
             logger.LogInformation("Repository-{ScriptLabel} ist deaktiviert.", scriptLabel);
             return;

@@ -297,22 +297,22 @@ public partial class End2EndTest
 
     private static string? DatenText(UpdateE2EProtokollEintrag entry, string name)
         => UpdateE2EFixture.Data(entry) is { } data
-            && data.TryGetProperty(name, out var wert)
-            ? wert.GetString()
+            && data.TryGetProperty(name, out var value)
+            ? value.GetString()
             : null;
 
     private static bool? DatenBool(UpdateE2EProtokollEintrag entry, string name)
         => UpdateE2EFixture.Data(entry) is { } data
-            && data.TryGetProperty(name, out var wert)
-            && wert.ValueKind is JsonValueKind.True or JsonValueKind.False
-            ? wert.GetBoolean()
+            && data.TryGetProperty(name, out var value)
+            && value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? value.GetBoolean()
             : null;
 
     private static long? DatenZahl(UpdateE2EProtokollEintrag entry, string name)
         => UpdateE2EFixture.Data(entry) is { } data
-            && data.TryGetProperty(name, out var wert)
-            && wert.ValueKind == JsonValueKind.Number
-            ? wert.GetInt64()
+            && data.TryGetProperty(name, out var value)
+            && value.ValueKind == JsonValueKind.Number
+            ? value.GetInt64()
             : null;
 
     private string? ErmittleAppExePfadDesLaufendenProzesses()

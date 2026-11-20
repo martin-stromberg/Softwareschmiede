@@ -95,7 +95,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
 
             return best is null
                 ? UpdateReleaseLookupResult.NoMatch
-                : UpdateReleaseLookupResult.Gefunden(best);
+                : UpdateReleaseLookupResult.Found(best);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
