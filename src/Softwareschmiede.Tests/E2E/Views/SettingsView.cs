@@ -207,8 +207,8 @@ public sealed class SettingsView : BaseWindowView
     /// <returns><c>true</c>, wenn der Eintrag an erster Stelle steht.</returns>
     public bool IsFirstIdePlugin(string pluginPrefix)
     {
-        var liste = WaitForElement(Window, cf => cf.ByName("IdePluginListe"), Short);
-        var items = liste.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
+        var list = WaitForElement(Window, cf => cf.ByName("IdePluginListe"), Short);
+        var items = list.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
         if (items.Length < 2)
             return false;
 

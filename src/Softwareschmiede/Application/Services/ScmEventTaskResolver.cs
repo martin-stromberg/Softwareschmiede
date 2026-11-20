@@ -38,7 +38,7 @@ public sealed record ScmTaskResolution(ScmTaskResolutionKind Kind, Guid? WorkIte
 /// eindeutigem Treffer, Anlage aus den Ereignisdaten bei fehlendem Treffer, Mehrdeutigkeitsdiagnose
 /// bei mehreren Treffern. Läuft vor der Inbox-Aufnahme und hält deren Aufgabeninvariante.</summary>
 public sealed class ScmEventTaskResolver(
-    SoftwareschmiedeDbContext db, AufgabeService workItems, ILogger<ScmEventTaskResolver> logger)
+    SoftwareschmiedeDbContext db, WorkItemService workItems, ILogger<ScmEventTaskResolver> logger)
 {
     /// <summary>Findet die eindeutig passende Aufgabe zur Referenz der qualifizierten Beobachtung
     /// <paramref name="trigger"/> oder legt sie an; <paramref name="repositories"/> enthält die
@@ -93,7 +93,7 @@ public sealed class ScmEventTaskResolver(
         if (contextTaskIds.Count > 1) return ScmTaskResolution.Ambiguous;
         if (contextTaskIds.Count == 1) return ScmTaskResolution.Assigned(contextTaskIds[0]);
         var repository = ChooseRepository(repositories);
-        var context = new ScmRepositoryContext(repository.Id, repository.PluginType, repositoryId, reference.Repository.Konto);
+        var context = new ScmRepositoryContext(repository.Id, repository.PluginType, repositoryId, reference.Repository.Account);
         var composed = pullRequest with { Body = ComposeBody(pullRequest.Body, trigger) };
         try
         {

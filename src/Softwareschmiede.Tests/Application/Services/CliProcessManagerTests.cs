@@ -14,7 +14,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Tests für den Concurrency-Schutz von CliProcessManager.AktualisierungAsync.</summary>
 public sealed class CliProcessManagerTests : IDisposable
 {
-    private readonly KiAusfuehrungsService _kiService;
+    private readonly AiExecutionService _kiService;
     private readonly CliProcessManager _sut;
 
     /// <summary>CliProcessManagerTests.</summary>
@@ -26,7 +26,7 @@ public sealed class CliProcessManagerTests : IDisposable
             _kiService,
             scopeFactoryMock.Object,
             NullLogger<CliProcessManager>.Instance,
-            new AufgabeLaufdatenChangedNotifier());
+            new WorkItemRunDataChangedNotifier());
     }
 
     /// <summary>Dispose.</summary>
@@ -51,7 +51,7 @@ public sealed class CliProcessManagerTests : IDisposable
         var semaphore = semaphores[workItemId];
         await semaphore.WaitAsync(TestContext.Current.CancellationToken);
 
-        var method = typeof(CliProcessManager).GetMethod("AktualisierungAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(CliProcessManager).GetMethod("UpdateAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(_sut, new object[] { workItemId })!;
 
         await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
@@ -80,7 +80,7 @@ public sealed class CliProcessManagerTests : IDisposable
         var semaphoreA = semaphores[aufgabeIdA];
         await semaphoreA.WaitAsync(TestContext.Current.CancellationToken);
 
-        var method = typeof(CliProcessManager).GetMethod("AktualisierungAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(CliProcessManager).GetMethod("UpdateAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var taskB = (Task)method.Invoke(_sut, new object[] { aufgabeIdB })!;
 
         var finished = await Task.WhenAny(taskB, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
@@ -94,14 +94,14 @@ public sealed class CliProcessManagerTests : IDisposable
     [Fact]
     public async Task AktivenLaufSetzenAsync_WithDisposedScopeFactory_Completes()
     {
-        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync("AktivenLaufSetzenAsync", Guid.NewGuid());
+        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync("SetActiveRunAsync", Guid.NewGuid());
     }
 
     /// <summary>Shutdown-Race: AktivenLaufBeendenAsync darf nicht fehlschlagen, wenn der DI-Provider bereits disposed ist.</summary>
     [Fact]
     public async Task AktivenLaufBeendenAsync_WithDisposedScopeFactory_Completes()
     {
-        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync("AktivenLaufBeendenAsync", Guid.NewGuid());
+        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync("EndActiveRunAsync", Guid.NewGuid());
     }
 
     /// <summary>Shutdown-Race: LaufdatenSicherstellenAsync darf nicht fehlschlagen, wenn der DI-Provider
@@ -118,7 +118,7 @@ public sealed class CliProcessManagerTests : IDisposable
 
         using var kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
 
-        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(kiService)!;
         handles[workItemId] = new CliProcessHandle(workItemId, System.Diagnostics.Process.GetCurrentProcess());
 
@@ -126,9 +126,9 @@ public sealed class CliProcessManagerTests : IDisposable
             kiService,
             scopeFactoryMock.Object,
             NullLogger<CliProcessManager>.Instance,
-            new AufgabeLaufdatenChangedNotifier());
+            new WorkItemRunDataChangedNotifier());
 
-        var method = typeof(CliProcessManager).GetMethod("LaufdatenSicherstellenAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(CliProcessManager).GetMethod("EnsureRunDataAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(manager, new object[] { workItemId })!;
         await task;
     }
@@ -147,7 +147,7 @@ public sealed class CliProcessManagerTests : IDisposable
 
         // Laufendes Handle mit Session pflanzen, damit LaufdatenSicherstellenAsync den
         // IsRunning-Check passiert und beide Anlagepfade (Timer + Subscription) erreicht würden.
-        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var handles = (ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
         var sessionMock = new Mock<ITerminalSession>();
         handles[workItemId] = new CliProcessHandle(workItemId, System.Diagnostics.Process.GetCurrentProcess())
@@ -157,7 +157,7 @@ public sealed class CliProcessManagerTests : IDisposable
 
         _sut.Dispose();
 
-        var method = typeof(CliProcessManager).GetMethod("LaufdatenSicherstellenAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(CliProcessManager).GetMethod("EnsureRunDataAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         await (Task)method.Invoke(_sut, new object[] { workItemId })!;
         _sut.StartHeartbeat(workItemId);
 
@@ -191,7 +191,7 @@ public sealed class CliProcessManagerTests : IDisposable
             kiService,
             scopeFactoryMock.Object,
             NullLogger<CliProcessManager>.Instance,
-            new AufgabeLaufdatenChangedNotifier());
+            new WorkItemRunDataChangedNotifier());
 
         var method = typeof(CliProcessManager).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(manager, arguments)!;

@@ -90,7 +90,7 @@ public sealed class PluginManager : IPluginManager
 
     private static int GetKiPluginPriority(IKiPlugin plugin)
         => plugin is CliKiPluginBase cliPlugin
-           && string.Equals(cliPlugin.ProviderDateiPraefix, "copilot", StringComparison.OrdinalIgnoreCase)
+           && string.Equals(cliPlugin.ProviderFilePrefix, "copilot", StringComparison.OrdinalIgnoreCase)
             ? 0
             : 1;
 

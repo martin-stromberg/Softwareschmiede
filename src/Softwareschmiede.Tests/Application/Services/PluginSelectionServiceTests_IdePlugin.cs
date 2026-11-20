@@ -74,8 +74,8 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Fallback);
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
         var pluginManager = CreatePluginManager([visualStudio, vsCode]);
-        var (sut, appEinstellungService) = CreateSut(pluginManager.Object);
-        await appEinstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode,Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
+        var (sut, appSettingService) = CreateSut(pluginManager.Object);
+        await appSettingService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode,Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
 
         var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
@@ -146,8 +146,8 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var rider = CreateIdePlugin("Rider", "Softwareschmiede.Rider", IdePluginCompatibility.Explicit);
         var pluginManager = CreatePluginManager([visualStudio, rider]);
-        var (sut, appEinstellungService) = CreateSut(pluginManager.Object);
-        await appEinstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Rider,Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
+        var (sut, appSettingService) = CreateSut(pluginManager.Object);
+        await appSettingService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Rider,Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
 
         var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
@@ -198,17 +198,17 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>
     /// Erzeugt den SUT und konstruiert dabei <see cref="PluginDefaultSettingsService"/>, <see cref="PluginActivationService"/>
-    /// und <see cref="AppEinstellungService"/> aus demselben <see cref="SoftwareschmiedeDbContext"/> — wie in der Produktion,
+    /// und <see cref="AppSettingService"/> aus demselben <see cref="SoftwareschmiedeDbContext"/> — wie in der Produktion,
     /// wo sich alle drei Dienste innerhalb eines <see cref="PluginSelectionService"/> denselben Scoped DbContext teilen.
     /// </summary>
-    private static (PluginSelectionService Sut, AppEinstellungService AppEinstellungService) CreateSut(IPluginManager pluginManager)
+    private static (PluginSelectionService Sut, AppSettingService AppSettingService) CreateSut(IPluginManager pluginManager)
     {
         var db = CreateDb();
-        var appEinstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        var appSettingService = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var activationService = new PluginActivationService(appEinstellungService, pluginManager, NullLogger<PluginActivationService>.Instance);
-        var sut = new PluginSelectionService(pluginManager, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, appEinstellungService);
-        return (sut, appEinstellungService);
+        var activationService = new PluginActivationService(appSettingService, pluginManager, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginSelectionService(pluginManager, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, appSettingService);
+        return (sut, appSettingService);
     }
 
     private static SoftwareschmiedeDbContext CreateDb() => TestDbContextFactory.Create();

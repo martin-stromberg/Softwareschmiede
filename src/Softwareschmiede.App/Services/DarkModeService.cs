@@ -8,7 +8,7 @@ namespace Softwareschmiede.App.Services;
 /// <summary>
 /// Verwaltet den Dark-Mode-Zustand der Anwendung.
 /// Wechselt zwischen Light- und Dark-Theme via WPF-ResourceDictionary.
-/// Persistiert die Einstellung über <see cref="AppEinstellungService"/>.
+/// Persistiert die Einstellung über <see cref="AppSettingService"/>.
 /// </summary>
 public sealed class DarkModeService
 {
@@ -45,9 +45,9 @@ public sealed class DarkModeService
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         using var scope = _scopeFactory.CreateScope();
-        var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-        var mode = await einstellungService.GetSettingAsync(
-            AppEinstellungService.DesignModeKey, ct);
+        var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+        var mode = await settingService.GetSettingAsync(
+            AppSettingService.DesignModeKey, ct);
         _currentMode = mode ?? "Dark";
         ApplyTheme(_currentMode);
     }
@@ -87,8 +87,8 @@ public sealed class DarkModeService
     public async Task SetModeAsync(string designMode, CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
-        var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-        await einstellungService.SetSettingAsync(AppEinstellungService.DesignModeKey, designMode, ct);
+        var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+        await settingService.SetSettingAsync(AppSettingService.DesignModeKey, designMode, ct);
 
         _currentMode = designMode;
         ApplyTheme(designMode);

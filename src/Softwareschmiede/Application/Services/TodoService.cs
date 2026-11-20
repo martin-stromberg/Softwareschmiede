@@ -19,9 +19,9 @@ public sealed class TodoService
     }
 
     /// <summary>Erstellt ein neues To-Do für eine Aufgabe.</summary>
-    public async Task<Todo> CreateTodoAsync(Guid workItemId, string beschreibung, CancellationToken ct = default)
+    public async Task<Todo> CreateTodoAsync(Guid workItemId, string description, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(beschreibung);
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
 
         _logger.LogInformation("To-Do für Aufgabe {AufgabeId} erstellen.", workItemId);
 
@@ -29,7 +29,7 @@ public sealed class TodoService
         {
             Id = Guid.NewGuid(),
             WorkItemId = workItemId,
-            Description = beschreibung,
+            Description = description,
             CreatedAt = DateTimeOffset.UtcNow
         };
 

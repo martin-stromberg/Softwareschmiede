@@ -12,7 +12,7 @@ using System.Text;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests fuer <see cref="CliOutputProtokollWriter"/>.</summary>
+/// <summary>Tests fuer <see cref="CliOutputLogWriter"/>.</summary>
 public sealed class CliOutputProtokollWriterTests
 {
     /// <summary>CompleteAsync wartet auf die Persistenz bereits angenommener Zeilen.</summary>
@@ -21,27 +21,27 @@ public sealed class CliOutputProtokollWriterTests
     {
         await using var provider = CreateCliOutputServiceProvider();
         var workItemId = Guid.NewGuid();
-        var sut = new CliOutputProtokollWriter(
+        var sut = new CliOutputLogWriter(
             workItemId,
             provider.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<CliOutputProtokollWriter>.Instance);
+            NullLogger<CliOutputLogWriter>.Instance);
 
         sut.OnOutputChunk(System.Text.Encoding.UTF8.GetBytes("erste\nzweite ohne ende"));
         await sut.CompleteAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>();
-        var eintraege = db.LogEntries
+        var entries = db.LogEntries
             .AsNoTracking()
             .Where(e => e.WorkItemId == workItemId && e.Type == LogEntryType.CliOutput)
             .OrderBy(e => e.Timestamp)
             .Select(e => e.Content)
             .ToList();
 
-        eintraege.Should().Equal("erste", "zweite ohne ende");
+        entries.Should().Equal("erste", "zweite ohne ende");
     }
 
-    /// <summary><see cref="CliOutputProtokollWriter"/> implementiert <see cref="Softwareschmiede.Infrastructure.Terminal.ITerminalDiagnoseSink"/>:
+    /// <summary><see cref="CliOutputLogWriter"/> implementiert <see cref="Softwareschmiede.Infrastructure.Terminal.ITerminalDiagnoseSink"/>:
     /// Diagnose-Marker laufen denselben Accumulator-Pfad wie normale CLI-Ausgabe und landen als
     /// Protokollzeilen im Aufgabenprotokoll.</summary>
     [Fact]
@@ -49,10 +49,10 @@ public sealed class CliOutputProtokollWriterTests
     {
         await using var provider = CreateCliOutputServiceProvider();
         var workItemId = Guid.NewGuid();
-        var sut = new CliOutputProtokollWriter(
+        var sut = new CliOutputLogWriter(
             workItemId,
             provider.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<CliOutputProtokollWriter>.Instance);
+            NullLogger<CliOutputLogWriter>.Instance);
 
         sut.Should().BeAssignableTo<Softwareschmiede.Infrastructure.Terminal.ITerminalDiagnoseSink>();
         sut.OnDiagnoseChunk(System.Text.Encoding.UTF8.GetBytes("[Terminal-Diagnose] Markerzeile\r\n"));
@@ -60,13 +60,13 @@ public sealed class CliOutputProtokollWriterTests
 
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>();
-        var eintraege = db.LogEntries
+        var entries = db.LogEntries
             .AsNoTracking()
             .Where(e => e.WorkItemId == workItemId && e.Type == LogEntryType.CliOutput)
             .Select(e => e.Content)
             .ToList();
 
-        eintraege.Should().Equal("[Terminal-Diagnose] Markerzeile");
+        entries.Should().Equal("[Terminal-Diagnose] Markerzeile");
     }
 
     /// <summary>Persistenzfehler werden geloggt und schlagen nicht in den Terminal-Lesepfad zurueck.</summary>
@@ -77,8 +77,8 @@ public sealed class CliOutputProtokollWriterTests
         scopeFactoryMock
             .Setup(f => f.CreateScope())
             .Throws(new InvalidOperationException("Simulierter Scope-Fehler"));
-        var loggerMock = new Mock<ILogger<CliOutputProtokollWriter>>();
-        var sut = new CliOutputProtokollWriter(Guid.NewGuid(), scopeFactoryMock.Object, loggerMock.Object);
+        var loggerMock = new Mock<ILogger<CliOutputLogWriter>>();
+        var sut = new CliOutputLogWriter(Guid.NewGuid(), scopeFactoryMock.Object, loggerMock.Object);
 
         var act = async () =>
         {
@@ -110,7 +110,7 @@ public sealed class CliOutputProtokollWriterTests
             .Callback(() => persistenzBlockiert.Wait(TimeSpan.FromSeconds(5)))
             .Throws(new InvalidOperationException("Simulierte langsame Persistenz"));
 
-        var loggerMock = new Mock<ILogger<CliOutputProtokollWriter>>();
+        var loggerMock = new Mock<ILogger<CliOutputLogWriter>>();
         loggerMock
             .Setup(l => l.Log(
                 It.Is<LogLevel>(lvl => lvl == LogLevel.Warning),
@@ -120,8 +120,8 @@ public sealed class CliOutputProtokollWriterTests
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
             .Callback(() => warningLogged.TrySetResult());
 
-        var sut = new CliOutputProtokollWriter(Guid.NewGuid(), scopeFactoryMock.Object, loggerMock.Object);
-        var output = string.Concat(Enumerable.Range(0, CliOutputProtokollWriter.QueueCapacity + 100).Select(i => $"zeile {i}\n"));
+        var sut = new CliOutputLogWriter(Guid.NewGuid(), scopeFactoryMock.Object, loggerMock.Object);
+        var output = string.Concat(Enumerable.Range(0, CliOutputLogWriter.QueueCapacity + 100).Select(i => $"zeile {i}\n"));
 
         var writeTask = Task.Run(() => sut.OnOutputChunk(Encoding.UTF8.GetBytes(output)), TestContext.Current.CancellationToken);
 
@@ -143,7 +143,7 @@ public sealed class CliOutputProtokollWriterTests
         await using var provider = CreateCliOutputServiceProvider(saveBlocker);
         var workItemId = Guid.NewGuid();
         var queueFullLogged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var loggerMock = new Mock<ILogger<CliOutputProtokollWriter>>();
+        var loggerMock = new Mock<ILogger<CliOutputLogWriter>>();
         loggerMock
             .Setup(l => l.Log(
                 It.Is<LogLevel>(lvl => lvl == LogLevel.Warning),
@@ -153,11 +153,11 @@ public sealed class CliOutputProtokollWriterTests
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
             .Callback(() => queueFullLogged.TrySetResult());
 
-        var sut = new CliOutputProtokollWriter(
+        var sut = new CliOutputLogWriter(
             workItemId,
             provider.GetRequiredService<IServiceScopeFactory>(),
             loggerMock.Object);
-        var expectedLines = Enumerable.Range(0, CliOutputProtokollWriter.QueueCapacity + 20)
+        var expectedLines = Enumerable.Range(0, CliOutputLogWriter.QueueCapacity + 20)
             .Select(i => $"zeile {i}")
             .ToArray();
         var output = string.Concat(expectedLines.Select(line => line + "\n"));
@@ -199,10 +199,10 @@ public sealed class CliOutputProtokollWriterTests
     {
         await using var provider = CreateCliOutputServiceProvider(mitLimitService: true);
         var workItemId = await SeedLaufendeAufgabeAsync(provider);
-        var sut = new CliOutputProtokollWriter(
+        var sut = new CliOutputLogWriter(
             workItemId,
             provider.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<CliOutputProtokollWriter>.Instance);
+            NullLogger<CliOutputLogWriter>.Instance);
 
         var resetUtc = DateTimeOffset.UtcNow.AddHours(2);
         sut.OnOutputChunk(Encoding.UTF8.GetBytes($"[[SOFTWARESCHMIEDE_RATE_LIMIT:{resetUtc:O}]]\n"));
@@ -211,10 +211,10 @@ public sealed class CliOutputProtokollWriterTests
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
 
-        var einstellung = db.AppSettings
+        var setting = db.AppSettings
             .AsNoTracking()
-            .SingleOrDefault(e => e.Key == KiPluginLimitService.SessionLimitKeyPrefix + "Softwareschmiede.TestKi");
-        einstellung.Should().NotBeNull("der Marker muss das Session-Limit des Plugin-Prefix persistieren");
+            .SingleOrDefault(e => e.Key == AiPluginLimitService.SessionLimitKeyPrefix + "Softwareschmiede.TestKi");
+        setting.Should().NotBeNull("der Marker muss das Session-Limit des Plugin-Prefix persistieren");
 
         var workItem = db.WorkItems.AsNoTracking().Single(a => a.Id == workItemId);
         workItem.PausedUntilUtc.Should().NotBeNull("die Aufgabe muss bei zukünftigem Limit pausiert werden");
@@ -231,10 +231,10 @@ public sealed class CliOutputProtokollWriterTests
     {
         await using var provider = CreateCliOutputServiceProvider(mitLimitService: true);
         var workItemId = await SeedLaufendeAufgabeAsync(provider);
-        var sut = new CliOutputProtokollWriter(
+        var sut = new CliOutputLogWriter(
             workItemId,
             provider.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<CliOutputProtokollWriter>.Instance);
+            NullLogger<CliOutputLogWriter>.Instance);
 
         sut.OnOutputChunk(Encoding.UTF8.GetBytes("normale ausgabe\n"));
         await sut.CompleteAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -242,7 +242,7 @@ public sealed class CliOutputProtokollWriterTests
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
 
-        db.AppSettings.AsNoTracking().Any(e => e.Key.StartsWith(KiPluginLimitService.SessionLimitKeyPrefix))
+        db.AppSettings.AsNoTracking().Any(e => e.Key.StartsWith(AiPluginLimitService.SessionLimitKeyPrefix))
             .Should().BeFalse("ohne Marker darf kein Session-Limit persistiert werden");
         db.WorkItems.AsNoTracking().Single(a => a.Id == workItemId).PausedUntilUtc.Should().BeNull();
     }
@@ -291,17 +291,17 @@ public sealed class CliOutputProtokollWriterTests
                 if (interceptors.Length > 0)
                     options.AddInterceptors(interceptors);
             })
-            .AddScoped<ProtokollService>()
-            .AddSingleton<ILogger<ProtokollService>>(NullLogger<ProtokollService>.Instance);
+            .AddScoped<LogService>()
+            .AddSingleton<ILogger<LogService>>(NullLogger<LogService>.Instance);
 
         if (mitLimitService)
         {
             services
-                .AddScoped<AppEinstellungService>()
-                .AddScoped<KiPluginLimitService>()
-                .AddSingleton<AufgabeLaufdatenChangedNotifier>()
-                .AddSingleton<ILogger<AppEinstellungService>>(NullLogger<AppEinstellungService>.Instance)
-                .AddSingleton<ILogger<KiPluginLimitService>>(NullLogger<KiPluginLimitService>.Instance);
+                .AddScoped<AppSettingService>()
+                .AddScoped<AiPluginLimitService>()
+                .AddSingleton<WorkItemRunDataChangedNotifier>()
+                .AddSingleton<ILogger<AppSettingService>>(NullLogger<AppSettingService>.Instance)
+                .AddSingleton<ILogger<AiPluginLimitService>>(NullLogger<AiPluginLimitService>.Instance);
         }
 
         return services.BuildServiceProvider();

@@ -9,11 +9,11 @@ using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für die Arbeitsverzeichnis-Auflösung und -Validierung in <see cref="KiAusfuehrungsService"/>.</summary>
+/// <summary>Tests für die Arbeitsverzeichnis-Auflösung und -Validierung in <see cref="AiExecutionService"/>.</summary>
 public sealed class KiAusfuehrungsServiceTests_WorkingDirectory : IDisposable
 {
     private readonly string _tempRoot;
-    private readonly KiAusfuehrungsService _sut;
+    private readonly AiExecutionService _sut;
 
     /// <summary>KiAusfuehrungsServiceTests_WorkingDirectory.</summary>
     public KiAusfuehrungsServiceTests_WorkingDirectory()

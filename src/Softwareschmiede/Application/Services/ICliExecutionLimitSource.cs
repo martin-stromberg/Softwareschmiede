@@ -3,7 +3,7 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>
 /// Liefert die für die Ausführungsbegrenzung benötigte Belegung laufender CLI-Ausführungen:
 /// welche Aufgaben gerade einen laufenden CLI-Prozess besitzen und welche lebende
-/// SCM-Promptsitzung daran gebunden ist. Implementiert von <see cref="KiAusfuehrungsService"/>.
+/// SCM-Promptsitzung daran gebunden ist. Implementiert von <see cref="AiExecutionService"/>.
 /// </summary>
 public interface ICliExecutionLimitSource
 {

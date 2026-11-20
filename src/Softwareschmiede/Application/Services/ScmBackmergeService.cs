@@ -21,7 +21,7 @@ namespace Softwareschmiede.Application.Services;
 /// </remarks>
 public sealed class ScmBackmergeService(
     SoftwareschmiedeDbContext db,
-    AppEinstellungService einstellungen,
+    AppSettingService settings,
     ScmEventChangeNotifier notifier,
     TimeProvider time,
     IOptions<ScmEventOptions> options,
@@ -41,11 +41,11 @@ public sealed class ScmBackmergeService(
         IReadOnlyList<GitRepository> lokaleRepositories,
         CancellationToken ct = default)
     {
-        var modus = await einstellungen.GetScmBackmergeModusAsync(ct);
-        if (modus == ScmBackmergeMode.Disabled)
+        var mode = await settings.GetScmBackmergeModusAsync(ct);
+        if (mode == ScmBackmergeMode.Disabled)
             return;
-        var draftAktivierung = await einstellungen.GetScmBackmergeDraftAktivierungAsync(ct);
-        var adminMerge = await einstellungen.GetScmBackmergeAdminMergeAsync(ct);
+        var draftAktivierung = await settings.GetScmBackmergeDraftAktivierungAsync(ct);
+        var adminMerge = await settings.GetScmBackmergeAdminMergeAsync(ct);
         // Ohne Schreibrecht des Tokens ist kein Merge möglich.
         if (!repository.CanWrite)
             return;
@@ -53,12 +53,12 @@ public sealed class ScmBackmergeService(
         if (pullRequests.Count == 0)
             return;
         var kandidaten = await FilterAktivierteRepositoriesAsync(lokaleRepositories
-            .Where(x => x.Active && !string.IsNullOrWhiteSpace(x.DefaultSourceBranchName)).ToList(), modus, ct);
+            .Where(x => x.Active && !string.IsNullOrWhiteSpace(x.DefaultSourceBranchName)).ToList(), mode, ct);
         if (kandidaten.Count == 0)
             return;
 
         var repositoryId = $"{repository.Owner}/{repository.Name}";
-        var kontext = new BewertungsKontext(plugin, repositoryId, kandidaten, new Dictionary<Guid, string?>(),
+        var kontext = new EvaluationContext(plugin, repositoryId, kandidaten, new Dictionary<Guid, string?>(),
             time.GetUtcNow(), draftAktivierung, adminMerge);
         foreach (var reference in pullRequests)
         {
@@ -96,7 +96,7 @@ public sealed class ScmBackmergeService(
     /// Draft-Aktivierung) und den Merge ausführen (optionaler Admin-Fallback).</summary>
     private async Task BewertePullRequestAsync(
         ScmEventReference reference,
-        ScmObservationCheckpoint checkpoint, BewertungsKontext kontext, CancellationToken ct)
+        ScmObservationCheckpoint checkpoint, EvaluationContext kontext, CancellationToken ct)
     {
         var status = await kontext.Plugin.GetPullRequestStatusAsync(kontext.RepositoryId, reference.Number, ct);
         if (status.Status != PullRequestStatus.Open)
@@ -105,8 +105,8 @@ public sealed class ScmBackmergeService(
             return;
         }
 
-        var (treffer, hauptbranchUnbekannt) = await FindeBackmergeZuordnungAsync(status, kontext, ct);
-        if (treffer is null)
+        var (match, hauptbranchUnbekannt) = await FindBackmergeAssignmentAsync(status, kontext, ct);
+        if (match is null)
         {
             if (hauptbranchUnbekannt)
             {
@@ -120,7 +120,7 @@ public sealed class ScmBackmergeService(
             return;
         }
 
-        var mergebarerStatus = await StelleMergebarkeitHerAsync(reference, status, checkpoint, kontext, ct);
+        var mergebarerStatus = await RestoreMergeabilityAsync(reference, status, checkpoint, kontext, ct);
         if (mergebarerStatus is null)
             return;
 
@@ -131,15 +131,15 @@ public sealed class ScmBackmergeService(
     /// Hauptbranch abweichenden Basisbranch das Pull-Request-Muster (Hauptbranch → Basisbranch)
     /// zutrifft. Hauptbranches werden pro Repository einmalig ermittelt und im
     /// <paramref name="kontext"/> zwischengespeichert.</summary>
-    private async Task<(GitRepository? Treffer, bool HauptbranchUnbekannt)> FindeBackmergeZuordnungAsync(
-        PullRequestStatusInfo status, BewertungsKontext kontext, CancellationToken ct)
+    private async Task<(GitRepository? Match, bool HauptbranchUnbekannt)> FindBackmergeAssignmentAsync(
+        PullRequestStatusInfo status, EvaluationContext kontext, CancellationToken ct)
     {
         var hauptbranchUnbekannt = false;
         foreach (var kandidat in kontext.Kandidaten)
         {
             if (!kontext.Hauptbranches.TryGetValue(kandidat.Id, out var hauptbranch))
             {
-                hauptbranch = await LadeHauptbranchAsync(kontext, kandidat, ct);
+                hauptbranch = await LoadMainBranchAsync(kontext, kandidat, ct);
                 kontext.Hauptbranches[kandidat.Id] = hauptbranch;
             }
             if (hauptbranch is null)
@@ -159,7 +159,7 @@ public sealed class ScmBackmergeService(
 
     /// <summary>Ermittelt den Hauptbranch eines Projekt-Repositories; ein Lesefehler gilt als
     /// „unbekannt“ und verzögert die Prüfung statt sie zu beenden.</summary>
-    private async Task<string?> LadeHauptbranchAsync(BewertungsKontext kontext, GitRepository kandidat, CancellationToken ct)
+    private async Task<string?> LoadMainBranchAsync(EvaluationContext kontext, GitRepository kandidat, CancellationToken ct)
     {
         try
         {
@@ -179,9 +179,9 @@ public sealed class ScmBackmergeService(
     /// <summary>Hebt bei aktivierter Option den Entwurfsstatus auf und prüft die Mergebarkeit.
     /// Gibt den mergefähigen Status zurück oder <see langword="null"/>, wenn der Checkpoint
     /// bereits auf „warten“/„fehlgeschlagen“ fortgeschrieben wurde.</summary>
-    private async Task<PullRequestStatusInfo?> StelleMergebarkeitHerAsync(
+    private async Task<PullRequestStatusInfo?> RestoreMergeabilityAsync(
         ScmEventReference reference, PullRequestStatusInfo status,
-        ScmObservationCheckpoint checkpoint, BewertungsKontext kontext, CancellationToken ct)
+        ScmObservationCheckpoint checkpoint, EvaluationContext kontext, CancellationToken ct)
     {
         if (status.IsDraft)
         {
@@ -257,7 +257,7 @@ public sealed class ScmBackmergeService(
     /// <summary>Führt den Backmerge aus: zuerst regulär, bei aktivierter Option mit Admin-Merge-Fallback.</summary>
     private async Task FuehreMergeAusAsync(
         ScmEventReference reference, PullRequestStatusInfo status,
-        ScmObservationCheckpoint checkpoint, BewertungsKontext kontext, CancellationToken ct)
+        ScmObservationCheckpoint checkpoint, EvaluationContext kontext, CancellationToken ct)
     {
         var result = await kontext.Plugin.CompletePullRequestAsync(kontext.RepositoryId, reference.Number,
             new PullRequestCompletionOptions(PullRequestCompletionStrategy.Merge, PullRequestMergeMethod.Merge,
@@ -289,13 +289,13 @@ public sealed class ScmBackmergeService(
     /// <summary>Filtert die Kandidaten nach dem Aktivierungsmodus; im projektbezogenen Modus werden
     /// die Freigabe-Flags aller betroffenen Projekte in einer Abfrage gelesen.</summary>
     private async Task<IReadOnlyList<GitRepository>> FilterAktivierteRepositoriesAsync(
-        List<GitRepository> kandidaten, ScmBackmergeMode modus, CancellationToken ct)
+        List<GitRepository> kandidaten, ScmBackmergeMode mode, CancellationToken ct)
     {
-        if (modus == ScmBackmergeMode.Global || kandidaten.Count == 0)
+        if (mode == ScmBackmergeMode.Global || kandidaten.Count == 0)
             return kandidaten;
-        var keys = kandidaten.Select(x => AppEinstellungService.BackmergeProjektKey(x.ProjectId)).Distinct().ToArray();
-        var flags = await einstellungen.GetSettingsAsync(keys, ct);
-        return kandidaten.Where(x => flags.TryGetValue(AppEinstellungService.BackmergeProjektKey(x.ProjectId), out var wert)
+        var keys = kandidaten.Select(x => AppSettingService.BackmergeProjektKey(x.ProjectId)).Distinct().ToArray();
+        var flags = await settings.GetSettingsAsync(keys, ct);
+        return kandidaten.Where(x => flags.TryGetValue(AppSettingService.BackmergeProjektKey(x.ProjectId), out var wert)
             && bool.TryParse(wert, out var aktiv) && aktiv).ToList();
     }
 
@@ -322,7 +322,7 @@ public sealed class ScmBackmergeService(
     /// <summary>Die über den Bewertungszyklus unveränderten Zyklusdaten (Plugin, Remote-Kennung,
     /// Kandidaten, Hauptbranch-Cache, Zeitpunkt und Merge-Optionen), gebündelt für die Teilmethoden
     /// der Pull-Request-Bewertung.</summary>
-    private sealed record BewertungsKontext(
+    private sealed record EvaluationContext(
         IGitPlugin Plugin,
         string RepositoryId,
         IReadOnlyList<GitRepository> Kandidaten,

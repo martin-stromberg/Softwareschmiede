@@ -13,7 +13,7 @@ public static class TestKiAusfuehrungsServiceFactory
 {
     /// <summary>Erstellt einen KiAusfuehrungsService mit einer deterministischen, In-Memory-Session
     /// (Prozess = CurrentProcess, Streams = MemoryStream — kein echter Prozessstart).</summary>
-    public static KiAusfuehrungsService Create()
+    public static AiExecutionService Create()
         => Create(new Mock<IServiceScopeFactory>().Object);
 
     /// <summary>Erstellt einen KiAusfuehrungsService mit eigener ScopeFactory und optionalem
@@ -26,14 +26,14 @@ public static class TestKiAusfuehrungsServiceFactory
     /// <param name="terminalOptions">Optionale <see cref="TerminalSessionOptions"/> (z. B. zum
     /// Deaktivieren der Rohbyte-Aufzeichnung via <c>AufzeichnungByteBudget</c>); Default: <c>new()</c>.</param>
     /// <param name="timeProvider">Optionale Zeitquelle für die Aufzeichnungs-Zeitstempel; Default: <see cref="TimeProvider.System"/>.</param>
-    public static KiAusfuehrungsService Create(
+    public static AiExecutionService Create(
         IServiceScopeFactory scopeFactory,
-        ILogger<KiAusfuehrungsService>? logger = null,
+        ILogger<AiExecutionService>? logger = null,
         IPseudoConsoleProcessLauncher? launcher = null,
         TerminalSessionOptions? terminalOptions = null,
         TimeProvider? timeProvider = null)
         => new(
-            logger ?? NullLogger<KiAusfuehrungsService>.Instance,
+            logger ?? NullLogger<AiExecutionService>.Instance,
             NullLoggerFactory.Instance,
             scopeFactory,
             new TestTerminalSessionFactory(launcher),

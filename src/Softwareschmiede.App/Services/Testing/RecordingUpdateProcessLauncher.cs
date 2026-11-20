@@ -24,7 +24,7 @@ public sealed class RecordingUpdateProcessLauncher : IUpdateProcessLauncher
     public bool Start(string fileName, IEnumerable<string> arguments, string workingDirectory, bool runElevated)
     {
         var argumente = arguments.ToArray();
-        var ergebnis = _kontext.LeseSzenario()?.ProzessStart?.Ergebnis ?? "Erfolg";
+        var result = _kontext.LeseSzenario()?.ProzessStart?.Result ?? "Erfolg";
 
         _kontext.Protokoll.Schreibe(
             UpdateE2EEreignisse.UpdateProcessStartRecorded,
@@ -34,10 +34,10 @@ public sealed class RecordingUpdateProcessLauncher : IUpdateProcessLauncher
                 arguments = argumente,
                 workingDirectory,
                 runElevated,
-                result = ergebnis
+                result = result
             });
 
-        return ergebnis switch
+        return result switch
         {
             "Fehler" => false,
             "Ausnahme" => throw new InvalidOperationException("Kontrollierter Update-E2E-Launcherfehler."),

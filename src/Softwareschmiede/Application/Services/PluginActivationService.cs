@@ -8,17 +8,17 @@ public sealed class PluginActivationService
 {
     private const string EnabledKeyPrefix = "plugins.enabled.";
 
-    private readonly AppEinstellungService _einstellungService;
+    private readonly AppSettingService _settingService;
     private readonly IPluginManager _pluginManager;
     private readonly ILogger<PluginActivationService> _logger;
 
     /// <inheritdoc cref="PluginActivationService"/>
     public PluginActivationService(
-        AppEinstellungService einstellungService,
+        AppSettingService settingService,
         IPluginManager pluginManager,
         ILogger<PluginActivationService> logger)
     {
-        _einstellungService = einstellungService;
+        _settingService = settingService;
         _pluginManager = pluginManager;
         _logger = logger;
     }
@@ -29,7 +29,7 @@ public sealed class PluginActivationService
     /// <returns><c>true</c>, wenn das Plugin aktiviert ist oder kein Eintrag existiert; sonst <c>false</c>.</returns>
     public async Task<bool> IsPluginEnabledAsync(string pluginPrefix, CancellationToken ct = default)
     {
-        var wert = await _einstellungService.GetSettingAsync(BuildKey(pluginPrefix), ct);
+        var wert = await _settingService.GetSettingAsync(BuildKey(pluginPrefix), ct);
         return IsEnabledValue(wert);
     }
 
@@ -39,7 +39,7 @@ public sealed class PluginActivationService
     /// <param name="ct">Abbruchtoken.</param>
     public async Task SetPluginEnabledAsync(string pluginPrefix, bool enabled, CancellationToken ct = default)
     {
-        await _einstellungService.SetSettingAsync(BuildKey(pluginPrefix), enabled.ToString(), ct);
+        await _settingService.SetSettingAsync(BuildKey(pluginPrefix), enabled.ToString(), ct);
 
         _logger.LogInformation(
             "Plugin-Aktivierungsstatus gespeichert: {PluginPrefix} => {Enabled}",
@@ -72,10 +72,10 @@ public sealed class PluginActivationService
             return plugins;
 
         var keys = plugins.Select(p => BuildKey(p.PluginPrefix)).ToArray();
-        var werte = await _einstellungService.GetSettingsAsync(keys, ct);
+        var values = await _settingService.GetSettingsAsync(keys, ct);
 
         return plugins
-            .Where(p => IsEnabledValue(werte.GetValueOrDefault(BuildKey(p.PluginPrefix))))
+            .Where(p => IsEnabledValue(values.GetValueOrDefault(BuildKey(p.PluginPrefix))))
             .ToList();
     }
 

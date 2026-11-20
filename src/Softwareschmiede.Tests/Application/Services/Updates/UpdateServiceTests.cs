@@ -21,9 +21,9 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(update));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(UpdateCheckStatus.UpdateVerfuegbar);
+        result.Status.Should().Be(UpdateCheckStatus.UpdateAvailable);
         result.Update.Should().Be(update);
     }
 
@@ -36,12 +36,12 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateReleaseLookupResult.KeinTreffer);
+            .ReturnsAsync(UpdateReleaseLookupResult.NoMatch);
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(UpdateCheckStatus.KeinUpdate);
+        result.Status.Should().Be(UpdateCheckStatus.NoUpdate);
         result.Update.Should().BeNull();
     }
 
@@ -57,9 +57,9 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(UpdateReleaseLookupResult.Failed);
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(UpdateCheckStatus.NichtPruefbar);
+        result.Status.Should().Be(UpdateCheckStatus.NotCheckable);
         result.Update.Should().BeNull();
     }
 
@@ -73,9 +73,9 @@ public sealed class UpdateServiceTests
         var releaseClient = new Mock<IUpdateReleaseClient>();
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(UpdateCheckStatus.NichtPruefbar);
+        result.Status.Should().Be(UpdateCheckStatus.NotCheckable);
         releaseClient.Verify(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -84,14 +84,14 @@ public sealed class UpdateServiceTests
     /// und trägt eine nicht-blockierende Warnung; bei passendem Kanal ist die Meldung leer.
     /// </summary>
     [Theory]
-    [InlineData("v1.2.0-rc.1", UpdatePfadKanalResolver.ProduktivversionenPfad, true)]
-    [InlineData("v1.2.0", UpdatePfadKanalResolver.VorabversionenPfad, true)]
-    [InlineData("v1.2.0", UpdatePfadKanalResolver.ProduktivversionenPfad, false)]
-    [InlineData("v1.2.0-rc.1", UpdatePfadKanalResolver.VorabversionenPfad, false)]
+    [InlineData("v1.2.0-rc.1", UpdatePathChannelResolver.StableVersionsPath, true)]
+    [InlineData("v1.2.0", UpdatePathChannelResolver.PrereleaseVersionsPath, true)]
+    [InlineData("v1.2.0", UpdatePathChannelResolver.StableVersionsPath, false)]
+    [InlineData("v1.2.0-rc.1", UpdatePathChannelResolver.PrereleaseVersionsPath, false)]
     public async Task CheckForUpdateAsync_WarnsOnInstallationChannelConflict(
-        string installierterTag, string updatePfad, bool erwarteWarnung)
+        string installierterTag, string updatePath, bool erwarteWarnung)
     {
-        var istRcKanal = updatePfad == UpdatePfadKanalResolver.VorabversionenPfad;
+        var istRcKanal = updatePath == UpdatePathChannelResolver.PrereleaseVersionsPath;
         var update = istRcKanal
             ? new UpdateInfo("1.3.0-rc.1", "v1.3.0-rc.1", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/rc.zip")), null, IsPrerelease: true)
             : new UpdateInfo("1.3.0", "v1.3.0", "release.zip", new UpdateDownloadRoute(new Uri("https://example.invalid/stable.zip")), null, IsPrerelease: false);
@@ -103,9 +103,9 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(update));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(updatePfad), TestContext.Current.CancellationToken);
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(updatePath), TestContext.Current.CancellationToken);
 
-        result.Status.Should().Be(UpdateCheckStatus.UpdateVerfuegbar);
+        result.Status.Should().Be(UpdateCheckStatus.UpdateAvailable);
         result.Update.Should().Be(update);
         if (erwarteWarnung)
             result.Message.Should().NotBeNullOrEmpty("ein Kanalkonflikt muss als nicht-blockierende Warnung mitreisen");

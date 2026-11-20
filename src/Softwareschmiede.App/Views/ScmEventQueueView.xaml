@@ -104,7 +104,7 @@
                 <TextBlock Text="{Binding SelectedEvent.StatusText}" FontWeight="SemiBold" AutomationProperties.AutomationId="ScmEventStatus"/>
                 <TextBox Text="{Binding SelectedEvent.Origin, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
                          AutomationProperties.AutomationId="ScmEventOrigin" ToolTip="Ursprung – Adresse kann kopiert werden"/>
-                <TextBlock Text="{Binding SelectedEvent.CliRunId, StringFormat=CLI-Sitzung: {0}}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}"
+                <TextBlock Text="{Binding SelectedEvent.CliRunId, StringFormat=CLI-Session: {0}}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}"
                            AutomationProperties.AutomationId="ScmEventRun"/>
             </StackPanel>
             <TextBlock Grid.Row="2" Text="{Binding SelectedEvent.Reason}" TextWrapping="Wrap" Margin="0,4,0,8"

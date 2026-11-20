@@ -20,7 +20,7 @@ public sealed class CodexPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
     public override string PluginName => "Codex CLI";
 
     /// <inheritdoc/>
-    public override string ProviderDateiPraefix => "codex";
+    public override string ProviderFilePrefix => "codex";
 
     /// <inheritdoc/>
     public override string PluginPrefix => "Softwareschmiede.Codex";

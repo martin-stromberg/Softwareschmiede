@@ -31,8 +31,8 @@ public sealed record ScmKontoModusOption(ScmKontoModus Mode, string Label)
     ];
 
     /// <summary>Liefert die Auswahloption zu einem gespeicherten Modus.</summary>
-    public static ScmKontoModusOption FuerModus(ScmKontoModus modus)
-        => All.First(o => o.Mode == modus);
+    public static ScmKontoModusOption FuerModus(ScmKontoModus mode)
+        => All.First(o => o.Mode == mode);
 
     /// <inheritdoc/>
     public override string ToString() => Label;

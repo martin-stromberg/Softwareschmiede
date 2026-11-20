@@ -18,7 +18,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>
 /// Regressionstests für Issue 108 (Folgefehler des Rückwegs Läuft → Wartet): <see cref="CliProcessManager"/>
 /// muss den Laufzeit-Substatus einer <see cref="PseudoConsoleSession"/> (<see cref="PseudoConsoleSession.RuntimeStatusChanged"/>)
-/// über <see cref="AufgabeService.AktivenLaufSicherstellenAsync"/> persistieren, damit
+/// über <see cref="WorkItemService.EnsureActiveRunAsync"/> persistieren, damit
 /// <c>KiAusfuehrungsStatusConverter</c> die Seitenleisten-Kachel zwischen "▶ Läuft" und "⏸ Wartet"
 /// umschalten kann, während der CLI-Prozess noch lebt. Vor dem Fix wurde dieser Substatus ausschließlich
 /// lokal in der <see cref="PseudoConsoleSession"/> gehalten und speiste nur die Fußzeile der
@@ -28,7 +28,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
 {
     private readonly string _dbName = Guid.NewGuid().ToString();
     private readonly ServiceProvider _provider;
-    private readonly KiAusfuehrungsService _kiService;
+    private readonly AiExecutionService _kiService;
     private readonly CliProcessManager _sut;
     private readonly Guid _projektId = Guid.NewGuid();
     private readonly Guid _aufgabeId = Guid.NewGuid();
@@ -39,8 +39,8 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     {
         var services = new ServiceCollection();
         services.AddDbContext<SoftwareschmiedeDbContext>(options => options.UseInMemoryDatabase(_dbName));
-        services.AddScoped<AufgabeService>();
-        services.AddSingleton<ILogger<AufgabeService>>(NullLogger<AufgabeService>.Instance);
+        services.AddScoped<WorkItemService>();
+        services.AddSingleton<ILogger<WorkItemService>>(NullLogger<WorkItemService>.Instance);
         services.AddScoped<TodoService>();
         services.AddSingleton<ILogger<TodoService>>(NullLogger<TodoService>.Instance);
         _provider = services.BuildServiceProvider();
@@ -73,7 +73,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
             _kiService,
             scopeFactory,
             NullLogger<CliProcessManager>.Instance,
-            new AufgabeLaufdatenChangedNotifier());
+            new WorkItemRunDataChangedNotifier());
     }
 
     /// <summary>Dispose.</summary>
@@ -100,12 +100,12 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     /// Legt eine <see cref="PseudoConsoleSession"/> mit einem nie endenden Output-Stream an (verhindert, dass
     /// die interne Leseschleife durch gelesene Bytes selbst <c>MarkOutputActivity()</c> auslöst und damit den
     /// für diesen Test kontrolliert herbeigeführten Statuswechsel überschreibt) und trägt sie über Reflection
-    /// in das private <c>_handles</c>-Dictionary von <see cref="KiAusfuehrungsService"/> ein — genau wie es
+    /// in das private <c>_handles</c>-Dictionary von <see cref="AiExecutionService"/> ein — genau wie es
     /// <c>StartTerminalSessionAsync</c> in der echten Anwendung tut, nur ohne tatsächlich einen cmd.exe-
     /// Prozess zu starten.
     /// </summary>
     /// <param name="workItemId">ID der Aufgabe, für die eine Fake-Sitzung registriert werden soll.</param>
-    /// <returns>Die neu angelegte, in <see cref="KiAusfuehrungsService"/> registrierte Sitzung.</returns>
+    /// <returns>Die neu angelegte, in <see cref="AiExecutionService"/> registrierte Sitzung.</returns>
     private PseudoConsoleSession RegisterFakeSessionForAufgabe(Guid workItemId)
     {
         var process = System.Diagnostics.Process.GetCurrentProcess();
@@ -117,19 +117,19 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
             NullLogger.Instance);
         _sessions.Add(session);
 
-        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var handles = (ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
         handles[workItemId] = new CliProcessHandle(workItemId, process) { Session = session };
 
         return session;
     }
 
-    private async Task RaiseStatusChangedAsync(CliProcessStatus status, Func<WorkItem, bool> bedingung)
+    private async Task RaiseStatusChangedAsync(CliProcessStatus status, Func<WorkItem, bool> condition)
     {
         var method = typeof(CliProcessManager).GetMethod("OnCliProcessStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
         method.Invoke(_sut, new object[] { _aufgabeId, status });
 
-        await PollUntilAsync(() => bedingung(LadeAufgabe()));
+        await PollUntilAsync(() => condition(LadeAufgabe()));
     }
 
     /// <summary>Ruft die private RefreshRuntimeStatus-Methode der Sitzung direkt auf, statt auf den echten

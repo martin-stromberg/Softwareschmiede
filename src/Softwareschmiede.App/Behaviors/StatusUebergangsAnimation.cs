@@ -76,6 +76,6 @@ public static class StatusUebergangsAnimation
             return;
 
         element.SetValue(UnloadedBereinigungRegistriertProperty, true);
-        element.Unloaded += (_, _) => AenderungsErkennung.Entfernen(workItemId);
+        element.Unloaded += (_, _) => AenderungsErkennung.Remove(workItemId);
     }
 }

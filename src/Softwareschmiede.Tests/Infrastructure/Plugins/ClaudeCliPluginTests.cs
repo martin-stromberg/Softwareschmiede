@@ -27,7 +27,7 @@ public sealed class ClaudeCliPluginTests
     {
         _sut.PluginName.Should().Be("Claude CLI");
         _sut.PluginPrefix.Should().Be("Softwareschmiede.ClaudeCli");
-        _sut.ProviderDateiPraefix.Should().Be("claude");
+        _sut.ProviderFilePrefix.Should().Be("claude");
         _sut.GetSettingGroups().SelectMany(g => g.Fields).Should().Contain(f => f.Key == "Token");
     }
 

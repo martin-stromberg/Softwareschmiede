@@ -87,17 +87,17 @@ public partial class End2EndTest
         Assert.False(pauseDialog.IsAufhebenEnabled(), "Ohne bestehende Pause muss 'Pause aufheben' deaktiviert sein.");
 
         // Phase 2: Zeitpunkt +2 h bestätigen → Pause wird persistiert und in der Kachel sichtbar.
-        var ziel = DateTime.Now.AddHours(2);
-        pauseDialog.SetzeZeitpunkt(ziel);
-        pauseDialog.Bestaetigen();
+        var target = DateTime.Now.AddHours(2);
+        pauseDialog.SetzeZeitpunkt(target);
+        pauseDialog.Confirm();
 
         await using (var db = OpenTestDbContext())
         {
             var workItem = await db.WorkItems.SingleAsync(a => a.Title == titel);
             Assert.NotNull(workItem.PausedUntilUtc);
             Assert.True(
-                Math.Abs((workItem.PausedUntilUtc.Value - new DateTimeOffset(ziel)).TotalMinutes) <= 1.5,
-                $"PausiertBisUtc '{workItem.PausedUntilUtc:O}' weicht vom erwarteten Ziel '{ziel:O}' ab.");
+                Math.Abs((workItem.PausedUntilUtc.Value - new DateTimeOffset(target)).TotalMinutes) <= 1.5,
+                $"PausiertBisUtc '{workItem.PausedUntilUtc:O}' weicht vom erwarteten Ziel '{target:O}' ab.");
         }
 
         // Kachel zeigt „⏸ Pausiert (noch …)" (HelpText des Status-Elements) und „Pausiert:True"
@@ -157,7 +157,7 @@ public partial class End2EndTest
     /// Wartet per Polling, bis der <c>HelpText</c> des benannten Elements das gegebene Prädikat erfüllt
     /// (die Seitenleiste aktualisiert sich über den 5-s-Timer bzw. den Laufdaten-Notifier).
     /// </summary>
-    private static void WarteAufElementHelpText(Window mainWindow, string elementName, Func<string, bool> predikat, TimeSpan timeout, string beschreibung)
+    private static void WarteAufElementHelpText(Window mainWindow, string elementName, Func<string, bool> predikat, TimeSpan timeout, string description)
     {
         var deadline = DateTime.UtcNow + timeout;
         string? lastHelpText = null;
@@ -172,6 +172,6 @@ public partial class End2EndTest
         }
 
         throw new TimeoutException(
-            $"{beschreibung} erfüllte innerhalb von {timeout.TotalSeconds}s nicht das erwartete Prädikat. Zuletzt gesehen: '{lastHelpText}'.");
+            $"{description} erfüllte innerhalb von {timeout.TotalSeconds}s nicht das erwartete Prädikat. Zuletzt gesehen: '{lastHelpText}'.");
     }
 }

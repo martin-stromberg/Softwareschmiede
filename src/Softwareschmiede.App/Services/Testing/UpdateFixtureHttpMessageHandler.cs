@@ -31,52 +31,52 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
         var url = request.RequestUri?.AbsoluteUri ?? string.Empty;
 
         var szenario = _kontext.LeseSzenario()
-            ?? throw new HttpRequestException($"Update-E2E-Szenariodatei ist nicht lesbar: {_kontext.Konfiguration.SzenarioDateiPfad}");
+            ?? throw new HttpRequestException($"Update-E2E-Szenariodatei ist nicht lesbar: {_kontext.Configuration.SzenarioDateiPfad}");
 
-        var antwort = szenario.FindeAntwort(url);
-        var art = antwort?.Art ?? Klassifiziere(url);
+        var e2eResponse = szenario.FindeAntwort(url);
+        var art = e2eResponse?.Art ?? Klassifiziere(url);
         _kontext.Protokoll.Schreibe(
             UpdateE2EEreignisse.HttpRequest,
             new { url, method = request.Method.Method, art });
 
-        if (antwort is null)
+        if (e2eResponse is null)
         {
             _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.UnknownHttpRequest, new { url });
             throw new HttpRequestException($"Unbekannte Update-E2E-Anfrage ohne konfigurierte Antwort: {url}");
         }
 
-        if (antwort.Fehler)
+        if (e2eResponse.Error)
             throw new HttpRequestException($"Absichtlicher Update-E2E-Transportfehler für: {url}");
 
-        if (!string.IsNullOrEmpty(antwort.Gate))
+        if (!string.IsNullOrEmpty(e2eResponse.Gate))
         {
-            _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpRequestBlocked, new { url, gate = antwort.Gate });
-            var freigegeben = await _kontext.WarteAufGateAsync(antwort.Gate, cancellationToken, StandardGateTimeout);
+            _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpRequestBlocked, new { url, gate = e2eResponse.Gate });
+            var freigegeben = await _kontext.WarteAufGateAsync(e2eResponse.Gate, cancellationToken, StandardGateTimeout);
             if (!freigegeben)
             {
-                if (_kontext.PruefeGate(antwort.Gate) == false)
+                if (_kontext.PruefeGate(e2eResponse.Gate) == false)
                     throw new OperationCanceledException(cancellationToken);
 
-                throw new HttpRequestException($"Update-E2E-Gate '{antwort.Gate}' wurde nicht innerhalb von {StandardGateTimeout.TotalSeconds}s freigegeben: {url}");
+                throw new HttpRequestException($"Update-E2E-Gate '{e2eResponse.Gate}' wurde nicht innerhalb von {StandardGateTimeout.TotalSeconds}s freigegeben: {url}");
             }
 
-            _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpRequestReleased, new { url, gate = antwort.Gate });
+            _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpRequestReleased, new { url, gate = e2eResponse.Gate });
         }
 
-        var inhalt = LadeAntwortInhalt(antwort);
-        var contentType = antwort.ContentType
-            ?? (antwort.BodyDatei?.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) == true
+        var inhalt = LadeAntwortInhalt(e2eResponse);
+        var contentType = e2eResponse.ContentType
+            ?? (e2eResponse.BodyDatei?.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) == true
                 ? "application/zip"
                 : "application/json");
 
         Stream stream = new MemoryStream(inhalt, writable: false);
-        if (!string.IsNullOrEmpty(antwort.StreamGate))
+        if (!string.IsNullOrEmpty(e2eResponse.StreamGate))
         {
-            var freieBytes = antwort.StreamGateBytes ?? inhalt.Length / 2;
-            stream = new GateBlockierterStream(stream, freieBytes, antwort.StreamGate, _kontext);
+            var freieBytes = e2eResponse.StreamGateBytes ?? inhalt.Length / 2;
+            stream = new GateBlockierterStream(stream, freieBytes, e2eResponse.StreamGate, _kontext);
         }
 
-        var response = new HttpResponseMessage((HttpStatusCode)antwort.Status)
+        var response = new HttpResponseMessage((HttpStatusCode)e2eResponse.Status)
         {
             RequestMessage = request,
             Content = new StreamContent(stream)
@@ -84,34 +84,34 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
         response.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         response.Content.Headers.ContentLength = inhalt.Length;
 
-        if (antwort.Header is not null)
+        if (e2eResponse.Header is not null)
         {
-            foreach (var (name, wert) in antwort.Header)
+            foreach (var (name, wert) in e2eResponse.Header)
             {
                 if (!response.Headers.TryAddWithoutValidation(name, wert))
                     response.Content.Headers.TryAddWithoutValidation(name, wert);
             }
         }
 
-        _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpResponse, new { url, status = antwort.Status });
+        _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpResponse, new { url, status = e2eResponse.Status });
         return response;
     }
 
-    private byte[] LadeAntwortInhalt(UpdateE2EAntwort antwort)
+    private byte[] LadeAntwortInhalt(UpdateE2EAntwort e2eResponse)
     {
-        if (antwort.Content is not null)
-            return Encoding.UTF8.GetBytes(antwort.Content);
+        if (e2eResponse.Content is not null)
+            return Encoding.UTF8.GetBytes(e2eResponse.Content);
 
-        if (antwort.BodyDatei is not null)
+        if (e2eResponse.BodyDatei is not null)
         {
-            var path = Path.GetFullPath(Path.Combine(_kontext.Konfiguration.Testwurzel, antwort.BodyDatei));
-            var relativ = Path.GetRelativePath(Path.GetFullPath(_kontext.Konfiguration.Testwurzel), path);
+            var path = Path.GetFullPath(Path.Combine(_kontext.Configuration.Testwurzel, e2eResponse.BodyDatei));
+            var relativ = Path.GetRelativePath(Path.GetFullPath(_kontext.Configuration.Testwurzel), path);
             if (relativ == ".."
                 || relativ.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                 || relativ.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal)
                 || Path.IsPathRooted(relativ))
             {
-                throw new HttpRequestException($"Update-E2E-Antwortdatei liegt außerhalb der Testwurzel: {antwort.BodyDatei}");
+                throw new HttpRequestException($"Update-E2E-Antwortdatei liegt außerhalb der Testwurzel: {e2eResponse.BodyDatei}");
             }
 
             return File.ReadAllBytes(path);

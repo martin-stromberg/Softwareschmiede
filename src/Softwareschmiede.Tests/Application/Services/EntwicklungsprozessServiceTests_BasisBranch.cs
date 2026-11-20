@@ -19,19 +19,19 @@ namespace Softwareschmiede.Tests.Application.Services;
 public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProtokollService _protokollService;
+    private readonly WorkItemService _aufgabeService;
+    private readonly LogService _logService;
     private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly Mock<IWorkingDirectoryResolver> _arbeitsverzeichnisResolverMock;
-    private readonly EntwicklungsprozessService _sut;
+    private readonly DevelopmentProcessService _sut;
     private readonly Guid _projektId = new("77777777-7777-7777-7777-777777777777");
 
     /// <summary>EntwicklungsprozessServiceTests_BasisBranch.</summary>
     public EntwicklungsprozessServiceTests_BasisBranch()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
-        _protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
+        _aufgabeService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
+        _logService = new LogService(_db, new Mock<ILogger<LogService>>().Object);
 
         _gitPluginMock = new Mock<IGitPlugin>();
         _gitPluginMock.SetupGet(p => p.PluginName).Returns("Mock Git");
@@ -45,7 +45,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppSettingService(_db, new Mock<ILogger<AppSettingService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
@@ -54,14 +54,14 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
 
         _arbeitsverzeichnisResolverMock = new Mock<IWorkingDirectoryResolver>();
 
-        _sut = new EntwicklungsprozessService(
+        _sut = new DevelopmentProcessService(
             _aufgabeService,
-            _protokollService,
+            _logService,
             _gitPluginMock.Object,
             pluginSelectionService,
             _arbeitsverzeichnisResolverMock.Object,
-            new EntwicklungsprozessServiceOptions(),
-            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+            new DevelopmentProcessServiceOptions(),
+            new Mock<ILogger<DevelopmentProcessService>>().Object);
 
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
@@ -133,7 +133,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
             .ReturnsAsync(["main", "develop"]);
 
         // Act
-        var act = () => _sut.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl);
+        var act = () => _sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl);
 
         // Assert
         await act.Should().ThrowAsync<GitBranchNotFoundException>();
@@ -166,7 +166,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
+            await _sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             var updatedAufgabe = await _aufgabeService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -196,7 +196,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
+            await _sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             var updatedAufgabe = await _aufgabeService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -234,7 +234,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
+            await _sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             _gitPluginMock.Verify(g => g.CheckoutRemoteBranchAsync(It.IsAny<string>(), "staging", It.IsAny<CancellationToken>()), Times.Once);
@@ -294,7 +294,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
+            await _sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             _gitPluginMock.Verify(g => g.CheckoutPullRequestSourceAsync(
@@ -335,7 +335,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
+            await _sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             _gitPluginMock.Verify(g => g.CheckoutRemoteBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);

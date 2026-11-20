@@ -23,16 +23,16 @@ public sealed class UpdateE2ETestKontext : IUpdateVersuchProtokoll
     private int _ordinalImVersuch;
 
     /// <inheritdoc cref="UpdateE2ETestKontext"/>
-    /// <param name="konfiguration">Die geladene und validierte Testkonfiguration.</param>
-    public UpdateE2ETestKontext(UpdateE2ETestConfiguration konfiguration)
+    /// <param name="configuration">Die geladene und validierte Testkonfiguration.</param>
+    public UpdateE2ETestKontext(UpdateE2ETestConfiguration configuration)
     {
-        Konfiguration = konfiguration;
-        Protokoll = new UpdateE2EProtokoll(konfiguration.ProtokollDateiPfad, konfiguration.SzenarioId);
-        Directory.CreateDirectory(konfiguration.EffektivesGatesVerzeichnis);
+        Configuration = configuration;
+        Protokoll = new UpdateE2EProtokoll(configuration.ProtokollDateiPfad, configuration.SzenarioId);
+        Directory.CreateDirectory(configuration.EffektivesGatesVerzeichnis);
     }
 
     /// <summary>Die statische Testkonfiguration.</summary>
-    public UpdateE2ETestConfiguration Konfiguration { get; }
+    public UpdateE2ETestConfiguration Configuration { get; }
 
     /// <summary>Der JSONL-Protokollschreiber.</summary>
     public UpdateE2EProtokoll Protokoll { get; }
@@ -102,8 +102,8 @@ public sealed class UpdateE2ETestKontext : IUpdateVersuchProtokoll
     /// </summary>
     /// <param name="art">Die Versuchsart.</param>
     /// <param name="updateVerfuegbar">Ob nach dem Versuch ein Updateangebot sichtbar ist.</param>
-    /// <param name="hinweis">Der aktuell angezeigte Update-Hinweis, falls vorhanden.</param>
-    public void BeendeVersuch(string art, bool updateVerfuegbar, string? hinweis)
+    /// <param name="hint">Der aktuell angezeigte Update-Hinweis, falls vorhanden.</param>
+    public void BeendeVersuch(string art, bool updateVerfuegbar, string? hint)
     {
         int index;
         lock (_ordinalLock)
@@ -113,12 +113,12 @@ public sealed class UpdateE2ETestKontext : IUpdateVersuchProtokoll
         }
         Protokoll.Schreibe(
             UpdateE2EEreignisse.UpdateAttemptCompleted,
-            new { versuch = art, versuchIndex = index, updateVerfuegbar, hinweis });
+            new { versuch = art, versuchIndex = index, updateVerfuegbar, hint });
         if (art == "startup")
         {
             Protokoll.Schreibe(
                 UpdateE2EEreignisse.StartupUpdateCompleted,
-                new { updateVerfuegbar, hinweis });
+                new { updateVerfuegbar, hint });
         }
     }
 
@@ -131,7 +131,7 @@ public sealed class UpdateE2ETestKontext : IUpdateVersuchProtokoll
     {
         try
         {
-            var json = File.ReadAllText(Konfiguration.SzenarioDateiPfad);
+            var json = File.ReadAllText(Configuration.SzenarioDateiPfad);
             return JsonSerializer.Deserialize<UpdateE2ESzenario>(json) ?? new UpdateE2ESzenario();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -154,9 +154,9 @@ public sealed class UpdateE2ETestKontext : IUpdateVersuchProtokoll
         while (DateTime.UtcNow < deadline)
         {
             ct.ThrowIfCancellationRequested();
-            var ergebnis = PruefeGate(gate);
-            if (ergebnis is not null)
-                return ergebnis.Value;
+            var result = PruefeGate(gate);
+            if (result is not null)
+                return result.Value;
 
             // ConfigureAwait(false): Die synchrone Variante blockiert denselben Ablauf über
             // GetAwaiter().GetResult() - ohne Kontextbefreiung könnte ein Aufrufer mit
@@ -189,10 +189,10 @@ public sealed class UpdateE2ETestKontext : IUpdateVersuchProtokoll
     /// <returns>Das Gate-Ergebnis oder <c>null</c>, wenn noch keine Datei existiert.</returns>
     public bool? PruefeGate(string gate)
     {
-        var verzeichnis = Konfiguration.EffektivesGatesVerzeichnis;
-        if (File.Exists(Path.Combine(verzeichnis, $"{gate}.release")))
+        var directory = Configuration.EffektivesGatesVerzeichnis;
+        if (File.Exists(Path.Combine(directory, $"{gate}.release")))
             return true;
-        if (File.Exists(Path.Combine(verzeichnis, $"{gate}.cancel")))
+        if (File.Exists(Path.Combine(directory, $"{gate}.cancel")))
             return false;
         return null;
     }

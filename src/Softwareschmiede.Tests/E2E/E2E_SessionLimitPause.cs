@@ -135,7 +135,7 @@ public partial class End2EndTest
         {
             // Plugin-weit persistiertes Session-Limit.
             var limitEintrag = await db.AppSettings
-                .SingleOrDefaultAsync(e => e.Key == KiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
+                .SingleOrDefaultAsync(e => e.Key == AiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
             Assert.NotNull(limitEintrag);
             Assert.True(
                 DateTimeOffset.TryParse(limitEintrag!.Value, out var persistiertesLimit),
@@ -198,10 +198,10 @@ public partial class End2EndTest
         // Heartbeat-Bewertung wieder: die laufenden Simulator-Aufgaben sind wieder riskant.
         await using (var db = OpenTestDbContext())
         {
-            var eintrag = await db.AppSettings
-                .SingleAsync(e => e.Key == KiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
-            eintrag.Value = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
-            eintrag.UpdatedAt = DateTimeOffset.UtcNow;
+            var entry = await db.AppSettings
+                .SingleAsync(e => e.Key == AiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
+            entry.Value = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+            entry.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();
         }
 
@@ -243,24 +243,24 @@ public partial class End2EndTest
 
     private static CliUpdateSafetyService ErstelleSafetyService(Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext db)
     {
-        var aufgabeService = new AufgabeService(
+        var aufgabeService = new WorkItemService(
             db,
-            NullLogger<AufgabeService>.Instance,
+            NullLogger<WorkItemService>.Instance,
             new TodoService(db, NullLogger<TodoService>.Instance));
-        var appEinstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        var limitService = new KiPluginLimitService(
+        var appSettingService = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        var limitService = new AiPluginLimitService(
             db,
-            appEinstellungService,
-            new AufgabeLaufdatenChangedNotifier(),
-            NullLogger<KiPluginLimitService>.Instance);
+            appSettingService,
+            new WorkItemRunDataChangedNotifier(),
+            NullLogger<AiPluginLimitService>.Instance);
         return new CliUpdateSafetyService(aufgabeService, limitService, NullLogger<CliUpdateSafetyService>.Instance);
     }
 
-    private static void AssertPausiertBisUtc(DateTimeOffset? pausiertBisUtc, DateTimeOffset erwartet, string titel)
+    private static void AssertPausiertBisUtc(DateTimeOffset? pausedUntilUtc, DateTimeOffset expected, string titel)
     {
-        Assert.NotNull(pausiertBisUtc);
+        Assert.NotNull(pausedUntilUtc);
         Assert.True(
-            Math.Abs((pausiertBisUtc!.Value - erwartet).TotalSeconds) < 2,
-            $"PausiertBisUtc von '{titel}' ('{pausiertBisUtc:O}') weicht vom Marker-Zeitpunkt '{erwartet:O}' ab.");
+            Math.Abs((pausedUntilUtc!.Value - expected).TotalSeconds) < 2,
+            $"PausiertBisUtc von '{titel}' ('{pausedUntilUtc:O}') weicht vom Marker-Zeitpunkt '{expected:O}' ab.");
     }
 }

@@ -11,29 +11,29 @@ namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>
 /// Tests für die Verdrahtung von <see cref="GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync"/>
-/// in <see cref="EntwicklungsprozessService.ProzessStartenAsync"/>: die Validierung des konfigurierten
+/// in <see cref="DevelopmentProcessService.StartProcessAsync"/>: die Validierung des konfigurierten
 /// Arbeitsverzeichnisses soll direkt nach einem erfolgreichen Git-Klon erfolgen (frühes, klares Fehlerbild),
 /// statt erst beim späteren CLI-Start.
 /// </summary>
 public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProjektService _projektService;
-    private readonly ProtokollService _protokollService;
+    private readonly WorkItemService _aufgabeService;
+    private readonly ProjectService _projektService;
+    private readonly LogService _logService;
     private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly Mock<IWorkingDirectoryResolver> _arbeitsverzeichnisResolverMock;
     private readonly GitOrchestrationService _gitOrchestrationService;
-    private readonly EntwicklungsprozessService _sut;
+    private readonly DevelopmentProcessService _sut;
     private readonly Guid _projektId = new("66666666-6666-6666-6666-666666666666");
 
     /// <summary>EntwicklungsprozessServiceTests_WorkingDirectoryValidation.</summary>
     public EntwicklungsprozessServiceTests_WorkingDirectoryValidation()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
-        _projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
-        _protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
+        _aufgabeService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
+        _projektService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
+        _logService = new LogService(_db, new Mock<ILogger<LogService>>().Object);
 
         _gitPluginMock = new Mock<IGitPlugin>();
         _gitPluginMock.SetupGet(p => p.PluginName).Returns("Mock Git");
@@ -49,7 +49,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppSettingService(_db, new Mock<ILogger<AppSettingService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
@@ -59,23 +59,23 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         _gitOrchestrationService = new GitOrchestrationService(
             _aufgabeService,
             _projektService,
-            _protokollService,
+            _logService,
             _gitPluginMock.Object,
             pluginSelectionService,
             new Mock<ILogger<GitOrchestrationService>>().Object);
 
         _arbeitsverzeichnisResolverMock = new Mock<IWorkingDirectoryResolver>();
 
-        _sut = new EntwicklungsprozessService(
+        _sut = new DevelopmentProcessService(
             _aufgabeService,
-            _protokollService,
+            _logService,
             _gitPluginMock.Object,
             pluginSelectionService,
             _arbeitsverzeichnisResolverMock.Object,
-            new EntwicklungsprozessServiceOptions(
-                ProjektService: _projektService,
+            new DevelopmentProcessServiceOptions(
+                ProjectService: _projektService,
                 GitOrchestrationService: _gitOrchestrationService),
-            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+            new Mock<ILogger<DevelopmentProcessService>>().Object);
 
         _db.Projects.Add(new Project
         {
@@ -154,7 +154,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         try
         {
             // Act
-            var act = () => _sut.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl);
+            var act = () => _sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl);
 
             // Assert
             await act.Should().ThrowAsync<DirectoryNotFoundException>();
@@ -188,7 +188,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         try
         {
             // Act
-            await _sut.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
+            await _sut.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             var updatedAufgabe = await _aufgabeService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -213,23 +213,23 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         var workItem = await _aufgabeService.CreateAsync(_projektId, "Ohne GitOrchestrationService", null, repository.Id, TestContext.Current.CancellationToken);
         var clonePath = SetupCloneWithDirectoryCreation();
 
-        var sutOhneValidation = new EntwicklungsprozessService(
+        var sutOhneValidation = new DevelopmentProcessService(
             _aufgabeService,
-            _protokollService,
+            _logService,
             _gitPluginMock.Object,
             new PluginSelectionService(
                 CreatePassthroughPluginManagerMock(),
                 new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object),
-                new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), CreatePassthroughPluginManagerMock(), new Mock<ILogger<PluginActivationService>>().Object),
+                new PluginActivationService(new AppSettingService(_db, new Mock<ILogger<AppSettingService>>().Object), CreatePassthroughPluginManagerMock(), new Mock<ILogger<PluginActivationService>>().Object),
                 new Mock<ILogger<PluginSelectionService>>().Object),
             _arbeitsverzeichnisResolverMock.Object,
-            new EntwicklungsprozessServiceOptions(ProjektService: _projektService),
-            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+            new DevelopmentProcessServiceOptions(ProjectService: _projektService),
+            new Mock<ILogger<DevelopmentProcessService>>().Object);
 
         try
         {
             // Act
-            await sutOhneValidation.ProzessStartenAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
+            await sutOhneValidation.StartProcessAsync(workItem.Id, repository.RepositoryUrl, ct: TestContext.Current.CancellationToken);
 
             // Assert
             var updatedAufgabe = await _aufgabeService.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);

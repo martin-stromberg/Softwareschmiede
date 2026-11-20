@@ -17,19 +17,19 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class DashboardViewModelTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly ProjektService _projektService;
-    private readonly AufgabeService _aufgabeService;
-    private readonly AufgabeRecoveryService _recoveryService;
+    private readonly ProjectService _projektService;
+    private readonly WorkItemService _aufgabeService;
+    private readonly WorkItemRecoveryService _recoveryService;
     private readonly Guid _projektId = new Guid("33333333-3333-3333-3333-333333333333");
 
     /// <summary>DashboardViewModelTests.</summary>
     public DashboardViewModelTests()
     {
         _db = TestDbContextFactory.Create();
-        _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         var runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
-        _recoveryService = new AufgabeRecoveryService(_db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance);
+        _recoveryService = new WorkItemRecoveryService(_db, runningStatusSourceMock.Object, NullLogger<WorkItemRecoveryService>.Instance);
 
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
@@ -146,8 +146,8 @@ public sealed class DashboardViewModelTests : IDisposable
         {
             using (var scope = provider.CreateScope())
             {
-                var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-                await einstellungen.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey, "Ki", TestContext.Current.CancellationToken);
+                var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+                await settings.SetSettingAsync(AppSettingService.AktiveAufgabenListenModusDashboardKey, "Ki", TestContext.Current.CancellationToken);
             }
 
             var sut = CreateSut(modusService);
@@ -180,9 +180,9 @@ public sealed class DashboardViewModelTests : IDisposable
             while (DateTime.UtcNow < deadline && wert != "Repository")
             {
                 using var scope = provider.CreateScope();
-                var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-                wert = await einstellungen.GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusDashboardKey, TestContext.Current.CancellationToken);
-                menueWert = await einstellungen.GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey, TestContext.Current.CancellationToken);
+                var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+                wert = await settings.GetSettingAsync(AppSettingService.AktiveAufgabenListenModusDashboardKey, TestContext.Current.CancellationToken);
+                menueWert = await settings.GetSettingAsync(AppSettingService.AktiveAufgabenListenModusKey, TestContext.Current.CancellationToken);
                 if (wert != "Repository")
                     await Task.Delay(50, TestContext.Current.CancellationToken);
             }

@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+
 namespace Softwareschmiede.Infrastructure.Terminal;
 
 /// <summary>Laufzeitparameter der Terminal-Integration (Konfigurationssektion <c>Terminal</c>).</summary>
@@ -17,5 +19,6 @@ public sealed class TerminalSessionOptions
 
     /// <summary>Byte-Budget der Rohbyte-Aufzeichnung (<see cref="CliOutputRecorder"/>) pro Session
     /// (Default: 8 MB). Werte <c>&lt;= 0</c> deaktivieren den Mitschnitt.</summary>
-    public int AufzeichnungByteBudget { get; set; } = 8 * 1024 * 1024;
+    [ConfigurationKeyName("AufzeichnungByteBudget")]
+    public int RecordingByteBudget { get; set; } = 8 * 1024 * 1024;
 }

@@ -62,8 +62,8 @@ public partial class End2EndTest
         await using (var db = OpenTestDbContext())
         {
             var workItem = await db.WorkItems.SingleAsync();
-            var datensatz = await db.ScheduledPrompts.SingleOrDefaultAsync(z => z.WorkItemId == workItem.Id);
-            Assert.NotNull(datensatz);
+            var record = await db.ScheduledPrompts.SingleOrDefaultAsync(z => z.WorkItemId == workItem.Id);
+            Assert.NotNull(record);
         }
 
         // Wiederöffnen: Wartestellung und Storno-Button müssen weiterhin sichtbar sein.

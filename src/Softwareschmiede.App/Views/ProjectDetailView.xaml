@@ -195,7 +195,7 @@
                                        Foreground="{DynamicResource SecondaryTextBrush}"
                                        VerticalAlignment="Center"
                                        Margin="0,0,8,0" />
-                            <TextBlock Text="{Binding SelectedRepositorySourceBranchName, TargetNullValue=Standard, FallbackValue=Standard}"
+                            <TextBlock Text="{Binding SelectedRepositorySourceBranchName, TargetNullValue=Default, FallbackValue=Default}"
                                        AutomationProperties.AutomationId="BasisBranchAnzeige"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource PrimaryTextBrush}"

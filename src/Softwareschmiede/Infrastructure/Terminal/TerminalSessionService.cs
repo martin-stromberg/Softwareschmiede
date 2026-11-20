@@ -104,7 +104,7 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
     }
 
     /// <summary>Wählt das Backend: Der E2E-Testmodus erzwingt Pipe; ansonsten gilt die im Preflight
-    /// abgeleitete <see cref="TerminalPreflightResult.BackendEmpfehlung"/> (einzige Entscheidungslogik).
+    /// abgeleitete <see cref="TerminalPreflightResult.BackendRecommendation"/> (einzige Entscheidungslogik).
     /// Die Fehlerfälle (Executable nicht auflösbar, RequiresPty ohne PTY) wurden zuvor bereits abgefangen.</summary>
     private IPseudoConsoleProcessLauncher SelectBackend(TerminalSessionStartSpec spec, TerminalPreflightResult preflight, ITerminalOutputSink? outputSink)
     {
@@ -114,7 +114,7 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
             return _pipeLauncher;
         }
 
-        if (preflight.BackendEmpfehlung == TerminalBackendEmpfehlung.Pty)
+        if (preflight.BackendRecommendation == TerminalBackendRecommendation.Pty)
             return _ptyLauncher;
 
         WriteDiagnosis(
@@ -159,8 +159,8 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
-            var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            var wert = await einstellungen.GetSettingAsync(ForcePtyUnavailableKey, ct).ConfigureAwait(false);
+            var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+            var wert = await settings.GetSettingAsync(ForcePtyUnavailableKey, ct).ConfigureAwait(false);
             return string.Equals(wert, "true", StringComparison.OrdinalIgnoreCase);
         }
         catch (Exception ex)

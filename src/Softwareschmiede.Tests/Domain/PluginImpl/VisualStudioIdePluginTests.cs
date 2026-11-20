@@ -32,11 +32,11 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     [Fact]
     public async Task CheckCompatibilityAsync_ShouldReturnExplicit_WhenSlnExists()
     {
-        var verzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(verzeichnis, "Loesung.sln"), string.Empty);
+        var directory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(directory, "Loesung.sln"), string.Empty);
         var sut = CreateSut();
 
-        var result = await sut.CheckCompatibilityAsync(verzeichnis, TestContext.Current.CancellationToken);
+        var result = await sut.CheckCompatibilityAsync(directory, TestContext.Current.CancellationToken);
 
         result.Should().Be(IdePluginCompatibility.Explicit);
     }
@@ -45,11 +45,11 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     [Fact]
     public async Task CheckCompatibilityAsync_ShouldReturnExplicit_WhenSlnxExists()
     {
-        var verzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(verzeichnis, "Loesung.slnx"), string.Empty);
+        var directory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(directory, "Loesung.slnx"), string.Empty);
         var sut = CreateSut();
 
-        var result = await sut.CheckCompatibilityAsync(verzeichnis, TestContext.Current.CancellationToken);
+        var result = await sut.CheckCompatibilityAsync(directory, TestContext.Current.CancellationToken);
 
         result.Should().Be(IdePluginCompatibility.Explicit);
     }
@@ -58,11 +58,11 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     [Fact]
     public async Task CheckCompatibilityAsync_ShouldReturnIncompatible_WhenNoSlnFound()
     {
-        var verzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(verzeichnis, "readme.txt"), string.Empty);
+        var directory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(directory, "readme.txt"), string.Empty);
         var sut = CreateSut();
 
-        var result = await sut.CheckCompatibilityAsync(verzeichnis, TestContext.Current.CancellationToken);
+        var result = await sut.CheckCompatibilityAsync(directory, TestContext.Current.CancellationToken);
 
         result.Should().Be(IdePluginCompatibility.Incompatible);
     }
@@ -73,9 +73,9 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     {
         var sut = CreateSut();
 
-        var aufruf = async () => await sut.CheckCompatibilityAsync(null!);
+        var call = async () => await sut.CheckCompatibilityAsync(null!);
 
-        await aufruf.Should().ThrowAsync<ArgumentException>();
+        await call.Should().ThrowAsync<ArgumentException>();
     }
 
     /// <summary>Ein leerer Pfad wirft eine Exception.</summary>
@@ -84,9 +84,9 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     {
         var sut = CreateSut();
 
-        var aufruf = async () => await sut.CheckCompatibilityAsync(string.Empty);
+        var call = async () => await sut.CheckCompatibilityAsync(string.Empty);
 
-        await aufruf.Should().ThrowAsync<ArgumentException>();
+        await call.Should().ThrowAsync<ArgumentException>();
     }
 
     /// <summary>Ein nicht existenter Pfad meldet Incompatible statt einer Exception.</summary>
@@ -105,29 +105,29 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     [Fact]
     public async Task FindEntryPointsAsync_MitMehrerenSln_LiefertAlleAlphabetischSortiert()
     {
-        var verzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(verzeichnis, "Zweite.sln"), string.Empty);
-        File.WriteAllText(Path.Combine(verzeichnis, "Erste.sln"), string.Empty);
+        var directory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(directory, "Zweite.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(directory, "Erste.sln"), string.Empty);
         var sut = CreateSut();
 
-        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis, TestContext.Current.CancellationToken);
+        var entryPoints = await sut.FindEntryPointsAsync(directory, TestContext.Current.CancellationToken);
 
         entryPoints.Should().HaveCount(2);
         entryPoints.Select(ep => ep.Path).Should().BeInAscendingOrder(StringComparer.OrdinalIgnoreCase);
-        entryPoints.Select(ep => ep.Path).Should().Contain(Path.Combine(verzeichnis, "Erste.sln"));
-        entryPoints.Select(ep => ep.Path).Should().Contain(Path.Combine(verzeichnis, "Zweite.sln"));
+        entryPoints.Select(ep => ep.Path).Should().Contain(Path.Combine(directory, "Erste.sln"));
+        entryPoints.Select(ep => ep.Path).Should().Contain(Path.Combine(directory, "Zweite.sln"));
     }
 
     /// <summary>Bei genau einer .sln-Datei liefert FindEntryPointsAsync eine Liste mit genau einem Einstiegspunkt.</summary>
     [Fact]
     public async Task FindEntryPointsAsync_MitGenauEinerSln_LiefertEinen()
     {
-        var verzeichnis = CreateTempDirectory();
-        var solutionPath = Path.Combine(verzeichnis, "Einzige.sln");
+        var directory = CreateTempDirectory();
+        var solutionPath = Path.Combine(directory, "Einzige.sln");
         File.WriteAllText(solutionPath, string.Empty);
         var sut = CreateSut();
 
-        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis, TestContext.Current.CancellationToken);
+        var entryPoints = await sut.FindEntryPointsAsync(directory, TestContext.Current.CancellationToken);
 
         entryPoints.Should().ContainSingle();
         entryPoints[0].Path.Should().Be(solutionPath);
@@ -137,11 +137,11 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     [Fact]
     public async Task FindEntryPointsAsync_OhneSln_LiefertLeereListe()
     {
-        var verzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(verzeichnis, "readme.txt"), string.Empty);
+        var directory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(directory, "readme.txt"), string.Empty);
         var sut = CreateSut();
 
-        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis, TestContext.Current.CancellationToken);
+        var entryPoints = await sut.FindEntryPointsAsync(directory, TestContext.Current.CancellationToken);
 
         entryPoints.Should().BeEmpty();
     }
@@ -150,8 +150,8 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     [Fact]
     public async Task OpenEntryPointAsync_RuftOpenSolutionFileAuf()
     {
-        var verzeichnis = CreateTempDirectory();
-        var solutionPath = Path.Combine(verzeichnis, "Loesung.sln");
+        var directory = CreateTempDirectory();
+        var solutionPath = Path.Combine(directory, "Loesung.sln");
         File.WriteAllText(solutionPath, string.Empty);
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = new VisualStudioIdePlugin(prozessStarterMock.Object);
@@ -171,9 +171,9 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     {
         var sut = CreateSut();
 
-        var aufruf = async () => await sut.OpenEntryPointAsync(null!);
+        var call = async () => await sut.OpenEntryPointAsync(null!);
 
-        await aufruf.Should().ThrowAsync<ArgumentNullException>();
+        await call.Should().ThrowAsync<ArgumentNullException>();
     }
 
     private string CreateTempDirectory() => _tempDirectoryFixture.CreateTempDirectory("visual_studio_ide_plugin_tests");

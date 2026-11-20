@@ -100,11 +100,11 @@ public partial class End2EndTest : WpfTestBase
         }
     }
 
-    private static async Task WartenBisAsync(Func<Task<bool>> bedingung, int maxVersuche = 150)
+    private static async Task WartenBisAsync(Func<Task<bool>> condition, int maxVersuche = 150)
     {
         for (var i = 0; i < maxVersuche; i++)
         {
-            if (await bedingung())
+            if (await condition())
             {
                 return;
             }

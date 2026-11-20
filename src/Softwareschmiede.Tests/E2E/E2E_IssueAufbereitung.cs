@@ -77,10 +77,10 @@ public partial class End2EndTest
             using (var db = OpenTestDbContext())
             {
                 Assert.Equal("True", db.AppSettings
-                    .Where(e => e.Key == AppEinstellungService.ScmIssueAufbereitungEnabledKey)
+                    .Where(e => e.Key == AppSettingService.ScmIssuePreparationEnabledKey)
                     .Select(e => e.Value).FirstOrDefault());
                 Assert.Equal("False", db.AppSettings
-                    .Where(e => e.Key == AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey)
+                    .Where(e => e.Key == AppSettingService.ScmIssuePreparationCommentEnabledKey)
                     .Select(e => e.Value).FirstOrDefault());
                 Assert.True(db.GitRepositories.Single(r => r.Id == repositoryId).IssuePreparationEnabled);
             }
@@ -105,9 +105,9 @@ public partial class End2EndTest
                 {
                     using var db = OpenTestDbContext();
                     db.AppSettings
-                        .Where(e => e.Key == AppEinstellungService.ScmIssueAufbereitungEnabledKey
-                            || e.Key == AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey
-                            || e.Key == AppEinstellungService.ScmIssueAufbereitungPluginKey)
+                        .Where(e => e.Key == AppSettingService.ScmIssuePreparationEnabledKey
+                            || e.Key == AppSettingService.ScmIssuePreparationCommentEnabledKey
+                            || e.Key == AppSettingService.ScmIssuePreparationPluginKey)
                         .ToList()
                         .ForEach(e => e.Value = null);
                     db.SaveChanges();

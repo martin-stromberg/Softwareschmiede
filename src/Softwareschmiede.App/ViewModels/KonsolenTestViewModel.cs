@@ -15,20 +15,20 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     private const string ZeitrafferValidierungsFehler = "Zeitraffer-Schwelle muss eine Dezimalzahl ≥ 0 sein (Sekunden; 0 = maximale Geschwindigkeit).";
 
     private readonly IDialogService _dialogService;
-    private readonly CliReplayAufzeichnungStore _store;
+    private readonly CliReplayRecordingStore _store;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<KonsolenTestViewModel> _logger;
     private readonly Action<Action> _dispatcherInvoke;
 
     private TerminalReplaySession? _replaySession;
-    private CliOutputAufzeichnung? _aufzeichnung;
+    private CliOutputRecording? _recording;
     private ITerminalSession? _session;
     private string? _dateiPfad;
     private string _statusText = "Keine Aufzeichnung geladen.";
     private string _positionsText = "Chunk 0/0";
     private string _geometrieText = "";
     private bool _istWiedergabeAktiv;
-    private bool _istPausiert;
+    private bool _isPaused;
     private bool _wiedergabeBeendet;
     private string _zeitrafferSchwelleText = "1";
     // Zuletzt gültige Zeitraffer-Schwelle — muss zum Initialwert von _zeitrafferSchwelleText
@@ -36,14 +36,14 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     // (Neustart/neues Laden) dieselbe Schwelle übernimmt statt still auf ihren Default
     // (Echtzeit) zurückzufallen.
     private TimeSpan _zeitrafferSchwelle = TimeSpan.FromSeconds(1);
-    private string? _fehlerMeldung;
+    private string? _errorMessage;
     private string? _unvollstaendigHinweis;
     private CliChunkAnzeigeEintrag? _aktuellerQuellEintrag;
 
     /// <inheritdoc cref="KonsolenTestViewModel"/>
     public KonsolenTestViewModel(
         IDialogService dialogService,
-        CliReplayAufzeichnungStore store,
+        CliReplayRecordingStore store,
         TimeProvider timeProvider,
         ILogger<KonsolenTestViewModel> logger,
         Action<Action>? dispatcherInvoke = null)
@@ -61,13 +61,13 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         WiedergabeNeustartenCommand = new RelayCommand(WiedergabeNeustarten,
             () => _replaySession is not null && (IstWiedergabeAktiv || _replaySession.AktuellerChunkIndex > 0));
         WiedergabePausierenCommand = new RelayCommand(WiedergabePausierenToggle, () => IstWiedergabeAktiv);
-        SchrittVorCommand = new RelayCommand(SchrittVor,
-            () => _replaySession is not null && (!IstWiedergabeAktiv || IstPausiert)
+        SchrittVorCommand = new RelayCommand(StepForward,
+            () => _replaySession is not null && (!IstWiedergabeAktiv || IsPaused)
                 && _replaySession.AktuellerChunkIndex < QuellEintraege.Count);
-        SchrittZurueckCommand = new RelayCommand(SchrittZurueck,
-            () => _replaySession is not null && (!IstWiedergabeAktiv || IstPausiert)
+        SchrittZurueckCommand = new RelayCommand(StepBackward,
+            () => _replaySession is not null && (!IstWiedergabeAktiv || IsPaused)
                 && _replaySession.AktuellerChunkIndex > 0);
-        SchliessenCommand = new RelayCommand(Schliessen);
+        SchliessenCommand = new RelayCommand(Close);
     }
 
     /// <summary>Wird ausgelöst, wenn der Dialog geschlossen werden soll.</summary>
@@ -153,13 +153,13 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>true, solange die Wiedergabe pausiert ist.</summary>
-    public bool IstPausiert
+    public bool IsPaused
     {
-        get => _istPausiert;
+        get => _isPaused;
         // Der Pausiert-Wechsel steuert die CanExecute der Schritt-Buttons (Schritte sind nur
         // bei nicht unpausiert laufender Wiedergabe erlaubt) — daher wie IstWiedergabeAktiv
         // einen Refresh-Impuls auslösen.
-        private set => SetProperty(ref _istPausiert, value, RelayCommand.Refresh);
+        private set => SetProperty(ref _isPaused, value, RelayCommand.Refresh);
     }
 
     /// <summary>Eingabe der Zeitraffer-Schwelle in Sekunden (Dezimalzahl ≥ 0; 0 = maximale Geschwindigkeit).</summary>
@@ -171,11 +171,11 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
             if (!SetProperty(ref _zeitrafferSchwelleText, value))
                 return;
 
-            if (TryParseZeitrafferSchwelle(value, out var schwelle))
+            if (TryParseZeitrafferSchwelle(value, out var threshold))
             {
-                _zeitrafferSchwelle = schwelle;
+                _zeitrafferSchwelle = threshold;
                 if (_replaySession is not null)
-                    _replaySession.ZeitrafferSchwelle = schwelle;
+                    _replaySession.TimeLapseThreshold = threshold;
                 if (FehlerMeldung == ZeitrafferValidierungsFehler)
                     FehlerMeldung = null;
             }
@@ -190,8 +190,8 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     /// <summary>Fehlermeldung des Dialogs (Laden/Validierung), oder null.</summary>
     public string? FehlerMeldung
     {
-        get => _fehlerMeldung;
-        private set => SetProperty(ref _fehlerMeldung, value);
+        get => _errorMessage;
+        private set => SetProperty(ref _errorMessage, value);
     }
 
     /// <summary>Hinweistext, wenn die geladene Aufzeichnung unvollständig ist, sonst null.</summary>
@@ -220,11 +220,11 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var aufzeichnung = await _store.LadeAsync(path, ct);
+            var recording = await _store.LoadAsync(path, ct);
             // Die Quelltext-Formatierung großer Aufzeichnungen läuft abseits des UI-Threads;
             // die ObservableCollection wird erst danach auf dem UI-Thread befüllt.
-            var eintraege = await Task.Run(() => ErzeugeQuellEintraege(aufzeichnung), ct);
-            LadeAufzeichnung(path, aufzeichnung, eintraege);
+            var entries = await Task.Run(() => ErzeugeQuellEintraege(recording), ct);
+            LadeAufzeichnung(path, recording, entries);
         }
         catch (OperationCanceledException)
         {
@@ -237,60 +237,60 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void LadeAufzeichnung(string path, CliOutputAufzeichnung aufzeichnung, IReadOnlyList<CliChunkAnzeigeEintrag> eintraege)
+    private void LadeAufzeichnung(string path, CliOutputRecording recording, IReadOnlyList<CliChunkAnzeigeEintrag> entries)
     {
         EntsorgeReplaySession();
 
         // Cols/Rows > 0 ist durch die Store-Validierung beim Laden bereits garantiert —
         // ein weiterer Default-Fallback an dieser Stelle wäre unerreichbarer Code.
-        _aufzeichnung = aufzeichnung;
-        _replaySession = ErzeugeReplaySession(aufzeichnung);
+        _recording = recording;
+        _replaySession = ErzeugeReplaySession(recording);
 
         DateiPfad = path;
         QuellEintraege.Clear();
-        foreach (var eintrag in eintraege)
-            QuellEintraege.Add(eintrag);
+        foreach (var entry in entries)
+            QuellEintraege.Add(entry);
 
         AktuellerQuellEintrag = null;
         IstWiedergabeAktiv = false;
-        IstPausiert = false;
+        IsPaused = false;
         _wiedergabeBeendet = false;
         FehlerMeldung = null;
-        UnvollstaendigHinweis = aufzeichnung.IstVollstaendig
+        UnvollstaendigHinweis = recording.IstVollstaendig
             ? null
             : "Aufzeichnung unvollständig — das Speicher-Limit wurde erreicht; die Wiedergabe endet vor dem tatsächlichen Ende der Session.";
-        PositionsText = $"Chunk 0/{aufzeichnung.Chunks.Count}";
-        SetzeGeometrieText(aufzeichnung);
-        StatusText = $"Aufzeichnung geladen ({aufzeichnung.PluginName}, {aufzeichnung.Chunks.Count} Chunks) — bereit.";
+        PositionsText = $"Chunk 0/{recording.Chunks.Count}";
+        SetzeGeometrieText(recording);
+        StatusText = $"Aufzeichnung geladen ({recording.PluginName}, {recording.Chunks.Count} Chunks) — bereit.";
         Session = _replaySession;
     }
 
-    private static List<CliChunkAnzeigeEintrag> ErzeugeQuellEintraege(CliOutputAufzeichnung aufzeichnung)
+    private static List<CliChunkAnzeigeEintrag> ErzeugeQuellEintraege(CliOutputRecording recording)
     {
-        var eintraege = new List<CliChunkAnzeigeEintrag>(aufzeichnung.Chunks.Count);
-        for (var i = 0; i < aufzeichnung.Chunks.Count; i++)
+        var entries = new List<CliChunkAnzeigeEintrag>(recording.Chunks.Count);
+        for (var i = 0; i < recording.Chunks.Count; i++)
         {
-            var chunk = aufzeichnung.Chunks[i];
-            eintraege.Add(new CliChunkAnzeigeEintrag
+            var chunk = recording.Chunks[i];
+            entries.Add(new CliChunkAnzeigeEintrag
             {
                 // 1-basiert: die #-Spalte zählt wie der PositionsText die angewendeten
                 // Chunks — „Chunk n/y" selektiert die Zeile „#n".
                 Index = i + 1,
                 Offset = chunk.Offset,
-                Laenge = chunk.Data.Length,
+                Length = chunk.Data.Length,
                 Quelltext = CliChunkQuelltextFormatter.Formatiere(chunk.Data),
             });
         }
-        return eintraege;
+        return entries;
     }
 
-    private TerminalReplaySession ErzeugeReplaySession(CliOutputAufzeichnung aufzeichnung)
+    private TerminalReplaySession ErzeugeReplaySession(CliOutputRecording recording)
     {
-        var session = new TerminalReplaySession(aufzeichnung, _timeProvider);
+        var session = new TerminalReplaySession(recording, _timeProvider);
         // Immer die zuletzt gültige Schwelle übernehmen — steht im Textfeld gerade ein
         // ungültiger Wert (Fehlerbanner), darf die frische Session nicht still auf ihren
         // Default (Echtzeit-Wiedergabe) zurückfallen.
-        session.ZeitrafferSchwelle = _zeitrafferSchwelle;
+        session.TimeLapseThreshold = _zeitrafferSchwelle;
         session.BufferChanged += OnReplayBufferChanged;
         session.Exited += OnReplayExited;
         return session;
@@ -314,12 +314,12 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         GeometrieText = "";
     }
 
-    private void SetzeGeometrieText(CliOutputAufzeichnung aufzeichnung)
-        => GeometrieText = $"Aufzeichnung: {aufzeichnung.Cols}×{aufzeichnung.Rows}";
+    private void SetzeGeometrieText(CliOutputRecording recording)
+        => GeometrieText = $"Aufzeichnung: {recording.Cols}×{recording.Rows}";
 
     private void WiedergabeStarten()
     {
-        if (_replaySession is null || _aufzeichnung is null || IstWiedergabeAktiv)
+        if (_replaySession is null || _recording is null || IstWiedergabeAktiv)
             return;
 
         // WiedergabeStarten der Session ist bewusst idempotent — für ein echtes erneutes
@@ -330,13 +330,13 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
 
         _replaySession.WiedergabeStarten();
         IstWiedergabeAktiv = true;
-        IstPausiert = false;
+        IsPaused = false;
         StatusText = "Wiedergabe läuft.";
     }
 
     private void WiedergabeNeustarten()
     {
-        if (_replaySession is null || _aufzeichnung is null
+        if (_replaySession is null || _recording is null
             || (!IstWiedergabeAktiv && _replaySession.AktuellerChunkIndex == 0))
             return;
 
@@ -346,17 +346,17 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         ErsetzeReplaySessionDurchFrische();
         _replaySession.WiedergabeStarten();
         IstWiedergabeAktiv = true;
-        IstPausiert = false;
+        IsPaused = false;
         StatusText = "Wiedergabe läuft.";
     }
 
     private void ErsetzeReplaySessionDurchFrische()
     {
         EntsorgeReplaySession();
-        _replaySession = ErzeugeReplaySession(_aufzeichnung!);
+        _replaySession = ErzeugeReplaySession(_recording!);
         AktuellerQuellEintrag = null;
-        PositionsText = $"Chunk 0/{_aufzeichnung!.Chunks.Count}";
-        SetzeGeometrieText(_aufzeichnung);
+        PositionsText = $"Chunk 0/{_recording!.Chunks.Count}";
+        SetzeGeometrieText(_recording);
         Session = _replaySession;
         _wiedergabeBeendet = false;
     }
@@ -366,28 +366,28 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         if (_replaySession is null || !IstWiedergabeAktiv)
             return;
 
-        if (_replaySession.IstPausiert)
+        if (_replaySession.IsPaused)
         {
-            _replaySession.Fortsetzen();
-            IstPausiert = false;
+            _replaySession.Resume();
+            IsPaused = false;
             StatusText = "Wiedergabe läuft.";
         }
         else
         {
-            _replaySession.Pausieren();
-            IstPausiert = true;
+            _replaySession.Pause();
+            IsPaused = true;
             StatusText = "Pausiert.";
         }
     }
 
-    private void SchrittVor()
+    private void StepForward()
     {
         // RelayCommand.Execute wertet CanExecute nicht aus — der Wiedergabe-Zustandsteil
         // der Sperre muss hier intern nachgezogen werden, damit ein programmatischer
         // Aufruf die Position nicht mitten im unpausierten Lauf mutiert (die
         // Positionsgrenzen meldet die Session über ihren Rückgabewert).
-        if (_replaySession is null || (IstWiedergabeAktiv && !IstPausiert)
-            || !_replaySession.SchrittVor())
+        if (_replaySession is null || (IstWiedergabeAktiv && !IsPaused)
+            || !_replaySession.StepForward())
             return;
 
         // Am Ende gilt der aus OnReplayExited gesetzte Text „Wiedergabe beendet." —
@@ -396,15 +396,15 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
             StatusText = $"Einzelschritt — Chunk {_replaySession.AktuellerChunkIndex}/{QuellEintraege.Count} angewendet.";
     }
 
-    private void SchrittZurueck()
+    private void StepBackward()
     {
         // Interner Guard wie in SchrittVor (CanExecute wird von RelayCommand.Execute
         // nicht ausgewertet).
-        if (_replaySession is null || (IstWiedergabeAktiv && !IstPausiert))
+        if (_replaySession is null || (IstWiedergabeAktiv && !IsPaused))
             return;
 
         var vorherigePosition = _replaySession.AktuellerChunkIndex;
-        if (!_replaySession.SchrittZurueck())
+        if (!_replaySession.StepBackward())
             return;
 
         // Die Position hat das Ende verlassen — „Abspielen" darf die Session nicht mehr
@@ -415,7 +415,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         StatusText = $"Schritt zurück — Chunk {vorherigePosition}/{QuellEintraege.Count} zurückgenommen.";
     }
 
-    private void Schliessen()
+    private void Close()
     {
         EntsorgeReplaySession();
         CloseRequested?.Invoke(this, false);
@@ -455,15 +455,15 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
                 return;
 
             IstWiedergabeAktiv = false;
-            IstPausiert = false;
+            IsPaused = false;
             _wiedergabeBeendet = true;
             StatusText = "Wiedergabe beendet.";
         });
     }
 
-    private static bool TryParseZeitrafferSchwelle(string? text, out TimeSpan schwelle)
+    private static bool TryParseZeitrafferSchwelle(string? text, out TimeSpan threshold)
     {
-        schwelle = TimeSpan.Zero;
+        threshold = TimeSpan.Zero;
         if (string.IsNullOrWhiteSpace(text))
             return false;
 
@@ -478,7 +478,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
             || sekunden > TimeSpan.MaxValue.TotalSeconds)
             return false;
 
-        schwelle = TimeSpan.FromSeconds(sekunden);
+        threshold = TimeSpan.FromSeconds(sekunden);
         return true;
     }
 }

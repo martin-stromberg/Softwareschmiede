@@ -15,8 +15,8 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class ProjectListViewModelTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly ProjektService _projektService;
-    private readonly AufgabeService _aufgabeService;
+    private readonly ProjectService _projektService;
+    private readonly WorkItemService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IPluginManager> _pluginManagerMock;
@@ -30,8 +30,8 @@ public sealed class ProjectListViewModelTests : IDisposable
         _pluginManagerMock = new Mock<IPluginManager>();
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
-        _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance, _pluginManagerMock.Object);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance, _pluginManagerMock.Object);
+        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
     }
 
     /// <summary>Dispose.</summary>

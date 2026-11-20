@@ -17,9 +17,9 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly TodoService _todoService;
-    private readonly AufgabeService _aufgabeService;
-    private readonly KiAusfuehrungsService _kiService;
-    private readonly PromptZeitVersandService _promptZeitVersandService;
+    private readonly WorkItemService _aufgabeService;
+    private readonly AiExecutionService _kiService;
+    private readonly PromptScheduleDispatchService _promptZeitVersandService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IRunningAutomationStatusSource> _runningStatusSourceMock;
     private readonly Guid _projektId = Guid.NewGuid();
@@ -29,9 +29,9 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, _todoService);
+        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, _todoService);
         _kiService = TestKiAusfuehrungsServiceFactory.Create();
-        _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
+        _promptZeitVersandService = new PromptScheduleDispatchService(_kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         _serviceProviderMock = new Mock<IServiceProvider>();
         _runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
 
@@ -40,8 +40,8 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         _serviceProviderMock.Setup(sp => sp.GetService(typeof(IPluginManager))).Returns(pluginManagerMock.Object);
 
-        var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
-        var recoveryService = new AufgabeRecoveryService(_db, _runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance);
+        var projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        var recoveryService = new WorkItemRecoveryService(_db, _runningStatusSourceMock.Object, NullLogger<WorkItemRecoveryService>.Instance);
         var dashboardViewModel = new DashboardViewModel(projektService, _aufgabeService, recoveryService, NullLogger<DashboardViewModel>.Instance);
         _serviceProviderMock.Setup(sp => sp.GetService(typeof(DashboardViewModel))).Returns(dashboardViewModel);
 

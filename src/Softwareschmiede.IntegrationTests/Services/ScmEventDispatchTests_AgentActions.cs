@@ -54,7 +54,7 @@ public sealed class ScmEventDispatchTests_AgentActions
         await fixture.InitializeAsync();
         var botRepository = fixture.Repository with
         {
-            Konto = ScmKontoModus.SeparatesKonto,
+            Account = ScmKontoModus.SeparatesKonto,
             ViewerId = "BOT",
             ViewerLogin = "scm-bot"
         };
@@ -64,7 +64,7 @@ public sealed class ScmEventDispatchTests_AgentActions
             .Returns((ScmRepositoryContext context, CancellationToken _) =>
             {
                 contexts.Add(context);
-                return Task.FromResult(botRepository with { Konto = context.Konto });
+                return Task.FromResult(botRepository with { Account = context.Account });
             });
         var (_, eventId) = await fixture.AddAsync(configured: true,
             body: "@scm-bot bitte übernehmen", eventRepository: botRepository);
@@ -73,7 +73,7 @@ public sealed class ScmEventDispatchTests_AgentActions
 
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
         var context = Assert.Single(contexts);
-        Assert.Equal(ScmKontoModus.SeparatesKonto, context.Konto);
+        Assert.Equal(ScmKontoModus.SeparatesKonto, context.Account);
     }
 
     /// <summary>Ein Fehler beim Auflösen der Agenten-Anbindung blockiert den regulären CLI-Start

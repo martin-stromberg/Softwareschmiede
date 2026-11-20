@@ -71,9 +71,9 @@ public partial class End2EndTest
         Assert.False(taskDetailReopened.HasIdeDropdown());
 
         // Phase 3: Zwei .sln-Dateien anlegen und die Aufgabe neu laden - der Dropdown-Button wird sichtbar.
-        var lokalerKlonPfad = await GetLokalerKlonPfadAsync();
-        var ersteSolution = Path.Combine(lokalerKlonPfad, "Erste.sln");
-        var zweiteSolution = Path.Combine(lokalerKlonPfad, "Zweite.sln");
+        var localClonePath = await GetLokalerKlonPfadAsync();
+        var ersteSolution = Path.Combine(localClonePath, "Erste.sln");
+        var zweiteSolution = Path.Combine(localClonePath, "Zweite.sln");
         File.WriteAllText(ersteSolution, string.Empty);
         File.WriteAllText(zweiteSolution, string.Empty);
         taskDetailReopened = taskDetailReopened.Reload();

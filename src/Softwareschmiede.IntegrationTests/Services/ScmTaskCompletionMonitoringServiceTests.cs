@@ -87,7 +87,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await SetWaitAsync(fixture, 5);
         SetupPullRequestStatus(fixture, PullRequestStatus.Merged);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
-        var promptService = fixture.Services.GetRequiredService<PromptZeitVersandService>();
+        var promptService = fixture.Services.GetRequiredService<PromptScheduleDispatchService>();
 
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
         Assert.NotNull((await TaskAsync(fixture, taskId)).ScmCompletionDetectedUtc);
@@ -168,22 +168,22 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: null);
         await AddIssueReferenceAsync(fixture, taskId, 7);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetScmKontoModusAsync(ScmKontoModus.SeparatesKonto, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetScmAccountModeAsync(ScmKontoModus.SeparatesKonto, TestContext.Current.CancellationToken);
         var contexts = new List<ScmRepositoryContext>();
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
             .Returns((ScmRepositoryContext context, CancellationToken _) =>
             {
                 contexts.Add(context);
-                return Task.FromResult(fixture.Repository with { Konto = context.Konto });
+                return Task.FromResult(fixture.Repository with { Account = context.Account });
             });
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var context = Assert.Single(contexts);
-        Assert.Equal(ScmKontoModus.Benutzerkonto, context.Konto);
+        Assert.Equal(ScmKontoModus.Benutzerkonto, context.Account);
         Assert.Equal("https://github.com/owner/repo", context.RepositoryId);
     }
 
@@ -201,8 +201,8 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmTaskCompletionEnabledKey, false, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmTaskCompletionEnabledKey, false, TestContext.Current.CancellationToken);
 
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -369,14 +369,14 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
     [Theory]
     [InlineData(ScmTaskCompletionCheckMode.EventDriven)]
     [InlineData(ScmTaskCompletionCheckMode.AllWorkItems)]
-    public async Task Monitor_AufgabeOhneIssueUndOhnePullRequest_WirdNiemalsBeendet(ScmTaskCompletionCheckMode modus)
+    public async Task Monitor_AufgabeOhneIssueUndOhnePullRequest_WirdNiemalsBeendet(ScmTaskCompletionCheckMode mode)
     {
         var time = new TestTimeProvider();
         await using var fixture = new ScmDispatchFixture(time: time);
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: null);
-        await SetPruefmodusAsync(fixture, modus);
+        await SetPruefmodusAsync(fixture, mode);
         await SetWaitAsync(fixture, 0);
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
@@ -422,15 +422,15 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
     private static async Task SetWaitAsync(ScmDispatchFixture fixture, int minutes)
     {
         using var scope = fixture.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-            .SetIntSettingAsync(AppEinstellungService.ScmTaskCompletionWaitMinutesKey, minutes);
+        await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+            .SetIntSettingAsync(AppSettingService.ScmTaskCompletionWaitMinutesKey, minutes);
     }
 
-    private static async Task SetPruefmodusAsync(ScmDispatchFixture fixture, ScmTaskCompletionCheckMode modus)
+    private static async Task SetPruefmodusAsync(ScmDispatchFixture fixture, ScmTaskCompletionCheckMode mode)
     {
         using var scope = fixture.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-            .SetScmTaskCompletionPruefmodusAsync(modus);
+        await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+            .SetScmTaskCompletionCheckModeAsync(mode);
     }
 
     private static async Task AddIssueReferenceAsync(ScmDispatchFixture fixture, Guid taskId, int? number)

@@ -10,17 +10,17 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly ProtokollService _protokollService;
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProjektService _projektService;
+    private readonly LogService _logService;
+    private readonly WorkItemService _aufgabeService;
+    private readonly ProjectService _projektService;
 
     /// <summary>RateLimitDetectionServiceIntegrationTests.</summary>
     public RateLimitDetectionServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
-        _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
-        _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
+        _logService = new LogService(_db, NullLogger<LogService>.Instance);
+        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
@@ -34,18 +34,18 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
         var workItem = await _aufgabeService.CreateAsync(project.Id, "RateLimit-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         var markerZeile = "[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-15T10:00:00Z]]";
-        await _protokollService.AddCliOutputAsync(workItem.Id, markerZeile, TestContext.Current.CancellationToken);
+        await _logService.AddCliOutputAsync(workItem.Id, markerZeile, TestContext.Current.CancellationToken);
 
-        var eintraege = await _protokollService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
-        eintraege.Should().HaveCount(2);
-        eintraege.Should().Contain(e => e.Type == LogEntryType.RateLimit);
+        var entries = await _logService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        entries.Should().HaveCount(2);
+        entries.Should().Contain(e => e.Type == LogEntryType.RateLimit);
     }
 
     /// <summary><summary>ParseRateLimitMarker_ExtrahiertZeitstempel_Korrekt.</summary>.</summary>
     [Fact]
     public void ParseRateLimitMarker_ExtrahiertZeitstempel_Korrekt()
     {
-        var (found, _, resetUtc) = ProtokollService.ParseRateLimitMarker("[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-15T10:00:00Z]]");
+        var (found, _, resetUtc) = LogService.ParseRateLimitMarker("[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-15T10:00:00Z]]");
 
         found.Should().BeTrue();
         resetUtc.Should().NotBeNull();

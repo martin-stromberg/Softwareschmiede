@@ -32,10 +32,10 @@ internal sealed class ScmE2EFixture
         Hold("complete", true);
         await using var db = OpenDatabase();
         await db.Database.MigrateAsync();
-        var settings = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        await settings.SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad));
-        await settings.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, null);
-        await settings.SetSettingAsync(ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey, Configuration.TestRoot);
+        var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        await settings.SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath));
+        await settings.SetSettingAsync(AppSettingService.DefaultKiPluginKey, null);
+        await settings.SetSettingAsync(WorkingDirectorySettingsService.RepositoriesWorkdirKey, Configuration.TestRoot);
         var origin = Path.Combine(Configuration.TestRoot, "origin");
         Directory.CreateDirectory(origin);
         await GitAsync(origin, "init", "--initial-branch=main");
@@ -108,11 +108,11 @@ internal sealed class ScmE2EFixture
         SaveScenario();
     }
 
-    public async Task SetKontoModus(ScmKontoModus modus)
+    public async Task SetKontoModus(ScmKontoModus mode)
     {
         await using var db = OpenDatabase();
-        var settings = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        await settings.SetScmKontoModusAsync(modus);
+        var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        await settings.SetScmAccountModeAsync(mode);
     }
 
     public void SaveScenario()

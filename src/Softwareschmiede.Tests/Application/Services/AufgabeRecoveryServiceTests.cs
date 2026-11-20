@@ -34,7 +34,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     {
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         await sut.RecoverManuellAsync(workItem.Id, TestContext.Current.CancellationToken);
 
@@ -50,7 +50,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     {
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Waiting);
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         await sut.RecoverManuellAsync(workItem.Id, TestContext.Current.CancellationToken);
 
@@ -76,7 +76,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [InlineData(WorkItemStatus.Completed, WorkItemExecutionStatus.Active, false)]
     public void IstRecoveryStatus_ShouldMatchAllowedStates(WorkItemStatus status, WorkItemExecutionStatus executionStatus, bool expected)
     {
-        AufgabeRecoveryService.IstRecoveryStatus(status, executionStatus).Should().Be(expected);
+        WorkItemRecoveryService.IstRecoveryStatus(status, executionStatus).Should().Be(expected);
     }
 
     /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning.</summary>.</summary>
@@ -85,7 +85,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     {
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var running = new FakeRunningAutomationStatusSource(true);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         var act = () => sut.RecoverManuellAsync(workItem.Id);
 
@@ -99,7 +99,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     {
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.New);
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         var act = () => sut.RecoverManuellAsync(workItem.Id);
 
@@ -113,7 +113,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     {
         var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var running = new ThrowingRunningAutomationStatusSource();
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         var act = () => sut.RecoverManuellAsync(workItem.Id);
 
@@ -188,7 +188,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         // Act
         var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
@@ -219,7 +219,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(true);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
 
@@ -256,7 +256,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         var kandidaten = (await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken)).ToList();
 
@@ -274,7 +274,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
         var act = () => sut.RecoverManuellAsync(workItem.Id);
 

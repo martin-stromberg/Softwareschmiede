@@ -22,7 +22,7 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase, IIssueTemplateTextGen
     public override string PluginName => "GitHub Copilot";
 
     /// <inheritdoc/>
-    public override string ProviderDateiPraefix => "copilot";
+    public override string ProviderFilePrefix => "copilot";
 
     /// <inheritdoc/>
     public override string PluginPrefix => "Softwareschmiede.GitHubCopilot";

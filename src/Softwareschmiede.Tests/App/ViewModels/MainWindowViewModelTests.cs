@@ -18,7 +18,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly TodoService _todoService;
-    private readonly AufgabeService _aufgabeService;
+    private readonly WorkItemService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IRunningAutomationStatusSource> _runningStatusSourceMock;
@@ -30,7 +30,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, _todoService);
+        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, _todoService);
         _serviceProviderMock = new Mock<IServiceProvider>();
         _dialogServiceMock = new Mock<IDialogService>();
         _runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
@@ -47,8 +47,8 @@ public sealed class MainWindowViewModelTests : IDisposable
         });
         _db.SaveChanges();
 
-        var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
-        var recoveryService = new AufgabeRecoveryService(_db, _runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance);
+        var projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        var recoveryService = new WorkItemRecoveryService(_db, _runningStatusSourceMock.Object, NullLogger<WorkItemRecoveryService>.Instance);
         var dashboardViewModel = new DashboardViewModel(projektService, _aufgabeService, recoveryService, NullLogger<DashboardViewModel>.Instance);
 
         _serviceProviderMock
@@ -78,16 +78,16 @@ public sealed class MainWindowViewModelTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     private MainWindowViewModel CreateSut(
-        IAktiveAufgabenService? aufgabeService = null,
+        IActiveWorkItemsService? aufgabeService = null,
         IDialogService? dialogService = null,
         IApplicationVersionProvider? versionProvider = null,
-        AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null,
+        WorkItemRunDataChangedNotifier? laufdatenChangedNotifier = null,
         AufgabenListenModusService? aufgabenListenModusService = null)
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var darkModeService = new DarkModeService(scopeFactoryMock.Object, NullLogger<DarkModeService>.Instance);
         var kiService = TestKiAusfuehrungsServiceFactory.Create();
-        var promptZeitVersandService = new PromptZeitVersandService(kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
+        var promptZeitVersandService = new PromptScheduleDispatchService(kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         return new MainWindowViewModel(
             darkModeService,
             _serviceProviderMock.Object,
@@ -104,7 +104,7 @@ public sealed class MainWindowViewModelTests : IDisposable
                 AufgabenListenModusService: aufgabenListenModusService));
     }
 
-    private ProjectListViewModel CreateProjectListViewModel(ProjektService projektService)
+    private ProjectListViewModel CreateProjectListViewModel(ProjectService projektService)
     {
         return new ProjectListViewModel(
             projektService,
@@ -113,7 +113,7 @@ public sealed class MainWindowViewModelTests : IDisposable
             NullLogger<ProjectListViewModel>.Instance);
     }
 
-    private ProjectDetailViewModel CreateProjectDetailViewModel(ProjektService projektService)
+    private ProjectDetailViewModel CreateProjectDetailViewModel(ProjectService projektService)
     {
         return new ProjectDetailViewModel(
             projektService,
@@ -191,10 +191,10 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldMapPausiertBisUtc_WhenTaskIsPaused()
     {
         // Arrange
-        var pausiertBis = DateTimeOffset.UtcNow.AddHours(2);
+        var pausedUntil = DateTimeOffset.UtcNow.AddHours(2);
         var workItem = await _aufgabeService.CreateAsync(_projektId, "Pausierte Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _aufgabeService.StartenAsync(workItem.Id, "feature/pause", "/tmp/pause", ct: TestContext.Current.CancellationToken);
-        await _aufgabeService.SetPauseAsync(workItem.Id, pausiertBis, TestContext.Current.CancellationToken);
+        await _aufgabeService.SetPauseAsync(workItem.Id, pausedUntil, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
@@ -202,8 +202,8 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         // Assert
         var item = sut.AktiveAufgabenListe.Single(a => a.Id == workItem.Id);
-        item.PausedUntilUtc.Should().BeCloseTo(pausiertBis, TimeSpan.FromSeconds(5));
-        item.IstPausiert.Should().BeTrue();
+        item.PausedUntilUtc.Should().BeCloseTo(pausedUntil, TimeSpan.FromSeconds(5));
+        item.IsPaused.Should().BeTrue();
     }
 
     /// <summary>OffeneTodosAnzeigenCommand öffnet den Dialog für die Aufgabe des aktiven Listen-Items.</summary>
@@ -607,7 +607,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task LaufdatenChanged_ShouldReloadVisiblePanelItem_WhenRunDataWasPersisted()
     {
         // Arrange
-        var notifier = new AufgabeLaufdatenChangedNotifier();
+        var notifier = new WorkItemRunDataChangedNotifier();
         var converter = new KiAusfuehrungsStatusConverter();
         var workItem = await _aufgabeService.CreateAsync(_projektId, "Laufdaten-Event-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _aufgabeService.StartenAsync(workItem.Id, "feature/laufdaten-event", "/tmp/klon", ct: TestContext.Current.CancellationToken);
@@ -619,7 +619,7 @@ public sealed class MainWindowViewModelTests : IDisposable
             .Should().Be("✓ Bereit");
 
         // Act
-        await _aufgabeService.AktivenLaufSetzenAsync(workItem.Id, "run-laufdaten-event", TestContext.Current.CancellationToken);
+        await _aufgabeService.SetActiveRunAsync(workItem.Id, "run-laufdaten-event", TestContext.Current.CancellationToken);
         notifier.NotifyLaufdatenChanged(workItem.Id);
 
         // Assert
@@ -671,7 +671,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == workItem.Id,
             "der vom Konstruktor gestartete Hintergrund-Refresh soll vor der Re-Entrancy-Pruefung abgeschlossen sein");
 
-        aufgabeService.Aktivieren();
+        aufgabeService.Enable();
         var ersterAufrufTask = Task.Run(() => sut.AktiveAufgabenAktualisierenAsync(), TestContext.Current.CancellationToken);
         await aufgabeService.ErsterVerzoegerterAbruf.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
@@ -686,7 +686,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         }
         finally
         {
-            aufgabeService.Fortsetzen();
+            aufgabeService.Resume();
             await ersterAufrufTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         }
     }
@@ -736,7 +736,7 @@ public sealed class MainWindowViewModelTests : IDisposable
             LocalClonePath = "/tmp/klon"
         };
         var aufgabeService = new ZaehlenderAktiveAufgabenService([workItem]);
-        var notifier = new AufgabeLaufdatenChangedNotifier();
+        var notifier = new WorkItemRunDataChangedNotifier();
         var sut = CreateSut(aufgabeService, laufdatenChangedNotifier: notifier);
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
@@ -956,7 +956,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         await _aufgabeService.StartenAsync(workItem.Id, "feature/sort", "/tmp/sort", ct: TestContext.Current.CancellationToken);
         // StartenAsync setzt LetzterCliStartUtc bewusst auf null — der Zeitstempel entsteht erst
         // beim echten CLI-Prozessstart (CliProcessManager → AktivenLaufSetzenAsync).
-        await _aufgabeService.AktivenLaufSetzenAsync(workItem.Id, Guid.NewGuid().ToString(), TestContext.Current.CancellationToken);
+        await _aufgabeService.SetActiveRunAsync(workItem.Id, Guid.NewGuid().ToString(), TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
         // Act
@@ -1005,8 +1005,8 @@ public sealed class MainWindowViewModelTests : IDisposable
         {
             using (var scope = provider.CreateScope())
             {
-                var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-                await einstellungen.SetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey, "Repository", TestContext.Current.CancellationToken);
+                var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+                await settings.SetSettingAsync(AppSettingService.AktiveAufgabenListenModusKey, "Repository", TestContext.Current.CancellationToken);
             }
 
             var sut = CreateSut(aufgabenListenModusService: modusService);
@@ -1038,8 +1038,8 @@ public sealed class MainWindowViewModelTests : IDisposable
             while (DateTime.UtcNow < deadline && wert != "Ki")
             {
                 using var scope = provider.CreateScope();
-                wert = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                    .GetSettingAsync(AppEinstellungService.AktiveAufgabenListenModusKey, TestContext.Current.CancellationToken);
+                wert = await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                    .GetSettingAsync(AppSettingService.AktiveAufgabenListenModusKey, TestContext.Current.CancellationToken);
                 if (wert != "Ki")
                     await Task.Delay(50, TestContext.Current.CancellationToken);
             }
@@ -1053,7 +1053,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     /// <summary>Test-Datenquelle, die aktive Aufgaben kontrolliert blockierend zurueckgibt.</summary>
-    private sealed class VerzoegernderAktiveAufgabenService : IAktiveAufgabenService
+    private sealed class VerzoegernderAktiveAufgabenService : IActiveWorkItemsService
     {
         private readonly ManualResetEventSlim _fortsetzen = new();
         private readonly TaskCompletionSource _ersterVerzoegerterAbruf = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1075,10 +1075,10 @@ public sealed class MainWindowViewModelTests : IDisposable
         public int VerzoegerteAbrufe => Volatile.Read(ref _verzoegerteAbrufe);
 
         /// <summary>Aktiviert die kuenstliche Verzoegerung fuer nachfolgende Abrufe.</summary>
-        public void Aktivieren() => Volatile.Write(ref _aktiv, 1);
+        public void Enable() => Volatile.Write(ref _aktiv, 1);
 
         /// <summary>Gibt blockierte Abrufe wieder frei.</summary>
-        public void Fortsetzen() => _fortsetzen.Set();
+        public void Resume() => _fortsetzen.Set();
 
         /// <inheritdoc />
         public Task<List<Softwareschmiede.Domain.Entities.WorkItem>> GetAktiveAufgabenAsync(CancellationToken ct = default)
@@ -1095,7 +1095,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     /// <summary>Test-Datenquelle, die Abrufe zaehlt.</summary>
-    private sealed class ZaehlenderAktiveAufgabenService : IAktiveAufgabenService
+    private sealed class ZaehlenderAktiveAufgabenService : IActiveWorkItemsService
     {
         private readonly List<Softwareschmiede.Domain.Entities.WorkItem> _aufgaben;
         private int _abrufe;

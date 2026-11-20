@@ -7,7 +7,7 @@ using Softwareschmiede.Application.Services;
 namespace Softwareschmiede.App.Services.Testing;
 
 /// <summary>
-/// EF-Core-Interceptor, der ausschließlich mit dem Abfragetag <see cref="AppEinstellungService.UpdateSettingsReadTag"/>
+/// EF-Core-Interceptor, der ausschließlich mit dem Abfragetag <see cref="AppSettingService.UpdateSettingsReadTag"/>
 /// markierte Lesebefehle der Update-Einstellungen gezielt mit einer kontrollierten Exception fehlschlagen lässt.
 /// Alle anderen Lese- und Schreibbefehle bleiben unberührt.
 /// </summary>
@@ -94,7 +94,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
     /// </summary>
     private Fehlerfall? PruefeMarkiertenRead(DbCommand command)
     {
-        if (!command.CommandText.Contains(AppEinstellungService.UpdateSettingsReadTag, StringComparison.Ordinal))
+        if (!command.CommandText.Contains(AppSettingService.UpdateSettingsReadTag, StringComparison.Ordinal))
             return null;
 
         Interlocked.Increment(ref _settingsReadCount);
@@ -122,7 +122,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
                 versuch,
                 versuchIndex,
                 ordinal,
-                grenze = lesefehler?.Grenze,
+                limit = lesefehler?.Limit,
                 fehlerAktiv = lesefehler?.Active == true || _failureEnabled
             });
 
@@ -198,7 +198,7 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
                 versuch = fehlerfall.Versuch,
                 versuchIndex = fehlerfall.VersuchIndex,
                 ordinal = fehlerfall.Ordinal,
-                grenze = fehlerfall.Lesefehler.Grenze,
+                limit = fehlerfall.Lesefehler.Limit,
                 grund
             });
 

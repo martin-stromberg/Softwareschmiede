@@ -23,16 +23,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private readonly DarkModeService _darkModeService;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IAktiveAufgabenService _aufgabeService;
+    private readonly IActiveWorkItemsService _aufgabeService;
     private readonly TodoService _todoService;
-    private readonly PromptZeitVersandService _promptZeitVersandService;
+    private readonly PromptScheduleDispatchService _promptZeitVersandService;
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IRunningAutomationStatusSource _runningStatusSource;
     private readonly MainWindowUpdateFlow _updateFlow;
     private readonly IDialogService? _dialogService;
     private readonly IApplicationVersionProvider? _versionProvider;
     private readonly IPluginManager? _pluginManager;
-    private readonly AufgabeLaufdatenChangedNotifier? _laufdatenChangedNotifier;
+    private readonly WorkItemRunDataChangedNotifier? _laufdatenChangedNotifier;
     private readonly AufgabenListenModusBindung _modusBindung;
     private readonly Action<Action> _dispatcherInvoke;
     private readonly DispatcherTimer _aktualisierungsTimer;
@@ -75,7 +75,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob ein neueres Programmupdate verfügbar ist.</summary>
-    public bool UpdateVerfuegbar => _updateFlow.UpdateVerfuegbar;
+    public bool UpdateAvailable => _updateFlow.UpdateAvailable;
 
     /// <summary>Informationen zum aktuell verfügbaren Update.</summary>
     public UpdateInfo? VerfuegbaresUpdate => _updateFlow.VerfuegbaresUpdate;
@@ -149,7 +149,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// Toleranzzeit des Auto-Shutdown-Countdowns in Minuten als Texteingabe (persistiert,
-    /// gültig: ganzzahlig 0–<see cref="AppEinstellungService.AutoShutdownMaxToleranzMinuten"/>).
+    /// gültig: ganzzahlig 0–<see cref="AppSettingService.AutoShutdownMaxToleranceMinutes"/>).
     /// </summary>
     public string AutoShutdownToleranzMinuten
     {
@@ -212,9 +212,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public MainWindowViewModel(
         DarkModeService darkModeService,
         IServiceProvider serviceProvider,
-        IAktiveAufgabenService aufgabeService,
+        IActiveWorkItemsService aufgabeService,
         TodoService todoService,
-        PromptZeitVersandService promptZeitVersandService,
+        PromptScheduleDispatchService promptZeitVersandService,
         ILogger<MainWindowViewModel> logger,
         IRunningAutomationStatusSource runningStatusSource,
         MainWindowOptionaleDienste? optionaleDienste = null)

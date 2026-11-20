@@ -95,15 +95,15 @@ public sealed partial class App : System.Windows.Application
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             await db.Database.MigrateAsync();
 
-            var promptVorlagenService = scope.ServiceProvider.GetRequiredService<PromptVorlagenService>();
-            await promptVorlagenService.EnsureInitialPromptVorlagenAsync();
+            var promptVorlagenService = scope.ServiceProvider.GetRequiredService<PromptTemplateService>();
+            await promptVorlagenService.EnsureInitialPromptTemplatesAsync();
         }
 
         // Re-Arm persistierter zeitgesteuerter Prompts bewusst NACH MigrateAsync: Bei einem Update,
         // das die Tabelle neu erzeugt, darf der Zugriff nicht vor der Migration erfolgen.
         try
         {
-            var promptZeitVersandService = _host.Services.GetRequiredService<PromptZeitVersandService>();
+            var promptZeitVersandService = _host.Services.GetRequiredService<PromptScheduleDispatchService>();
             await promptZeitVersandService.RestoreScheduledPromptsAsync();
         }
         catch (Exception ex)
@@ -211,14 +211,14 @@ public sealed partial class App : System.Windows.Application
 
         // Domain Services
         services.AddScoped<TodoService>();
-        services.AddScoped<AufgabeService>();
-        services.AddScoped<IAktiveAufgabenService>(sp => sp.GetRequiredService<AufgabeService>());
-        services.AddScoped<ProjektService>();
-        services.AddScoped<ProtokollService>();
-        services.AddScoped<RepositoryStartskriptService>();
-        services.AddScoped<RepositoryInitialisierungService>();
+        services.AddScoped<WorkItemService>();
+        services.AddScoped<IActiveWorkItemsService>(sp => sp.GetRequiredService<WorkItemService>());
+        services.AddScoped<ProjectService>();
+        services.AddScoped<LogService>();
+        services.AddScoped<RepositoryStartScriptService>();
+        services.AddScoped<RepositoryInitializationService>();
         services.AddScoped<GitOrchestrationService>();
-        services.AddScoped<PullRequestReferenzService>();
+        services.AddScoped<PullRequestReferenceService>();
         services.Configure<ScmEventOptions>(context.Configuration.GetSection("ScmEvents"));
         services.AddSingleton(ScmTaskCoordinator.Shared);
         services.AddSingleton<ScmEventStartupGate>();
@@ -228,50 +228,50 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ScmEventOutbox>();
         services.AddScoped<ScmEventOrchestrator>();
         // Prozessweiter Reservierungsbestand der SCM-Ausführungsbegrenzung (geteilt über alle Scopes).
-        services.AddSingleton<ScmStartPlatzReservierungsPool>();
+        services.AddSingleton<ScmStartSlotReservationPool>();
         services.AddScoped<ScmEventExecutionLimitService>();
         services.AddScoped<ScmEventTaskResolver>();
-        services.AddScoped<ScmIssueAufbereitungsService>();
+        services.AddScoped<ScmIssuePreparationService>();
         services.AddScoped<ScmBackmergeService>();
         services.AddSingleton<ScmEventMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmEventMonitoringService>());
         services.AddSingleton<ScmBackmergeMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmBackmergeMonitoringService>());
-        services.AddSingleton<ScmIssueAufbereitungMonitoringService>();
-        services.AddHostedService(sp => sp.GetRequiredService<ScmIssueAufbereitungMonitoringService>());
+        services.AddSingleton<ScmIssuePreparationMonitoringService>();
+        services.AddHostedService(sp => sp.GetRequiredService<ScmIssuePreparationMonitoringService>());
         services.AddSingleton<ScmEventExchangeService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmEventExchangeService>());
-        services.AddScoped<EntwicklungsprozessService>(sp => new EntwicklungsprozessService(
-            sp.GetRequiredService<AufgabeService>(),
-            sp.GetRequiredService<ProtokollService>(),
+        services.AddScoped<DevelopmentProcessService>(sp => new DevelopmentProcessService(
+            sp.GetRequiredService<WorkItemService>(),
+            sp.GetRequiredService<LogService>(),
             sp.GetRequiredService<IGitPlugin>(),
             sp.GetRequiredService<PluginSelectionService>(),
             sp.GetRequiredService<IWorkingDirectoryResolver>(),
-            new EntwicklungsprozessServiceOptions(
-                ProjektService: sp.GetRequiredService<ProjektService>(),
-                RepositoryStartskriptService: sp.GetRequiredService<RepositoryStartskriptService>(),
-                RepositoryInitialisierungService: sp.GetRequiredService<RepositoryInitialisierungService>(),
-                KiAusfuehrungsService: sp.GetRequiredService<KiAusfuehrungsService>(),
+            new DevelopmentProcessServiceOptions(
+                ProjectService: sp.GetRequiredService<ProjectService>(),
+                RepositoryStartScriptService: sp.GetRequiredService<RepositoryStartScriptService>(),
+                RepositoryInitializationService: sp.GetRequiredService<RepositoryInitializationService>(),
+                AiExecutionService: sp.GetRequiredService<AiExecutionService>(),
                 GitOrchestrationService: sp.GetRequiredService<GitOrchestrationService>(),
-                PromptZeitVersandService: sp.GetRequiredService<PromptZeitVersandService>()),
-            sp.GetRequiredService<ILogger<EntwicklungsprozessService>>()));
-        services.AddScoped<BenachrichtigungsService>();
-        services.AddScoped<BenachrichtigungsEinstellungenService>();
-        services.AddScoped<BenachrichtigungsAuditService>();
-        services.AddScoped<AppEinstellungService>();
-        services.AddScoped<KiPluginLimitService>();
-        services.AddScoped<ArbeitsverzeichnisSettingsService>();
+                PromptScheduleDispatchService: sp.GetRequiredService<PromptScheduleDispatchService>()),
+            sp.GetRequiredService<ILogger<DevelopmentProcessService>>()));
+        services.AddScoped<NotificationService>();
+        services.AddScoped<NotificationSettingsService>();
+        services.AddScoped<NotificationAuditService>();
+        services.AddScoped<AppSettingService>();
+        services.AddScoped<AiPluginLimitService>();
+        services.AddScoped<WorkingDirectorySettingsService>();
         services.AddScoped<PluginSettingsService>();
         services.AddScoped<PluginActivationService>();
         services.AddScoped<PluginSelectionService>();
-        services.AddScoped<AufgabeRecoveryService>();
-        services.AddScoped<PromptVorlagenService>();
-        services.AddScoped<ZeitgesteuerterPromptStore>();
-        services.AddSingleton<AufgabeLaufdatenChangedNotifier>();
-        services.AddSingleton<PromptVorlagenPlatzhalterService>();
+        services.AddScoped<WorkItemRecoveryService>();
+        services.AddScoped<PromptTemplateService>();
+        services.AddScoped<ScheduledPromptStore>();
+        services.AddSingleton<WorkItemRunDataChangedNotifier>();
+        services.AddSingleton<PromptTemplatePlaceholderService>();
         services.AddScoped<IGitWorkspaceBrowserService, GitWorkspaceBrowserService>();
         services.AddSingleton<ITextDiffService, TextDiffService>();
-        services.AddScoped<ArbeitsverzeichnisOeffnenService>();
+        services.AddScoped<WorkingDirectoryOpenService>();
         services.AddSingleton<IVisualStudioCodeLocator, VisualStudioCodeLocator>();
         services.AddScoped<ICliUpdateSafetyService, CliUpdateSafetyService>();
         services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
@@ -280,17 +280,17 @@ public sealed partial class App : System.Windows.Application
         // Infrastructure Services
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(TerminalSessionService.TestDatenbankPfadVariable)))
         {
-            services.AddSingleton<IProcessStarter>(sp => new AufzeichnenderProzessStarter(
-                sp.GetRequiredService<ILogger<AufzeichnenderProzessStarter>>(),
-                AufzeichnenderProzessStarter.ResolveLogDateiPfad(dbPath)));
+            services.AddSingleton<IProcessStarter>(sp => new RecordingProcessStarter(
+                sp.GetRequiredService<ILogger<RecordingProcessStarter>>(),
+                RecordingProcessStarter.ResolveLogFilePath(dbPath)));
             // Testmodus: kein echter OS-Shutdown — Anforderungen landen in der Logdatei neben der Test-DB.
-            services.AddSingleton<ISystemShutdownService>(sp => new AufzeichnenderSystemShutdownService(
-                sp.GetRequiredService<ILogger<AufzeichnenderSystemShutdownService>>(),
-                AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(dbPath)));
+            services.AddSingleton<ISystemShutdownService>(sp => new RecordingSystemShutdownService(
+                sp.GetRequiredService<ILogger<RecordingSystemShutdownService>>(),
+                RecordingSystemShutdownService.ResolveLogFilePath(dbPath)));
         }
         else
         {
-            services.AddSingleton<IProcessStarter, SystemProzessStarter>();
+            services.AddSingleton<IProcessStarter, SystemProcessStarter>();
             services.AddSingleton<ISystemShutdownService, SystemShutdownService>();
         }
 
@@ -306,40 +306,40 @@ public sealed partial class App : System.Windows.Application
             sp.GetRequiredService<SimulatedPseudoConsoleProcessLauncher>(),
             sp.GetRequiredService<ILogger<TerminalSessionService>>()));
         services.AddSingleton<ITerminalSessionFactory>(sp => sp.GetRequiredService<TerminalSessionService>());
-        services.AddSingleton<KiAusfuehrungsService>();
+        services.AddSingleton<AiExecutionService>();
         services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<PromptZeitVersandService>();
+        services.AddSingleton<PromptScheduleDispatchService>();
         services.AddSingleton<PullRequestMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<PullRequestMonitoringService>());
         services.AddSingleton<ScmTaskCompletionMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmTaskCompletionMonitoringService>());
         // Ereignisgesteuerter Auslöser der SCM-Startprüfung (freiwerdende Plätze, Pausen).
-        services.AddSingleton<ScmStartPruefungsAusloeser>();
-        services.AddSingleton<ScmStartPruefungsService>();
-        services.AddHostedService(sp => sp.GetRequiredService<ScmStartPruefungsService>());
+        services.AddSingleton<ScmStartCheckTrigger>();
+        services.AddSingleton<ScmStartCheckService>();
+        services.AddHostedService(sp => sp.GetRequiredService<ScmStartCheckService>());
         services.AddSingleton<CliProcessManager>();
         services.AddSingleton<INotificationAudioService, WpfAudioService>();
         services.AddSingleton<INotificationBannerService, WpfBannerService>();
         services.AddSingleton<IRunningAutomationStatusSource>(sp =>
-            sp.GetRequiredService<KiAusfuehrungsService>());
+            sp.GetRequiredService<AiExecutionService>());
         services.AddSingleton<ICliExecutionLimitSource>(sp =>
-            sp.GetRequiredService<KiAusfuehrungsService>());
+            sp.GetRequiredService<AiExecutionService>());
         services.AddSingleton<DarkModeService>();
         services.AddSingleton<AufgabenListenModusService>();
 
         // Auto-Shutdown bei Abschluss: Zähler und Orchestrator sind Singletons (greifen für
         // scoped Dienste selbst über IServiceScopeFactory zu); der Einstellungen-Service
         // persistiert nur die Nebenwerte (Erzwingen, Toleranz) — die Aktivierung bleibt Session-Zustand.
-        services.AddSingleton<LaufendeAutomatisierungenZaehlung>();
-        services.AddSingleton<ILaufendeAutomatisierungenZaehlung>(sp =>
-            sp.GetRequiredService<LaufendeAutomatisierungenZaehlung>());
+        services.AddSingleton<RunningAutomationsCount>();
+        services.AddSingleton<IRunningAutomationsCount>(sp =>
+            sp.GetRequiredService<RunningAutomationsCount>());
         services.AddSingleton<AutoShutdownOrchestrator>();
         services.AddSingleton<IAutoShutdownOrchestrator>(sp =>
             sp.GetRequiredService<AutoShutdownOrchestrator>());
         services.AddSingleton<AutoShutdownEinstellungenService>();
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<ICliRawExportService, CliRawExportService>();
-        services.AddSingleton<CliReplayAufzeichnungStore>();
+        services.AddSingleton<CliReplayRecordingStore>();
         services.AddSingleton<ICliReplayExportService, CliReplayExportService>();
         services.AddSingleton<IUpdateProgressDialogService, WpfUpdateProgressDialogService>();
         services.AddSingleton<IApplicationShutdownService, WpfApplicationShutdownService>();
@@ -358,7 +358,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient(sp => new MainWindowOptionaleDienste(
             DialogService: sp.GetService<IDialogService>(),
             VersionProvider: sp.GetService<IApplicationVersionProvider>(),
-            LaufdatenChangedNotifier: sp.GetService<AufgabeLaufdatenChangedNotifier>(),
+            LaufdatenChangedNotifier: sp.GetService<WorkItemRunDataChangedNotifier>(),
             UpdateDienste: sp.GetService<MainWindowUpdateDienste>(),
             AufgabenListenModusService: sp.GetService<AufgabenListenModusService>(),
             AutoShutdownOrchestrator: sp.GetService<IAutoShutdownOrchestrator>(),
@@ -374,8 +374,8 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<ICliRunner>(sp => sp.GetRequiredService<CliRunner>());
 
         // Infrastructure implementations for domain interfaces
-        services.AddScoped<IUserContextService, BenutzerkontextService>();
-        services.AddScoped<IWorkingDirectoryResolver, ArbeitsverzeichnisResolver>();
+        services.AddScoped<IUserContextService, UserContextService>();
+        services.AddScoped<IWorkingDirectoryResolver, RuntimeWorkingDirectoryResolver>();
         services.AddScoped<PluginDefaultSettingsService>();
         services.AddScoped<IGitPlugin>(sp => sp.GetRequiredService<IPluginManager>().GetDefaultSourceCodeManagementPlugin());
 
@@ -420,10 +420,10 @@ public sealed partial class App : System.Windows.Application
         if (updateTestKontext is not null)
         {
             var kontext = updateTestKontext;
-            var testwurzel = kontext.Konfiguration.Testwurzel;
+            var testwurzel = kontext.Configuration.Testwurzel;
 
             services.AddSingleton<IApplicationVersionProvider>(sp => new ApplicationVersionProvider(
-                kontext.Konfiguration.InstallationsVerzeichnis,
+                kontext.Configuration.InstallationsVerzeichnis,
                 sp.GetRequiredService<ILogger<ApplicationVersionProvider>>()));
 
             services.AddSingleton(sp => new HttpClient(new UpdateFixtureHttpMessageHandler(kontext)));

@@ -44,11 +44,11 @@ public partial class End2EndTest
         // Nach erfolgreichem Start ist das Repository geklont (LokalerKlonPfad gesetzt).
         taskDetail.WaitForCliRunning();
 
-        var lokalerKlonPfad = await GetLokalerKlonPfadAsync();
+        var localClonePath = await GetLokalerKlonPfadAsync();
 
         // Phase 1: "Arbeitsverzeichnis öffnen" zeichnet den OS-Dateiexplorer-Start mit dem LokalerKlonPfad auf.
         taskDetail.OpenWorkingDirectory();
-        await WaitForProzessStartEintragAsync(lokalerKlonPfad);
+        await WaitForProzessStartEintragAsync(localClonePath);
 
         // Phase 2: Ohne "*.sln" ist "IDE öffnen" weiterhin aktiv (CanExecute hängt nur noch vom vorhandenen
         // Arbeitsverzeichnis ab, nicht mehr von gefundenen Solutions) - ein Klick löst über
@@ -58,12 +58,12 @@ public partial class End2EndTest
 
         var protokollVorFallback = await ReadProzessStartLogAsync();
         taskDetail.OpenIde();
-        await WaitForProzessStartEintragAsync(Path.GetFullPath(lokalerKlonPfad), sinceContent: protokollVorFallback);
+        await WaitForProzessStartEintragAsync(Path.GetFullPath(localClonePath), sinceContent: protokollVorFallback);
 
         Assert.False(new SolutionSelectionDialogView(mainWindow).IsVisible, "ohne gefundene Solution öffnet der Visual-Studio-Code-Fallback direkt, ohne Auswahl-Dialog");
 
         // Genau eine "*.sln" anlegen und die Aufgabe neu laden (Ribbon-Button-CanExecute wird beim Laden gecacht).
-        var ersteSolution = Path.Combine(lokalerKlonPfad, "Erste.sln");
+        var ersteSolution = Path.Combine(localClonePath, "Erste.sln");
         File.WriteAllText(ersteSolution, string.Empty);
         taskDetail = taskDetail.Reload();
 
@@ -80,7 +80,7 @@ public partial class End2EndTest
         Assert.True(taskDetail.HasIdeDropdown(), "Visual Studio liefert die eine .sln als Explicit-Einstiegspunkt, zusätzlich liefert das weiterhin aktive Visual-Studio-Code-Fallback-Plugin einen weiteren Einstiegspunkt - aggregiert sind das 2 Einstiegspunkte, der Dropdown-Button muss also sichtbar sein");
 
         // Eine zweite "*.slnx" anlegen und die Aufgabe erneut neu laden.
-        var zweiteSolution = Path.Combine(lokalerKlonPfad, "Zweite.slnx");
+        var zweiteSolution = Path.Combine(localClonePath, "Zweite.slnx");
         File.WriteAllText(zweiteSolution, string.Empty);
         taskDetail = taskDetail.Reload();
 
@@ -126,8 +126,8 @@ public partial class End2EndTest
         var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
         taskDetail.WaitForCliRunning();
 
-        var lokalerKlonPfad = await GetLokalerKlonPfadAsync();
-        var unterverzeichnis = Path.Combine(lokalerKlonPfad, "backend");
+        var localClonePath = await GetLokalerKlonPfadAsync();
+        var unterverzeichnis = Path.Combine(localClonePath, "backend");
         Directory.CreateDirectory(unterverzeichnis);
 
         await SeedRepositoryWorkingDirectoryAsync("backend");

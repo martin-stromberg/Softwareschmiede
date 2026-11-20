@@ -121,7 +121,7 @@ public partial class End2EndTest
 
             dialog.StartWiedergabe();
             dialog.WarteAufStatus("Wiedergabe beendet.");
-            dialog.Schliessen();
+            dialog.Close();
 
             settings.ForceClose(recurseToDashboard: false);
 
@@ -427,7 +427,7 @@ public partial class End2EndTest
     /// <summary>Setzt Text in die Zwischenablage über einen STA-Thread (WPF-Clipboard ist STA-gebunden).</summary>
     private static void SetClipboardText(string text)
     {
-        Exception? fehler = null;
+        Exception? error = null;
         var thread = new Thread(() =>
         {
             // Clipboard kann unmittelbar nach dem Schließen einer UIA-/Screenshot-Operation
@@ -442,13 +442,13 @@ public partial class End2EndTest
             }
             catch (Exception ex)
             {
-                fehler = ex;
+                error = ex;
             }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
-        if (fehler is not null)
-            throw fehler;
+        if (error is not null)
+            throw error;
     }
 }

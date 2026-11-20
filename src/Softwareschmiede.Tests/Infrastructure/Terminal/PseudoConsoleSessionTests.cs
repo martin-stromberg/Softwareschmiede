@@ -288,8 +288,8 @@ public sealed class PseudoConsoleSessionTests
 
         await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        var zeile = new string(session.Buffer.GetRow(0).Select(c => c.Character).ToArray()).TrimEnd();
-        zeile.Should().Be("AB",
+        var line = new string(session.Buffer.GetRow(0).Select(c => c.Character).ToArray()).TrimEnd();
+        line.Should().Be("AB",
             "der Chunk darf nur einmal angewendet werden — ein Rebuild vor dem Live-Apply darf ihn nicht doppelt einspielen");
     }
 

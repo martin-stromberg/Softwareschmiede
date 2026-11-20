@@ -279,10 +279,10 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
             Times.Never);
     }
 
-    private RepositoryInitialisierungService CreateSut()
+    private RepositoryInitializationService CreateSut()
         => new(
             _cliRunnerMock.Object,
-            NullLogger<RepositoryInitialisierungService>.Instance);
+            NullLogger<RepositoryInitializationService>.Instance);
 
     /// <summary>
     /// Richtet das gemeinsame Mock-Setup für <see cref="ICliRunner.RunAsync"/> ein und liefert ein

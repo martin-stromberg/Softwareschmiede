@@ -11,7 +11,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für die Update-Einstellungen in <see cref="AppEinstellungService"/> mit echter SQLite-Datei-Datenbank.</summary>
+/// <summary>Tests für die Update-Einstellungen in <see cref="AppSettingService"/> mit echter SQLite-Datei-Datenbank.</summary>
 public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
 {
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"sw-updatesettings-{Guid.NewGuid():N}.db");
@@ -31,14 +31,14 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         await using (var db = CreateContext())
         {
             await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-            await CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad), TestContext.Current.CancellationToken);
+            await CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.CheckAndRunAtStartup, UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
         }
 
         await using (var db = CreateContext())
         {
             var settings = await CreateService(db).GetUpdateSettingsAsync(TestContext.Current.CancellationToken);
 
-            settings.Should().Be(new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad));
+            settings.Should().Be(new UpdateSettings(UpdateMode.CheckAndRunAtStartup, UpdatePathChannelResolver.PrereleaseVersionsPath));
         }
     }
 
@@ -49,7 +49,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         await using (var db = CreateContext())
         {
             await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-            await CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Aus, UpdatePfadKanalResolver.VorabversionenPfad), TestContext.Current.CancellationToken);
+            await CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Off, UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
         }
 
         // Eine zweite Verbindung hält eine offene Schreibtransaktion und damit den SQLite-Write-Lock;
@@ -67,7 +67,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
 
         await using (var db = CreateContext(defaultTimeoutSeconds: 1))
         {
-            var act = () => CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
+            var act = () => CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
 
             await act.Should().ThrowAsync<SqliteException>();
         }
@@ -76,7 +76,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         {
             var settings = await CreateService(db).GetUpdateSettingsAsync(TestContext.Current.CancellationToken);
 
-            settings.Should().Be(new UpdateSettings(UpdateMode.Aus, UpdatePfadKanalResolver.VorabversionenPfad));
+            settings.Should().Be(new UpdateSettings(UpdateMode.Off, UpdatePathChannelResolver.PrereleaseVersionsPath));
         }
     }
 
@@ -89,7 +89,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         await using (var db = CreateContext())
         {
             await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-            await CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad), TestContext.Current.CancellationToken);
+            await CreateService(db).SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.CheckAndRunAtStartup, UpdatePathChannelResolver.PrereleaseVersionsPath), TestContext.Current.CancellationToken);
         }
 
         var reachedCount = 0;
@@ -99,7 +99,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         {
             var settings = await CreateService(db).GetUpdateSettingsAsync(TestContext.Current.CancellationToken);
 
-            settings.Should().Be(new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad));
+            settings.Should().Be(new UpdateSettings(UpdateMode.CheckAndRunAtStartup, UpdatePathChannelResolver.PrereleaseVersionsPath));
             interceptor.SettingsReadCount.Should().Be(1);
             reachedCount.Should().Be(1);
         }
@@ -120,7 +120,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         {
             var settings = await CreateService(db).GetUpdateSettingsAsync(TestContext.Current.CancellationToken);
 
-            settings.Should().Be(new UpdateSettings(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdatePfadKanalResolver.VorabversionenPfad));
+            settings.Should().Be(new UpdateSettings(UpdateMode.CheckAndRunAtStartup, UpdatePathChannelResolver.PrereleaseVersionsPath));
         }
     }
 
@@ -133,27 +133,27 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         var service = CreateService(db);
 
         (await service.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
+            .Should().Be(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
 
-        await service.SetSettingAsync(AppEinstellungService.UpdateModeKey, "kein-modus", TestContext.Current.CancellationToken);
-        await service.SetSettingAsync(AppEinstellungService.UpdatePfadKey, "vielleicht", TestContext.Current.CancellationToken);
-
-        (await service.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
-
-        await service.SetSettingAsync(AppEinstellungService.UpdateModeKey, "7", TestContext.Current.CancellationToken);
-        await service.SetSettingAsync(AppEinstellungService.UpdatePfadKey, "Vorabversionen", TestContext.Current.CancellationToken);
+        await service.SetSettingAsync(AppSettingService.UpdateModeKey, "kein-modus", TestContext.Current.CancellationToken);
+        await service.SetSettingAsync(AppSettingService.UpdatePfadKey, "vielleicht", TestContext.Current.CancellationToken);
 
         (await service.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.VorabversionenPfad));
+            .Should().Be(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
+
+        await service.SetSettingAsync(AppSettingService.UpdateModeKey, "7", TestContext.Current.CancellationToken);
+        await service.SetSettingAsync(AppSettingService.UpdatePfadKey, "Vorabversionen", TestContext.Current.CancellationToken);
+
+        (await service.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
+            .Should().Be(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.PrereleaseVersionsPath));
 
         // Altbestand des entfernten Schlüssels updates.includePrereleases verfällt still.
-        await service.SetSettingAsync(AppEinstellungService.UpdateModeKey, "1", TestContext.Current.CancellationToken);
-        await service.SetSettingAsync(AppEinstellungService.UpdatePfadKey, "Produktivversionen", TestContext.Current.CancellationToken);
+        await service.SetSettingAsync(AppSettingService.UpdateModeKey, "1", TestContext.Current.CancellationToken);
+        await service.SetSettingAsync(AppSettingService.UpdatePfadKey, "Produktivversionen", TestContext.Current.CancellationToken);
         await service.SetSettingAsync("updates.includePrereleases", "True", TestContext.Current.CancellationToken);
 
         (await service.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
+            .Should().Be(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
     }
 
     /// <summary>SetUpdateSettingsAsync lehnt nicht definierte UpdateMode-Werte ab, ohne etwas zu schreiben.</summary>
@@ -164,11 +164,11 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
         var service = CreateService(db);
 
-        var act = () => service.SetUpdateSettingsAsync(new UpdateSettings((UpdateMode)7, UpdatePfadKanalResolver.ProduktivversionenPfad));
+        var act = () => service.SetUpdateSettingsAsync(new UpdateSettings((UpdateMode)7, UpdatePathChannelResolver.StableVersionsPath));
 
         await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
         (await service.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
+            .Should().Be(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
     }
 
     /// <summary>SetUpdateSettingsAsync lehnt unbekannte Update-Pfade ab, ohne etwas zu schreiben.</summary>
@@ -179,11 +179,11 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
         var service = CreateService(db);
 
-        var act = () => service.SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, "unbekannter-pfad"));
+        var act = () => service.SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.CheckOnly, "unbekannter-pfad"));
 
         await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
         (await service.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
-            .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
+            .Should().Be(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
     }
 
     private SoftwareschmiedeDbContext CreateContext(
@@ -199,6 +199,6 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
             interceptor is not null ? [interceptor] : []);
     }
 
-    private static AppEinstellungService CreateService(SoftwareschmiedeDbContext db)
-        => new(db, NullLogger<AppEinstellungService>.Instance);
+    private static AppSettingService CreateService(SoftwareschmiedeDbContext db)
+        => new(db, NullLogger<AppSettingService>.Instance);
 }

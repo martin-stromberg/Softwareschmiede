@@ -13,11 +13,11 @@ public static class ScmPromptAppendix
     /// <summary>Alle fünf Einstellungsschlüssel der Prompt-Anhänge (für gebündelte Leseabfragen).</summary>
     public static readonly IReadOnlyCollection<string> SettingKeys =
     [
-        AppEinstellungService.ScmPromptAppendGeneralKey,
-        AppEinstellungService.ScmPromptAppendIssueKey,
-        AppEinstellungService.ScmPromptAppendIssueCommentKey,
-        AppEinstellungService.ScmPromptAppendPullRequestKey,
-        AppEinstellungService.ScmPromptAppendPullRequestCommentKey,
+        AppSettingService.ScmPromptAppendGeneralKey,
+        AppSettingService.ScmPromptAppendIssueKey,
+        AppSettingService.ScmPromptAppendIssueCommentKey,
+        AppSettingService.ScmPromptAppendPullRequestKey,
+        AppSettingService.ScmPromptAppendPullRequestCommentKey,
     ];
 
     /// <summary>
@@ -33,11 +33,11 @@ public static class ScmPromptAppendix
     public static string SpecificKeyFor(ScmEventObservation observation)
         => observation.Reference.Kind == ScmReferenceKind.PullRequest
             ? observation.ContentKind == ScmContentKind.Description
-                ? AppEinstellungService.ScmPromptAppendPullRequestKey
-                : AppEinstellungService.ScmPromptAppendPullRequestCommentKey
+                ? AppSettingService.ScmPromptAppendPullRequestKey
+                : AppSettingService.ScmPromptAppendPullRequestCommentKey
             : observation.ContentKind == ScmContentKind.Description
-                ? AppEinstellungService.ScmPromptAppendIssueKey
-                : AppEinstellungService.ScmPromptAppendIssueCommentKey;
+                ? AppSettingService.ScmPromptAppendIssueKey
+                : AppSettingService.ScmPromptAppendIssueCommentKey;
 
     /// <summary>
     /// Kombiniert den allgemeinen und den spezifischen Anhang: Zuerst <paramref name="general"/>,
@@ -61,10 +61,10 @@ public static class ScmPromptAppendix
     /// allgemeiner Anhang zuerst, dann der spezifische der Ereignisart.
     /// </summary>
     /// <param name="observation">Die beobachtete Textversion.</param>
-    /// <param name="values">Schlüssel-Wert-Zuordnung, z. B. aus <see cref="AppEinstellungService.GetScmPromptAppendicesAsync"/>.</param>
+    /// <param name="values">Schlüssel-Wert-Zuordnung, z. B. aus <see cref="AppSettingService.GetScmPromptAppendicesAsync"/>.</param>
     /// <returns>Der anzuhängende Text oder <see langword="null"/>, wenn nichts konfiguriert ist.</returns>
     public static string? Resolve(ScmEventObservation observation, IReadOnlyDictionary<string, string?> values)
         => Combine(
-            values.GetValueOrDefault(AppEinstellungService.ScmPromptAppendGeneralKey),
+            values.GetValueOrDefault(AppSettingService.ScmPromptAppendGeneralKey),
             values.GetValueOrDefault(SpecificKeyFor(observation)));
 }

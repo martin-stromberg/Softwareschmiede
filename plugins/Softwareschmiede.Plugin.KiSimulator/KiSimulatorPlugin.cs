@@ -18,7 +18,7 @@ public sealed class KiSimulatorPlugin : CliKiPluginBase, IIssueTemplateTextGener
     public override string PluginName => "KI Simulator";
 
     /// <inheritdoc/>
-    public override string ProviderDateiPraefix => "simulator";
+    public override string ProviderFilePrefix => "simulator";
 
     /// <inheritdoc/>
     public override string PluginPrefix => "Softwareschmiede.KiSimulator";

@@ -45,7 +45,7 @@ public sealed class GitHubReleaseClientTests
 """));
         var sut = CreateSut(httpClient);
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
         result.Erfolg.Should().BeTrue();
         result.Release.Should().NotBeNull();
@@ -86,7 +86,7 @@ public sealed class GitHubReleaseClientTests
 """));
         var sut = CreateSut(httpClient);
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
         result.Erfolg.Should().BeTrue();
         result.Release.Should().NotBeNull();
@@ -119,7 +119,7 @@ public sealed class GitHubReleaseClientTests
 """));
         var sut = CreateSut(httpClient);
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
         result.Erfolg.Should().BeTrue();
         result.Release.Should().NotBeNull();
@@ -156,7 +156,7 @@ public sealed class GitHubReleaseClientTests
 """));
         var sut = CreateSut(httpClient);
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
         result.Erfolg.Should().BeTrue();
         result.Release.Should().NotBeNull();
@@ -185,7 +185,7 @@ public sealed class GitHubReleaseClientTests
 """));
         var sut = CreateSut(httpClient);
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
         result.Erfolg.Should().BeTrue();
         result.Release.Should().NotBeNull();
@@ -207,7 +207,7 @@ public sealed class GitHubReleaseClientTests
     {
         var sut = CreateSut(new HttpClient(new StaticHttpHandler(statusCode, body)));
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
         result.Erfolg.Should().Be(!expectFailure);
         result.Release.Should().BeNull();
@@ -221,7 +221,7 @@ public sealed class GitHubReleaseClientTests
     {
         var sut = CreateSut(new HttpClient(new StaticHttpHandler(HttpStatusCode.OK, body)));
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
         result.Erfolg.Should().BeFalse();
         result.Release.Should().BeNull();
@@ -234,7 +234,7 @@ public sealed class GitHubReleaseClientTests
         var httpClient = new HttpClient(new DelayingHttpHandler());
         var sut = CreateSut(httpClient, new UpdateOptions { CheckTimeout = TimeSpan.FromMilliseconds(50) });
 
-        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);
+        var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
 
         result.Erfolg.Should().BeFalse();
         result.Release.Should().BeNull();

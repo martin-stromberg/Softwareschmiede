@@ -14,9 +14,9 @@ namespace Softwareschmiede.Tests.Application.Services;
 public sealed class GitOrchestrationServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProjektService _projektService;
-    private readonly ProtokollService _protokollService;
+    private readonly WorkItemService _aufgabeService;
+    private readonly ProjectService _projektService;
+    private readonly LogService _logService;
     private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly GitOrchestrationService _sut;
     private readonly Guid _projektId = new("55555555-5555-5555-5555-555555555555");
@@ -25,9 +25,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public GitOrchestrationServiceTests()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
-        _projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
-        _protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
+        _aufgabeService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
+        _projektService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
+        _logService = new LogService(_db, new Mock<ILogger<LogService>>().Object);
         _gitPluginMock = new Mock<IGitPlugin>();
         _gitPluginMock.SetupGet(plugin => plugin.PluginName).Returns("Mock Git");
         _gitPluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns("Mock.Git");
@@ -41,7 +41,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         pluginManagerMock.Setup(manager => manager.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppSettingService(_db, new Mock<ILogger<AppSettingService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
@@ -50,7 +50,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _sut = new GitOrchestrationService(
             _aufgabeService,
             _projektService,
-            _protokollService,
+            _logService,
             _gitPluginMock.Object,
             pluginSelectionService,
             new Mock<ILogger<GitOrchestrationService>>().Object);
@@ -86,7 +86,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedIssues);
 
         // Act
-        var result = (await _sut.IssuesAbrufenAsync("owner/repo", TestContext.Current.CancellationToken)).ToList();
+        var result = (await _sut.FetchIssuesAsync("owner/repo", TestContext.Current.CancellationToken)).ToList();
 
         // Assert
         result.Should().BeEquivalentTo(expectedIssues);
@@ -106,8 +106,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
         // Assert
         _gitPluginMock.Verify(g => g.CommitAsync(@"C:\repos\task-1", "feat: add tests", It.IsAny<CancellationToken>()), Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
-        protokoll.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Commit: feat: add tests"));
+        var log = await _logService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Commit: feat: add tests"));
     }
 
     /// <summary><summary>CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType.</summary>.</summary>
@@ -150,8 +150,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
         // Assert
         _gitPluginMock.Verify(g => g.ResetAsync(@"C:\repos\task-2", "hard", null, It.IsAny<CancellationToken>()), Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
-        protokoll.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Reset (hard) auf HEAD"));
+        var log = await _logService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Reset (hard) auf HEAD"));
     }
 
     /// <summary>PushAsync wirft eine Exception, wenn kein BranchName vorhanden ist.</summary>
@@ -184,8 +184,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         await _sut.PullAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.PullAsync(@"C:\repos\task-pull", It.IsAny<CancellationToken>()), Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
-        protokoll.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Kein Merge"));
+        var log = await _logService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Kein Merge"));
     }
 
     /// <summary><summary>PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin.</summary>.</summary>
@@ -199,9 +199,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         await _sut.PullAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.PullAsync(@"C:\repos\task-pull-remote", It.IsAny<CancellationToken>()), Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
-        protokoll.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Änderungen vom Remote geholt"));
-        protokoll.Should().NotContain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Kein Merge"));
+        var log = await _logService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Änderungen vom Remote geholt"));
+        log.Should().NotContain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Kein Merge"));
     }
 
     /// <summary><summary>PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository.</summary>.</summary>
@@ -226,8 +226,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         defaultPluginMock.Verify(
             plugin => plugin.PullAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        var protokoll = await _protokollService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
-        protokoll.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Kein Merge"));
+        var log = await _logService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Kein Merge"));
     }
 
     /// <summary><summary>CommitAsync_ShouldFallbackToDefaultPlugin_WhenSelectedPluginTypeCannotBeResolved.</summary>.</summary>
@@ -289,8 +289,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         await _sut.MergeToSourceAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.MergeToSourceAsync(@"C:\repos\task-merge", It.IsAny<CancellationToken>()), Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
-        protokoll.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("ins Quellverzeichnis übernommen"));
+        var log = await _logService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("ins Quellverzeichnis übernommen"));
     }
 
     /// <summary>MergeToSourceAsync bricht ab, wenn kein lokaler Klonpfad gesetzt ist.</summary>
@@ -381,7 +381,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedPr);
 
         // Act
-        var result = await _sut.PullRequestErstellenAsync(workItem.Id, title: "Custom title", body: "Custom body", ct: TestContext.Current.CancellationToken);
+        var result = await _sut.CreatePullRequestAsync(workItem.Id, title: "Custom title", body: "Custom body", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(expectedPr);
@@ -391,9 +391,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(
             g => g.CreatePullRequestAsync("test/repo", "feature/pr", null, "Custom title", "Custom body", It.IsAny<CancellationToken>()),
             Times.Once);
-        var protokoll = await _protokollService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
-        protokoll.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("vor Pull-Request-Erstellung gepusht"));
-        protokoll.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Pull Request erstellt: #42"));
+        var log = await _logService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("vor Pull-Request-Erstellung gepusht"));
+        log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Pull Request erstellt: #42"));
     }
 
     /// <summary>PullRequestErstellenAsync baut den PR-Body aus den Branch-Commits statt aus der ursprünglichen Anforderungsbeschreibung.</summary>
@@ -430,12 +430,12 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var sut = new GitOrchestrationService(
             _aufgabeService,
             _projektService,
-            _protokollService,
+            _logService,
             _gitPluginMock.Object,
             new PluginSelectionService(
                 pluginManagerMock.Object,
                 new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object),
-                new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object),
+                new PluginActivationService(new AppSettingService(_db, new Mock<ILogger<AppSettingService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object),
                 new Mock<ILogger<PluginSelectionService>>().Object),
             new Mock<ILogger<GitOrchestrationService>>().Object,
             workspaceBrowserMock.Object);
@@ -455,7 +455,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(new PullRequest(44, "PR mit Commits", "https://example/pr/44", "feature/commit-body"));
 
         // Act
-        await sut.PullRequestErstellenAsync(workItem.Id, ct: TestContext.Current.CancellationToken);
+        await sut.CreatePullRequestAsync(workItem.Id, ct: TestContext.Current.CancellationToken);
 
         // Assert
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
@@ -506,12 +506,12 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var sut = new GitOrchestrationService(
             _aufgabeService,
             _projektService,
-            _protokollService,
+            _logService,
             _gitPluginMock.Object,
             new PluginSelectionService(
                 pluginManagerMock.Object,
                 new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object),
-                new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object),
+                new PluginActivationService(new AppSettingService(_db, new Mock<ILogger<AppSettingService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object),
                 new Mock<ILogger<PluginSelectionService>>().Object),
             new Mock<ILogger<GitOrchestrationService>>().Object,
             workspaceBrowserMock.Object);
@@ -530,7 +530,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(new PullRequest(45, "PR mit Staging-Basis", "https://example/pr/45", "feature/staging-basis"));
 
         // Act
-        await sut.PullRequestErstellenAsync(workItem.Id, ct: TestContext.Current.CancellationToken);
+        await sut.CreatePullRequestAsync(workItem.Id, ct: TestContext.Current.CancellationToken);
 
         // Assert
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
@@ -563,7 +563,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedPr);
 
         // Act
-        var result = await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel aus Aufgabe", body: "Body aus Aufgabe", ct: TestContext.Current.CancellationToken);
+        var result = await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel aus Aufgabe", body: "Body aus Aufgabe", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(expectedPr);
@@ -592,7 +592,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedPr);
 
         // Act
-        var result = await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
+        var result = await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(expectedPr);
@@ -618,7 +618,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedPr);
 
         // Act
-        var result = await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
+        var result = await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(expectedPr);
@@ -656,7 +656,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(77, "PR", "https://example/pr/77", "feature/issue"));
 
-        await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
+        await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/issue-repo",
@@ -666,8 +666,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             It.Is<string>(body => body == $"Body{Environment.NewLine}{Environment.NewLine}Closes #123"),
             It.IsAny<CancellationToken>()), Times.Once);
 
-        var protokoll = await _protokollService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
-        protokoll.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Issue #123"));
+        var log = await _logService.GetByAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
+        log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Issue #123"));
     }
 
     /// <summary>PullRequestErstellenAsync dupliziert keine bereits vorhandene Closing-Direktive.</summary>
@@ -700,7 +700,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(78, "PR", "https://example/pr/78", "feature/no-dup"));
 
-        await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
+        await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/existing-directive",
@@ -742,7 +742,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(new PullRequest(79, "PR", "https://example/pr/79", "feature/whitespace"));
 
         // Act
-        await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: "   ", ct: TestContext.Current.CancellationToken);
+        await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: "   ", ct: TestContext.Current.CancellationToken);
 
         // Assert
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
@@ -787,7 +787,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(new PullRequest(80, "PR", "https://example/pr/80", "feature/other-directive"));
 
         // Act
-        await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
+        await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
 
         // Assert
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
@@ -828,7 +828,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(82, "PR", "https://example/pr/82", "feature/no-issue-number"));
 
-        await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
+        await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/no-issue-number",
@@ -870,7 +870,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(83, "PR", "https://example/pr/83", $"feature/non-positive-{Math.Abs(issueNummer)}"));
 
-        await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
+        await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             $"test/non-positive-{Math.Abs(issueNummer)}",
@@ -911,7 +911,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(84, "PR", "https://example/pr/84", "feature/qualified-directive"));
 
-        await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
+        await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/qualified-directive",
@@ -954,7 +954,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(85, "PR", "https://example/pr/85", "feature/alternative-directive"));
 
-        await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
+        await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: existingBody, ct: TestContext.Current.CancellationToken);
 
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/alternative-directive",
@@ -978,7 +978,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         await _aufgabeService.StartenAsync(workItem.Id, "feature/ambiguous", @"C:\repos\task-6", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var act = () => _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: "Body");
+        var act = () => _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: "Body");
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -998,7 +998,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         await _aufgabeService.StartenAsync(workItem.Id, "feature/no-active-repo", @"C:\repos\task-no-active-repo", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var act = () => _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: "Body");
+        var act = () => _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: "Body");
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -1031,7 +1031,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .ReturnsAsync(expectedPr);
 
         // Act
-        var result = await _sut.PullRequestErstellenAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
+        var result = await _sut.CreatePullRequestAsync(workItem.Id, title: "Titel", body: "Body", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(expectedPr);
@@ -1109,7 +1109,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
 
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppSettingService(_db, new Mock<ILogger<AppSettingService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
@@ -1119,7 +1119,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         return new GitOrchestrationService(
             _aufgabeService,
             _projektService,
-            _protokollService,
+            _logService,
             defaultPlugin.Object,
             pluginSelectionService,
             (loggerMock ?? new Mock<ILogger<GitOrchestrationService>>()).Object);

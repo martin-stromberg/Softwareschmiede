@@ -207,7 +207,7 @@ public sealed class CliKiPluginBaseTests
 
     private abstract class BaseTestPlugin(string providerPraefix = "test") : CliKiPluginBase
     {
-        public override string ProviderDateiPraefix => providerPraefix;
+        public override string ProviderFilePrefix => providerPraefix;
         public override string PluginName => "Test";
         public override string PluginPrefix => "Softwareschmiede.Test";
         public override PluginType PluginType => PluginType.DevelopmentAutomation;
@@ -233,7 +233,7 @@ public sealed class CliKiPluginBaseTests
     private sealed class TestCliKiPluginWithHelpOverride() : BaseTestPlugin("nonexistent-cli-xyz")
     {
         protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
-            => new() { FileName = ProviderDateiPraefix, WorkingDirectory = localRepoPath };
+            => new() { FileName = ProviderFilePrefix, WorkingDirectory = localRepoPath };
     }
 
     private sealed class TestCliKiPluginWithCredentialStore(ICredentialStore cs) : BaseTestPlugin
@@ -255,9 +255,9 @@ public sealed class CliKiPluginBaseTests
     private sealed class TestCliKiPluginWithShortTimeout(string exe, TimeSpan timeout) : BaseTestPlugin(exe)
     {
         public override Task<string?> GetCliHelpTextAsync(CancellationToken ct = default)
-            => RunHelpCommandAsync(ProviderDateiPraefix, ct, timeout);
+            => RunHelpCommandAsync(ProviderFilePrefix, ct, timeout);
 
         protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
-            => new() { FileName = ProviderDateiPraefix, WorkingDirectory = localRepoPath };
+            => new() { FileName = ProviderFilePrefix, WorkingDirectory = localRepoPath };
     }
 }

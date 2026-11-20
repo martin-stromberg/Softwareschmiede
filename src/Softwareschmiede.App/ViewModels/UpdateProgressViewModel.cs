@@ -87,9 +87,9 @@ public sealed class UpdateProgressViewModel : ViewModelBase
         PhaseText = progress.Phase switch
         {
             UpdatePreparationPhase.Download => "Download",
-            UpdatePreparationPhase.Verifizieren => "Verifikation",
-            UpdatePreparationPhase.Entpacken => "Entpacken",
-            UpdatePreparationPhase.UpdateVorbereiten => "Update-Vorbereitung",
+            UpdatePreparationPhase.Verify => "Verifikation",
+            UpdatePreparationPhase.Extract => "Entpacken",
+            UpdatePreparationPhase.PrepareUpdate => "Update-Vorbereitung",
             _ => "Vorbereitung"
         };
         Message = progress.Message;

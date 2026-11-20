@@ -12,7 +12,7 @@ public sealed class UpdateE2ESzenario
 {
     /// <summary>Abbildung exakter Request-URLs auf die zu liefernden Antworten.</summary>
     [JsonPropertyName("responses")]
-    public List<UpdateE2EAntwort> Antworten { get; set; } = [];
+    public List<UpdateE2EAntwort> Answer { get; set; } = [];
 
     /// <summary>Steuerung des kontrollierten Settings-Lesefehlers (T-09).</summary>
     [JsonPropertyName("settingsReadFailure")]
@@ -32,7 +32,7 @@ public sealed class UpdateE2ESzenario
     public UpdateE2EAntwort? FindeAntwort(string? url)
         => url is null
             ? null
-            : Antworten.FirstOrDefault(a => string.Equals(a.Url, url, StringComparison.OrdinalIgnoreCase));
+            : Answer.FirstOrDefault(a => string.Equals(a.Url, url, StringComparison.OrdinalIgnoreCase));
 }
 
 /// <summary>Antwortdefinition für eine exakte Request-URL der Update-Release-/Paketpipeline.</summary>
@@ -79,7 +79,7 @@ public sealed class UpdateE2EAntwort
 
     /// <summary>Bei <c>true</c> wird statt einer Antwort ein absichtlicher Transportfehler geworfen.</summary>
     [JsonPropertyName("fault")]
-    public bool Fehler { get; set; }
+    public bool Error { get; set; }
 
     /// <summary>Überschreibt die URL-basierte Klassifizierung der Anfrage im Protokoll.</summary>
     [JsonPropertyName("art")]
@@ -111,7 +111,7 @@ public sealed class UpdateE2ELesefehler
     /// (zweiter Read, vor dem Download) oder <c>BeforeUpdaterStart</c> (dritter Read, vor dem Start).
     /// </summary>
     [JsonPropertyName("boundary")]
-    public string Grenze { get; set; } = "Initial";
+    public string Limit { get; set; } = "Initial";
 
     /// <summary>
     /// Bei <c>true</c> wartet der betroffene Read begrenzt auf die Freigabe-Datei
@@ -127,7 +127,7 @@ public sealed class UpdateE2ELesefehler
 
     /// <summary>Ordnet die konfigurierte Lesegrenze der Read-Ordnungszahl innerhalb des Versuchs zu.</summary>
     /// <returns>Die Ordnungszahl (1-basiert), ab der markierte Reads fehlschlagen.</returns>
-    public int GrenzOrdinal() => Grenze switch
+    public int GrenzOrdinal() => Limit switch
     {
         "BeforePreparation" => 2,
         "BeforeUpdaterStart" => 3,
@@ -162,5 +162,5 @@ public sealed class UpdateE2EProzessStart
 {
     /// <summary>Ergebnis des Starts: <c>Erfolg</c>, <c>Fehler</c> (Rückgabe <c>false</c>) oder <c>Ausnahme</c>.</summary>
     [JsonPropertyName("result")]
-    public string Ergebnis { get; set; } = "Erfolg";
+    public string Result { get; set; } = "Erfolg";
 }

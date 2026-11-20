@@ -69,7 +69,7 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
     public DateTimeOffset? PausedUntilUtc { get; init; }
 
     /// <summary>Gibt an, ob die Aufgabe aktuell pausiert ist (<see cref="PausedUntilUtc"/> liegt in der Zukunft).</summary>
-    public bool IstPausiert => PausedUntilUtc > DateTimeOffset.UtcNow;
+    public bool IsPaused => PausedUntilUtc > DateTimeOffset.UtcNow;
 
     /// <summary>Gibt an, ob für diese Aufgabe aktuell ein zeitgesteuerter Prompt in der Warteschlange steht.</summary>
     public bool HasScheduledPrompt { get; init; }

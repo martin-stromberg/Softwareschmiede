@@ -12,10 +12,10 @@ public sealed class AufgabenListenAnsichtTests
     public void Konfiguriere_ShouldApplyGroupingAndSorting_WhenModusIstDatum()
     {
         var sortierungen = AufgabenListenAnsicht.ErstelleSortierDeskriptoren(AufgabenListenModus.Datum);
-        var gruppierung = AufgabenListenAnsicht.ErstelleGruppenDeskriptor(AufgabenListenModus.Datum);
+        var grouping = AufgabenListenAnsicht.ErstelleGruppenDeskriptor(AufgabenListenModus.Datum);
 
         sortierungen[0].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.SortierZeitpunkt), ListSortDirection.Descending));
-        gruppierung.Should().BeNull();
+        grouping.Should().BeNull();
     }
 
     /// <summary>Konfiguriere im Modus Repository gruppiert nach RepositoryGruppenName mit Fallback-Gruppe am Ende.</summary>
@@ -23,10 +23,10 @@ public sealed class AufgabenListenAnsichtTests
     public void Konfiguriere_ShouldApplyGroupingAndSorting_WhenModusIstRepository()
     {
         var sortierungen = AufgabenListenAnsicht.ErstelleSortierDeskriptoren(AufgabenListenModus.Repository);
-        var gruppierung = AufgabenListenAnsicht.ErstelleGruppenDeskriptor(AufgabenListenModus.Repository);
+        var grouping = AufgabenListenAnsicht.ErstelleGruppenDeskriptor(AufgabenListenModus.Repository);
 
-        gruppierung.Should().NotBeNull();
-        gruppierung!.PropertyName.Should().Be(nameof(AktiveAufgabePanelItem.RepositoryGruppenName));
+        grouping.Should().NotBeNull();
+        grouping!.PropertyName.Should().Be(nameof(AktiveAufgabePanelItem.RepositoryGruppenName));
         sortierungen[0].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.RepositoryGruppeIstFallback), ListSortDirection.Ascending));
         sortierungen[1].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.RepositoryGruppenName), ListSortDirection.Ascending));
         sortierungen[2].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.SortierZeitpunkt), ListSortDirection.Descending));
@@ -37,10 +37,10 @@ public sealed class AufgabenListenAnsichtTests
     public void Konfiguriere_ShouldApplyGroupingAndSorting_WhenModusIstKi()
     {
         var sortierungen = AufgabenListenAnsicht.ErstelleSortierDeskriptoren(AufgabenListenModus.Ki);
-        var gruppierung = AufgabenListenAnsicht.ErstelleGruppenDeskriptor(AufgabenListenModus.Ki);
+        var grouping = AufgabenListenAnsicht.ErstelleGruppenDeskriptor(AufgabenListenModus.Ki);
 
-        gruppierung.Should().NotBeNull();
-        gruppierung!.PropertyName.Should().Be(nameof(AktiveAufgabePanelItem.KiGruppenName));
+        grouping.Should().NotBeNull();
+        grouping!.PropertyName.Should().Be(nameof(AktiveAufgabePanelItem.KiGruppenName));
         sortierungen[0].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.KiGruppeIstFallback), ListSortDirection.Ascending));
         sortierungen[1].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.KiGruppenName), ListSortDirection.Ascending));
         sortierungen[2].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.SortierZeitpunkt), ListSortDirection.Descending));
@@ -60,8 +60,8 @@ public sealed class AufgabenListenAnsichtTests
 
         AufgabenListenAnsicht.Konfiguriere(view, AufgabenListenModus.Repository);
 
-        var gruppen = view.Groups!.Cast<System.Windows.Data.CollectionViewGroup>().Select(g => (string)g.Name!).ToArray();
-        gruppen.Should().Equal("alpha-repo", "zeta-repo", AufgabenListenAnsicht.OhneRepository);
+        var groups = view.Groups!.Cast<System.Windows.Data.CollectionViewGroup>().Select(g => (string)g.Name!).ToArray();
+        groups.Should().Equal("alpha-repo", "zeta-repo", AufgabenListenAnsicht.OhneRepository);
     }
 
     /// <summary>Innerhalb einer Gruppe wird absteigend nach SortierZeitpunkt sortiert.</summary>

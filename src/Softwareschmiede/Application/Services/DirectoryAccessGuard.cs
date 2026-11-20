@@ -6,7 +6,7 @@ namespace Softwareschmiede.Application.Services;
 internal static class DirectoryAccessGuard
 {
     /// <summary>Führt <paramref name="action"/> aus und wandelt <see cref="IOException"/>/<see cref="UnauthorizedAccessException"/> in eine <see cref="DirectoryAccessException"/> für <paramref name="path"/> um.</summary>
-    public static async Task AusfuehrenAsync(string path, Func<Task> action)
+    public static async Task ExecuteAsync(string path, Func<Task> action)
     {
         try
         {

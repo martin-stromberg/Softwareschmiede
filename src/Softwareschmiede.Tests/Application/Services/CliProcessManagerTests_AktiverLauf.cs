@@ -15,7 +15,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>
 /// Regressionstests für Issue 108 (Kundenrückmeldung): <see cref="CliProcessManager"/> muss beim Start und
-/// Stopp eines CLI-Prozesses <see cref="WorkItem.ActiveRunId"/> über <see cref="AufgabeService"/> persistieren,
+/// Stopp eines CLI-Prozesses <see cref="WorkItem.ActiveRunId"/> über <see cref="WorkItemService"/> persistieren,
 /// damit der <c>KiAusfuehrungsStatusConverter</c> die Seitenleisten-Kachel korrekt auf "▶ Läuft" umschaltet.
 /// Vor dem Fix wurde <c>AktiveRunId</c> nirgends im Produktivcode gesetzt — der zugehörige E2E-Test simulierte
 /// den Heartbeat direkt in der Datenbank und deckte diese Lücke daher nicht auf.
@@ -24,9 +24,9 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
 {
     private readonly string _dbName = Guid.NewGuid().ToString();
     private readonly ServiceProvider _provider;
-    private readonly KiAusfuehrungsService _kiService;
+    private readonly AiExecutionService _kiService;
     private readonly CliProcessManager _sut;
-    private readonly AufgabeLaufdatenChangedNotifier _laufdatenChangedNotifier = new();
+    private readonly WorkItemRunDataChangedNotifier _laufdatenChangedNotifier = new();
     private readonly Guid _projektId = Guid.NewGuid();
     private readonly Guid _aufgabeId = Guid.NewGuid();
 
@@ -35,8 +35,8 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     {
         var services = new ServiceCollection();
         services.AddDbContext<SoftwareschmiedeDbContext>(options => options.UseInMemoryDatabase(_dbName));
-        services.AddScoped<AufgabeService>();
-        services.AddSingleton<ILogger<AufgabeService>>(NullLogger<AufgabeService>.Instance);
+        services.AddScoped<WorkItemService>();
+        services.AddSingleton<ILogger<WorkItemService>>(NullLogger<WorkItemService>.Instance);
         services.AddScoped<TodoService>();
         services.AddSingleton<ILogger<TodoService>>(NullLogger<TodoService>.Instance);
         _provider = services.BuildServiceProvider();
@@ -158,14 +158,14 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         await RaiseStatusChangedAsync(CliProcessStatus.Started);
         LadeAufgabe().ActiveRunId.Should().NotBeNull();
 
-        await RaiseStatusChangedAsync(CliProcessStatus.Fehler);
+        await RaiseStatusChangedAsync(CliProcessStatus.Error);
 
         LadeAufgabe().ActiveRunId.Should().BeNull();
     }
 
     private void PlantLaufendesHandle(Guid workItemId)
     {
-        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
         handles[workItemId] = new CliProcessHandle(workItemId, System.Diagnostics.Process.GetCurrentProcess());
     }
@@ -220,7 +220,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        var method = typeof(CliProcessManager).GetMethod("AktualisierungAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(CliProcessManager).GetMethod("UpdateAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         await (Task)method.Invoke(_sut, new object[] { _aufgabeId })!;
 
         var workItem = LadeAufgabe();
@@ -239,7 +239,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         PlantLaufendesHandle(_aufgabeId);
         LadeAufgabe().ActiveRunId.Should().BeNull();
 
-        var method = typeof(CliProcessManager).GetMethod("AbgleichAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(CliProcessManager).GetMethod("ReconcileAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         await (Task)method.Invoke(_sut, Array.Empty<object>())!;
 
         var workItem = LadeAufgabe();

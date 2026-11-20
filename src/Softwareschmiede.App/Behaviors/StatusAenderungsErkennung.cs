@@ -18,5 +18,5 @@ public sealed class StatusAenderungsErkennung
 
     /// <summary>Entfernt die gemerkte Beobachtung für eine Aufgabe, z. B. wenn das zugehörige UI-Element entladen wird.</summary>
     /// <param name="workItemId">Die ID der Aufgabe.</param>
-    public void Entfernen(Guid workItemId) => _letzterStatus.Remove(workItemId);
+    public void Remove(Guid workItemId) => _letzterStatus.Remove(workItemId);
 }

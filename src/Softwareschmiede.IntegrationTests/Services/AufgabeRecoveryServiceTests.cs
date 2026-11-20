@@ -8,7 +8,7 @@ using Softwareschmiede.IntegrationTests.Infrastructure;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>Integrationstests für <see cref="AufgabeRecoveryService"/> mit echter SQLite-Datenbank.</summary>
+/// <summary>Integrationstests für <see cref="WorkItemRecoveryService"/> mit echter SQLite-Datenbank.</summary>
 public sealed class AufgabeRecoveryServiceTests
 {
     /// <summary>Prüft, dass RecoveryVersion inkrementiert und ein Audit-Eintrag angelegt wird.</summary>
@@ -17,7 +17,7 @@ public sealed class AufgabeRecoveryServiceTests
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var workItem = await CreateTaskAsync(db, WorkItemStatus.Started);
-        var sut = new AufgabeRecoveryService(db.Context, new AlwaysNotRunningAutomationStatusSource(), NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(db.Context, new AlwaysNotRunningAutomationStatusSource(), NullLogger<WorkItemRecoveryService>.Instance);
 
         await sut.RecoverManuellAsync(workItem.Id, TestContext.Current.CancellationToken);
 
@@ -36,7 +36,7 @@ public sealed class AufgabeRecoveryServiceTests
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var workItem = await CreateTaskAsync(db, WorkItemStatus.Started);
-        var sut = new AufgabeRecoveryService(db.Context, new AlwaysRunningAutomationStatusSource(), NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(db.Context, new AlwaysRunningAutomationStatusSource(), NullLogger<WorkItemRecoveryService>.Instance);
 
         var act = () => sut.RecoverManuellAsync(workItem.Id);
 
@@ -63,7 +63,7 @@ public sealed class AufgabeRecoveryServiceTests
             concurrent.RecoveryVersion++;
             concurrentContext.SaveChanges();
         });
-        var sut = new AufgabeRecoveryService(db.Context, runningStatus, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(db.Context, runningStatus, NullLogger<WorkItemRecoveryService>.Instance);
 
         var act = () => sut.RecoverManuellAsync(workItem.Id);
 
@@ -83,7 +83,7 @@ public sealed class AufgabeRecoveryServiceTests
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var workItem = await CreateTaskAsync(db, WorkItemStatus.New);
-        var sut = new AufgabeRecoveryService(db.Context, new AlwaysNotRunningAutomationStatusSource(), NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(db.Context, new AlwaysNotRunningAutomationStatusSource(), NullLogger<WorkItemRecoveryService>.Instance);
 
         var act = () => sut.RecoverManuellAsync(workItem.Id);
 
@@ -106,8 +106,8 @@ public sealed class AufgabeRecoveryServiceTests
         // entirely before the other reads, giving the second task a different starting RecoveryVersion
         // and allowing both to succeed.
         var runningStatus = new BarrieredNotRunningStatusSource(participantCount: 2);
-        var recovery1 = new AufgabeRecoveryService(context1, runningStatus, NullLogger<AufgabeRecoveryService>.Instance);
-        var recovery2 = new AufgabeRecoveryService(context2, runningStatus, NullLogger<AufgabeRecoveryService>.Instance);
+        var recovery1 = new WorkItemRecoveryService(context1, runningStatus, NullLogger<WorkItemRecoveryService>.Instance);
+        var recovery2 = new WorkItemRecoveryService(context2, runningStatus, NullLogger<WorkItemRecoveryService>.Instance);
 
         var task1 = Task.Run(() => ExecuteRecoverSafeAsync(recovery1, workItem.Id));
         var task2 = Task.Run(() => ExecuteRecoverSafeAsync(recovery2, workItem.Id));
@@ -123,7 +123,7 @@ public sealed class AufgabeRecoveryServiceTests
             .Should().Be(1);
     }
 
-    private static async Task<bool> ExecuteRecoverSafeAsync(AufgabeRecoveryService service, Guid workItemId)
+    private static async Task<bool> ExecuteRecoverSafeAsync(WorkItemRecoveryService service, Guid workItemId)
     {
         try
         {
@@ -199,9 +199,9 @@ public sealed class AufgabeRecoveryServiceTests
 
     private static async Task<WorkItem> CreateTaskAsync(DatabaseFixture db, WorkItemStatus status)
     {
-        var project = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var project = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
         var projektEntity = await project.CreateAsync("Recovery-Parallel", null);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var workItem = await aufgabeService.CreateAsync(projektEntity.Id, "Festhängende Aufgabe", "test");
         await aufgabeService.StatusSetzenAsync(workItem.Id, status);
         if (status.IsActiveOrWaiting())

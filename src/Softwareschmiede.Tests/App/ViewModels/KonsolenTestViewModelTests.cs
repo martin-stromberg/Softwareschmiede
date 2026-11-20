@@ -14,7 +14,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
 {
     private readonly List<string> _tempFiles = [];
     private readonly Mock<IDialogService> _dialogServiceMock = new();
-    private readonly CliReplayAufzeichnungStore _store = new();
+    private readonly CliReplayRecordingStore _store = new();
     private readonly FakeTimeProvider _timeProvider = new();
     private readonly List<KonsolenTestViewModel> _suts = [];
 
@@ -43,10 +43,10 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     private async Task<string> ErstelleAufzeichnungsDateiAsync(bool istVollstaendig = true, params byte[][] chunkDaten)
     {
         var chunks = (chunkDaten.Length > 0 ? chunkDaten : [Encoding.UTF8.GetBytes("X")])
-            .Select((daten, i) => new CliOutputChunkRecord(TimeSpan.Zero, daten))
+            .Select((data, i) => new CliOutputChunkRecord(TimeSpan.Zero, data))
             .ToArray();
         var path = Path.Combine(Path.GetTempPath(), $"konsolentest-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
+        await _store.SaveAsync(path, new CliOutputRecording
         {
             WorkItemId = Guid.NewGuid(),
             PluginName = "TestPlugin",
@@ -71,10 +71,10 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             .ReturnsAsync(path);
     }
 
-    private static async Task WarteBisAsync(Func<bool> bedingung, TimeSpan? timeout = null)
+    private static async Task WarteBisAsync(Func<bool> condition, TimeSpan? timeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
-        while (!bedingung())
+        while (!condition())
         {
             DateTime.UtcNow.Should().BeBefore(deadline, "die Bedingung wurde nicht rechtzeitig erfüllt");
             await Task.Delay(10);
@@ -99,7 +99,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.QuellEintraege.Should().HaveCount(2);
         sut.QuellEintraege[0].Index.Should().Be(1, "die #-Spalte zählt 1-basiert wie der PositionsText");
         sut.QuellEintraege[1].Index.Should().Be(2);
-        sut.QuellEintraege[0].Laenge.Should().Be(10);
+        sut.QuellEintraege[0].Length.Should().Be(10);
         sut.QuellEintraege[0].Quelltext.Should().Be("alpha␛[31m");
         sut.QuellEintraege[1].Quelltext.Should().Be("beta");
         sut.PositionsText.Should().Be("Chunk 0/2");
@@ -206,7 +206,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     public async Task Wiedergabe_PausierenUndFortsetzen()
     {
         var path = Path.Combine(Path.GetTempPath(), $"konsolentest-pause-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
+        await _store.SaveAsync(path, new CliOutputRecording
         {
             WorkItemId = Guid.NewGuid(),
             PluginName = "P",
@@ -230,7 +230,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         await WarteBisAsync(() => replay.AktuellerChunkIndex >= 1);
 
         sut.WiedergabePausierenCommand.Execute(null);
-        sut.IstPausiert.Should().BeTrue();
+        sut.IsPaused.Should().BeTrue();
         sut.StatusText.Should().Be("Pausiert.");
 
         // Die reale Pause des zweiten Chunks (5 min → auf 1 s Schwelle verkürzt) läuft im
@@ -241,7 +241,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             "während der Pausierung darf kein weiterer Chunk angewendet werden");
 
         sut.WiedergabePausierenCommand.Execute(null);
-        sut.IstPausiert.Should().BeFalse();
+        sut.IsPaused.Should().BeFalse();
         // Die Pause des zweiten Chunks wird nach dem Fortsetzen ggf. erst neu auf der Schleife
         // angelegt — wiederholte Advances decken die Registrierungsreihenfolge ab. Großzügigere
         // Deadline: das Warten hängt an realer Thread-Pool-/Dispatcher-Einplanung (die logische
@@ -296,19 +296,19 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         var session = (TerminalReplaySession)sut.Session!;
 
-        session.ZeitrafferSchwelle.Should().Be(TimeSpan.FromSeconds(1), "Default-Text '1' wird beim Laden angewendet");
+        session.TimeLapseThreshold.Should().Be(TimeSpan.FromSeconds(1), "Default-Text '1' wird beim Laden angewendet");
 
         sut.ZeitrafferSchwelleText = "0,25";
-        session.ZeitrafferSchwelle.Should().Be(TimeSpan.FromMilliseconds(250));
+        session.TimeLapseThreshold.Should().Be(TimeSpan.FromMilliseconds(250));
         sut.FehlerMeldung.Should().BeNull();
 
         sut.ZeitrafferSchwelleText = "keine-zahl";
         sut.FehlerMeldung.Should().NotBeNullOrWhiteSpace();
-        session.ZeitrafferSchwelle.Should().Be(TimeSpan.FromMilliseconds(250),
+        session.TimeLapseThreshold.Should().Be(TimeSpan.FromMilliseconds(250),
             "die letzte gültige Schwelle bleibt bei ungültiger Eingabe aktiv");
 
         sut.ZeitrafferSchwelleText = "0";
-        session.ZeitrafferSchwelle.Should().Be(TimeSpan.Zero);
+        session.TimeLapseThreshold.Should().Be(TimeSpan.Zero);
         sut.FehlerMeldung.Should().BeNull("ein anschließend gültiger Wert räumt die Validierungsmeldung auf");
     }
 
@@ -329,7 +329,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.ZeitrafferSchwelleText = eingabe;
 
         sut.FehlerMeldung.Should().NotBeNullOrWhiteSpace();
-        session.ZeitrafferSchwelle.Should().Be(TimeSpan.FromSeconds(1));
+        session.TimeLapseThreshold.Should().Be(TimeSpan.FromSeconds(1));
     }
 
     /// <summary>Steht im Zeitraffer-Feld ein ungültiger Text, muss eine frisch erzeugte
@@ -352,7 +352,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
 
         var session = (TerminalReplaySession)sut.Session!;
-        session.ZeitrafferSchwelle.Should().Be(TimeSpan.Zero,
+        session.TimeLapseThreshold.Should().Be(TimeSpan.Zero,
             "die frische Session muss die zuletzt gültige Schwelle übernehmen, nicht den Echtzeit-Default");
     }
 
@@ -363,7 +363,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     public async Task Wiedergabe_NeustartAusPausiertemLauf_SpieltErneutAbPosition0()
     {
         var path = Path.Combine(Path.GetTempPath(), $"konsolentest-neustart-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
+        await _store.SaveAsync(path, new CliOutputRecording
         {
             WorkItemId = Guid.NewGuid(),
             PluginName = "P",
@@ -389,7 +389,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.WiedergabeStartenCommand.Execute(null);
         await WarteBisAsync(() => erste.AktuellerChunkIndex >= 1);
         sut.WiedergabePausierenCommand.Execute(null);
-        sut.IstPausiert.Should().BeTrue();
+        sut.IsPaused.Should().BeTrue();
 
         sut.WiedergabeNeustartenCommand.CanExecute(null).Should().BeTrue(
             "der Neustart-Command muss auch aus dem Pausiert-Zustand erreichbar sein");
@@ -397,7 +397,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
 
         var zweite = (TerminalReplaySession)sut.Session!;
         zweite.Should().NotBeSameAs(erste, "der Neustart verwirft die laufende Session");
-        sut.IstPausiert.Should().BeFalse();
+        sut.IsPaused.Should().BeFalse();
         sut.IstWiedergabeAktiv.Should().BeTrue();
         sut.StatusText.Should().Be("Wiedergabe läuft.");
 
@@ -451,7 +451,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.SchrittZurueckCommand.Execute(null);
 
         sut.IstWiedergabeAktiv.Should().BeFalse();
-        sut.IstPausiert.Should().BeFalse();
+        sut.IsPaused.Should().BeFalse();
         sut.Session.Should().BeNull();
     }
 
@@ -497,7 +497,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     public async Task SchrittCommands_CanExecute_NachZustand()
     {
         var path = Path.Combine(Path.GetTempPath(), $"konsolentest-schritt-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
+        await _store.SaveAsync(path, new CliOutputRecording
         {
             WorkItemId = Guid.NewGuid(),
             PluginName = "P",
@@ -525,7 +525,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.WiedergabeStartenCommand.Execute(null);
         await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
         sut.IstWiedergabeAktiv.Should().BeTrue();
-        sut.IstPausiert.Should().BeFalse();
+        sut.IsPaused.Should().BeFalse();
         sut.SchrittVorCommand.CanExecute(null).Should().BeFalse(
             "Schritte sind während unpausierter Wiedergabe gesperrt");
         sut.SchrittZurueckCommand.CanExecute(null).Should().BeFalse();
@@ -554,7 +554,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     public async Task SchrittCommands_Execute_WaehrendLaufenderWiedergabe_SindNoOp()
     {
         var path = Path.Combine(Path.GetTempPath(), $"konsolentest-schrittguard-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
+        await _store.SaveAsync(path, new CliOutputRecording
         {
             WorkItemId = Guid.NewGuid(),
             PluginName = "P",
@@ -578,7 +578,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.WiedergabeStartenCommand.Execute(null);
         await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
         sut.IstWiedergabeAktiv.Should().BeTrue();
-        sut.IstPausiert.Should().BeFalse();
+        sut.IsPaused.Should().BeFalse();
 
         sut.SchrittVorCommand.Execute(null);
         sut.SchrittZurueckCommand.Execute(null);
@@ -670,7 +670,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     public async Task Pausiert_Schritt_Fortsetzen_ViewModelEbene()
     {
         var path = Path.Combine(Path.GetTempPath(), $"konsolentest-schrittpause-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
+        await _store.SaveAsync(path, new CliOutputRecording
         {
             WorkItemId = Guid.NewGuid(),
             PluginName = "P",
@@ -694,7 +694,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.WiedergabeStartenCommand.Execute(null);
         await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
         sut.WiedergabePausierenCommand.Execute(null);
-        sut.IstPausiert.Should().BeTrue();
+        sut.IsPaused.Should().BeTrue();
 
         // Schritte im Pausiert-Zustand verändern die Position der laufenden Wiedergabe.
         sut.SchrittZurueckCommand.Execute(null);
@@ -703,7 +703,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.PositionsText.Should().Be("Chunk 1/3");
 
         sut.WiedergabePausierenCommand.Execute(null);
-        sut.IstPausiert.Should().BeFalse();
+        sut.IsPaused.Should().BeFalse();
 
         // Die Inter-Chunk-Delays (5 min, auf die 1-s-Schwelle verkürzt) werden sequenziell und
         // ggf. erst nach dem Fortsetzen neu angelegt — wiederholte Advances decken das ab.

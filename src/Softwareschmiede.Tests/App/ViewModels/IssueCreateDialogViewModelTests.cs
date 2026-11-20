@@ -359,10 +359,10 @@ public sealed class IssueCreateDialogViewModelTests
         var deaktiviertesPlugin = new FakeFailingKiPlugin();
         _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
         await using var db = Softwareschmiede.Tests.Helpers.TestDbContextFactory.Create();
-        var einstellungService = new Softwareschmiede.Application.Services.AppEinstellungService(
-            db, NullLogger<Softwareschmiede.Application.Services.AppEinstellungService>.Instance);
+        var settingService = new Softwareschmiede.Application.Services.AppSettingService(
+            db, NullLogger<Softwareschmiede.Application.Services.AppSettingService>.Instance);
         var activationService = new Softwareschmiede.Application.Services.PluginActivationService(
-            einstellungService, _pluginManagerMock.Object, NullLogger<Softwareschmiede.Application.Services.PluginActivationService>.Instance);
+            settingService, _pluginManagerMock.Object, NullLogger<Softwareschmiede.Application.Services.PluginActivationService>.Instance);
         await activationService.SetPluginEnabledAsync("FailKi", false, TestContext.Current.CancellationToken);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance, activationService);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");

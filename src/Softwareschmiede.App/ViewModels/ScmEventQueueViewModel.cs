@@ -47,7 +47,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
         RetrySourcesCommand = Command(async ct =>
         {
             using var scope = _scopes.CreateScope();
-            var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct);
+            var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppSettingService>().GetScmMonitoringEnabledAsync(ct);
             // Die Backoff-Rücksetzung gilt für Ereignis- wie Backmerge-Checkpoints gleichermaßen.
             await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmObservationCheckpoints
                 .ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)null), ct);
@@ -65,7 +65,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             // Der Aufbereitungs-Entdeckungszyklus ist ebenfalls unabhängig vom
             // Ereignisüberwachungs-Schalter; er prüft seinen eigenen Schalter
             // (Einstellungen → Automatisierung → Issue-Aufbereitung).
-            await scope.ServiceProvider.GetRequiredService<ScmIssueAufbereitungMonitoringService>().RunOnceAsync(ct);
+            await scope.ServiceProvider.GetRequiredService<ScmIssuePreparationMonitoringService>().RunOnceAsync(ct);
         });
         OpenEventCommand = Command(OpenAsync, () => SelectedEvent is { IsFinal: false, IsBlocked: false, AttemptId: null });
         // Eine nach „Verarbeitet" permanent gescheiterte Outbox-Aktion (z. B. Screenshot-Nachweis)
@@ -196,7 +196,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
                 .Join(db.ScmIncomingEvents.AsNoTracking(), x => x.EventId, e => e.Id,
                     (x, e) => new { x.Purpose, x.Status, x.Error, x.NextAttemptUtc, Event = e })
                 .ToListAsync(ct);
-            var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct);
+            var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppSettingService>().GetScmMonitoringEnabledAsync(ct);
             // Die heilsame Schaltfläche unterscheidet sich: Quellen-Fehler löst ausschließlich
             // „Quellen erneut prüfen", eine gesperrte Outbox-Aktion (z. B. Screenshot-Nachweis)
             // nur das ereignisbezogene „Erneut prüfen" am betroffenen Ereignis.
@@ -403,7 +403,7 @@ public sealed record ScmEventQueueItem(Guid Id, Guid TaskId, string TaskTitle, s
         return new(item.Id, item.WorkItemId, task?.Title ?? "Entfernte Aufgabe",
             $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}",
             $"{(observation.Reference.Kind == Domain.ValueObjects.ScmReferenceKind.Issue ? "Issue" : "Pull Request")} #{observation.Reference.Number}",
-            item.Purpose == ScmIssueAufbereitungsService.Purpose ? "Issue-Aufbereitung"
+            item.Purpose == ScmIssuePreparationService.Purpose ? "Issue-Aufbereitung"
                 : observation.ContentKind switch { Domain.ValueObjects.ScmContentKind.Description => "Beschreibung", Domain.ValueObjects.ScmContentKind.ReviewComment => "Review-Kommentar", Domain.ValueObjects.ScmContentKind.PullRequestReview => "Review", _ => "Kommentar" },
             DateTimeOffset.FromUnixTimeMilliseconds(item.ReceivedUtc).ToLocalTime().ToString("g"), item.Status,
             item.Status switch { "ZustellungVorbereitet" => "Zustellung vorbereitet", "InBearbeitung" => "In Bearbeitung", "ZustellungUngewiss" => "Zustellung ungewiss", "VerarbeitungUngeklärt" => "Verarbeitung ungeklärt", _ => item.Status },

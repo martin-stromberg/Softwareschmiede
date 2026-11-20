@@ -6,8 +6,8 @@ namespace Softwareschmiede.Application.Services;
 
 /// <summary>
 /// Gemeinsame Ausführungslogik für konfigurierbare Repository-Skripte (z. B. Start- oder
-/// Initialisierungsskripte), genutzt von <see cref="RepositoryStartskriptService"/> und
-/// <see cref="RepositoryInitialisierungService"/>.
+/// Initialisierungsskripte), genutzt von <see cref="RepositoryStartScriptService"/> und
+/// <see cref="RepositoryInitializationService"/>.
 /// </summary>
 internal static class RepositoryScriptExecutor
 {

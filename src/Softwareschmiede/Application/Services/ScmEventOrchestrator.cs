@@ -14,19 +14,19 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Ein gemeinsamer, dauerhafter Dispatch für Polling und Queue-Bedienung.</summary>
 public sealed class ScmEventOrchestrator(
     SoftwareschmiedeDbContext db, ScmEventStore store, ScmEventOutbox outbox,
-    IPluginManager plugins, PluginSelectionService selection, EntwicklungsprozessService development,
-    AufgabeService tasks, KiAusfuehrungsService cli, ScmEventExchangeProtocol exchange,
+    IPluginManager plugins, PluginSelectionService selection, DevelopmentProcessService development,
+    WorkItemService tasks, AiExecutionService cli, ScmEventExchangeProtocol exchange,
     ScmEventChangeNotifier notifier, IServiceScopeFactory scopes, TimeProvider time, IOptions<ScmEventOptions> options,
-    AppEinstellungService einstellungen, PullRequestReferenzService pullRequestReferenzen,
-    ProtokollService protokoll, ScmEventExecutionLimitService executionLimits,
-    ILogger<ScmEventOrchestrator> logger, ScmStartPruefungsAusloeser? startPruefungsAusloeser = null)
+    AppSettingService settings, PullRequestReferenceService pullRequestReferenzen,
+    LogService log, ScmEventExecutionLimitService executionLimits,
+    ILogger<ScmEventOrchestrator> logger, ScmStartCheckTrigger? startCheckTrigger = null)
 {
     /// <summary>
     /// Startprüfung: Dispatcht alle fälligen, nicht abgeschlossenen Ereignisse in der priorisierten
-    /// Reihenfolge aus <see cref="ScmDispatchPrioritaet"/> (Fortsetzungsereignisse → fällige
+    /// Reihenfolge aus <see cref="ScmDispatchPriority"/> (Fortsetzungsereignisse → fällige
     /// Verzögerungen zeitaufsteigend → Eingangsreihenfolge). Wird vom Poll-Zyklus des
     /// <see cref="ScmEventMonitoringService"/> und vom ereignisgesteuerten
-    /// <see cref="ScmStartPruefungsService"/> gleichermaßen aufgerufen und ist beliebig oft
+    /// <see cref="ScmStartCheckService"/> gleichermaßen aufgerufen und ist beliebig oft
     /// wiederholbar: Fälligkeit, Sperren und die atomare Platzvergabe entscheidet
     /// <see cref="DispatchAsync"/> je Ereignis erneut unter der Aufgabensperre.
     /// </summary>
@@ -45,7 +45,7 @@ public sealed class ScmEventOrchestrator(
                 db.ScmOutgoingActions.Any(action => action.EventId == x.Id && action.Status != "Succeeded"
                     && (action.NextAttemptUtc == null || action.NextAttemptUtc <= nowMilliseconds))))
                 .OrderBy(x => x.Sequence).Take(100)
-                .Select(x => new ScmDispatchPrioritaet.EreignisAuswahl(x.Id, x.WorkItemId, x.Sequence, x.Status, x.NextAttemptUtc))
+                .Select(x => new ScmDispatchPriority.EventSelection(x.Id, x.WorkItemId, x.Sequence, x.Status, x.NextAttemptUtc))
                 .ToListAsync(ct);
             if (batch.Count == 0) break;
             afterSequence = batch[^1].Sequence;
@@ -56,8 +56,8 @@ public sealed class ScmEventOrchestrator(
                 .Where(x => batchAufgabeIds.Contains(x.Id))
                 .Select(x => new { x.Id, x.Status, x.ExecutionStatus, x.PausedUntilUtc })
                 .ToDictionaryAsync(x => x.Id,
-                    x => new ScmDispatchPrioritaet.AufgabenZustand(x.Status, x.ExecutionStatus, x.PausedUntilUtc), ct);
-            foreach (var item in ScmDispatchPrioritaet.OrderForDispatch(batch, aufgabenZustaende))
+                    x => new ScmDispatchPriority.WorkItemState(x.Status, x.ExecutionStatus, x.PausedUntilUtc), ct);
+            foreach (var item in ScmDispatchPriority.OrderForDispatch(batch, aufgabenZustaende))
             {
                 using var dispatchScope = scopes.CreateScope();
                 await dispatchScope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(item.Id, ct: ct);
@@ -132,9 +132,9 @@ public sealed class ScmEventOrchestrator(
             if (item.Status == "Abgebrochen") return;
             // Interner Aufbereitungsauftrag: dedizierter Ausführungspfad; der generische
             // Zustellpfad würde den rohen Issue-Body als Prompt zustellen.
-            if (item.Purpose == ScmIssueAufbereitungsService.Purpose)
+            if (item.Purpose == ScmIssuePreparationService.Purpose)
             {
-                await DispatchAufbereitungAsync(item, explicitPluginPrefix, ct);
+                await DispatchPreparationAsync(item, explicitPluginPrefix, ct);
                 return;
             }
             var observation = ScmEventStore.Observation(item);
@@ -192,14 +192,14 @@ public sealed class ScmEventOrchestrator(
             {
                 var currentRepository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(task.GitRepositoryId!.Value,
                     plugin.PluginPrefix, $"https://{observation.Reference.Repository.Host}/{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}",
-                    observation.Reference.Repository.Konto), ct);
+                    observation.Reference.Repository.Account), ct);
                 if (currentRepository.RepositoryId != observation.Reference.Repository.RepositoryId || !currentRepository.CanWrite)
                 { await WaitWithCommentAsync(item, observation, responder, "Schreibberechtigung für den Ereignisursprung fehlt. Prüfen Sie unter Einstellungen → Plugins → GitHub → Authentifizierung den Personal Access Token: Er benötigt Zugriff auf " + observation.Reference.Repository.Owner + "/" + observation.Reference.Repository.Name + " sowie Lese- und Schreibrechte für Issues und Pull Requests. Speichern Sie Änderungen und klicken Sie anschließend beim Ereignis auf Erneut prüfen.", ct); return; }
                 // Der Trigger wurde bereits bei der Aufnahme geprüft; ein seither geändertes
                 // Keyword entwertet ein angenommenes Ereignis nicht nachträglich.
                 var revalidation = ScmEventValidationService.GetRejection(
                     observation with { Reference = observation.Reference with { Repository = currentRepository } },
-                    await einstellungen.GetScmTriggerKeywordAsync(ct));
+                    await settings.GetScmTriggerKeywordAsync(ct));
                 // Eine gespeicherte Beobachtung mit Kontoreaktion erreicht die Inbox produktiv
                 // nie (Eingangsablehnung); Altbestand oder Eingriffe werden sicherheitshalber
                 // nicht zugestellt, sondern zur Klärung vorgelegt.
@@ -229,7 +229,7 @@ public sealed class ScmEventOrchestrator(
                             // Protokolleintrag nur bei geändertem Wartegrund, damit der Poll-Zyklus
                             // nicht bei jedem Versuch denselben Eintrag erzeugt.
                             if (!string.Equals(item.Reason, reason, StringComparison.Ordinal))
-                                await protokoll.AddEintragAsync(item.WorkItemId, LogEntryType.SystemMessage, reason, ct: ct);
+                                await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage, reason, ct: ct);
                             await WaitWithCommentAsync(item, observation, responder, reason, ct);
                             return;
                         }
@@ -242,21 +242,21 @@ public sealed class ScmEventOrchestrator(
                     // gesamte Startfenster (Plugin-Auflösung, Health-Check, Prozessstart) ab und
                     // wird nach der Handle-Registrierung von der echten Laufzählung abgelöst —
                     // so kann kein nebenläufiger Dispatch zwischen Prüfung und Start rutschen.
-                    var zulassung = await executionLimits.PruefeUndReserviereStartPlatzAsync(prefix, ct);
-                    if (zulassung.Wartegrund is not null)
+                    var admission = await executionLimits.CheckAndReserveStartSlotAsync(prefix, ct);
+                    if (admission.WaitReason is not null)
                     {
-                        if (!string.Equals(item.Reason, zulassung.Wartegrund, StringComparison.Ordinal))
-                            await protokoll.AddEintragAsync(item.WorkItemId, LogEntryType.SystemMessage, zulassung.Wartegrund, ct: ct);
-                        await WaitAsync(item, zulassung.Wartegrund, ct);
+                        if (!string.Equals(item.Reason, admission.WaitReason, StringComparison.Ordinal))
+                            await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage, admission.WaitReason, ct: ct);
+                        await WaitAsync(item, admission.WaitReason, ct);
                         return;
                     }
-                    using (zulassung.Reservierung)
+                    using (admission.Reservation)
                     {
                         var kiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);
                         if (!await kiPlugin.CheckHealthAsync(ct)) throw new InvalidOperationException("Die ausgewählte CLI ist nicht startbereit.");
                         var parameters = prefix.Contains("KiSimulator", StringComparison.OrdinalIgnoreCase) ? "--scm-exchange" : null;
                         if (string.IsNullOrWhiteSpace(task.LocalClonePath))
-                            await development.ProzessStartenUndCliStartenAsync(task.Id, task.GitRepository!.RepositoryUrl,
+                            await development.StartProcessAndCliAsync(task.Id, task.GitRepository!.RepositoryUrl,
                                 task.BaseBranchName, prefix, ct, strictPluginSelection: true, optionalParameters: parameters);
                         else
                             await development.CliNeustartenAsync(task.Id, prefix, parameters, ct, strictPluginSelection: true);
@@ -296,7 +296,7 @@ public sealed class ScmEventOrchestrator(
                 // Konfigurierte Prompt-Anhänge werden erst hier — bei der tatsächlichen Zustellung —
                 // aufgelöst und nur in den Prompt eingefügt: Der gespeicherte Ereignistext, die
                 // Trigger-Gegenprüfung, Dedup/BodyHash und request.json bleiben unverändert.
-                var promptSuffix = ScmPromptAppendix.Resolve(observation, await einstellungen.GetScmPromptAppendicesAsync(ct));
+                var promptSuffix = ScmPromptAppendix.Resolve(observation, await settings.GetScmPromptAppendicesAsync(ct));
                 var attempt = await exchange.PrepareAsync(new(item.Id, attemptId, adapter.CliRunId, task.Id, observation.Body,
                     observation.ContentKind.ToString(), $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url), adapter.WorkingDirectory, ct, access.RestrictedWriteSids, promptSuffix);
                 if (!ReferenceEquals(adapter, cli.GetScmPromptSession(task.Id)) || !adapter.IsAlive)
@@ -448,7 +448,7 @@ public sealed class ScmEventOrchestrator(
             // Ein Abbruch kann einen Ausführungsplatz freigeben (zurückgestufte Pause) oder
             // spätere Ereignisse derselben Aufgabe entsperren — die Startprüfung soll das
             // nicht erst beim nächsten Poll sehen.
-            startPruefungsAusloeser?.StartpruefungAnfordern();
+            startCheckTrigger?.RequestStartCheck();
         }
         return changed != 0;
     }
@@ -567,7 +567,7 @@ public sealed class ScmEventOrchestrator(
                         await outbox.ExecuteAsync(outgoing, responder, ct);
                     }
                     if (collected.Skipped.Count > 0)
-                        await protokoll.AddEintragAsync(item.WorkItemId, LogEntryType.GitAction,
+                        await log.AddEntryAsync(item.WorkItemId, LogEntryType.GitAction,
                             "Screenshot-Nachweise übersprungen: " + string.Join("; ", collected.Skipped.Take(8))
                                 + (collected.Skipped.Count > 8 ? "; …" : string.Empty), ct: ct);
                 }
@@ -600,11 +600,11 @@ public sealed class ScmEventOrchestrator(
     }
 
     /// <summary>Dedizierter Ausführungspfad für interne Aufbereitungsaufträge
-    /// (<see cref="ScmIssueAufbereitungsService.Purpose"/>): Spiegelt den generischen Zustellpfad,
+    /// (<see cref="ScmIssuePreparationService.Purpose"/>): Spiegelt den generischen Zustellpfad,
     /// liefert aber den festen Analyse-Prompt statt des Ereignistexts, erzeugt nie einen
     /// Kommentar am Issue und wertet das Analyse-Ergebnis über den eigenen Abgleich aus.
     /// Die Ausführung zählt über die gemeinsame Reservierung in die #410-Begrenzung.</summary>
-    private async Task DispatchAufbereitungAsync(ScmIncomingEvent item, string? explicitPluginPrefix, CancellationToken ct)
+    private async Task DispatchPreparationAsync(ScmIncomingEvent item, string? explicitPluginPrefix, CancellationToken ct)
     {
         var observation = ScmEventStore.Observation(item);
         var plugin = plugins.GetSourceCodeManagementPlugins().FirstOrDefault(x => x.PluginPrefix == observation.Reference.Repository.ProviderPrefix);
@@ -621,7 +621,7 @@ public sealed class ScmEventOrchestrator(
         if (item.Status == "Verarbeitet") return;
         if (item.DeliveryAttemptId is not null)
         {
-            try { await ReconcileAufbereitungAttemptAsync(item, observation, responder, ct); }
+            try { await ReconcilePreparationAttemptAsync(item, observation, responder, ct); }
             catch (ScmActionIdCollisionException ex)
             {
                 item.Status = "VerarbeitungUngeklärt";
@@ -647,13 +647,13 @@ public sealed class ScmEventOrchestrator(
             // Wirksamkeitsprüfung der Schalter zum Ausführungszeitpunkt: Eine deaktivierte
             // Funktion oder ein abgewähltes Repository lässt den Auftrag ehrlich warten,
             // ohne dass er verloren geht oder remote irgendetwas sichtbar wird.
-            if (!await einstellungen.GetScmIssueAufbereitungEnabledAsync(ct))
+            if (!await settings.GetScmIssuePreparationEnabledAsync(ct))
             { await WaitAsync(item, "Die Issue-Aufbereitung ist in den Einstellungen deaktiviert.", ct); return; }
             if (task.GitRepository?.IssuePreparationEnabled != true)
             { await WaitAsync(item, "Die Issue-Aufbereitung ist für dieses Repository deaktiviert.", ct); return; }
             var currentRepository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(task.GitRepositoryId!.Value,
                 plugin.PluginPrefix, $"https://{observation.Reference.Repository.Host}/{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}",
-                observation.Reference.Repository.Konto), ct);
+                observation.Reference.Repository.Account), ct);
             if (currentRepository.RepositoryId != observation.Reference.Repository.RepositoryId || !currentRepository.CanWrite)
             { await WaitAsync(item, "Schreibberechtigung für den Ereignisursprung fehlt. Prüfen Sie unter Einstellungen → Plugins → GitHub → Authentifizierung den Personal Access Token und klicken Sie anschließend beim Ereignis auf Erneut prüfen.", ct); return; }
             var issue = await source.ReadIssueAsync(observation.Reference, ct);
@@ -666,7 +666,7 @@ public sealed class ScmEventOrchestrator(
                 item.Status = "Verarbeitet";
                 item.Reason = null;
                 await db.SaveChangesAsync(ct);
-                await protokoll.AddEintragAsync(item.WorkItemId, LogEntryType.SystemMessage,
+                await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
                     $"Issue #{issue.Nummer} ist bereits geschlossen; die Aufbereitung wurde ohne Änderung abgeschlossen.", ct: ct);
                 return;
             }
@@ -685,7 +685,7 @@ public sealed class ScmEventOrchestrator(
                     // Aufbereitungs-Plugin (Einstellung bzw. in der Aufgabe hinterlegtes Prefix),
                     // danach die #411-Kette: Projekt-Default → Global-Default → ki.plugin.default.
                     var resolution = await selection.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(
-                        await einstellungen.GetScmIssueAufbereitungPluginPrefixAsync(ct) ?? task.AiPluginPrefix, task.ProjectId, ct);
+                        await settings.GetScmIssuePreparationPluginPrefixAsync(ct) ?? task.AiPluginPrefix, task.ProjectId, ct);
                     prefix = resolution.PluginPrefix;
                     if (prefix is null && resolution.IgnoredPluginPrefixes.Count > 0)
                     {
@@ -693,7 +693,7 @@ public sealed class ScmEventOrchestrator(
                             + string.Join(", ", resolution.IgnoredPluginPrefixes.Select(x => $"'{x}'"))
                             + ") ist nicht mehr installiert oder aktiviert, und es ist kein ausführbares Standard-Plugin konfiguriert. Plugin in den Einstellungen aktivieren oder Ereignis öffnen und CLI auswählen.";
                         if (!string.Equals(item.Reason, reason, StringComparison.Ordinal))
-                            await protokoll.AddEintragAsync(item.WorkItemId, LogEntryType.SystemMessage, reason, ct: ct);
+                            await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage, reason, ct: ct);
                         await WaitAsync(item, reason, ct);
                         return;
                     }
@@ -702,21 +702,21 @@ public sealed class ScmEventOrchestrator(
                 { await WaitAsync(item, "Keine ausführbare CLI für die Issue-Aufbereitung konfiguriert. Ereignis öffnen und CLI auswählen.", ct); return; }
                 // Zulassungskontrolle unmittelbar vor dem CLI-Start: Erreichtes globales oder
                 // Plugin-Limit lässt den Auftrag ohne neue Ausführung ehrlich warten.
-                var zulassung = await executionLimits.PruefeUndReserviereStartPlatzAsync(prefix, ct);
-                if (zulassung.Wartegrund is not null)
+                var admission = await executionLimits.CheckAndReserveStartSlotAsync(prefix, ct);
+                if (admission.WaitReason is not null)
                 {
-                    if (!string.Equals(item.Reason, zulassung.Wartegrund, StringComparison.Ordinal))
-                        await protokoll.AddEintragAsync(item.WorkItemId, LogEntryType.SystemMessage, zulassung.Wartegrund, ct: ct);
-                    await WaitAsync(item, zulassung.Wartegrund, ct);
+                    if (!string.Equals(item.Reason, admission.WaitReason, StringComparison.Ordinal))
+                        await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage, admission.WaitReason, ct: ct);
+                    await WaitAsync(item, admission.WaitReason, ct);
                     return;
                 }
-                using (zulassung.Reservierung)
+                using (admission.Reservation)
                 {
                     var kiPlugin = await selection.ResolveDevelopmentAutomationPluginStrictAsync(prefix, ct);
                     if (!await kiPlugin.CheckHealthAsync(ct)) throw new InvalidOperationException("Die ausgewählte CLI ist nicht startbereit.");
                     var parameters = prefix.Contains("KiSimulator", StringComparison.OrdinalIgnoreCase) ? "--scm-exchange" : null;
                     if (string.IsNullOrWhiteSpace(task.LocalClonePath))
-                        await development.ProzessStartenUndCliStartenAsync(task.Id, task.GitRepository!.RepositoryUrl,
+                        await development.StartProcessAndCliAsync(task.Id, task.GitRepository!.RepositoryUrl,
                             task.BaseBranchName, prefix, ct, strictPluginSelection: true, optionalParameters: parameters);
                     else
                         await development.CliNeustartenAsync(task.Id, prefix, parameters, ct, strictPluginSelection: true);
@@ -750,9 +750,9 @@ public sealed class ScmEventOrchestrator(
             var attemptId = Guid.NewGuid();
             // Der Analyse-Prompt wird aus persistierten Erkennungsdaten gebaut und bleibt damit
             // beim Wiederanlauf bitgleich rekonstruierbar (Prüfung gegen request.json).
-            var promptBody = ScmIssueAufbereitungPrompt.Build(task.IssueReference?.Title ?? task.Title, observation.Body);
+            var promptBody = ScmIssuePreparationPrompt.Build(task.IssueReference?.Title ?? task.Title, observation.Body);
             var attempt = await exchange.PrepareAsync(new(item.Id, attemptId, adapter.CliRunId, task.Id, promptBody,
-                ScmIssueAufbereitungsService.Purpose, $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}",
+                ScmIssuePreparationService.Purpose, $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}",
                 issue.IssueUrl ?? observation.Url), adapter.WorkingDirectory, ct, access.RestrictedWriteSids);
             if (!ReferenceEquals(adapter, cli.GetScmPromptSession(task.Id)) || !adapter.IsAlive)
             { await WaitAsync(item, "CLI-Sitzung hat sich geändert. Erneut prüfen.", ct); return; }
@@ -789,7 +789,7 @@ public sealed class ScmEventOrchestrator(
             item.NextAttemptUtc = ex.FailureKind is ScmProviderFailureKind.Authentication or ScmProviderFailureKind.Permission
                 ? long.MaxValue : ScmEventStore.RetryAt(++item.Attempts, time.GetUtcNow().ToUnixTimeMilliseconds(), ex.RetryAfterUtc);
             logger.LogWarning(ex, "Issue-Aufbereitung {EventId}: Anbieter-Fehler ({FailureKind}).", item.Id, ex.FailureKind);
-            await ProtokolliereAufbereitungsFehlerAsync(item, ex.Message, ct);
+            await LogPreparationErrorAsync(item, ex.Message, ct);
             await WaitAsync(item, ex.Message, ct);
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
@@ -798,7 +798,7 @@ public sealed class ScmEventOrchestrator(
             // Neuversand nach Korrektur — kein automatischer Retry, keine Remote-Änderung.
             item.NextAttemptUtc = long.MaxValue;
             logger.LogError(ex, "Issue-Aufbereitung {EventId} fehlgeschlagen.", item.Id);
-            await ProtokolliereAufbereitungsFehlerAsync(item, ex.Message, ct);
+            await LogPreparationErrorAsync(item, ex.Message, ct);
             await WaitAsync(item, ex.Message, ct);
         }
     }
@@ -807,10 +807,10 @@ public sealed class ScmEventOrchestrator(
     /// Protokolleintrag am Vorgang aus (dedupliziert nach Wartegrund, damit der
     /// Poll-Zyklus nicht bei jedem Versuch denselben Eintrag erzeugt). Es wird
     /// bewusst kein Kommentar am Issue erzeugt.</summary>
-    private async Task ProtokolliereAufbereitungsFehlerAsync(ScmIncomingEvent item, string reason, CancellationToken ct)
+    private async Task LogPreparationErrorAsync(ScmIncomingEvent item, string reason, CancellationToken ct)
     {
         if (string.Equals(item.Reason, reason, StringComparison.Ordinal)) return;
-        await protokoll.AddEintragAsync(item.WorkItemId, LogEntryType.SystemMessage,
+        await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
             "Issue-Aufbereitung fehlgeschlagen: " + reason, ct: ct);
     }
 
@@ -821,15 +821,15 @@ public sealed class ScmEventOrchestrator(
     /// erzwungen: Bei deaktiviertem Schalter wird eine gelieferte Kommentaraktion verworfen und
     /// protokolliert, bei aktivem Schalter ist ein erfolgreicher Kommentar Abschlusskriterium.
     /// Kein Wartehinweis-, Fehler- oder Attachments-Kommentar am Issue.</summary>
-    private async Task ReconcileAufbereitungAttemptAsync(ScmIncomingEvent item, ScmEventObservation observation,
+    private async Task ReconcilePreparationAttemptAsync(ScmIncomingEvent item, ScmEventObservation observation,
         IScmEventResponder responder, CancellationToken ct)
     {
         if (item.ExchangePath is null || !Guid.TryParse(item.CliRunId, out var runId)) return;
         var task = await db.WorkItems.Include(x => x.IssueReference)
             .SingleOrDefaultAsync(x => x.Id == item.WorkItemId, ct);
-        var promptBody = ScmIssueAufbereitungPrompt.Build(task?.IssueReference?.Title ?? task?.Title, observation.Body);
+        var promptBody = ScmIssuePreparationPrompt.Build(task?.IssueReference?.Title ?? task?.Title, observation.Body);
         var request = new ScmExchangeRequest(item.Id, item.DeliveryAttemptId!.Value, runId, item.WorkItemId, promptBody,
-            ScmIssueAufbereitungsService.Purpose, $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url);
+            ScmIssuePreparationService.Purpose, $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url);
         var attempt = new ScmExchangeAttempt(request, item.ExchangePath)
         {
             RestrictedWriteSids = JsonSerializer.Deserialize<string[]>(item.ExchangeRestrictedWriteSidsJson ?? "[]") ?? []
@@ -841,7 +841,7 @@ public sealed class ScmEventOrchestrator(
             item.Status = "VerarbeitungUngeklärt";
             item.Reason = messages.Diagnostic;
         }
-        var kommentarErlaubt = await einstellungen.GetScmIssueAufbereitungKommentarEnabledAsync(ct);
+        var commentAllowed = await settings.GetScmIssuePreparationCommentEnabledAsync(ct);
         if (messages.Accepted is not null)
         {
             item.AcceptedUtc ??= time.GetUtcNow().ToUnixTimeMilliseconds();
@@ -862,7 +862,7 @@ public sealed class ScmEventOrchestrator(
                     // Der Kommentar-Schalter ist eine Host-Entscheidung: Bei „aus" wird die
                     // gelieferte Dokumentation ehrlich verworfen (Result success=false), damit
                     // das Issue unverändert bleibt und die CLI das Ergebnis sieht.
-                    if (!kommentarErlaubt)
+                    if (!commentAllowed)
                     {
                         skippedComments++;
                         skippedActionIds.Add(action.ActionId);
@@ -899,12 +899,12 @@ public sealed class ScmEventOrchestrator(
                     // kein Fehlerkommentar am Issue.
                     item.Status = "VerarbeitungUngeklärt";
                     logger.LogError("Issue-Aufbereitung {EventId}: Aktion {ActionId} fehlgeschlagen: {Error}", item.Id, action.ActionId, outgoing.Error);
-                    await ProtokolliereAufbereitungsFehlerAsync(item, outgoing.Error ?? "Unbekannter Fehler.", ct);
+                    await LogPreparationErrorAsync(item, outgoing.Error ?? "Unbekannter Fehler.", ct);
                     item.Reason = outgoing.Error;
                 }
             }
             if (skippedComments > 0)
-                await protokoll.AddEintragAsync(item.WorkItemId, LogEntryType.SystemMessage,
+                await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
                     $"{skippedComments} Analyse-Kommentar(e) verworfen: Der Dokumentations-Kommentar ist in den Einstellungen deaktiviert.", ct: ct);
             if (messages.Complete is { } complete && item.Status == "InBearbeitung")
             {
@@ -915,30 +915,30 @@ public sealed class ScmEventOrchestrator(
                     item.Status = "Verarbeitet";
                     item.Reason = null;
                     if (!string.IsNullOrWhiteSpace(complete.Report))
-                        await protokoll.AddEintragAsync(item.WorkItemId, LogEntryType.SystemMessage,
+                        await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
                             "Issue-Aufbereitung abgeschlossen ohne Remote-Änderung: " + complete.Report, ct: ct);
                 }
                 else if (!complete.NoRemoteAction
-                    && completeSet.Except(skippedActionIds).ToHashSet() is { } erwartet
-                    && actions.Count == erwartet.Count && actions.All(x => erwartet.Contains(x.Id) && x.Status == "Succeeded")
+                    && completeSet.Except(skippedActionIds).ToHashSet() is { } expected
+                    && actions.Count == expected.Count && actions.All(x => expected.Contains(x.Id) && x.Status == "Succeeded")
                     && actions.Any(x => JsonSerializer.Deserialize<ScmResponseRequest>(x.RequestJson, ScmEventStore.JsonOptions)?.Kind == ScmResponseKind.IssueBodyUpdate))
                 {
                     // Abschlusskriterien: ≥1 erfolgreiches IssueBodyUpdate; bei aktivem
                     // Kommentar-Schalter zusätzlich ≥1 erfolgreicher Analyse-Kommentar.
-                    var commentOk = !kommentarErlaubt || actions.Any(x =>
+                    var commentOk = !commentAllowed || actions.Any(x =>
                         JsonSerializer.Deserialize<ScmResponseRequest>(x.RequestJson, ScmEventStore.JsonOptions)?.Kind == ScmResponseKind.Comment);
                     if (commentOk)
                     {
                         item.Status = "Verarbeitet";
                         item.Reason = null;
                         if (!string.IsNullOrWhiteSpace(complete.Report))
-                            await protokoll.AddEintragAsync(item.WorkItemId, LogEntryType.SystemMessage,
+                            await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
                                 "Issue-Aufbereitung abgeschlossen: " + complete.Report, ct: ct);
                     }
                     else
                     {
                         item.Status = "VerarbeitungUngeklärt";
-                        await ProtokolliereAufbereitungsFehlerAsync(item, "Der dokumentierende Analyse-Kommentar wurde nicht remote bestätigt.", ct);
+                        await LogPreparationErrorAsync(item, "Der dokumentierende Analyse-Kommentar wurde nicht remote bestätigt.", ct);
                         item.Reason = "Der dokumentierende Analyse-Kommentar wurde nicht remote bestätigt.";
                     }
                 }
@@ -983,7 +983,7 @@ public sealed class ScmEventOrchestrator(
         var url = $"https://{repository.Host}/{repository.Owner}/{repository.Name}/pull/{pullRequestNumber}";
         var linked = await pullRequestReferenzen.SaveReportedAsync(
             item.WorkItemId, repository.ProviderPrefix, repositoryId, pullRequestNumber, url, ct);
-        await protokoll.AddEintragAsync(item.WorkItemId, LogEntryType.GitAction,
+        await log.AddEntryAsync(item.WorkItemId, LogEntryType.GitAction,
             linked is not null
                 ? $"Pull Request #{pullRequestNumber} wurde vom Agenten gemeldet und mit der Aufgabe verknüpft ({url})."
                 : $"Der vom Agenten gemeldete Pull Request #{pullRequestNumber} ist bereits einer anderen Aufgabe zugeordnet und wurde nicht verknüpft ({url}).",
@@ -997,7 +997,7 @@ public sealed class ScmEventOrchestrator(
 
     private string? BlockReason(WorkItem task)
         => task.Status is WorkItemStatus.Completed or WorkItemStatus.Archived ? "Aufgabe beendet/archiviert; Start gesperrt."
-            : task.PausedUntilUtc.IstAktuellPausiert(time.GetUtcNow()) ? "Aufgabe pausiert; Start gesperrt." : null;
+            : task.PausedUntilUtc.IsCurrentlyPaused(time.GetUtcNow()) ? "Aufgabe pausiert; Start gesperrt." : null;
 
     private async Task WaitAsync(ScmIncomingEvent item, string reason, CancellationToken ct)
     {

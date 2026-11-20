@@ -245,7 +245,7 @@ public sealed class ProjectDetailView : BaseWindowView
         var expander = WaitForElement(Window, cf => cf.ByName("BeendeteAufgabenExpander"), Short);
         expander.Patterns.ExpandCollapse.Pattern.Expand();
 
-        var liste = WaitForElement(expander, cf => cf.ByName("BeendeteAufgabenListe"), Short);
-        return liste.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
+        var list = WaitForElement(expander, cf => cf.ByName("BeendeteAufgabenListe"), Short);
+        return list.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
     }
 }

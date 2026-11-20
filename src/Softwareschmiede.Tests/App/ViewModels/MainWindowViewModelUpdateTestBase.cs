@@ -62,16 +62,16 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
             o.UseSqlite($"Data Source={_dbPath}");
             ConfigureDbContext(o);
         });
-        services.AddScoped<AppEinstellungService>();
-        services.AddScoped<ArbeitsverzeichnisSettingsService>();
+        services.AddScoped<AppSettingService>();
+        services.AddScoped<WorkingDirectorySettingsService>();
         services.AddScoped<PluginActivationService>();
         services.AddScoped<PluginSettingsService>();
-        services.AddScoped<PromptVorlagenService>();
+        services.AddScoped<PromptTemplateService>();
         services.AddScoped<TodoService>();
-        services.AddScoped<AufgabeService>();
-        services.AddScoped<IAktiveAufgabenService>(sp => sp.GetRequiredService<AufgabeService>());
-        services.AddScoped<ProjektService>();
-        services.AddScoped<AufgabeRecoveryService>();
+        services.AddScoped<WorkItemService>();
+        services.AddScoped<IActiveWorkItemsService>(sp => sp.GetRequiredService<WorkItemService>());
+        services.AddScoped<ProjectService>();
+        services.AddScoped<WorkItemRecoveryService>();
         services.AddScoped<DashboardViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddSingleton<DarkModeService>();
@@ -108,12 +108,12 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
     protected MainWindowViewModel CreateSut()
     {
         var kiService = TestKiAusfuehrungsServiceFactory.Create();
-        var promptZeitVersand = new PromptZeitVersandService(
-            kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
+        var promptZeitVersand = new PromptScheduleDispatchService(
+            kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         return new MainWindowViewModel(
             _provider.GetRequiredService<DarkModeService>(),
             _provider,
-            _provider.GetRequiredService<IAktiveAufgabenService>(),
+            _provider.GetRequiredService<IActiveWorkItemsService>(),
             _provider.GetRequiredService<TodoService>(),
             promptZeitVersand,
             NullLogger<MainWindowViewModel>.Instance,
@@ -132,7 +132,7 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
     protected async Task SetUpdateSettingsAsync(UpdateSettings settings)
     {
         using var scope = _provider.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
+        await scope.ServiceProvider.GetRequiredService<AppSettingService>()
             .SetUpdateSettingsAsync(settings);
     }
 
@@ -141,13 +141,13 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
     /// sodass das UpdateSettingsSaved-Ereignis im MainWindowViewModel ausgelöst wird.
     /// </summary>
     protected async Task SpeichereUpdateEinstellungenUeberUiAsync(
-        MainWindowViewModel sut, UpdateModusOption modus, string updatePfad)
+        MainWindowViewModel sut, UpdateModusOption mode, string updatePath)
     {
         sut.NavigateToSettingsCommand.Execute(null);
         var settingsViewModel = sut.CurrentView.Should().BeOfType<SettingsViewModel>().Subject;
         await ((AsyncRelayCommand)settingsViewModel.LadenCommand).ExecuteAsync();
-        settingsViewModel.SelectedUpdateMode = modus;
-        settingsViewModel.SelectedUpdatePfad = UpdatePfadOption.FuerPfad(updatePfad);
+        settingsViewModel.SelectedUpdateMode = mode;
+        settingsViewModel.SelectedUpdatePfad = UpdatePfadOption.FuerPfad(updatePath);
         await ((AsyncRelayCommand)settingsViewModel.SpeichernCommand).ExecuteAsync();
         settingsViewModel.FehlerMeldung.Should().BeNull(
             "das Speichern der Update-Einstellungen muss im Test erfolgreich sein");

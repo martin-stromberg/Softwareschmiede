@@ -415,7 +415,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         }, "Aufgabe für Issue 18 nicht angelegt");
         Assert.NotNull(botTask);
         var waiting = await fixture.WaitEventForTaskAsync(botTask!.Id, "Wartend");
-        Assert.Equal(ScmKontoModus.SeparatesKonto, ScmEventStore.Observation(waiting).Reference.Repository.Konto);
+        Assert.Equal(ScmKontoModus.SeparatesKonto, ScmEventStore.Observation(waiting).Reference.Repository.Account);
         SelectEventByTitle(window, "SCM Referenz 18", "/issues/18");
         StartSelected(window);
         await fixture.WaitEventForTaskAsync(botTask.Id, "Verarbeitet");

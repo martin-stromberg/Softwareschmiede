@@ -361,7 +361,7 @@ public sealed class ScmEventDispatchTests_Limits
 
         using (var scope = fixture.Services.CreateScope())
         {
-            await scope.ServiceProvider.GetRequiredService<AufgabeService>()
+            await scope.ServiceProvider.GetRequiredService<WorkItemService>()
                 .SetPauseAsync(firstTask, DateTimeOffset.UtcNow.AddMinutes(30), TestContext.Current.CancellationToken);
         }
         await fixture.DispatchAsync(secondId);
@@ -389,7 +389,7 @@ public sealed class ScmEventDispatchTests_Limits
 
         using (var scope = fixture.Services.CreateScope())
         {
-            await scope.ServiceProvider.GetRequiredService<AufgabeService>()
+            await scope.ServiceProvider.GetRequiredService<WorkItemService>()
                 .SetPauseAsync(firstTask, DateTimeOffset.UtcNow.AddMinutes(30), TestContext.Current.CancellationToken);
         }
         await fixture.DispatchAsync(secondId);

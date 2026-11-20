@@ -272,7 +272,7 @@
                                    FontSize="12"
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    Margin="0,0,0,8" />
-                        <TextBox Text="{Binding Arbeitsverzeichnis, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBox Text="{Binding WorkingDirectory, UpdateSourceTrigger=PropertyChanged}"
                                  Padding="8,6"
                                  BorderBrush="{DynamicResource BorderBrush}" />
                     </StackPanel>

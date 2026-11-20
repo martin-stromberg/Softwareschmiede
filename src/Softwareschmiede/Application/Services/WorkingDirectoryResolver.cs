@@ -5,7 +5,7 @@ namespace Softwareschmiede.Application.Services;
 
 /// <summary>
 /// Löst das effektive Arbeitsverzeichnis eines Repositories anhand einer optionalen
-/// <see cref="RepositoryStartConfiguration"/> auf. Von <see cref="KiAusfuehrungsService"/> (CLI-Start) und
+/// <see cref="RepositoryStartConfiguration"/> auf. Von <see cref="AiExecutionService"/> (CLI-Start) und
 /// <see cref="GitOrchestrationService"/> (Validierung nach Klon) gemeinsam genutzt, damit keiner der beiden
 /// Services in die jeweils andere, fachlich fremde Klasse greifen muss.
 /// </summary>

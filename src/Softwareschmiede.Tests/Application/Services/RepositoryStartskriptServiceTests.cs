@@ -127,10 +127,10 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
             .WithMessage("*fehlgeschlagen*");
     }
 
-    private RepositoryStartskriptService CreateSut()
+    private RepositoryStartScriptService CreateSut()
         => new(
             _cliRunnerMock.Object,
-            NullLogger<RepositoryStartskriptService>.Instance);
+            NullLogger<RepositoryStartScriptService>.Instance);
 
     private static RepositoryStartConfiguration CreateConfig()
         => new()

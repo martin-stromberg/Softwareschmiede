@@ -4,7 +4,7 @@ namespace Softwareschmiede.App.ViewModels;
 public enum DateibrowserAnsichtsmodus
 {
     /// <summary>Zeigt den vollständigen Arbeitsbaum des geklonten Repositories.</summary>
-    Standard,
+    Default,
 
     /// <summary>Zeigt nur im Branch geänderte Dateien, gruppiert nach Commits.</summary>
     Vergleich

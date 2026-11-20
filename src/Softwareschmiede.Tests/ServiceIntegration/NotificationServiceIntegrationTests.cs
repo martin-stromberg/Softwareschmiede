@@ -13,15 +13,15 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 public sealed class NotificationServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly BenachrichtigungsEinstellungenService _einstellungenService;
-    private readonly BenachrichtigungsAuditService _auditService;
+    private readonly NotificationSettingsService _settingsService;
+    private readonly NotificationAuditService _auditService;
 
     /// <summary>NotificationServiceIntegrationTests.</summary>
     public NotificationServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
-        _einstellungenService = new BenachrichtigungsEinstellungenService(_db);
-        _auditService = new BenachrichtigungsAuditService(_db, NullLogger<BenachrichtigungsAuditService>.Instance);
+        _settingsService = new NotificationSettingsService(_db);
+        _auditService = new NotificationAuditService(_db, NullLogger<NotificationAuditService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
@@ -53,10 +53,10 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
     public async Task BenachrichtigungsEinstellungen_WerdenGespeichert_UndGeladen()
     {
         var benutzerId = "test-user";
-        var dto = new BenachrichtigungsEinstellungenDto(NotificationMode.Banner, NotificationMode.Sound);
+        var dto = new NotificationSettingsDto(NotificationMode.Banner, NotificationMode.Sound);
 
-        await _einstellungenService.SaveAsync(benutzerId, dto, TestContext.Current.CancellationToken);
-        var geladen = await _einstellungenService.GetAsync(benutzerId, TestContext.Current.CancellationToken);
+        await _settingsService.SaveAsync(benutzerId, dto, TestContext.Current.CancellationToken);
+        var geladen = await _settingsService.GetAsync(benutzerId, TestContext.Current.CancellationToken);
 
         geladen.BannerMode.Should().Be(NotificationMode.Banner);
         geladen.SoundMode.Should().Be(NotificationMode.Sound);
@@ -91,13 +91,13 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
         _db.WorkItems.Add(workItem);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        await _einstellungenService.SaveAsync(benutzerId, new BenachrichtigungsEinstellungenDto(NotificationMode.Disabled, NotificationMode.Disabled), TestContext.Current.CancellationToken);
+        await _settingsService.SaveAsync(benutzerId, new NotificationSettingsDto(NotificationMode.Disabled, NotificationMode.Disabled), TestContext.Current.CancellationToken);
 
-        var sut = new BenachrichtigungsService(
-            _einstellungenService,
+        var sut = new NotificationService(
+            _settingsService,
             _auditService,
             benutzerService.Object,
-            NullLogger<BenachrichtigungsService>.Instance);
+            NullLogger<NotificationService>.Instance);
 
         await sut.DispatchAsync(workItemId, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 

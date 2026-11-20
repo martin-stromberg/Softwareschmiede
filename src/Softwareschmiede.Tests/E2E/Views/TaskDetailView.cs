@@ -356,38 +356,38 @@ public sealed class TaskDetailView : BaseWindowView
     }
 
     /// <summary>Klickt den CLI-Raw-Export-Button und bedient den nativen Save-Dialog.</summary>
-    /// <param name="zielPfad">Der Zielpfad der zu speichernden *.raw-Datei oder null/leer für Abbruch.</param>
+    /// <param name="targetPath">Der Zielpfad der zu speichernden *.raw-Datei oder null/leer für Abbruch.</param>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView ExportCliRaw(string? zielPfad)
+    public TaskDetailView ExportCliRaw(string? targetPath)
     {
         WaitForEnabledElement(Window, "CliRawExport", Medium).AsButton().ClickInForeground();
-        return HandleSaveFileDialog(zielPfad);
+        return HandleSaveFileDialog(targetPath);
     }
 
     /// <summary>Klickt den "Aufzeichnung exportieren"-Button (CLI-Replay) und bedient den nativen Save-Dialog.</summary>
-    /// <param name="zielPfad">Der Zielpfad der zu speichernden *.clireplay-Datei oder null/leer für Abbruch.</param>
+    /// <param name="targetPath">Der Zielpfad der zu speichernden *.clireplay-Datei oder null/leer für Abbruch.</param>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView ExportCliReplay(string? zielPfad)
+    public TaskDetailView ExportCliReplay(string? targetPath)
     {
         WaitForEnabledElement(Window, "CliReplayExport", Medium).AsButton().ClickInForeground();
-        return HandleSaveFileDialog(zielPfad);
+        return HandleSaveFileDialog(targetPath);
     }
 
     /// <summary>Bedient den nativen Save-Dialog: schreibt den Zielpfad und bestätigt, oder bricht per ESC ab.</summary>
-    /// <param name="zielPfad">Der Zielpfad oder null/leer zum Abbrechen.</param>
+    /// <param name="targetPath">Der Zielpfad oder null/leer zum Abbrechen.</param>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView HandleSaveFileDialog(string? zielPfad)
+    public TaskDetailView HandleSaveFileDialog(string? targetPath)
     {
         var dialog = WaitForSaveDialog();
         dialog.Focus();
 
-        if (string.IsNullOrWhiteSpace(zielPfad))
+        if (string.IsNullOrWhiteSpace(targetPath))
         {
             Keyboard.Press(VirtualKeyShort.ESCAPE);
         }
         else
         {
-            Keyboard.Type(zielPfad);
+            Keyboard.Type(targetPath);
             Keyboard.Press(VirtualKeyShort.RETURN);
         }
 

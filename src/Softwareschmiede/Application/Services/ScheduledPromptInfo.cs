@@ -11,5 +11,5 @@ public sealed record ScheduledPromptInfo(Guid WorkItemId, string PromptText, Dat
     /// <c>true</c>, wenn die Zielzeit bereits verstrichen ist, der Versand aber mangels aktiver
     /// CLI-Session aussteht — der Plan bleibt gültig und wird beim nächsten CLI-Start zugestellt.
     /// </summary>
-    public bool WartetAufSession { get; init; }
+    public bool WaitingForSession { get; init; }
 }

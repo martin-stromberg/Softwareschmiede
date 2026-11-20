@@ -27,8 +27,8 @@ public sealed class SolutionSelectionDialogView : DialogView
     public SolutionSelectionDialogView SelectSolution(string displayName)
     {
         var dialog = GetDialogWindow();
-        var liste = WaitForElement(dialog, cf => cf.ByName("SolutionAuswahl"), Short);
-        WaitForElement(liste, cf => cf.ByName(displayName), Short).ClickInForeground();
+        var list = WaitForElement(dialog, cf => cf.ByName("SolutionAuswahl"), Short);
+        WaitForElement(list, cf => cf.ByName(displayName), Short).ClickInForeground();
         return this;
     }
 

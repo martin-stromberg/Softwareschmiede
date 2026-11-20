@@ -78,17 +78,17 @@ public sealed class UpdateProgressDialogView : DialogView
         string? letzteMeldung = null;
         while (DateTime.UtcNow < deadline)
         {
-            var abbrechen = dialog.FindFirstDescendant(cf => cf.ByName("UpdateAbbrechen"));
-            var meldung = dialog.FindFirstDescendant(cf => cf.ByAutomationId("UpdateFortschrittMeldung"))?.Name ?? string.Empty;
+            var cancel = dialog.FindFirstDescendant(cf => cf.ByName("UpdateAbbrechen"));
+            var message = dialog.FindFirstDescendant(cf => cf.ByAutomationId("UpdateFortschrittMeldung"))?.Name ?? string.Empty;
 
             // Fehlerzustand = Abbrechen deaktiviert + Meldung gesetzt. Die Meldung muss in zwei
             // aufeinanderfolgenden Reads identisch sein: ViewModel-Setzungen (CanCancel=false vor
             // dem Fehlertext in SetError) können über den Dispatcher zeitversetzt in der UIA
             // sichtbar werden, sonst würde ein veralteter Fortschrittstext als "Fehler" zurückkehren.
-            if (abbrechen is not null && !abbrechen.IsEnabled && meldung.Length > 0 && meldung == letzteMeldung)
-                return meldung;
+            if (cancel is not null && !cancel.IsEnabled && message.Length > 0 && message == letzteMeldung)
+                return message;
 
-            letzteMeldung = meldung;
+            letzteMeldung = message;
             Thread.Sleep(200);
         }
 

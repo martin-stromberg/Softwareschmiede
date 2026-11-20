@@ -4,7 +4,7 @@ using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.Tests.Infrastructure.Terminal;
 
-/// <summary>Unit-Tests für <see cref="CliReplayAufzeichnungStore"/> (.clireplay-Binärformat).</summary>
+/// <summary>Unit-Tests für <see cref="CliReplayRecordingStore"/> (.clireplay-Binärformat).</summary>
 public sealed class CliReplayAufzeichnungStoreTests
 {
     /// <summary>Schreiben und Laden erhalten alle Header-Felder und jeden Chunk-Record
@@ -12,8 +12,8 @@ public sealed class CliReplayAufzeichnungStoreTests
     [Fact]
     public async Task SchreibeUndLade_Roundtrip_ErhaeltHeaderUndChunks()
     {
-        var store = new CliReplayAufzeichnungStore();
-        var quelle = new CliOutputAufzeichnung
+        var store = new CliReplayRecordingStore();
+        var source = new CliOutputRecording
         {
             WorkItemId = Guid.NewGuid(),
             PluginName = "Devin CLI (äöü)",
@@ -31,14 +31,14 @@ public sealed class CliReplayAufzeichnungStoreTests
         };
 
         using var stream = new MemoryStream();
-        await store.SpeichernAsync(stream, quelle, TestContext.Current.CancellationToken);
+        await store.SaveAsync(stream, source, TestContext.Current.CancellationToken);
         stream.Position = 0;
-        var geladen = await store.LadeAsync(stream, TestContext.Current.CancellationToken);
+        var geladen = await store.LoadAsync(stream, TestContext.Current.CancellationToken);
 
-        geladen.WorkItemId.Should().Be(quelle.WorkItemId);
-        geladen.PluginName.Should().Be(quelle.PluginName);
-        geladen.StartUtc.Should().Be(quelle.StartUtc);
-        geladen.EndeUtc.Should().Be(quelle.EndeUtc);
+        geladen.WorkItemId.Should().Be(source.WorkItemId);
+        geladen.PluginName.Should().Be(source.PluginName);
+        geladen.StartUtc.Should().Be(source.StartUtc);
+        geladen.EndeUtc.Should().Be(source.EndeUtc);
         geladen.Cols.Should().Be(220);
         geladen.Rows.Should().Be(50);
         geladen.IstVollstaendig.Should().BeFalse();
@@ -54,24 +54,24 @@ public sealed class CliReplayAufzeichnungStoreTests
     [Fact]
     public async Task Roundtrip_EndeUtcNull_BleibtNull()
     {
-        var store = new CliReplayAufzeichnungStore();
-        var quelle = CreateAufzeichnung();
-        quelle = new CliOutputAufzeichnung
+        var store = new CliReplayRecordingStore();
+        var source = CreateAufzeichnung();
+        source = new CliOutputRecording
         {
-            WorkItemId = quelle.WorkItemId,
-            PluginName = quelle.PluginName,
-            StartUtc = quelle.StartUtc,
+            WorkItemId = source.WorkItemId,
+            PluginName = source.PluginName,
+            StartUtc = source.StartUtc,
             EndeUtc = null,
-            Cols = quelle.Cols,
-            Rows = quelle.Rows,
+            Cols = source.Cols,
+            Rows = source.Rows,
             IstVollstaendig = true,
-            Chunks = quelle.Chunks,
+            Chunks = source.Chunks,
         };
 
         using var stream = new MemoryStream();
-        await store.SpeichernAsync(stream, quelle, TestContext.Current.CancellationToken);
+        await store.SaveAsync(stream, source, TestContext.Current.CancellationToken);
         stream.Position = 0;
-        var geladen = await store.LadeAsync(stream, TestContext.Current.CancellationToken);
+        var geladen = await store.LoadAsync(stream, TestContext.Current.CancellationToken);
 
         geladen.EndeUtc.Should().BeNull();
     }
@@ -80,10 +80,10 @@ public sealed class CliReplayAufzeichnungStoreTests
     [Fact]
     public async Task LadeAsync_UngueltigesMagic_WirftInvalidDataException()
     {
-        var store = new CliReplayAufzeichnungStore();
+        var store = new CliReplayRecordingStore();
         using var stream = new MemoryStream(Encoding.ASCII.GetBytes("NOMAGIC!!xxxxx"));
 
-        var act = () => store.LadeAsync(stream);
+        var act = () => store.LoadAsync(stream);
 
         await act.Should().ThrowAsync<InvalidDataException>();
     }
@@ -92,7 +92,7 @@ public sealed class CliReplayAufzeichnungStoreTests
     [Fact]
     public async Task LadeAsync_UnbekannteVersion_WirftInvalidDataException()
     {
-        var store = new CliReplayAufzeichnungStore();
+        var store = new CliReplayRecordingStore();
         using var stream = new MemoryStream();
         await using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
         {
@@ -102,7 +102,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         }
         stream.Position = 0;
 
-        var act = () => store.LadeAsync(stream);
+        var act = () => store.LoadAsync(stream);
 
         await act.Should().ThrowAsync<InvalidDataException>();
     }
@@ -111,10 +111,10 @@ public sealed class CliReplayAufzeichnungStoreTests
     [Fact]
     public async Task LadeAsync_AbgeschnittenerHeader_WirftInvalidDataException()
     {
-        var store = new CliReplayAufzeichnungStore();
+        var store = new CliReplayRecordingStore();
         using var stream = new MemoryStream(Encoding.ASCII.GetBytes("SWCLRPLY"));
 
-        var act = () => store.LadeAsync(stream);
+        var act = () => store.LoadAsync(stream);
 
         await act.Should().ThrowAsync<InvalidDataException>();
     }
@@ -123,9 +123,9 @@ public sealed class CliReplayAufzeichnungStoreTests
     [Fact]
     public async Task LadeAsync_UngueltigeGeometrie_WirftInvalidDataException()
     {
-        var store = new CliReplayAufzeichnungStore();
+        var store = new CliReplayRecordingStore();
         using var stream = new MemoryStream();
-        await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+        await store.SaveAsync(stream, new CliOutputRecording
         {
             WorkItemId = Guid.NewGuid(),
             PluginName = "P",
@@ -137,7 +137,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         }, TestContext.Current.CancellationToken);
         stream.Position = 0;
 
-        var act = () => store.LadeAsync(stream);
+        var act = () => store.LoadAsync(stream);
 
         await act.Should().ThrowAsync<InvalidDataException>();
     }
@@ -146,9 +146,9 @@ public sealed class CliReplayAufzeichnungStoreTests
     [Fact]
     public async Task LadeAsync_AbgeschnittenerChunkRecord_WirftInvalidDataException()
     {
-        var store = new CliReplayAufzeichnungStore();
+        var store = new CliReplayRecordingStore();
         using var stream = new MemoryStream();
-        await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+        await store.SaveAsync(stream, new CliOutputRecording
         {
             WorkItemId = Guid.NewGuid(),
             PluginName = "P",
@@ -163,7 +163,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         stream.SetLength(stream.Length - 3);
         stream.Position = 0;
 
-        var act = () => store.LadeAsync(stream);
+        var act = () => store.LoadAsync(stream);
 
         await act.Should().ThrowAsync<InvalidDataException>();
     }
@@ -172,9 +172,9 @@ public sealed class CliReplayAufzeichnungStoreTests
     [Fact]
     public async Task LadeAsync_AbgeschnittenerRecordHeader_WirftInvalidDataException()
     {
-        var store = new CliReplayAufzeichnungStore();
+        var store = new CliReplayRecordingStore();
         using var stream = new MemoryStream();
-        await store.SpeichernAsync(stream, CreateAufzeichnung(), TestContext.Current.CancellationToken);
+        await store.SaveAsync(stream, CreateAufzeichnung(), TestContext.Current.CancellationToken);
 
         // 5 Bytes hinter dem regulären Dateiende würden als leeres Ende erkannt werden —
         // ein abgeschnittener 12-Byte-Record-Header (1..11 Bytes) muss dagegen fehlschlagen.
@@ -183,7 +183,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         verkuerzt.Write(new byte[5]);
         verkuerzt.Position = 0;
 
-        var act = () => store.LadeAsync(verkuerzt);
+        var act = () => store.LoadAsync(verkuerzt);
 
         await act.Should().ThrowAsync<InvalidDataException>();
     }
@@ -194,7 +194,7 @@ public sealed class CliReplayAufzeichnungStoreTests
     [Fact]
     public async Task LadeAsync_UebergrossePluginNameLaenge_WirftInvalidDataException()
     {
-        var store = new CliReplayAufzeichnungStore();
+        var store = new CliReplayRecordingStore();
         using var stream = new MemoryStream();
         await using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
         {
@@ -210,7 +210,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         }
         stream.Position = 0;
 
-        var act = () => store.LadeAsync(stream);
+        var act = () => store.LoadAsync(stream);
 
         await act.Should().ThrowAsync<InvalidDataException>();
     }
@@ -220,8 +220,8 @@ public sealed class CliReplayAufzeichnungStoreTests
     [Fact]
     public async Task Roundtrip_ZeitstempelMitOffset_WerdenUtcNormalisiert()
     {
-        var store = new CliReplayAufzeichnungStore();
-        var quelle = new CliOutputAufzeichnung
+        var store = new CliReplayRecordingStore();
+        var source = new CliOutputRecording
         {
             WorkItemId = Guid.NewGuid(),
             PluginName = "P",
@@ -234,32 +234,32 @@ public sealed class CliReplayAufzeichnungStoreTests
         };
 
         using var stream = new MemoryStream();
-        await store.SpeichernAsync(stream, quelle, TestContext.Current.CancellationToken);
+        await store.SaveAsync(stream, source, TestContext.Current.CancellationToken);
         stream.Position = 0;
-        var geladen = await store.LadeAsync(stream, TestContext.Current.CancellationToken);
+        var geladen = await store.LoadAsync(stream, TestContext.Current.CancellationToken);
 
-        geladen.StartUtc.Should().Be(quelle.StartUtc, "derselbe Zeitpunkt muss erhalten bleiben");
+        geladen.StartUtc.Should().Be(source.StartUtc, "derselbe Zeitpunkt muss erhalten bleiben");
         geladen.StartUtc.Offset.Should().Be(TimeSpan.Zero, "die Speicherung erfolgt UTC-normalisiert");
-        geladen.EndeUtc.Should().Be(quelle.EndeUtc);
+        geladen.EndeUtc.Should().Be(source.EndeUtc);
         geladen.EndeUtc!.Value.Offset.Should().Be(TimeSpan.Zero);
     }
 
-    /// <summary>Die Datei-Wrapper <see cref="CliReplayAufzeichnungStore.SpeichernAsync(string, CliOutputAufzeichnung, CancellationToken)"/>
-    /// und <see cref="CliReplayAufzeichnungStore.LadeAsync(string, CancellationToken)"/> runden denselben
+    /// <summary>Die Datei-Wrapper <see cref="CliReplayRecordingStore.SaveAsync(string, CliOutputRecording, CancellationToken)"/>
+    /// und <see cref="CliReplayRecordingStore.LoadAsync(string, CancellationToken)"/> runden denselben
     /// Inhalt wie die Stream-Kernmethoden ab.</summary>
     [Fact]
     public async Task DateiWrapper_SpeichernUndLaden_Roundtrip()
     {
-        var store = new CliReplayAufzeichnungStore();
+        var store = new CliReplayRecordingStore();
         var path = Path.Combine(Path.GetTempPath(), $"clireplay-test-{Guid.NewGuid():N}.clireplay");
         try
         {
-            var quelle = CreateAufzeichnung();
-            await store.SpeichernAsync(path, quelle, TestContext.Current.CancellationToken);
+            var source = CreateAufzeichnung();
+            await store.SaveAsync(path, source, TestContext.Current.CancellationToken);
 
             File.Exists(path).Should().BeTrue();
-            var geladen = await store.LadeAsync(path, TestContext.Current.CancellationToken);
-            geladen.WorkItemId.Should().Be(quelle.WorkItemId);
+            var geladen = await store.LoadAsync(path, TestContext.Current.CancellationToken);
+            geladen.WorkItemId.Should().Be(source.WorkItemId);
             geladen.Chunks.Should().HaveCount(1);
             geladen.Chunks[0].Data.Should().Equal(Encoding.UTF8.GetBytes("payload"));
         }
@@ -270,7 +270,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         }
     }
 
-    private static CliOutputAufzeichnung CreateAufzeichnung() => new()
+    private static CliOutputRecording CreateAufzeichnung() => new()
     {
         WorkItemId = Guid.NewGuid(),
         PluginName = "TestPlugin",

@@ -10,7 +10,7 @@ public sealed class TodoServiceTests
 {
     private static async Task<Guid> CreateTestProjektAsync(DatabaseFixture db)
     {
-        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var service = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
         var project = await service.CreateAsync("Todo-Integrationstestprojekt", null);
         return project.Id;
     }
@@ -22,7 +22,7 @@ public sealed class TodoServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projectId = await CreateTestProjektAsync(db);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var todoService = new TodoService(db.Context, NullLogger<TodoService>.Instance);
         var workItem = await aufgabeService.CreateAsync(projectId, "Aufgabe mit Todo", null, ct: TestContext.Current.CancellationToken);
 
@@ -46,7 +46,7 @@ public sealed class TodoServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projectId = await CreateTestProjektAsync(db);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var todoService = new TodoService(db.Context, NullLogger<TodoService>.Instance);
         var workItem = await aufgabeService.CreateAsync(projectId, "Aufgabe mit Todos", null, ct: TestContext.Current.CancellationToken);
         await todoService.CreateTodoAsync(workItem.Id, "Todo 1", TestContext.Current.CancellationToken);
@@ -68,7 +68,7 @@ public sealed class TodoServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projectId = await CreateTestProjektAsync(db);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var todoService = new TodoService(db.Context, NullLogger<TodoService>.Instance);
         var workItem = await aufgabeService.CreateAsync(projectId, "Aufgabe mit verknüpften Todos", null, ct: TestContext.Current.CancellationToken);
         await todoService.CreateTodoAsync(workItem.Id, "Verknüpftes Todo", TestContext.Current.CancellationToken);
@@ -88,7 +88,7 @@ public sealed class TodoServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projectId = await CreateTestProjektAsync(db);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var aufgabeService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var todoService = new TodoService(db.Context, NullLogger<TodoService>.Instance);
         var workItem = await aufgabeService.CreateAsync(projectId, "Aufgabe mit erledigtem Todo", null, ct: TestContext.Current.CancellationToken);
         var todo = await todoService.CreateTodoAsync(workItem.Id, "Zu erledigendes Todo", TestContext.Current.CancellationToken);

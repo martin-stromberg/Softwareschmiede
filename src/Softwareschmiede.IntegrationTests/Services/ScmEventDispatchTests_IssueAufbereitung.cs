@@ -86,7 +86,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await fixture.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey, "false");
+        await fixture.SetSettingAsync(AppSettingService.ScmIssuePreparationCommentEnabledKey, "false");
         fixture.ConfigureIssue();
         var (_, eventId) = await AddAufbereitungAsync(fixture, ScmDispatchFixture.KiPrefix);
         await fixture.DispatchAsync(eventId);
@@ -173,7 +173,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
-        await fixture.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, "custom.auf");
+        await fixture.SetSettingAsync(AppSettingService.ScmIssuePreparationPluginKey, "custom.auf");
         fixture.ConfigureIssue();
         var (_, eventId) = await AddAufbereitungAsync(fixture, kiPluginPrefix: null);
 
@@ -239,7 +239,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         await fixture.InitializeAsync();
         await EnableAsync(fixture);
         fixture.ConfigureIssue();
-        var (_, eventId) = await AddAufbereitungAsync(fixture, ScmDispatchFixture.KiPrefix, issueAufbereitungAktiv: false);
+        var (_, eventId) = await AddAufbereitungAsync(fixture, ScmDispatchFixture.KiPrefix, issuePreparationEnabled: false);
 
         await fixture.DispatchAsync(eventId);
 
@@ -340,12 +340,12 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
     }
 
     private static async Task EnableAsync(ScmDispatchFixture fixture)
-        => await fixture.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungEnabledKey, "true");
+        => await fixture.SetSettingAsync(AppSettingService.ScmIssuePreparationEnabledKey, "true");
 
     /// <summary>Legt die Schritt-5-Artefakte direkt an: Zweck-markierte Aufgabe mit
     /// IssueReferenz und internem, sofort fälligem Aufbereitungsereignis.</summary>
     private static async Task<(Guid TaskId, Guid EventId)> AddAufbereitungAsync(ScmDispatchFixture fixture,
-        string? kiPluginPrefix, bool issueAufbereitungAktiv = true)
+        string? kiPluginPrefix, bool issuePreparationEnabled = true)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
@@ -358,7 +358,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
             RepositoryName = "repo",
             PluginType = fixture.Repository.ProviderPrefix,
             Active = true,
-            IssuePreparationEnabled = issueAufbereitungAktiv
+            IssuePreparationEnabled = issuePreparationEnabled
         };
         var task = new WorkItem
         {
@@ -366,7 +366,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
             Title = "Issue Titel 9",
             ProjectId = project.Id,
             GitRepositoryId = repository.Id,
-            Purpose = ScmIssueAufbereitungsService.Purpose,
+            Purpose = ScmIssuePreparationService.Purpose,
             AiPluginPrefix = kiPluginPrefix
         };
         var referenz = new IssueReference
@@ -386,10 +386,10 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         var item = new ScmIncomingEvent
         {
             WorkItemId = task.Id,
-            EventKey = observation.ContentKey + "/" + ScmIssueAufbereitungsService.Purpose,
+            EventKey = observation.ContentKey + "/" + ScmIssuePreparationService.Purpose,
             ObservationJson = JsonSerializer.Serialize(observation, ScmEventStore.JsonOptions),
             ReceivedUtc = time.ToUnixTimeMilliseconds(),
-            Purpose = ScmIssueAufbereitungsService.Purpose,
+            Purpose = ScmIssuePreparationService.Purpose,
             Reason = "Interner Aufbereitungsauftrag für Issue #9."
         };
         db.AddRange(project, repository, task, referenz, item);

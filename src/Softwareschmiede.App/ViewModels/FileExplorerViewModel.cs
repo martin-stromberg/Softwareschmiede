@@ -26,7 +26,7 @@ public sealed class FileExplorerViewModel : ViewModelBase
     private string? _repositoryPath;
     private WorkspaceFileNode? _ausgewaehlterKnoten;
     private string? _dateiInhalt;
-    private DateibrowserAnsichtsmodus _aktuellerModus = DateibrowserAnsichtsmodus.Standard;
+    private DateibrowserAnsichtsmodus _aktuellerModus = DateibrowserAnsichtsmodus.Default;
     private CancellationTokenSource? _dateiLadenCts;
     private int _aktuellerAenderungsIndex = -1;
 
@@ -124,7 +124,7 @@ public sealed class FileExplorerViewModel : ViewModelBase
     public async Task InitialisierenAsync(string? repositoryPath, CancellationToken ct = default)
     {
         _repositoryPath = repositoryPath;
-        AktuellerModus = DateibrowserAnsichtsmodus.Standard;
+        AktuellerModus = DateibrowserAnsichtsmodus.Default;
         AuswahlUndLadevorgangZuruecksetzen();
 
         if (string.IsNullOrWhiteSpace(repositoryPath))
@@ -275,7 +275,7 @@ public sealed class FileExplorerViewModel : ViewModelBase
 
     private async Task StandardAnsichtAsync(CancellationToken ct)
     {
-        AktuellerModus = DateibrowserAnsichtsmodus.Standard;
+        AktuellerModus = DateibrowserAnsichtsmodus.Default;
         await LadeArbeitsbaumAsync(ct);
     }
 
@@ -347,11 +347,11 @@ public sealed class FileExplorerViewModel : ViewModelBase
         }
     }
 
-    private void SetDiffZeilen(IEnumerable<TextDiffLine> zeilen)
+    private void SetDiffZeilen(IEnumerable<TextDiffLine> lines)
     {
         DiffZeilen.Clear();
-        foreach (var zeile in zeilen)
-            DiffZeilen.Add(zeile);
+        foreach (var line in lines)
+            DiffZeilen.Add(line);
         _aktuellerAenderungsIndex = -1;
         OnPropertyChanged(nameof(ZeigtDiffAnsicht));
     }

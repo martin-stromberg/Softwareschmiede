@@ -36,9 +36,9 @@ public sealed class UpdatePackageServiceTests
         File.Exists(Path.Combine(result.ExtractedDirectory, "version.json")).Should().BeTrue();
         File.Exists(result.ScriptPath).Should().BeTrue();
         progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Download);
-        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Verifizieren);
-        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Entpacken);
-        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.UpdateVorbereiten);
+        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Verify);
+        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Extract);
+        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.PrepareUpdate);
         handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, ManifestDownloadUrl.AbsoluteUri);
     }
 

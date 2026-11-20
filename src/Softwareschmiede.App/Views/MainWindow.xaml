@@ -236,7 +236,7 @@
                                Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" />
 
                     <Button Command="{Binding UpdateStartenCommand}"
-                            Visibility="{Binding UpdateVerfuegbar, Converter={StaticResource BoolToVisibilityConverter}}"
+                            Visibility="{Binding UpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}"
                             AutomationProperties.Name="Programmupdate starten"
                             ToolTip="{Binding VerfuegbaresUpdate.Version, StringFormat=Update auf Version {0} vorbereiten}"
                             Margin="0,2"

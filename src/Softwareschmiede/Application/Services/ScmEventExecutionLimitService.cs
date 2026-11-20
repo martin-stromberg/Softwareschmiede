@@ -9,22 +9,22 @@ namespace Softwareschmiede.Application.Services;
 /// <param name="Global">Anzahl aller Aufgaben mit laufender, nicht pausierter CLI-Ausführung
 /// (inklusive laufender Handles ohne auflösbare Aufgabenzeile).</param>
 /// <param name="ProPlugin">Anzahl laufender, nicht pausierter Ausführungen je zugeordnetem KI-Plugin-Prefix.</param>
-public sealed record CliAusfuehrungsBelegung(int Global, IReadOnlyDictionary<string, int> ProPlugin)
+public sealed record CliExecutionOccupancy(int Global, IReadOnlyDictionary<string, int> ProPlugin)
 {
     /// <summary>Anzahl laufender Ausführungen, die dem angegebenen Plugin-Prefix zugeordnet sind.</summary>
     /// <param name="pluginPrefix">KI-Plugin-Prefix (Groß-/Kleinschreibung wird ignoriert).</param>
     /// <returns>Anzahl laufender Ausführungen des Plugins; <c>0</c>, wenn keine bekannt sind.</returns>
     public int FuerPlugin(string pluginPrefix)
-        => !string.IsNullOrWhiteSpace(pluginPrefix) && ProPlugin.TryGetValue(pluginPrefix, out var anzahl) ? anzahl : 0;
+        => !string.IsNullOrWhiteSpace(pluginPrefix) && ProPlugin.TryGetValue(pluginPrefix, out var count) ? count : 0;
 }
 
 /// <summary>Ergebnis der atomaren Zulassungsprüfung für einen neuen CLI-Start.</summary>
-/// <param name="Wartegrund">Benutzerlesbarer Wartegrund bei erreichtem Limit; <c>null</c>, wenn ein Platz frei ist.</param>
-/// <param name="Reservierung">
+/// <param name="WaitReason">Benutzerlesbarer Wartegrund bei erreichtem Limit; <c>null</c>, wenn ein Platz frei ist.</param>
+/// <param name="Reservation">
 /// Belegter Startplatz für die Dauer bis zur Prozess-Handle-Registrierung; <c>null</c> bei
-/// vollem Limit (<paramref name="Wartegrund"/> gesetzt) oder bei unbegrenzter Konfiguration.
+/// vollem Limit (<paramref name="WaitReason"/> gesetzt) oder bei unbegrenzter Konfiguration.
 /// </param>
-public sealed record CliStartPlatzZulassung(string? Wartegrund, IDisposable? Reservierung);
+public sealed record CliStartSlotAdmission(string? WaitReason, IDisposable? Reservation);
 
 /// <summary>
 /// Zulassungskontrolle für neue CLI-Ausführungen aus dem SCM-Ereignis-Dispatch:
@@ -34,22 +34,22 @@ public sealed record CliStartPlatzZulassung(string? Wartegrund, IDisposable? Res
 /// Grenzen: leer/unset/ungültig = unbegrenzt; gültige Werte sind Ganzzahlen ≥ 1.
 /// </summary>
 /// <remarks>
-/// <see cref="PruefeUndReserviereStartPlatzAsync"/> verbindet Limit-Prüfung und Platzbelegung
+/// <see cref="CheckAndReserveStartSlotAsync"/> verbindet Limit-Prüfung und Platzbelegung
 /// zu einer atomaren Operation: Der reservierte Platz zählt sofort für jeden weiteren
 /// Zulassungsversuch, sodass nebenläufige Dispatches verschiedener Aufgaben (Polling, Queue,
 /// UI-Aktionen) einander nicht zwischen Prüfung und Prozessstart überholen können. Die
 /// Reservierung wird nach erfolgreicher Handle-Registrierung von der echten Laufzählung
 /// abgelöst, bei jedem Fehlschlag vor dem Start freigegeben und verfällt spätestens nach
-/// <see cref="ReservierungsLebensdauer"/>, falls der Start hängenbleibt. Reservierungen liegen
-/// im <see cref="ScmStartPlatzReservierungsPool"/> (DI-Singleton; der Service selbst ist scoped),
+/// <see cref="ReservationLifetime"/>, falls der Start hängenbleibt. Reservierungen liegen
+/// im <see cref="ScmStartSlotReservationPool"/> (DI-Singleton; der Service selbst ist scoped),
 /// damit alle Dispatch-Pfade desselben Providers denselben Bestand sehen.
 /// </remarks>
 public sealed class ScmEventExecutionLimitService(
     SoftwareschmiedeDbContext db,
-    AppEinstellungService einstellungen,
+    AppSettingService settings,
     ICliExecutionLimitSource cli,
     TimeProvider time,
-    ScmStartPlatzReservierungsPool reservierungsPool)
+    ScmStartSlotReservationPool reservationPool)
 {
     /// <summary>Einstellungsschlüssel des globalen Limits paralleler CLI-Ausführungen.</summary>
     public const string GlobalLimitKey = "scm.execution.maxparallel";
@@ -59,7 +59,7 @@ public sealed class ScmEventExecutionLimitService(
 
     /// <summary>Lebensdauer einer Startplatz-Reservierung; danach verfällt der Platz,
     /// falls der Start zwischen Reservierung und Handle-Registrierung hängenbleibt.</summary>
-    internal static readonly TimeSpan ReservierungsLebensdauer = TimeSpan.FromMinutes(5);
+    internal static readonly TimeSpan ReservationLifetime = TimeSpan.FromMinutes(5);
 
     /// <summary>Einstellungsschlüssel des Parallel-Limits eines konkreten KI-Plugins.</summary>
     /// <param name="pluginPrefix">KI-Plugin-Prefix.</param>
@@ -75,31 +75,31 @@ public sealed class ScmEventExecutionLimitService(
     /// </summary>
     /// <param name="pluginPrefix">Prefix des zu startenden KI-Plugins.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    /// <returns>Entweder eine freizugebende <see cref="CliStartPlatzZulassung.Reservierung"/> oder
-    /// einen benutzerlesbaren <see cref="CliStartPlatzZulassung.Wartegrund"/>; bei unbegrenzter
+    /// <returns>Entweder eine freizugebende <see cref="CliStartSlotAdmission.Reservation"/> oder
+    /// einen benutzerlesbaren <see cref="CliStartSlotAdmission.WaitReason"/>; bei unbegrenzter
     /// Konfiguration ist beides <c>null</c>.</returns>
-    public async Task<CliStartPlatzZulassung> PruefeUndReserviereStartPlatzAsync(string pluginPrefix, CancellationToken ct = default)
+    public async Task<CliStartSlotAdmission> CheckAndReserveStartSlotAsync(string pluginPrefix, CancellationToken ct = default)
     {
         var (globalLimit, pluginLimit) = await GetLimitsAsync(pluginPrefix, ct);
         if (globalLimit is null && pluginLimit is null)
-            return new CliStartPlatzZulassung(null, null);
-        await reservierungsPool.ZulassungsGate.WaitAsync(ct);
+            return new CliStartSlotAdmission(null, null);
+        await reservationPool.AdmissionGate.WaitAsync(ct);
         try
         {
             // Check + Claim unter derselben Sperre: Auch die Handle-Belegung wird erst hier
             // gelesen, damit die Momentaufnahme nicht zwischen Prüfung und Platzbelegung
             // veralten kann. Starts, die die Zulassungskontrolle gar nicht passieren (z. B.
             // manuelle CLI-Starts im Aufgabenfenster), unterliegen dem Limit bewusst nicht.
-            var wartegrund = GetStartBlockReason(pluginPrefix, globalLimit, pluginLimit, await WirksameBelegungAsync(ct));
+            var wartegrund = GetStartBlockReason(pluginPrefix, globalLimit, pluginLimit, await EffectiveOccupancyAsync(ct));
             if (wartegrund is not null)
-                return new CliStartPlatzZulassung(wartegrund, null);
-            var reservierung = reservierungsPool.Reservieren(pluginPrefix,
-                time.GetUtcNow().ToUnixTimeMilliseconds() + (long)ReservierungsLebensdauer.TotalMilliseconds);
-            return new CliStartPlatzZulassung(null, reservierung);
+                return new CliStartSlotAdmission(wartegrund, null);
+            var reservation = reservationPool.Reserve(pluginPrefix,
+                time.GetUtcNow().ToUnixTimeMilliseconds() + (long)ReservationLifetime.TotalMilliseconds);
+            return new CliStartSlotAdmission(null, reservation);
         }
         finally
         {
-            reservierungsPool.ZulassungsGate.Release();
+            reservationPool.AdmissionGate.Release();
         }
     }
 
@@ -119,14 +119,14 @@ public sealed class ScmEventExecutionLimitService(
         var (globalLimit, pluginLimit) = await GetLimitsAsync(pluginPrefix, ct);
         if (globalLimit is null && pluginLimit is null)
             return null;
-        await reservierungsPool.ZulassungsGate.WaitAsync(ct);
+        await reservationPool.AdmissionGate.WaitAsync(ct);
         try
         {
-            return GetStartBlockReason(pluginPrefix, globalLimit, pluginLimit, await WirksameBelegungAsync(ct));
+            return GetStartBlockReason(pluginPrefix, globalLimit, pluginLimit, await EffectiveOccupancyAsync(ct));
         }
         finally
         {
-            reservierungsPool.ZulassungsGate.Release();
+            reservationPool.AdmissionGate.Release();
         }
     }
 
@@ -134,14 +134,14 @@ public sealed class ScmEventExecutionLimitService(
     /// <param name="pluginPrefix">Prefix des zu startenden KI-Plugins.</param>
     /// <param name="globalLimit">Konfiguriertes globales Limit oder <c>null</c> (unbegrenzt).</param>
     /// <param name="pluginLimit">Konfiguriertes Plugin-Limit oder <c>null</c> (unbegrenzt).</param>
-    /// <param name="belegung">Aktuelle Belegung laufender Ausführungen.</param>
+    /// <param name="occupancy">Aktuelle Belegung laufender Ausführungen.</param>
     /// <returns><c>null</c>, wenn ein Platz frei ist; sonst ein benutzerlesbarer Wartegrund.</returns>
     internal static string? GetStartBlockReason(string? pluginPrefix, int? globalLimit, int? pluginLimit,
-        CliAusfuehrungsBelegung belegung)
+        CliExecutionOccupancy occupancy)
     {
-        if (globalLimit is { } g && belegung.Global >= g)
+        if (globalLimit is { } g && occupancy.Global >= g)
             return $"Das globale Limit paralleler CLI-Ausführungen ({g}) ist erreicht; der Start erfolgt, sobald ein Platz frei wird.";
-        if (pluginLimit is { } p && !string.IsNullOrWhiteSpace(pluginPrefix) && belegung.FuerPlugin(pluginPrefix) >= p)
+        if (pluginLimit is { } p && !string.IsNullOrWhiteSpace(pluginPrefix) && occupancy.FuerPlugin(pluginPrefix) >= p)
             return $"Das Limit paralleler CLI-Ausführungen für die CLI '{pluginPrefix}' ({p}) ist erreicht; der Start erfolgt, sobald ein Platz frei wird.";
         return null;
     }
@@ -152,31 +152,31 @@ public sealed class ScmEventExecutionLimitService(
         var keys = new List<string> { GlobalLimitKey };
         if (!string.IsNullOrWhiteSpace(pluginPrefix))
             keys.Add(PluginLimitKey(pluginPrefix));
-        var werte = await einstellungen.GetSettingsAsync(keys, ct);
-        var globalLimit = ParseLimit(werte.TryGetValue(GlobalLimitKey, out var g) ? g : null);
+        var values = await settings.GetSettingsAsync(keys, ct);
+        var globalLimit = ParseLimit(values.TryGetValue(GlobalLimitKey, out var g) ? g : null);
         var pluginLimit = !string.IsNullOrWhiteSpace(pluginPrefix)
-            ? ParseLimit(werte.TryGetValue(PluginLimitKey(pluginPrefix), out var p) ? p : null)
+            ? ParseLimit(values.TryGetValue(PluginLimitKey(pluginPrefix), out var p) ? p : null)
             : null;
         return (globalLimit, pluginLimit);
     }
 
     /// <summary>Handle-Belegung plus offene Reservierungen; verfallene Reservierungen werden
-    /// vor der Zählung entfernt. Muss unter <see cref="ScmStartPlatzReservierungsPool.ZulassungsGate"/>
+    /// vor der Zählung entfernt. Muss unter <see cref="ScmStartSlotReservationPool.AdmissionGate"/>
     /// aufgerufen werden.</summary>
-    private async Task<CliAusfuehrungsBelegung> WirksameBelegungAsync(CancellationToken ct)
+    private async Task<CliExecutionOccupancy> EffectiveOccupancyAsync(CancellationToken ct)
     {
-        var belegung = await GetBelegungAsync(ct);
-        var aktive = reservierungsPool.AktiveReservierungen(time.GetUtcNow().ToUnixTimeMilliseconds());
+        var occupancy = await GetOccupancyAsync(ct);
+        var aktive = reservationPool.ActiveReservations(time.GetUtcNow().ToUnixTimeMilliseconds());
         if (aktive.Count == 0)
-            return belegung;
-        var proPlugin = new Dictionary<string, int>(belegung.ProPlugin, StringComparer.OrdinalIgnoreCase);
-        foreach (var reservierung in aktive)
+            return occupancy;
+        var proPlugin = new Dictionary<string, int>(occupancy.ProPlugin, StringComparer.OrdinalIgnoreCase);
+        foreach (var reservation in aktive)
         {
-            if (string.IsNullOrWhiteSpace(reservierung.PluginPrefix)) continue;
-            proPlugin.TryGetValue(reservierung.PluginPrefix, out var anzahl);
-            proPlugin[reservierung.PluginPrefix] = anzahl + 1;
+            if (string.IsNullOrWhiteSpace(reservation.PluginPrefix)) continue;
+            proPlugin.TryGetValue(reservation.PluginPrefix, out var count);
+            proPlugin[reservation.PluginPrefix] = count + 1;
         }
-        return new(belegung.Global + aktive.Count, proPlugin);
+        return new(occupancy.Global + aktive.Count, proPlugin);
     }
 
     private static int? ParseLimit(string? wert)
@@ -186,7 +186,7 @@ public sealed class ScmEventExecutionLimitService(
     /// (<c>PausiertBisUtc</c> in der Zukunft — ihr Prozess läuft bewusst weiter) belegen keinen
     /// Platz und werden vor der globalen Zählung und der Plugin-Attribution herausgefiltert;
     /// abgelaufene oder fehlende Pausenzeiten sowie Handles ohne Aufgabenzeile zählen voll.</summary>
-    private async Task<CliAusfuehrungsBelegung> GetBelegungAsync(CancellationToken ct)
+    private async Task<CliExecutionOccupancy> GetOccupancyAsync(CancellationToken ct)
     {
         var laufendeIds = cli.GetLaufendeAufgabenIds();
         if (laufendeIds.Count == 0)
@@ -196,7 +196,7 @@ public sealed class ScmEventExecutionLimitService(
             .Select(x => new { x.Id, x.AiPluginPrefix, x.PausedUntilUtc })
             .ToListAsync(ct);
         var jetzt = time.GetUtcNow();
-        var aktive = workItems.Where(x => !x.PausedUntilUtc.IstAktuellPausiert(jetzt)).ToList();
+        var aktive = workItems.Where(x => !x.PausedUntilUtc.IsCurrentlyPaused(jetzt)).ToList();
         var proPlugin = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var workItem in aktive)
         {
@@ -205,8 +205,8 @@ public sealed class ScmEventExecutionLimitService(
                 ? session.PluginPrefix
                 : workItem.AiPluginPrefix;
             if (string.IsNullOrWhiteSpace(prefix)) continue;
-            proPlugin.TryGetValue(prefix, out var anzahl);
-            proPlugin[prefix] = anzahl + 1;
+            proPlugin.TryGetValue(prefix, out var count);
+            proPlugin[prefix] = count + 1;
         }
         // Global = aktive Aufgaben plus laufende Handles ohne auflösbare Aufgabenzeile
         // (letztere haben kein PausiertBisUtc und zählen bewusst weiterhin voll).

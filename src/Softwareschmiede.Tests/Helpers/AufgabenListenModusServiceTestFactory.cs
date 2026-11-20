@@ -9,7 +9,7 @@ namespace Softwareschmiede.Tests.Helpers;
 
 /// <summary>
 /// Gemeinsame Test-Factory für <see cref="AufgabenListenModusService"/>: baut einen
-/// DI-Container (DbContext auf temporärer SQLite-Datei + scoped <see cref="AppEinstellungService"/>),
+/// DI-Container (DbContext auf temporärer SQLite-Datei + scoped <see cref="AppSettingService"/>),
 /// dessen <see cref="IServiceScopeFactory"/> der Service für seine Scope-Operationen nutzt.
 /// Der zurückgegebene <see cref="ServiceProvider"/> gehört dem Aufrufer (Dispose-Verantwortung).
 /// </summary>
@@ -27,7 +27,7 @@ public static class AufgabenListenModusServiceTestFactory
         services.AddLogging();
         services.AddDbContext<SoftwareschmiedeDbContext>(
             o => o.UseSqlite($"Data Source={dbPath};Pooling=False"));
-        services.AddScoped<AppEinstellungService>();
+        services.AddScoped<AppSettingService>();
         var provider = services.BuildServiceProvider();
         using (var initScope = provider.CreateScope())
         {

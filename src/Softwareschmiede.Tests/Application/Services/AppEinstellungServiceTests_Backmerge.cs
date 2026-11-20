@@ -7,15 +7,15 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für die Backmerge-Einstellungen (Modus und Projekt-Freigabe) in <see cref="AppEinstellungService"/>.</summary>
+/// <summary>Tests für die Backmerge-Einstellungen (Modus und Projekt-Freigabe) in <see cref="AppSettingService"/>.</summary>
 public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
 {
     private readonly SoftwareschmiedeDbContext _db = TestDbContextFactory.Create();
-    private readonly AppEinstellungService _sut;
+    private readonly AppSettingService _sut;
 
     /// <inheritdoc cref="AppEinstellungServiceTests_Backmerge"/>
     public AppEinstellungServiceTests_Backmerge()
-        => _sut = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        => _sut = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
 
     /// <summary>Räumt den InMemory-Datenbankkontext auf.</summary>
     public void Dispose() => _db.Dispose();
@@ -31,7 +31,7 @@ public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
     [InlineData("99")]
     public async Task GetScmBackmergeModusAsync_InvalidStoredValue_FallsBackToDeaktiviert(string stored)
     {
-        await _sut.SetSettingAsync(AppEinstellungService.ScmBackmergeModeKey, stored, TestContext.Current.CancellationToken);
+        await _sut.SetSettingAsync(AppSettingService.ScmBackmergeModeKey, stored, TestContext.Current.CancellationToken);
         (await _sut.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeMode.Disabled);
     }
 
@@ -39,10 +39,10 @@ public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
     [Theory]
     [InlineData(ScmBackmergeMode.Global)]
     [InlineData(ScmBackmergeMode.ProjectScoped)]
-    public async Task SetScmBackmergeModusAsync_PersistedValue_IsHonored(ScmBackmergeMode modus)
+    public async Task SetScmBackmergeModusAsync_PersistedValue_IsHonored(ScmBackmergeMode mode)
     {
-        await _sut.SetScmBackmergeModusAsync(modus, TestContext.Current.CancellationToken);
-        (await _sut.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(modus);
+        await _sut.SetScmBackmergeModusAsync(mode, TestContext.Current.CancellationToken);
+        (await _sut.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(mode);
     }
 
     /// <summary>Ein nicht definierter Modus wird abgelehnt.</summary>
@@ -62,6 +62,6 @@ public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
 
         (await _sut.GetBackmergeProjektAktivAsync(projectId, TestContext.Current.CancellationToken)).Should().BeTrue();
         (await _sut.GetBackmergeProjektAktivAsync(Guid.NewGuid(), TestContext.Current.CancellationToken)).Should().BeFalse("die Freigabe gilt je Projekt");
-        (await _sut.GetSettingAsync(AppEinstellungService.BackmergeProjektKey(projectId), TestContext.Current.CancellationToken)).Should().Be("True");
+        (await _sut.GetSettingAsync(AppSettingService.BackmergeProjektKey(projectId), TestContext.Current.CancellationToken)).Should().Be("True");
     }
 }

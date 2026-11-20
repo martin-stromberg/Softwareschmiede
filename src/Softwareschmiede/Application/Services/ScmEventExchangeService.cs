@@ -18,7 +18,7 @@ public sealed class ScmEventExchangeService(IServiceScopeFactory scopes, TimePro
         // Derselbe Laufzeit-Schalter wie für die Überwachung: Bei deaktivierter
         // SCM-Ereignisüberwachung wird auch nicht automatisch zugestellt oder abgeglichen.
         // Explizite Benutzeraktionen in der Ereignisübersicht bleiben davon unberührt.
-        if (!await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct))
+        if (!await scope.ServiceProvider.GetRequiredService<AppSettingService>().GetScmMonitoringEnabledAsync(ct))
         {
             logger.LogDebug("SCM-Ereignisüberwachung ist deaktiviert; Antwortkanal-Prüfung wird übersprungen.");
             return;

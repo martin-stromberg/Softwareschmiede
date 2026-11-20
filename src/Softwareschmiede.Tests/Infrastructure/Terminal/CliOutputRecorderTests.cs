@@ -23,20 +23,20 @@ public sealed class CliOutputRecorderTests
         timeProvider.Advance(TimeSpan.FromMilliseconds(500));
         sut.OnOutputChunk(Encoding.UTF8.GetBytes("zweiter"));
 
-        var aufzeichnung = sut.GetAufzeichnung();
-        aufzeichnung.WorkItemId.Should().Be(workItemId);
-        aufzeichnung.PluginName.Should().Be("TestPlugin");
-        aufzeichnung.StartUtc.Should().Be(timeProvider.Start);
-        aufzeichnung.Cols.Should().Be(120);
-        aufzeichnung.Rows.Should().Be(30);
-        aufzeichnung.IstVollstaendig.Should().BeTrue();
-        aufzeichnung.EndeUtc.Should().BeNull("Complete() wurde noch nicht aufgerufen");
-        aufzeichnung.Chunks.Should().HaveCount(2);
-        aufzeichnung.Chunks[0].Offset.Should().Be(TimeSpan.Zero);
-        aufzeichnung.Chunks[0].Data.Should().Equal(Encoding.UTF8.GetBytes("erster"),
+        var recording = sut.GetRecording();
+        recording.WorkItemId.Should().Be(workItemId);
+        recording.PluginName.Should().Be("TestPlugin");
+        recording.StartUtc.Should().Be(timeProvider.Start);
+        recording.Cols.Should().Be(120);
+        recording.Rows.Should().Be(30);
+        recording.IstVollstaendig.Should().BeTrue();
+        recording.EndeUtc.Should().BeNull("Complete() wurde noch nicht aufgerufen");
+        recording.Chunks.Should().HaveCount(2);
+        recording.Chunks[0].Offset.Should().Be(TimeSpan.Zero);
+        recording.Chunks[0].Data.Should().Equal(Encoding.UTF8.GetBytes("erster"),
             "der Recorder muss die Bytes sofort kopieren — nachträgliche Puffer-Änderungen bleiben wirkungslos");
-        aufzeichnung.Chunks[1].Offset.Should().Be(TimeSpan.FromMilliseconds(500));
-        aufzeichnung.Chunks[1].Data.Should().Equal(Encoding.UTF8.GetBytes("zweiter"));
+        recording.Chunks[1].Offset.Should().Be(TimeSpan.FromMilliseconds(500));
+        recording.Chunks[1].Data.Should().Equal(Encoding.UTF8.GetBytes("zweiter"));
     }
 
     /// <summary>Bei Budget-Überschreitung bleibt das intakte Präfix erhalten und die Aufzeichnung
@@ -50,10 +50,10 @@ public sealed class CliOutputRecorderTests
         sut.OnOutputChunk(Encoding.UTF8.GetBytes("f"));     // würde überschreiten → Stop
         sut.OnOutputChunk(Encoding.UTF8.GetBytes("xy"));    // wird nicht mehr angenommen
 
-        var aufzeichnung = sut.GetAufzeichnung();
-        aufzeichnung.IstVollstaendig.Should().BeFalse();
-        aufzeichnung.Chunks.Should().HaveCount(1);
-        aufzeichnung.Chunks[0].Data.Should().Equal(Encoding.UTF8.GetBytes("abcde"));
+        var recording = sut.GetRecording();
+        recording.IstVollstaendig.Should().BeFalse();
+        recording.Chunks.Should().HaveCount(1);
+        recording.Chunks[0].Data.Should().Equal(Encoding.UTF8.GetBytes("abcde"));
     }
 
     /// <summary><see cref="CliOutputRecorder.Complete"/> setzt das Ende-Zeitstempel-Feld einmalig
@@ -70,12 +70,12 @@ public sealed class CliOutputRecorderTests
         timeProvider.Advance(TimeSpan.FromSeconds(5));
         await sut.CompleteAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
 
-        var aufzeichnung = sut.GetAufzeichnung();
-        aufzeichnung.EndeUtc.Should().Be(timeProvider.Start + TimeSpan.FromSeconds(2),
+        var recording = sut.GetRecording();
+        recording.EndeUtc.Should().Be(timeProvider.Start + TimeSpan.FromSeconds(2),
             "das erste Complete() muss den Endzeitpunkt festhalten; spätere Aufrufe ändern ihn nicht");
     }
 
-    /// <summary><see cref="CliOutputRecorder.GetAufzeichnung"/> liefert einen Snapshot: später
+    /// <summary><see cref="CliOutputRecorder.GetRecording"/> liefert einen Snapshot: später
     /// aufgezeichnete Chunks ändern eine bereits geholte Aufzeichnung nicht.</summary>
     [Fact]
     public void GetAufzeichnung_LiefertUnabhaengigenSnapshot()
@@ -83,13 +83,13 @@ public sealed class CliOutputRecorderTests
         var sut = new CliOutputRecorder(Guid.NewGuid(), "P", 80, 24, 1024, new FakeTimeProvider());
 
         sut.OnOutputChunk(Encoding.UTF8.GetBytes("a"));
-        var snapshot = sut.GetAufzeichnung();
+        var snapshot = sut.GetRecording();
         sut.OnOutputChunk(Encoding.UTF8.GetBytes("b"));
         sut.Complete();
 
         snapshot.Chunks.Should().HaveCount(1);
         snapshot.EndeUtc.Should().BeNull();
-        sut.GetAufzeichnung().Chunks.Should().HaveCount(2);
+        sut.GetRecording().Chunks.Should().HaveCount(2);
     }
 
     /// <summary>Leere Chunks werden nicht aufgezeichnet (kein Rauschen im Mitschnitt).</summary>
@@ -100,7 +100,7 @@ public sealed class CliOutputRecorderTests
 
         sut.OnOutputChunk(ReadOnlySpan<byte>.Empty);
 
-        sut.GetAufzeichnung().Chunks.Should().BeEmpty();
+        sut.GetRecording().Chunks.Should().BeEmpty();
     }
 
     /// <summary>Der Recorder implementiert bewusst nicht <see cref="ITerminalDiagnoseSink"/>, damit

@@ -12,7 +12,7 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly KiAusfuehrungsService _kiService;
+    private readonly AiExecutionService _kiService;
 
     /// <summary>CliEmbeddingServiceIntegrationTests.</summary>
     public CliEmbeddingServiceIntegrationTests()

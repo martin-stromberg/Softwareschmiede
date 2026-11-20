@@ -11,9 +11,9 @@ using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>
-/// Tests für die Verwaltung eines aktiven CLI-Laufs auf <see cref="AufgabeService"/>
-/// (<see cref="AufgabeService.AktivenLaufSetzenAsync"/>, <see cref="AufgabeService.AktivenLaufBeendenAsync"/>,
-/// <see cref="AufgabeService.AktivenLaufSicherstellenAsync"/>). Deckt den vollständigen Substatus-Zyklus
+/// Tests für die Verwaltung eines aktiven CLI-Laufs auf <see cref="WorkItemService"/>
+/// (<see cref="WorkItemService.SetActiveRunAsync"/>, <see cref="WorkItemService.EndActiveRunAsync"/>,
+/// <see cref="WorkItemService.EnsureActiveRunAsync"/>). Deckt den vollständigen Substatus-Zyklus
 /// Bereit → Läuft → Wartet (während der Prozess noch lebt) → Bereit (nach Stopp) aus Sicht des Services ab
 /// (Issue 108, Folgefehler des Rückwegs Läuft → Wartet: <see cref="Softwareschmiede.Domain.Entities.WorkItem.RunStatus"/>
 /// bildet den bis dahin nirgends persistierten Laufzeit-Substatus der CLI ab).
@@ -21,16 +21,16 @@ namespace Softwareschmiede.Tests.Application.Services;
 public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly Mock<ILogger<AufgabeService>> _loggerMock;
-    private readonly AufgabeService _sut;
+    private readonly Mock<ILogger<WorkItemService>> _loggerMock;
+    private readonly WorkItemService _sut;
     private readonly Guid _projektId = new Guid("22222222-2222-2222-2222-222222222222");
 
     /// <summary>AufgabeServiceTests_AktiverLauf.</summary>
     public AufgabeServiceTests_AktiverLauf()
     {
         _db = TestDbContextFactory.Create();
-        _loggerMock = new Mock<ILogger<AufgabeService>>();
-        _sut = new AufgabeService(_db, _loggerMock.Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
+        _loggerMock = new Mock<ILogger<WorkItemService>>();
+        _sut = new WorkItemService(_db, _loggerMock.Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
 
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
@@ -59,7 +59,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
 
         // Act
         var vorUpdate = DateTimeOffset.UtcNow;
-        await _sut.AktivenLaufSetzenAsync(workItem.Id, "lauf-123", TestContext.Current.CancellationToken);
+        await _sut.SetActiveRunAsync(workItem.Id, "lauf-123", TestContext.Current.CancellationToken);
         var nachUpdate = DateTimeOffset.UtcNow;
 
         // Assert
@@ -81,11 +81,11 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     {
         // Arrange
         var workItem = await _sut.CreateAsync(_projektId, "Aktiver-Lauf-Beenden-Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        await _sut.AktivenLaufSetzenAsync(workItem.Id, "lauf-456", TestContext.Current.CancellationToken);
+        await _sut.SetActiveRunAsync(workItem.Id, "lauf-456", TestContext.Current.CancellationToken);
         (await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken))!.ActiveRunId.Should().Be("lauf-456");
 
         // Act
-        await _sut.AktivenLaufBeendenAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await _sut.EndActiveRunAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
         var geladen = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -106,12 +106,12 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     {
         // Arrange
         var workItem = await _sut.CreateAsync(_projektId, "Aktiver-Lauf-Beenden-LaufStatus-Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        await _sut.AktivenLaufSetzenAsync(workItem.Id, "lauf-789", TestContext.Current.CancellationToken);
-        await _sut.AktivenLaufSicherstellenAsync(workItem.Id, () => WorkItemRunStatus.WaitingForInput, TestContext.Current.CancellationToken);
+        await _sut.SetActiveRunAsync(workItem.Id, "lauf-789", TestContext.Current.CancellationToken);
+        await _sut.EnsureActiveRunAsync(workItem.Id, () => WorkItemRunStatus.WaitingForInput, TestContext.Current.CancellationToken);
         (await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken))!.RunStatus.Should().Be(WorkItemRunStatus.WaitingForInput);
 
         // Act
-        await _sut.AktivenLaufBeendenAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await _sut.EndActiveRunAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
         var geladen = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -130,7 +130,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         var workItem = await _sut.CreateAsync(_projektId, "Guard-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.AktivenLaufSicherstellenAsync(workItem.Id, laeuftGuard: () => false, ct: TestContext.Current.CancellationToken);
+        await _sut.EnsureActiveRunAsync(workItem.Id, laeuftGuard: () => false, ct: TestContext.Current.CancellationToken);
 
         // Assert
         var geladen = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -150,10 +150,10 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     {
         // Arrange: eine Schreiboperation muss einmal gelaufen sein, damit der Gate-Eintrag existiert.
         var workItem = await _sut.CreateAsync(_projektId, "Serialisierungs-Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        await _sut.AktivenLaufSetzenAsync(workItem.Id, "lauf-ser", TestContext.Current.CancellationToken);
+        await _sut.SetActiveRunAsync(workItem.Id, "lauf-ser", TestContext.Current.CancellationToken);
 
-        var gates = (ConcurrentDictionary<Guid, SemaphoreSlim>)typeof(AufgabeService)
-            .GetField("LaufGates", BindingFlags.NonPublic | BindingFlags.Static)!
+        var gates = (ConcurrentDictionary<Guid, SemaphoreSlim>)typeof(WorkItemService)
+            .GetField("RunGates", BindingFlags.NonPublic | BindingFlags.Static)!
             .GetValue(null)!;
         var gate = gates[workItem.Id];
         await gate.WaitAsync(TestContext.Current.CancellationToken);
@@ -162,7 +162,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         try
         {
             // Act
-            beendenTask = _sut.AktivenLaufBeendenAsync(workItem.Id, TestContext.Current.CancellationToken);
+            beendenTask = _sut.EndActiveRunAsync(workItem.Id, TestContext.Current.CancellationToken);
             await Task.Delay(200, TestContext.Current.CancellationToken);
 
             // Assert
@@ -190,10 +190,10 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     {
         // Arrange: Schreiboperation einmal laufen lassen, damit der Gate-Eintrag existiert.
         var workItem = await _sut.CreateAsync(_projektId, "Provider-Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        await _sut.AktivenLaufSetzenAsync(workItem.Id, "lauf-prov", TestContext.Current.CancellationToken);
+        await _sut.SetActiveRunAsync(workItem.Id, "lauf-prov", TestContext.Current.CancellationToken);
 
-        var gates = (ConcurrentDictionary<Guid, SemaphoreSlim>)typeof(AufgabeService)
-            .GetField("LaufGates", BindingFlags.NonPublic | BindingFlags.Static)!
+        var gates = (ConcurrentDictionary<Guid, SemaphoreSlim>)typeof(WorkItemService)
+            .GetField("RunGates", BindingFlags.NonPublic | BindingFlags.Static)!
             .GetValue(null)!;
         var gate = gates[workItem.Id];
         await gate.WaitAsync(TestContext.Current.CancellationToken);
@@ -203,7 +203,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         try
         {
             // Act
-            sicherstellenTask = _sut.AktivenLaufSicherstellenAsync(workItem.Id, laufStatusProvider: () =>
+            sicherstellenTask = _sut.EnsureActiveRunAsync(workItem.Id, laufStatusProvider: () =>
                 {
                     providerAusgewertet = true;
                     return WorkItemRunStatus.WaitingForInput;
@@ -240,19 +240,19 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         workItem.RunStatus.Should().BeNull();
 
         // Läuft: CLI-Prozess gestartet.
-        await _sut.AktivenLaufSetzenAsync(workItem.Id, "lauf-zyklus-1", TestContext.Current.CancellationToken);
+        await _sut.SetActiveRunAsync(workItem.Id, "lauf-zyklus-1", TestContext.Current.CancellationToken);
         var nachStart = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         nachStart!.ActiveRunId.Should().NotBeNull();
         nachStart.RunStatus.Should().Be(WorkItemRunStatus.Running);
 
         // Wartet: CLI erzeugt seit längerer Zeit keine Ausgabe mehr (Prozess lebt weiterhin).
-        await _sut.AktivenLaufSicherstellenAsync(workItem.Id, () => WorkItemRunStatus.WaitingForInput, TestContext.Current.CancellationToken);
+        await _sut.EnsureActiveRunAsync(workItem.Id, () => WorkItemRunStatus.WaitingForInput, TestContext.Current.CancellationToken);
         var waehrendWarten = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         waehrendWarten!.ActiveRunId.Should().NotBeNull("der Prozess lebt während des Wartens weiterhin");
         waehrendWarten.RunStatus.Should().Be(WorkItemRunStatus.WaitingForInput);
 
         // Bereit: CLI-Prozess beendet.
-        await _sut.AktivenLaufBeendenAsync(workItem.Id, TestContext.Current.CancellationToken);
+        await _sut.EndActiveRunAsync(workItem.Id, TestContext.Current.CancellationToken);
         var nachStopp = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         nachStopp!.ActiveRunId.Should().BeNull();
         nachStopp.RunStatus.Should().BeNull();
@@ -271,7 +271,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         workItem.ActiveRunId.Should().BeNull();
 
         var vorUpdate = DateTimeOffset.UtcNow;
-        await _sut.AktivenLaufSicherstellenAsync(workItem.Id, ct: TestContext.Current.CancellationToken);
+        await _sut.EnsureActiveRunAsync(workItem.Id, ct: TestContext.Current.CancellationToken);
         var nachUpdate = DateTimeOffset.UtcNow;
 
         var geladen = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -291,7 +291,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     {
         var workItem = await _sut.CreateAsync(_projektId, "Sicherstellen-Substatus-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
-        await _sut.AktivenLaufSicherstellenAsync(workItem.Id, () => WorkItemRunStatus.WaitingForInput, TestContext.Current.CancellationToken);
+        await _sut.EnsureActiveRunAsync(workItem.Id, () => WorkItemRunStatus.WaitingForInput, TestContext.Current.CancellationToken);
 
         var geladen = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         geladen!.ActiveRunId.Should().NotBeNullOrEmpty();
@@ -307,7 +307,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     public async Task AktivenLaufSicherstellenAsync_BehaeltAktiveRunId_UndFrischtHeartbeat_BeiBestehendemLauf()
     {
         var workItem = await _sut.CreateAsync(_projektId, "Idempotenz-Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        await _sut.AktivenLaufSetzenAsync(workItem.Id, "lauf-bestehend", TestContext.Current.CancellationToken);
+        await _sut.SetActiveRunAsync(workItem.Id, "lauf-bestehend", TestContext.Current.CancellationToken);
 
         var tracked = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         var bekannterStart = DateTimeOffset.UtcNow.AddHours(-2);
@@ -318,7 +318,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         _db.ChangeTracker.Clear();
 
         var vorUpdate = DateTimeOffset.UtcNow;
-        await _sut.AktivenLaufSicherstellenAsync(workItem.Id, ct: TestContext.Current.CancellationToken);
+        await _sut.EnsureActiveRunAsync(workItem.Id, ct: TestContext.Current.CancellationToken);
 
         var geladen = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         geladen!.ActiveRunId.Should().Be("lauf-bestehend");
@@ -328,7 +328,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         geladen.RunStatus.Should().Be(WorkItemRunStatus.WaitingForInput,
             "ohne Parameter bleibt der bestehende Substatus erhalten");
 
-        await _sut.AktivenLaufSicherstellenAsync(workItem.Id, () => WorkItemRunStatus.Running, TestContext.Current.CancellationToken);
+        await _sut.EnsureActiveRunAsync(workItem.Id, () => WorkItemRunStatus.Running, TestContext.Current.CancellationToken);
         (await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken))!.RunStatus.Should().Be(WorkItemRunStatus.Running,
             "mit Parameter wird der Substatus aktualisiert");
     }
@@ -343,7 +343,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
         _db.ChangeTracker.Clear();
 
-        var act = () => _sut.AktivenLaufSicherstellenAsync(workItem.Id);
+        var act = () => _sut.EnsureActiveRunAsync(workItem.Id);
 
         await act.Should().NotThrowAsync();
         var geladen = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -355,7 +355,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     [Fact]
     public async Task AktivenLaufSicherstellenAsync_Wirft_BeiUnbekannterAufgabe()
     {
-        var act = () => _sut.AktivenLaufSicherstellenAsync(Guid.NewGuid());
+        var act = () => _sut.EnsureActiveRunAsync(Guid.NewGuid());
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

@@ -124,14 +124,14 @@ public partial class End2EndTest
 
         await using (var db = OpenTestDbContext())
         {
-            var eintraege = await db.AppSettings
-                .Where(e => e.Key == AppEinstellungService.AktiveAufgabenListenModusKey
-                            || e.Key == AppEinstellungService.AktiveAufgabenListenModusDashboardKey)
+            var entries = await db.AppSettings
+                .Where(e => e.Key == AppSettingService.AktiveAufgabenListenModusKey
+                            || e.Key == AppSettingService.AktiveAufgabenListenModusDashboardKey)
                 .ToDictionaryAsync(e => e.Key, e => e.Value);
-            Assert.Equal("Repository", eintraege[AppEinstellungService.AktiveAufgabenListenModusDashboardKey]);
+            Assert.Equal("Repository", entries[AppSettingService.AktiveAufgabenListenModusDashboardKey]);
             Assert.True(
-                !eintraege.ContainsKey(AppEinstellungService.AktiveAufgabenListenModusKey)
-                || eintraege[AppEinstellungService.AktiveAufgabenListenModusKey] == "Datum",
+                !entries.ContainsKey(AppSettingService.AktiveAufgabenListenModusKey)
+                || entries[AppSettingService.AktiveAufgabenListenModusKey] == "Datum",
                 "Der Dashboard-Moduswechsel darf den Menü-Schlüssel nicht verändern.");
         }
 
@@ -144,7 +144,7 @@ public partial class End2EndTest
         await using (var db = OpenTestDbContext())
         {
             var wert = await db.AppSettings
-                .Where(e => e.Key == AppEinstellungService.AktiveAufgabenListenModusKey)
+                .Where(e => e.Key == AppSettingService.AktiveAufgabenListenModusKey)
                 .Select(e => e.Value)
                 .FirstOrDefaultAsync();
             Assert.Equal("Repository", wert);

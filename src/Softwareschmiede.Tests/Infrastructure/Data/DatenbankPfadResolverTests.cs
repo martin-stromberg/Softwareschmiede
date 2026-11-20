@@ -101,10 +101,10 @@ public sealed class DatenbankPfadResolverTests
         result.Should().Be(Path.Combine(temp.Path, "softwareschmiede.db"));
     }
 
-    private static void SchreibeVersionJson(string verzeichnis, string tagName)
+    private static void SchreibeVersionJson(string directory, string tagName)
     {
         File.WriteAllText(
-            Path.Combine(verzeichnis, "version.json"),
+            Path.Combine(directory, "version.json"),
             $$"""
             {
               "version": "1.2.3",

@@ -9,13 +9,13 @@ namespace Softwareschmiede.App.ViewModels;
 public static class UpdateModusTexte
 {
     /// <summary>Update-Prüfung deaktiviert.</summary>
-    public const string Aus = "Aus";
+    public const string Off = "Aus";
 
     /// <summary>Nur auf Updates prüfen, ohne automatische Installation.</summary>
-    public const string NurPruefen = "Nur prüfen";
+    public const string CheckOnly = "Nur prüfen";
 
     /// <summary>Beim Programmstart prüfen und bei Befund installieren.</summary>
-    public const string BeiProgrammstartPruefenUndAusfuehren = "Bei Programmstart prüfen und ausführen";
+    public const string CheckAndRunAtStartup = "Bei Programmstart prüfen und ausführen";
 }
 
 /// <summary>
@@ -29,14 +29,14 @@ public sealed record UpdateModusOption(UpdateMode Mode, string Label)
     /// <summary>Alle wählbaren Update-Modi in Anzeigereihenfolge.</summary>
     public static IReadOnlyList<UpdateModusOption> All { get; } =
     [
-        new(UpdateMode.Aus, UpdateModusTexte.Aus),
-        new(UpdateMode.NurPruefen, UpdateModusTexte.NurPruefen),
-        new(UpdateMode.BeiProgrammstartPruefenUndAusfuehren, UpdateModusTexte.BeiProgrammstartPruefenUndAusfuehren)
+        new(UpdateMode.Off, UpdateModusTexte.Off),
+        new(UpdateMode.CheckOnly, UpdateModusTexte.CheckOnly),
+        new(UpdateMode.CheckAndRunAtStartup, UpdateModusTexte.CheckAndRunAtStartup)
     ];
 
     /// <summary>Liefert die Auswahloption zu einem gespeicherten Modus.</summary>
-    public static UpdateModusOption FuerModus(UpdateMode modus)
-        => All.First(o => o.Mode == modus);
+    public static UpdateModusOption FuerModus(UpdateMode mode)
+        => All.First(o => o.Mode == mode);
 
     /// <inheritdoc/>
     public override string ToString() => Label;

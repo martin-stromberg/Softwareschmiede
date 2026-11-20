@@ -14,7 +14,7 @@ public sealed class PluginSelectionService
     private readonly PluginDefaultSettingsService _defaultSettingsService;
     private readonly PluginActivationService _pluginActivationService;
     private readonly ILogger<PluginSelectionService> _logger;
-    private readonly AppEinstellungService? _appEinstellungService;
+    private readonly AppSettingService? _appSettingService;
 
     /// <inheritdoc cref="PluginSelectionService"/>
     public PluginSelectionService(
@@ -22,13 +22,13 @@ public sealed class PluginSelectionService
         PluginDefaultSettingsService defaultSettingsService,
         PluginActivationService pluginActivationService,
         ILogger<PluginSelectionService> logger,
-        AppEinstellungService? appEinstellungService = null)
+        AppSettingService? appSettingService = null)
     {
         _pluginManager = pluginManager;
         _defaultSettingsService = defaultSettingsService;
         _pluginActivationService = pluginActivationService;
         _logger = logger;
-        _appEinstellungService = appEinstellungService;
+        _appSettingService = appSettingService;
     }
 
     /// <summary>Liest den gespeicherten PluginPrefix für den Plugin-Typ.</summary>
@@ -78,7 +78,7 @@ public sealed class PluginSelectionService
             selectedPluginPrefix,
             available,
             _pluginManager.GetDefaultDevelopmentAutomationPlugin,
-            GetKiFallbackSortKey,
+            GetAiFallbackSortKey,
             ct);
 
         return resolved;
@@ -96,7 +96,7 @@ public sealed class PluginSelectionService
     /// <summary>
     /// Löst das KI-Plugin-Prefix mit Projekt-Kontext auf: Aufgaben-Plugin → Projekt-Default → Global-Default
     /// (<c>plugins.default.*</c>) → in den Einstellungen konfigurierte Standard-CLI
-    /// (<see cref="AppEinstellungService.DefaultKiPluginKey"/>).
+    /// (<see cref="AppSettingService.DefaultKiPluginKey"/>).
     /// Wird nichts gefunden, gibt die Methode <c>null</c> zurück; der Aufrufer muss in diesem Fall
     /// den Plugin-Auswahl-Dialog anzeigen.
     /// </summary>
@@ -128,13 +128,13 @@ public sealed class PluginSelectionService
     /// <summary>
     /// Löst das KI-Plugin-Prefix für die automatische SCM-Ereignisausführung aktivierungsbewusst auf:
     /// Aufgaben-Plugin → Projekt-Default → Global-Default (<c>plugins.default.*</c>) → in den
-    /// Einstellungen konfigurierte Standard-CLI (<see cref="AppEinstellungService.DefaultKiPluginKey"/>).
+    /// Einstellungen konfigurierte Standard-CLI (<see cref="AppSettingService.DefaultKiPluginKey"/>).
     /// Eine Stufe gilt nur, wenn das zugeordnete Plugin installiert, ladbar und aktiviert ist;
     /// konfigurierte, nicht ausführbare Zuordnungen werden ignoriert und im Ergebnis benannt.
     /// Anders als <see cref="ResolveDevelopmentAutomationPluginWithProjectScopeAsync"/> führt diese
     /// Variante nie zu einer deaktivierten oder nicht vorhandenen Zuordnung.
     /// </summary>
-    public async Task<KiPluginResolution> ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(
+    public async Task<AiPluginResolution> ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(
         string? aufgabenPluginPrefix,
         Guid projectId,
         CancellationToken ct = default)
@@ -185,9 +185,9 @@ public sealed class PluginSelectionService
             return new(globalPlugin, ignored);
         }
 
-        if (_appEinstellungService is not null)
+        if (_appSettingService is not null)
         {
-            var configured = await _appEinstellungService.GetSettingAsync(AppEinstellungService.DefaultKiPluginKey, ct);
+            var configured = await _appSettingService.GetSettingAsync(AppSettingService.DefaultKiPluginKey, ct);
             if (!string.IsNullOrWhiteSpace(configured))
             {
                 var trimmed = configured.Trim();
@@ -211,19 +211,19 @@ public sealed class PluginSelectionService
     }
 
     /// <summary>
-    /// Löst die in den Einstellungen konfigurierte Standard-CLI (<see cref="AppEinstellungService.DefaultKiPluginKey"/>)
+    /// Löst die in den Einstellungen konfigurierte Standard-CLI (<see cref="AppSettingService.DefaultKiPluginKey"/>)
     /// auf einen Plugin-Prefix auf. Die Einstellungen speichern den <see cref="IPlugin.PluginName"/>;
     /// zur Robustheit wird zusätzlich der <see cref="IPlugin.PluginPrefix"/> akzeptiert. Passt der gespeicherte
     /// Wert auf kein vorhandenes KI-Plugin, wird <c>null</c> zurückgegeben — es wird kein anderes Plugin vermutet.
     /// </summary>
     private async Task<string?> ResolveConfiguredDefaultKiPluginPrefixAsync(CancellationToken ct)
     {
-        if (_appEinstellungService is null)
+        if (_appSettingService is null)
         {
             return null;
         }
 
-        var configured = await _appEinstellungService.GetSettingAsync(AppEinstellungService.DefaultKiPluginKey, ct);
+        var configured = await _appSettingService.GetSettingAsync(AppSettingService.DefaultKiPluginKey, ct);
         if (string.IsNullOrWhiteSpace(configured))
         {
             return null;
@@ -336,9 +336,9 @@ public sealed class PluginSelectionService
             return [];
         }
 
-        var orderSetting = _appEinstellungService is null
+        var orderSetting = _appSettingService is null
             ? null
-            : await _appEinstellungService.GetSettingAsync(AppEinstellungService.IdePluginOrderKey, ct);
+            : await _appSettingService.GetSettingAsync(AppSettingService.IdePluginOrderKey, ct);
 
         return ApplyIdePluginOrder(enabledPlugins, orderSetting);
     }
@@ -407,10 +407,10 @@ public sealed class PluginSelectionService
             string.Equals(plugin.PluginPrefix, pluginPrefix.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string GetKiFallbackSortKey(IKiPlugin plugin)
+    private static string GetAiFallbackSortKey(IKiPlugin plugin)
     {
         if (plugin is CliKiPluginBase cliPlugin
-            && string.Equals(cliPlugin.ProviderDateiPraefix, "copilot", StringComparison.OrdinalIgnoreCase))
+            && string.Equals(cliPlugin.ProviderFilePrefix, "copilot", StringComparison.OrdinalIgnoreCase))
         {
             return $"0-{plugin.PluginName}";
         }
@@ -422,4 +422,4 @@ public sealed class PluginSelectionService
 /// <summary>Ergebnis der aktivierungsbewussten KI-Plugin-Auflösung: der aufgelöste Prefix
 /// (oder <c>null</c>, wenn keine ausführbare Zuordnung existiert) sowie die konfigurierten,
 /// nicht ausführbaren Zuordnungen, die dabei ignoriert wurden.</summary>
-public sealed record KiPluginResolution(string? PluginPrefix, IReadOnlyList<string> IgnoredPluginPrefixes);
+public sealed record AiPluginResolution(string? PluginPrefix, IReadOnlyList<string> IgnoredPluginPrefixes);

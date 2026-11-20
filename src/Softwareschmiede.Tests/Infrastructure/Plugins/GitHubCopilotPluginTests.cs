@@ -27,7 +27,7 @@ public sealed class GitHubCopilotPluginTests
     {
         _sut.PluginName.Should().Be("GitHub Copilot");
         _sut.PluginPrefix.Should().Be("Softwareschmiede.GitHubCopilot");
-        _sut.ProviderDateiPraefix.Should().Be("copilot");
+        _sut.ProviderFilePrefix.Should().Be("copilot");
         _sut.GetSettingGroups().Should().HaveCount(3);
         _sut.GetSettingGroups().SelectMany(g => g.Fields).Should().Contain(f => f.Key == "Token");
         _sut.GetSettingGroups().Should().Contain(g => g.GroupName == "CLI-Konfiguration");

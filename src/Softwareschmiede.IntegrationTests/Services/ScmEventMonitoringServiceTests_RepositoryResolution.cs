@@ -81,7 +81,7 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
                 context.RepositoryId.Contains("private-repo", StringComparison.OrdinalIgnoreCase)
                     ? Task.FromException<ScmEventRepository>(new ScmProviderException(ScmProviderFailureKind.Permanent,
                         "GitHub-Anfrage fehlgeschlagen (HTTP 404, github.com/repos/owner/private-repo)."))
-                    : Task.FromResult(ScmDispatchFixture.BotRepository with { Konto = context.Konto }));
+                    : Task.FromResult(ScmDispatchFixture.BotRepository with { Account = context.Account }));
 
     private static async Task AddRepositoryAsync(ScmDispatchFixture fixture, string repositoryUrl, string repositoryName)
     {

@@ -5,7 +5,7 @@ namespace Softwareschmiede.Application.Services;
 
 /// <summary>
 /// Orchestriert den automatischen OS-Shutdown: Sobald bei aktiviertem Schalter keine
-/// Automatisierung mehr fachlich läuft (<see cref="ILaufendeAutomatisierungenZaehlung"/>),
+/// Automatisierung mehr fachlich läuft (<see cref="IRunningAutomationsCount"/>),
 /// armiert er einen Countdown über die konfigurierte Toleranzzeit. Statuswechsel-Ereignisse
 /// lösen eine koaleszierte Neuauswertung aus — ein laufender Countdown läuft bei unveränderter
 /// Anzahl mit dem bestehenden Endzeitpunkt weiter (kein Verhungern durch periodische
@@ -17,8 +17,8 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     private static readonly TimeSpan SicherheitsTickIntervall = TimeSpan.FromSeconds(5);
 
     private readonly IRunningAutomationStatusSource _runningAutomationStatusSource;
-    private readonly AufgabeLaufdatenChangedNotifier _laufdatenChangedNotifier;
-    private readonly ILaufendeAutomatisierungenZaehlung _zaehlung;
+    private readonly WorkItemRunDataChangedNotifier _laufdatenChangedNotifier;
+    private readonly IRunningAutomationsCount _count;
     private readonly ISystemShutdownService _systemShutdownService;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<AutoShutdownOrchestrator> _logger;
@@ -29,7 +29,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
 
     private bool _enabled;
     private bool _erzwingen;
-    private int _toleranzMinuten = AppEinstellungService.AutoShutdownDefaultToleranzMinuten;
+    private int _toleranceMinutes = AppSettingService.AutoShutdownDefaultToleranceMinutes;
     private DateTimeOffset? _countdownEndeUtc;
     private bool _shutdownAusgeloest;
     private bool _evalErneutAngefordert;
@@ -38,15 +38,15 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     /// <summary>Erstellt eine neue Instanz von <see cref="AutoShutdownOrchestrator"/>.</summary>
     public AutoShutdownOrchestrator(
         IRunningAutomationStatusSource runningAutomationStatusSource,
-        AufgabeLaufdatenChangedNotifier laufdatenChangedNotifier,
-        ILaufendeAutomatisierungenZaehlung zaehlung,
+        WorkItemRunDataChangedNotifier laufdatenChangedNotifier,
+        IRunningAutomationsCount count,
         ISystemShutdownService systemShutdownService,
         TimeProvider timeProvider,
         ILogger<AutoShutdownOrchestrator> logger)
     {
         _runningAutomationStatusSource = runningAutomationStatusSource;
         _laufdatenChangedNotifier = laufdatenChangedNotifier;
-        _zaehlung = zaehlung;
+        _count = count;
         _systemShutdownService = systemShutdownService;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -138,10 +138,10 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     }
 
     /// <inheritdoc/>
-    public void SetOptionen(int toleranzMinuten, bool force)
+    public void SetOptionen(int toleranceMinutes, bool force)
     {
         var zustandGeaendert = false;
-        var neueToleranz = Math.Max(0, toleranzMinuten);
+        var newTolerance = Math.Max(0, toleranceMinutes);
 
         lock (_syncLock)
         {
@@ -150,16 +150,16 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
                 return;
             }
 
-            if (_toleranzMinuten != neueToleranz)
+            if (_toleranceMinutes != newTolerance)
             {
-                _toleranzMinuten = neueToleranz;
+                _toleranceMinutes = newTolerance;
                 zustandGeaendert = true;
 
                 if (_countdownEndeUtc is not null)
                 {
-                    var ende = _timeProvider.GetUtcNow() + TimeSpan.FromMinutes(neueToleranz);
-                    _countdownEndeUtc = ende;
-                    ArmiereCountdownTimerUnterLock(ende);
+                    var end = _timeProvider.GetUtcNow() + TimeSpan.FromMinutes(newTolerance);
+                    _countdownEndeUtc = end;
+                    ArmiereCountdownTimerUnterLock(end);
                 }
             }
 
@@ -263,7 +263,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
         int count;
         try
         {
-            count = await _zaehlung.ZaehleAsync();
+            count = await _count.CountAsync();
         }
         catch (Exception ex)
         {
@@ -294,9 +294,9 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
             }
             else if (_enabled && !_shutdownAusgeloest && _countdownEndeUtc is null)
             {
-                var ende = _timeProvider.GetUtcNow() + TimeSpan.FromMinutes(_toleranzMinuten);
-                _countdownEndeUtc = ende;
-                ArmiereCountdownTimerUnterLock(ende);
+                var end = _timeProvider.GetUtcNow() + TimeSpan.FromMinutes(_toleranceMinutes);
+                _countdownEndeUtc = end;
+                ArmiereCountdownTimerUnterLock(end);
                 zustandGeaendert = true;
             }
         }
@@ -307,9 +307,9 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
         }
     }
 
-    private void ArmiereCountdownTimerUnterLock(DateTimeOffset ende)
+    private void ArmiereCountdownTimerUnterLock(DateTimeOffset end)
     {
-        var rest = ende - _timeProvider.GetUtcNow();
+        var rest = end - _timeProvider.GetUtcNow();
         _countdownTimer.Change(rest > TimeSpan.Zero ? rest : TimeSpan.Zero, Timeout.InfiniteTimeSpan);
     }
 
@@ -324,7 +324,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
             int count;
             try
             {
-                count = await _zaehlung.ZaehleAsync();
+                count = await _count.CountAsync();
             }
             catch (Exception ex)
             {

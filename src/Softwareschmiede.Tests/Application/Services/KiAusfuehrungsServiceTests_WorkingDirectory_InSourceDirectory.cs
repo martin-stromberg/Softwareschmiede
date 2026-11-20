@@ -12,10 +12,10 @@ using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>
-/// Regressionstest für Issue #98 (zweiter Nacharbeits-Zyklus): <see cref="KiAusfuehrungsService"/> muss ein
+/// Regressionstest für Issue #98 (zweiter Nacharbeits-Zyklus): <see cref="AiExecutionService"/> muss ein
 /// konfiguriertes relatives Arbeitsverzeichnis auch dann korrekt auflösen, wenn <see cref="LocalDirectoryPlugin"/>
 /// im Workspace-Modus <c>InSourceDirectory</c> betrieben wird. In diesem Modus enthält der an
-/// <see cref="KiAusfuehrungsService.StartCliAsync"/> übergebene "Klon-Pfad" nur eine Pointer-Datei auf das
+/// <see cref="AiExecutionService.StartCliAsync"/> übergebene "Klon-Pfad" nur eine Pointer-Datei auf das
 /// tatsächliche Quellverzeichnis — die eigentliche Verzeichnisstruktur (z. B. ein Unterverzeichnis "backend")
 /// befindet sich dort, nicht im Klon-Pfad selbst. Vor dem Fix wurde der Klon-Pfad unverändert mit dem relativen
 /// Pfad kombiniert, was zu einer <see cref="DirectoryNotFoundException"/> führte, obwohl "backend" im
@@ -26,7 +26,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
     private readonly string _sourceDir;
     private readonly string _clonePath;
     private readonly LocalDirectoryPlugin _gitPlugin;
-    private readonly KiAusfuehrungsService _kiAusfuehrungsService;
+    private readonly AiExecutionService _kiAusfuehrungsService;
 
     /// <summary>KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirectory.</summary>
     public KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirectory()

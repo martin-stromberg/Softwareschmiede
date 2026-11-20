@@ -15,8 +15,8 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly ProjektService _projektService;
-    private readonly AufgabeService _aufgabeService;
+    private readonly ProjectService _projektService;
+    private readonly WorkItemService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IPluginManager> _pluginManagerMock;
@@ -25,8 +25,8 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
     public ProjectDetailViewModelTests_Arbeitsverzeichnis()
     {
         _db = TestDbContextFactory.Create();
-        _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _serviceProviderMock = new Mock<IServiceProvider>();
         _dialogServiceMock = new Mock<IDialogService>();
         _pluginManagerMock = new Mock<IPluginManager>();
@@ -104,9 +104,9 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
 
         await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();
 
-        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
-        startKonfiguration.Should().NotBeNull();
-        startKonfiguration!.WorkingDirectoryRelativePath.Should().Be("frontend");
+        var startConfiguration = await _projektService.GetRepositoryStartConfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
+        startConfiguration.Should().NotBeNull();
+        startConfiguration!.WorkingDirectoryRelativePath.Should().Be("frontend");
     }
 
     /// <summary>Bricht der Benutzer den Dialog ab, bleibt das bisherige Arbeitsverzeichnis unverändert.</summary>
@@ -129,9 +129,9 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
 
         await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();
 
-        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
-        startKonfiguration.Should().NotBeNull();
-        startKonfiguration!.WorkingDirectoryRelativePath.Should().Be("backend");
+        var startConfiguration = await _projektService.GetRepositoryStartConfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
+        startConfiguration.Should().NotBeNull();
+        startConfiguration!.WorkingDirectoryRelativePath.Should().Be("backend");
     }
 
     /// <summary>Wird das Root-Verzeichnis ('.') ausgewählt, wird das gespeicherte Arbeitsverzeichnis auf null (Repository-Root) zurückgesetzt.</summary>
@@ -154,7 +154,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
 
         await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();
 
-        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
-        startKonfiguration!.WorkingDirectoryRelativePath.Should().BeNull();
+        var startConfiguration = await _projektService.GetRepositoryStartConfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
+        startConfiguration!.WorkingDirectoryRelativePath.Should().BeNull();
     }
 }

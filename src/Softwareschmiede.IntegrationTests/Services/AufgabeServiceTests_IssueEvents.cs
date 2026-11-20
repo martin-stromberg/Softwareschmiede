@@ -8,7 +8,7 @@ using Softwareschmiede.IntegrationTests.Infrastructure;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>Tests für <see cref="AufgabeService.CreateFromIssueEventAsync"/>: SourceKey-Dedup der ereignisgesteuerten Anlage.</summary>
+/// <summary>Tests für <see cref="WorkItemService.CreateFromIssueEventAsync"/>: SourceKey-Dedup der ereignisgesteuerten Anlage.</summary>
 public sealed class AufgabeServiceTests_IssueEvents
 {
     /// <summary>Die Anlage persistiert Aufgabe und IssueReferenz inklusive SourceKey.</summary>
@@ -17,7 +17,7 @@ public sealed class AufgabeServiceTests_IssueEvents
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var (projectId, repositoryId) = await CreateProjektMitRepositoryAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var service = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var issue = new Issue(9, "Issue Titel", "Beschreibung", ["bug"], null, "https://github.com/owner/repo/issues/9");
 
         var created = await service.CreateFromIssueEventAsync(projectId, issue, repositoryId, "test-scm/github.com/R_1/Issue/9", TestContext.Current.CancellationToken);
@@ -36,7 +36,7 @@ public sealed class AufgabeServiceTests_IssueEvents
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var (projectId, repositoryId) = await CreateProjektMitRepositoryAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var service = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var issue = new Issue(9, "Issue Titel", "Beschreibung", [], null, null);
 
         var first = await service.CreateFromIssueEventAsync(projectId, issue, repositoryId, "test-scm/github.com/R_1/Issue/9", TestContext.Current.CancellationToken);
@@ -53,7 +53,7 @@ public sealed class AufgabeServiceTests_IssueEvents
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var (projectId, repositoryId) = await CreateProjektMitRepositoryAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var service = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var issue = new Issue(9, "Issue Titel", "Beschreibung", [], null, null);
 
         var first = await service.CreateFromIssueEventAsync(projectId, issue, repositoryId, "test-scm/github.com/R_1/Issue/9", TestContext.Current.CancellationToken);

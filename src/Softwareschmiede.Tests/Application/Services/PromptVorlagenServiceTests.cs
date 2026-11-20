@@ -15,17 +15,17 @@ public sealed class PromptVorlagenServiceTests
     public async Task EnsureInitialPromptVorlagenAsync_LegtDreiStandardvorlagenAn()
     {
         using var db = TestDbContextFactory.Create();
-        var sut = new PromptVorlagenService(db, NullLogger<PromptVorlagenService>.Instance);
+        var sut = new PromptTemplateService(db, NullLogger<PromptTemplateService>.Instance);
 
-        await sut.EnsureInitialPromptVorlagenAsync(TestContext.Current.CancellationToken);
+        await sut.EnsureInitialPromptTemplatesAsync(TestContext.Current.CancellationToken);
 
-        var vorlagen = await sut.GetAllAsync(TestContext.Current.CancellationToken);
-        vorlagen.Should().HaveCount(3);
-        vorlagen.Select(v => v.Name).Should().ContainInOrder(
+        var templates = await sut.GetAllAsync(TestContext.Current.CancellationToken);
+        templates.Should().HaveCount(3);
+        templates.Select(v => v.Name).Should().ContainInOrder(
             "Initialanforderung senden",
             "Weitermachen",
             "Pullrequest");
-        vorlagen[0].PromptText.Should().Be("Die Anforderung zum Thema '%TaskName%' ist in issue.md beschrieben.");
+        templates[0].PromptText.Should().Be("Die Anforderung zum Thema '%TaskName%' ist in issue.md beschrieben.");
     }
 
     /// <summary>EnsureInitialPromptVorlagenAsync legt keine Duplikate an, wenn bereits Vorlagen existieren.</summary>
@@ -40,20 +40,20 @@ public sealed class PromptVorlagenServiceTests
             SortOrder = 0
         });
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
-        var sut = new PromptVorlagenService(db, NullLogger<PromptVorlagenService>.Instance);
+        var sut = new PromptTemplateService(db, NullLogger<PromptTemplateService>.Instance);
 
-        await sut.EnsureInitialPromptVorlagenAsync(TestContext.Current.CancellationToken);
+        await sut.EnsureInitialPromptTemplatesAsync(TestContext.Current.CancellationToken);
 
-        var vorlagen = await sut.GetAllAsync(TestContext.Current.CancellationToken);
-        vorlagen.Should().ContainSingle();
-        vorlagen[0].Name.Should().Be("Benutzerdefiniert");
+        var templates = await sut.GetAllAsync(TestContext.Current.CancellationToken);
+        templates.Should().ContainSingle();
+        templates[0].Name.Should().Be("Benutzerdefiniert");
     }
 
     /// <summary>PromptVorlagenPlatzhalterService ersetzt bekannte Platzhalter und laesst unbekannte stehen.</summary>
     [Fact]
     public void PromptVorlagenPlatzhalterService_Resolve_ErsetztBekanntePlatzhalter()
     {
-        var sut = new PromptVorlagenPlatzhalterService();
+        var sut = new PromptTemplatePlaceholderService();
         var project = new Project { Id = Guid.NewGuid(), Name = "Projekt A", Status = ProjectStatus.Active };
         var repository = new GitRepository
         {
@@ -81,7 +81,7 @@ public sealed class PromptVorlagenServiceTests
     [Fact]
     public void PromptVorlagenPlatzhalterService_Resolve_FehlendesRepositoryWirdLeer()
     {
-        var sut = new PromptVorlagenPlatzhalterService();
+        var sut = new PromptTemplatePlaceholderService();
         var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),

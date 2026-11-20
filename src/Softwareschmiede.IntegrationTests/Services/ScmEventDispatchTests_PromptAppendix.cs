@@ -25,12 +25,12 @@ public sealed class ScmEventDispatchTests_PromptAppendix
         await fixture.InitializeAsync();
         using (var scope = fixture.Services.CreateScope())
         {
-            var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "ALLGEMEIN", TestContext.Current.CancellationToken);
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendIssueKey, "ISSUE", TestContext.Current.CancellationToken);
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendIssueCommentKey, "ISSUE_KOMMENTAR", TestContext.Current.CancellationToken);
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestKey, "PR", TestContext.Current.CancellationToken);
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendPullRequestCommentKey, "PR_KOMMENTAR", TestContext.Current.CancellationToken);
+            var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+            await settings.SetSettingAsync(AppSettingService.ScmPromptAppendGeneralKey, "ALLGEMEIN", TestContext.Current.CancellationToken);
+            await settings.SetSettingAsync(AppSettingService.ScmPromptAppendIssueKey, "ISSUE", TestContext.Current.CancellationToken);
+            await settings.SetSettingAsync(AppSettingService.ScmPromptAppendIssueCommentKey, "ISSUE_KOMMENTAR", TestContext.Current.CancellationToken);
+            await settings.SetSettingAsync(AppSettingService.ScmPromptAppendPullRequestKey, "PR", TestContext.Current.CancellationToken);
+            await settings.SetSettingAsync(AppSettingService.ScmPromptAppendPullRequestCommentKey, "PR_KOMMENTAR", TestContext.Current.CancellationToken);
         }
 
         var cases = new (ScmReferenceKind Kind, ScmContentKind Content, string Expected)[]
@@ -89,9 +89,9 @@ public sealed class ScmEventDispatchTests_PromptAppendix
         await fixture.InitializeAsync();
         using (var scope = fixture.Services.CreateScope())
         {
-            var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "  ALLGEMEIN  ", TestContext.Current.CancellationToken);
-            await einstellungen.SetSettingAsync(AppEinstellungService.ScmPromptAppendIssueCommentKey, "   ", TestContext.Current.CancellationToken);
+            var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+            await settings.SetSettingAsync(AppSettingService.ScmPromptAppendGeneralKey, "  ALLGEMEIN  ", TestContext.Current.CancellationToken);
+            await settings.SetSettingAsync(AppSettingService.ScmPromptAppendIssueCommentKey, "   ", TestContext.Current.CancellationToken);
         }
         var (_, eventId) = await fixture.AddAsync(configured: true);
 
@@ -110,8 +110,8 @@ public sealed class ScmEventDispatchTests_PromptAppendix
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.ScmPromptAppendGeneralKey, "ALLGEMEIN", TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetSettingAsync(AppSettingService.ScmPromptAppendGeneralKey, "ALLGEMEIN", TestContext.Current.CancellationToken);
         var (_, eventId) = await fixture.AddAsync(configured: true);
 
         await fixture.DispatchAsync(eventId);

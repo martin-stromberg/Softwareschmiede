@@ -55,7 +55,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
     }
 
     /// <summary>Gibt an, ob ein neueres Programmupdate verfügbar ist.</summary>
-    public bool UpdateVerfuegbar
+    public bool UpdateAvailable
     {
         get => _updateVerfuegbar;
         private set => SetProperty(ref _updateVerfuegbar, value, RelayCommand.Refresh);
@@ -91,14 +91,14 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
 
     /// <summary>Tooltip der Prüfen-Schaltfläche; begründet die Deaktivierung im Modus „Aus".</summary>
     public string UpdatePruefenTooltip
-        => _aktuelleUpdateEinstellungen is { Mode: UpdateMode.Aus }
+        => _aktuelleUpdateEinstellungen is { Mode: UpdateMode.Off }
             ? "Update-Prüfung ist in den Einstellungen deaktiviert."
             : "Auf Programmupdate prüfen";
 
     /// <summary>Gibt an, ob eine manuelle Update-Prüfung aktuell gestartet werden kann.</summary>
     public bool KannPruefen()
         => _updateService is not null
-           && _aktuelleUpdateEinstellungen is { Mode: not UpdateMode.Aus }
+           && _aktuelleUpdateEinstellungen is { Mode: not UpdateMode.Off }
            && !UpdateCheckLaeuft
            && !UpdateWirdVorbereitet;
 
@@ -108,8 +108,8 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
            && _cliUpdateSafetyService is not null
            && _updateProgressDialogService is not null
            && _dialogService is not null
-           && _aktuelleUpdateEinstellungen is { Mode: not UpdateMode.Aus }
-           && UpdateVerfuegbar
+           && _aktuelleUpdateEinstellungen is { Mode: not UpdateMode.Off }
+           && UpdateAvailable
            && !UpdateCheckLaeuft
            && !UpdateWirdVorbereitet;
 
@@ -128,7 +128,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
             Interlocked.Increment(ref _updateSettingsGeneration);
             CancelLaufendenUpdateAblauf();
             VerfuegbaresUpdate = null;
-            UpdateVerfuegbar = false;
+            UpdateAvailable = false;
             UpdateHinweis = null;
         }
 
@@ -176,8 +176,8 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
 
             ApplyUpdateCheckResult(result, isManualRefresh: false);
 
-            if (settings.Mode == UpdateMode.BeiProgrammstartPruefenUndAusfuehren
-                && result.Status == UpdateCheckStatus.UpdateVerfuegbar
+            if (settings.Mode == UpdateMode.CheckAndRunAtStartup
+                && result.Status == UpdateCheckStatus.UpdateAvailable
                 && result.Update is not null)
             {
                 await InstalliereUpdateAsync(result.Update, settings, generation, token);
@@ -222,7 +222,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
                 return;
 
             ApplyUpdateCheckResult(checkResult, isManualRefresh: false);
-            if (checkResult.Status != UpdateCheckStatus.UpdateVerfuegbar || checkResult.Update is null)
+            if (checkResult.Status != UpdateCheckStatus.UpdateAvailable || checkResult.Update is null)
                 return;
 
             await InstalliereUpdateAsync(checkResult.Update, settings, generation, token);
@@ -259,7 +259,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
                 return;
             }
 
-            if (settings.Mode == UpdateMode.Aus)
+            if (settings.Mode == UpdateMode.Off)
             {
                 UpdateAngebotEntfernen();
                 return;
@@ -279,7 +279,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
                 UpdateCheckLaeuft = false;
             // BeendeVersuch muss vor der Gate-Freigabe liegen: Sonst kann der nächste Versuch
             // beginnen, bevor dieser Versuch AktuellerVersuch zurückgesetzt hat.
-            _versuchProtokoll?.BeendeVersuch(versuchArt, UpdateVerfuegbar, UpdateHinweis);
+            _versuchProtokoll?.BeendeVersuch(versuchArt, UpdateAvailable, UpdateHinweis);
             _updateGate.Release();
         }
     }
@@ -378,8 +378,8 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         try
         {
             using var scope = _serviceProvider.CreateScope();
-            var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            var settings = await einstellungService.GetUpdateSettingsAsync(ct);
+            var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+            var settings = await settingService.GetUpdateSettingsAsync(ct);
             _aktuelleUpdateEinstellungen = settings;
             OnPropertyChanged(nameof(UpdatePruefenTooltip));
             return settings;
@@ -407,22 +407,22 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
     private void UpdateAngebotEntfernen()
     {
         VerfuegbaresUpdate = null;
-        UpdateVerfuegbar = false;
+        UpdateAvailable = false;
     }
 
     private void ApplyUpdateCheckResult(UpdateCheckResult result, bool isManualRefresh)
     {
-        if (result.Status == UpdateCheckStatus.UpdateVerfuegbar && result.Update is not null)
+        if (result.Status == UpdateCheckStatus.UpdateAvailable && result.Update is not null)
         {
             VerfuegbaresUpdate = result.Update;
-            UpdateVerfuegbar = true;
+            UpdateAvailable = true;
             UpdateHinweis = result.Message;
             return;
         }
 
         VerfuegbaresUpdate = null;
-        UpdateVerfuegbar = false;
-        UpdateHinweis = result.Status == UpdateCheckStatus.NichtPruefbar || isManualRefresh
+        UpdateAvailable = false;
+        UpdateHinweis = result.Status == UpdateCheckStatus.NotCheckable || isManualRefresh
             ? result.Message
             : null;
     }

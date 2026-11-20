@@ -37,7 +37,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         var observation = ScmEventStore.Observation(item);
         Assert.Equal(7, observation.Reference.Number);
-        Assert.Equal(ScmKontoModus.SeparatesKonto, observation.Reference.Repository.Konto);
+        Assert.Equal(ScmKontoModus.SeparatesKonto, observation.Reference.Repository.Account);
         Assert.NotEqual(Guid.Empty, item.WorkItemId);
         fixture.Git.As<IScmEventSource>().Verify(x => x.EnumerateReferencesAsync(
             It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -225,7 +225,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
             .Returns((ScmRepositoryContext context, CancellationToken _) => Task.FromResult(
-                (context.RepositoryId.Contains("ghe-b") ? repositoryB : repositoryA) with { Konto = context.Konto }));
+                (context.RepositoryId.Contains("ghe-b") ? repositoryB : repositoryA) with { Account = context.Account }));
         fixture.Git.As<IScmNotificationSource>().Setup(x => x.EnumerateNotificationsAsync(
                 It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .Returns((string host, DateTimeOffset? _, CancellationToken _) =>
@@ -266,7 +266,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
             .Returns((ScmRepositoryContext context, CancellationToken _) =>
-                Task.FromResult(fixture.Repository with { Konto = context.Konto }));
+                Task.FromResult(fixture.Repository with { Account = context.Account }));
 
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -280,7 +280,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         => fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
             .Returns((ScmRepositoryContext context, CancellationToken _) =>
-                Task.FromResult(ScmDispatchFixture.BotRepository with { Konto = context.Konto }));
+                Task.FromResult(ScmDispatchFixture.BotRepository with { Account = context.Account }));
 
     private static async Task AddRepositoryAsync(ScmDispatchFixture fixture,
         string repositoryUrl = "https://github.com/owner/repo", string repositoryName = "repo")

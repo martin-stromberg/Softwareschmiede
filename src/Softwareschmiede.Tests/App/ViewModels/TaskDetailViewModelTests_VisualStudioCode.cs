@@ -22,10 +22,10 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
     [Fact]
     public async Task OeffneIdeAsync_OhneSolutionMitKonfiguriertemArbeitsverzeichnis_RuftVsCodeMitAufgeloestemPfadAuf()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        Directory.CreateDirectory(Path.Combine(arbeitsverzeichnis, "backend"));
+        var workingDirectory = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(workingDirectory, "backend"));
         var workItem = await ErstelleAufgabeMitRepositoryAsync("backend");
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
@@ -35,7 +35,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
 
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
-        var erwarteterPfad = Path.GetFullPath(Path.Combine(arbeitsverzeichnis, "backend"));
+        var erwarteterPfad = Path.GetFullPath(Path.Combine(workingDirectory, "backend"));
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a =>
                 a.FileName == "code.cmd"
@@ -47,9 +47,9 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
     [Fact]
     public async Task OeffneIdeAsync_OhneSolutionOhneKonfiguration_RuftVsCodeMitRepositoryRootAuf()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
+        var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
@@ -62,7 +62,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a =>
                 a.FileName == "code.cmd"
-                && a.Arguments == $"\"{arbeitsverzeichnis}\"")),
+                && a.Arguments == $"\"{workingDirectory}\"")),
             Times.Once);
     }
 
@@ -70,9 +70,9 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
     [Fact]
     public async Task OeffneIdeAsync_OhneSolutionOhneVsCode_ZeigtFehlermeldung()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
+        var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable);
@@ -90,14 +90,14 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
     [Fact]
     public async Task OeffneIdeAsync_OhneLoesungenImArbeitsverzeichnis_FaelltZuVsCodeZurueck()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
+        var workingDirectory = CreateTempDirectory();
         // .sln im Repository-Root anlegen: darf NICHT gefunden werden, da nur das konfigurierte Unterverzeichnis durchsucht werden darf.
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "RootLoesung.sln"), string.Empty);
-        var unterverzeichnis = Path.Combine(arbeitsverzeichnis, "backend");
+        File.WriteAllText(Path.Combine(workingDirectory, "RootLoesung.sln"), string.Empty);
+        var unterverzeichnis = Path.Combine(workingDirectory, "backend");
         Directory.CreateDirectory(unterverzeichnis);
 
         var workItem = await ErstelleAufgabeMitRepositoryAsync("backend");
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));

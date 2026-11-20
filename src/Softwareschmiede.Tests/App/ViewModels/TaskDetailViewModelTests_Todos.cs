@@ -12,7 +12,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class TaskDetailViewModelTests_Todos : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly AufgabeService _aufgabeService;
+    private readonly WorkItemService _aufgabeService;
     private readonly TodoService _todoService;
     private readonly Guid _projektId = Guid.NewGuid();
 
@@ -21,7 +21,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, _todoService);
+        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, _todoService);
 
         _db.Projects.Add(new Project
         {

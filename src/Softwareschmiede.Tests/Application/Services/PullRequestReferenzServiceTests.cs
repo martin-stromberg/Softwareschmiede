@@ -8,7 +8,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests fuer <see cref="PullRequestReferenzService"/>.</summary>
+/// <summary>Tests fuer <see cref="PullRequestReferenceService"/>.</summary>
 public sealed class PullRequestReferenzServiceTests
 {
     /// <summary>SaveCreatedAsync persistiert eine neue PR-Referenz an der Aufgabe.</summary>
@@ -81,8 +81,8 @@ public sealed class PullRequestReferenzServiceTests
         Assert.Contains(loaded.WorkflowRuns, run => run.ProviderRunId == "2");
     }
 
-    private static PullRequestReferenzService CreateService(SoftwareschmiedeDbContext db)
-        => new(db, TimeProvider.System, NullLogger<PullRequestReferenzService>.Instance);
+    private static PullRequestReferenceService CreateService(SoftwareschmiedeDbContext db)
+        => new(db, TimeProvider.System, NullLogger<PullRequestReferenceService>.Instance);
 
     private static (Project Project, WorkItem WorkItem) AddAufgabe(SoftwareschmiedeDbContext db)
     {

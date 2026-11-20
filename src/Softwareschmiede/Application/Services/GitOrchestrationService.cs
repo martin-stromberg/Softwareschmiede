@@ -9,29 +9,29 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Orchestriert Git-Operationen für Aufgaben.</summary>
 public sealed class GitOrchestrationService
 {
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProjektService _projektService;
-    private readonly ProtokollService _protokollService;
+    private readonly WorkItemService _aufgabeService;
+    private readonly ProjectService _projektService;
+    private readonly LogService _logService;
     private readonly IGitPlugin _gitPlugin;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly ILogger<GitOrchestrationService> _logger;
     private readonly IGitWorkspaceBrowserService? _gitWorkspaceBrowserService;
-    private readonly PullRequestReferenzService? _pullRequestReferenzService;
+    private readonly PullRequestReferenceService? _pullRequestReferenzService;
 
     /// <inheritdoc cref="GitOrchestrationService"/>
     public GitOrchestrationService(
-        AufgabeService aufgabeService,
-        ProjektService projektService,
-        ProtokollService protokollService,
+        WorkItemService aufgabeService,
+        ProjectService projektService,
+        LogService logService,
         IGitPlugin gitPlugin,
         PluginSelectionService pluginSelectionService,
         ILogger<GitOrchestrationService> logger,
         IGitWorkspaceBrowserService? gitWorkspaceBrowserService = null,
-        PullRequestReferenzService? pullRequestReferenzService = null)
+        PullRequestReferenceService? pullRequestReferenzService = null)
     {
         _aufgabeService = aufgabeService;
         _projektService = projektService;
-        _protokollService = protokollService;
+        _logService = logService;
         _gitPlugin = gitPlugin;
         _pluginSelectionService = pluginSelectionService;
         _logger = logger;
@@ -40,7 +40,7 @@ public sealed class GitOrchestrationService
     }
 
     /// <summary>Ruft Issues aus einem Repository ab.</summary>
-    public async Task<IEnumerable<Issue>> IssuesAbrufenAsync(string repositoryId, CancellationToken ct = default)
+    public async Task<IEnumerable<Issue>> FetchIssuesAsync(string repositoryId, CancellationToken ct = default)
     {
         _logger.LogInformation("Issues für Repository '{RepositoryId}' abrufen.", repositoryId);
         return await _gitPlugin.GetIssuesAsync(repositoryId, ct);
@@ -60,7 +60,7 @@ public sealed class GitOrchestrationService
         var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
         await gitPlugin.CommitAsync(workItem.LocalClonePath, message, ct);
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
             $"Commit: {message}",
@@ -83,11 +83,11 @@ public sealed class GitOrchestrationService
         var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
         await gitPlugin.ResetAsync(workItem.LocalClonePath, resetType, targetRef, ct);
 
-        var ziel = targetRef ?? "HEAD";
-        await _protokollService.AddEintragAsync(
+        var target = targetRef ?? "HEAD";
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
-            $"Reset ({resetType}) auf {ziel}",
+            $"Reset ({resetType}) auf {target}",
             ct: ct);
 
         _logger.LogInformation("Reset ({ResetType}) für Aufgabe {AufgabeId} durchgeführt.", resetType, workItemId);
@@ -110,7 +110,7 @@ public sealed class GitOrchestrationService
         var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
         await gitPlugin.PushBranchAsync(workItem.LocalClonePath, workItem.BranchName, ct);
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
             $"Push: Branch '{workItem.BranchName}' gepusht.",
@@ -137,7 +137,7 @@ public sealed class GitOrchestrationService
             ? "Pull: Kein Merge durchgeführt. Arbeitsverzeichnis wurde per Dateisynchronisation aktualisiert."
             : "Pull: Änderungen vom Remote geholt.";
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
             pullLogText,
@@ -160,7 +160,7 @@ public sealed class GitOrchestrationService
         var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
         await gitPlugin.MergeToSourceAsync(workItem.LocalClonePath, ct);
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
             "Merge: Änderungen aus dem Arbeitsverzeichnis ins Quellverzeichnis übernommen.",
@@ -180,7 +180,7 @@ public sealed class GitOrchestrationService
     }
 
     /// <summary>Erstellt einen Pull Request und protokolliert die Aktion.</summary>
-    public async Task<PullRequest> PullRequestErstellenAsync(
+    public async Task<PullRequest> CreatePullRequestAsync(
         Guid workItemId,
         string? title = null,
         string? body = null,
@@ -218,13 +218,13 @@ public sealed class GitOrchestrationService
             ? $" (Issue #{issueNummer.Value}, Auto-Close aktiv)"
             : string.Empty;
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
             $"Push: Branch '{workItem.BranchName}' vor Pull-Request-Erstellung gepusht.",
             ct: ct);
 
-        await _protokollService.AddEintragAsync(
+        await _logService.AddEntryAsync(
             workItemId,
             LogEntryType.GitAction,
             $"Pull Request erstellt: #{pullRequest.Nummer} – {pullRequest.Title} ({pullRequest.Url}){issueLogSuffix}",

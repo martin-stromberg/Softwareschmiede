@@ -5,14 +5,14 @@ namespace Softwareschmiede.Application.Services.Updates;
 /// <summary>Prüft aktive CLI-Aufgaben vor dem Start eines Programmupdates.</summary>
 public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
 {
-    private readonly AufgabeService _aufgabeService;
-    private readonly KiPluginLimitService _kiPluginLimitService;
+    private readonly WorkItemService _aufgabeService;
+    private readonly AiPluginLimitService _kiPluginLimitService;
     private readonly ILogger<CliUpdateSafetyService> _logger;
 
     /// <inheritdoc cref="CliUpdateSafetyService"/>
     public CliUpdateSafetyService(
-        AufgabeService aufgabeService,
-        KiPluginLimitService kiPluginLimitService,
+        WorkItemService aufgabeService,
+        AiPluginLimitService kiPluginLimitService,
         ILogger<CliUpdateSafetyService> logger)
     {
         _aufgabeService = aufgabeService;
@@ -48,7 +48,7 @@ public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
                     return false;
                 }
 
-                return AufgabeLaufAktivitaet.IstAktiv(a.ActiveRunId, a.LastHeartbeatUtc, now);
+                return WorkItemRunActivity.IstAktiv(a.ActiveRunId, a.LastHeartbeatUtc, now);
             })
             .Select(a => $"{a.Title} ({a.Id})")
             .ToList();

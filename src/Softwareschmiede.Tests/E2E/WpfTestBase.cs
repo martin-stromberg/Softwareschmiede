@@ -94,7 +94,7 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Löscht die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/>, falls sie existiert.
+    /// Löscht die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.RecordingProcessStarter"/>, falls sie existiert.
     /// Verhindert, dass Einträge aus vorherigen Testläufen die Substring-Prüfungen von
     /// <see cref="WaitForProzessStartEintragAsync"/> verfälschen.
     /// </summary>
@@ -108,10 +108,10 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Löst den Pfad der Prozessstart-Logdatei für die Testdatenbank dieser Instanz auf.</summary>
     /// <returns>Der Pfad zur Prozessstart-Logdatei.</returns>
     protected string ResolveProzessStartLogPfad()
-        => AufzeichnenderProzessStarter.ResolveLogDateiPfad(_testDbPath);
+        => RecordingProcessStarter.ResolveLogFilePath(_testDbPath);
 
     /// <summary>
-    /// Löscht die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderSystemShutdownService"/>, falls sie existiert.
+    /// Löscht die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.RecordingSystemShutdownService"/>, falls sie existiert.
     /// Verhindert, dass Einträge aus vorherigen Testläufen die Substring-Prüfungen von
     /// <see cref="WaitForSystemShutdownEintragAsync"/> verfälschen.
     /// </summary>
@@ -125,13 +125,13 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Löst den Pfad der System-Shutdown-Logdatei für die Testdatenbank dieser Instanz auf.</summary>
     /// <returns>Der Pfad zur System-Shutdown-Logdatei.</returns>
     protected string ResolveSystemShutdownLogPfad()
-        => AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(_testDbPath);
+        => RecordingSystemShutdownService.ResolveLogFilePath(_testDbPath);
 
     /// <summary>
-    /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderSystemShutdownService"/> einen
+    /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.RecordingSystemShutdownService"/> einen
     /// Eintrag enthält, der <paramref name="substring"/> enthält. Voraussetzung: die App läuft im Testmodus
     /// (<see cref="LaunchApp"/> wurde aufgerufen), sodass <c>ISystemShutdownService</c> auf
-    /// <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderSystemShutdownService"/> zeigt.
+    /// <see cref="Softwareschmiede.Infrastructure.Services.RecordingSystemShutdownService"/> zeigt.
     /// </summary>
     /// <param name="substring">Der erwartete Teilstring innerhalb eines Logeintrags (z. B. <c>erzwingen=True</c>).</param>
     /// <param name="timeout">Maximale Wartezeit. Standard: <see cref="Short"/>.</param>
@@ -166,10 +166,10 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/> einen
+    /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.RecordingProcessStarter"/> einen
     /// Eintrag enthält, der <paramref name="substring"/> enthält. Voraussetzung: die App läuft im Testmodus
     /// (<see cref="LaunchApp"/> wurde aufgerufen), sodass <c>IProzessStarter</c> auf
-    /// <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/> zeigt.
+    /// <see cref="Softwareschmiede.Infrastructure.Services.RecordingProcessStarter"/> zeigt.
     /// </summary>
     /// <param name="substring">Der erwartete Teilstring innerhalb eines Logeintrags.</param>
     /// <param name="timeout">Maximale Wartezeit. Standard: <see cref="Short"/>.</param>

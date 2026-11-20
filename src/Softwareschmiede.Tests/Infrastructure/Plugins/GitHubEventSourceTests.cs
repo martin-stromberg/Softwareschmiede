@@ -942,13 +942,13 @@ public sealed class GitHubEventSourceTests
     [Theory]
     [InlineData(ScmKontoModus.Benutzerkonto)]
     [InlineData(ScmKontoModus.SeparatesKonto)]
-    public async Task IssueBodyUpdate_RoutesByReferenceKonto(ScmKontoModus konto)
+    public async Task IssueBodyUpdate_RoutesByReferenceKonto(ScmKontoModus account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();
-        var routed = konto == ScmKontoModus.SeparatesKonto ? agent : user;
-        var idle = konto == ScmKontoModus.SeparatesKonto ? user : agent;
-        var request = new ScmResponseRequest(Issue with { Repository = Repository with { Konto = konto } },
+        var routed = account == ScmKontoModus.SeparatesKonto ? agent : user;
+        var idle = account == ScmKontoModus.SeparatesKonto ? user : agent;
+        var request = new ScmResponseRequest(Issue with { Repository = Repository with { Account = account } },
             "action-1", ScmResponseKind.IssueBodyUpdate, "Neue Beschreibung.");
         Identity(routed);
         routed.Add("issues/7", new { id = 77, body = "alte Beschreibung" });
@@ -1129,7 +1129,7 @@ public sealed class GitHubEventSourceTests
 
         var result = await plugin.GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo", ScmKontoModus.SeparatesKonto), TestContext.Current.CancellationToken);
 
-        Assert.Equal(Repository with { Konto = ScmKontoModus.SeparatesKonto }, result);
+        Assert.Equal(Repository with { Account = ScmKontoModus.SeparatesKonto }, result);
         Assert.Empty(user.Requests);
         Assert.Equal(2, agent.Requests.Count);
     }
@@ -1139,15 +1139,15 @@ public sealed class GitHubEventSourceTests
     [Theory]
     [InlineData(ScmKontoModus.Benutzerkonto)]
     [InlineData(ScmKontoModus.SeparatesKonto)]
-    public async Task ReadEventsAsync_RoutesByReferenceKonto(ScmKontoModus konto)
+    public async Task ReadEventsAsync_RoutesByReferenceKonto(ScmKontoModus account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();
-        var routed = konto == ScmKontoModus.SeparatesKonto ? agent : user;
-        var idle = konto == ScmKontoModus.SeparatesKonto ? user : agent;
+        var routed = account == ScmKontoModus.SeparatesKonto ? agent : user;
+        var idle = account == ScmKontoModus.SeparatesKonto ? user : agent;
         routed.AddGraph(new { repository = new { issue = Node("I_7", "text") } });
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
-        var reference = Issue with { Repository = Repository with { Konto = konto } };
+        var reference = Issue with { Repository = Repository with { Account = account } };
 
         var batch = await plugin.ReadEventsAsync(Read(reference, ScmContentKind.Description), TestContext.Current.CancellationToken);
 
@@ -1161,17 +1161,17 @@ public sealed class GitHubEventSourceTests
     [Theory]
     [InlineData(ScmKontoModus.Benutzerkonto)]
     [InlineData(ScmKontoModus.SeparatesKonto)]
-    public async Task Response_RoutesByReferenceKonto(ScmKontoModus konto)
+    public async Task Response_RoutesByReferenceKonto(ScmKontoModus account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();
-        var routed = konto == ScmKontoModus.SeparatesKonto ? agent : user;
-        var idle = konto == ScmKontoModus.SeparatesKonto ? user : agent;
+        var routed = account == ScmKontoModus.SeparatesKonto ? agent : user;
+        var idle = account == ScmKontoModus.SeparatesKonto ? user : agent;
         Identity(routed);
         routed.Add("comments?", Array.Empty<object>());
         routed.Add("issues/7/comments", new { id = 99, html_url = "https://github.com/owner/repo/issues/7#issuecomment-99" });
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
-        var reference = Issue with { Repository = Repository with { Konto = konto } };
+        var reference = Issue with { Repository = Repository with { Account = account } };
 
         var result = await plugin.ExecuteResponseAsync(new(reference, "action-1", ScmResponseKind.Comment, "Antwort"), TestContext.Current.CancellationToken);
 

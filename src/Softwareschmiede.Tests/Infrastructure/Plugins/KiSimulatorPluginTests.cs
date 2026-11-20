@@ -23,7 +23,7 @@ public sealed class KiSimulatorPluginTests
     {
         _sut.PluginName.Should().Be("KI Simulator");
         _sut.PluginPrefix.Should().Be("Softwareschmiede.KiSimulator");
-        _sut.ProviderDateiPraefix.Should().Be("simulator");
+        _sut.ProviderFilePrefix.Should().Be("simulator");
         _sut.GetSettingGroups().Should().BeEmpty();
     }
 

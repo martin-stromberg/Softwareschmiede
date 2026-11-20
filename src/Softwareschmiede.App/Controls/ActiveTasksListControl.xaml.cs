@@ -83,9 +83,9 @@ public sealed partial class ActiveTasksListControl : UserControl
 
     private void ErstelleAnsicht(object? itemsSource)
     {
-        if (itemsSource is IList liste)
+        if (itemsSource is IList list)
         {
-            _view = new ListCollectionView(liste);
+            _view = new ListCollectionView(list);
             AufgabenListenAnsicht.Konfiguriere(_view, ListenModus);
         }
         else

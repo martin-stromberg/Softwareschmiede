@@ -137,9 +137,9 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public MenuView SetzeAutoShutdownToleranz(string minuten)
     {
-        var feld = WaitForElement(Window, cf => cf.ByAutomationId("AutoShutdownToleranzMinuten"), Medium).AsTextBox();
-        feld.Focus();
-        feld.Text = minuten;
+        var field = WaitForElement(Window, cf => cf.ByAutomationId("AutoShutdownToleranzMinuten"), Medium).AsTextBox();
+        field.Focus();
+        field.Text = minuten;
         return this;
     }
 
@@ -416,11 +416,11 @@ public sealed class MenuView : BaseWindowView
     /// 'AufgabenModus:{modus}'-Umschalter). Fensterweit eindeutig, da die Dashboard-Umschalter
     /// 'DashboardAufgabenModus:*' heißen.
     /// </summary>
-    /// <param name="modus">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
+    /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
     /// <returns>Diese Instanz.</returns>
-    public MenuView SetzeAufgabenListenModus(string modus)
+    public MenuView SetzeAufgabenListenModus(string mode)
     {
-        KlickeAufgabenModusUmschalter(AufgabenModusPraefix, modus);
+        KlickeAufgabenModusUmschalter(AufgabenModusPraefix, mode);
         return this;
     }
 
@@ -581,11 +581,11 @@ public sealed class MenuView : BaseWindowView
             if (zielSichtbar())
                 return;
 
-            var fehlerMeldung = Window.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-            if (fehlerMeldung is not null && !fehlerMeldung.IsOffscreen)
+            var errorMessage = Window.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+            if (errorMessage is not null && !errorMessage.IsOffscreen)
             {
                 throw new InvalidOperationException(
-                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(fehlerMeldung)}");
+                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(errorMessage)}");
             }
 
             if (DateTime.UtcNow >= naechsterKlick)
@@ -687,14 +687,14 @@ public sealed class MenuView : BaseWindowView
     /// Setzt eine Checkbox auf den gewünschten Zustand: wartet auf Sichtbarkeit, klickt bei
     /// Abweichung (ggf. wiederholt) und kehrt erst zurück, wenn <c>IsChecked</c> den Zielzustand
     /// meldet — ein wirkungslos bleibender UIA-Klick wird so erkannt statt erst an späteren,
-    /// nicht zusammenhängenden Asserts aufzuschlagen. Sonderfall <paramref name="ziel"/>
+    /// nicht zusammenhängenden Asserts aufzuschlagen. Sonderfall <paramref name="target"/>
     /// <c>false</c>: Sichtbarkeitsregeln können die Checkbox synchron mit dem Ausschalten aus
     /// dem UIA-Baum kollabieren lassen (z. B. <c>AutoShutdownUiSichtbar</c> bei Anzahl 0 +
     /// Deaktivierung). War sie zuvor sichtbar und verschwindet nun, ist das Ausschalten damit
     /// bereits bewiesen — der Helper wartet nicht vergeblich auf einen lesbaren Zustand.
     /// </summary>
     /// <exception cref="TimeoutException">Die Checkbox wurde nicht rechtzeitig sichtbar oder erreichte den Zielzustand nicht.</exception>
-    private MenuView SetzeCheckBoxZustand(string automationId, bool ziel, string fehlertext)
+    private MenuView SetzeCheckBoxZustand(string automationId, bool target, string fehlertext)
     {
         var deadline = DateTime.UtcNow + Medium;
         var naechsterKlick = DateTime.UtcNow;
@@ -707,7 +707,7 @@ public sealed class MenuView : BaseWindowView
             {
                 // Verschwinden NACH dem ersten Sichtbarwerden beweist bei ziel == false
                 // den ausgeschalteten Zustand (siehe Methoden-Dokumentation).
-                if (!ziel && gefunden)
+                if (!target && gefunden)
                 {
                     return this;
                 }
@@ -730,7 +730,7 @@ public sealed class MenuView : BaseWindowView
                     // UIA-Provider des kollabierenden Elements transient nicht erreichbar.
                 }
 
-                if (zuletztIsChecked == ziel)
+                if (zuletztIsChecked == target)
                 {
                     return this;
                 }
@@ -760,7 +760,7 @@ public sealed class MenuView : BaseWindowView
         }
 
         var diagnose = gefunden
-            ? $" Zuletzt gesehen: IsChecked={zuletztIsChecked?.ToString() ?? "null"}, Ziel={ziel}."
+            ? $" Zuletzt gesehen: IsChecked={zuletztIsChecked?.ToString() ?? "null"}, Ziel={target}."
             : string.Empty;
         throw new TimeoutException(fehlertext + diagnose);
     }

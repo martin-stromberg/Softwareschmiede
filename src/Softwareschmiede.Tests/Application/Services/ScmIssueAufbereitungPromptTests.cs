@@ -11,7 +11,7 @@ public sealed class ScmIssueAufbereitungPromptTests
     [Fact]
     public void Build_BettetTitelUndBeschreibungEin()
     {
-        var prompt = ScmIssueAufbereitungPrompt.Build("Mein Titel", "Meine Beschreibung");
+        var prompt = ScmIssuePreparationPrompt.Build("Mein Titel", "Meine Beschreibung");
 
         prompt.Should().Contain("Mein Titel");
         prompt.Should().Contain("Meine Beschreibung");
@@ -21,7 +21,7 @@ public sealed class ScmIssueAufbereitungPromptTests
     [Fact]
     public void Build_EnthältAlleQualitätskriterien()
     {
-        var prompt = ScmIssueAufbereitungPrompt.Build("T", "B");
+        var prompt = ScmIssuePreparationPrompt.Build("T", "B");
 
         prompt.Should().Contain("Verständlichkeit");
         prompt.Should().Contain("sprachliche Qualität");
@@ -39,7 +39,7 @@ public sealed class ScmIssueAufbereitungPromptTests
     [Fact]
     public void Build_DefiniertAusgabevertrag()
     {
-        var prompt = ScmIssueAufbereitungPrompt.Build("T", "B");
+        var prompt = ScmIssuePreparationPrompt.Build("T", "B");
 
         prompt.Should().Contain("issueBodyUpdate");
         prompt.Should().Contain("comment");
@@ -51,15 +51,15 @@ public sealed class ScmIssueAufbereitungPromptTests
     [Fact]
     public void Build_IstDeterministisch()
     {
-        ScmIssueAufbereitungPrompt.Build("T", "B").Should().Be(ScmIssueAufbereitungPrompt.Build("T", "B"));
-        ScmIssueAufbereitungPrompt.Build(null, null).Should().Be(ScmIssueAufbereitungPrompt.Build(null, null));
+        ScmIssuePreparationPrompt.Build("T", "B").Should().Be(ScmIssuePreparationPrompt.Build("T", "B"));
+        ScmIssuePreparationPrompt.Build(null, null).Should().Be(ScmIssuePreparationPrompt.Build(null, null));
     }
 
     /// <summary>Fehlende Werte degradieren ehrlich statt zu stürzen.</summary>
     [Fact]
     public void Build_LeereWerte_LiefertPlatzhalter()
     {
-        var prompt = ScmIssueAufbereitungPrompt.Build(null, "  ");
+        var prompt = ScmIssuePreparationPrompt.Build(null, "  ");
 
         prompt.Should().Contain("(kein Titel)");
         prompt.Should().Contain("(leer)");

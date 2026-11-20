@@ -64,10 +64,10 @@ public sealed class E2E_RepositoryInitialisierungAusfuehrungTests : WpfTestBase
         var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
         Assert.NotNull(stoppenButton);
 
-        var lokalerKlonPfad = await WaitForLokalerKlonPfadAsync();
-        Assert.False(string.IsNullOrWhiteSpace(lokalerKlonPfad), "Aufgabe hat keinen lokalen Klonpfad erhalten.");
+        var localClonePath = await WaitForLokalerKlonPfadAsync();
+        Assert.False(string.IsNullOrWhiteSpace(localClonePath), "Aufgabe hat keinen lokalen Klonpfad erhalten.");
 
-        var markerPfad = Path.Combine(lokalerKlonPfad!, MarkerDateiName);
+        var markerPfad = Path.Combine(localClonePath!, MarkerDateiName);
         Assert.True(File.Exists(markerPfad), $"Erwartete Marker-Datei '{markerPfad}' wurde vom Initialisierungsskript nicht erzeugt.");
 
         StoppeCliUndRaeumeAuf(mainWindow);

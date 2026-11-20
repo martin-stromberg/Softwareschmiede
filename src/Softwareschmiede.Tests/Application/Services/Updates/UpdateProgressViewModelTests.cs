@@ -27,7 +27,7 @@ public sealed class UpdateProgressViewModelTests
     {
         var sut = new UpdateProgressViewModel();
 
-        sut.Apply(new UpdatePreparationProgress(UpdatePreparationPhase.Verifizieren, null, "Update-Paket wird verifiziert."));
+        sut.Apply(new UpdatePreparationProgress(UpdatePreparationPhase.Verify, null, "Update-Paket wird verifiziert."));
 
         sut.PhaseText.Should().Be("Verifikation");
         sut.IsIndeterminate.Should().BeTrue();

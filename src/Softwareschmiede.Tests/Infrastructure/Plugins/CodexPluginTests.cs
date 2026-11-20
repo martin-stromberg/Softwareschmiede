@@ -28,7 +28,7 @@ public sealed class CodexPluginTests
     {
         _sut.PluginName.Should().Be("Codex CLI");
         _sut.PluginPrefix.Should().Be("Softwareschmiede.Codex");
-        _sut.ProviderDateiPraefix.Should().Be("codex");
+        _sut.ProviderFilePrefix.Should().Be("codex");
         _sut.PluginType.Should().Be(PluginType.DevelopmentAutomation);
 
         var settings = _sut.GetSettingGroups();

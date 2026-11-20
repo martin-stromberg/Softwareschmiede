@@ -23,9 +23,9 @@ namespace Softwareschmiede.Tests.E2E;
 /// </summary>
 public partial class End2EndTest
 {
-    private const string UpdateModusAusLabel = UpdateModusTexte.Aus;
-    private const string UpdateModusNurPruefenLabel = UpdateModusTexte.NurPruefen;
-    private const string UpdateModusStartLabel = UpdateModusTexte.BeiProgrammstartPruefenUndAusfuehren;
+    private const string UpdateModusAusLabel = UpdateModusTexte.Off;
+    private const string UpdateModusNurPruefenLabel = UpdateModusTexte.CheckOnly;
+    private const string UpdateModusStartLabel = UpdateModusTexte.CheckAndRunAtStartup;
     private const string UpdatePfadProduktivLabel = UpdatePfadTexte.Produktivversionen;
     private const string UpdatePfadVorabLabel = UpdatePfadTexte.Vorabversionen;
     private const string UpdateHinweisKanalKonfliktTeil = "passt nicht";
@@ -47,7 +47,7 @@ public partial class End2EndTest
     private async Task Settings_AllModesAndUpdatePfadPersist()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, UpdatePfadKanalResolver.VorabversionenPfad);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Off, UpdatePathChannelResolver.PrereleaseVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -144,10 +144,10 @@ public partial class End2EndTest
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
 
             Assert.Equal(UpdateE2EFixture.RcVersion, menu.WaitForOfferedUpdateVersion(Medium));
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckStarted
-                && DatenText(e, "updatePfad") == UpdatePfadKanalResolver.VorabversionenPfad
-                && DatenText(e, "kanal") == nameof(UpdateKanal.ReleaseCandidate));
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckCompleted
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.UpdateCheckStarted
+                && DatenText(e, "updatePfad") == UpdatePathChannelResolver.PrereleaseVersionsPath
+                && DatenText(e, "kanal") == nameof(UpdateChannel.ReleaseCandidate));
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.UpdateCheckCompleted
                 && DatenText(e, "version") == UpdateE2EFixture.RcVersion
                 && DatenBool(e, "isPrerelease") == true);
             menu.WaitForUpdateHinweis(UpdateHinweisKanalKonfliktTeil, Medium);
@@ -180,7 +180,7 @@ public partial class End2EndTest
     private async Task Startup_ModesDriveUpdatePipeline()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -215,9 +215,9 @@ public partial class End2EndTest
             menu = new MenuView(mainWindow);
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
 
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.HttpRequest
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.HttpRequest
                 && DatenText(e, "url") == UpdateE2EFixture.ReleaseApiUrl);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckCompleted
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.UpdateCheckCompleted
                 && DatenText(e, "status") == "UpdateVerfuegbar"
                 && DatenText(e, "version") == UpdateE2EFixture.StableVersion
                 && DatenBool(e, "isPrerelease") == false);
@@ -230,7 +230,7 @@ public partial class End2EndTest
             await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusStartLabel, UpdatePfadProduktivLabel);
             fixture.AktualisiereSzenario(s =>
             {
-                var paket = s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl);
+                var paket = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
                 paket.StreamGate = UpdateDownloadGate;
                 paket.StreamGateBytes = 128;
             });
@@ -243,7 +243,7 @@ public partial class End2EndTest
             var dialogElement = WaitForWindow("Update vorbereiten", Long);
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.HttpRequestBlocked, Long,
                 filter: e => DatenText(e, "gate") == UpdateDownloadGate);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.HttpResponse
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.HttpResponse
                 && DatenText(e, "url") == UpdateE2EFixture.ReleaseApiUrl);
 
             // Korrekter Owner: Der Fortschrittsdialog gehört dem Hauptfenster.
@@ -291,7 +291,7 @@ public partial class End2EndTest
     private async Task UpdatePfad_SelectsExclusiveChannelAsset()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -324,13 +324,13 @@ public partial class End2EndTest
             // stabile Version ist kanalfremd. Produktive Installation + Vorab-Pfad ergibt
             // den Kanalkonflikt: Angebot bleibt, die Warnung ist nicht blockierend.
             fixture.AktualisiereSzenario(s =>
-                s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Content =
+                s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Content =
                     ErzeugeRcUndHoeheresStableReleaseJson(fixture));
             await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadVorabLabel);
             await PruefeUpdateUeberUiAsync(fixture, menu, basis = ProtokollBasis(fixture),
                 UpdateE2EFixture.RcVersion, isPrerelease: true, UpdatePfadVorabLabel);
             menu.WaitForUpdateHinweis(UpdateHinweisKanalKonfliktTeil, Medium);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateAttemptCompleted
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.UpdateAttemptCompleted
                 && DatenText(e, "versuch") == "pruefen"
                 && (DatenText(e, "hinweis") ?? string.Empty).Contains(UpdateHinweisKanalKonfliktTeil));
 
@@ -367,7 +367,7 @@ public partial class End2EndTest
             AssertiereInstallationsNachweis(fixture, basis,
                 UpdateE2EFixture.RcVersion, fixture.RcDownloadUrl, "rc-marker");
             menu.WaitForUpdateHinweis(UpdateHinweisKanalKonfliktTeil, Medium);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.StartupUpdateCompleted
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.StartupUpdateCompleted
                 && (DatenText(e, "hinweis") ?? string.Empty).Contains(UpdateHinweisKanalKonfliktTeil));
             new UpdateProgressDialogView(mainWindow).Close();
         }
@@ -392,7 +392,7 @@ public partial class End2EndTest
     private async Task SavedChangesInvalidatePreviousOffer()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.NurPruefen, UpdatePfadKanalResolver.VorabversionenPfad);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.CheckOnly, UpdatePathChannelResolver.PrereleaseVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -441,7 +441,7 @@ public partial class End2EndTest
 
             // Laufenden Prüfrequest blockieren; währenddessen "Aus" speichern.
             fixture.AktualisiereSzenario(s =>
-                s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Gate = UpdateReleaseGate);
+                s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Gate = UpdateReleaseGate);
             basis = ProtokollBasis(fixture);
             menu.ClickUpdatePruefen();
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.HttpRequestBlocked, Long,
@@ -460,15 +460,15 @@ public partial class End2EndTest
                 filter: e => DatenText(e, "versuch") == "pruefen");
 
             var phaseEintraege = EintraegeSeit(fixture, basis);
-            Assert.Contains(phaseEintraege, e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckCompleted
+            Assert.Contains(phaseEintraege, e => e.Event == UpdateE2EEreignisse.UpdateCheckCompleted
                 && DatenText(e, "version") == UpdateE2EFixture.RcVersion);
             Assert.Null(menu.GetOfferedUpdateVersion());
             Assert.False(menu.IsUpdateStartButtonVisible());
-            Assert.DoesNotContain(phaseEintraege, e => e.Ereignis == UpdateE2EEreignisse.HttpRequest
+            Assert.DoesNotContain(phaseEintraege, e => e.Event == UpdateE2EEreignisse.HttpRequest
                 && DatenText(e, "art") == "asset");
             AssertKeinUpdateNebenwirkungSeit(fixture, basis);
             fixture.AktualisiereSzenario(s =>
-                s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Gate = null);
+                s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Gate = null);
             fixture.SetzeGateZurueck(UpdateReleaseGate);
 
             // Gleiche DB neu starten: der Modus Aus erzeugt den Nullabruf.
@@ -506,7 +506,7 @@ public partial class End2EndTest
     private async Task Startup_NoUpdateOrUncheckableRemainsUsable()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -525,13 +525,13 @@ public partial class End2EndTest
 
             // Variante: gleiche/ältere Release-Version -> kein Update, keine Nebenwirkungen.
             fixture.AktualisiereSzenario(s =>
-                s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Content =
+                s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Content =
                     ErzeugeReleaseListenJson(fixture, "1.2.0", "1.1.9"));
             basis = ProtokollBasis(fixture);
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckCompleted
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.UpdateCheckCompleted
                 && DatenText(e, "status") == "KeinUpdate");
             Assert.Null(menu.GetUpdateHinweis());
             Assert.False(menu.IsUpdateStartButtonVisible());
@@ -548,7 +548,7 @@ public partial class End2EndTest
             mainWindow = RestartAppPreservingDatabase();
             menu = new MenuView(mainWindow);
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckCompleted
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.UpdateCheckCompleted
                 && DatenText(e, "status") == "NichtPruefbar");
             Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.HttpRequest));
             menu.WaitForUpdateHinweis("Lokale Version", Medium);
@@ -574,9 +574,9 @@ public partial class End2EndTest
             // Variante: Release-HTTP-Fehler -> NichtPruefbar, Hinweis, keine Nebenwirkungen.
             fixture.AktualisiereSzenario(s =>
             {
-                var antwort = s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl);
-                antwort.Status = 500;
-                antwort.Content = "e2e-fehler";
+                var response = s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl);
+                response.Status = 500;
+                response.Content = "e2e-fehler";
             });
             basis = ProtokollBasis(fixture);
             mainWindow = RestartAppPreservingDatabase();
@@ -584,7 +584,7 @@ public partial class End2EndTest
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
             Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.HttpRequest,
                 e => DatenText(e, "url") == UpdateE2EFixture.ReleaseApiUrl));
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckCompleted
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.UpdateCheckCompleted
                 && DatenText(e, "status") == "NichtPruefbar");
             menu.WaitForUpdateHinweis(UpdateHinweisNichtPruefbarTeil, Medium);
             Assert.False(menu.IsUpdateStartButtonVisible());
@@ -595,9 +595,9 @@ public partial class End2EndTest
             // Variante: ungültiges Release-JSON -> NichtPruefbar, Hinweis, keine Nebenwirkungen.
             fixture.AktualisiereSzenario(s =>
             {
-                var antwort = s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl);
-                antwort.Status = 200;
-                antwort.Content = "definitiv kein gueltiges json {{{";
+                var response = s.Answer.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl);
+                response.Status = 200;
+                response.Content = "definitiv kein gueltiges json {{{";
             });
             basis = ProtokollBasis(fixture);
             mainWindow = RestartAppPreservingDatabase();
@@ -605,7 +605,7 @@ public partial class End2EndTest
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
             Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.HttpRequest,
                 e => DatenText(e, "url") == UpdateE2EFixture.ReleaseApiUrl));
-            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckCompleted
+            Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.UpdateCheckCompleted
                 && DatenText(e, "status") == "NichtPruefbar");
             menu.WaitForUpdateHinweis(UpdateHinweisNichtPruefbarTeil, Medium);
             Assert.False(menu.IsUpdateStartButtonVisible());
@@ -638,7 +638,7 @@ public partial class End2EndTest
     private async Task Startup_SafetyCancelAndErrorsRemainUsable()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -672,7 +672,7 @@ public partial class End2EndTest
             // (d) Gültige Vorbereitung, Launcherfehler: ein Versuch, kein erfolgreicher Start,
             // kein Shutdown.
             (mainWindow, menu) = await LauncherFehlerPhaseAsync(fixture);
-            fixture.AktualisiereSzenario(s => s.ProzessStart = new UpdateE2EProzessStart { Ergebnis = "Erfolg" });
+            fixture.AktualisiereSzenario(s => s.ProzessStart = new UpdateE2EProzessStart { Result = "Erfolg" });
 
             // (c4) Primärer Asset-Abruf 5xx, einmaliger Fallback auf die API-Asset-URL:
             // die Installation läuft vollständig durch.
@@ -747,7 +747,7 @@ public partial class End2EndTest
     {
         fixture.AktualisiereSzenario(s =>
         {
-            var paket = s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl);
+            var paket = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
             paket.StreamGate = UpdateDownloadGate;
             paket.StreamGateBytes = 128;
         });
@@ -778,7 +778,7 @@ public partial class End2EndTest
         fixture.AktualisiereSzenario(s =>
         {
             s.CliSicherheit = new UpdateE2ECliSicherheit { Active = false };
-            s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl).StreamGate = null;
+            s.Answer.Single(a => a.Url == fixture.StableDownloadUrl).StreamGate = null;
         });
         await PruefeSettingsBedienbarAsync(fixture, menu);
         Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateAttemptStarted));
@@ -795,8 +795,8 @@ public partial class End2EndTest
     {
         fixture.AktualisiereSzenario(s =>
         {
-            s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl).Status = 500;
-            s.Antworten.Single(a => a.Url == UpdateE2EFixture.StableAssetApiUrl).Status = 500;
+            s.Answer.Single(a => a.Url == fixture.StableDownloadUrl).Status = 500;
+            s.Answer.Single(a => a.Url == UpdateE2EFixture.StableAssetApiUrl).Status = 500;
         });
         var basis = ProtokollBasis(fixture);
         var mainWindow = RestartAppPreservingDatabase();
@@ -830,10 +830,10 @@ public partial class End2EndTest
         File.WriteAllText(defektesPaket, "E2E: kein gueltiges ZIP");
         fixture.AktualisiereSzenario(s =>
         {
-            var antwort = s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl);
-            antwort.Status = 200;
-            antwort.BodyDatei = Path.GetRelativePath(fixture.Testwurzel, defektesPaket);
-            s.Antworten.Single(a => a.Url == fixture.StableManifestDownloadUrl).Content =
+            var response = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
+            response.Status = 200;
+            response.BodyDatei = Path.GetRelativePath(fixture.Testwurzel, defektesPaket);
+            s.Answer.Single(a => a.Url == fixture.StableManifestDownloadUrl).Content =
                 UpdateE2EFixture.ErzeugeManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, defektesPaket);
         });
         var basis = ProtokollBasis(fixture);
@@ -861,10 +861,10 @@ public partial class End2EndTest
         UpdateE2EFixture.ErstellePaketZip(manipuliertesPaket, UpdateE2EFixture.StableVersion, "manipulierter-marker");
         fixture.AktualisiereSzenario(s =>
         {
-            var antwort = s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl);
-            antwort.Status = 200;
-            antwort.BodyDatei = Path.GetRelativePath(fixture.Testwurzel, manipuliertesPaket);
-            s.Antworten.Single(a => a.Url == fixture.StableManifestDownloadUrl).Content =
+            var response = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
+            response.Status = 200;
+            response.BodyDatei = Path.GetRelativePath(fixture.Testwurzel, manipuliertesPaket);
+            s.Answer.Single(a => a.Url == fixture.StableManifestDownloadUrl).Content =
                 UpdateE2EFixture.ErzeugeManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, fixture.StableZipPfad);
         });
         var basis = ProtokollBasis(fixture);
@@ -894,9 +894,9 @@ public partial class End2EndTest
     {
         fixture.AktualisiereSzenario(s =>
         {
-            var antwort = s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl);
-            antwort.BodyDatei = Path.GetRelativePath(fixture.Testwurzel, fixture.StableZipPfad);
-            s.ProzessStart = new UpdateE2EProzessStart { Ergebnis = "Fehler" };
+            var response = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
+            response.BodyDatei = Path.GetRelativePath(fixture.Testwurzel, fixture.StableZipPfad);
+            s.ProzessStart = new UpdateE2EProzessStart { Result = "Fehler" };
         });
         var basis = ProtokollBasis(fixture);
         var mainWindow = RestartAppPreservingDatabase();
@@ -906,7 +906,7 @@ public partial class End2EndTest
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
         Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateStartAttempt));
         var launcherFehler = Assert.Single(EintraegeSeit(fixture, basis),
-            e => e.Ereignis == UpdateE2EEreignisse.UpdateProcessStartRecorded);
+            e => e.Event == UpdateE2EEreignisse.UpdateProcessStartRecorded);
         Assert.Equal("Fehler", DatenText(launcherFehler, "result"));
         Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateStartFailed));
         Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateStartSucceeded));
@@ -929,8 +929,8 @@ public partial class End2EndTest
     {
         fixture.AktualisiereSzenario(s =>
         {
-            s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl).Status = 500;
-            s.Antworten.Single(a => a.Url == UpdateE2EFixture.StableAssetApiUrl).Status = 200;
+            s.Answer.Single(a => a.Url == fixture.StableDownloadUrl).Status = 500;
+            s.Answer.Single(a => a.Url == UpdateE2EFixture.StableAssetApiUrl).Status = 200;
         });
         var basis = ProtokollBasis(fixture);
         var mainWindow = RestartAppPreservingDatabase();
@@ -943,35 +943,35 @@ public partial class End2EndTest
             [UpdateE2EFixture.StableAssetApiUrl]);
         fortschritt.Close();
         fixture.AktualisiereSzenario(s =>
-            s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl).Status = 200);
+            s.Answer.Single(a => a.Url == fixture.StableDownloadUrl).Status = 200);
         return (mainWindow, menu);
     }
 
     /// <summary>
     /// E-06 T-09 automatisch: Einen Startversuch mit aktivem Lesefehler an der Grenze
-    /// <paramref name="grenze"/> durchlaufen und die grenzabhängigen Nachweise prüfen.
+    /// <paramref name="limit"/> durchlaufen und die grenzabhängigen Nachweise prüfen.
     /// </summary>
     /// <param name="fixture">Die Update-Fixture.</param>
-    /// <param name="grenze">Die Lesegrenze (<c>Initial</c>, <c>BeforePreparation</c>, <c>BeforeUpdaterStart</c>).</param>
+    /// <param name="limit">Die Lesegrenze (<c>Initial</c>, <c>BeforePreparation</c>, <c>BeforeUpdaterStart</c>).</param>
     /// <param name="ordinal">Die erwartete Ordnungszahl des blockierten Reads.</param>
     /// <param name="erwarteReleaseAbruf">Ob der Releaseabruf vor dem Lesefehler gelaufen ist.</param>
     /// <param name="erwarteVorbereitung">Ob die Vorbereitung vor dem Lesefehler abgeschlossen war.</param>
     /// <param name="erwarteDialogFehler">Ob der Fehler im Fortschrittsdialog statt im Hinweistext erscheint.</param>
     /// <returns>Das neue Hauptfenster und das Navigationsmenü.</returns>
     private async Task<(Window MainWindow, MenuView Menu)> T09StartupPhaseAsync(
-        UpdateE2EFixture fixture, string grenze, int ordinal,
+        UpdateE2EFixture fixture, string limit, int ordinal,
         bool erwarteReleaseAbruf, bool erwarteVorbereitung, bool erwarteDialogFehler)
     {
-        var (mainWindow, basis) = await LesefehlerStartupVarianteStartenAsync(fixture, grenze, ordinal);
+        var (mainWindow, basis) = await LesefehlerStartupVarianteStartenAsync(fixture, limit, ordinal);
         var menu = new MenuView(mainWindow);
 
         if (erwarteVorbereitung)
         {
             var letzterRead = EintraegeSeit(fixture, basis)
-                .Last(e => e.Ereignis == UpdateE2EEreignisse.UpdateSettingsReadReached
+                .Last(e => e.Event == UpdateE2EEreignisse.UpdateSettingsReadReached
                     && DatenText(e, "versuch") == "startup" && DatenZahl(e, "ordinal") == ordinal);
             Assert.True(EintraegeSeit(fixture, basis)
-                    .Single(e => e.Ereignis == UpdateE2EEreignisse.PreparationCompleted).Seq < letzterRead.Seq,
+                    .Single(e => e.Event == UpdateE2EEreignisse.PreparationCompleted).Seq < letzterRead.Seq,
                 "Der Read an der Grenze muss erst nach PreparationCompleted erfolgen.");
         }
 
@@ -1036,18 +1036,18 @@ public partial class End2EndTest
 
     /// <summary>
     /// E-06 T-09 manuell beim Startversuch: Nach erfolgreicher Prüfung wird der Startversuch
-    /// an der Lesegrenze <paramref name="grenze"/> blockiert und schlägt fehl - der
+    /// an der Lesegrenze <paramref name="limit"/> blockiert und schlägt fehl - der
     /// Fortschrittsdialog zeigt den Lesefehler, ohne unerlaubte Folgeschritte.
     /// </summary>
     /// <param name="fixture">Die Update-Fixture.</param>
     /// <param name="menu">Das Navigationsmenü.</param>
-    /// <param name="grenze">Die Lesegrenze (<c>BeforePreparation</c>, <c>BeforeUpdaterStart</c>).</param>
+    /// <param name="limit">Die Lesegrenze (<c>BeforePreparation</c>, <c>BeforeUpdaterStart</c>).</param>
     /// <param name="ordinal">Die erwartete Ordnungszahl des blockierten Reads.</param>
     /// <param name="erwarteVorbereitung">Ob die Vorbereitung vor dem Lesefehler abgeschlossen war.</param>
     private async Task T09ManuellStartenPhaseAsync(
-        UpdateE2EFixture fixture, MenuView menu, string grenze, int ordinal, bool erwarteVorbereitung)
+        UpdateE2EFixture fixture, MenuView menu, string limit, int ordinal, bool erwarteVorbereitung)
     {
-        fixture.AktiviereLesefehler(grenze, versuch: "starten");
+        fixture.AktiviereLesefehler(limit, versuch: "starten");
         var basis = ProtokollBasis(fixture);
         menu.ClickUpdatePruefen();
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.UpdateAttemptCompleted, Long,
@@ -1060,13 +1060,13 @@ public partial class End2EndTest
         if (erwarteVorbereitung)
         {
             Assert.True(EintraegeSeit(fixture, basis)
-                    .Single(e => e.Ereignis == UpdateE2EEreignisse.PreparationCompleted).Seq < letzterRead.Seq,
+                    .Single(e => e.Event == UpdateE2EEreignisse.PreparationCompleted).Seq < letzterRead.Seq,
                 "Der BeforeUpdaterStart-Read muss erst nach PreparationCompleted erfolgen.");
         }
 
         fixture.OeffneGate(UpdateE2ETestKontext.LesefehlerGateName);
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.UpdateSettingsReadFailed, Long,
-            filter: e => DatenText(e, "versuch") == "starten" && DatenText(e, "grenze") == grenze);
+            filter: e => DatenText(e, "versuch") == "starten" && DatenText(e, "grenze") == limit);
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.UpdateAttemptCompleted, Long,
             filter: e => DatenText(e, "versuch") == "starten");
         var fortschritt = new UpdateProgressDialogView(menu.Window);
@@ -1096,7 +1096,7 @@ public partial class End2EndTest
     private async Task Startup_IsOnceAndCommandsStayBlocked()
     {
         using var fixture = new UpdateE2EFixture();
-        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad);
+        await fixture.SetzeUpdateEinstellungenAsync(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath);
 
         // Die Protokoll-Basis muss VOR dem Start gezogen werden: Der komplette Startlauf
         // (inkl. StartupUpdateCompleted) kann bereits während des Fenster-Wartens
@@ -1113,7 +1113,7 @@ public partial class End2EndTest
 
             fixture.AktualisiereSzenario(s =>
             {
-                var paket = s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl);
+                var paket = s.Answer.Single(a => a.Url == fixture.StableDownloadUrl);
                 paket.StreamGate = UpdateDownloadGate;
                 paket.StreamGateBytes = 128;
             });
@@ -1146,9 +1146,9 @@ public partial class End2EndTest
             // Freigabe: genau eine Vorbereitung, eine Übergabe, ein Shutdown.
             fixture.OeffneGate(UpdateDownloadGate);
             await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.StartupUpdateCompleted, Long);
-            var eintraege = EintraegeSeit(fixture, basis);
-            Assert.Single(eintraege, e => e.Ereignis == UpdateE2EEreignisse.UpdateAttemptStarted);
-            Assert.Single(eintraege, e => e.Ereignis == UpdateE2EEreignisse.UpdateAttemptCompleted);
+            var entries = EintraegeSeit(fixture, basis);
+            Assert.Single(entries, e => e.Event == UpdateE2EEreignisse.UpdateAttemptStarted);
+            Assert.Single(entries, e => e.Event == UpdateE2EEreignisse.UpdateAttemptCompleted);
             AssertiereInstallationsNachweis(fixture, basis,
                 UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, "stable-marker");
             fortschritt.Close();
@@ -1178,20 +1178,20 @@ public partial class End2EndTest
     /// starten, auf den blockierten markierten Read warten und das Gate freigeben.
     /// </summary>
     /// <param name="fixture">Die Update-Fixture.</param>
-    /// <param name="grenze">Die Lesegrenze (<c>Initial</c>, <c>BeforePreparation</c>).</param>
+    /// <param name="limit">Die Lesegrenze (<c>Initial</c>, <c>BeforePreparation</c>).</param>
     /// <param name="ordinal">Die erwartete Ordnungszahl des blockierten Reads.</param>
     /// <returns>Das neue Hauptfenster und die Protokoll-Basis der Phase.</returns>
     private async Task<(Window MainWindow, int Basis)> LesefehlerStartupVarianteStartenAsync(
-        UpdateE2EFixture fixture, string grenze, int ordinal)
+        UpdateE2EFixture fixture, string limit, int ordinal)
     {
-        fixture.AktiviereLesefehler(grenze, versuch: "startup");
+        fixture.AktiviereLesefehler(limit, versuch: "startup");
         var basis = ProtokollBasis(fixture);
         var mainWindow = RestartAppPreservingDatabase();
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.UpdateSettingsReadReached, Long,
             filter: e => DatenText(e, "versuch") == "startup" && DatenZahl(e, "ordinal") == ordinal);
         fixture.OeffneGate(UpdateE2ETestKontext.LesefehlerGateName);
         await WarteAufEreignisSeitAsync(fixture, basis, UpdateE2EEreignisse.UpdateSettingsReadFailed, Long,
-            filter: e => DatenText(e, "versuch") == "startup" && DatenText(e, "grenze") == grenze);
+            filter: e => DatenText(e, "versuch") == "startup" && DatenText(e, "grenze") == limit);
         return (mainWindow, basis);
     }
 
@@ -1279,12 +1279,12 @@ public partial class End2EndTest
             filter: e => DatenText(e, "versuch") == "pruefen");
         Assert.Equal(erwarteteVersion, menu.WaitForOfferedUpdateVersion(Medium));
         var erwarteterKanal = erwarteterPfad == UpdatePfadVorabLabel
-            ? nameof(UpdateKanal.ReleaseCandidate)
-            : nameof(UpdateKanal.Produktiv);
-        Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckStarted
+            ? nameof(UpdateChannel.ReleaseCandidate)
+            : nameof(UpdateChannel.Stable);
+        Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.UpdateCheckStarted
             && DatenText(e, "updatePfad") == erwarteterPfad
             && DatenText(e, "kanal") == erwarteterKanal);
-        Assert.Contains(EintraegeSeit(fixture, basis), e => e.Ereignis == UpdateE2EEreignisse.UpdateCheckCompleted
+        Assert.Contains(EintraegeSeit(fixture, basis), e => e.Event == UpdateE2EEreignisse.UpdateCheckCompleted
             && DatenText(e, "status") == "UpdateVerfuegbar"
             && DatenText(e, "version") == erwarteteVersion
             && DatenBool(e, "isPrerelease") == isPrerelease);
@@ -1312,18 +1312,18 @@ public partial class End2EndTest
         UpdateE2EFixture fixture, int basis, string erwarteteVersion, string erwarteteDownloadUrl,
         string erwarteterMarker, IReadOnlyList<string>? weitereErwarteteAssetUrls = null)
     {
-        var eintraege = EintraegeSeit(fixture, basis);
+        var entries = EintraegeSeit(fixture, basis);
 
         var erwarteteAssetUrls = new List<string?> { erwarteteDownloadUrl };
         if (weitereErwarteteAssetUrls is not null)
             erwarteteAssetUrls.AddRange(weitereErwarteteAssetUrls);
-        Assert.Equal(erwarteteAssetUrls, eintraege
-            .Where(e => e.Ereignis == UpdateE2EEreignisse.HttpRequest && DatenText(e, "art") == "asset")
+        Assert.Equal(erwarteteAssetUrls, entries
+            .Where(e => e.Event == UpdateE2EEreignisse.HttpRequest && DatenText(e, "art") == "asset")
             .Select(e => DatenText(e, "url"))
             .ToList());
 
-        var vorbereitung = Assert.Single(eintraege,
-            e => e.Ereignis == UpdateE2EEreignisse.PreparationCompleted);
+        var vorbereitung = Assert.Single(entries,
+            e => e.Event == UpdateE2EEreignisse.PreparationCompleted);
         var extractedDirectory = DatenText(vorbereitung, "extractedDirectory");
         Assert.NotNull(extractedDirectory);
         Assert.Equal(erwarteteVersion,
@@ -1336,11 +1336,11 @@ public partial class End2EndTest
         Assert.NotNull(scriptPfad);
         Assert.True(File.Exists(scriptPfad), $"Update-Skript fehlt: {scriptPfad}");
 
-        var launcher = Assert.Single(eintraege,
-            e => e.Ereignis == UpdateE2EEreignisse.UpdateProcessStartRecorded);
+        var launcher = Assert.Single(entries,
+            e => e.Event == UpdateE2EEreignisse.UpdateProcessStartRecorded);
         Assert.Equal("Erfolg", DatenText(launcher, "result"));
         Assert.Equal(fixture.Testwurzel, DatenText(launcher, "workingDirectory"));
-        var argumente = UpdateE2EFixture.Daten(launcher) is { } launcherDaten
+        var argumente = UpdateE2EFixture.Data(launcher) is { } launcherDaten
             && launcherDaten.TryGetProperty("arguments", out var argsElement)
                 ? argsElement.EnumerateArray().Select(a => a.GetString()).ToList()
                 : [];
@@ -1349,9 +1349,9 @@ public partial class End2EndTest
             "Launcher-Argumente enthalten kein -ExtractedDirectory.");
         Assert.Equal(extractedDirectory, argumente[dirIndex + 1]);
 
-        Assert.Single(eintraege, e => e.Ereignis == UpdateE2EEreignisse.UpdateStartAttempt);
-        Assert.Single(eintraege, e => e.Ereignis == UpdateE2EEreignisse.UpdateStartSucceeded);
-        var shutdown = Assert.Single(eintraege, e => e.Ereignis == UpdateE2EEreignisse.ShutdownRequested);
+        Assert.Single(entries, e => e.Event == UpdateE2EEreignisse.UpdateStartAttempt);
+        Assert.Single(entries, e => e.Event == UpdateE2EEreignisse.UpdateStartSucceeded);
+        var shutdown = Assert.Single(entries, e => e.Event == UpdateE2EEreignisse.ShutdownRequested);
         Assert.True(shutdown.Seq > launcher.Seq,
             "ShutdownRequested muss nach dem aufgezeichneten Launcher-Start protokolliert sein.");
     }
@@ -1365,12 +1365,12 @@ public partial class End2EndTest
     private static void AssertKeinUpdateNebenwirkungSeit(
         UpdateE2EFixture fixture, int basis, bool erlaubeVorbereitung = false)
     {
-        var eintraege = EintraegeSeit(fixture, basis);
+        var entries = EintraegeSeit(fixture, basis);
         if (!erlaubeVorbereitung)
-            Assert.DoesNotContain(eintraege, e => e.Ereignis == UpdateE2EEreignisse.PreparationCompleted);
-        Assert.DoesNotContain(eintraege, e => e.Ereignis == UpdateE2EEreignisse.UpdateStartAttempt);
-        Assert.DoesNotContain(eintraege, e => e.Ereignis == UpdateE2EEreignisse.UpdateProcessStartRecorded);
-        Assert.DoesNotContain(eintraege, e => e.Ereignis == UpdateE2EEreignisse.ShutdownRequested);
+            Assert.DoesNotContain(entries, e => e.Event == UpdateE2EEreignisse.PreparationCompleted);
+        Assert.DoesNotContain(entries, e => e.Event == UpdateE2EEreignisse.UpdateStartAttempt);
+        Assert.DoesNotContain(entries, e => e.Event == UpdateE2EEreignisse.UpdateProcessStartRecorded);
+        Assert.DoesNotContain(entries, e => e.Event == UpdateE2EEreignisse.ShutdownRequested);
     }
 
     /// <summary>Anzahl bisher geschriebener Protokolleinträge (Phasengrenze im JSONL).</summary>
@@ -1383,46 +1383,46 @@ public partial class End2EndTest
 
     /// <summary>Anzahl der Protokolleinträge eines Ereignisnamens seit der Phasengrenze.</summary>
     private static int ZaehleEreignisSeit(
-        UpdateE2EFixture fixture, int basis, string ereignis,
+        UpdateE2EFixture fixture, int basis, string evt,
         Func<UpdateE2EProtokollEintrag, bool>? filter = null)
-        => EintraegeSeit(fixture, basis).Count(e => e.Ereignis == ereignis && (filter?.Invoke(e) ?? true));
+        => EintraegeSeit(fixture, basis).Count(e => e.Event == evt && (filter?.Invoke(e) ?? true));
 
     /// <summary>Wartet auf ein Protokollereignis seit der Phasengrenze.</summary>
     private async Task<IReadOnlyList<UpdateE2EProtokollEintrag>> WarteAufEreignisSeitAsync(
-        UpdateE2EFixture fixture, int basis, string ereignis, TimeSpan timeout,
+        UpdateE2EFixture fixture, int basis, string evt, TimeSpan timeout,
         int mindestens = 1, Func<UpdateE2EProtokollEintrag, bool>? filter = null)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            var treffer = EintraegeSeit(fixture, basis)
-                .Where(e => e.Ereignis == ereignis && (filter?.Invoke(e) ?? true))
+            var match = EintraegeSeit(fixture, basis)
+                .Where(e => e.Event == evt && (filter?.Invoke(e) ?? true))
                 .ToList();
-            if (treffer.Count >= mindestens)
-                return treffer;
+            if (match.Count >= mindestens)
+                return match;
 
             await Task.Delay(100);
         }
 
         throw new TimeoutException(
-            $"Protokollereignis '{ereignis}' (mindestens {mindestens}) seit Basis {basis} erschien nicht " +
+            $"Protokollereignis '{evt}' (mindestens {mindestens}) seit Basis {basis} erschien nicht " +
             $"innerhalb von {timeout.TotalSeconds}s. Ereignisse seit Basis: " +
-            $"{string.Join(", ", EintraegeSeit(fixture, basis).Select(e => e.Ereignis).Distinct())}");
+            $"{string.Join(", ", EintraegeSeit(fixture, basis).Select(e => e.Event).Distinct())}");
     }
 
     /// <summary>Wartet begrenzt auf einen UI-Zustand (gebundene Waits statt fester Sleeps).</summary>
-    private static void WarteAufUiZustand(Func<bool> bedingung, string beschreibung, TimeSpan timeout)
+    private static void WarteAufUiZustand(Func<bool> condition, string description, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            if (bedingung())
+            if (condition())
                 return;
 
             Thread.Sleep(150);
         }
 
-        throw new TimeoutException($"UI-Zustand '{beschreibung}' nicht innerhalb von {timeout.TotalSeconds}s erreicht.");
+        throw new TimeoutException($"UI-Zustand '{description}' nicht innerhalb von {timeout.TotalSeconds}s erreicht.");
     }
 
     /// <summary>
@@ -1477,9 +1477,9 @@ public partial class End2EndTest
         var deadline = DateTime.UtcNow + Medium;
         while (DateTime.UtcNow < deadline)
         {
-            var eintraege = fixture.LeseProtokoll();
-            if (eintraege.Count(e => e.Ereignis == UpdateE2EEreignisse.UpdateAttemptStarted)
-                <= eintraege.Count(e => e.Ereignis == UpdateE2EEreignisse.UpdateAttemptCompleted))
+            var entries = fixture.LeseProtokoll();
+            if (entries.Count(e => e.Event == UpdateE2EEreignisse.UpdateAttemptStarted)
+                <= entries.Count(e => e.Event == UpdateE2EEreignisse.UpdateAttemptCompleted))
                 break;
 
             await Task.Delay(200);

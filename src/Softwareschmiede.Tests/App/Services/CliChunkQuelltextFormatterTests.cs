@@ -13,9 +13,9 @@ public sealed class CliChunkQuelltextFormatterTests
     {
         var input = Encoding.UTF8.GetBytes("a\x1b[31mb\rc\nd\te");
 
-        var ergebnis = CliChunkQuelltextFormatter.Formatiere(input);
+        var result = CliChunkQuelltextFormatter.Formatiere(input);
 
-        ergebnis.Should().Be("a␛[31mb\\rc\\nd\\te");
+        result.Should().Be("a␛[31mb\\rc\\nd\\te");
     }
 
     /// <summary>Sonstige Steuerbytes werden als \xNN (hex, Großbuchstaben) dargestellt.</summary>
@@ -24,9 +24,9 @@ public sealed class CliChunkQuelltextFormatterTests
     {
         var input = new byte[] { 0x00, 0x07, 0x7F };
 
-        var ergebnis = CliChunkQuelltextFormatter.Formatiere(input);
+        var result = CliChunkQuelltextFormatter.Formatiere(input);
 
-        ergebnis.Should().Be("\\x00\\x07\\x7F");
+        result.Should().Be("\\x00\\x07\\x7F");
     }
 
     /// <summary>UTF-8-Mehrbyte-Sequenzen bleiben als Zeichen lesbar.</summary>
@@ -35,9 +35,9 @@ public sealed class CliChunkQuelltextFormatterTests
     {
         var input = Encoding.UTF8.GetBytes("äöü€✓");
 
-        var ergebnis = CliChunkQuelltextFormatter.Formatiere(input);
+        var result = CliChunkQuelltextFormatter.Formatiere(input);
 
-        ergebnis.Should().Be("äöü€✓");
+        result.Should().Be("äöü€✓");
     }
 
     /// <summary>Leere und reine Text-Chunks bleiben unverändert.</summary>

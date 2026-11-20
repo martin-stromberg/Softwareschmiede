@@ -17,7 +17,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 public sealed class ScmBackmergeServiceTests : IDisposable
 {
     private readonly SoftwareschmiedeDbContext _db = TestDbContextFactory.Create();
-    private readonly AppEinstellungService _einstellungen;
+    private readonly AppSettingService _einstellungen;
     private readonly ScmBackmergeService _sut;
     private readonly FakeTimeProvider _time = new(DateTimeOffset.UtcNow);
     private readonly Mock<IGitPlugin> _plugin = new();
@@ -28,7 +28,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     /// <summary>Initialisiert DB, Einstellungen und das lokale Repository mit Basisbranch <c>staging</c>.</summary>
     public ScmBackmergeServiceTests()
     {
-        _einstellungen = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        _einstellungen = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
         _sut = new ScmBackmergeService(_db, _einstellungen, new ScmEventChangeNotifier(),
             _time, Options.Create(new ScmEventOptions()),
             NullLogger<ScmBackmergeService>.Instance);
@@ -66,8 +66,8 @@ public sealed class ScmBackmergeServiceTests : IDisposable
         => _plugin.Setup(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
             .ReturnsAsync(StatusInfo(status, mergeStatus, source, target, isDraft, review, checks));
 
-    private Task EvaluateAsync(params ScmEventReference[] referenzen)
-        => _sut.EvaluateDiscoveredReferencesAsync(_plugin.Object, _remote, referenzen, [_lokal]);
+    private Task EvaluateAsync(params ScmEventReference[] references)
+        => _sut.EvaluateDiscoveredReferencesAsync(_plugin.Object, _remote, references, [_lokal]);
 
     private ScmEventReference Pr(int nummer = 7) => new(_remote, ScmReferenceKind.PullRequest, nummer);
 
@@ -335,9 +335,9 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     {
         await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         await _einstellungen.SetScmBackmergeDraftAktivierungAsync(true, TestContext.Current.CancellationToken);
-        var abfragen = 0;
+        var query = 0;
         _plugin.Setup(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => ++abfragen == 1
+            .ReturnsAsync(() => ++query == 1
                 ? StatusInfo(mergeStatus: PullRequestMergeStatus.Blocked, isDraft: true)
                 : StatusInfo(mergeStatus: PullRequestMergeStatus.Mergeable, isDraft: false));
         _plugin.Setup(x => x.MarkPullRequestReadyAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
@@ -386,9 +386,9 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     public async Task Evaluate_NurReviewBlockiert_GenehmigtUndMergedRegulaer()
     {
         await _einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
-        var abfragen = 0;
+        var query = 0;
         _plugin.Setup(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => ++abfragen == 1
+            .ReturnsAsync(() => ++query == 1
                 ? StatusInfo(mergeStatus: PullRequestMergeStatus.Blocked,
                     review: PullRequestReviewDecision.ReviewRequired, checks: PullRequestChecksState.Success)
                 : StatusInfo(mergeStatus: PullRequestMergeStatus.Mergeable,

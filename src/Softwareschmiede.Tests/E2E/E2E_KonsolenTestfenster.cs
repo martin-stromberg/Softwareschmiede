@@ -12,7 +12,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// Laden von synthetisch erzeugten .clireplay-Dateien über den nativen Öffnen-Dialog, Zeitraffer-,
 /// Pause-/Fortsetzen-, Schrittmodus- (vorwärts/rückwärts) und Neustart-Steuerung sowie Nachweis
 /// der Quell-Chunk-Liste (ohne
-/// ConPTY-Abhängigkeit — die Aufzeichnungen werden direkt über <see cref="CliReplayAufzeichnungStore"/>
+/// ConPTY-Abhängigkeit — die Aufzeichnungen werden direkt über <see cref="CliReplayRecordingStore"/>
 /// erzeugt).
 /// </summary>
 public partial class End2EndTest
@@ -57,7 +57,7 @@ public partial class End2EndTest
     /// <summary>Startet für genau einen Auswahlpfad eine isolierte Aufzeichnung, einen eigenen
     /// Dialog und eine eigene Replay-Session. Damit wird keine Interaktion zwischen Maus- und
     /// Tastaturauswahl als Produktsemantik vorausgesetzt.</summary>
-    private async Task ReplayText_MitFrischerAufzeichnung(Window mainWindow, string pluginName, Action<KonsolenTestDialogView> pruefung)
+    private async Task ReplayText_MitFrischerAufzeichnung(Window mainWindow, string pluginName, Action<KonsolenTestDialogView> check)
     {
         var path = Path.Combine(Path.GetTempPath(), $"softwareschmiede_selection_{Guid.NewGuid():N}.clireplay");
         var prozessstartsVorher = File.Exists(ResolveProzessStartLogPfad())
@@ -66,10 +66,10 @@ public partial class End2EndTest
         KonsolenTestDialogView? dialog = null;
         try
         {
-            var store = new CliReplayAufzeichnungStore();
+            var store = new CliReplayRecordingStore();
             await using (var stream = File.Create(path))
             {
-                await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+                await store.SaveAsync(stream, new CliOutputRecording
                 {
                     WorkItemId = Guid.NewGuid(),
                     PluginName = pluginName,
@@ -95,7 +95,7 @@ public partial class End2EndTest
             dialog.WarteAufStatus($"Aufzeichnung geladen ({pluginName}, 1 Chunks) — bereit.");
             dialog.StartWiedergabe();
             dialog.WarteAufStatus("Wiedergabe beendet.");
-            pruefung(dialog);
+            check(dialog);
 
             // Replay besitzt absichtlich keinen InputStream. Während des gesamten Szenarios
             // darf daher weder eine Live-CLI gestartet noch eine Live-Prozesseingabe ausgelöst
@@ -154,14 +154,14 @@ public partial class End2EndTest
         KonsolenTestDialogView? dialog = null;
         try
         {
-            var store = new CliReplayAufzeichnungStore();
+            var store = new CliReplayRecordingStore();
 
             // Synthetische Aufzeichnung mit zwei getrennten Roh-Chunks (Chunk-Grenzen bleiben
             // sichtbar); Chunk 1 enthält SGR-Farbsequenzen — die Quell-Ansicht muss die
             // Steuersequenzen sichtbar machen (ESC als ␛).
             await using (var stream = File.Create(path))
             {
-                await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+                await store.SaveAsync(stream, new CliOutputRecording
                 {
                     WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Diagnose",
@@ -182,7 +182,7 @@ public partial class End2EndTest
             // Pausieren/Fortsetzen-Phase deterministisch innerhalb der realen Pause auslösen.
             await using (var stream = File.Create(pausePfad))
             {
-                await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+                await store.SaveAsync(stream, new CliOutputRecording
                 {
                     WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Pause",
@@ -204,7 +204,7 @@ public partial class End2EndTest
             // einem Rückwärtsschritt läuft unter Zeitraffer-Schwelle 0 ohne realen Delay ab).
             await using (var stream = File.Create(schrittPfad))
             {
-                await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+                await store.SaveAsync(stream, new CliOutputRecording
                 {
                     WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Schritt",
@@ -227,7 +227,7 @@ public partial class End2EndTest
             // überschüssige Inhalt muss horizontal scrollbar werden.
             await using (var stream = File.Create(breitPfad))
             {
-                await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+                await store.SaveAsync(stream, new CliOutputRecording
                 {
                     WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Breit",
@@ -247,7 +247,7 @@ public partial class End2EndTest
             // es darf keine horizontale Scrollbar entstehen.
             await using (var stream = File.Create(schmalPfad))
             {
-                await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+                await store.SaveAsync(stream, new CliOutputRecording
                 {
                     WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Schmal",
@@ -293,8 +293,8 @@ public partial class End2EndTest
             Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittZurueck"),
                 "an Position 0 muss 'Schritt zurück' deaktiviert sein");
 
-            dialog.SchrittVor();
-            dialog.SchrittVor();
+            dialog.StepForward();
+            dialog.StepForward();
             dialog.WarteAufPosition("Chunk 2/3");
             dialog.WarteAufStatus("Einzelschritt — Chunk 2/3 angewendet.");
             // Die Quell-Selektion muss den zuletzt angewendeten Chunk markieren.
@@ -302,11 +302,11 @@ public partial class End2EndTest
             Assert.True(dialog.IstSchaltflaecheAktiviert("WiedergabeNeustarten"),
                 "aus dem Schrittmodus muss 'Neu starten' als direkter Rückweg zu Position 0 erreichbar sein");
 
-            dialog.SchrittZurueck();
+            dialog.StepBackward();
             dialog.WarteAufPosition("Chunk 1/3");
             dialog.WarteAufStatus("Schritt zurück — Chunk 2/3 zurückgenommen.");
             Assert.Equal(0, dialog.GetSelektierterQuellEintragIndex());
-            dialog.SchrittZurueck();
+            dialog.StepBackward();
             dialog.WarteAufPosition("Chunk 0/3");
             // An Position 0 darf kein Quell-Eintrag selektiert sein.
             Assert.Equal(-1, dialog.GetSelektierterQuellEintragIndex());
@@ -317,15 +317,15 @@ public partial class End2EndTest
 
             // Schrittmodus-Phase 2: bis ans Ende schreiten feuert die Ende-Semantik; danach
             // zurückschreiten und "Abspielen" setzt an der Schrittposition fort (Re-Arm).
-            dialog.SchrittVor();
-            dialog.SchrittVor();
-            dialog.SchrittVor();
+            dialog.StepForward();
+            dialog.StepForward();
+            dialog.StepForward();
             dialog.WarteAufStatus("Wiedergabe beendet.");
             Assert.Equal("Chunk 3/3", dialog.GetPositionsText());
             Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittVor"),
                 "am Ende der Aufzeichnung muss 'Schritt vor' deaktiviert sein");
 
-            dialog.SchrittZurueck();
+            dialog.StepBackward();
             dialog.WarteAufPosition("Chunk 2/3");
             Assert.Equal(1, dialog.GetSelektierterQuellEintragIndex());
 
@@ -383,7 +383,7 @@ public partial class End2EndTest
             dialog.PausierenToggle();
             dialog.WarteAufStatus("Pausiert.");
 
-            dialog.SchrittZurueck();
+            dialog.StepBackward();
             dialog.WarteAufPosition("Chunk 0/2");
             Assert.Equal(-1, dialog.GetSelektierterQuellEintragIndex());
 
@@ -488,7 +488,7 @@ public partial class End2EndTest
             Assert.True(schmalNichtScrollbar,
                 "eine 60×20-Aufzeichnung passt in den Viewport — es darf keine horizontale Scrollbar geben");
 
-            dialog.Schliessen();
+            dialog.Close();
             Assert.False(dialog.IsVisible);
 
             // Nach dem Schließen ist wieder die Einstellungsansicht aktiv.
@@ -524,7 +524,7 @@ public partial class End2EndTest
         try
         {
             if (dialog is not null && dialog.IsVisible)
-                dialog.Schliessen();
+                dialog.Close();
         }
         catch
         {

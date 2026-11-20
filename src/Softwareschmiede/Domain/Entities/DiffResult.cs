@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.Domain.Entities;
@@ -10,13 +11,15 @@ public sealed class DiffResult
     /// <summary>Eindeutige ID des Diff-Ergebnisses.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>ID der zugehörigen Aufgabe (NOT NULL).</summary>
+    /// <summary>ID der zugehörigen Aufgabe (NOT NULL). JSON-Name gepinnt: <c>CachedData</c>-Bestand im DiffCache.</summary>
+    [JsonPropertyName("AufgabeId")]
     public Guid WorkItemId { get; set; }
 
     /// <summary>Optionale ID des Git-Repositories (für Kontext).</summary>
     public Guid? GitRepositoryId { get; set; }
 
-    /// <summary>Optionaler Verweis auf Protokolleintrag (wenn als Ereignis protokolliert).</summary>
+    /// <summary>Optionaler Verweis auf Protokolleintrag (wenn als Ereignis protokolliert). JSON-Name gepinnt.</summary>
+    [JsonPropertyName("ProtokollEintragId")]
     public Guid? LogEntryId { get; set; }
 
     /// <summary>Relative Dateipfad im Repository (z.B. "src/App.razor").</summary>
@@ -62,12 +65,14 @@ public sealed class DiffResult
     public DateTimeOffset? ExpiresAt { get; set; }
 
     /// <summary>Navigationseigenschaft zur zugehörigen Aufgabe.</summary>
+    [JsonPropertyName("Aufgabe")]
     public WorkItem WorkItem { get; set; } = null!;
 
     /// <summary>Optionale Navigationseigenschaft zum Git-Repository.</summary>
     public GitRepository? GitRepository { get; set; }
 
     /// <summary>Optionale Navigationseigenschaft zum Protokolleintrag.</summary>
+    [JsonPropertyName("ProtokollEintrag")]
     public LogEntry? LogEntry { get; set; }
 
     /// <summary>Diff-Blöcke (kaskadierendes Löschen).</summary>

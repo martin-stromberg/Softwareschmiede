@@ -27,8 +27,8 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         var monitor = fixture.Monitor;
 
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
 
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -54,8 +54,8 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         }
 
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
 
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -80,8 +80,8 @@ public sealed class ScmEventMonitoringServiceTests_Settings
             item.DeliveredUtc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             item.Status = "Zugestellt";
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
         }
         var exchange = new ScmEventExchangeService(fixture.Services.GetRequiredService<IServiceScopeFactory>(),
             TimeProvider.System, fixture.Services.GetRequiredService<ScmEventStartupGate>(),
@@ -93,8 +93,8 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
 
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
 
         await exchange.RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -112,8 +112,8 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         await AddTaskWithIssueAsync(fixture, 42);
         ConfigureObservations(fixture, number => number == 7 ? "!Bearbeite bitte" : "$Softwareschmiede bitte");
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "!Bearbeite", TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetSettingAsync(AppSettingService.ScmTriggerKeywordKey, "!Bearbeite", TestContext.Current.CancellationToken);
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -135,8 +135,8 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
 
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);

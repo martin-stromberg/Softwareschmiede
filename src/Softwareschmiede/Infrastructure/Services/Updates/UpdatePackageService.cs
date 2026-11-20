@@ -73,16 +73,16 @@ public sealed class UpdatePackageService : IUpdatePackageService
             if (new FileInfo(zipPath).Length == 0)
                 throw new InvalidDataException("Das heruntergeladene Update-Paket ist leer.");
 
-            progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.Verifizieren, null, "Update-Paket wird verifiziert."));
+            progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.Verify, null, "Update-Paket wird verifiziert."));
             var manifestJson = await DownloadManifestAsync(update, ct);
             var expectedSha256 = GetExpectedSha256(manifestJson);
             await VerifyPackageHashAsync(zipPath, expectedSha256, ct);
 
-            progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.Entpacken, null, "Update wird entpackt."));
+            progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.Extract, null, "Update wird entpackt."));
             ZipFile.ExtractToDirectory(zipPath, extractedDirectory, overwriteFiles: true);
             ValidateExtractedPackage(extractedDirectory);
 
-            progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.UpdateVorbereiten, null, "Update-Skript wird vorbereitet."));
+            progress?.Report(new UpdatePreparationProgress(UpdatePreparationPhase.PrepareUpdate, null, "Update-Skript wird vorbereitet."));
             var scriptPath = await _scriptService.CreateScriptAsync(_baseDirectory, extractedDirectory, _options.ExecutableName, logPath, ct);
             var requiresElevation = !CanWriteToBaseDirectory();
 
@@ -141,7 +141,7 @@ public sealed class UpdatePackageService : IUpdatePackageService
         }
     }
 
-    private async Task<HttpResponseMessage> SendWithFallbackAsync(UpdateDownloadRoute route, string beschreibung, CancellationToken ct)
+    private async Task<HttpResponseMessage> SendWithFallbackAsync(UpdateDownloadRoute route, string description, CancellationToken ct)
     {
         var response = await SendDownloadRequestAsync(route.Primary, useApiHeaders: false, ct);
         if (!response.IsSuccessStatusCode
@@ -150,7 +150,7 @@ public sealed class UpdatePackageService : IUpdatePackageService
         {
             _logger.LogWarning(
                 "{Beschreibung} über {DownloadUrl} lieferte HTTP {StatusCode}; versuche einmalig die API-Asset-URL {FallbackDownloadUrl}.",
-                beschreibung,
+                description,
                 route.Primary,
                 (int)response.StatusCode,
                 route.Fallback);

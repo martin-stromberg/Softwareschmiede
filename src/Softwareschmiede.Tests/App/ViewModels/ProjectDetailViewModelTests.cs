@@ -17,8 +17,8 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class ProjectDetailViewModelTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly ProjektService _projektService;
-    private readonly AufgabeService _aufgabeService;
+    private readonly ProjectService _projektService;
+    private readonly WorkItemService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IPluginManager> _pluginManagerMock;
@@ -27,8 +27,8 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     public ProjectDetailViewModelTests()
     {
         _db = TestDbContextFactory.Create();
-        _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        _aufgabeService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _serviceProviderMock = new Mock<IServiceProvider>();
         _dialogServiceMock = new Mock<IDialogService>();
         _pluginManagerMock = new Mock<IPluginManager>();
@@ -282,10 +282,10 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         // Assert
         var detail = await _projektService.GetDetailAsync(project.Id, TestContext.Current.CancellationToken);
         var repository = detail!.Repositories.Single();
-        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
+        var startConfiguration = await _projektService.GetRepositoryStartConfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
 
-        startKonfiguration.Should().NotBeNull();
-        startKonfiguration!.WorkingDirectoryRelativePath.Should().Be("backend");
+        startConfiguration.Should().NotBeNull();
+        startConfiguration!.WorkingDirectoryRelativePath.Should().Be("backend");
     }
 
     /// <summary>RepositoryOeffnenCommand hat CanExecute false, wenn kein Repository geladen ist.</summary>
@@ -462,12 +462,12 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         var project = await _projektService.CreateAsync("Status-Trennung-Projekt", null, TestContext.Current.CancellationToken);
         var neu = await _aufgabeService.CreateAsync(project.Id, "Neu", null, ct: TestContext.Current.CancellationToken);
         var gestartet = await _aufgabeService.CreateAsync(project.Id, "Gestartet", null, ct: TestContext.Current.CancellationToken);
-        var wartend = await _aufgabeService.CreateAsync(project.Id, "Wartend", null, ct: TestContext.Current.CancellationToken);
+        var waiting = await _aufgabeService.CreateAsync(project.Id, "Wartend", null, ct: TestContext.Current.CancellationToken);
         var beendet = await _aufgabeService.CreateAsync(project.Id, "Beendet", null, ct: TestContext.Current.CancellationToken);
         var archiviert = await _aufgabeService.CreateAsync(project.Id, "Archiviert", null, ct: TestContext.Current.CancellationToken);
 
         await _aufgabeService.StatusSetzenAsync(gestartet.Id, WorkItemStatus.Started, TestContext.Current.CancellationToken);
-        await _aufgabeService.StatusSetzenAsync(wartend.Id, WorkItemStatus.Waiting, TestContext.Current.CancellationToken);
+        await _aufgabeService.StatusSetzenAsync(waiting.Id, WorkItemStatus.Waiting, TestContext.Current.CancellationToken);
         await _aufgabeService.StatusSetzenAsync(beendet.Id, WorkItemStatus.Completed, TestContext.Current.CancellationToken);
         await _aufgabeService.StatusSetzenAsync(archiviert.Id, WorkItemStatus.Archived, TestContext.Current.CancellationToken);
 
@@ -478,7 +478,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         // Assert
-        sut.NichtBeendeteAufgaben.Select(a => a.Id).Should().BeEquivalentTo([neu.Id, gestartet.Id, wartend.Id]);
+        sut.NichtBeendeteAufgaben.Select(a => a.Id).Should().BeEquivalentTo([neu.Id, gestartet.Id, waiting.Id]);
         sut.BeendeteAufgaben.Select(a => a.Id).Should().BeEquivalentTo([beendet.Id]);
         sut.NichtBeendeteAufgaben.Should().NotContain(a => a.Id == archiviert.Id);
         sut.BeendeteAufgaben.Should().NotContain(a => a.Id == archiviert.Id);

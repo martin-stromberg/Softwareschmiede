@@ -133,7 +133,7 @@ public sealed class WpfDialogService : IDialogService
         ct.ThrowIfCancellationRequested();
         return ShowDialogAsync(
             () => new AufgabePausierenDialog(viewModel),
-            () => viewModel.Ergebnis);
+            () => viewModel.Result);
     }
 
     /// <inheritdoc/>

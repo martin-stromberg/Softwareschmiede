@@ -113,9 +113,9 @@ public partial class End2EndTest
         var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
         taskDetail.WaitForCliRunning();
 
-        var lokalerKlonPfad = await GetLokalerKlonPfadAsync();
-        Directory.CreateDirectory(Path.Combine(lokalerKlonPfad, "Ebene1", "Ebene2"));
-        File.WriteAllText(Path.Combine(lokalerKlonPfad, "Ebene1", "Ebene2", "Deep.cs"), "tief verschachtelter Inhalt");
+        var localClonePath = await GetLokalerKlonPfadAsync();
+        Directory.CreateDirectory(Path.Combine(localClonePath, "Ebene1", "Ebene2"));
+        File.WriteAllText(Path.Combine(localClonePath, "Ebene1", "Ebene2", "Deep.cs"), "tief verschachtelter Inhalt");
 
         // Der Arbeitsbaum wird beim ersten Anzeigen der Aufgabendetailansicht einmalig geladen - ein
         // erneutes Öffnen erzwingt einen frischen InitialisierenAsync-Aufruf, der die soeben angelegte
@@ -160,8 +160,8 @@ public partial class End2EndTest
         var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
         taskDetail.WaitForCliRunning();
 
-        var lokalerKlonPfad = await GetLokalerKlonPfadAsync();
-        var ebene2Verzeichnis = Path.Combine(lokalerKlonPfad, "Ebene1", "Ebene2");
+        var localClonePath = await GetLokalerKlonPfadAsync();
+        var ebene2Verzeichnis = Path.Combine(localClonePath, "Ebene1", "Ebene2");
         Directory.CreateDirectory(ebene2Verzeichnis);
         File.WriteAllText(Path.Combine(ebene2Verzeichnis, "Deep.cs"), "tief verschachtelter Inhalt");
 

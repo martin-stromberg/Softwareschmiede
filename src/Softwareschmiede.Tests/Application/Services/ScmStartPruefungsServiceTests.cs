@@ -17,10 +17,10 @@ public sealed class ScmStartPruefungsServiceTests
     public void Ausloeser_SignalWirdAngenommen()
     {
         using var fixture = new Fixture();
-        fixture.Ausloeser.StartpruefungAnfordern();
-        fixture.Ausloeser.StartpruefungAnfordern();
+        fixture.Trigger.RequestStartCheck();
+        fixture.Trigger.RequestStartCheck();
 
-        Assert.Equal(1, fixture.Service.AusstehendePruefungen);
+        Assert.Equal(1, fixture.Service.PendingChecks);
     }
 
     /// <summary>Nur eine sinkende Laufzahl (frei werdender Platz) löst die Prüfung aus;
@@ -31,13 +31,13 @@ public sealed class ScmStartPruefungsServiceTests
         using var fixture = new Fixture();
 
         fixture.Laufzaehlung.Raise(x => x.RunningCountChanged += null, 1, 2);
-        Assert.Equal(0, fixture.Service.AusstehendePruefungen);
+        Assert.Equal(0, fixture.Service.PendingChecks);
 
         fixture.Laufzaehlung.Raise(x => x.RunningCountChanged += null, 2, 2);
-        Assert.Equal(0, fixture.Service.AusstehendePruefungen);
+        Assert.Equal(0, fixture.Service.PendingChecks);
 
         fixture.Laufzaehlung.Raise(x => x.RunningCountChanged += null, 2, 1);
-        Assert.Equal(1, fixture.Service.AusstehendePruefungen);
+        Assert.Equal(1, fixture.Service.PendingChecks);
     }
 
     /// <summary>Ein Rückgang auf null (letzter laufender Prozess) löst ebenfalls aus.</summary>
@@ -46,7 +46,7 @@ public sealed class ScmStartPruefungsServiceTests
     {
         using var fixture = new Fixture();
         fixture.Laufzaehlung.Raise(x => x.RunningCountChanged += null, 1, 0);
-        Assert.Equal(1, fixture.Service.AusstehendePruefungen);
+        Assert.Equal(1, fixture.Service.PendingChecks);
     }
 
     /// <summary>Nach Dispose sind die Abonnements getrennt: weitere Signale schlagen weder
@@ -57,25 +57,25 @@ public sealed class ScmStartPruefungsServiceTests
         var fixture = new Fixture();
         fixture.Service.Dispose();
 
-        fixture.Ausloeser.StartpruefungAnfordern();
+        fixture.Trigger.RequestStartCheck();
         fixture.Laufzaehlung.Raise(x => x.RunningCountChanged += null, 2, 1);
-        Assert.Equal(0, fixture.Service.AusstehendePruefungen);
+        Assert.Equal(0, fixture.Service.PendingChecks);
     }
 
     private sealed class Fixture : IDisposable
     {
-        public ScmStartPruefungsAusloeser Ausloeser { get; } = new();
+        public ScmStartCheckTrigger Trigger { get; } = new();
         public Mock<IRunningAutomationStatusSource> Laufzaehlung { get; } = new();
-        public ScmStartPruefungsService Service { get; }
+        public ScmStartCheckService Service { get; }
 
         public Fixture()
         {
             var scopeFactory = new Mock<IServiceScopeFactory>();
             var gate = new ScmEventStartupGate();
             gate.Ready();
-            Service = new ScmStartPruefungsService(
-                scopeFactory.Object, Ausloeser, Laufzaehlung.Object, gate,
-                TimeProvider.System, NullLogger<ScmStartPruefungsService>.Instance);
+            Service = new ScmStartCheckService(
+                scopeFactory.Object, Trigger, Laufzaehlung.Object, gate,
+                TimeProvider.System, NullLogger<ScmStartCheckService>.Instance);
         }
 
         public void Dispose() => Service.Dispose();

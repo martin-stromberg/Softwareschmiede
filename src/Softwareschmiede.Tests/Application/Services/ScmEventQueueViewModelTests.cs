@@ -406,9 +406,9 @@ public sealed class ScmEventQueueViewModelTests
         await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
-            var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-            await einstellungen.SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
-            await einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
+            var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
+            await settings.SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+            await settings.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         }
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
 
@@ -430,8 +430,8 @@ public sealed class ScmEventQueueViewModelTests
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        await fixture.SetSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, "false");
-        await fixture.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungEnabledKey, "true");
+        await fixture.SetSettingAsync(AppSettingService.ScmMonitoringEnabledKey, "false");
+        await fixture.SetSettingAsync(AppSettingService.ScmIssuePreparationEnabledKey, "true");
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();

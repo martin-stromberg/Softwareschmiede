@@ -25,7 +25,7 @@ public partial class End2EndTest
         using (var db = OpenTestDbContext())
         {
             vorherigesDefault = db.AppSettings
-                .Where(e => e.Key == AppEinstellungService.DefaultKiPluginKey)
+                .Where(e => e.Key == AppSettingService.DefaultKiPluginKey)
                 .Select(e => e.Value)
                 .FirstOrDefault();
         }
@@ -67,21 +67,21 @@ public partial class End2EndTest
             try
             {
                 using var db = OpenTestDbContext();
-                var eintrag = db.AppSettings
-                    .FirstOrDefault(e => e.Key == AppEinstellungService.DefaultKiPluginKey);
-                if (eintrag is null && vorherigesDefault is not null)
+                var entry = db.AppSettings
+                    .FirstOrDefault(e => e.Key == AppSettingService.DefaultKiPluginKey);
+                if (entry is null && vorherigesDefault is not null)
                 {
                     db.AppSettings.Add(new Softwareschmiede.Domain.Entities.AppSetting
                     {
                         Id = Guid.NewGuid(),
-                        Key = AppEinstellungService.DefaultKiPluginKey,
+                        Key = AppSettingService.DefaultKiPluginKey,
                     });
-                    eintrag = db.AppSettings.Local.FirstOrDefault(e => e.Key == AppEinstellungService.DefaultKiPluginKey);
+                    entry = db.AppSettings.Local.FirstOrDefault(e => e.Key == AppSettingService.DefaultKiPluginKey);
                 }
-                if (eintrag is not null)
+                if (entry is not null)
                 {
-                    eintrag.Value = vorherigesDefault;
-                    eintrag.UpdatedAt = DateTimeOffset.UtcNow;
+                    entry.Value = vorherigesDefault;
+                    entry.UpdatedAt = DateTimeOffset.UtcNow;
                     db.SaveChanges();
                 }
             }

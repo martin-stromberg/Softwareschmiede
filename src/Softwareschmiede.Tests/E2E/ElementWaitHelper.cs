@@ -74,8 +74,8 @@ internal static class ElementWaitHelper
             if (element is not null && isVisible(element))
                 return element;
 
-            var fehlerMeldung = parent.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-            if (fehlerMeldung is not null && isVisible(fehlerMeldung))
+            var errorMessage = parent.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+            if (errorMessage is not null && isVisible(errorMessage))
             {
                 // Letzter Versuch: Falls conditionFunc selbst auf "FehlerMeldung" zielt, ist das Element
                 // inzwischen sicher auffindbar (siehe Erklärung oben) und der Aufruf soll regulär mit
@@ -85,7 +85,7 @@ internal static class ElementWaitHelper
                     return element;
 
                 throw new InvalidOperationException(
-                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(fehlerMeldung)}");
+                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(errorMessage)}");
             }
 
             Thread.Sleep(200);
@@ -187,10 +187,10 @@ internal static class ElementWaitHelper
             if (element is not null && isVisible(element))
                 return element;
 
-            var fehlerMeldung = scopeElement.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-            if (fehlerMeldung is not null && isVisible(fehlerMeldung))
+            var errorMessage = scopeElement.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+            if (errorMessage is not null && isVisible(errorMessage))
                 throw new InvalidOperationException(
-                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(fehlerMeldung)}");
+                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(errorMessage)}");
 
             Thread.Sleep(200);
         }
@@ -432,23 +432,23 @@ internal static class ElementWaitHelper
     /// </summary>
     private static bool IstPunktVerdeckt(AutomationElement element, System.Drawing.Point punkt)
     {
-        AutomationElement? treffer;
+        AutomationElement? match;
         try
         {
-            treffer = element.Automation.FromPoint(punkt);
+            match = element.Automation.FromPoint(punkt);
         }
         catch (Exception)
         {
             return false;
         }
 
-        if (treffer is null)
+        if (match is null)
             return false;
 
         try
         {
             var fensterZiel = element.Properties.NativeWindowHandle.ValueOrDefault;
-            var fensterTreffer = treffer.Properties.NativeWindowHandle.ValueOrDefault;
+            var fensterTreffer = match.Properties.NativeWindowHandle.ValueOrDefault;
             return fensterZiel != IntPtr.Zero && fensterTreffer != IntPtr.Zero && fensterZiel != fensterTreffer;
         }
         catch (Exception)

@@ -18,8 +18,8 @@ namespace Softwareschmiede.App.ViewModels;
 /// <summary>ViewModel für die Projektdetailansicht mit Aufgabenliste.</summary>
 public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 {
-    private readonly ProjektService _projektService;
-    private readonly AufgabeService _aufgabeService;
+    private readonly ProjectService _projektService;
+    private readonly WorkItemService _aufgabeService;
     private readonly IServiceProvider _serviceProvider;
     private readonly IDialogService _dialogService;
     private readonly IPluginManager _pluginManager;
@@ -41,7 +41,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private Guid _projektId;
     private Project? _projekt;
     private bool _isLoading;
-    private string? _fehlerMeldung;
+    private string? _errorMessage;
     private CancellationTokenSource? _ladenCts;
     private string _projektName = string.Empty;
     private string? _projektBeschreibung;
@@ -101,8 +101,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Fehlermeldung bei Ladefehlern.</summary>
     public string? FehlerMeldung
     {
-        get => _fehlerMeldung;
-        private set => SetProperty(ref _fehlerMeldung, value);
+        get => _errorMessage;
+        private set => SetProperty(ref _errorMessage, value);
     }
 
     /// <summary>Liste der Aufgaben des Projekts.</summary>
@@ -351,8 +351,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
     /// <inheritdoc cref="ProjectDetailViewModel"/>
     public ProjectDetailViewModel(
-        ProjektService projektService,
-        AufgabeService aufgabeService,
+        ProjectService projektService,
+        WorkItemService aufgabeService,
         IServiceProvider serviceProvider,
         IDialogService dialogService,
         IPluginManager pluginManager,
@@ -423,9 +423,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             try
             {
                 using var einstellungenScope = _serviceProvider.CreateScope();
-                var einstellungen = einstellungenScope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-                _isBackmergeModusProjektbezogen = await einstellungen.GetScmBackmergeModusAsync(ct) == ScmBackmergeMode.ProjectScoped;
-                _isBackmergeAutoMergeEnabled = await einstellungen.GetBackmergeProjektAktivAsync(_projektId, ct);
+                var settings = einstellungenScope.ServiceProvider.GetRequiredService<AppSettingService>();
+                _isBackmergeModusProjektbezogen = await settings.GetScmBackmergeModusAsync(ct) == ScmBackmergeMode.ProjectScoped;
+                _isBackmergeAutoMergeEnabled = await settings.GetBackmergeProjektAktivAsync(_projektId, ct);
             }
             catch (OperationCanceledException)
             {
@@ -746,7 +746,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             return;
 
         using var scope = _serviceProvider.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
+        await scope.ServiceProvider.GetRequiredService<AppSettingService>()
             .SetBackmergeProjektAktivAsync(_projektId, aktiv, CancellationToken.None);
     }
 
@@ -816,7 +816,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 ? null
                 : SelectedInitialisierungsskript.Trim();
 
-            var updatedKonfiguration = await _projektService.SaveRepositoryInitialisierungskriptAsync(repository.Id, normalized, ct);
+            var updatedKonfiguration = await _projektService.SaveRepositoryInitializationScriptAsync(repository.Id, normalized, ct);
 
             repository.InitializationConfiguration = updatedKonfiguration;
             SelectedInitialisierungsskript = updatedKonfiguration?.InitializationScriptRelativePath;
@@ -889,13 +889,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private void AktualisiereAufgabenAnsichten()
     {
         GefilterteAufgaben.Clear();
-        var quelle = _aufgabenFilter switch
+        var source = _aufgabenFilter switch
         {
             WorkItemFilterType.Active => WorkItems.Where(a => a.Status != WorkItemStatus.Archived),
             WorkItemFilterType.Archived => WorkItems.Where(a => a.Status == WorkItemStatus.Archived),
             _ => WorkItems
         };
-        foreach (var workItem in quelle)
+        foreach (var workItem in source)
             GefilterteAufgaben.Add(workItem);
 
         NichtBeendeteAufgaben.Clear();
@@ -1003,30 +1003,30 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task AufgabeAusAnforderungErstellenAsync(ScmRequirement? anforderung, CancellationToken ct)
+    private async Task AufgabeAusAnforderungErstellenAsync(ScmRequirement? requirement, CancellationToken ct)
     {
-        if (anforderung == null)
+        if (requirement == null)
             return;
 
-        if (anforderung.Kind == ScmRequirementKind.Issue)
+        if (requirement.Kind == ScmRequirementKind.Issue)
         {
-            await AufgabeAusIssueErstellenAsync(anforderung.Issue, ct);
+            await AufgabeAusIssueErstellenAsync(requirement.Issue, ct);
             return;
         }
 
-        if (anforderung.Kind == ScmRequirementKind.PullRequest)
+        if (requirement.Kind == ScmRequirementKind.PullRequest)
         {
-            await AufgabeAusPullRequestErstellenAsync(anforderung, ct);
+            await AufgabeAusPullRequestErstellenAsync(requirement, ct);
             return;
         }
 
-        await AufgabeAusAlertErstellenAsync(anforderung, ct);
+        await AufgabeAusAlertErstellenAsync(requirement, ct);
     }
 
-    private async Task AufgabeAusPullRequestErstellenAsync(ScmRequirement anforderung, CancellationToken ct)
+    private async Task AufgabeAusPullRequestErstellenAsync(ScmRequirement requirement, CancellationToken ct)
     {
-        var pullRequest = anforderung.PullRequest;
-        var repositoryContext = anforderung.RepositoryContext;
+        var pullRequest = requirement.PullRequest;
+        var repositoryContext = requirement.RepositoryContext;
         if (pullRequest == null || repositoryContext == null || _projektId == Guid.Empty)
             return;
 
@@ -1087,9 +1087,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             var zuEntfernen = IssueVorschlaege.FirstOrDefault(i => i.Nummer == issue.Nummer);
             if (zuEntfernen != null)
                 IssueVorschlaege.Remove(zuEntfernen);
-            var anforderung = OffeneAnforderungen.FirstOrDefault(a => a.Kind == ScmRequirementKind.Issue && a.Issue?.Nummer == issue.Nummer);
-            if (anforderung != null)
-                OffeneAnforderungen.Remove(anforderung);
+            var requirement = OffeneAnforderungen.FirstOrDefault(a => a.Kind == ScmRequirementKind.Issue && a.Issue?.Nummer == issue.Nummer);
+            if (requirement != null)
+                OffeneAnforderungen.Remove(requirement);
 
             WorkItems.Add(workItem);
             AktualisiereAufgabenAnsichten();
@@ -1105,9 +1105,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task AufgabeAusAlertErstellenAsync(ScmRequirement anforderung, CancellationToken ct)
+    private async Task AufgabeAusAlertErstellenAsync(ScmRequirement requirement, CancellationToken ct)
     {
-        var alert = anforderung.Alert;
+        var alert = requirement.Alert;
         if (alert == null || _projektId == Guid.Empty || _selectedRepository == null)
             return;
 
@@ -1224,7 +1224,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 .Any(p => string.Equals(p.PluginPrefix, _selectedRepository.PluginType, StringComparison.OrdinalIgnoreCase));
     }
 
-    private void SetFehler(Exception ex) => SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
+    private void SetFehler(Exception ex) => SetFehler(ref _errorMessage, nameof(FehlerMeldung), ex);
 
     /// <inheritdoc/>
     public void Dispose()

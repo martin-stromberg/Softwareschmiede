@@ -157,43 +157,43 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddSingleton(time ?? TimeProvider.System);
         services.AddSingleton<IOptions<TerminalSessionOptions>>(Options.Create(new TerminalSessionOptions()));
         services.AddSingleton<IOptions<ScmEventOptions>>(Options.Create(new ScmEventOptions()));
-        services.AddSingleton<KiAusfuehrungsService>();
-        services.AddSingleton<ICliExecutionLimitSource>(sp => sp.GetRequiredService<KiAusfuehrungsService>());
-        services.AddSingleton<IRunningAutomationStatusSource>(sp => sp.GetRequiredService<KiAusfuehrungsService>());
-        services.AddSingleton<PromptZeitVersandService>();
+        services.AddSingleton<AiExecutionService>();
+        services.AddSingleton<ICliExecutionLimitSource>(sp => sp.GetRequiredService<AiExecutionService>());
+        services.AddSingleton<IRunningAutomationStatusSource>(sp => sp.GetRequiredService<AiExecutionService>());
+        services.AddSingleton<PromptScheduleDispatchService>();
         services.AddSingleton<ScmEventStartupGate>();
         services.AddSingleton<ScmEventChangeNotifier>();
         services.AddSingleton<ScmEventExchangeProtocol>();
         services.AddSingleton<ScmEventMonitoringService>();
         services.AddSingleton<ScmBackmergeMonitoringService>();
-        services.AddSingleton<ScmIssueAufbereitungMonitoringService>();
+        services.AddSingleton<ScmIssuePreparationMonitoringService>();
         services.AddSingleton<ScmTaskCompletionMonitoringService>();
-        services.AddSingleton<ScmStartPruefungsAusloeser>();
-        services.AddSingleton<ScmStartPruefungsService>();
-        services.AddSingleton<AufgabeLaufdatenChangedNotifier>();
-        services.AddScoped<PullRequestReferenzService>();
+        services.AddSingleton<ScmStartCheckTrigger>();
+        services.AddSingleton<ScmStartCheckService>();
+        services.AddSingleton<WorkItemRunDataChangedNotifier>();
+        services.AddScoped<PullRequestReferenceService>();
         services.AddScoped<TodoService>();
-        services.AddScoped<AufgabeService>();
-        services.AddScoped<ProtokollService>();
-        services.AddScoped<AppEinstellungService>();
+        services.AddScoped<WorkItemService>();
+        services.AddScoped<LogService>();
+        services.AddScoped<AppSettingService>();
         services.AddScoped<PluginDefaultSettingsService>();
         services.AddScoped<PluginActivationService>();
         services.AddScoped<PluginSelectionService>();
-        services.AddScoped<KiPluginLimitService>();
+        services.AddScoped<AiPluginLimitService>();
         services.AddScoped<ScmEventStore>();
         services.AddScoped<ScmEventOutbox>();
         services.AddScoped<ScmEventOrchestrator>();
         // Jede Fixture erhält einen eigenen Reservierungsbestand — dadurch sind die
         // Reservierungen der Fixture vollständig von parallel laufenden Tests isoliert.
-        services.AddSingleton<ScmStartPlatzReservierungsPool>();
+        services.AddSingleton<ScmStartSlotReservationPool>();
         services.AddScoped<ScmEventExecutionLimitService>();
         services.AddScoped<ScmEventTaskResolver>();
-        services.AddScoped<ScmIssueAufbereitungsService>();
+        services.AddScoped<ScmIssuePreparationService>();
         services.AddScoped<ScmBackmergeService>();
-        services.AddScoped(sp => new EntwicklungsprozessService(sp.GetRequiredService<AufgabeService>(), sp.GetRequiredService<ProtokollService>(),
+        services.AddScoped(sp => new DevelopmentProcessService(sp.GetRequiredService<WorkItemService>(), sp.GetRequiredService<LogService>(),
             Git.Object, sp.GetRequiredService<PluginSelectionService>(), directories.Object,
-            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: sp.GetRequiredService<KiAusfuehrungsService>(),
-                PromptZeitVersandService: sp.GetRequiredService<PromptZeitVersandService>()), sp.GetRequiredService<ILogger<EntwicklungsprozessService>>()));
+            new DevelopmentProcessServiceOptions(AiExecutionService: sp.GetRequiredService<AiExecutionService>(),
+                PromptScheduleDispatchService: sp.GetRequiredService<PromptScheduleDispatchService>()), sp.GetRequiredService<ILogger<DevelopmentProcessService>>()));
         Services = services.BuildServiceProvider();
     }
 
@@ -257,27 +257,27 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal ScmEventMonitoringService Monitor => Services.GetRequiredService<ScmEventMonitoringService>();
 
     /// <summary>Der Auslöser der ereignisgesteuerten Startprüfung aus dem Service-Provider der Fixture.</summary>
-    internal ScmStartPruefungsAusloeser Ausloeser => Services.GetRequiredService<ScmStartPruefungsAusloeser>();
+    internal ScmStartCheckTrigger Trigger => Services.GetRequiredService<ScmStartCheckTrigger>();
 
     /// <summary>Der ereignisgesteuerte Startprüfungs-Dienst aus dem Service-Provider der Fixture.</summary>
-    internal ScmStartPruefungsService StartPruefung => Services.GetRequiredService<ScmStartPruefungsService>();
+    internal ScmStartCheckService StartPruefung => Services.GetRequiredService<ScmStartCheckService>();
 
-    /// <summary>Setzt den Konto-Modus über den <see cref="AppEinstellungService"/>.</summary>
-    internal async Task SetKontoModusAsync(ScmKontoModus modus)
+    /// <summary>Setzt den Konto-Modus über den <see cref="AppSettingService"/>.</summary>
+    internal async Task SetKontoModusAsync(ScmKontoModus mode)
     {
         using var scope = Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().SetScmKontoModusAsync(modus);
+        await scope.ServiceProvider.GetRequiredService<AppSettingService>().SetScmAccountModeAsync(mode);
     }
 
     /// <summary>Schreibt eine generische Anwendungseinstellung (z. B. Ausführungslimits).</summary>
     internal async Task SetSettingAsync(string schluessel, string? wert)
     {
         using var scope = Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().SetSettingAsync(schluessel, wert);
+        await scope.ServiceProvider.GetRequiredService<AppSettingService>().SetSettingAsync(schluessel, wert);
     }
 
     /// <summary>Der Singleton-Prozessverwalter der Fixture (für Start/Stop-Prüfungen).</summary>
-    internal KiAusfuehrungsService Cli => Services.GetRequiredService<KiAusfuehrungsService>();
+    internal AiExecutionService Cli => Services.GetRequiredService<AiExecutionService>();
 
     internal async Task DispatchAsync(Guid id)
     {

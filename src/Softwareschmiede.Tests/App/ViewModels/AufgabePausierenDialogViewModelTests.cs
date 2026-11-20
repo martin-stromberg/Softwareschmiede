@@ -86,10 +86,10 @@ public sealed class AufgabePausierenDialogViewModelTests
         var timeProvider = new FakeTimeProvider(ReferenzZeit);
         timeProvider.SetLocalTimeZone(TimeZoneInfo.Local);
         var sut = new AufgabePausierenDialogViewModel(timeProvider);
-        var ziel = timeProvider.GetLocalNow().AddDays(1);
-        sut.PausiertDatum = ziel.Date;
-        sut.PausiertStunde = ziel.Hour;
-        sut.PausiertMinute = ziel.Minute;
+        var target = timeProvider.GetLocalNow().AddDays(1);
+        sut.PausiertDatum = target.Date;
+        sut.PausiertStunde = target.Hour;
+        sut.PausiertMinute = target.Minute;
         var closed = new List<bool>();
         sut.CloseRequested += (_, result) => closed.Add(result);
 
@@ -99,11 +99,11 @@ public sealed class AufgabePausierenDialogViewModelTests
         // nach UTC um; dank SetLocalTimeZone(TimeZoneInfo.Local) entspricht das der Maschinen-Zone —
         // Erwartung daher über DateTimeKind.Local → UTC berechnen.
         var erwartetUtc = new DateTimeOffset(
-            new DateTime(ziel.Year, ziel.Month, ziel.Day, ziel.Hour, ziel.Minute, 0, DateTimeKind.Local)).ToUniversalTime();
+            new DateTime(target.Year, target.Month, target.Day, target.Hour, target.Minute, 0, DateTimeKind.Local)).ToUniversalTime();
 
-        sut.Ergebnis.Should().NotBeNull();
-        sut.Ergebnis!.Aufheben.Should().BeFalse();
-        sut.Ergebnis.PausedUntilUtc.Should().BeCloseTo(erwartetUtc, TimeSpan.FromMinutes(1));
+        sut.Result.Should().NotBeNull();
+        sut.Result!.Aufheben.Should().BeFalse();
+        sut.Result.PausedUntilUtc.Should().BeCloseTo(erwartetUtc, TimeSpan.FromMinutes(1));
         closed.Should().Equal(true);
     }
 
@@ -116,10 +116,10 @@ public sealed class AufgabePausierenDialogViewModelTests
 
         sut.AufhebenCommand.CanExecute(null).Should().BeFalse("ohne aktive Pause ist Aufheben deaktiviert");
 
-        var pausiertBis = timeProvider.GetUtcNow().AddHours(2);
-        sut.Initialize(pausiertBis);
+        var pausedUntil = timeProvider.GetUtcNow().AddHours(2);
+        sut.Initialize(pausedUntil);
 
-        sut.IstAktuellPausiert.Should().BeTrue();
+        sut.IsCurrentlyPaused.Should().BeTrue();
         sut.AktuellePauseAnzeige.Should().NotBeNull();
         sut.AufhebenCommand.CanExecute(null).Should().BeTrue();
 
@@ -127,9 +127,9 @@ public sealed class AufgabePausierenDialogViewModelTests
         sut.CloseRequested += (_, result) => closed.Add(result);
         sut.AufhebenCommand.Execute(null);
 
-        sut.Ergebnis.Should().NotBeNull();
-        sut.Ergebnis!.Aufheben.Should().BeTrue();
-        sut.Ergebnis.PausedUntilUtc.Should().BeNull();
+        sut.Result.Should().NotBeNull();
+        sut.Result!.Aufheben.Should().BeTrue();
+        sut.Result.PausedUntilUtc.Should().BeNull();
         closed.Should().Equal(true);
     }
 
@@ -146,7 +146,7 @@ public sealed class AufgabePausierenDialogViewModelTests
         sut.Initialize(timeProvider.GetUtcNow().AddMinutes(-5));
 
         sut.AktuellePauseAnzeige.Should().BeNull("eine abgelaufene Pause ist keine aktive Pause");
-        sut.IstAktuellPausiert.Should().BeFalse();
+        sut.IsCurrentlyPaused.Should().BeFalse();
 
         var vorbelegung = timeProvider.GetLocalNow().AddMinutes(1);
         sut.PausiertDatum.Should().Be(vorbelegung.Date);
@@ -163,10 +163,10 @@ public sealed class AufgabePausierenDialogViewModelTests
         var timeProvider = new FakeTimeProvider(ReferenzZeit);
         timeProvider.SetLocalTimeZone(TimeZoneInfo.Local);
         var sut = new AufgabePausierenDialogViewModel(timeProvider);
-        var pausiertBis = timeProvider.GetUtcNow().AddHours(5);
-        var lokal = pausiertBis.ToLocalTime();
+        var pausedUntil = timeProvider.GetUtcNow().AddHours(5);
+        var lokal = pausedUntil.ToLocalTime();
 
-        sut.Initialize(pausiertBis);
+        sut.Initialize(pausedUntil);
 
         sut.PausiertDatum.Should().Be(lokal.Date);
         sut.PausiertStunde.Should().Be(lokal.Hour);
@@ -183,7 +183,7 @@ public sealed class AufgabePausierenDialogViewModelTests
 
         sut.AbbrechenCommand.Execute(null);
 
-        sut.Ergebnis.Should().BeNull();
+        sut.Result.Should().BeNull();
         closed.Should().Equal(false);
     }
 }

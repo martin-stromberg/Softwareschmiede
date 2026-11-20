@@ -94,12 +94,12 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
     }
 
     /// <summary>Liefert eine Momentaufnahme der Aufzeichnung (auch nach dem Session-Ende abrufbar).</summary>
-    /// <returns>Die <see cref="CliOutputAufzeichnung"/> mit den bis dahin aufgezeichneten Chunks.</returns>
-    public CliOutputAufzeichnung GetAufzeichnung()
+    /// <returns>Die <see cref="CliOutputRecording"/> mit den bis dahin aufgezeichneten Chunks.</returns>
+    public CliOutputRecording GetRecording()
     {
         lock (_lock)
         {
-            return new CliOutputAufzeichnung
+            return new CliOutputRecording
             {
                 WorkItemId = _aufgabeId,
                 PluginName = _pluginName,

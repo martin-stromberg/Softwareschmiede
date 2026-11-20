@@ -14,18 +14,18 @@ namespace Softwareschmiede.Tests.Application.Services;
 public sealed class AufgabeServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly Mock<ILogger<AufgabeService>> _loggerMock;
+    private readonly Mock<ILogger<WorkItemService>> _loggerMock;
     private readonly TodoService _todoService;
-    private readonly AufgabeService _sut;
+    private readonly WorkItemService _sut;
     private readonly Guid _projektId = new Guid("11111111-1111-1111-1111-111111111111");
 
     /// <summary>AufgabeServiceTests.</summary>
     public AufgabeServiceTests()
     {
         _db = TestDbContextFactory.Create();
-        _loggerMock = new Mock<ILogger<AufgabeService>>();
+        _loggerMock = new Mock<ILogger<WorkItemService>>();
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _sut = new AufgabeService(_db, _loggerMock.Object, _todoService);
+        _sut = new WorkItemService(_db, _loggerMock.Object, _todoService);
 
         // Seed a project for FK constraints
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
@@ -469,15 +469,15 @@ public sealed class AufgabeServiceTests : IDisposable
     {
         // Arrange
         var workItem = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag", null, ct: TestContext.Current.CancellationToken);
-        var ausfuehrenAbUtc = new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero);
+        var executeAfterUtc = new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero);
 
         // Act
-        await _sut.SavePromptVorschlagAsync(workItem.Id, "Mach nun bitte weiter.", ausfuehrenAbUtc, TestContext.Current.CancellationToken);
+        await _sut.SavePromptVorschlagAsync(workItem.Id, "Mach nun bitte weiter.", executeAfterUtc, TestContext.Current.CancellationToken);
 
         // Assert
         var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         result!.SuggestedPrompt.Should().Be("Mach nun bitte weiter.");
-        result.SuggestedExecuteAfterUtc.Should().Be(ausfuehrenAbUtc);
+        result.SuggestedExecuteAfterUtc.Should().Be(executeAfterUtc);
     }
 
     /// <summary>SavePromptVorschlagAsync entfernt Zeitstempel, wenn der Prompt leer ist.</summary>
@@ -522,7 +522,7 @@ public sealed class AufgabeServiceTests : IDisposable
         var workItem = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.VerwerfenAsync(workItem.Id, DiscardAction.Archive, TestContext.Current.CancellationToken);
+        await _sut.DiscardAsync(workItem.Id, DiscardAction.Archive, TestContext.Current.CancellationToken);
 
         // Assert
         var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -537,7 +537,7 @@ public sealed class AufgabeServiceTests : IDisposable
         var workItem = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.VerwerfenAsync(workItem.Id, DiscardAction.Delete, TestContext.Current.CancellationToken);
+        await _sut.DiscardAsync(workItem.Id, DiscardAction.Delete, TestContext.Current.CancellationToken);
 
         // Assert
         var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -553,7 +553,7 @@ public sealed class AufgabeServiceTests : IDisposable
         await _sut.StartenAsync(workItem.Id, "feature/test", @"C:\klon", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var act = () => _sut.VerwerfenAsync(workItem.Id, DiscardAction.Archive);
+        var act = () => _sut.DiscardAsync(workItem.Id, DiscardAction.Archive);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()

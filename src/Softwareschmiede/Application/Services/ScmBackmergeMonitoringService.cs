@@ -33,10 +33,10 @@ public sealed class ScmBackmergeMonitoringService(
     {
         await startup.WaitAsync(ct);
         using var scope = scopes.CreateScope();
-        var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+        var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
         // Laufzeit-Schalter (Einstellungen → Automatisierung → Prozessabläufe): Bei deaktiviertem
         // Backmerge-Modus wird nicht enumeriert. Die Ereignisüberwachung ist davon unabhängig.
-        if (await einstellungen.GetScmBackmergeModusAsync(ct) == ScmBackmergeMode.Disabled)
+        if (await settings.GetScmBackmergeModusAsync(ct) == ScmBackmergeMode.Disabled)
         {
             logger.LogDebug("Backmerge-Automatisierung ist deaktiviert; Durchlauf wird übersprungen.");
             return;

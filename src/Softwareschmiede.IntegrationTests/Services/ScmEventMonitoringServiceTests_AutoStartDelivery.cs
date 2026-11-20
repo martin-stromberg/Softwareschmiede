@@ -65,8 +65,8 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         ConfigureObservations(fixture);
         fixture.ConfigureIssue(9);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator", TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Simulator", TestContext.Current.CancellationToken);
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 

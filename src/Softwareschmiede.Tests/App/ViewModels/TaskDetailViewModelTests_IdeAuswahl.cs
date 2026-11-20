@@ -24,13 +24,13 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task OeffneIdeAuswahlCommand_ExecuteAsync_RuftOeffneIdeAuswahlAsyncAuf()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        var ersteSolution = Path.Combine(arbeitsverzeichnis, "Erste.sln");
-        var zweiteSolution = Path.Combine(arbeitsverzeichnis, "Zweite.sln");
+        var workingDirectory = CreateTempDirectory();
+        var ersteSolution = Path.Combine(workingDirectory, "Erste.sln");
+        var zweiteSolution = Path.Combine(workingDirectory, "Zweite.sln");
         File.WriteAllText(ersteSolution, string.Empty);
         File.WriteAllText(zweiteSolution, string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -73,10 +73,10 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task KannIdeAuswaehlen_WhenOneEntryPoint_ReturnsFalse()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Einzige.sln"), string.Empty);
+        var workingDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(workingDirectory, "Einzige.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var visualStudioPlugin = new VisualStudioIdePlugin(new Mock<IProcessStarter>().Object);
         var sut = CreateSut(idePlugins: [visualStudioPlugin]);
@@ -92,11 +92,11 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task KannIdeAuswaehlen_WhenMultipleEntryPoints_ReturnsTrue()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Erste.sln"), string.Empty);
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Zweite.sln"), string.Empty);
+        var workingDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(workingDirectory, "Erste.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(workingDirectory, "Zweite.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
@@ -116,11 +116,11 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task KannIdeAuswaehlen_NachLadenAsync_WhenMultipleEntryPoints_ReturnsTrueOhneOeffnen()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Erste.sln"), string.Empty);
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Zweite.sln"), string.Empty);
+        var workingDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(workingDirectory, "Erste.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(workingDirectory, "Zweite.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
@@ -139,10 +139,10 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task KannIdeAuswaehlen_NachLadenAsync_WhenOneEntryPoint_ReturnsFalse()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Einzige.sln"), string.Empty);
+        var workingDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(workingDirectory, "Einzige.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var visualStudioPlugin = new VisualStudioIdePlugin(new Mock<IProcessStarter>().Object);
         var sut = CreateSut(idePlugins: [visualStudioPlugin]);
@@ -156,9 +156,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task KannIdeAuswaehlen_NachLadenAsync_WhenNoEntryPoints_ReturnsFalseOhneFehlerMeldung()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
+        var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut(visualStudioCodeLocator: new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
         sut.WorkItemId = workItem.Id;
@@ -172,9 +172,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task KannIdeAuswaehlen_WhenNoEntryPoints_ReturnsFalse()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
+        var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut(visualStudioCodeLocator: new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
         sut.WorkItemId = workItem.Id;
@@ -190,13 +190,13 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task WaehleEntryPointAsync_WithMultipleEntryPoints_ShowsDialogAndReturnsSelected()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        var ersteSolution = Path.Combine(arbeitsverzeichnis, "Erste.sln");
-        var zweiteSolution = Path.Combine(arbeitsverzeichnis, "Zweite.sln");
+        var workingDirectory = CreateTempDirectory();
+        var ersteSolution = Path.Combine(workingDirectory, "Erste.sln");
+        var zweiteSolution = Path.Combine(workingDirectory, "Zweite.sln");
         File.WriteAllText(ersteSolution, string.Empty);
         File.WriteAllText(zweiteSolution, string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -211,7 +211,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         _dialogServiceMock.Verify(
             d => d.ShowSolutionSelectionDialogAsync(
-                It.Is<IReadOnlyList<string>>(liste => liste.Contains("Visual Studio: Erste.sln") && liste.Contains("Visual Studio: Zweite.sln")),
+                It.Is<IReadOnlyList<string>>(list => list.Contains("Visual Studio: Erste.sln") && list.Contains("Visual Studio: Zweite.sln")),
                 It.IsAny<CancellationToken>()),
             Times.Once);
         prozessStarterMock.Verify(
@@ -223,11 +223,11 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task WaehleEntryPointAsync_WithDialogAbort_ReturnsNull()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Erste.sln"), string.Empty);
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Zweite.sln"), string.Empty);
+        var workingDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(workingDirectory, "Erste.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(workingDirectory, "Zweite.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -248,15 +248,15 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task WaehleEntryPointAsync_UsesDisplayNameInDialog()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        var ersterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(arbeitsverzeichnis, "erste.sln"), "Erste Solution");
-        var zweiterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(arbeitsverzeichnis, "zweite.sln"), "Zweite Solution");
+        var workingDirectory = CreateTempDirectory();
+        var ersterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(workingDirectory, "erste.sln"), "Erste Solution");
+        var zweiterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(workingDirectory, "zweite.sln"), "Zweite Solution");
         var idePluginMock = CreateTestIdePluginMock([ersterEntryPoint, zweiterEntryPoint]);
         idePluginMock.Setup(p => p.OpenEntryPointAsync(It.IsAny<IdeEntryPoint>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -270,7 +270,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         _dialogServiceMock.Verify(
             d => d.ShowSolutionSelectionDialogAsync(
-                It.Is<IReadOnlyList<string>>(liste => liste.Contains("Test-IDE: Erste Solution") && liste.Contains("Test-IDE: Zweite Solution")),
+                It.Is<IReadOnlyList<string>>(list => list.Contains("Test-IDE: Erste Solution") && list.Contains("Test-IDE: Zweite Solution")),
                 It.IsAny<CancellationToken>()),
             Times.Once);
         idePluginMock.Verify(p => p.OpenEntryPointAsync(zweiterEntryPoint, It.IsAny<CancellationToken>()), Times.Once);
@@ -285,15 +285,15 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task KannIdeAuswaehlen_WhenOpenEntryPointFailsWithMultipleEntryPoints_BleibtTrue()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        var ersterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(arbeitsverzeichnis, "erste.sln"), "Erste Solution");
-        var zweiterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(arbeitsverzeichnis, "zweite.sln"), "Zweite Solution");
+        var workingDirectory = CreateTempDirectory();
+        var ersterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(workingDirectory, "erste.sln"), "Erste Solution");
+        var zweiterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(workingDirectory, "zweite.sln"), "Zweite Solution");
         var idePluginMock = CreateTestIdePluginMock([ersterEntryPoint, zweiterEntryPoint]);
         idePluginMock.Setup(p => p.OpenEntryPointAsync(It.IsAny<IdeEntryPoint>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("IDE-Prozess konnte nicht gestartet werden."));
 
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut(idePlugins: [idePluginMock.Object]);
         sut.WorkItemId = workItem.Id;
@@ -309,9 +309,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task OeffneIdeAuswahlAsync_WithNoEntryPoints_ShowsError()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
+        var workingDirectory = CreateTempDirectory();
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(
@@ -334,10 +334,10 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task WaehleEntryPointAsync_WithEntryPointsFromTwoPlugins_ShowsBothInDialog()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "MyProject.sln"), string.Empty);
+        var workingDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(workingDirectory, "MyProject.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -351,7 +351,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         _dialogServiceMock.Verify(
             d => d.ShowSolutionSelectionDialogAsync(
-                It.Is<IReadOnlyList<string>>(liste => liste.Contains("Visual Studio: MyProject.sln") && liste.Contains("Visual Studio Code")),
+                It.Is<IReadOnlyList<string>>(list => list.Contains("Visual Studio: MyProject.sln") && list.Contains("Visual Studio Code")),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -364,10 +364,10 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task WaehleEntryPointAsync_SelectingEntryFromFallbackPlugin_OpensViaThatPlugin_NotViaResolvedPlugin()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "MyProject.sln"), string.Empty);
+        var workingDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(workingDirectory, "MyProject.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -393,10 +393,10 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task WaehleEntryPointAsync_OrdersExplicitPluginEntriesBeforeFallbackPluginEntries()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "MyProject.sln"), string.Empty);
+        var workingDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(workingDirectory, "MyProject.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var prozessStarterMock = new Mock<IProcessStarter>();
         var visualStudioCodePlugin = new VisualStudioCodeIdePlugin(
@@ -407,7 +407,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         IReadOnlyList<string>? angezeigteWerte = null;
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .Callback<IReadOnlyList<string>, CancellationToken>((liste, _) => angezeigteWerte = liste)
+            .Callback<IReadOnlyList<string>, CancellationToken>((list, _) => angezeigteWerte = list)
             .ReturnsAsync((string?)null);
 
         // VS Code (Fallback) wird zuerst registriert, VS (Explicit) danach - die Rückgabeliste muss trotzdem Explicit-vor-Fallback ordnen.
@@ -426,15 +426,15 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task FormatiereAnzeigeWert_ForVisualStudioEntryPoint_UsesPluginNamePrefixAndFileName()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "MyProject.sln"), string.Empty);
+        var workingDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(workingDirectory, "MyProject.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         IReadOnlyList<string>? angezeigteWerte = null;
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .Callback<IReadOnlyList<string>, CancellationToken>((liste, _) => angezeigteWerte = liste)
+            .Callback<IReadOnlyList<string>, CancellationToken>((list, _) => angezeigteWerte = list)
             .ReturnsAsync((string?)null);
 
         var sut = CreateSut();
@@ -450,15 +450,15 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task FormatiereAnzeigeWert_ForVisualStudioCodeEntryPoint_UsesPluginNameOnly()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "MyProject.sln"), string.Empty);
+        var workingDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(workingDirectory, "MyProject.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         IReadOnlyList<string>? angezeigteWerte = null;
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .Callback<IReadOnlyList<string>, CancellationToken>((liste, _) => angezeigteWerte = liste)
+            .Callback<IReadOnlyList<string>, CancellationToken>((list, _) => angezeigteWerte = list)
             .ReturnsAsync((string?)null);
 
         var sut = CreateSut();
@@ -479,10 +479,10 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
     [Fact]
     public async Task KannIdeAuswaehlen_WhenEachCompatiblePluginHasExactlyOneEntryPoint_ButMultiplePluginsCompatible_ReturnsTrue()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Einzige.sln"), string.Empty);
+        var workingDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(workingDirectory, "Einzige.sln"), string.Empty);
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", workingDirectory, ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;

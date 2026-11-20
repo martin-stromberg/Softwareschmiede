@@ -31,7 +31,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
         var dbName = Guid.NewGuid().ToString();
         _provider = new ServiceCollection()
             .AddDbContext<SoftwareschmiedeDbContext>(o => o.UseInMemoryDatabase(dbName))
-            .AddScoped<AppEinstellungService>()
+            .AddScoped<AppSettingService>()
             .AddSingleton(typeof(ILogger<>), typeof(NullLogger<>))
             .BuildServiceProvider();
         _sut = CreateService(Options.Create(new TerminalSessionOptions()));
@@ -64,8 +64,8 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
         await act.Should().ThrowAsync<InvalidOperationException>();
         _sink.Text.Should().Contain("[Terminal-Diagnose]");
-        _ptyLauncher.Aufrufe.Should().Be(0);
-        _pipeLauncher.Aufrufe.Should().Be(0);
+        _ptyLauncher.Calls.Should().Be(0);
+        _pipeLauncher.Calls.Should().Be(0);
     }
 
     /// <summary>Eine gefundene, aber nicht ausführbare Datei (.ps1) schlägt ebenfalls ohne Fallback fehl.</summary>
@@ -80,8 +80,8 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
             await act.Should().ThrowAsync<InvalidOperationException>();
             _sink.Text.Should().Contain("[Terminal-Diagnose]");
-            _ptyLauncher.Aufrufe.Should().Be(0);
-            _pipeLauncher.Aufrufe.Should().Be(0);
+            _ptyLauncher.Calls.Should().Be(0);
+            _pipeLauncher.Calls.Should().Be(0);
         }
         finally
         {
@@ -99,7 +99,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
         {
             var result = await _sut.StartAsync(Guid.NewGuid(), CreateSpec(fileName: shim), _sink, null, CancellationToken.None);
 
-            _ptyLauncher.Aufrufe.Should().Be(1, "bei verfügbarer PTY muss der PTY-Launcher verwendet werden");
+            _ptyLauncher.Calls.Should().Be(1, "bei verfügbarer PTY muss der PTY-Launcher verwendet werden");
             _ptyLauncher.LetzteSpec.Should().NotBeNull();
             _ptyLauncher.LetzteSpec!.FileName.Should().Be("cmd.exe");
             _ptyLauncher.LetzteSpec.Arguments.Should().Be($"/d /s /c \"{shim}\"");
@@ -129,7 +129,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
             CancellationToken.None);
 
         healthCheckCalled.Should().BeTrue();
-        _ptyLauncher.Aufrufe.Should().Be(1);
+        _ptyLauncher.Calls.Should().Be(1);
     }
 
     /// <summary>Ein Plugin ohne SupportsPty-Flag läuft auf dem Pipe-Backend inkl. Diagnose-Marker.</summary>
@@ -140,8 +140,8 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
         var result = await _sut.StartAsync(Guid.NewGuid(), spec, _sink, null, CancellationToken.None);
 
-        _pipeLauncher.Aufrufe.Should().Be(1);
-        _ptyLauncher.Aufrufe.Should().Be(0);
+        _pipeLauncher.Calls.Should().Be(1);
+        _ptyLauncher.Calls.Should().Be(0);
         result.IsPseudoTerminal.Should().BeFalse();
         _sink.Text.Should().Contain("[Terminal-Diagnose]");
     }
@@ -152,14 +152,14 @@ public sealed class TerminalSessionServiceTests : IDisposable
     {
         await using (var scope = _provider.CreateAsyncScope())
         {
-            var settings = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+            var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
             await settings.SetSettingAsync(TerminalSessionService.ForcePtyUnavailableKey, "true", TestContext.Current.CancellationToken);
         }
 
         var result = await _sut.StartAsync(Guid.NewGuid(), CreateSpec(), _sink, null, CancellationToken.None);
 
-        _pipeLauncher.Aufrufe.Should().Be(1);
-        _ptyLauncher.Aufrufe.Should().Be(0);
+        _pipeLauncher.Calls.Should().Be(1);
+        _ptyLauncher.Calls.Should().Be(0);
         result.IsPseudoTerminal.Should().BeFalse();
         _sink.Text.Should().Contain("[Terminal-Diagnose]");
         _sink.Text.Should().Contain("PtyVerfuegbar=False");
@@ -171,7 +171,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
     {
         await using (var scope = _provider.CreateAsyncScope())
         {
-            var settings = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+            var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
             await settings.SetSettingAsync(TerminalSessionService.ForcePtyUnavailableKey, "true", TestContext.Current.CancellationToken);
         }
         var spec = CreateSpec() with { Capabilities = TerminalProviderCapabilities.RequiresPty | TerminalProviderCapabilities.SupportsPty };
@@ -180,8 +180,8 @@ public sealed class TerminalSessionServiceTests : IDisposable
 
         await act.Should().ThrowAsync<InvalidOperationException>();
         _sink.Text.Should().Contain("[Terminal-Diagnose]");
-        _ptyLauncher.Aufrufe.Should().Be(0);
-        _pipeLauncher.Aufrufe.Should().Be(0);
+        _ptyLauncher.Calls.Should().Be(0);
+        _pipeLauncher.Calls.Should().Be(0);
     }
 
     /// <summary>Diagnose-Marker gehen an <see cref="ITerminalDiagnoseSink"/>-Senken über
@@ -232,8 +232,8 @@ public sealed class TerminalSessionServiceTests : IDisposable
         var act = () => sut.StartAsync(Guid.NewGuid(), CreateSpec(), null, null, CancellationToken.None);
 
         await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
-        _ptyLauncher.Aufrufe.Should().Be(0);
-        _pipeLauncher.Aufrufe.Should().Be(0);
+        _ptyLauncher.Calls.Should().Be(0);
+        _pipeLauncher.Calls.Should().Be(0);
     }
 
     private TerminalSessionService CreateService(IOptions<TerminalSessionOptions> options)
@@ -258,12 +258,12 @@ public sealed class TerminalSessionServiceTests : IDisposable
         private readonly List<ITerminalSession> _sessions = [];
 
         public bool IsPseudoTerminal { get; init; }
-        public int Aufrufe { get; private set; }
+        public int Calls { get; private set; }
         public TerminalSessionStartSpec? LetzteSpec { get; private set; }
 
         public TerminalSessionStartResult Start(Guid workItemId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
         {
-            Aufrufe++;
+            Calls++;
             LetzteSpec = spec;
             var process = Process.GetCurrentProcess();
             var session = new PseudoConsoleSession(

@@ -70,8 +70,8 @@ public sealed class TodoListView : BaseWindowView
     /// <exception cref="InvalidOperationException">Wird geworfen, wenn die Checkbox nicht gefunden wird.</exception>
     public TodoListView CheckOff(string description)
     {
-        var eintrag = WaitForElement(Window, cf => cf.ByName(description), Short);
-        var container = eintrag.Parent;
+        var entry = WaitForElement(Window, cf => cf.ByName(description), Short);
+        var container = entry.Parent;
         var checkbox = container?.FindFirstDescendant(cf => cf.ByName("TodoErledigtCheckbox"))
             ?? throw new InvalidOperationException($"Checkbox für To-Do '{description}' nicht gefunden.");
         checkbox.AsCheckBox().ClickInForeground();
@@ -84,8 +84,8 @@ public sealed class TodoListView : BaseWindowView
     /// <exception cref="InvalidOperationException">Wird geworfen, wenn der Löschen-Button nicht gefunden wird.</exception>
     public TodoListView DeleteTodo(string description)
     {
-        var eintrag = WaitForElement(Window, cf => cf.ByName(description), Short);
-        var container = eintrag.Parent;
+        var entry = WaitForElement(Window, cf => cf.ByName(description), Short);
+        var container = entry.Parent;
         var loeschenButton = container?.FindFirstDescendant(cf => cf.ByName("TodoLoeschen"))
             ?? throw new InvalidOperationException($"Löschen-Button für To-Do '{description}' nicht gefunden.");
         loeschenButton.AsButton().ClickInForeground();

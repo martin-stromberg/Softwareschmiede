@@ -125,7 +125,7 @@ public sealed class AufgabenListenModusBindung
         if (_ladeModusAsync is null || _geaendert)
             return;
 
-        var modus = await _ladeModusAsync(ct);
+        var mode = await _ladeModusAsync(ct);
         _dispatch(() =>
         {
             if (_geaendert)
@@ -133,7 +133,7 @@ public sealed class AufgabenListenModusBindung
 
             // Wiederherstellung ohne Write-Back: nur Wert + Benachrichtigung,
             // damit der Start keinen Persistenz-Schreibzugriff auslöst.
-            _wert = modus;
+            _wert = mode;
             WertGeaendert?.Invoke();
         });
     }

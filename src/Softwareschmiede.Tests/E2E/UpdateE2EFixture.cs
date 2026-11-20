@@ -169,8 +169,8 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <param name="mitRcRelease">Bei <c>false</c> enthält die Release-Liste nur das Stable-Release.</param>
     public void SetzeStandardAntworten(bool mitRcRelease = true)
     {
-        _szenario.Antworten.Clear();
-        _szenario.Antworten.Add(new UpdateE2EAntwort
+        _szenario.Answer.Clear();
+        _szenario.Answer.Add(new UpdateE2EAntwort
         {
             Url = ReleaseApiUrl,
             Status = 200,
@@ -184,7 +184,7 @@ public sealed class UpdateE2EFixture : IDisposable
             (RcAssetApiUrl, RcZipPfad)
         })
         {
-            _szenario.Antworten.Add(new UpdateE2EAntwort
+            _szenario.Answer.Add(new UpdateE2EAntwort
             {
                 Url = url,
                 Status = 200,
@@ -200,7 +200,7 @@ public sealed class UpdateE2EFixture : IDisposable
             (RcManifestAssetApiUrl, RcVersion, RcDownloadUrl, RcZipPfad)
         })
         {
-            _szenario.Antworten.Add(new UpdateE2EAntwort
+            _szenario.Answer.Add(new UpdateE2EAntwort
             {
                 Url = manifestUrl,
                 Status = 200,
@@ -233,12 +233,12 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <summary>
     /// Aktiviert den kontrollierten Settings-Lesefehler für die gewählte Lesegrenze.
     /// </summary>
-    /// <param name="grenze"><c>Initial</c>, <c>BeforePreparation</c> oder <c>BeforeUpdaterStart</c>.</param>
+    /// <param name="limit"><c>Initial</c>, <c>BeforePreparation</c> oder <c>BeforeUpdaterStart</c>.</param>
     /// <param name="versuch">Versuchsauswahl (<c>any</c>, <c>startup</c>, <c>manuell</c>, <c>pruefen</c>, <c>starten</c>).</param>
     /// <param name="aufFreigabeWarten">Bei <c>true</c> blockiert der betroffene Read bis zur Gate-Freigabe.</param>
     /// <param name="wartezeitSekunden">Maximale Gate-Wartezeit in Sekunden.</param>
     public void AktiviereLesefehler(
-        string grenze,
+        string limit,
         string versuch = "any",
         bool aufFreigabeWarten = true,
         int wartezeitSekunden = 30)
@@ -247,7 +247,7 @@ public sealed class UpdateE2EFixture : IDisposable
         {
             Active = true,
             Versuch = versuch,
-            Grenze = grenze,
+            Limit = limit,
             AufFreigabeWarten = aufFreigabeWarten,
             WartezeitSekunden = wartezeitSekunden
         });
@@ -290,28 +290,28 @@ public sealed class UpdateE2EFixture : IDisposable
     /// Erstellt die Fixture-Datenbank (EF-Migration) und persistiert die Update-Einstellungen
     /// darin. Für Vorbedingungen vor dem ersten App-Start.
     /// </summary>
-    /// <param name="modus">Der zu speichernde Update-Modus.</param>
-    /// <param name="updatePfad">Der zu speichernde Update-Pfad.</param>
-    public async Task SetzeUpdateEinstellungenAsync(UpdateMode modus, string updatePfad)
-        => await SchreibeUpdateEinstellungenAsync(modus, updatePfad, migriere: true);
+    /// <param name="mode">Der zu speichernde Update-Modus.</param>
+    /// <param name="updatePath">Der zu speichernde Update-Pfad.</param>
+    public async Task SetzeUpdateEinstellungenAsync(UpdateMode mode, string updatePath)
+        => await SchreibeUpdateEinstellungenAsync(mode, updatePath, migriere: true);
 
     /// <summary>
     /// Persistiert Update-Einstellungen in der bereits bestehenden Fixture-Datenbank
     /// (für Änderungen zwischen zwei App-Läufen bei erhaltener Datenbank).
     /// </summary>
-    /// <param name="modus">Der zu speichernde Update-Modus.</param>
-    /// <param name="updatePfad">Der zu speichernde Update-Pfad.</param>
-    public async Task AktualisiereUpdateEinstellungenAsync(UpdateMode modus, string updatePfad)
-        => await SchreibeUpdateEinstellungenAsync(modus, updatePfad, migriere: false);
+    /// <param name="mode">Der zu speichernde Update-Modus.</param>
+    /// <param name="updatePath">Der zu speichernde Update-Pfad.</param>
+    public async Task AktualisiereUpdateEinstellungenAsync(UpdateMode mode, string updatePath)
+        => await SchreibeUpdateEinstellungenAsync(mode, updatePath, migriere: false);
 
     /// <summary>
     /// Persistiert die Update-Einstellungen über einen eigenen DbContext auf der
     /// Fixture-Datenbank; migriert das Schema nur bei <paramref name="migriere"/>.
     /// </summary>
-    /// <param name="modus">Der zu speichernde Update-Modus.</param>
-    /// <param name="updatePfad">Der zu speichernde Update-Pfad.</param>
+    /// <param name="mode">Der zu speichernde Update-Modus.</param>
+    /// <param name="updatePath">Der zu speichernde Update-Pfad.</param>
     /// <param name="migriere">Bei <c>true</c> wird die Fixture-Datenbank zuvor per EF-Migration erstellt.</param>
-    private async Task SchreibeUpdateEinstellungenAsync(UpdateMode modus, string updatePfad, bool migriere)
+    private async Task SchreibeUpdateEinstellungenAsync(UpdateMode mode, string updatePath, bool migriere)
     {
         var options = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>()
             .UseSqlite($"Data Source={DatenbankPfad}")
@@ -320,8 +320,8 @@ public sealed class UpdateE2EFixture : IDisposable
         await using var db = new SoftwareschmiedeDbContext(options);
         if (migriere)
             await db.Database.MigrateAsync();
-        var service = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        await service.SetUpdateSettingsAsync(new UpdateSettings(modus, updatePfad));
+        var service = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        await service.SetUpdateSettingsAsync(new UpdateSettings(mode, updatePath));
     }
 
     /// <summary>Liest alle bisher geschriebenen JSONL-Protokolleinträge.</summary>
@@ -331,7 +331,7 @@ public sealed class UpdateE2EFixture : IDisposable
         if (!File.Exists(ProtokollDateiPfad))
             return [];
 
-        var eintraege = new List<UpdateE2EProtokollEintrag>();
+        var entries = new List<UpdateE2EProtokollEintrag>();
         string inhalt;
         using (var stream = new FileStream(ProtokollDateiPfad, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
         using (var reader = new StreamReader(stream))
@@ -339,28 +339,28 @@ public sealed class UpdateE2EFixture : IDisposable
             inhalt = reader.ReadToEnd();
         }
 
-        foreach (var zeile in inhalt.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        foreach (var line in inhalt.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
-            var eintrag = JsonSerializer.Deserialize<UpdateE2EProtokollEintrag>(zeile.Trim());
-            if (eintrag is not null)
-                eintraege.Add(eintrag);
+            var entry = JsonSerializer.Deserialize<UpdateE2EProtokollEintrag>(line.Trim());
+            if (entry is not null)
+                entries.Add(entry);
         }
 
-        return eintraege;
+        return entries;
     }
 
     /// <summary>
     /// Wartet begrenzt, bis mindestens <paramref name="mindestens"/> Protokolleinträge mit dem
     /// Ereignisnamen (und optionalem Filter) vorliegen, und liefert die Treffer.
     /// </summary>
-    /// <param name="ereignis">Der Ereignisname.</param>
+    /// <param name="evt">Der Ereignisname.</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <param name="mindestens">Mindestanzahl der Treffer.</param>
     /// <param name="filter">Optionaler Filter auf den Nutzdaten-Eintrag.</param>
     /// <returns>Die gefundenen Einträge.</returns>
     /// <exception cref="TimeoutException">Die Ereignisse erschienen nicht rechtzeitig.</exception>
     public async Task<IReadOnlyList<UpdateE2EProtokollEintrag>> WarteAufEreignisAsync(
-        string ereignis,
+        string evt,
         TimeSpan timeout,
         int mindestens = 1,
         Func<UpdateE2EProtokollEintrag, bool>? filter = null)
@@ -368,36 +368,36 @@ public sealed class UpdateE2EFixture : IDisposable
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            var treffer = LeseProtokoll()
-                .Where(e => e.Ereignis == ereignis && (filter is null || filter(e)))
+            var match = LeseProtokoll()
+                .Where(e => e.Event == evt && (filter is null || filter(e)))
                 .ToList();
-            if (treffer.Count >= mindestens)
-                return treffer;
+            if (match.Count >= mindestens)
+                return match;
 
             await Task.Delay(100);
         }
 
-        var protokoll = LeseProtokoll();
-        var gleichnamig = protokoll
-            .Where(e => e.Ereignis == ereignis)
-            .Select(e => e.Daten is null ? "(ohne Daten)" : JsonSerializer.Serialize(e.Daten));
+        var log = LeseProtokoll();
+        var gleichnamig = log
+            .Where(e => e.Event == evt)
+            .Select(e => e.Data is null ? "(ohne Daten)" : JsonSerializer.Serialize(e.Data));
         throw new TimeoutException(
-            $"Protokollereignis '{ereignis}' (mindestens {mindestens}) erschien nicht innerhalb von {timeout.TotalSeconds}s. " +
-            $"Bisherige Ereignisse: {string.Join(", ", protokoll.Select(e => e.Ereignis).Distinct())}. " +
-            $"Vorhandene '{ereignis}'-Daten: {string.Join(" | ", gleichnamig)}");
+            $"Protokollereignis '{evt}' (mindestens {mindestens}) erschien nicht innerhalb von {timeout.TotalSeconds}s. " +
+            $"Bisherige Ereignisse: {string.Join(", ", log.Select(e => e.Event).Distinct())}. " +
+            $"Vorhandene '{evt}'-Daten: {string.Join(" | ", gleichnamig)}");
     }
 
     /// <summary>Liefert die Anzahl der Protokolleinträge eines Ereignisnamens.</summary>
-    /// <param name="ereignis">Der Ereignisname.</param>
+    /// <param name="evt">Der Ereignisname.</param>
     /// <returns>Die Anzahl der Einträge.</returns>
-    public int ZaehleEreignis(string ereignis)
-        => LeseProtokoll().Count(e => e.Ereignis == ereignis);
+    public int ZaehleEreignis(string evt)
+        => LeseProtokoll().Count(e => e.Event == evt);
 
     /// <summary>Liefert den <c>data</c>-Wert eines Protokolleintrags als <see cref="JsonElement"/>.</summary>
-    /// <param name="eintrag">Der Protokolleintrag.</param>
+    /// <param name="entry">Der Protokolleintrag.</param>
     /// <returns>Das Nutzdaten-Element oder <c>null</c>.</returns>
-    public static JsonElement? Daten(UpdateE2EProtokollEintrag eintrag)
-        => eintrag.Daten as JsonElement? ?? (eintrag.Daten is null ? null : JsonSerializer.SerializeToElement(eintrag.Daten));
+    public static JsonElement? Data(UpdateE2EProtokollEintrag entry)
+        => entry.Data as JsonElement? ?? (entry.Data is null ? null : JsonSerializer.SerializeToElement(entry.Data));
 
     /// <summary>GitHub-API-Asset-URL (Fallback-Download-Route) zu einer Asset-ID.</summary>
     /// <param name="assetId">Die Asset-ID.</param>
@@ -512,11 +512,11 @@ public sealed class UpdateE2EFixture : IDisposable
     }
 
     /// <summary>Liest den Markerinhalt der Paket-Exe aus einem entpackten Verzeichnis.</summary>
-    /// <param name="verzeichnis">Das entpackte Paketverzeichnis.</param>
+    /// <param name="directory">Das entpackte Paketverzeichnis.</param>
     /// <returns>Der Inhalt der Paket-Exe oder <c>null</c>.</returns>
-    public static string? LesePaketExeInhalt(string verzeichnis)
+    public static string? LesePaketExeInhalt(string directory)
     {
-        var path = Path.Combine(verzeichnis, StandardOptionen.ExecutableName);
+        var path = Path.Combine(directory, StandardOptionen.ExecutableName);
         return File.Exists(path) ? File.ReadAllText(path) : null;
     }
 
@@ -563,7 +563,7 @@ public sealed class UpdateE2EFixture : IDisposable
 
     private void SchreibeKonfiguration()
     {
-        var konfiguration = new UpdateE2ETestConfiguration
+        var configuration = new UpdateE2ETestConfiguration
         {
             Testwurzel = Testwurzel,
             SzenarioDateiPfad = SzenarioDateiPfad,
@@ -572,7 +572,7 @@ public sealed class UpdateE2EFixture : IDisposable
             GatesVerzeichnis = GatesVerzeichnis
         };
 
-        File.WriteAllText(KonfigurationDateiPfad, JsonSerializer.Serialize(konfiguration, JsonOptionen));
+        File.WriteAllText(KonfigurationDateiPfad, JsonSerializer.Serialize(configuration, JsonOptionen));
     }
 
     private string ErzeugeReleaseListenJson(bool mitRcRelease)
