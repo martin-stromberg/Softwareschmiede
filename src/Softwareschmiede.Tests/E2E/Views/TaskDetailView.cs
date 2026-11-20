@@ -223,12 +223,12 @@ public sealed class TaskDetailView : BaseWindowView
         return this;
     }
 
-    /// <summary>Wartet, bis ein Protokolleintrag des angegebenen Typs ("ProtokollTyp-{Typ}") sichtbar ist.</summary>
+    /// <summary>Wartet, bis ein Protokolleintrag des angegebenen Typs ("LogKind-{Typ}") sichtbar ist.</summary>
     /// <param name="type">Der Protokolltyp (z. B. "GitAktion").</param>
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView WaitForLogEntry(string type)
     {
-        WaitForElement(Window, cf => cf.ByName($"ProtokollTyp-{type}"), Long);
+        WaitForElement(Window, cf => cf.ByName($"LogKind-{type}"), Long);
         return this;
     }
 

@@ -13,7 +13,7 @@ namespace Softwareschmiede.Tests.Infrastructure.Testing;
 /// <c>GetOpenClipboardWindow</c>/<c>GetClipboardOwner</c> den haltenden Prozess.
 /// Alle Methoden müssen auf einem STA-Thread laufen (WPF-Clipboard ist STA-gebunden).
 /// </summary>
-public static class ClipboardTestHelfer
+public static class ClipboardTestHelper
 {
     /// <summary>Setzt Text in die Zwischenablage und bestätigt per Read-back die stabile
     /// Vorbedingung. Wiederholt bei <see cref="COMException"/> bis <paramref name="maxAttempts"/>.</summary>
@@ -38,7 +38,7 @@ public static class ClipboardTestHelfer
 
         throw new InvalidOperationException(
             $"Die Zwischenablage konnte nach {maxAttempts} Versuchen nicht stabil mit dem erwarteten Text " +
-            $"vorbereitet werden. Aktueller Halter: {BeschreibeHalter()}.");
+            $"vorbereitet werden. Aktueller Halter: {DescribeOwner()}.");
     }
 
     /// <summary>Liest den Zwischenablage-Text mit Retry bei <see cref="COMException"/>.</summary>
@@ -62,7 +62,7 @@ public static class ClipboardTestHelfer
 
         throw new InvalidOperationException(
             $"Die Zwischenablage konnte nach {maxAttempts} Versuchen nicht gelesen werden. " +
-            $"Aktueller Halter: {BeschreibeHalter()}.", lastError);
+            $"Aktueller Halter: {DescribeOwner()}.", lastError);
     }
 
     /// <summary>Leert die Zwischenablage mit Retry bei <see cref="COMException"/>.</summary>
@@ -83,22 +83,22 @@ public static class ClipboardTestHelfer
 
         throw new InvalidOperationException(
             $"Die Zwischenablage konnte nach {maxAttempts} Versuchen nicht geleert werden. " +
-            $"Aktueller Halter: {BeschreibeHalter()}.");
+            $"Aktueller Halter: {DescribeOwner()}.");
     }
 
     /// <summary>Bestmögliche Diagnose, welcher Prozess die Zwischenablage gerade offen hält
     /// (<c>GetOpenClipboardWindow</c>) bzw. zuletzt befüllt hat (<c>GetClipboardOwner</c>).
     /// Erscheint in Fehlermeldungen, damit externe Halter erkennbar werden.</summary>
     /// <returns>Prozessname und PID des Halters bzw. Besitzers, oder „unbekannt".</returns>
-    public static string BeschreibeHalter()
+    public static string DescribeOwner()
     {
         var open = GetOpenClipboardWindow();
-        var besitzer = GetClipboardOwner();
+        var owner = GetClipboardOwner();
         var part = new List<string>();
         if (open != IntPtr.Zero)
             part.Add($"offen gehalten von {ProcessName(open)}");
-        if (besitzer != IntPtr.Zero && besitzer != open)
-            part.Add($"Inhalt zuletzt von {ProcessName(besitzer)} gesetzt");
+        if (owner != IntPtr.Zero && owner != open)
+            part.Add($"Inhalt zuletzt von {ProcessName(owner)} gesetzt");
         return part.Count > 0
             ? string.Join("; ", part)
             : "kein offener Halter/Besitzer ermittelbar (zwischen den Versuchen freigegeben)";

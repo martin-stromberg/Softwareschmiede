@@ -4,9 +4,9 @@ using Softwareschmiede.App.Services;
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>
-/// ViewModel für den Dialog zum Einstellen oder Lift einer Aufgaben-Pause.
+/// ViewModel für den Dialog zum Einstellen oder Aufheben einer Aufgaben-Pause.
 /// Bietet Datums-/Zeiteingabe (lokal), eine Anzeige der aktuell gesetzten Pause und
-/// das Ergebnis als <see cref="PauseWorkItemResult"/> (UTC-Zeitpunkt oder Lift).
+/// das Ergebnis als <see cref="PauseWorkItemResult"/> (UTC-Zeitpunkt oder Aufheben).
 /// </summary>
 public sealed class PauseWorkItemDialogViewModel : ViewModelBase
 {

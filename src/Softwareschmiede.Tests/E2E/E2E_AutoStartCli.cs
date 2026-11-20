@@ -37,7 +37,7 @@ public partial class End2EndTest
         // Protokoll-Nachladen (Issue 193): Der GitAktion-Eintrag aus der Repository-Vorbereitung
         // wird asynchron im Hintergrund geladen und muss ohne expliziten Reload sichtbar werden.
         // AutomationProperties.Name des Protokolltyp-TextBlocks ist explizit an Typ gebunden
-        // (TaskDetailView.xaml, "ProtokollTyp-{Typ}"), statt zufällig am impliziten Textinhalt.
+        // (TaskDetailView.xaml, "LogKind-{Typ}"), statt zufällig am impliziten Textinhalt.
         taskDetail.WaitForLogEntry("GitAktion");
 
         // CLI manuell stoppen, Gesamtstatus bleibt "Gestartet"

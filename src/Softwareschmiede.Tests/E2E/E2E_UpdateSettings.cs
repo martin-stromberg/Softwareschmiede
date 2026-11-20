@@ -80,7 +80,7 @@ public partial class End2EndTest
             // Fenster lesbar bleiben (TextWrapping statt horizontalem Abschneiden).
             settings.Window.Patterns.Transform.Pattern.Resize(900, 600);
             Thread.Sleep(300);
-            var updateCombo = WaitForElement(settings.Window, cf => cf.ByName("Update-Modus"), Short);
+            var updateCombo = WaitForElement(settings.Window, cf => cf.ByName("Update-Mode"), Short);
             updateCombo.Patterns.ExpandCollapse.Pattern.Expand();
             var longerEntry = WaitForElement(
                 updateCombo,

@@ -29,11 +29,11 @@ public sealed partial class TerminalControlTests
     /// </summary>
     /// <param name="text">Der in die Zwischenablage zu schreibende Text.</param>
     private static void SetClipboardTextWithRetry(string text)
-        => ClipboardTestHelfer.SetTextWithRetry(text);
+        => ClipboardTestHelper.SetTextWithRetry(text);
 
     /// <summary>Leert die Windows-Zwischenablage mit Retry - Begründung siehe <see cref="SetClipboardTextWithRetry"/>.</summary>
     private static void ClearClipboardWithRetry()
-        => ClipboardTestHelfer.EmptyWithRetry();
+        => ClipboardTestHelper.EmptyWithRetry();
 
     /// <summary>Drückt der Anwender <c>Ctrl+V</c>, muss das Tastaturereignis als behandelt markiert werden,
     /// damit es nicht an den bestehenden Tastatur-Encoder weitergereicht wird.</summary>

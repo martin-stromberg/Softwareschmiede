@@ -787,14 +787,14 @@ public sealed class SettingsView : BaseWindowView
     /// <summary>Liest das aktuell ausgewählte Label der "Update-Modus"-ComboBox im "Allgemein"-Tab.</summary>
     /// <returns>Das Anzeige-Label des gewählten Update-Modus (siehe <c>UpdateModusTexte</c>).</returns>
     public string GetUpdateMode()
-        => WaitForElement(Window, cf => cf.ByName("Update-Modus"), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+        => WaitForElement(Window, cf => cf.ByName("Update-Mode"), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
 
     /// <summary>Wählt einen Eintrag der "Update-Modus"-ComboBox und wartet, bis er übernommen wurde.</summary>
     /// <param name="label">Das Anzeige-Label (aus <c>UpdateModusTexte</c>: "Aus", "Nur prüfen" oder "Bei Programmstart prüfen und ausführen").</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetUpdateMode(string label)
     {
-        var box = WaitForElement(Window, cf => cf.ByName("Update-Modus"), Short);
+        var box = WaitForElement(Window, cf => cf.ByName("Update-Mode"), Short);
         SelectComboBoxItemByClick(box, label, Short);
         WaitForUpdateMode(label, Short);
         return this;
@@ -811,21 +811,21 @@ public sealed class SettingsView : BaseWindowView
     public SettingsView WaitForUpdateMode(string label, TimeSpan timeout)
     {
         ElementWaitHelper.WaitForSelectedComboBoxItem(
-            WaitForElement(Window, cf => cf.ByName("Update-Modus"), timeout), label, timeout);
+            WaitForElement(Window, cf => cf.ByName("Update-Mode"), timeout), label, timeout);
         return this;
     }
 
     /// <summary>Liest das aktuell ausgewählte Label der "Update-Pfad"-ComboBox im "Allgemein"-Tab.</summary>
     /// <returns>Das Anzeige-Label des gewählten Update-Pfads (siehe <c>UpdatePfadTexte</c>).</returns>
     public string GetUpdatePath()
-        => WaitForElement(Window, cf => cf.ByName("Update-Pfad").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+        => WaitForElement(Window, cf => cf.ByName("Update-Path").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
 
     /// <summary>Wählt einen Eintrag der "Update-Pfad"-ComboBox und wartet, bis er übernommen wurde.</summary>
     /// <param name="label">Das Anzeige-Label (aus <c>UpdatePfadTexte</c>: "Produktivversionen" oder "Vorabversionen").</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetUpdatePath(string label)
     {
-        var box = WaitForElement(Window, cf => cf.ByName("Update-Pfad").And(cf.ByControlType(ControlType.ComboBox)), Short);
+        var box = WaitForElement(Window, cf => cf.ByName("Update-Path").And(cf.ByControlType(ControlType.ComboBox)), Short);
         SelectComboBoxItemByClick(box, label, Short);
         WaitForUpdatePath(label, Short);
         return this;
@@ -839,7 +839,7 @@ public sealed class SettingsView : BaseWindowView
     public SettingsView WaitForUpdatePath(string label, TimeSpan timeout)
     {
         ElementWaitHelper.WaitForSelectedComboBoxItem(
-            WaitForElement(Window, cf => cf.ByName("Update-Pfad").And(cf.ByControlType(ControlType.ComboBox)), timeout), label, timeout);
+            WaitForElement(Window, cf => cf.ByName("Update-Path").And(cf.ByControlType(ControlType.ComboBox)), timeout), label, timeout);
         return this;
     }
 

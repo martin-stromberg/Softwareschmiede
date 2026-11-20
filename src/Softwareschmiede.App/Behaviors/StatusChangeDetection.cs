@@ -11,9 +11,9 @@ public sealed class StatusChangeDetection
     /// <returns><c>false</c> bei Erstbeobachtung oder unverändertem Status, <c>true</c> bei einem echten Wechsel.</returns>
     public bool HasChanged(Guid workItemId, string? newStatus)
     {
-        var hasSichChanged = _lastStatus.TryGetValue(workItemId, out var bisherigerStatus) && bisherigerStatus != newStatus;
+        var hasChanged = _lastStatus.TryGetValue(workItemId, out var previousStatus) && previousStatus != newStatus;
         _lastStatus[workItemId] = newStatus;
-        return hasSichChanged;
+        return hasChanged;
     }
 
     /// <summary>Entfernt die gemerkte Beobachtung für eine Aufgabe, z. B. wenn das zugehörige UI-Element entladen wird.</summary>

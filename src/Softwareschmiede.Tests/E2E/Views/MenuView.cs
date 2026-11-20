@@ -75,7 +75,7 @@ public sealed class MenuView : BaseWindowView
     /// <summary>Liest den Anzahl-Text des Auto-Shutdown-Blocks ("AutoShutdownRunningCount").</summary>
     /// <returns>Der Anzeigetext oder <c>null</c>, wenn das Element nicht sichtbar ist.</returns>
     public string? GetAutoShutdownRunningCountText()
-        => LiesElementText("AutoShutdownRunningCount");
+        => ReadElementText("AutoShutdownRunningCount");
 
     /// <summary>Wartet, bis der Anzahl-Text des Auto-Shutdown-Blocks <paramref name="partText"/> enthält.</summary>
     /// <param name="partText">Der erwartete Teiltext (z. B. "1 laufende").</param>
@@ -167,7 +167,7 @@ public sealed class MenuView : BaseWindowView
     /// <summary>Liest den Countdown-Text des Auto-Shutdown-Blocks ("AutoShutdownCountdown").</summary>
     /// <returns>Der Anzeigetext oder <c>null</c>, wenn kein Countdown sichtbar ist.</returns>
     public string? GetAutoShutdownCountdownText()
-        => LiesElementText("AutoShutdownCountdown");
+        => ReadElementText("AutoShutdownCountdown");
 
     /// <summary>Wartet, bis der Countdown-Text sichtbar ist und <paramref name="partText"/> enthält.</summary>
     /// <param name="partText">Der erwartete Teiltext (z. B. "Herunterfahren in").</param>
@@ -352,18 +352,18 @@ public sealed class MenuView : BaseWindowView
     public string WaitForUpdateNotice(string partText, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
-        string? zuletzt = null;
+        string? last = null;
         while (DateTime.UtcNow < deadline)
         {
-            zuletzt = GetUpdateNotice();
-            if (zuletzt is not null && zuletzt.Contains(partText, StringComparison.Ordinal))
-                return zuletzt;
+            last = GetUpdateNotice();
+            if (last is not null && last.Contains(partText, StringComparison.Ordinal))
+                return last;
 
             Thread.Sleep(200);
         }
 
         throw new TimeoutException(
-            $"UpdateNotice enthielt nicht innerhalb von {timeout.TotalSeconds}s '{partText}'. Zuletzt gesehen: '{zuletzt}'.");
+            $"UpdateNotice enthielt nicht innerhalb von {timeout.TotalSeconds}s '{partText}'. Zuletzt gesehen: '{last}'.");
     }
 
     /// <summary>
@@ -514,7 +514,7 @@ public sealed class MenuView : BaseWindowView
     {
         WaitForElement(
             ActiveWorkItemsListMenuElement(),
-            cf => cf.ByName($"OffeneTodos:{taskTitle}"),
+            cf => cf.ByName($"OpenTodos:{taskTitle}"),
             Medium).ClickInForeground();
         return this;
     }
@@ -564,11 +564,11 @@ public sealed class MenuView : BaseWindowView
     /// </summary>
     /// <param name="buttonNames">Akzeptierte UIA-Namen des Navigations-Buttons.</param>
     /// <param name="targetVisible">Prädikat für die sichtbare Zielansicht.</param>
-    /// <param name="fehlertext">Assert-Meldung bei ausbleibender Zielansicht.</param>
+    /// <param name="errorText">Assert-Meldung bei ausbleibender Zielansicht.</param>
     private void NavigateUntilVisible(
         IReadOnlyList<string> buttonNames,
         Func<bool> targetVisible,
-        string fehlertext)
+        string errorText)
     {
         // Erst auf den Button warten - fehlt er ganz, ist das eine andere Fehlerart als ein
         // verschluckter Klick und soll weiterhin mit eigenem Timeout diagnostiziert werden.
@@ -608,7 +608,7 @@ public sealed class MenuView : BaseWindowView
             Thread.Sleep(200);
         }
 
-        Assert.True(targetVisible(), fehlertext + " " + TryFindNavigationButton(buttonNames)?.DescribeClickTarget()
+        Assert.True(targetVisible(), errorText + " " + TryFindNavigationButton(buttonNames)?.DescribeClickTarget()
             + "; Window=" + Window.BoundingRectangle + "; Children=" + string.Join(" | ", Window.FindAllChildren().Select(e => e.ControlType + ":" + e.Name)));
     }
 
@@ -666,7 +666,7 @@ public sealed class MenuView : BaseWindowView
     }
 
     /// <summary>Liest den UIA-Namen (Anzeigetext) eines Elements; <c>null</c>, wenn es fehlt oder ausgeblendet ist.</summary>
-    private string? LiesElementText(string automationId)
+    private string? ReadElementText(string automationId)
     {
         var element = Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
         return element is null || element.IsOffscreen ? null : element.Name;
@@ -694,12 +694,12 @@ public sealed class MenuView : BaseWindowView
     /// bereits bewiesen — der Helper wartet nicht vergeblich auf einen lesbaren Zustand.
     /// </summary>
     /// <exception cref="TimeoutException">Die Checkbox wurde nicht rechtzeitig sichtbar oder erreichte den Zielzustand nicht.</exception>
-    private MenuView SetCheckBoxState(string automationId, bool target, string fehlertext)
+    private MenuView SetCheckBoxState(string automationId, bool target, string errorText)
     {
         var deadline = DateTime.UtcNow + Medium;
         var nextClick = DateTime.UtcNow;
         var found = false;
-        bool? zuletztIsChecked = null;
+        bool? lastIsChecked = null;
         while (DateTime.UtcNow < deadline)
         {
             var element = Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
@@ -718,7 +718,7 @@ public sealed class MenuView : BaseWindowView
                 var checkbox = element.AsCheckBox();
                 try
                 {
-                    zuletztIsChecked = checkbox.IsChecked;
+                    lastIsChecked = checkbox.IsChecked;
                 }
                 catch (FlaUI.Core.Exceptions.FlaUIException)
                 {
@@ -730,7 +730,7 @@ public sealed class MenuView : BaseWindowView
                     // UIA-Provider des kollabierenden Elements transient nicht erreichbar.
                 }
 
-                if (zuletztIsChecked == target)
+                if (lastIsChecked == target)
                 {
                     return this;
                 }
@@ -760,9 +760,9 @@ public sealed class MenuView : BaseWindowView
         }
 
         var diagnostics = found
-            ? $" Zuletzt gesehen: IsChecked={zuletztIsChecked?.ToString() ?? "null"}, Ziel={target}."
+            ? $" Zuletzt gesehen: IsChecked={lastIsChecked?.ToString() ?? "null"}, Ziel={target}."
             : string.Empty;
-        throw new TimeoutException(fehlertext + diagnostics);
+        throw new TimeoutException(errorText + diagnostics);
     }
 
     /// <summary>Wartet, bis der Anzeigetext eines Elements <paramref name="partText"/> enthält.</summary>
@@ -770,18 +770,18 @@ public sealed class MenuView : BaseWindowView
     private string WaitOnElementText(string automationId, string partText, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
-        string? zuletzt = null;
+        string? last = null;
         while (DateTime.UtcNow < deadline)
         {
-            zuletzt = LiesElementText(automationId);
-            if (zuletzt is not null && zuletzt.Contains(partText, StringComparison.Ordinal))
-                return zuletzt;
+            last = ReadElementText(automationId);
+            if (last is not null && last.Contains(partText, StringComparison.Ordinal))
+                return last;
 
             Thread.Sleep(200);
         }
 
         throw new TimeoutException(
-            $"{automationId} enthielt nicht innerhalb von {timeout.TotalSeconds}s '{partText}'. Zuletzt gesehen: '{zuletzt}'.");
+            $"{automationId} enthielt nicht innerhalb von {timeout.TotalSeconds}s '{partText}'. Zuletzt gesehen: '{last}'.");
     }
 
     /// <summary>Wartet, bis ein Element keinen sichtbaren Anzeigetext mehr liefert.</summary>
@@ -791,14 +791,14 @@ public sealed class MenuView : BaseWindowView
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            if (LiesElementText(automationId) is null)
+            if (ReadElementText(automationId) is null)
                 return this;
 
             Thread.Sleep(200);
         }
 
         throw new TimeoutException(
-            $"{automationId} blieb länger als {timeout.TotalSeconds}s sichtbar. Zuletzt gesehen: '{LiesElementText(automationId)}'.");
+            $"{automationId} blieb länger als {timeout.TotalSeconds}s sichtbar. Zuletzt gesehen: '{ReadElementText(automationId)}'.");
     }
 
     /// <summary>Wartet, bis ein Element nicht mehr vorhanden oder ausgeblendet ist.</summary>

@@ -50,10 +50,10 @@ public sealed class PluginSelectionServiceTests
         var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
 
         // Act
-        var prefixe = await sut.GetAvailableAiPluginPrefixesAsync(TestContext.Current.CancellationToken);
+        var prefixes = await sut.GetAvailableAiPluginPrefixesAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        prefixe.Should().ContainSingle().Which.Should().Be("Softwareschmiede.Aktiv");
+        prefixes.Should().ContainSingle().Which.Should().Be("Softwareschmiede.Aktiv");
     }
 
     /// <summary>Fällt auf gespeicherten Standard zurück, wenn keine explizite Auswahl vorliegt.</summary>

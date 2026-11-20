@@ -120,7 +120,7 @@ public partial class End2EndTest
         Exception? error = null;
         var thread = new Thread(() =>
         {
-            try { text = ClipboardTestHelfer.GetTextWithRetry(); }
+            try { text = ClipboardTestHelper.GetTextWithRetry(); }
             catch (Exception ex) { error = ex; }
         });
         thread.SetApartmentState(ApartmentState.STA);

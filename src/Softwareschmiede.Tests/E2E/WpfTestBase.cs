@@ -358,7 +358,7 @@ public abstract class WpfTestBase : IDisposable
     protected Window WaitOnRealMainwindow(FlaUI.Core.Application app)
     {
         var deadline = DateTime.UtcNow + Long;
-        var gesehen = string.Empty;
+        var seen = string.Empty;
         while (DateTime.UtcNow < deadline)
         {
             try
@@ -372,7 +372,7 @@ public abstract class WpfTestBase : IDisposable
                 // fragt alle Top-Level-Fenster aller Prozesse ab und kann an einem nicht antwortenden
                 // Fremd-Provider die volle UIA-Timeout-Zeit hängen (gemessen: ~80s pro Aufruf).
                 var window = ProcessWindowEnumeration.TopLevelWindowsAndTitles(app.ProcessId);
-                gesehen = string.Join(" | ", window.Select(f => $"'{f.Title}'"));
+                seen = string.Join(" | ", window.Select(f => $"'{f.Title}'"));
                 var mainHandle = window.FirstOrDefault(
                     f => f.Title.StartsWith("Softwareschmiede", StringComparison.Ordinal)).Hwnd;
                 if (mainHandle != IntPtr.Zero)
@@ -396,7 +396,7 @@ public abstract class WpfTestBase : IDisposable
         }
 
         throw new TimeoutException(
-            $"Das Hauptfenster der Testanwendung wurde nicht gefunden (Top-Level-Fenster: {gesehen}).");
+            $"Das Hauptfenster der Testanwendung wurde nicht gefunden (Top-Level-Fenster: {seen}).");
     }
 
     private static void WaitForProcessExitOrThrow(int processId, TimeSpan timeout)
@@ -1199,8 +1199,8 @@ public abstract class WpfTestBase : IDisposable
     {
         if (items.Length == 0)
             throw new InvalidOperationException(
-                "ErsteOffeneAufgabeOeffnen wurde mit einer leeren Aufgabenliste aufgerufen. " +
-                "Aufrufer müssen zuvor sicherstellen, dass OffeneAufgabenItems mindestens ein Element liefert.");
+                "OpenFirstOpenWorkItem wurde mit einer leeren Aufgabenliste aufgerufen. " +
+                "Aufrufer müssen zuvor sicherstellen, dass OpenWorkItemsItems mindestens ein Element liefert.");
 
         items[0].DoubleClickInForeground();
     }

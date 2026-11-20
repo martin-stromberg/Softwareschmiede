@@ -438,7 +438,7 @@ public partial class End2EndTest
             // Exception den haltenden Prozess.
             try
             {
-                ClipboardTestHelfer.SetTextWithRetry(text);
+                ClipboardTestHelper.SetTextWithRetry(text);
             }
             catch (Exception ex)
             {

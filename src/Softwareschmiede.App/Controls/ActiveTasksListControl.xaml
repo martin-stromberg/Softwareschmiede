@@ -44,7 +44,7 @@
                     <Button Content="{Binding OpenTodoLabelText}"
                             Command="{Binding ShowOpenTodosCommand}"
                             Click="OpenTodosButtonClick"
-                            AutomationProperties.Name="{Binding Title, StringFormat=OffeneTodos:{0}}"
+                            AutomationProperties.Name="{Binding Title, StringFormat=OpenTodos:{0}}"
                             AutomationProperties.HelpText="{Binding OpenTodoLabelText}"
                             MinWidth="64"
                             HorizontalAlignment="Left"
