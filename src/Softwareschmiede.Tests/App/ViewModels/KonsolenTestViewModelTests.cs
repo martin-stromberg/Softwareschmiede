@@ -48,7 +48,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-{Guid.NewGuid():N}.clireplay");
         await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "TestPlugin",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -208,7 +208,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-pause-{Guid.NewGuid():N}.clireplay");
         await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -365,7 +365,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-neustart-{Guid.NewGuid():N}.clireplay");
         await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -499,7 +499,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-schritt-{Guid.NewGuid():N}.clireplay");
         await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -556,7 +556,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-schrittguard-{Guid.NewGuid():N}.clireplay");
         await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -672,7 +672,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-schrittpause-{Guid.NewGuid():N}.clireplay");
         await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,

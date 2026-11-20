@@ -37,14 +37,14 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
         var sut = TestKiAusfuehrungsServiceFactory.Create(
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher(chunks));
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
-        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        var aufzeichnung = sut.GetCliAufzeichnung(aufgabeId);
+        var aufzeichnung = sut.GetCliAufzeichnung(workItemId);
         aufzeichnung.Should().NotBeNull();
-        aufzeichnung!.AufgabeId.Should().Be(aufgabeId);
+        aufzeichnung!.WorkItemId.Should().Be(workItemId);
         aufzeichnung.PluginName.Should().Be("TestPlugin");
         aufzeichnung.Cols.Should().Be(new TerminalSessionOptions().DefaultCols);
         aufzeichnung.Rows.Should().Be(new TerminalSessionOptions().DefaultRows);
@@ -73,12 +73,12 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
             new Mock<IServiceScopeFactory>().Object,
             launcher: launcher,
             terminalOptions: new TerminalSessionOptions { AufzeichnungByteBudget = 0 });
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
-        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        var handle = await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        sut.GetCliAufzeichnung(aufgabeId).Should().BeNull("bei deaktiviertem Budget wird kein Recorder erstellt");
+        sut.GetCliAufzeichnung(workItemId).Should().BeNull("bei deaktiviertem Budget wird kein Recorder erstellt");
         handle.OutputSink.Should().BeOfType<CliOutputProtokollWriter>(
             "ohne Recorder wird der Protokoll-Writer direkt als Senke übergeben");
     }
@@ -91,10 +91,10 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
         var sut = TestKiAusfuehrungsServiceFactory.Create(
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher([Encoding.UTF8.GetBytes("x")]));
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
-        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        var handle = await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         handle.OutputSink.Should().BeOfType<CompositeTerminalOutputSink>(
             "der an die Session übergebene Sink muss die Composite-Instanz sein (Recorder + Writer)");
@@ -114,12 +114,12 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher(chunks),
             terminalOptions: new TerminalSessionOptions { AufzeichnungByteBudget = 8 });
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
-        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        var aufzeichnung = sut.GetCliAufzeichnung(aufgabeId);
+        var aufzeichnung = sut.GetCliAufzeichnung(workItemId);
         aufzeichnung.Should().NotBeNull();
         aufzeichnung!.IstVollstaendig.Should().BeFalse();
         aufzeichnung.Chunks.Should().HaveCount(1);
@@ -160,12 +160,12 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher([Encoding.UTF8.GetBytes("x")]),
             timeProvider: timeProvider);
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = CreatePlugin();
 
-        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        var aufzeichnung = sut.GetCliAufzeichnung(aufgabeId);
+        var aufzeichnung = sut.GetCliAufzeichnung(workItemId);
         aufzeichnung.Should().NotBeNull();
         aufzeichnung!.StartUtc.Should().Be(timeProvider.Start);
         aufzeichnung.Chunks[0].Offset.Should().Be(TimeSpan.Zero);

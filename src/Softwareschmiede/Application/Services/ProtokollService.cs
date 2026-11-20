@@ -11,132 +11,132 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Service zum Speichern und Abrufen von Protokolleinträgen.</summary>
 public sealed class ProtokollService
 {
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly ILogger<ProtokollService> _logger;
 
     /// <inheritdoc cref="ProtokollService"/>
-    public ProtokollService(SoftwareschmiededDbContext db, ILogger<ProtokollService> logger)
+    public ProtokollService(SoftwareschmiedeDbContext db, ILogger<ProtokollService> logger)
     {
         _db = db;
         _logger = logger;
     }
 
     /// <summary>Gibt alle Protokolleinträge einer Aufgabe chronologisch sortiert zurück (inkl. TestErgebnisse).</summary>
-    public async Task<IReadOnlyList<Protokolleintrag>> GetByAufgabeAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<LogEntry>> GetByAufgabeAsync(Guid workItemId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Protokolleinträge für Aufgabe {AufgabeId} abrufen.", aufgabeId);
-        return await _db.Protokolleintraege
+        _logger.LogInformation("Protokolleinträge für Aufgabe {AufgabeId} abrufen.", workItemId);
+        return await _db.LogEntries
             .AsNoTracking()
-            .Include(p => p.TestErgebnisse)
-            .Where(p => p.AufgabeId == aufgabeId)
-            .OrderBy(p => p.Zeitstempel)
+            .Include(p => p.TestResults)
+            .Where(p => p.WorkItemId == workItemId)
+            .OrderBy(p => p.Timestamp)
             .ToListAsync(ct);
     }
 
     /// <summary>Fügt einen neuen Protokolleintrag hinzu.</summary>
-    public async Task<Protokolleintrag> AddEintragAsync(
-        Guid aufgabeId,
-        ProtokollTyp typ,
+    public async Task<LogEntry> AddEintragAsync(
+        Guid workItemId,
+        LogEntryType typ,
         string inhalt,
         string? agentName = null,
         CancellationToken ct = default)
     {
-        _logger.LogInformation("Protokolleintrag (Typ: {Typ}) für Aufgabe {AufgabeId} hinzufügen.", typ, aufgabeId);
+        _logger.LogInformation("Protokolleintrag (Typ: {Typ}) für Aufgabe {AufgabeId} hinzufügen.", typ, workItemId);
 
-        var eintrag = new Protokolleintrag
+        var eintrag = new LogEntry
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabeId,
-            Typ = typ,
-            Inhalt = inhalt,
+            WorkItemId = workItemId,
+            Type = typ,
+            Content = inhalt,
             AgentName = agentName,
-            Zeitstempel = DateTimeOffset.UtcNow
+            Timestamp = DateTimeOffset.UtcNow
         };
 
-        _db.Protokolleintraege.Add(eintrag);
+        _db.LogEntries.Add(eintrag);
         await _db.SaveChangesAsync(ct);
 
         return eintrag;
     }
 
     /// <summary>Erstellt einen Protokolleintrag vom Typ TestErgebnis und fügt TestErgebnis-Einträge hinzu.</summary>
-    public async Task<Protokolleintrag> AddTestErgebnisseAsync(
-        Guid aufgabeId,
-        TestResult testResult,
+    public async Task<LogEntry> AddTestErgebnisseAsync(
+        Guid workItemId,
+        TestRunResult testResult,
         CancellationToken ct = default)
     {
         _logger.LogInformation(
             "TestErgebnis-Protokolleintrag für Aufgabe {AufgabeId} hinzufügen. Bestanden: {Bestanden}, Anzahl: {Anzahl}.",
-            aufgabeId,
-            testResult.Bestanden,
+            workItemId,
+            testResult.Passed,
             testResult.Ergebnisse.Count);
 
-        var zusammenfassung = testResult.Bestanden
+        var zusammenfassung = testResult.Passed
             ? $"Alle {testResult.Ergebnisse.Count} Tests bestanden."
-            : $"{testResult.Ergebnisse.Count(e => e.Status == TestStatus.Fehlgeschlagen)} von {testResult.Ergebnisse.Count} Tests fehlgeschlagen.";
+            : $"{testResult.Ergebnisse.Count(e => e.Status == TestStatus.Failed)} von {testResult.Ergebnisse.Count} Tests fehlgeschlagen.";
 
-        var eintrag = new Protokolleintrag
+        var eintrag = new LogEntry
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabeId,
-            Typ = ProtokollTyp.TestErgebnis,
-            Inhalt = zusammenfassung,
-            Zeitstempel = DateTimeOffset.UtcNow
+            WorkItemId = workItemId,
+            Type = LogEntryType.TestResult,
+            Content = zusammenfassung,
+            Timestamp = DateTimeOffset.UtcNow
         };
 
-        eintrag.TestErgebnisse = testResult.Ergebnisse.Select(e => new TestErgebnis
+        eintrag.TestResults = testResult.Ergebnisse.Select(e => new TestResult
         {
             Id = Guid.NewGuid(),
-            ProtokollEintragId = eintrag.Id,
+            LogEntryId = eintrag.Id,
             TestName = e.TestName,
             Status = e.Status,
-            Fehlermeldung = e.Fehlermeldung,
-            Dauer = e.Dauer
+            ErrorMessage = e.ErrorMessage,
+            Duration = e.Duration
         }).ToList();
 
-        _db.Protokolleintraege.Add(eintrag);
+        _db.LogEntries.Add(eintrag);
         await _db.SaveChangesAsync(ct);
 
         return eintrag;
     }
 
     /// <summary>Erstellt einen Protokolleintrag für einen Statusübergang.</summary>
-    public async Task<Protokolleintrag> AddStatusUebergangAsync(
-        Guid aufgabeId,
-        AufgabeStatus vonStatus,
-        AufgabeStatus nachStatus,
+    public async Task<LogEntry> AddStatusUebergangAsync(
+        Guid workItemId,
+        WorkItemStatus vonStatus,
+        WorkItemStatus nachStatus,
         CancellationToken ct = default)
     {
         _logger.LogInformation(
             "Statusübergang für Aufgabe {AufgabeId}: {VonStatus} → {NachStatus}.",
-            aufgabeId,
+            workItemId,
             vonStatus,
             nachStatus);
 
-        var inhalt = $"Status geändert: {vonStatus} → {nachStatus}";
+        var inhalt = $"Status geändert: {vonStatus.ToDisplayText()} → {nachStatus.ToDisplayText()}";
 
-        return await AddEintragAsync(aufgabeId, ProtokollTyp.StatusUebergang, inhalt, null, ct);
+        return await AddEintragAsync(workItemId, LogEntryType.StatusTransition, inhalt, null, ct);
     }
 
     private const string RateLimitMarkerPrefix = "[[SOFTWARESCHMIEDE_RATE_LIMIT";
 
     /// <summary>
-    /// Speichert eine einzelne CLI-Ausgabezeile als Protokolleintrag vom Typ <see cref="ProtokollTyp.CliOutput"/>.
+    /// Speichert eine einzelne CLI-Ausgabezeile als Protokolleintrag vom Typ <see cref="LogEntryType.CliOutput"/>.
     /// Wenn die Zeile einen Rate-Limit-Marker enthält, wird zusätzlich ein Eintrag vom Typ
-    /// <see cref="ProtokollTyp.RateLimit"/> gespeichert.
+    /// <see cref="LogEntryType.RateLimit"/> gespeichert.
     /// </summary>
-    public async Task AddCliOutputAsync(Guid aufgabeId, string outputLine, CancellationToken ct = default)
+    public async Task AddCliOutputAsync(Guid workItemId, string outputLine, CancellationToken ct = default)
     {
-        var eintrag = new Protokolleintrag
+        var eintrag = new LogEntry
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabeId,
-            Typ = ProtokollTyp.CliOutput,
-            Inhalt = outputLine,
-            Zeitstempel = DateTimeOffset.UtcNow
+            WorkItemId = workItemId,
+            Type = LogEntryType.CliOutput,
+            Content = outputLine,
+            Timestamp = DateTimeOffset.UtcNow
         };
 
-        _db.Protokolleintraege.Add(eintrag);
+        _db.LogEntries.Add(eintrag);
 
         if (TryParseRateLimitMarker(outputLine, out var resetUtc))
         {
@@ -144,19 +144,19 @@ public sealed class ProtokollService
                 ? $"Rate-Limit erkannt. Weiter ab: {resetUtc.Value:O}"
                 : "Rate-Limit erkannt (kein Zeitstempel).";
 
-            var rateLimitEintrag = new Protokolleintrag
+            var rateLimitEintrag = new LogEntry
             {
                 Id = Guid.NewGuid(),
-                AufgabeId = aufgabeId,
-                Typ = ProtokollTyp.RateLimit,
-                Inhalt = rateLimitInhalt,
-                Zeitstempel = DateTimeOffset.UtcNow
+                WorkItemId = workItemId,
+                Type = LogEntryType.RateLimit,
+                Content = rateLimitInhalt,
+                Timestamp = DateTimeOffset.UtcNow
             };
-            _db.Protokolleintraege.Add(rateLimitEintrag);
+            _db.LogEntries.Add(rateLimitEintrag);
 
             _logger.LogInformation(
                 "Rate-Limit-Marker für Aufgabe {AufgabeId} erkannt. Reset: {ResetUtc}",
-                aufgabeId,
+                workItemId,
                 resetUtc?.ToString("O") ?? "(unbekannt)");
         }
 
@@ -214,19 +214,19 @@ public sealed class ProtokollService
     }
 
     /// <summary>Sucht in Inhalt und AgentName der Protokolleinträge einer Aufgabe.</summary>
-    public async Task<IReadOnlyList<Protokolleintrag>> SuchenAsync(
-        Guid aufgabeId,
+    public async Task<IReadOnlyList<LogEntry>> SuchenAsync(
+        Guid workItemId,
         string suchbegriff,
         CancellationToken ct = default)
     {
-        _logger.LogInformation("Protokolleinträge für Aufgabe {AufgabeId} nach '{Suchbegriff}' durchsuchen.", aufgabeId, suchbegriff);
+        _logger.LogInformation("Protokolleinträge für Aufgabe {AufgabeId} nach '{Suchbegriff}' durchsuchen.", workItemId, suchbegriff);
 
-        return await _db.Protokolleintraege
+        return await _db.LogEntries
             .AsNoTracking()
-            .Include(p => p.TestErgebnisse)
-            .Where(p => p.AufgabeId == aufgabeId
-                && (p.Inhalt.Contains(suchbegriff) || (p.AgentName != null && p.AgentName.Contains(suchbegriff))))
-            .OrderBy(p => p.Zeitstempel)
+            .Include(p => p.TestResults)
+            .Where(p => p.WorkItemId == workItemId
+                && (p.Content.Contains(suchbegriff) || (p.AgentName != null && p.AgentName.Contains(suchbegriff))))
+            .OrderBy(p => p.Timestamp)
             .ToListAsync(ct);
     }
 }

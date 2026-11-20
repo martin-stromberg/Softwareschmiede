@@ -6,7 +6,7 @@ namespace Softwareschmiede.Domain.Interfaces;
 public interface ISystemShutdownService
 {
     /// <summary>Fordert das Herunterfahren des Host-Systems an.</summary>
-    /// <param name="erzwingen"><see langword="true"/> erzwingt das Herunterfahren gegen den Widerstand laufender Anwendungen (unter Windows via <c>/f</c>); unter Linux/macOS ohne Wirkung.</param>
+    /// <param name="force"><see langword="true"/> erzwingt das Herunterfahren gegen den Widerstand laufender Anwendungen (unter Windows via <c>/f</c>); unter Linux/macOS ohne Wirkung.</param>
     /// <param name="cancellationToken">Token zum Abbrechen der Operation.</param>
-    Task RequestShutdownAsync(bool erzwingen, CancellationToken cancellationToken = default);
+    Task RequestShutdownAsync(bool force, CancellationToken cancellationToken = default);
 }

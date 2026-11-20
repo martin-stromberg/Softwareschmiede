@@ -14,8 +14,8 @@ public sealed class CliOutputRecorderTests
     public void OnOutputChunk_ZeichnetChunksMitOffsetUndBytekopie()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero));
-        var aufgabeId = Guid.NewGuid();
-        var sut = new CliOutputRecorder(aufgabeId, "TestPlugin", 120, 30, 1024, timeProvider);
+        var workItemId = Guid.NewGuid();
+        var sut = new CliOutputRecorder(workItemId, "TestPlugin", 120, 30, 1024, timeProvider);
 
         var chunk1 = Encoding.UTF8.GetBytes("erster");
         sut.OnOutputChunk(chunk1);
@@ -24,7 +24,7 @@ public sealed class CliOutputRecorderTests
         sut.OnOutputChunk(Encoding.UTF8.GetBytes("zweiter"));
 
         var aufzeichnung = sut.GetAufzeichnung();
-        aufzeichnung.AufgabeId.Should().Be(aufgabeId);
+        aufzeichnung.WorkItemId.Should().Be(workItemId);
         aufzeichnung.PluginName.Should().Be("TestPlugin");
         aufzeichnung.StartUtc.Should().Be(timeProvider.Start);
         aufzeichnung.Cols.Should().Be(120);

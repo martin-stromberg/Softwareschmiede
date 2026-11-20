@@ -174,7 +174,7 @@ public sealed class UpdateE2EFixture : IDisposable
         {
             Url = ReleaseApiUrl,
             Status = 200,
-            Inhalt = ErzeugeReleaseListenJson(mitRcRelease)
+            Content = ErzeugeReleaseListenJson(mitRcRelease)
         });
         foreach (var (url, zipPfad) in new[]
         {
@@ -204,7 +204,7 @@ public sealed class UpdateE2EFixture : IDisposable
             {
                 Url = manifestUrl,
                 Status = 200,
-                Inhalt = ErzeugeManifestJson(version, downloadUrl, zipPfad),
+                Content = ErzeugeManifestJson(version, downloadUrl, zipPfad),
                 Art = "manifest"
             });
         }
@@ -245,7 +245,7 @@ public sealed class UpdateE2EFixture : IDisposable
     {
         AktualisiereSzenario(s => s.Lesefehler = new UpdateE2ELesefehler
         {
-            Aktiv = true,
+            Active = true,
             Versuch = versuch,
             Grenze = grenze,
             AufFreigabeWarten = aufFreigabeWarten,
@@ -259,7 +259,7 @@ public sealed class UpdateE2EFixture : IDisposable
     /// </summary>
     public void DeaktiviereLesefehler()
     {
-        AktualisiereSzenario(s => s.Lesefehler = new UpdateE2ELesefehler { Aktiv = false });
+        AktualisiereSzenario(s => s.Lesefehler = new UpdateE2ELesefehler { Active = false });
         UpdateE2EProtokoll.Anfuegen(
             ProtokollDateiPfad, SzenarioId, UpdateE2EEreignisse.UpdateSettingsReadFailureDisabled);
     }
@@ -313,11 +313,11 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <param name="migriere">Bei <c>true</c> wird die Fixture-Datenbank zuvor per EF-Migration erstellt.</param>
     private async Task SchreibeUpdateEinstellungenAsync(UpdateMode modus, string updatePfad, bool migriere)
     {
-        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
+        var options = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>()
             .UseSqlite($"Data Source={DatenbankPfad}")
             .Options;
 
-        await using var db = new SoftwareschmiededDbContext(options);
+        await using var db = new SoftwareschmiedeDbContext(options);
         if (migriere)
             await db.Database.MigrateAsync();
         var service = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);

@@ -102,7 +102,7 @@ public sealed class TerminalReplaySessionTests
 
         session.Pausieren();
         session.IstPausiert.Should().BeTrue();
-        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Laeuft, "die Wiedergabe läuft auch pausiert weiter");
+        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Running, "die Wiedergabe läuft auch pausiert weiter");
 
         // Auch nach Ablauf der realen Pause darf während der Pausierung kein Chunk angewendet werden —
         // unabhängig davon, ob die Schleife bereits im Delay oder noch am Pause-Gate parkt.
@@ -159,7 +159,7 @@ public sealed class TerminalReplaySessionTests
 
         session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inaktiv, "vor der Wiedergabe ist die Session inaktiv");
         session.WiedergabeStarten();
-        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Laeuft);
+        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Running);
 
         var args = await exitedArgs.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         args.ExitCode.Should().BeNull("die Replay-Session hat keinen echten Prozess-Exit-Code");
@@ -550,7 +550,7 @@ public sealed class TerminalReplaySessionTests
         // (Position 0, kein anhängiger Delay) — kein Raten des Parkpunkts nötig.
         session.Pausieren();
         session.WiedergabeStarten();
-        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Laeuft);
+        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Running);
 
         session.SchrittVor().Should().BeTrue();
         session.SchrittVor().Should().BeTrue();
@@ -567,7 +567,7 @@ public sealed class TerminalReplaySessionTests
         // Schrittposition fort und feuert am Ende erneut Exited.
         session.SchrittZurueck().Should().BeTrue();
         session.WiedergabeStarten();
-        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Laeuft,
+        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Running,
             "die terminierte Schleife muss das Lauf-Flag freigegeben haben");
         // Der Delay der neuen Schleife wird erst nach dem Task-Start angelegt — wiederholte
         // Advances decken die Registrierungsreihenfolge ab.
@@ -706,7 +706,7 @@ public sealed class TerminalReplaySessionTests
         // „Abspielen": die Schleife schläft noch im Fake-Delay — der CAS schlägt garantiert
         // fehl. Ohne Widerruf/Neustart stürbe die Schleife beim nächsten Advance lautlos.
         session.WiedergabeStarten();
-        await WarteBisAsync(() => session.RuntimeStatus == CliRuntimeStatus.Laeuft);
+        await WarteBisAsync(() => session.RuntimeStatus == CliRuntimeStatus.Running);
 
         // Nach Zeitsprüngen muss die Wiedergabe an der Schrittposition fortsetzen — über die
         // widerrufene Schleife oder einen ans Task-Ende gehängten Neustart: der letzte Chunk
@@ -832,7 +832,7 @@ public sealed class TerminalReplaySessionTests
             .ToArray();
         return new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "TestPlugin",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = cols,

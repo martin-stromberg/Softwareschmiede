@@ -5,7 +5,7 @@ namespace Softwareschmiede.Infrastructure.Terminal;
 public sealed class CliOutputAufzeichnung
 {
     /// <summary>ID der Aufgabe, zu der die Session gehörte.</summary>
-    public required Guid AufgabeId { get; init; }
+    public required Guid WorkItemId { get; init; }
 
     /// <summary>Anzeigename des KI-Plugins, dessen CLI aufgezeichnet wurde.</summary>
     public required string PluginName { get; init; }

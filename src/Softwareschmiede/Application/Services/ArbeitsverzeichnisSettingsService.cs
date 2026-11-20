@@ -11,12 +11,12 @@ public sealed class ArbeitsverzeichnisSettingsService
     /// <summary>Schlüssel der App-Einstellung für das Repository-Arbeitsverzeichnis.</summary>
     public const string RepositoriesWorkdirKey = "repositories.workdir";
 
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly ILogger<ArbeitsverzeichnisSettingsService> _logger;
 
     /// <inheritdoc cref="ArbeitsverzeichnisSettingsService"/>
     public ArbeitsverzeichnisSettingsService(
-        SoftwareschmiededDbContext db,
+        SoftwareschmiedeDbContext db,
         ILogger<ArbeitsverzeichnisSettingsService> logger)
     {
         _db = db;
@@ -26,11 +26,11 @@ public sealed class ArbeitsverzeichnisSettingsService
     /// <summary>Liest den aktuell gespeicherten Arbeitsverzeichnis-Wert.</summary>
     public async Task<string?> GetArbeitsverzeichnisAsync(CancellationToken ct = default)
     {
-        var setting = await _db.AppEinstellungen
+        var setting = await _db.AppSettings
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Schluessel == RepositoriesWorkdirKey, ct);
+            .FirstOrDefaultAsync(s => s.Key == RepositoriesWorkdirKey, ct);
 
-        return setting?.Wert;
+        return setting?.Value;
     }
 
     /// <summary>Speichert das Arbeitsverzeichnis (null/leer = Default verwenden).</summary>
@@ -50,21 +50,21 @@ public sealed class ArbeitsverzeichnisSettingsService
             await EnsureDirectoryExistsAsync(normalized);
         }
 
-        var setting = await _db.AppEinstellungen
-            .FirstOrDefaultAsync(s => s.Schluessel == RepositoriesWorkdirKey, ct);
+        var setting = await _db.AppSettings
+            .FirstOrDefaultAsync(s => s.Key == RepositoriesWorkdirKey, ct);
 
         if (setting is null)
         {
-            setting = new AppEinstellung
+            setting = new AppSetting
             {
                 Id = Guid.NewGuid(),
-                Schluessel = RepositoriesWorkdirKey
+                Key = RepositoriesWorkdirKey
             };
-            _db.AppEinstellungen.Add(setting);
+            _db.AppSettings.Add(setting);
         }
 
-        setting.Wert = normalized;
-        setting.AktualisiertAm = DateTimeOffset.UtcNow;
+        setting.Value = normalized;
+        setting.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Arbeitsverzeichnis-Einstellung gespeichert: {Path}", normalized);

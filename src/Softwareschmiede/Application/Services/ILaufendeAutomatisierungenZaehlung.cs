@@ -3,7 +3,7 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>
 /// Zählt die fachlich „laufenden" Automatisierungen — d. h. die aktiven Aufgaben, deren
 /// <see cref="KiAusfuehrungsStatusKlassifikation"/> den Zustand
-/// <see cref="Domain.Enums.KiAusfuehrungsZustand.Laeuft"/> ergibt.
+/// <see cref="Domain.Enums.AiExecutionState.Running"/> ergibt.
 /// </summary>
 public interface ILaufendeAutomatisierungenZaehlung
 {

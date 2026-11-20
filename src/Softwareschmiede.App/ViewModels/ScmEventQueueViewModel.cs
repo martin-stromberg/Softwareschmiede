@@ -49,7 +49,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             using var scope = _scopes.CreateScope();
             var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct);
             // Die Backoff-Rücksetzung gilt für Ereignis- wie Backmerge-Checkpoints gleichermaßen.
-            await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmObservationCheckpoints
+            await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmObservationCheckpoints
                 .ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)null), ct);
             if (!monitoringEnabled)
             {
@@ -169,22 +169,22 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
         {
             _dispatch(() => IsLoading = true);
             using var scope = _scopes.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var filter = SelectedFilter;
             var query = db.ScmIncomingEvents.AsNoTracking();
             if (filter == "Wartend") query = query.Where(x => x.Status != "Verarbeitet" && x.Status != "Abgebrochen");
             if (filter == "Verarbeitet") query = query.Where(x => x.Status == "Verarbeitet");
             if (filter == "Abgebrochen") query = query.Where(x => x.Status == "Abgebrochen");
             var records = await query.OrderBy(x => x.Sequence).ToListAsync(ct);
-            var taskIds = records.Select(x => x.AufgabeId).Distinct().ToArray();
-            var tasks = await db.Aufgaben.AsNoTracking().Where(x => taskIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+            var taskIds = records.Select(x => x.WorkItemId).Distinct().ToArray();
+            var tasks = await db.WorkItems.AsNoTracking().Where(x => taskIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
             // Nicht abgeschlossene Outbox-Aktionen markieren, damit „Erneut prüfen" auch an
             // einem „Verarbeitet"-Ereignis mit gescheiterter Folgeaktion angeboten werden kann.
             var eventIds = records.Select(x => x.Id).ToArray();
             var openActionEvents = (await db.ScmOutgoingActions.AsNoTracking()
                 .Where(x => x.Status != "Succeeded" && eventIds.Contains(x.EventId))
                 .Select(x => x.EventId).Distinct().ToListAsync(ct)).ToHashSet();
-            var entries = records.Select(item => ScmEventQueueItem.From(item, tasks.GetValueOrDefault(item.AufgabeId),
+            var entries = records.Select(item => ScmEventQueueItem.From(item, tasks.GetValueOrDefault(item.WorkItemId),
                 openActionEvents.Contains(item.Id))).ToList();
             // "Keine Aufgabe zugeordnet" ist der erwartete Normalzustand enumerierter Referenzen ohne lokale
             // Aufgabe und weder eine Unterbrechung noch ein Fehler — nur echte Beobachtungsfehler alarmieren.
@@ -286,10 +286,10 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
                 return null;
             }
             // Absichtlich kein Single-Plugin-Kurzschluss: auch ein einziges Plugin erfordert die Auswahlbestätigung.
-            var result = await _dialogs.ShowPluginSelectionDialogAsync(available, task.KiPluginPrefix, token);
+            var result = await _dialogs.ShowPluginSelectionDialogAsync(available, task.AiPluginPrefix, token);
             if (result.SelectedPluginPrefix is null) return null;
             if (result.SaveAsProjectDefault)
-                await selection.SaveProjectDefaultPluginPrefixAsync(task.ProjektId, PluginType.DevelopmentAutomation, result.SelectedPluginPrefix, token);
+                await selection.SaveProjectDefaultPluginPrefixAsync(task.ProjectId, PluginType.DevelopmentAutomation, result.SelectedPluginPrefix, token);
             return result.SelectedPluginPrefix;
         }, ct);
     }
@@ -300,7 +300,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
         using var scope = _scopes.CreateScope();
         ct.ThrowIfCancellationRequested();
         await action(scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>(), item);
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var current = await db.ScmIncomingEvents.AsNoTracking().SingleOrDefaultAsync(x => x.Id == item.Id, ct);
         if (current is not null)
         {
@@ -394,16 +394,16 @@ public sealed record ScmEventQueueItem(Guid Id, Guid TaskId, string TaskTitle, s
     /// <summary>Nur ein als bestätigbar markierter, noch nicht zugestellter Wartegrund bietet die Bestätigung an.</summary>
     public bool CanConfirmReady => !IsBlocked && AttemptId is null && CliRunId is not null && ScmCliWaitReason.IsConfirmable(Reason);
     /// <summary>Erstellt die menschenlesbare Projektion aus dauerhaften Daten.</summary>
-    public static ScmEventQueueItem From(ScmIncomingEvent item, Aufgabe? task, bool hasOpenActions)
+    public static ScmEventQueueItem From(ScmIncomingEvent item, WorkItem? task, bool hasOpenActions)
     {
         var observation = ScmEventStore.Observation(item);
-        var blocked = task is null || task.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert || task.PausiertBisUtc > DateTimeOffset.UtcNow;
-        var reason = task is null ? "Zugehörige Aufgabe wurde entfernt." : task.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert
-            ? "Aufgabe beendet/archiviert; Start gesperrt." : task.PausiertBisUtc > DateTimeOffset.UtcNow ? "Aufgabe pausiert; Start gesperrt." : item.Reason;
-        return new(item.Id, item.AufgabeId, task?.Titel ?? "Entfernte Aufgabe",
+        var blocked = task is null || task.Status is WorkItemStatus.Completed or WorkItemStatus.Archived || task.PausedUntilUtc > DateTimeOffset.UtcNow;
+        var reason = task is null ? "Zugehörige Aufgabe wurde entfernt." : task.Status is WorkItemStatus.Completed or WorkItemStatus.Archived
+            ? "Aufgabe beendet/archiviert; Start gesperrt." : task.PausedUntilUtc > DateTimeOffset.UtcNow ? "Aufgabe pausiert; Start gesperrt." : item.Reason;
+        return new(item.Id, item.WorkItemId, task?.Title ?? "Entfernte Aufgabe",
             $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}",
             $"{(observation.Reference.Kind == Domain.ValueObjects.ScmReferenceKind.Issue ? "Issue" : "Pull Request")} #{observation.Reference.Number}",
-            item.Zweck == ScmIssueAufbereitungsService.Zweck ? "Issue-Aufbereitung"
+            item.Purpose == ScmIssueAufbereitungsService.Purpose ? "Issue-Aufbereitung"
                 : observation.ContentKind switch { Domain.ValueObjects.ScmContentKind.Description => "Beschreibung", Domain.ValueObjects.ScmContentKind.ReviewComment => "Review-Kommentar", Domain.ValueObjects.ScmContentKind.PullRequestReview => "Review", _ => "Kommentar" },
             DateTimeOffset.FromUnixTimeMilliseconds(item.ReceivedUtc).ToLocalTime().ToString("g"), item.Status,
             item.Status switch { "ZustellungVorbereitet" => "Zustellung vorbereitet", "InBearbeitung" => "In Bearbeitung", "ZustellungUngewiss" => "Zustellung ungewiss", "VerarbeitungUngeklärt" => "Verarbeitung ungeklärt", _ => item.Status },

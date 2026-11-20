@@ -149,7 +149,7 @@ public sealed class ScmEventQueueViewModelTests
 
         Assert.Equal(2, attempts);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments", cancellationToken: TestContext.Current.CancellationToken)).Status);
     }
 
@@ -164,7 +164,7 @@ public sealed class ScmEventQueueViewModelTests
         var (_, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             db.ScmOutgoingActions.Add(new ScmOutgoingAction
             {
                 Id = Guid.NewGuid(),
@@ -199,7 +199,7 @@ public sealed class ScmEventQueueViewModelTests
         var (_, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             (await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, cancellationToken: TestContext.Current.CancellationToken)).Status = status;
             db.ScmOutgoingActions.Add(new ScmOutgoingAction
             {
@@ -232,7 +232,7 @@ public sealed class ScmEventQueueViewModelTests
         var (_, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             (await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, cancellationToken: TestContext.Current.CancellationToken)).Status = "Verarbeitet";
             db.ScmOutgoingActions.Add(new ScmOutgoingAction
             {
@@ -301,7 +301,7 @@ public sealed class ScmEventQueueViewModelTests
         await fixture.InitializeAsync();
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
             {
                 SourceKey = "owner/repo",
@@ -318,7 +318,7 @@ public sealed class ScmEventQueueViewModelTests
         Assert.Contains("erneut anmelden", view.MonitoringNotice);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var source = (await db.ScmObservationCheckpoints.FindAsync(new object?[] { "owner/repo" }, TestContext.Current.CancellationToken))!;
             source.Diagnostic = null; source.ErrorCode = null; source.NextAttemptUtc = null;
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -336,7 +336,7 @@ public sealed class ScmEventQueueViewModelTests
         await fixture.InitializeAsync();
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
             {
                 SourceKey = "github/github.com/owner%2Frepo/Issue/1/Description",
@@ -355,7 +355,7 @@ public sealed class ScmEventQueueViewModelTests
         Assert.DoesNotContain(ScmEventStore.UnassignedDiagnostic, view.Diagnostics ?? string.Empty);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
             {
                 SourceKey = "repository/github/owner%2Frepo",
@@ -381,7 +381,7 @@ public sealed class ScmEventQueueViewModelTests
         await fixture.InitializeAsync();
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             db.ScmObservationCheckpoints.Add(new ScmObservationCheckpoint
             {
                 SourceKey = "notifications/softwareschmiede.github/github.com",
@@ -408,7 +408,7 @@ public sealed class ScmEventQueueViewModelTests
         {
             var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
             await einstellungen.SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
-            await einstellungen.SetScmBackmergeModusAsync(ScmBackmergeModus.Global, TestContext.Current.CancellationToken);
+            await einstellungen.SetScmBackmergeModusAsync(ScmBackmergeMode.Global, TestContext.Current.CancellationToken);
         }
         using var view = View(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture);
 
@@ -434,17 +434,17 @@ public sealed class ScmEventQueueViewModelTests
         await fixture.SetSettingAsync(AppEinstellungService.ScmIssueAufbereitungEnabledKey, "true");
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var project = new Projekt { Id = Guid.NewGuid(), Name = "Aufbereitung" };
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            var project = new Project { Id = Guid.NewGuid(), Name = "Aufbereitung" };
             var repository = new GitRepository
             {
                 Id = Guid.NewGuid(),
-                Projekt = project,
+                Project = project,
                 RepositoryUrl = "https://github.com/owner/repo",
                 RepositoryName = "repo",
-                PluginTyp = fixture.Repository.ProviderPrefix,
-                Aktiv = true,
-                IssueAufbereitungAktiv = true
+                PluginType = fixture.Repository.ProviderPrefix,
+                Active = true,
+                IssuePreparationEnabled = true
             };
             db.AddRange(project, repository);
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);

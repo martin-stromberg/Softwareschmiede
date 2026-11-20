@@ -188,15 +188,15 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var projektId = Guid.NewGuid();
-        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
+        var projectId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
 
         var pluginManager = CreatePluginManager([]);
         var activationService = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
         var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
 
         // Act
-        var resolved = await sut.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(null, projektId, TestContext.Current.CancellationToken);
+        var resolved = await sut.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(null, projectId, TestContext.Current.CancellationToken);
 
         // Assert
         resolved.Should().Be("Softwareschmiede.ProjectKi");
@@ -254,15 +254,15 @@ public sealed class PluginSelectionServiceTests
         var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
         await einstellungen.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var projektId = Guid.NewGuid();
-        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
+        var projectId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
         var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
         var pluginManager = CreatePluginManager([simulator]);
         var activationService = new PluginActivationService(einstellungen, pluginManager.Object, NullLogger<PluginActivationService>.Instance);
         var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, einstellungen);
 
         // Act
-        var resolved = await sut.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(null, projektId, TestContext.Current.CancellationToken);
+        var resolved = await sut.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(null, projectId, TestContext.Current.CancellationToken);
 
         // Assert
         resolved.Should().Be("Softwareschmiede.ProjectKi");
@@ -339,8 +339,8 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var projektId = Guid.NewGuid();
-        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
+        var projectId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
         await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.GlobalKi", TestContext.Current.CancellationToken);
 
         var task = CreateKiPlugin("Task", "Softwareschmiede.TaskKi");
@@ -351,7 +351,7 @@ public sealed class PluginSelectionServiceTests
         var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
 
         // Act
-        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.TaskKi", projektId, TestContext.Current.CancellationToken);
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.TaskKi", projectId, TestContext.Current.CancellationToken);
 
         // Assert
         resolution.PluginPrefix.Should().Be("Softwareschmiede.TaskKi");
@@ -366,8 +366,8 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var projektId = Guid.NewGuid();
-        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
+        var projectId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
 
         var task = CreateKiPlugin("Task", "Softwareschmiede.TaskKi");
         var project = CreateKiPlugin("Project", "Softwareschmiede.ProjectKi");
@@ -377,7 +377,7 @@ public sealed class PluginSelectionServiceTests
         var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
 
         // Act
-        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.TaskKi", projektId, TestContext.Current.CancellationToken);
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.TaskKi", projectId, TestContext.Current.CancellationToken);
 
         // Assert
         resolution.PluginPrefix.Should().Be("Softwareschmiede.ProjectKi");
@@ -392,8 +392,8 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var projektId = Guid.NewGuid();
-        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
+        var projectId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
 
         var project = CreateKiPlugin("Project", "Softwareschmiede.ProjectKi");
         var pluginManager = CreatePluginManager([project]);
@@ -401,7 +401,7 @@ public sealed class PluginSelectionServiceTests
         var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
 
         // Act
-        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.Missing", projektId, TestContext.Current.CancellationToken);
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.Missing", projectId, TestContext.Current.CancellationToken);
 
         // Assert
         resolution.PluginPrefix.Should().Be("Softwareschmiede.ProjectKi");
@@ -416,8 +416,8 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var projektId = Guid.NewGuid();
-        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
+        var projectId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
         await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.GlobalKi", TestContext.Current.CancellationToken);
 
         var project = CreateKiPlugin("Project", "Softwareschmiede.ProjectKi");
@@ -428,7 +428,7 @@ public sealed class PluginSelectionServiceTests
         var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
 
         // Act
-        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(null, projektId, TestContext.Current.CancellationToken);
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(null, projectId, TestContext.Current.CancellationToken);
 
         // Assert
         resolution.PluginPrefix.Should().Be("Softwareschmiede.GlobalKi");
@@ -472,8 +472,8 @@ public sealed class PluginSelectionServiceTests
         var einstellungen = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
         await einstellungen.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var projektId = Guid.NewGuid();
-        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
+        var projectId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
         await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.GlobalKi", TestContext.Current.CancellationToken);
 
         var task = CreateKiPlugin("Task", "Softwareschmiede.TaskKi");
@@ -487,7 +487,7 @@ public sealed class PluginSelectionServiceTests
         var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, einstellungen);
 
         // Act
-        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.TaskKi", projektId, TestContext.Current.CancellationToken);
+        var resolution = await sut.ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync("Softwareschmiede.TaskKi", projectId, TestContext.Current.CancellationToken);
 
         // Assert
         resolution.PluginPrefix.Should().BeNull();

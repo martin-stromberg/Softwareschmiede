@@ -10,7 +10,7 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Migrations
 {
-    [DbContext(typeof(SoftwareschmiededDbContext))]
+    [DbContext(typeof(SoftwareschmiedeDbContext))]
     [Migration("20260626204930_202606260001_MigrateGitRepositoryPluginTyp")]
     partial class _202606260001_MigrateGitRepositoryPluginTyp
     {

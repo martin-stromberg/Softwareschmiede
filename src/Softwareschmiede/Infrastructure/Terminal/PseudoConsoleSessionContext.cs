@@ -25,7 +25,7 @@ internal sealed record PseudoConsoleSessionContext
     /// <summary>Zeitquelle für die Runtime-Status-Erkennung (Test-Hook).</summary>
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
-    /// <summary>Dauer ohne I/O-Aktivität, ab der der Runtime-Status <see cref="CliRuntimeStatus.WartetAufEingabe"/> angenommen wird.</summary>
+    /// <summary>Dauer ohne I/O-Aktivität, ab der der Runtime-Status <see cref="CliRuntimeStatus.WaitingForInput"/> angenommen wird.</summary>
     public TimeSpan WaitingThreshold { get; init; } = TimeSpan.FromSeconds(4);
 
     /// <summary>Verzögerung, mit der <see cref="PseudoConsoleSession.WritePromptAsync"/> den

@@ -80,12 +80,12 @@ public sealed class AppEinstellungServiceTests_AutoShutdown : IDisposable
     {
         await using var db = CreateContext();
         await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-        db.AppEinstellungen.Add(new AppEinstellung
+        db.AppSettings.Add(new AppSetting
         {
             Id = Guid.NewGuid(),
-            Schluessel = AppEinstellungService.AutoShutdownToleranzMinutenKey,
-            Wert = "keine-zahl",
-            AktualisiertAm = DateTimeOffset.UtcNow
+            Key = AppEinstellungService.AutoShutdownToleranzMinutenKey,
+            Value = "keine-zahl",
+            UpdatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         var service = CreateService(db);
@@ -94,9 +94,9 @@ public sealed class AppEinstellungServiceTests_AutoShutdown : IDisposable
             .Should().Be(AppEinstellungService.AutoShutdownDefaultToleranzMinuten);
     }
 
-    private SoftwareschmiededDbContext CreateContext()
+    private SoftwareschmiedeDbContext CreateContext()
         => TestDbContextFactory.CreateSqlite($"Data Source={_dbPath}");
 
-    private static AppEinstellungService CreateService(SoftwareschmiededDbContext db)
+    private static AppEinstellungService CreateService(SoftwareschmiedeDbContext db)
         => new(db, NullLogger<AppEinstellungService>.Instance);
 }

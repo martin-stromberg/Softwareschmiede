@@ -1,0 +1,14 @@
+namespace Softwareschmiede.Domain.Enums;
+
+/// <summary>Kategorie eines Plugins.</summary>
+public enum PluginCategory
+{
+    /// <summary>Git-Provider Plugin (z.B. GitHub, GitLab).</summary>
+    Git,
+
+    /// <summary>KI-Plugin (z.B. GitHub Copilot).</summary>
+    Ai,
+
+    /// <summary>IDE-Integration Plugin (z.B. Visual Studio, Visual Studio Code).</summary>
+    Ide
+}

@@ -29,7 +29,7 @@ public sealed class ProtokollierenderUpdateService : IUpdateService
     {
         _kontext.Protokoll.Schreibe(
             UpdateE2EEreignisse.UpdateCheckStarted,
-            new { updatePfad = options.UpdatePfad, kanal = options.Kanal.ToString() });
+            new { updatePfad = options.UpdatePfad, kanal = options.Channel.ToString() });
 
         var ergebnis = await _inner.CheckForUpdateAsync(options, ct);
 

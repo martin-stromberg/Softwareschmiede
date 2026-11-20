@@ -96,10 +96,10 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für den Anzeigemodus der Aufgabenliste im Dashboard (<c>AufgabenListenModus</c>-Name).</summary>
     public const string AktiveAufgabenListenModusDashboardKey = "aktiveaufgaben.listenmodus.dashboard";
 
-    /// <summary>Schlüssel für den Backmerge-Aktivierungsmodus (<see cref="ScmBackmergeModus"/>-Wert als Zahl gespeichert).</summary>
+    /// <summary>Schlüssel für den Backmerge-Aktivierungsmodus (<see cref="ScmBackmergeMode"/>-Wert als Zahl gespeichert).</summary>
     public const string ScmBackmergeModeKey = "scm.backmerge.mode";
 
-    /// <summary>Schlüssel für den Prüfmodus der SCM-Abschlussüberwachung (<see cref="ScmTaskCompletionPruefmodus"/>-Wert als Zahl gespeichert).</summary>
+    /// <summary>Schlüssel für den Prüfmodus der SCM-Abschlussüberwachung (<see cref="ScmTaskCompletionCheckMode"/>-Wert als Zahl gespeichert).</summary>
     public const string ScmTaskCompletionPruefmodusKey = "scm.taskcompletion.scope";
 
     /// <summary>Schlüssel für die automatische Aktivierung von Draft-Backmerge-PRs.</summary>
@@ -126,12 +126,12 @@ public sealed class AppEinstellungService
     /// <summary>Maximalwert der Auto-Shutdown-Toleranzzeit in Minuten.</summary>
     public const int AutoShutdownMaxToleranzMinuten = 1440;
 
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly ILogger<AppEinstellungService> _logger;
 
     /// <inheritdoc cref="AppEinstellungService"/>
     public AppEinstellungService(
-        SoftwareschmiededDbContext db,
+        SoftwareschmiedeDbContext db,
         ILogger<AppEinstellungService> logger)
     {
         _db = db;
@@ -141,11 +141,11 @@ public sealed class AppEinstellungService
     /// <summary>Liest den Wert einer Einstellung. Gibt <c>null</c> zurück, wenn kein Wert gespeichert ist.</summary>
     public async Task<string?> GetSettingAsync(string schluessel, CancellationToken ct = default)
     {
-        var einstellung = await _db.AppEinstellungen
+        var einstellung = await _db.AppSettings
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Schluessel == schluessel, ct);
+            .FirstOrDefaultAsync(s => s.Key == schluessel, ct);
 
-        return einstellung?.Wert;
+        return einstellung?.Value;
     }
 
     /// <summary>Liest den Wert einer Einstellung als <see cref="int"/>. Gibt <c>null</c> zurück, wenn kein Wert gespeichert ist oder der Wert kein gültiger Integer ist.</summary>
@@ -169,21 +169,21 @@ public sealed class AppEinstellungService
     /// <summary>Speichert oder überschreibt eine Einstellung. Übergibt man <c>null</c>, wird der Wert auf null gesetzt (nicht gelöscht).</summary>
     public async Task SetSettingAsync(string schluessel, string? wert, CancellationToken ct = default)
     {
-        var einstellung = await _db.AppEinstellungen
-            .FirstOrDefaultAsync(s => s.Schluessel == schluessel, ct);
+        var einstellung = await _db.AppSettings
+            .FirstOrDefaultAsync(s => s.Key == schluessel, ct);
 
         if (einstellung is null)
         {
-            einstellung = new AppEinstellung
+            einstellung = new AppSetting
             {
                 Id = Guid.NewGuid(),
-                Schluessel = schluessel
+                Key = schluessel
             };
-            _db.AppEinstellungen.Add(einstellung);
+            _db.AppSettings.Add(einstellung);
         }
 
-        einstellung.Wert = wert;
-        einstellung.AktualisiertAm = DateTimeOffset.UtcNow;
+        einstellung.Value = wert;
+        einstellung.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);
         _logger.LogDebug("Einstellung '{Schluessel}' gespeichert.", schluessel);
@@ -241,30 +241,30 @@ public sealed class AppEinstellungService
         => await GetBoolSettingAsync(ScmIssueAufbereitungKommentarEnabledKey, ct) ?? true;
 
     /// <summary>Bildet den Einstellungsschlüssel der projektbezogenen Backmerge-Freigabe.</summary>
-    /// <param name="projektId">Die Projekt-ID.</param>
+    /// <param name="projectId">Die Projekt-ID.</param>
     /// <returns>Den vollständigen Einstellungsschlüssel <c>plugins.backmerge.project.{projektId}</c>.</returns>
-    public static string BackmergeProjektKey(Guid projektId) => $"{BackmergeProjektKeyPrefix}{projektId}";
+    public static string BackmergeProjektKey(Guid projectId) => $"{BackmergeProjektKeyPrefix}{projectId}";
 
     /// <summary>
     /// Liest den Backmerge-Aktivierungsmodus unter <see cref="ScmBackmergeModeKey"/>.
     /// Fehlende oder ungültige gespeicherte Werte fallen auf
-    /// <see cref="ScmBackmergeModus.Deaktiviert"/> zurück.
+    /// <see cref="ScmBackmergeMode.Disabled"/> zurück.
     /// </summary>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Der effektive Backmerge-Modus.</returns>
-    public async Task<ScmBackmergeModus> GetScmBackmergeModusAsync(CancellationToken ct = default)
+    public async Task<ScmBackmergeMode> GetScmBackmergeModusAsync(CancellationToken ct = default)
     {
         var wert = await GetSettingAsync(ScmBackmergeModeKey, ct);
-        return int.TryParse(wert, out var modus) && Enum.IsDefined((ScmBackmergeModus)modus)
-            ? (ScmBackmergeModus)modus
-            : ScmBackmergeModus.Deaktiviert;
+        return int.TryParse(wert, out var modus) && Enum.IsDefined((ScmBackmergeMode)modus)
+            ? (ScmBackmergeMode)modus
+            : ScmBackmergeMode.Disabled;
     }
 
     /// <summary>Speichert den Backmerge-Aktivierungsmodus unter <see cref="ScmBackmergeModeKey"/>.</summary>
     /// <param name="modus">Der zu speichernde Modus.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="modus"/> ist kein definierter <see cref="ScmBackmergeModus"/>-Wert.</exception>
-    public Task SetScmBackmergeModusAsync(ScmBackmergeModus modus, CancellationToken ct = default)
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="modus"/> ist kein definierter <see cref="ScmBackmergeMode"/>-Wert.</exception>
+    public Task SetScmBackmergeModusAsync(ScmBackmergeMode modus, CancellationToken ct = default)
     {
         if (!Enum.IsDefined(modus))
             throw new ArgumentOutOfRangeException(nameof(modus), modus, "Unbekannter Backmerge-Modus.");
@@ -300,18 +300,18 @@ public sealed class AppEinstellungService
     }
 
     /// <summary>Ermittelt, ob die projektbezogene Backmerge-Freigabe für das Projekt gesetzt ist (Standard: <see langword="false"/>).</summary>
-    /// <param name="projektId">Die Projekt-ID.</param>
+    /// <param name="projectId">Die Projekt-ID.</param>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns><see langword="true"/>, wenn Backmerge-PRs für dieses Projekt automatisch gemergt werden dürfen.</returns>
-    public async Task<bool> GetBackmergeProjektAktivAsync(Guid projektId, CancellationToken ct = default)
-        => await GetBoolSettingAsync(BackmergeProjektKey(projektId), ct) ?? false;
+    public async Task<bool> GetBackmergeProjektAktivAsync(Guid projectId, CancellationToken ct = default)
+        => await GetBoolSettingAsync(BackmergeProjektKey(projectId), ct) ?? false;
 
     /// <summary>Setzt die projektbezogene Backmerge-Freigabe für das Projekt.</summary>
-    /// <param name="projektId">Die Projekt-ID.</param>
+    /// <param name="projectId">Die Projekt-ID.</param>
     /// <param name="aktiv">Der zu speichernde Schalter.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    public Task SetBackmergeProjektAktivAsync(Guid projektId, bool aktiv, CancellationToken ct = default)
-        => SetBoolSettingAsync(BackmergeProjektKey(projektId), aktiv, ct);
+    public Task SetBackmergeProjektAktivAsync(Guid projectId, bool aktiv, CancellationToken ct = default)
+        => SetBoolSettingAsync(BackmergeProjektKey(projectId), aktiv, ct);
 
     /// <summary>
     /// Ermittelt, ob Draft-Backmerge-Pull-Requests vor dem Merge automatisch aktiviert werden
@@ -372,23 +372,23 @@ public sealed class AppEinstellungService
     /// <summary>
     /// Liest den Prüfmodus der SCM-Abschlussüberwachung unter <see cref="ScmTaskCompletionPruefmodusKey"/>.
     /// Fehlende oder ungültige gespeicherte Werte fallen auf
-    /// <see cref="ScmTaskCompletionPruefmodus.Ereignisgesteuert"/> zurück.
+    /// <see cref="ScmTaskCompletionCheckMode.EventDriven"/> zurück.
     /// </summary>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Der effektive Prüfmodus.</returns>
-    public async Task<ScmTaskCompletionPruefmodus> GetScmTaskCompletionPruefmodusAsync(CancellationToken ct = default)
+    public async Task<ScmTaskCompletionCheckMode> GetScmTaskCompletionPruefmodusAsync(CancellationToken ct = default)
     {
         var wert = await GetSettingAsync(ScmTaskCompletionPruefmodusKey, ct);
-        return int.TryParse(wert, out var modus) && Enum.IsDefined((ScmTaskCompletionPruefmodus)modus)
-            ? (ScmTaskCompletionPruefmodus)modus
-            : ScmTaskCompletionPruefmodus.Ereignisgesteuert;
+        return int.TryParse(wert, out var modus) && Enum.IsDefined((ScmTaskCompletionCheckMode)modus)
+            ? (ScmTaskCompletionCheckMode)modus
+            : ScmTaskCompletionCheckMode.EventDriven;
     }
 
     /// <summary>Speichert den Prüfmodus der SCM-Abschlussüberwachung unter <see cref="ScmTaskCompletionPruefmodusKey"/>.</summary>
     /// <param name="modus">Der zu speichernde Modus.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="modus"/> ist kein definierter <see cref="ScmTaskCompletionPruefmodus"/>-Wert.</exception>
-    public Task SetScmTaskCompletionPruefmodusAsync(ScmTaskCompletionPruefmodus modus, CancellationToken ct = default)
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="modus"/> ist kein definierter <see cref="ScmTaskCompletionCheckMode"/>-Wert.</exception>
+    public Task SetScmTaskCompletionPruefmodusAsync(ScmTaskCompletionCheckMode modus, CancellationToken ct = default)
     {
         if (!Enum.IsDefined(modus))
             throw new ArgumentOutOfRangeException(nameof(modus), modus, "Unbekannter Prüfmodus der SCM-Abschlussüberwachung.");
@@ -439,10 +439,10 @@ public sealed class AppEinstellungService
         if (schluessel.Count == 0)
             return new Dictionary<string, string?>();
 
-        return await _db.AppEinstellungen
+        return await _db.AppSettings
             .AsNoTracking()
-            .Where(s => schluessel.Contains(s.Schluessel))
-            .ToDictionaryAsync(s => s.Schluessel, s => s.Wert, ct);
+            .Where(s => schluessel.Contains(s.Key))
+            .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
     }
 
     /// <summary>Liest alle Fenstergeometrie-Einstellungen in einer einzigen Datenbankabfrage.</summary>
@@ -456,10 +456,10 @@ public sealed class AppEinstellungService
             WindowHeightKey
         };
 
-        var werte = await _db.AppEinstellungen
+        var werte = await _db.AppSettings
             .AsNoTracking()
-            .Where(s => keys.Contains(s.Schluessel))
-            .ToDictionaryAsync(s => s.Schluessel, s => s.Wert, ct);
+            .Where(s => keys.Contains(s.Key))
+            .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
 
         static int? ParseInt(Dictionary<string, string?> d, string key)
             => d.TryGetValue(key, out var v) && int.TryParse(v, out var i) ? i : null;
@@ -484,25 +484,25 @@ public sealed class AppEinstellungService
 
         var keys = updates.Select(u => u.Item1).ToArray();
 
-        var bestehende = await _db.AppEinstellungen
-            .Where(s => keys.Contains(s.Schluessel))
-            .ToDictionaryAsync(s => s.Schluessel, ct);
+        var bestehende = await _db.AppSettings
+            .Where(s => keys.Contains(s.Key))
+            .ToDictionaryAsync(s => s.Key, ct);
 
         foreach (var (schluessel, wert) in updates)
         {
             if (bestehende.TryGetValue(schluessel, out var einstellung))
             {
-                einstellung.Wert = wert;
-                einstellung.AktualisiertAm = DateTimeOffset.UtcNow;
+                einstellung.Value = wert;
+                einstellung.UpdatedAt = DateTimeOffset.UtcNow;
             }
             else
             {
-                _db.AppEinstellungen.Add(new AppEinstellung
+                _db.AppSettings.Add(new AppSetting
                 {
                     Id = Guid.NewGuid(),
-                    Schluessel = schluessel,
-                    Wert = wert,
-                    AktualisiertAm = DateTimeOffset.UtcNow
+                    Key = schluessel,
+                    Value = wert,
+                    UpdatedAt = DateTimeOffset.UtcNow
                 });
             }
         }
@@ -524,11 +524,11 @@ public sealed class AppEinstellungService
     {
         var keys = new[] { UpdateModeKey, UpdatePfadKey };
 
-        var werte = await _db.AppEinstellungen
+        var werte = await _db.AppSettings
             .AsNoTracking()
             .TagWith(UpdateSettingsReadTag)
-            .Where(s => keys.Contains(s.Schluessel))
-            .ToDictionaryAsync(s => s.Schluessel, s => s.Wert, ct);
+            .Where(s => keys.Contains(s.Key))
+            .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
 
         var modus = UpdateMode.NurPruefen;
         if (werte.TryGetValue(UpdateModeKey, out var modusWert)
@@ -553,39 +553,39 @@ public sealed class AppEinstellungService
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="settings"/> enthält einen nicht definierten <see cref="UpdateMode"/>-Wert oder einen unbekannten Update-Pfad.</exception>
     public async Task SetUpdateSettingsAsync(UpdateSettings settings, CancellationToken ct = default)
     {
-        if (!Enum.IsDefined(settings.Modus))
-            throw new ArgumentOutOfRangeException(nameof(settings), settings.Modus, "Unbekannter Update-Modus.");
+        if (!Enum.IsDefined(settings.Mode))
+            throw new ArgumentOutOfRangeException(nameof(settings), settings.Mode, "Unbekannter Update-Modus.");
 
         if (!UpdatePfadKanalResolver.IstGueltigerPfad(settings.UpdatePfad))
             throw new ArgumentOutOfRangeException(nameof(settings), settings.UpdatePfad, "Unbekannter Update-Pfad.");
 
         var updates = new[]
         {
-            (UpdateModeKey, ((int)settings.Modus).ToString()),
+            (UpdateModeKey, ((int)settings.Mode).ToString()),
             (UpdatePfadKey, UpdatePfadKanalResolver.NormalisierePfad(settings.UpdatePfad)),
         };
 
         var keys = updates.Select(u => u.Item1).ToArray();
 
-        var bestehende = await _db.AppEinstellungen
-            .Where(s => keys.Contains(s.Schluessel))
-            .ToDictionaryAsync(s => s.Schluessel, ct);
+        var bestehende = await _db.AppSettings
+            .Where(s => keys.Contains(s.Key))
+            .ToDictionaryAsync(s => s.Key, ct);
 
         foreach (var (schluessel, wert) in updates)
         {
             if (bestehende.TryGetValue(schluessel, out var einstellung))
             {
-                einstellung.Wert = wert;
-                einstellung.AktualisiertAm = DateTimeOffset.UtcNow;
+                einstellung.Value = wert;
+                einstellung.UpdatedAt = DateTimeOffset.UtcNow;
             }
             else
             {
-                _db.AppEinstellungen.Add(new AppEinstellung
+                _db.AppSettings.Add(new AppSetting
                 {
                     Id = Guid.NewGuid(),
-                    Schluessel = schluessel,
-                    Wert = wert,
-                    AktualisiertAm = DateTimeOffset.UtcNow
+                    Key = schluessel,
+                    Value = wert,
+                    UpdatedAt = DateTimeOffset.UtcNow
                 });
             }
         }
@@ -604,10 +604,10 @@ public sealed class AppEinstellungService
         => await GetBoolSettingAsync(AutoShutdownErzwingenKey, ct) ?? false;
 
     /// <summary>Setzt den Schalter "Herunterfahren erzwingen" des Auto-Shutdowns (<see cref="AutoShutdownErzwingenKey"/>).</summary>
-    /// <param name="erzwingen">Der zu speichernde Schalter.</param>
+    /// <param name="force">Der zu speichernde Schalter.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    public Task SetAutoShutdownErzwingenAsync(bool erzwingen, CancellationToken ct = default)
-        => SetBoolSettingAsync(AutoShutdownErzwingenKey, erzwingen, ct);
+    public Task SetAutoShutdownErzwingenAsync(bool force, CancellationToken ct = default)
+        => SetBoolSettingAsync(AutoShutdownErzwingenKey, force, ct);
 
     /// <summary>
     /// Liest die Toleranzzeit in Minuten des Auto-Shutdown-Countdowns

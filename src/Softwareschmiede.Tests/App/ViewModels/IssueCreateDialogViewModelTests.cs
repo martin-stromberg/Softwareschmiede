@@ -461,7 +461,7 @@ public sealed class IssueCreateDialogViewModelTests
         public PluginType PluginType => PluginType.DevelopmentAutomation;
         public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
         public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
-        public string GetProcessWindowTitle(Guid aufgabeId) => "Fake KI";
+        public string GetProcessWindowTitle(Guid workItemId) => "Fake KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
@@ -482,7 +482,7 @@ public sealed class IssueCreateDialogViewModelTests
         public PluginType PluginType => PluginType.DevelopmentAutomation;
         public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
         public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
-        public string GetProcessWindowTitle(Guid aufgabeId) => "Fail KI";
+        public string GetProcessWindowTitle(Guid workItemId) => "Fail KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
@@ -499,7 +499,7 @@ public sealed class IssueCreateDialogViewModelTests
         public PluginType PluginType => PluginType.DevelopmentAutomation;
         public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
         public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
-        public string GetProcessWindowTitle(Guid aufgabeId) => "Cancel KI";
+        public string GetProcessWindowTitle(Guid workItemId) => "Cancel KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
@@ -516,7 +516,7 @@ public sealed class IssueCreateDialogViewModelTests
         public PluginType PluginType => PluginType.DevelopmentAutomation;
         public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
         public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
-        public string GetProcessWindowTitle(Guid aufgabeId) => "Plain KI";
+        public string GetProcessWindowTitle(Guid workItemId) => "Plain KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;

@@ -47,12 +47,12 @@ public partial class End2EndTest
             Assert.Equal("2", settingsReopened.GetPluginParallelLimit());
             using (var db = OpenTestDbContext())
             {
-                Assert.Equal("1", db.AppEinstellungen
-                    .Where(e => e.Schluessel == ScmEventExecutionLimitService.GlobalLimitKey)
-                    .Select(e => e.Wert).FirstOrDefault());
-                Assert.Equal("2", db.AppEinstellungen
-                    .Where(e => e.Schluessel == ScmEventExecutionLimitService.PluginLimitKey(kiPrefix))
-                    .Select(e => e.Wert).FirstOrDefault());
+                Assert.Equal("1", db.AppSettings
+                    .Where(e => e.Key == ScmEventExecutionLimitService.GlobalLimitKey)
+                    .Select(e => e.Value).FirstOrDefault());
+                Assert.Equal("2", db.AppSettings
+                    .Where(e => e.Key == ScmEventExecutionLimitService.PluginLimitKey(kiPrefix))
+                    .Select(e => e.Value).FirstOrDefault());
             }
 
             // Validierung: „0“ ist kein gültiges globales Limit → Fehler, nichts wird persistiert.
@@ -62,9 +62,9 @@ public partial class End2EndTest
             Assert.Contains("Limit paralleler CLI-Ausführungen", fehler);
             using (var db = OpenTestDbContext())
             {
-                Assert.Equal("1", db.AppEinstellungen
-                    .Where(e => e.Schluessel == ScmEventExecutionLimitService.GlobalLimitKey)
-                    .Select(e => e.Wert).FirstOrDefault());
+                Assert.Equal("1", db.AppSettings
+                    .Where(e => e.Key == ScmEventExecutionLimitService.GlobalLimitKey)
+                    .Select(e => e.Value).FirstOrDefault());
             }
             settingsReopened.DiscardChanges();
         }
@@ -89,11 +89,11 @@ public partial class End2EndTest
                 try
                 {
                     using var db = OpenTestDbContext();
-                    db.AppEinstellungen
-                        .Where(e => e.Schluessel == ScmEventExecutionLimitService.GlobalLimitKey
-                            || e.Schluessel == ScmEventExecutionLimitService.PluginLimitKey(kiPrefix))
+                    db.AppSettings
+                        .Where(e => e.Key == ScmEventExecutionLimitService.GlobalLimitKey
+                            || e.Key == ScmEventExecutionLimitService.PluginLimitKey(kiPrefix))
                         .ToList()
-                        .ForEach(e => e.Wert = null);
+                        .ForEach(e => e.Value = null);
                     db.SaveChanges();
                 }
                 catch { }

@@ -11,7 +11,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Tests für OpenTodosDialogViewModel.</summary>
 public sealed class OpenTodosDialogViewModelTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly TodoService _todoService;
     private readonly Guid _aufgabeId;
 
@@ -21,23 +21,23 @@ public sealed class OpenTodosDialogViewModelTests : IDisposable
         _db = TestDbContextFactory.Create();
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
 
-        var projektId = Guid.NewGuid();
-        _db.Projekte.Add(new Projekt
+        var projectId = Guid.NewGuid();
+        _db.Projects.Add(new Project
         {
-            Id = projektId,
+            Id = projectId,
             Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
 
         _aufgabeId = Guid.NewGuid();
-        _db.Aufgaben.Add(new Aufgabe
+        _db.WorkItems.Add(new WorkItem
         {
             Id = _aufgabeId,
-            ProjektId = projektId,
-            Titel = "Testaufgabe",
-            Status = AufgabeStatus.Neu,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            ProjectId = projectId,
+            Title = "Testaufgabe",
+            Status = WorkItemStatus.New,
+            CreatedAt = DateTimeOffset.UtcNow
         });
         _db.SaveChanges();
     }
@@ -59,7 +59,7 @@ public sealed class OpenTodosDialogViewModelTests : IDisposable
         await sut.LoadAsync(_aufgabeId, "Aufgabentitel", TestContext.Current.CancellationToken);
 
         // Assert
-        sut.AufgabeId.Should().Be(_aufgabeId);
+        sut.WorkItemId.Should().Be(_aufgabeId);
         sut.AufgabenTitel.Should().Be("Aufgabentitel");
         sut.Todos.Should().ContainSingle();
         sut.Todos[0].Id.Should().Be(offen.Id);

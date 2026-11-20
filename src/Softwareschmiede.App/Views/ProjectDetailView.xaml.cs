@@ -23,10 +23,10 @@ public sealed partial class ProjectDetailView : UserControl
 
     private void AufgabeDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (sender is ListBoxItem { DataContext: Aufgabe aufgabe }
+        if (sender is ListBoxItem { DataContext: WorkItem workItem }
             && DataContext is ProjectDetailViewModel vm)
         {
-            vm.AufgabeOeffnenCommand.Execute(aufgabe.Id);
+            vm.AufgabeOeffnenCommand.Execute(workItem.Id);
         }
     }
 

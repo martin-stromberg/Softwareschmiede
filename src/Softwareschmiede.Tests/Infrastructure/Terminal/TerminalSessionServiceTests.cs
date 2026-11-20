@@ -30,7 +30,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
     {
         var dbName = Guid.NewGuid().ToString();
         _provider = new ServiceCollection()
-            .AddDbContext<SoftwareschmiededDbContext>(o => o.UseInMemoryDatabase(dbName))
+            .AddDbContext<SoftwareschmiedeDbContext>(o => o.UseInMemoryDatabase(dbName))
             .AddScoped<AppEinstellungService>()
             .AddSingleton(typeof(ILogger<>), typeof(NullLogger<>))
             .BuildServiceProvider();
@@ -261,7 +261,7 @@ public sealed class TerminalSessionServiceTests : IDisposable
         public int Aufrufe { get; private set; }
         public TerminalSessionStartSpec? LetzteSpec { get; private set; }
 
-        public TerminalSessionStartResult Start(Guid aufgabeId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
+        public TerminalSessionStartResult Start(Guid workItemId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
         {
             Aufrufe++;
             LetzteSpec = spec;

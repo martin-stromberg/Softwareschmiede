@@ -23,7 +23,7 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
     private DateTimeOffset? _endeUtc;
 
     /// <summary>Erstellt einen neuen Recorder.</summary>
-    /// <param name="aufgabeId">ID der aufgezeichneten Aufgabe.</param>
+    /// <param name="workItemId">ID der aufgezeichneten Aufgabe.</param>
     /// <param name="pluginName">Anzeigename des aufgezeichneten KI-Plugins.</param>
     /// <param name="cols">Initiale Spaltenanzahl der Session.</param>
     /// <param name="rows">Initiale Zeilenanzahl der Session.</param>
@@ -31,7 +31,7 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
     /// <param name="timeProvider">Zeitquelle für die Chunk-Zeitstempel (Test-Hook).</param>
     /// <param name="logger">Logger für Diagnosemeldungen (optional).</param>
     public CliOutputRecorder(
-        Guid aufgabeId,
+        Guid workItemId,
         string pluginName,
         int cols,
         int rows,
@@ -39,7 +39,7 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
         TimeProvider timeProvider,
         ILogger? logger = null)
     {
-        _aufgabeId = aufgabeId;
+        _aufgabeId = workItemId;
         _pluginName = pluginName;
         _cols = cols;
         _rows = rows;
@@ -101,7 +101,7 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
         {
             return new CliOutputAufzeichnung
             {
-                AufgabeId = _aufgabeId,
+                WorkItemId = _aufgabeId,
                 PluginName = _pluginName,
                 StartUtc = _startUtc,
                 Cols = _cols,

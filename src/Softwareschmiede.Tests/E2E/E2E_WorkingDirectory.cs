@@ -257,12 +257,12 @@ public partial class End2EndTest
             Directory.CreateDirectory(Path.Combine(repository.RepositoryUrl, relativePath));
         }
 
-        db.Add(new RepositoryStartKonfiguration
+        db.Add(new RepositoryStartConfiguration
         {
             Id = Guid.NewGuid(),
             GitRepositoryId = repository.Id,
             WorkingDirectoryRelativePath = relativePath,
-            Aktiv = true
+            Active = true
         });
         await db.SaveChangesAsync();
     }
@@ -274,33 +274,33 @@ public partial class End2EndTest
         string workingDirectory)
     {
         await using var db = OpenTestDbContext();
-        var projekt = new Projekt
+        var project = new Project
         {
             Id = Guid.NewGuid(),
             Name = projektName,
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         };
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjektId = projekt.Id,
-            PluginTyp = "LocalDirectoryPlugin",
+            ProjectId = project.Id,
+            PluginType = "LocalDirectoryPlugin",
             RepositoryName = repositoryName,
             RepositoryUrl = repositoryUrl,
-            Aktiv = true
+            Active = true
         };
-        var configuration = new RepositoryStartKonfiguration
+        var configuration = new RepositoryStartConfiguration
         {
             Id = Guid.NewGuid(),
             GitRepositoryId = repository.Id,
             WorkingDirectoryRelativePath = workingDirectory,
-            Aktiv = true
+            Active = true
         };
 
-        db.Projekte.Add(projekt);
+        db.Projects.Add(project);
         db.GitRepositories.Add(repository);
-        db.RepositoryStartKonfigurationen.Add(configuration);
+        db.RepositoryStartConfigurations.Add(configuration);
         await db.SaveChangesAsync();
     }
 
@@ -314,7 +314,7 @@ public partial class End2EndTest
             var repo = db.GitRepositories.FirstOrDefault(r => r.RepositoryName == repositoryName);
             saved = repo is null
                 ? null
-                : db.RepositoryStartKonfigurationen.Where(c => c.GitRepositoryId == repo.Id).SingleOrDefault()?.WorkingDirectoryRelativePath;
+                : db.RepositoryStartConfigurations.Where(c => c.GitRepositoryId == repo.Id).SingleOrDefault()?.WorkingDirectoryRelativePath;
             if (string.Equals(saved, expected, StringComparison.Ordinal))
                 return saved;
 

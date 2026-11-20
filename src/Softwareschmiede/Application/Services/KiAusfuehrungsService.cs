@@ -60,7 +60,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
 
     /// <summary>Wird ausgelöst, wenn ein CLI-Prozess gestartet, gestoppt oder ein Fehler aufgetreten ist.</summary>
     /// <remarks>
-    /// Der <see cref="CliProcessStatus.Gestartet"/>-Invoke läuft unter der klassenweiten Start-Sperre
+    /// Der <see cref="CliProcessStatus.Started"/>-Invoke läuft unter der klassenweiten Start-Sperre
     /// (<c>_startLock</c>). Abonnenten müssen daher non-blocking sein und dürfen nicht reentrant
     /// <see cref="StartCliAsync"/>/<see cref="StartTerminalSessionAsync"/> aufrufen — sonst
     /// blockieren/deadlocken sie sämtliche Prozessstarts aller Aufgaben.
@@ -69,7 +69,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
 
     /// <summary>
     /// Wird ausgelöst, wenn eine Startanforderung einen bereits laufenden Prozess zurückgibt
-    /// (Early-Return ohne <see cref="CliProcessStatus.Gestartet"/>-Ereignis) bzw. ein laufender
+    /// (Early-Return ohne <see cref="CliProcessStatus.Started"/>-Ereignis) bzw. ein laufender
     /// Prozess über <see cref="NotifyLaufAktiv"/> bestätigt wird. Abonnenten können damit die
     /// Laufdaten-Persistenz für laufende Prozesse ohne Gestartet-Ereignis sicherstellen.
     /// </summary>
@@ -85,9 +85,9 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
     public event Action<int, int>? RunningCountChanged;
 
     /// <inheritdoc/>
-    public bool IsRunning(Guid aufgabeId)
+    public bool IsRunning(Guid workItemId)
     {
-        if (!_handles.TryGetValue(aufgabeId, out var handle))
+        if (!_handles.TryGetValue(workItemId, out var handle))
         {
             return false;
         }
@@ -97,11 +97,11 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
     }
 
     /// <summary>Gibt den laufenden Prozess für eine Aufgabe zurück, oder null wenn kein Prozess läuft.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="workItemId">ID der Aufgabe.</param>
     /// <returns>Den laufenden <see cref="System.Diagnostics.Process"/>, oder null.</returns>
-    public System.Diagnostics.Process? GetRunningProcess(Guid aufgabeId)
+    public System.Diagnostics.Process? GetRunningProcess(Guid workItemId)
     {
-        if (!_handles.TryGetValue(aufgabeId, out var handle))
+        if (!_handles.TryGetValue(workItemId, out var handle))
             return null;
         try { return !handle.Process.HasExited ? handle.Process : null; }
         catch { return null; }
@@ -120,12 +120,12 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
     /// sonst No-Op. Für Aufrufer außerhalb des Service, die einen laufenden Prozess bestätigt
     /// haben (z. B. der Session-Alive-Early-Return in <c>EntwicklungsprozessService</c>).
     /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
-    public void NotifyLaufAktiv(Guid aufgabeId)
+    /// <param name="workItemId">ID der Aufgabe.</param>
+    public void NotifyLaufAktiv(Guid workItemId)
     {
-        if (IsRunning(aufgabeId))
+        if (IsRunning(workItemId))
         {
-            CliLaufAktiv?.Invoke(aufgabeId);
+            CliLaufAktiv?.Invoke(workItemId);
         }
     }
 
@@ -143,9 +143,9 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             .ToList();
 
     /// <inheritdoc/>
-    public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId)
+    public WorkItemRunStatus? GetLiveRunStatus(Guid workItemId)
     {
-        if (!IsRunning(aufgabeId))
+        if (!IsRunning(workItemId))
         {
             return null;
         }
@@ -153,14 +153,14 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
         // Abweichung bewusst explizit: Der Live-Substatus kennt kein "null bei Inaktiv/keiner Session"
         // — ein nachweislich laufender Prozess ohne Wartet-Meldung ist fachlich "Läuft" (Issue 342:
         // Live-Zweig des Klassifikators darf nie auf Bereit zurückfallen, solange ein Handle lebt).
-        return GetTerminalSession(aufgabeId)?.RuntimeStatus.ToAufgabeLaufStatus()
-            ?? AufgabeLaufStatus.Laeuft;
+        return GetTerminalSession(workItemId)?.RuntimeStatus.ToAufgabeLaufStatus()
+            ?? WorkItemRunStatus.Running;
     }
 
     private readonly SemaphoreSlim _startLock = new(1, 1);
 
     /// <summary>Startet einen CLI-Prozess für eine Aufgabe und gibt das Handle zurück.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="workItemId">ID der Aufgabe.</param>
     /// <param name="kiPlugin">Das zu verwendende KI-Plugin.</param>
     /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis.</param>
     /// <param name="optionalParameters">Optionale zusätzliche Parameter für den CLI-Start.</param>
@@ -172,23 +172,23 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
     /// </param>
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public Task<CliProcessHandle> StartCliAsync(
-        Guid aufgabeId,
+        Guid workItemId,
         IKiPlugin kiPlugin,
         string localRepoPath,
         string? optionalParameters = null,
         CancellationToken ct = default,
-        RepositoryStartKonfiguration? startConfig = null,
+        RepositoryStartConfiguration? startConfig = null,
         IGitPlugin? gitPlugin = null)
-        => ScmTaskCoordinator.Shared.RunAsync(aufgabeId,
-            () => StartCliCoreAsync(aufgabeId, kiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin), ct);
+        => ScmTaskCoordinator.Shared.RunAsync(workItemId,
+            () => StartCliCoreAsync(workItemId, kiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin), ct);
 
-    private async Task<CliProcessHandle> StartCliCoreAsync(Guid aufgabeId, IKiPlugin kiPlugin, string localRepoPath,
-        string? optionalParameters, CancellationToken ct, RepositoryStartKonfiguration? startConfig, IGitPlugin? gitPlugin)
+    private async Task<CliProcessHandle> StartCliCoreAsync(Guid workItemId, IKiPlugin kiPlugin, string localRepoPath,
+        string? optionalParameters, CancellationToken ct, RepositoryStartConfiguration? startConfig, IGitPlugin? gitPlugin)
     {
         await _startLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_handles.TryGetValue(aufgabeId, out var existing))
+            if (_handles.TryGetValue(workItemId, out var existing))
             {
                 bool istNochAktiv;
                 try { istNochAktiv = !existing.Process.HasExited; }
@@ -196,8 +196,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
 
                 if (istNochAktiv)
                 {
-                    _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", aufgabeId);
-                    CliLaufAktiv?.Invoke(aufgabeId);
+                    _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", workItemId);
+                    CliLaufAktiv?.Invoke(workItemId);
                     return existing;
                 }
             }
@@ -214,16 +214,16 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
                 psi.EnvironmentVariables["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
             }
 
-            _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} starten.", aufgabeId);
+            _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} starten.", workItemId);
 
             var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
-            var handle = new CliProcessHandle(aufgabeId, process);
+            var handle = new CliProcessHandle(workItemId, process);
 
-            process.Exited += (_, _) => HandleProcessExitedAsync(aufgabeId, process, handle, "Standard").SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleProcessExitedAsync");
+            process.Exited += (_, _) => HandleProcessExitedAsync(workItemId, process, handle, "Standard").SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleProcessExitedAsync");
 
             // Handle VOR process.Start() eintragen, damit der Exited-Handler
             // das Handle immer vorfindet (Race-Condition bei sehr kurzlebigen Prozessen).
-            _handles[aufgabeId] = handle;
+            _handles[workItemId] = handle;
 
             bool started;
             try
@@ -232,19 +232,19 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             }
             catch
             {
-                _handles.TryRemove(aufgabeId, out _);
+                _handles.TryRemove(workItemId, out _);
                 throw;
             }
 
             if (!started)
             {
-                _handles.TryRemove(aufgabeId, out _);
+                _handles.TryRemove(workItemId, out _);
                 throw new InvalidOperationException("Prozess konnte nicht gestartet werden.");
             }
 
-            _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, process.Id);
+            _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", workItemId, process.Id);
             RaiseRunningCountChanged();
-            CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestartet);
+            CliProcessStatusChanged?.Invoke(workItemId, CliProcessStatus.Started);
 
             return handle;
         }
@@ -256,7 +256,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
 
     /// <summary>Startet einen CLI-Prozess für eine Aufgabe über eine interaktive Terminal-Session
     /// (PTY-Backend oder diagnostizierter Pipe-Fallback, gewählt durch <see cref="ITerminalSessionFactory"/>).</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="workItemId">ID der Aufgabe.</param>
     /// <param name="kiPlugin">Das zu verwendende KI-Plugin.</param>
     /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis.</param>
     /// <param name="optionalParameters">Optionale zusätzliche Parameter für den CLI-Start.</param>
@@ -270,25 +270,25 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
     /// für die hostgebundene SCM-Anbindung des Agenten (<see cref="IScmAgentAccess"/>).</param>
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public Task<CliProcessHandle> StartTerminalSessionAsync(
-        Guid aufgabeId,
+        Guid workItemId,
         IKiPlugin kiPlugin,
         string localRepoPath,
         string? optionalParameters = null,
         CancellationToken ct = default,
-        RepositoryStartKonfiguration? startConfig = null,
+        RepositoryStartConfiguration? startConfig = null,
         IGitPlugin? gitPlugin = null,
         string? repositoryUrl = null)
-        => ScmTaskCoordinator.Shared.RunAsync(aufgabeId,
-            () => StartTerminalSessionCoreAsync(aufgabeId, kiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin, repositoryUrl), ct);
+        => ScmTaskCoordinator.Shared.RunAsync(workItemId,
+            () => StartTerminalSessionCoreAsync(workItemId, kiPlugin, localRepoPath, optionalParameters, ct, startConfig, gitPlugin, repositoryUrl), ct);
 
-    private async Task<CliProcessHandle> StartTerminalSessionCoreAsync(Guid aufgabeId, IKiPlugin kiPlugin, string localRepoPath,
-        string? optionalParameters, CancellationToken ct, RepositoryStartKonfiguration? startConfig, IGitPlugin? gitPlugin,
+    private async Task<CliProcessHandle> StartTerminalSessionCoreAsync(Guid workItemId, IKiPlugin kiPlugin, string localRepoPath,
+        string? optionalParameters, CancellationToken ct, RepositoryStartConfiguration? startConfig, IGitPlugin? gitPlugin,
         string? repositoryUrl)
     {
         await _startLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_handles.TryGetValue(aufgabeId, out var existing))
+            if (_handles.TryGetValue(workItemId, out var existing))
             {
                 bool istNochAktiv;
                 try { istNochAktiv = !existing.Process.HasExited; }
@@ -296,8 +296,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
 
                 if (istNochAktiv)
                 {
-                    _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", aufgabeId);
-                    CliLaufAktiv?.Invoke(aufgabeId);
+                    _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", workItemId);
+                    CliLaufAktiv?.Invoke(workItemId);
                     return existing;
                 }
             }
@@ -322,7 +322,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             }
 
             var outputWriter = new CliOutputProtokollWriter(
-                aufgabeId,
+                workItemId,
                 _scopeFactory,
                 _loggerFactory.CreateLogger<CliOutputProtokollWriter>());
 
@@ -332,7 +332,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             var options = _terminalOptions.Value;
             CliOutputRecorder? recorder = options.AufzeichnungByteBudget > 0
                 ? new CliOutputRecorder(
-                    aufgabeId,
+                    workItemId,
                     spec.PluginName,
                     options.DefaultCols,
                     options.DefaultRows,
@@ -347,7 +347,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             TerminalSessionStartResult startResult;
             try
             {
-                startResult = await _sessionFactory.StartAsync(aufgabeId, spec, outputSink, kiPlugin.CheckHealthAsync, ct).ConfigureAwait(false);
+                startResult = await _sessionFactory.StartAsync(workItemId, spec, outputSink, kiPlugin.CheckHealthAsync, ct).ConfigureAwait(false);
             }
             catch
             {
@@ -356,8 +356,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             }
 
             var process = startResult.Process;
-            var session = new ScmCoordinatedTerminalSession(aufgabeId, startResult.Session);
-            var handle = new CliProcessHandle(aufgabeId, process)
+            var session = new ScmCoordinatedTerminalSession(workItemId, startResult.Session);
+            var handle = new CliProcessHandle(workItemId, process)
             {
                 Session = session,
                 OutputSink = outputSink
@@ -366,20 +366,20 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             // Der Recorder-Eintrag überlebt das Session-Ende (der CliProcessHandle wird bei Exited
             // entfernt) und wird beim nächsten Start derselben Aufgabe ersetzt.
             if (recorder is not null)
-                RegistriereAufzeichnung(aufgabeId, recorder);
+                RegistriereAufzeichnung(workItemId, recorder);
 
             // Exit-/Fehlerbehandlung läuft über die Session — sie besitzt das native Prozess-Handle und
             // erkennt das Prozessende selbst (Process.Exited bzw. Ende des Output-Streams). Das Handle wird
             // vor der Event-Verdrahtung eingetragen, damit ein bereits ausgelöstes Exited/Failed das
             // Handle vorfindet (sonst würde HandleExitedCoreAsync es stillschweigend verwerfen).
-            _handles[aufgabeId] = handle;
+            _handles[workItemId] = handle;
 
-            handle.ScmPromptSession = new ScmPromptSessionAdapter(aufgabeId, handle.CliRunId, kiPlugin.PluginPrefix,
-                spec, session, scmConfiguration, () => _handles.TryGetValue(aufgabeId, out var active) && ReferenceEquals(active, handle), _timeProvider);
+            handle.ScmPromptSession = new ScmPromptSessionAdapter(workItemId, handle.CliRunId, kiPlugin.PluginPrefix,
+                spec, session, scmConfiguration, () => _handles.TryGetValue(workItemId, out var active) && ReferenceEquals(active, handle), _timeProvider);
             session.InputStarted = handle.ScmPromptSession.MarkInputStarted;
 
-            session.Exited += (_, e) => HandleSessionEndedAsync(aufgabeId, handle, e.ExitCode, "Terminal").SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionEndedAsync");
-            session.Failed += (_, e) => HandleSessionFailedAsync(aufgabeId, handle, e).SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionFailedAsync");
+            session.Exited += (_, e) => HandleSessionEndedAsync(workItemId, handle, e.ExitCode, "Terminal").SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionEndedAsync");
+            session.Failed += (_, e) => HandleSessionFailedAsync(workItemId, handle, e).SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionFailedAsync");
 
             // Ein vor der Verdrahtung ausgelöstes Failed (z. B. Leseschleifen-Fehler bei noch
             // laufendem Prozess) ist ohne Subscriber verlorengegangen — über den auf der Session
@@ -389,7 +389,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             // mitgeführt, sofern er bereits bekannt ist).
             if (session.Failure is { } preWiringFailure)
             {
-                await HandleSessionFailedAsync(aufgabeId, handle, preWiringFailure).ConfigureAwait(false);
+                await HandleSessionFailedAsync(workItemId, handle, preWiringFailure).ConfigureAwait(false);
                 return handle;
             }
 
@@ -401,20 +401,20 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             // Gestartet-Event für einen bereits beendeten Prozess).
             if (process.HasExited)
             {
-                await HandleSessionEndedAsync(aufgabeId, handle, session.ExitCode ?? TryGetExitCode(process), "Terminal").ConfigureAwait(false);
+                await HandleSessionEndedAsync(workItemId, handle, session.ExitCode ?? TryGetExitCode(process), "Terminal").ConfigureAwait(false);
                 return handle;
             }
 
             // Hat ein zwischenzeitlich ausgelöstes Session-Event (Exited/Failed) das Handle bereits
             // entfernt und den Endzustand gemeldet, darf kein Gestartet-Event mehr folgen.
-            if (!_handles.TryGetValue(aufgabeId, out var registered) || !ReferenceEquals(registered, handle))
+            if (!_handles.TryGetValue(workItemId, out var registered) || !ReferenceEquals(registered, handle))
             {
                 return handle;
             }
 
-            _logger.LogInformation("CLI-Prozess (Terminal-Session) für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, process.Id);
+            _logger.LogInformation("CLI-Prozess (Terminal-Session) für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", workItemId, process.Id);
             RaiseRunningCountChanged();
-            CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestartet);
+            CliProcessStatusChanged?.Invoke(workItemId, CliProcessStatus.Started);
 
             return handle;
         }
@@ -467,39 +467,39 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
     }
 
     /// <summary>Gibt die <see cref="ITerminalSession"/> für eine Aufgabe zurück, oder null wenn keine vorhanden.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="workItemId">ID der Aufgabe.</param>
     /// <returns>Die <see cref="ITerminalSession"/>, oder null.</returns>
-    public ITerminalSession? GetTerminalSession(Guid aufgabeId)
+    public ITerminalSession? GetTerminalSession(Guid workItemId)
     {
-        if (!_handles.TryGetValue(aufgabeId, out var handle))
+        if (!_handles.TryGetValue(workItemId, out var handle))
             return null;
         return handle.Session;
     }
 
     /// <summary>Gibt den an den tatsächlichen Start gebundenen SCM-Adapter zurück; Alt-/Shellstarts haben keinen sicheren Vertrag.</summary>
-    public IScmPromptSessionAdapter? GetScmPromptSession(Guid aufgabeId)
-        => _handles.TryGetValue(aufgabeId, out var handle) ? handle.ScmPromptSession : null;
+    public IScmPromptSessionAdapter? GetScmPromptSession(Guid workItemId)
+        => _handles.TryGetValue(workItemId, out var handle) ? handle.ScmPromptSession : null;
 
     /// <summary>Gibt die Rohbyte-Aufzeichnung der letzten Terminal-Session einer Aufgabe zurück —
     /// auch nach dem Session-Ende abrufbar (der Eintrag überlebt das Handle).</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="workItemId">ID der Aufgabe.</param>
     /// <returns>Ein Snapshot der <see cref="CliOutputAufzeichnung"/>, oder null wenn keine Aufzeichnung
     /// existiert (kein Session-Start oder Aufzeichnung via <c>AufzeichnungByteBudget</c> deaktiviert).</returns>
-    public CliOutputAufzeichnung? GetCliAufzeichnung(Guid aufgabeId)
-        => _aufzeichnungen.TryGetValue(aufgabeId, out var recorder) ? recorder.GetAufzeichnung() : null;
+    public CliOutputAufzeichnung? GetCliAufzeichnung(Guid workItemId)
+        => _aufzeichnungen.TryGetValue(workItemId, out var recorder) ? recorder.GetAufzeichnung() : null;
 
     /// <summary>Registriert einen Recorder für den Export. Die Registry ist auf die letzten
     /// <see cref="MaxAufzeichnungenAnzahl"/> Aufgaben begrenzt — ältere Mitschnitte werden
     /// verworfen, damit der Speicherverbrauch nicht unbegrenzt mit der Zahl gestarteter
     /// Sessions wächst (ein Eintrag kann bis zu <c>AufzeichnungByteBudget</c> Bytes halten).
     /// Ein Neustart derselben Aufgabe zählt als jüngster Eintrag.</summary>
-    private void RegistriereAufzeichnung(Guid aufgabeId, CliOutputRecorder recorder)
+    private void RegistriereAufzeichnung(Guid workItemId, CliOutputRecorder recorder)
     {
         lock (_aufzeichnungenLock)
         {
-            _aufzeichnungen[aufgabeId] = recorder;
-            _aufzeichnungsReihenfolge.Remove(aufgabeId);
-            _aufzeichnungsReihenfolge.AddLast(aufgabeId);
+            _aufzeichnungen[workItemId] = recorder;
+            _aufzeichnungsReihenfolge.Remove(workItemId);
+            _aufzeichnungsReihenfolge.AddLast(workItemId);
             while (_aufzeichnungsReihenfolge.Count > MaxAufzeichnungenAnzahl)
             {
                 _aufzeichnungen.TryRemove(_aufzeichnungsReihenfolge.First!.Value, out _);
@@ -509,11 +509,11 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
     }
 
     /// <summary>Stoppt den laufenden CLI-Prozess für eine Aufgabe (SIGTERM → 5s → Kill).</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="workItemId">ID der Aufgabe.</param>
     /// <param name="ct">Abbruch-Token.</param>
-    public async Task StopCliAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task StopCliAsync(Guid workItemId, CancellationToken ct = default)
     {
-        if (!_handles.TryGetValue(aufgabeId, out var handle))
+        if (!_handles.TryGetValue(workItemId, out var handle))
         {
             return;
         }
@@ -521,7 +521,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
         var process = handle.Process;
         handle.AbsichtlichGestoppt = true;
 
-        _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} beenden.", aufgabeId);
+        _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} beenden.", workItemId);
 
         try
         {
@@ -534,23 +534,23 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             var exited = await WaitForExitAsync(process, TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
             if (!exited)
             {
-                _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} antwortet nicht – Kill.", aufgabeId);
+                _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} antwortet nicht – Kill.", workItemId);
                 process.Kill(entireProcessTree: true);
                 await WaitForExitAsync(process, TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Beenden des CLI-Prozesses für Aufgabe {AufgabeId}.", aufgabeId);
+            _logger.LogError(ex, "Fehler beim Beenden des CLI-Prozesses für Aufgabe {AufgabeId}.", workItemId);
         }
     }
 
     /// <summary>Gibt den Exit-Code des letzten Prozesses zurück.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="workItemId">ID der Aufgabe.</param>
     /// <returns>Der Exit-Code, oder null wenn kein Prozess bekannt ist.</returns>
-    public int? GetLastExitCode(Guid aufgabeId)
+    public int? GetLastExitCode(Guid workItemId)
     {
-        if (!_handles.TryGetValue(aufgabeId, out var handle))
+        if (!_handles.TryGetValue(workItemId, out var handle))
         {
             return null;
         }
@@ -559,10 +559,10 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
     }
 
     /// <summary>Aktualisiert LastHeartbeatUtc der Aufgabe (für externe Nutzung durch AufgabeService).</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
-    public void UpdateHeartbeat(Guid aufgabeId)
+    /// <param name="workItemId">ID der Aufgabe.</param>
+    public void UpdateHeartbeat(Guid workItemId)
     {
-        if (_handles.TryGetValue(aufgabeId, out var handle))
+        if (_handles.TryGetValue(workItemId, out var handle))
         {
             handle.LastHeartbeat = DateTimeOffset.UtcNow;
         }
@@ -594,13 +594,13 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
         _startLock.Dispose();
     }
 
-    private async Task PersistFehlgeschlagenAsync(Guid aufgabeId, int? exitCode)
+    private async Task PersistFehlgeschlagenAsync(Guid workItemId, int? exitCode)
     {
         if (_isDisposed)
         {
             _logger.LogWarning(
                 "Status nach Fehler für Aufgabe {AufgabeId} nicht persistiert, da der Dienst bereits beendet wird.",
-                aufgabeId);
+                workItemId);
             return;
         }
 
@@ -612,30 +612,30 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             {
                 _logger.LogWarning(
                     "Status nach Fehler für Aufgabe {AufgabeId} nicht persistiert, da der Dienst bereits beendet wird.",
-                    aufgabeId);
+                    workItemId);
                 return;
             }
 
             var protokollService = scope.ServiceProvider.GetRequiredService<ProtokollService>();
             await protokollService.AddEintragAsync(
-                aufgabeId,
-                ProtokollTyp.SystemMeldung,
+                workItemId,
+                LogEntryType.SystemMessage,
                 exitCode is not null and not 0
                     ? $"CLI-Prozess mit Fehler beendet (ExitCode: {exitCode.Value}). Aufgabe bleibt im Status Gestartet — CLI-Start kann erneut versucht werden."
                     : "Terminal-Session mit einem Laufzeitfehler beendet. Aufgabe bleibt im Status Gestartet — CLI-Start kann erneut versucht werden.").ConfigureAwait(false);
 
-            _logger.LogInformation("Aufgabe {AufgabeId}: CLI-Prozess mit Fehler beendet (ExitCode: {ExitCode}), Status bleibt unverändert.", aufgabeId, exitCode);
+            _logger.LogInformation("Aufgabe {AufgabeId}: CLI-Prozess mit Fehler beendet (ExitCode: {ExitCode}), Status bleibt unverändert.", workItemId, exitCode);
         }
         catch (ObjectDisposedException ex)
         {
             _logger.LogWarning(
                 ex,
                 "Status nach Fehler für Aufgabe {AufgabeId} konnte nicht persistiert werden, da der ServiceProvider während des Shutdowns bereits disposed wurde.",
-                aufgabeId);
+                workItemId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Persistieren des Beendet-Status für Aufgabe {AufgabeId}.", aufgabeId);
+            _logger.LogError(ex, "Fehler beim Persistieren des Beendet-Status für Aufgabe {AufgabeId}.", workItemId);
         }
     }
 
@@ -643,48 +643,48 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
     /// Gemeinsame Behandlung des <see cref="Process.Exited"/>-Events für klassischen und ConPTY-Start:
     /// Ermittelt Exit-Code und Status, persistiert Fehler bei Bedarf und löst <see cref="CliProcessStatusChanged"/> aus.
     /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="workItemId">ID der Aufgabe.</param>
     /// <param name="process">Der beendete Prozess.</param>
     /// <param name="handle">Das zugehörige <see cref="CliProcessHandle"/>.</param>
     /// <param name="logKontext">Bezeichnung des Start-Modus für die Log-Ausgabe (z. B. "Standard" oder "ConPTY").</param>
     /// <param name="vorAufraeumenAsync">Optionale zusätzliche Aufräumlogik (z. B. Drain und Dispose der Session), die nach der Handle-Entfernung, aber vor der Statusermittlung ausgeführt wird.</param>
-    private async Task HandleProcessExitedAsync(Guid aufgabeId, Process process, CliProcessHandle handle, string logKontext, Func<Task>? vorAufraeumenAsync = null)
+    private async Task HandleProcessExitedAsync(Guid workItemId, Process process, CliProcessHandle handle, string logKontext, Func<Task>? vorAufraeumenAsync = null)
     {
-        await HandleExitedCoreAsync(aufgabeId, handle, TryGetExitCode(process), logKontext, vorAufraeumenAsync).ConfigureAwait(false);
+        await HandleExitedCoreAsync(workItemId, handle, TryGetExitCode(process), logKontext, vorAufraeumenAsync).ConfigureAwait(false);
     }
 
     /// <summary>Behandelt das <see cref="ITerminalSession.Exited"/>-Ereignis einer Terminal-Session:
     /// Exit-Code kommt aus <see cref="TerminalSessionExitedEventArgs"/>, die Session-Ressourcen werden
     /// über <see cref="DisposeSessionResourcesAsync"/> aufgeräumt.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="workItemId">ID der Aufgabe.</param>
     /// <param name="handle">Das zugehörige <see cref="CliProcessHandle"/>.</param>
     /// <param name="exitCode">Der ermittelte Exit-Code, oder <c>null</c>, wenn keiner bekannt ist.</param>
     /// <param name="logKontext">Bezeichnung des Kontexts für die Log-Ausgabe (z. B. "Terminal").</param>
     /// <param name="istFehlerhaftesEnde"><c>true</c>, wenn das Ende auf einem fatalen
     /// Laufzeitfehler der Session beruht (<see cref="ITerminalSession.Failed"/>) — dann wird auch ohne
     /// bekannten Exit-Code der Status <see cref="CliProcessStatus.Fehler"/> gemeldet.</param>
-    private async Task HandleSessionEndedAsync(Guid aufgabeId, CliProcessHandle handle, int? exitCode, string logKontext, bool istFehlerhaftesEnde = false)
+    private async Task HandleSessionEndedAsync(Guid workItemId, CliProcessHandle handle, int? exitCode, string logKontext, bool istFehlerhaftesEnde = false)
     {
-        await HandleExitedCoreAsync(aufgabeId, handle, exitCode, logKontext, () => DisposeSessionResourcesAsync(handle), istFehlerhaftesEnde).ConfigureAwait(false);
+        await HandleExitedCoreAsync(workItemId, handle, exitCode, logKontext, () => DisposeSessionResourcesAsync(handle), istFehlerhaftesEnde).ConfigureAwait(false);
     }
 
     /// <summary>Behandelt das <see cref="ITerminalSession.Failed"/>-Ereignis einer Terminal-Session:
     /// ein fataler Laufzeitfehler wird wie ein Exit mit Fehlercode behandelt (Status
     /// <see cref="CliProcessStatus.Fehler"/> inkl. Fehler-Protokolleintrag; ein bekannt gewordener
     /// Exit-Code wird dabei mitgeführt).</summary>
-    private async Task HandleSessionFailedAsync(Guid aufgabeId, CliProcessHandle handle, TerminalSessionFailedEventArgs args)
+    private async Task HandleSessionFailedAsync(Guid workItemId, CliProcessHandle handle, TerminalSessionFailedEventArgs args)
     {
-        _logger.LogError(args.Error, "Terminal-Session für Aufgabe {AufgabeId} fehlgeschlagen (Phase: {Phase}).", aufgabeId, args.Phase);
-        await HandleSessionEndedAsync(aufgabeId, handle, handle.Session?.ExitCode ?? TryGetExitCode(handle.Process), "Terminal-Fehler", istFehlerhaftesEnde: true).ConfigureAwait(false);
+        _logger.LogError(args.Error, "Terminal-Session für Aufgabe {AufgabeId} fehlgeschlagen (Phase: {Phase}).", workItemId, args.Phase);
+        await HandleSessionEndedAsync(workItemId, handle, handle.Session?.ExitCode ?? TryGetExitCode(handle.Process), "Terminal-Fehler", istFehlerhaftesEnde: true).ConfigureAwait(false);
     }
 
-    private async Task HandleExitedCoreAsync(Guid aufgabeId, CliProcessHandle handle, int? exitCode, string logKontext, Func<Task>? vorAufraeumenAsync, bool istFehlerhaftesEnde = false)
+    private async Task HandleExitedCoreAsync(Guid workItemId, CliProcessHandle handle, int? exitCode, string logKontext, Func<Task>? vorAufraeumenAsync, bool istFehlerhaftesEnde = false)
     {
         try
         {
             // TryRemove ist atomar: gibt false zurück, wenn der Prozess bereits über den
             // HasExited-Check nach dem Start bereinigt wurde. So wird jede Aktion genau einmal ausgeführt.
-            if (!_handles.TryRemove(aufgabeId, out var removedHandle))
+            if (!_handles.TryRemove(workItemId, out var removedHandle))
             {
                 return;
             }
@@ -694,7 +694,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             // einsetzen und den alten Exit-Event ignorieren.
             if (!ReferenceEquals(removedHandle, handle))
             {
-                _handles.TryAdd(aufgabeId, removedHandle);
+                _handles.TryAdd(workItemId, removedHandle);
                 return;
             }
 
@@ -704,7 +704,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             _logger.LogInformation(
                 "CLI-Prozess ({LogKontext}) für Aufgabe {AufgabeId} beendet (ExitCode: {ExitCode}).",
                 logKontext,
-                aufgabeId,
+                workItemId,
                 exitCode);
 
             RaiseRunningCountChanged();
@@ -717,29 +717,29 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             else if (istFehlerhaftesEnde || (exitCode.HasValue && exitCode.Value != 0))
             {
                 status = CliProcessStatus.Fehler;
-                PersistFehlgeschlagenAsync(aufgabeId, exitCode).SafeFireAndForget(_logger, "KiAusfuehrungsService.PersistFehlgeschlagenAsync");
+                PersistFehlgeschlagenAsync(workItemId, exitCode).SafeFireAndForget(_logger, "KiAusfuehrungsService.PersistFehlgeschlagenAsync");
             }
             else
             {
                 status = CliProcessStatus.Gestoppt;
             }
 
-            await PersistAusfuehrungBeendetAsync(aufgabeId).ConfigureAwait(false);
-            CliProcessStatusChanged?.Invoke(aufgabeId, status);
+            await PersistAusfuehrungBeendetAsync(workItemId).ConfigureAwait(false);
+            CliProcessStatusChanged?.Invoke(workItemId, status);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler im Exited-Handler ({LogKontext}) für Aufgabe {AufgabeId}.", logKontext, aufgabeId);
+            _logger.LogError(ex, "Fehler im Exited-Handler ({LogKontext}) für Aufgabe {AufgabeId}.", logKontext, workItemId);
         }
     }
 
-    private async Task PersistAusfuehrungBeendetAsync(Guid aufgabeId)
+    private async Task PersistAusfuehrungBeendetAsync(Guid workItemId)
     {
         if (_isDisposed)
         {
             _logger.LogWarning(
                 "Ausführungsstatus für Aufgabe {AufgabeId} nicht persistiert, da der Dienst bereits beendet wird.",
-                aufgabeId);
+                workItemId);
             return;
         }
 
@@ -751,23 +751,23 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, ICli
             {
                 _logger.LogWarning(
                     "Ausführungsstatus für Aufgabe {AufgabeId} nicht persistiert, da der Dienst bereits beendet wird.",
-                    aufgabeId);
+                    workItemId);
                 return;
             }
 
             var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
-            await aufgabeService.AktivenLaufBeendenAsync(aufgabeId).ConfigureAwait(false);
+            await aufgabeService.AktivenLaufBeendenAsync(workItemId).ConfigureAwait(false);
         }
         catch (ObjectDisposedException ex)
         {
             _logger.LogDebug(
                 ex,
                 "Ausführungsstatus für Aufgabe {AufgabeId} konnte nicht persistiert werden, da der ServiceProvider bereits disposed wurde.",
-                aufgabeId);
+                workItemId);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Fehler beim Persistieren des beendeten Ausführungsstatus für Aufgabe {AufgabeId}.", aufgabeId);
+            _logger.LogWarning(ex, "Fehler beim Persistieren des beendeten Ausführungsstatus für Aufgabe {AufgabeId}.", workItemId);
         }
     }
 
@@ -858,7 +858,7 @@ public sealed class CliProcessHandle
     /// <summary>SCM-Vertrag des tatsächlichen interaktiven Starts.</summary>
     public ScmPromptSessionAdapter? ScmPromptSession { get; set; }
     /// <summary>Aufgaben-ID zu der dieser Prozess gehört.</summary>
-    public Guid AufgabeId { get; }
+    public Guid WorkItemId { get; }
 
     /// <summary>Der verwaltete Prozess.</summary>
     public Process Process { get; }
@@ -882,11 +882,11 @@ public sealed class CliProcessHandle
     public ITerminalOutputSink? OutputSink { get; set; }
 
     /// <summary>Erstellt ein neues Handle.</summary>
-    /// <param name="aufgabeId">ID der zugehörigen Aufgabe.</param>
+    /// <param name="workItemId">ID der zugehörigen Aufgabe.</param>
     /// <param name="process">Der verwaltete Prozess.</param>
-    public CliProcessHandle(Guid aufgabeId, Process process)
+    public CliProcessHandle(Guid workItemId, Process process)
     {
-        AufgabeId = aufgabeId;
+        WorkItemId = workItemId;
         Process = process;
     }
 }
@@ -895,7 +895,7 @@ public sealed class CliProcessHandle
 public enum CliProcessStatus
 {
     /// <summary>Prozess läuft.</summary>
-    Gestartet,
+    Started,
     /// <summary>Prozess wurde gestoppt.</summary>
     Gestoppt,
     /// <summary>Prozess ist mit einem Fehler beendet.</summary>

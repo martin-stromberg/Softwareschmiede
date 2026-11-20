@@ -38,7 +38,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     public CliProcessManagerTests_LaufStatus()
     {
         var services = new ServiceCollection();
-        services.AddDbContext<SoftwareschmiededDbContext>(options => options.UseInMemoryDatabase(_dbName));
+        services.AddDbContext<SoftwareschmiedeDbContext>(options => options.UseInMemoryDatabase(_dbName));
         services.AddScoped<AufgabeService>();
         services.AddSingleton<ILogger<AufgabeService>>(NullLogger<AufgabeService>.Instance);
         services.AddScoped<TodoService>();
@@ -47,22 +47,22 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
 
         using (var scope = _provider.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             db.Database.EnsureCreated();
-            db.Projekte.Add(new Projekt
+            db.Projects.Add(new Project
             {
                 Id = _projektId,
                 Name = "Testprojekt",
-                ErstellungsDatum = DateTimeOffset.UtcNow,
-                Status = ProjektStatus.Aktiv
+                CreatedAt = DateTimeOffset.UtcNow,
+                Status = ProjectStatus.Active
             });
-            db.Aufgaben.Add(new Aufgabe
+            db.WorkItems.Add(new WorkItem
             {
                 Id = _aufgabeId,
-                ProjektId = _projektId,
-                Titel = "CLI-Prozess-Aufgabe",
-                Status = AufgabeStatus.Gestartet,
-                ErstellungsDatum = DateTimeOffset.UtcNow
+                ProjectId = _projektId,
+                Title = "CLI-Prozess-Aufgabe",
+                Status = WorkItemStatus.Started,
+                CreatedAt = DateTimeOffset.UtcNow
             });
             db.SaveChanges();
         }
@@ -89,11 +89,11 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
         _provider.Dispose();
     }
 
-    private Aufgabe LadeAufgabe()
+    private WorkItem LadeAufgabe()
     {
         using var scope = _provider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        return db.Aufgaben.AsNoTracking().Single(a => a.Id == _aufgabeId);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        return db.WorkItems.AsNoTracking().Single(a => a.Id == _aufgabeId);
     }
 
     /// <summary>
@@ -104,9 +104,9 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     /// <c>StartTerminalSessionAsync</c> in der echten Anwendung tut, nur ohne tatsächlich einen cmd.exe-
     /// Prozess zu starten.
     /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe, für die eine Fake-Sitzung registriert werden soll.</param>
+    /// <param name="workItemId">ID der Aufgabe, für die eine Fake-Sitzung registriert werden soll.</param>
     /// <returns>Die neu angelegte, in <see cref="KiAusfuehrungsService"/> registrierte Sitzung.</returns>
-    private PseudoConsoleSession RegisterFakeSessionForAufgabe(Guid aufgabeId)
+    private PseudoConsoleSession RegisterFakeSessionForAufgabe(Guid workItemId)
     {
         var process = System.Diagnostics.Process.GetCurrentProcess();
         var session = TestPseudoConsoleSessionFactory.Create(
@@ -119,12 +119,12 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
 
         var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var handles = (ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
-        handles[aufgabeId] = new CliProcessHandle(aufgabeId, process) { Session = session };
+        handles[workItemId] = new CliProcessHandle(workItemId, process) { Session = session };
 
         return session;
     }
 
-    private async Task RaiseStatusChangedAsync(CliProcessStatus status, Func<Aufgabe, bool> bedingung)
+    private async Task RaiseStatusChangedAsync(CliProcessStatus status, Func<WorkItem, bool> bedingung)
     {
         var method = typeof(CliProcessManager).GetMethod("OnCliProcessStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
         method.Invoke(_sut, new object[] { _aufgabeId, status });
@@ -165,25 +165,25 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
 
         // Läuft: CliProcessManager setzt AktiveRunId + LaufStatus=Laeuft sofort beim Start und abonniert
         // die Sitzung.
-        await RaiseStatusChangedAsync(CliProcessStatus.Gestartet, a => a.AktiveRunId != null);
+        await RaiseStatusChangedAsync(CliProcessStatus.Started, a => a.ActiveRunId != null);
         var nachStart = LadeAufgabe();
-        nachStart.AktiveRunId.Should().NotBeNull();
-        nachStart.LaufStatus.Should().Be(AufgabeLaufStatus.Laeuft);
+        nachStart.ActiveRunId.Should().NotBeNull();
+        nachStart.RunStatus.Should().Be(WorkItemRunStatus.Running);
 
         // Wartet: Die Sitzung erkennt fehlende I/O-Aktivität (RefreshRuntimeStatus, hier direkt statt über
         // den echten 1s-Timer ausgelöst) und wechselt auf WartetAufEingabe — der Prozess selbst lebt
         // weiterhin (Process.GetCurrentProcess() ist der Testprozess und hat nicht beendet).
         ForceRuntimeStatusRefresh(session);
-        await PollUntilAsync(() => LadeAufgabe().LaufStatus == AufgabeLaufStatus.WartetAufEingabe);
+        await PollUntilAsync(() => LadeAufgabe().RunStatus == WorkItemRunStatus.WaitingForInput);
         var waehrendWarten = LadeAufgabe();
-        waehrendWarten.AktiveRunId.Should().NotBeNull("der Prozess lebt während des Wartens auf Eingabe weiterhin");
-        waehrendWarten.LaufStatus.Should().Be(AufgabeLaufStatus.WartetAufEingabe);
+        waehrendWarten.ActiveRunId.Should().NotBeNull("der Prozess lebt während des Wartens auf Eingabe weiterhin");
+        waehrendWarten.RunStatus.Should().Be(WorkItemRunStatus.WaitingForInput);
 
         // Bereit: Prozess wird beendet — AktiveRunId und LaufStatus müssen beide entfernt werden.
-        await RaiseStatusChangedAsync(CliProcessStatus.Gestoppt, a => a.AktiveRunId == null);
+        await RaiseStatusChangedAsync(CliProcessStatus.Gestoppt, a => a.ActiveRunId == null);
         var nachStopp = LadeAufgabe();
-        nachStopp.AktiveRunId.Should().BeNull();
-        nachStopp.LaufStatus.Should().BeNull();
+        nachStopp.ActiveRunId.Should().BeNull();
+        nachStopp.RunStatus.Should().BeNull();
     }
 
     /// <summary>
@@ -195,15 +195,15 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     public async Task RaisesRuntimeStatusChanged_AfterGestoppt_AktualisiertLaufStatusNichtMehr()
     {
         var session = RegisterFakeSessionForAufgabe(_aufgabeId);
-        await RaiseStatusChangedAsync(CliProcessStatus.Gestartet, a => a.AktiveRunId != null);
-        await RaiseStatusChangedAsync(CliProcessStatus.Gestoppt, a => a.AktiveRunId == null);
+        await RaiseStatusChangedAsync(CliProcessStatus.Started, a => a.ActiveRunId != null);
+        await RaiseStatusChangedAsync(CliProcessStatus.Gestoppt, a => a.ActiveRunId == null);
 
         // Verspätetes Event nach dem Stopp: darf keinen Effekt mehr haben (weder über die Abmeldung in
         // CliProcessManager, noch nachgelagert über den IsRunning-Guard der Laufdaten-Sicherstellung).
         ForceRuntimeStatusRefresh(session);
         await Task.Delay(200, TestContext.Current.CancellationToken);
 
-        LadeAufgabe().LaufStatus.Should().BeNull();
+        LadeAufgabe().RunStatus.Should().BeNull();
     }
 
     /// <summary>
@@ -215,7 +215,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     public async Task OnRuntimeStatusChanged_HeiltFehlendeAktiveRunId()
     {
         var session = RegisterFakeSessionForAufgabe(_aufgabeId);
-        LadeAufgabe().AktiveRunId.Should().BeNull("Ausgangslage: keine Gestartet-Persistierung");
+        LadeAufgabe().ActiveRunId.Should().BeNull("Ausgangslage: keine Gestartet-Persistierung");
 
         // Session deterministisch in den Wartezustand bringen (Schwelle: 1 ms), damit die
         // Selbstheilung den Live-Substatus WartetAufEingabe persistiert.
@@ -223,14 +223,14 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
         ForceRuntimeStatusRefresh(session);
 
         var method = typeof(CliProcessManager).GetMethod("OnRuntimeStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        method.Invoke(_sut, new object[] { _aufgabeId, CliRuntimeStatus.WartetAufEingabe });
+        method.Invoke(_sut, new object[] { _aufgabeId, CliRuntimeStatus.WaitingForInput });
 
-        await PollUntilAsync(() => LadeAufgabe().AktiveRunId is not null);
-        var aufgabe = LadeAufgabe();
-        aufgabe.AktiveRunId.Should().NotBeNullOrEmpty();
-        aufgabe.LastHeartbeatUtc.Should().NotBeNull();
-        aufgabe.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
-        aufgabe.LaufStatus.Should().Be(AufgabeLaufStatus.WartetAufEingabe);
+        await PollUntilAsync(() => LadeAufgabe().ActiveRunId is not null);
+        var workItem = LadeAufgabe();
+        workItem.ActiveRunId.Should().NotBeNullOrEmpty();
+        workItem.LastHeartbeatUtc.Should().NotBeNull();
+        workItem.ExecutionStatus.Should().Be(WorkItemExecutionStatus.Active);
+        workItem.RunStatus.Should().Be(WorkItemRunStatus.WaitingForInput);
     }
 
     /// <summary>Stream, dessen Lesevorgang niemals zurückkehrt — verhindert, dass die Leseschleife der

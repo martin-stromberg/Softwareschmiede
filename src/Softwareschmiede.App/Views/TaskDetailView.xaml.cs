@@ -166,9 +166,9 @@ public sealed partial class TaskDetailView : UserControl
     /// <returns>Die Aufgaben-ID als String, oder ein leerer String, wenn keine Sitzung oder Aufgabe vorhanden ist.</returns>
     private string GetTerminalTaskId(ITerminalSession? session)
     {
-        if (session is null || _subscribedViewModel?.AufgabeId is not { } aufgabeId || aufgabeId == Guid.Empty)
+        if (session is null || _subscribedViewModel?.WorkItemId is not { } workItemId || workItemId == Guid.Empty)
             return string.Empty;
 
-        return aufgabeId.ToString("D");
+        return workItemId.ToString("D");
     }
 }

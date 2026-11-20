@@ -4,8 +4,8 @@ namespace Softwareschmiede.Application.Services;
 
 /// <summary>Ereignisdaten bei Abschluss einer KI-Aufgabe.</summary>
 public sealed record KiAufgabenAbschlussEreignis(
-    Guid EreignisId,
-    Guid AufgabeId,
+    Guid EventId,
+    Guid WorkItemId,
     string Aufgabentitel,
-    AufgabeStatus AbschlussStatus,
-    DateTimeOffset Zeitstempel);
+    WorkItemStatus AbschlussStatus,
+    DateTimeOffset Timestamp);

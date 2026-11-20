@@ -54,7 +54,7 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateReleaseLookupResult.Fehlgeschlagen);
+            .ReturnsAsync(UpdateReleaseLookupResult.Failed);
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
         var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(UpdatePfadKanalResolver.ProduktivversionenPfad), TestContext.Current.CancellationToken);

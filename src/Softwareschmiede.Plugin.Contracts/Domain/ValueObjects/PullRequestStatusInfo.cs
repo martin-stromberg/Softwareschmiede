@@ -9,7 +9,7 @@ public sealed record PullRequestStatusInfo(
     int Nummer,
     string? ProviderPullRequestId,
     string Url,
-    string Titel,
+    string Title,
     string SourceBranch,
     string TargetBranch,
     string? HeadSha,

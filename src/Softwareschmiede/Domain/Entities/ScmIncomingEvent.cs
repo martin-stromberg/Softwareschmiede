@@ -13,7 +13,7 @@ public sealed class ScmIncomingEvent
     public string EventKey { get; set; } = "";
 
     /// <summary>AufgabeId des Ereignisprozesses.</summary>
-    public Guid AufgabeId { get; set; }
+    public Guid WorkItemId { get; set; }
 
     /// <summary>ObservationJson des Ereignisprozesses.</summary>
     public string ObservationJson { get; set; } = "";
@@ -66,5 +66,5 @@ public sealed class ScmIncomingEvent
     /// <summary>Zweck-Kennzeichnung des Ereignisses; <see langword="null"/> kennzeichnet ein
     /// reguläres externes Ereignis. Intern erzeugte Ereignisse (z. B. <c>"IssueAufbereitung"</c>)
     /// umgehen die Trigger-Validierung und folgen ihrem eigenen Ausführungspfad.</summary>
-    public string? Zweck { get; set; }
+    public string? Purpose { get; set; }
 }

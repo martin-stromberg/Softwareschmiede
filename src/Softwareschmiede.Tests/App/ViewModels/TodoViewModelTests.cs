@@ -11,10 +11,10 @@ public sealed class TodoViewModelTests
     private static Todo CreateTodo(DateTimeOffset? erledaltAm = null) => new()
     {
         Id = Guid.NewGuid(),
-        AufgabeId = Guid.NewGuid(),
-        Beschreibung = "Testbeschreibung",
-        ErstellungsDatum = DateTimeOffset.UtcNow,
-        ErledigtAm = erledaltAm
+        WorkItemId = Guid.NewGuid(),
+        Description = "Testbeschreibung",
+        CreatedAt = DateTimeOffset.UtcNow,
+        CompletedAt = erledaltAm
     };
 
     /// <summary>Properties sind nach der Konstruktion korrekt bindbar.</summary>
@@ -25,8 +25,8 @@ public sealed class TodoViewModelTests
         var sut = new TodoViewModel(todo);
 
         sut.Id.Should().Be(todo.Id);
-        sut.Beschreibung.Should().Be(todo.Beschreibung);
-        sut.ErstellungsDatum.Should().Be(todo.ErstellungsDatum);
+        sut.Description.Should().Be(todo.Description);
+        sut.CreatedAt.Should().Be(todo.CreatedAt);
         sut.IstErledigt.Should().BeFalse();
     }
 
@@ -48,10 +48,10 @@ public sealed class TodoViewModelTests
         var raised = new List<string?>();
         sut.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
-        sut.Beschreibung = "Neue Beschreibung";
+        sut.Description = "Neue Beschreibung";
 
-        raised.Should().Contain(nameof(TodoViewModel.Beschreibung));
-        sut.Beschreibung.Should().Be("Neue Beschreibung");
+        raised.Should().Contain(nameof(TodoViewModel.Description));
+        sut.Description.Should().Be("Neue Beschreibung");
     }
 
     /// <summary>PropertyChanged wird für IstErledigt ausgelöst, wenn der Wert geändert wird.</summary>
@@ -73,11 +73,11 @@ public sealed class TodoViewModelTests
     public void PropertyChanged_NotRaised_WhenValueUnchanged()
     {
         var sut = new TodoViewModel(CreateTodo());
-        sut.Beschreibung = "Unverändert";
+        sut.Description = "Unverändert";
         var raised = new List<string?>();
         sut.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
-        sut.Beschreibung = "Unverändert";
+        sut.Description = "Unverändert";
 
         raised.Should().BeEmpty();
     }

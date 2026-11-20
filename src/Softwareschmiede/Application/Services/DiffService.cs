@@ -11,7 +11,7 @@ namespace Softwareschmiede.Application.Services;
 /// </summary>
 public sealed class DiffService
 {
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly DiffAlgorithmService _diffAlgorithmService;
     private readonly DiffCachingService _diffCachingService;
     private readonly ILogger<DiffService> _logger;
@@ -21,7 +21,7 @@ public sealed class DiffService
 
     /// <inheritdoc cref="DiffService"/>
     public DiffService(
-        SoftwareschmiededDbContext db,
+        SoftwareschmiedeDbContext db,
         DiffAlgorithmService diffAlgorithmService,
         DiffCachingService diffCachingService,
         ILogger<DiffService> logger)
@@ -36,7 +36,7 @@ public sealed class DiffService
     /// Generiert einen Diff zwischen zwei Dateiinhalten (vereinfachte Überladung für den Controller).
     /// </summary>
     public async Task<DiffResult> GenerateDiffAsync(
-        Guid aufgabeId,
+        Guid workItemId,
         string filePath,
         string sourceContent,
         string targetContent,
@@ -47,7 +47,7 @@ public sealed class DiffService
         CancellationToken ct = default)
     {
         return await GenerateDiffAsync(
-            aufgabeId: aufgabeId,
+            workItemId: workItemId,
             gitRepositoryId: null,
             filePath: filePath,
             sourceVersion: sourceVersion,
@@ -62,7 +62,7 @@ public sealed class DiffService
     /// Generiert einen Diff zwischen zwei Dateiversionen (mit Caching).
     /// </summary>
     public async Task<DiffResult> GenerateDiffAsync(
-        Guid aufgabeId,
+        Guid workItemId,
         Guid? gitRepositoryId,
         string filePath,
         string sourceVersion,
@@ -81,18 +81,18 @@ public sealed class DiffService
 
         _logger.LogInformation(
             "Diff-Generierung gestartet. Aufgabe: {AufgabeId}, Datei: {FilePath}, {Source} → {Target}",
-            aufgabeId, filePath, sourceVersion, targetVersion);
+            workItemId, filePath, sourceVersion, targetVersion);
 
         // Prüfe, ob die Aufgabe existiert
-        var aufgabe = await _db.Aufgaben.FindAsync(new object?[] { aufgabeId }, cancellationToken: ct);
-        if (aufgabe == null)
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var workItem = await _db.WorkItems.FindAsync(new object?[] { workItemId }, cancellationToken: ct);
+        if (workItem == null)
+            throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
         // Erstelle neues DiffResult
         var diffResult = new DiffResult
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabeId,
+            WorkItemId = workItemId,
             GitRepositoryId = gitRepositoryId,
             FilePath = filePath,
             SourceVersion = sourceVersion,
@@ -106,7 +106,7 @@ public sealed class DiffService
 
         // Prüfe Cache
         var cachedResult = await _diffCachingService.GetFromCacheAsync(
-            diffResult.Id, aufgabeId, filePath, sourceVersion, targetVersion, ct);
+            diffResult.Id, workItemId, filePath, sourceVersion, targetVersion, ct);
 
         if (cachedResult != null)
         {
@@ -145,7 +145,7 @@ public sealed class DiffService
                 diffResult.Id, blocks.Count, addedLines, removedLines, modifiedLines);
 
             // Cache speichern (async, ohne zu warten)
-            _ = _diffCachingService.SetInCacheAsync(diffResult, aufgabeId, filePath, sourceVersion, targetVersion, ct)
+            _ = _diffCachingService.SetInCacheAsync(diffResult, workItemId, filePath, sourceVersion, targetVersion, ct)
                 .ContinueWith(t =>
                 {
                     if (t.IsFaulted)
@@ -182,17 +182,17 @@ public sealed class DiffService
     /// Ruft alle Diffs für eine Aufgabe ab.
     /// </summary>
     public async Task<IReadOnlyList<DiffResult>> GetDiffsByAufgabeAsync(
-        Guid aufgabeId,
+        Guid workItemId,
         int skip = 0,
         int take = 50,
         CancellationToken ct = default)
     {
         _logger.LogInformation("Diffs für Aufgabe abrufen. AufgabeId: {AufgabeId}, Skip: {Skip}, Take: {Take}",
-            aufgabeId, skip, take);
+            workItemId, skip, take);
 
         return await _db.DiffResults
             .AsNoTracking()
-            .Where(dr => dr.AufgabeId == aufgabeId)
+            .Where(dr => dr.WorkItemId == workItemId)
             .OrderByDescending(dr => dr.GeneratedAt)
             .Skip(skip)
             .Take(take)
@@ -223,18 +223,18 @@ public sealed class DiffService
     /// Sucht Diffs nach Aufgabe mit optionalem Suchterm.
     /// </summary>
     public async Task<IReadOnlyList<DiffResult>> SearchDiffsAsync(
-        Guid aufgabeId,
+        Guid workItemId,
         int skipCount = 0,
         int takeCount = 50,
         string? searchTerm = null,
         CancellationToken ct = default)
     {
         _logger.LogInformation("Diffs durchsuchen. AufgabeId: {AufgabeId}, Skip: {Skip}, Take: {Take}",
-            aufgabeId, skipCount, takeCount);
+            workItemId, skipCount, takeCount);
 
         var query = _db.DiffResults
             .AsNoTracking()
-            .Where(dr => dr.AufgabeId == aufgabeId);
+            .Where(dr => dr.WorkItemId == workItemId);
 
         // Suche in Dateipfad (optional)
         if (!string.IsNullOrWhiteSpace(searchTerm))
@@ -255,18 +255,18 @@ public sealed class DiffService
     /// Sucht Diffs nach Dateiname oder Inhalt (ältere Überladung für Rückwärtskompatibilität).
     /// </summary>
     public async Task<IReadOnlyList<DiffResult>> SearchDiffsAsync(
-        Guid aufgabeId,
+        Guid workItemId,
         string searchTerm,
         int skip = 0,
         int take = 50,
         CancellationToken ct = default)
     {
         _logger.LogInformation("Diffs durchsuchen. AufgabeId: {AufgabeId}, SearchTerm: {SearchTerm}",
-            aufgabeId, searchTerm);
+            workItemId, searchTerm);
 
         var query = _db.DiffResults
             .AsNoTracking()
-            .Where(dr => dr.AufgabeId == aufgabeId);
+            .Where(dr => dr.WorkItemId == workItemId);
 
         // Suche in Dateipfad
         if (!string.IsNullOrWhiteSpace(searchTerm))
@@ -286,13 +286,13 @@ public sealed class DiffService
     /// <summary>
     /// Zählt die Anzahl der Diffs für eine Aufgabe.
     /// </summary>
-    public async Task<int> GetDiffCountAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task<int> GetDiffCountAsync(Guid workItemId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Diff-Anzahl abrufen. AufgabeId: {AufgabeId}", aufgabeId);
+        _logger.LogInformation("Diff-Anzahl abrufen. AufgabeId: {AufgabeId}", workItemId);
 
         return await _db.DiffResults
             .AsNoTracking()
-            .CountAsync(dr => dr.AufgabeId == aufgabeId, cancellationToken: ct);
+            .CountAsync(dr => dr.WorkItemId == workItemId, cancellationToken: ct);
     }
 
     /// <summary>
@@ -307,13 +307,13 @@ public sealed class DiffService
     /// <summary>
     /// Ruft Statistiken für eine Aufgabe ab (mit erweiterten Feldern für Controller).
     /// </summary>
-    public async Task<DiffStatisticsDto> GetStatisticsAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task<DiffStatisticsDto> GetStatisticsAsync(Guid workItemId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Statistiken abrufen. AufgabeId: {AufgabeId}", aufgabeId);
+        _logger.LogInformation("Statistiken abrufen. AufgabeId: {AufgabeId}", workItemId);
 
         var diffs = await _db.DiffResults
             .AsNoTracking()
-            .Where(dr => dr.AufgabeId == aufgabeId)
+            .Where(dr => dr.WorkItemId == workItemId)
             .ToListAsync(cancellationToken: ct);
 
         if (diffs.Count == 0)

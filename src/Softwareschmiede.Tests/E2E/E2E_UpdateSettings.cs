@@ -324,7 +324,7 @@ public partial class End2EndTest
             // stabile Version ist kanalfremd. Produktive Installation + Vorab-Pfad ergibt
             // den Kanalkonflikt: Angebot bleibt, die Warnung ist nicht blockierend.
             fixture.AktualisiereSzenario(s =>
-                s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Inhalt =
+                s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Content =
                     ErzeugeRcUndHoeheresStableReleaseJson(fixture));
             await SpeichereUpdateEinstellungenUeberUiAsync(fixture, menu, UpdateModusNurPruefenLabel, UpdatePfadVorabLabel);
             await PruefeUpdateUeberUiAsync(fixture, menu, basis = ProtokollBasis(fixture),
@@ -525,7 +525,7 @@ public partial class End2EndTest
 
             // Variante: gleiche/ältere Release-Version -> kein Update, keine Nebenwirkungen.
             fixture.AktualisiereSzenario(s =>
-                s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Inhalt =
+                s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl).Content =
                     ErzeugeReleaseListenJson(fixture, "1.2.0", "1.1.9"));
             basis = ProtokollBasis(fixture);
             mainWindow = RestartAppPreservingDatabase();
@@ -576,7 +576,7 @@ public partial class End2EndTest
             {
                 var antwort = s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl);
                 antwort.Status = 500;
-                antwort.Inhalt = "e2e-fehler";
+                antwort.Content = "e2e-fehler";
             });
             basis = ProtokollBasis(fixture);
             mainWindow = RestartAppPreservingDatabase();
@@ -597,7 +597,7 @@ public partial class End2EndTest
             {
                 var antwort = s.Antworten.Single(a => a.Url == UpdateE2EFixture.ReleaseApiUrl);
                 antwort.Status = 200;
-                antwort.Inhalt = "definitiv kein gueltiges json {{{";
+                antwort.Content = "definitiv kein gueltiges json {{{";
             });
             basis = ProtokollBasis(fixture);
             mainWindow = RestartAppPreservingDatabase();
@@ -716,7 +716,7 @@ public partial class End2EndTest
     {
         fixture.AktualisiereSzenario(s => s.CliSicherheit = new UpdateE2ECliSicherheit
         {
-            Aktiv = true,
+            Active = true,
             RiskanteAufgaben = ["E2E-Risikoaufgabe"]
         });
         var basis = ProtokollBasis(fixture);
@@ -777,7 +777,7 @@ public partial class End2EndTest
         fixture.SetzeGateZurueck(UpdateDownloadGate);
         fixture.AktualisiereSzenario(s =>
         {
-            s.CliSicherheit = new UpdateE2ECliSicherheit { Aktiv = false };
+            s.CliSicherheit = new UpdateE2ECliSicherheit { Active = false };
             s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl).StreamGate = null;
         });
         await PruefeSettingsBedienbarAsync(fixture, menu);
@@ -833,7 +833,7 @@ public partial class End2EndTest
             var antwort = s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl);
             antwort.Status = 200;
             antwort.BodyDatei = Path.GetRelativePath(fixture.Testwurzel, defektesPaket);
-            s.Antworten.Single(a => a.Url == fixture.StableManifestDownloadUrl).Inhalt =
+            s.Antworten.Single(a => a.Url == fixture.StableManifestDownloadUrl).Content =
                 UpdateE2EFixture.ErzeugeManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, defektesPaket);
         });
         var basis = ProtokollBasis(fixture);
@@ -864,7 +864,7 @@ public partial class End2EndTest
             var antwort = s.Antworten.Single(a => a.Url == fixture.StableDownloadUrl);
             antwort.Status = 200;
             antwort.BodyDatei = Path.GetRelativePath(fixture.Testwurzel, manipuliertesPaket);
-            s.Antworten.Single(a => a.Url == fixture.StableManifestDownloadUrl).Inhalt =
+            s.Antworten.Single(a => a.Url == fixture.StableManifestDownloadUrl).Content =
                 UpdateE2EFixture.ErzeugeManifestJson(UpdateE2EFixture.StableVersion, fixture.StableDownloadUrl, fixture.StableZipPfad);
         });
         var basis = ProtokollBasis(fixture);

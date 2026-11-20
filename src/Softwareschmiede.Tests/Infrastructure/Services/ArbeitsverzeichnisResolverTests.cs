@@ -55,12 +55,12 @@ public sealed class ArbeitsverzeichnisResolverTests
         var settings = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
         var filePath = Path.Combine(Path.GetTempPath(), $"resolver-file-{Guid.NewGuid():N}.txt");
         await File.WriteAllTextAsync(filePath, "file", TestContext.Current.CancellationToken);
-        db.AppEinstellungen.Add(new AppEinstellung
+        db.AppSettings.Add(new AppSetting
         {
             Id = Guid.NewGuid(),
-            Schluessel = ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey,
-            Wert = filePath,
-            AktualisiertAm = DateTimeOffset.UtcNow
+            Key = ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey,
+            Value = filePath,
+            UpdatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -85,12 +85,12 @@ public sealed class ArbeitsverzeichnisResolverTests
         await using var db = TestDbContextFactory.Create();
         var settings = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
         var invalidPath = $"invalid{Path.DirectorySeparatorChar}\0path";
-        db.AppEinstellungen.Add(new AppEinstellung
+        db.AppSettings.Add(new AppSetting
         {
             Id = Guid.NewGuid(),
-            Schluessel = ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey,
-            Wert = invalidPath,
-            AktualisiertAm = DateTimeOffset.UtcNow
+            Key = ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey,
+            Value = invalidPath,
+            UpdatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 

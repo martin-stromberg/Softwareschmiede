@@ -11,7 +11,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>DiffServiceTests.</summary>
 public sealed class DiffServiceTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly IMemoryCache _memoryCache;
     private readonly DiffService _sut;
 
@@ -41,10 +41,10 @@ public sealed class DiffServiceTests : IDisposable
     public async Task GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists()
     {
         // Arrange
-        var aufgabeId = await SeedAufgabeAsync();
+        var workItemId = await SeedAufgabeAsync();
 
         // Act
-        var result = await _sut.GenerateDiffAsync(aufgabeId, "src/file.cs", "a\nb\nc", "a\nx\nc", ct: TestContext.Current.CancellationToken);
+        var result = await _sut.GenerateDiffAsync(workItemId, "src/file.cs", "a\nb\nc", "a\nx\nc", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Status.Should().Be(DiffResultStatus.Generated);
@@ -60,12 +60,12 @@ public sealed class DiffServiceTests : IDisposable
     public async Task GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit()
     {
         // Arrange
-        var aufgabeId = await SeedAufgabeAsync();
+        var workItemId = await SeedAufgabeAsync();
         var largeSource = new string('a', 102401);
         var largeTarget = new string('b', 102401);
 
         // Act
-        var result = await _sut.GenerateDiffAsync(aufgabeId, "src/huge.txt", largeSource, largeTarget, ct: TestContext.Current.CancellationToken);
+        var result = await _sut.GenerateDiffAsync(workItemId, "src/huge.txt", largeSource, largeTarget, ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.SourceContent.Should().BeNull();
@@ -77,14 +77,14 @@ public sealed class DiffServiceTests : IDisposable
     public async Task GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows()
     {
         // Arrange
-        var aufgabeId = await SeedAufgabeAsync();
+        var workItemId = await SeedAufgabeAsync();
 
         // Act
-        var act = () => _sut.GenerateDiffAsync(aufgabeId, "src/file.cs", " ", "target");
+        var act = () => _sut.GenerateDiffAsync(workItemId, "src/file.cs", " ", "target");
 
         // Assert
         await act.Should().ThrowAsync<ArgumentNullException>();
-        _db.DiffResults.Should().ContainSingle(dr => dr.AufgabeId == aufgabeId && dr.Status == DiffResultStatus.Error);
+        _db.DiffResults.Should().ContainSingle(dr => dr.WorkItemId == workItemId && dr.Status == DiffResultStatus.Error);
     }
 
     /// <summary><summary>GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe.</summary>.</summary>
@@ -92,12 +92,12 @@ public sealed class DiffServiceTests : IDisposable
     public async Task GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe()
     {
         // Arrange
-        var aufgabeId = await SeedAufgabeAsync();
+        var workItemId = await SeedAufgabeAsync();
         _db.DiffResults.AddRange(
             new DiffResult
             {
                 Id = Guid.NewGuid(),
-                AufgabeId = aufgabeId,
+                WorkItemId = workItemId,
                 FilePath = "a.cs",
                 SourceVersion = "v1",
                 TargetVersion = "v2",
@@ -111,7 +111,7 @@ public sealed class DiffServiceTests : IDisposable
             new DiffResult
             {
                 Id = Guid.NewGuid(),
-                AufgabeId = aufgabeId,
+                WorkItemId = workItemId,
                 FilePath = "b.cs",
                 SourceVersion = "v2",
                 TargetVersion = "v3",
@@ -125,7 +125,7 @@ public sealed class DiffServiceTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
-        var stats = await _sut.GetStatisticsAsync(aufgabeId, TestContext.Current.CancellationToken);
+        var stats = await _sut.GetStatisticsAsync(workItemId, TestContext.Current.CancellationToken);
 
         // Assert
         stats.TotalDiffCount.Should().Be(2);
@@ -141,8 +141,8 @@ public sealed class DiffServiceTests : IDisposable
     public async Task DeleteDiffAsync_ShouldDeleteDiff_WhenExisting()
     {
         // Arrange
-        var aufgabeId = await SeedAufgabeAsync();
-        var diff = await _sut.GenerateDiffAsync(aufgabeId, "src/file.cs", "a", "b", ct: TestContext.Current.CancellationToken);
+        var workItemId = await SeedAufgabeAsync();
+        var diff = await _sut.GenerateDiffAsync(workItemId, "src/file.cs", "a", "b", ct: TestContext.Current.CancellationToken);
 
         // Act
         var deleted = await _sut.DeleteDiffAsync(diff.Id, TestContext.Current.CancellationToken);
@@ -161,24 +161,24 @@ public sealed class DiffServiceTests : IDisposable
 
     private async Task<Guid> SeedAufgabeAsync()
     {
-        var projektId = Guid.NewGuid();
-        var aufgabeId = Guid.NewGuid();
-        _db.Projekte.Add(new Projekt
+        var projectId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
+        _db.Projects.Add(new Project
         {
-            Id = projektId,
-            Name = $"Projekt-{projektId:N}",
-            Status = ProjektStatus.Aktiv,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Id = projectId,
+            Name = $"Projekt-{projectId:N}",
+            Status = ProjectStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow
         });
-        _db.Aufgaben.Add(new Aufgabe
+        _db.WorkItems.Add(new WorkItem
         {
-            Id = aufgabeId,
-            ProjektId = projektId,
-            Titel = "Diff-Aufgabe",
-            Status = AufgabeStatus.Neu,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Id = workItemId,
+            ProjectId = projectId,
+            Title = "Diff-Aufgabe",
+            Status = WorkItemStatus.New,
+            CreatedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
-        return aufgabeId;
+        return workItemId;
     }
 }

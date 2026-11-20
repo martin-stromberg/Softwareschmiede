@@ -158,10 +158,10 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
             var projektService = new ProjektService(db, NullLogger<ProjektService>.Instance);
             var aufgabeService = new AufgabeService(db, NullLogger<AufgabeService>.Instance, new TodoService(db, NullLogger<TodoService>.Instance));
 
-            var projekt = await projektService.CreateAsync(projektName, null);
-            await aufgabeService.CreateAsync(projekt.Id, offeneAufgabeTitel, null);
-            var beendeteAufgabe = await aufgabeService.CreateAsync(projekt.Id, beendeteAufgabeTitel, null);
-            await aufgabeService.StatusSetzenAsync(beendeteAufgabe.Id, AufgabeStatus.Beendet);
+            var project = await projektService.CreateAsync(projektName, null);
+            await aufgabeService.CreateAsync(project.Id, offeneAufgabeTitel, null);
+            var beendeteAufgabe = await aufgabeService.CreateAsync(project.Id, beendeteAufgabeTitel, null);
+            await aufgabeService.StatusSetzenAsync(beendeteAufgabe.Id, WorkItemStatus.Completed);
         }
 
         var projectList = new ProjectListView(mainWindow).ForceShow();

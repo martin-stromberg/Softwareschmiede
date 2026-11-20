@@ -20,7 +20,7 @@ namespace Softwareschmiede.Application.Services;
 /// im Abstand des konfigurierten Poll-Intervalls wiederholt.
 /// </remarks>
 public sealed class ScmBackmergeService(
-    SoftwareschmiededDbContext db,
+    SoftwareschmiedeDbContext db,
     AppEinstellungService einstellungen,
     ScmEventChangeNotifier notifier,
     TimeProvider time,
@@ -42,7 +42,7 @@ public sealed class ScmBackmergeService(
         CancellationToken ct = default)
     {
         var modus = await einstellungen.GetScmBackmergeModusAsync(ct);
-        if (modus == ScmBackmergeModus.Deaktiviert)
+        if (modus == ScmBackmergeMode.Disabled)
             return;
         var draftAktivierung = await einstellungen.GetScmBackmergeDraftAktivierungAsync(ct);
         var adminMerge = await einstellungen.GetScmBackmergeAdminMergeAsync(ct);
@@ -53,7 +53,7 @@ public sealed class ScmBackmergeService(
         if (pullRequests.Count == 0)
             return;
         var kandidaten = await FilterAktivierteRepositoriesAsync(lokaleRepositories
-            .Where(x => x.Aktiv && !string.IsNullOrWhiteSpace(x.DefaultSourceBranchName)).ToList(), modus, ct);
+            .Where(x => x.Active && !string.IsNullOrWhiteSpace(x.DefaultSourceBranchName)).ToList(), modus, ct);
         if (kandidaten.Count == 0)
             return;
 
@@ -289,13 +289,13 @@ public sealed class ScmBackmergeService(
     /// <summary>Filtert die Kandidaten nach dem Aktivierungsmodus; im projektbezogenen Modus werden
     /// die Freigabe-Flags aller betroffenen Projekte in einer Abfrage gelesen.</summary>
     private async Task<IReadOnlyList<GitRepository>> FilterAktivierteRepositoriesAsync(
-        List<GitRepository> kandidaten, ScmBackmergeModus modus, CancellationToken ct)
+        List<GitRepository> kandidaten, ScmBackmergeMode modus, CancellationToken ct)
     {
-        if (modus == ScmBackmergeModus.Global || kandidaten.Count == 0)
+        if (modus == ScmBackmergeMode.Global || kandidaten.Count == 0)
             return kandidaten;
-        var keys = kandidaten.Select(x => AppEinstellungService.BackmergeProjektKey(x.ProjektId)).Distinct().ToArray();
+        var keys = kandidaten.Select(x => AppEinstellungService.BackmergeProjektKey(x.ProjectId)).Distinct().ToArray();
         var flags = await einstellungen.GetSettingsAsync(keys, ct);
-        return kandidaten.Where(x => flags.TryGetValue(AppEinstellungService.BackmergeProjektKey(x.ProjektId), out var wert)
+        return kandidaten.Where(x => flags.TryGetValue(AppEinstellungService.BackmergeProjektKey(x.ProjectId), out var wert)
             && bool.TryParse(wert, out var aktiv) && aktiv).ToList();
     }
 

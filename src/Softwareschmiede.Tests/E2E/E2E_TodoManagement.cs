@@ -94,8 +94,8 @@ public partial class End2EndTest
     private void SetzeAufgabeStatusGestartet(string aufgabeTitel)
     {
         using var db = OpenTestDbContext();
-        var aufgabe = db.Aufgaben.Single(a => a.Titel == aufgabeTitel);
-        aufgabe.Status = AufgabeStatus.Gestartet;
+        var workItem = db.WorkItems.Single(a => a.Title == aufgabeTitel);
+        workItem.Status = WorkItemStatus.Started;
         db.SaveChanges();
     }
 }

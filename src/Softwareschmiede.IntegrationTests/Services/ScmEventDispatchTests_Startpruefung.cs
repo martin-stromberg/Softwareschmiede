@@ -96,7 +96,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        var (taskId, eventId) = await fixture.AddAsync(AufgabeStatus.Gestartet, configured: true);
+        var (taskId, eventId) = await fixture.AddAsync(WorkItemStatus.Started, configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
             await scope.ServiceProvider.GetRequiredService<AufgabeService>()
@@ -141,8 +141,8 @@ public sealed class ScmEventDispatchTests_Startpruefung
         Assert.True(angefordert >= 1, "Die durch die Verzögerungsdirektive gesetzte Pause hat keinen Auslöser gemeldet.");
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            Assert.NotNull(await db.Aufgaben.Where(x => x.Id == taskId).Select(x => x.PausiertBisUtc).SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            Assert.NotNull(await db.WorkItems.Where(x => x.Id == taskId).Select(x => x.PausedUntilUtc).SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
         }
     }
 
@@ -153,12 +153,12 @@ public sealed class ScmEventDispatchTests_Startpruefung
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        var (taskId, _) = await fixture.AddAsync(AufgabeStatus.Gestartet, configured: true);
+        var (taskId, _) = await fixture.AddAsync(WorkItemStatus.Started, configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            await db.Aufgaben.Where(x => x.Id == taskId)
-                .ExecuteUpdateAsync(x => x.SetProperty(p => p.AusfuehrungsStatus, AufgabeAusfuehrungsStatus.Aktiv), cancellationToken: TestContext.Current.CancellationToken);
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            await db.WorkItems.Where(x => x.Id == taskId)
+                .ExecuteUpdateAsync(x => x.SetProperty(p => p.ExecutionStatus, WorkItemExecutionStatus.Active), cancellationToken: TestContext.Current.CancellationToken);
         }
         var angefordert = 0;
         fixture.Ausloeser.Angefordert += () => angefordert++;
@@ -172,8 +172,8 @@ public sealed class ScmEventDispatchTests_Startpruefung
         Assert.True(angefordert >= 1, "Die Session-Limit-Pause hat keinen Auslöser gemeldet.");
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            Assert.NotNull(await db.Aufgaben.Where(x => x.Id == taskId).Select(x => x.PausiertBisUtc).SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            Assert.NotNull(await db.WorkItems.Where(x => x.Id == taskId).Select(x => x.PausedUntilUtc).SingleAsync(cancellationToken: TestContext.Current.CancellationToken));
         }
     }
 
@@ -232,7 +232,7 @@ public sealed class ScmEventDispatchTests_Startpruefung
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
-        var (nonScmTask, _) = await fixture.AddAsync(AufgabeStatus.Gestartet, configured: true);
+        var (nonScmTask, _) = await fixture.AddAsync(WorkItemStatus.Started, configured: true);
         var (_, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
         {

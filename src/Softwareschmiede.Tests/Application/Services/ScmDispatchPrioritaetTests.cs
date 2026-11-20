@@ -10,9 +10,9 @@ public sealed class ScmDispatchPrioritaetTests
     private static readonly Guid AufgabeA = new("11111111-1111-1111-1111-111111111111");
     private static readonly Guid AufgabeB = new("22222222-2222-2222-2222-222222222222");
 
-    private static ScmDispatchPrioritaet.EreignisAuswahl Ereignis(long sequence, Guid? aufgabeId = null,
+    private static ScmDispatchPrioritaet.EreignisAuswahl Ereignis(long sequence, Guid? workItemId = null,
         string status = "Wartend", long? nextAttemptUtc = null)
-        => new(Guid.NewGuid(), aufgabeId ?? AufgabeB, sequence, status, nextAttemptUtc);
+        => new(Guid.NewGuid(), workItemId ?? AufgabeB, sequence, status, nextAttemptUtc);
 
     private static Dictionary<Guid, ScmDispatchPrioritaet.AufgabenZustand> Zustaende(
         params (Guid Id, ScmDispatchPrioritaet.AufgabenZustand Zustand)[] eintraege)
@@ -22,35 +22,35 @@ public sealed class ScmDispatchPrioritaetTests
     [Fact]
     public void PrioritaetsKlasse_Pausiert_GibtKlasse1()
     {
-        var zustand = new ScmDispatchPrioritaet.AufgabenZustand(AufgabeStatus.Wartend,
-            AufgabeAusfuehrungsStatus.Aktiv, DateTimeOffset.UtcNow.AddMinutes(-5));
+        var zustand = new ScmDispatchPrioritaet.AufgabenZustand(WorkItemStatus.Waiting,
+            WorkItemExecutionStatus.Active, DateTimeOffset.UtcNow.AddMinutes(-5));
 
         ScmDispatchPrioritaet.PrioritaetsKlasse(Ereignis(1, AufgabeA), zustand).Should().Be(1);
     }
 
     /// <summary>Klasse 1: beendeter Lauf einer aktiven Aufgabe (Neu/Gestartet/Wartend).</summary>
     [Theory]
-    [InlineData(AufgabeStatus.Neu)]
-    [InlineData(AufgabeStatus.Gestartet)]
-    [InlineData(AufgabeStatus.Wartend)]
-    public void PrioritaetsKlasse_LaufBeendetAufgabeAktiv_GibtKlasse1(AufgabeStatus status)
+    [InlineData(WorkItemStatus.New)]
+    [InlineData(WorkItemStatus.Started)]
+    [InlineData(WorkItemStatus.Waiting)]
+    public void PrioritaetsKlasse_LaufBeendetAufgabeAktiv_GibtKlasse1(WorkItemStatus status)
     {
         var zustand = new ScmDispatchPrioritaet.AufgabenZustand(status,
-            AufgabeAusfuehrungsStatus.Beendet, null);
+            WorkItemExecutionStatus.Completed, null);
 
         ScmDispatchPrioritaet.PrioritaetsKlasse(Ereignis(1, AufgabeA), zustand).Should().Be(1);
     }
 
     /// <summary>Klasse 1 greift nicht bei beendeter/archivierter Aufgabe oder aktivem Lauf.</summary>
     [Theory]
-    [InlineData(AufgabeStatus.Beendet, AufgabeAusfuehrungsStatus.Beendet)]
-    [InlineData(AufgabeStatus.Archiviert, AufgabeAusfuehrungsStatus.Beendet)]
-    [InlineData(AufgabeStatus.Gestartet, AufgabeAusfuehrungsStatus.Aktiv)]
-    [InlineData(AufgabeStatus.Neu, AufgabeAusfuehrungsStatus.NichtGestartet)]
-    public void PrioritaetsKlasse_KeinFortsetzungsfall_GibtNichtKlasse1(AufgabeStatus status,
-        AufgabeAusfuehrungsStatus ausfuehrungsStatus)
+    [InlineData(WorkItemStatus.Completed, WorkItemExecutionStatus.Completed)]
+    [InlineData(WorkItemStatus.Archived, WorkItemExecutionStatus.Completed)]
+    [InlineData(WorkItemStatus.Started, WorkItemExecutionStatus.Active)]
+    [InlineData(WorkItemStatus.New, WorkItemExecutionStatus.NotStarted)]
+    public void PrioritaetsKlasse_KeinFortsetzungsfall_GibtNichtKlasse1(WorkItemStatus status,
+        WorkItemExecutionStatus executionStatus)
     {
-        var zustand = new ScmDispatchPrioritaet.AufgabenZustand(status, ausfuehrungsStatus, null);
+        var zustand = new ScmDispatchPrioritaet.AufgabenZustand(status, executionStatus, null);
 
         ScmDispatchPrioritaet.PrioritaetsKlasse(Ereignis(1, AufgabeA, "Wartend"), zustand).Should().Be(3);
     }
@@ -59,20 +59,20 @@ public sealed class ScmDispatchPrioritaetTests
     [Fact]
     public void PrioritaetsKlasse_PausiertInZukunft_GibtKlasse1()
     {
-        var zustand = new ScmDispatchPrioritaet.AufgabenZustand(AufgabeStatus.Wartend,
-            AufgabeAusfuehrungsStatus.Aktiv, DateTimeOffset.UtcNow.AddHours(1));
+        var zustand = new ScmDispatchPrioritaet.AufgabenZustand(WorkItemStatus.Waiting,
+            WorkItemExecutionStatus.Active, DateTimeOffset.UtcNow.AddHours(1));
 
         ScmDispatchPrioritaet.PrioritaetsKlasse(Ereignis(1, AufgabeA), zustand).Should().Be(1);
     }
 
     /// <summary>Beendete/Archivierte Aufgabe unterdrückt Klasse 1 auch bei gesetzter Pause.</summary>
     [Theory]
-    [InlineData(AufgabeStatus.Beendet)]
-    [InlineData(AufgabeStatus.Archiviert)]
-    public void PrioritaetsKlasse_PausiertAberAufgabeBeendet_NichtKlasse1(AufgabeStatus status)
+    [InlineData(WorkItemStatus.Completed)]
+    [InlineData(WorkItemStatus.Archived)]
+    public void PrioritaetsKlasse_PausiertAberAufgabeBeendet_NichtKlasse1(WorkItemStatus status)
     {
         var zustand = new ScmDispatchPrioritaet.AufgabenZustand(status,
-            AufgabeAusfuehrungsStatus.Aktiv, DateTimeOffset.UtcNow.AddMinutes(-5));
+            WorkItemExecutionStatus.Active, DateTimeOffset.UtcNow.AddMinutes(-5));
 
         ScmDispatchPrioritaet.PrioritaetsKlasse(Ereignis(1, AufgabeA, "Wartend"), zustand).Should().Be(3);
     }
@@ -81,8 +81,8 @@ public sealed class ScmDispatchPrioritaetTests
     [Fact]
     public void PrioritaetsKlasse_Verzoegert_GibtKlasse2()
     {
-        var zustand = new ScmDispatchPrioritaet.AufgabenZustand(AufgabeStatus.Neu,
-            AufgabeAusfuehrungsStatus.NichtGestartet, null);
+        var zustand = new ScmDispatchPrioritaet.AufgabenZustand(WorkItemStatus.New,
+            WorkItemExecutionStatus.NotStarted, null);
 
         ScmDispatchPrioritaet.PrioritaetsKlasse(Ereignis(1, AufgabeA, "Verzögert"), zustand).Should().Be(2);
     }
@@ -91,8 +91,8 @@ public sealed class ScmDispatchPrioritaetTests
     [Fact]
     public void PrioritaetsKlasse_FortsetzungSchlaegtVerzoegerung()
     {
-        var zustand = new ScmDispatchPrioritaet.AufgabenZustand(AufgabeStatus.Wartend,
-            AufgabeAusfuehrungsStatus.Aktiv, DateTimeOffset.UtcNow.AddMinutes(-5));
+        var zustand = new ScmDispatchPrioritaet.AufgabenZustand(WorkItemStatus.Waiting,
+            WorkItemExecutionStatus.Active, DateTimeOffset.UtcNow.AddMinutes(-5));
 
         ScmDispatchPrioritaet.PrioritaetsKlasse(Ereignis(1, AufgabeA, "Verzögert"), zustand).Should().Be(1);
     }
@@ -104,15 +104,15 @@ public sealed class ScmDispatchPrioritaetTests
         var regulär1 = Ereignis(1);
         var verzögertSpät = Ereignis(2, status: "Verzögert", nextAttemptUtc: 2000);
         var regulär2 = Ereignis(3);
-        var fortsetzung = Ereignis(4, aufgabeId: AufgabeA);
+        var fortsetzung = Ereignis(4, workItemId: AufgabeA);
         var verzögertFrüh = Ereignis(5, status: "Verzögert", nextAttemptUtc: 1000);
         var items = new List<ScmDispatchPrioritaet.EreignisAuswahl>
             { regulär1, verzögertSpät, regulär2, fortsetzung, verzögertFrüh };
         var zustaende = Zustaende(
-            (AufgabeA, new ScmDispatchPrioritaet.AufgabenZustand(AufgabeStatus.Gestartet,
-                AufgabeAusfuehrungsStatus.Beendet, null)),
-            (AufgabeB, new ScmDispatchPrioritaet.AufgabenZustand(AufgabeStatus.Neu,
-                AufgabeAusfuehrungsStatus.NichtGestartet, null)));
+            (AufgabeA, new ScmDispatchPrioritaet.AufgabenZustand(WorkItemStatus.Started,
+                WorkItemExecutionStatus.Completed, null)),
+            (AufgabeB, new ScmDispatchPrioritaet.AufgabenZustand(WorkItemStatus.New,
+                WorkItemExecutionStatus.NotStarted, null)));
 
         var geordnet = ScmDispatchPrioritaet.OrderForDispatch(items, zustaende);
 
@@ -136,8 +136,8 @@ public sealed class ScmDispatchPrioritaetTests
     [Fact]
     public void OrderForDispatch_OhneAufgabenzustand_Eingangsreihenfolge()
     {
-        var e2 = Ereignis(2, aufgabeId: Guid.NewGuid());
-        var e1 = Ereignis(1, aufgabeId: Guid.NewGuid());
+        var e2 = Ereignis(2, workItemId: Guid.NewGuid());
+        var e1 = Ereignis(1, workItemId: Guid.NewGuid());
 
         var geordnet = ScmDispatchPrioritaet.OrderForDispatch([e2, e1],
             new Dictionary<Guid, ScmDispatchPrioritaet.AufgabenZustand>());

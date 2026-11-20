@@ -8,7 +8,7 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 /// <summary>E2E-Test: Fensterposition verschieben/skalieren und beim Neustart wiederherstellen.</summary>
 public sealed class WindowGeometryServiceIntegrationTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AppEinstellungService _einstellungService;
 
     /// <summary>WindowGeometryServiceIntegrationTests.</summary>

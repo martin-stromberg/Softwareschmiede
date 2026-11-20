@@ -9,17 +9,17 @@ namespace Softwareschmiede.Application.Services;
 
 /// <summary>
 /// Service Layer für KI-Plugin-Session-Limits. Persistiert den vom Plugin gemeldeten
-/// Reset-Zeitpunkt pro <see cref="Aufgabe.KiPluginPrefix"/> als <see cref="AppEinstellung"/>
+/// Reset-Zeitpunkt pro <see cref="WorkItem.AiPluginPrefix"/> als <see cref="AppSetting"/>
 /// (Schlüssel <c>plugins.sessionlimit.&lt;Prefix&gt;</c>) und wendet die Pause auf alle
 /// aktiv ausgeführten regulären Aufgaben desselben Prefix an — ohne laufende CLI-Prozesse
 /// zu unterbrechen.
 /// </summary>
 public sealed class KiPluginLimitService
 {
-    /// <summary>Schlüsselpräfix für persistierte Session-Limit-Reset-Zeitpunkte in <see cref="AppEinstellung"/>.</summary>
+    /// <summary>Schlüsselpräfix für persistierte Session-Limit-Reset-Zeitpunkte in <see cref="AppSetting"/>.</summary>
     public const string SessionLimitKeyPrefix = "plugins.sessionlimit.";
 
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly AppEinstellungService _appEinstellungService;
     private readonly AufgabeLaufdatenChangedNotifier _laufdatenChangedNotifier;
     private readonly ILogger<KiPluginLimitService> _logger;
@@ -33,7 +33,7 @@ public sealed class KiPluginLimitService
     /// <param name="startPruefungsAusloeser">Optionaler Auslöser der SCM-Startprüfung;
     /// wird benachrichtigt, wenn das Session-Limit Aufgaben pausiert.</param>
     public KiPluginLimitService(
-        SoftwareschmiededDbContext db,
+        SoftwareschmiedeDbContext db,
         AppEinstellungService appEinstellungService,
         AufgabeLaufdatenChangedNotifier laufdatenChangedNotifier,
         ILogger<KiPluginLimitService> logger,
@@ -50,24 +50,24 @@ public sealed class KiPluginLimitService
     /// Verarbeitet einen erkannten Session-Limit-Marker: Persistiert den Reset-Zeitpunkt
     /// unter <c>plugins.sessionlimit.&lt;KiPluginPrefix&gt;</c> der auslösenden Aufgabe und
     /// pausiert bei zukünftigem Zeitpunkt alle aktiv laufenden regulären Aufgaben mit
-    /// demselben Prefix (pro pausierter Aufgabe ein <see cref="ProtokollTyp.SystemMeldung"/>-Eintrag).
+    /// demselben Prefix (pro pausierter Aufgabe ein <see cref="LogEntryType.SystemMessage"/>-Eintrag).
     /// Laufende CLI-Prozesse werden nicht angefasst.
     /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe, in deren CLI-Ausgabe der Marker erkannt wurde.</param>
+    /// <param name="workItemId">ID der Aufgabe, in deren CLI-Ausgabe der Marker erkannt wurde.</param>
     /// <param name="resetUtc">Gemeldeter Reset-Zeitpunkt des Session-Limits.</param>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    public async Task VerarbeiteRateLimitAsync(Guid aufgabeId, DateTimeOffset resetUtc, CancellationToken ct = default)
+    public async Task VerarbeiteRateLimitAsync(Guid workItemId, DateTimeOffset resetUtc, CancellationToken ct = default)
     {
-        var ausloesendeAufgabe = await _db.Aufgaben
+        var ausloesendeAufgabe = await _db.WorkItems
             .AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Id == aufgabeId, ct);
+            .FirstOrDefaultAsync(a => a.Id == workItemId, ct);
 
-        var prefix = ausloesendeAufgabe?.KiPluginPrefix;
+        var prefix = ausloesendeAufgabe?.AiPluginPrefix;
         if (ausloesendeAufgabe is null || string.IsNullOrWhiteSpace(prefix))
         {
             _logger.LogWarning(
                 "Rate-Limit-Marker für Aufgabe {AufgabeId} ohne KiPluginPrefix erkannt — kein Plugin-Limit wird persistiert.",
-                aufgabeId);
+                workItemId);
             return;
         }
 
@@ -88,14 +88,14 @@ public sealed class KiPluginLimitService
             return;
         }
 
-        var kandidaten = await _db.Aufgaben
-            .Where(a => AufgabeStatusExtensions.AktivOderWartendStatus.Contains(a.Status)
-                && a.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv
-                && a.KiPluginPrefix != null)
+        var kandidaten = await _db.WorkItems
+            .Where(a => WorkItemStatusExtensions.ActiveOrWaitingStatuses.Contains(a.Status)
+                && a.ExecutionStatus == WorkItemExecutionStatus.Active
+                && a.AiPluginPrefix != null)
             .ToListAsync(ct);
 
         var betroffene = kandidaten
-            .Where(a => string.Equals(a.KiPluginPrefix, prefix, StringComparison.OrdinalIgnoreCase))
+            .Where(a => string.Equals(a.AiPluginPrefix, prefix, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         if (betroffene.Count == 0)
@@ -107,21 +107,21 @@ public sealed class KiPluginLimitService
             return;
         }
 
-        foreach (var aufgabe in betroffene)
+        foreach (var workItem in betroffene)
         {
             // Max-Semantik: Eine manuell gesetzte, später endende Pause darf durch einen
             // früheren Session-Limit-Reset nicht verkürzt werden.
-            var effektiv = aufgabe.PausiertBisUtc is { } vorhanden && vorhanden > resetUtcNormalized
+            var effektiv = workItem.PausedUntilUtc is { } vorhanden && vorhanden > resetUtcNormalized
                 ? vorhanden
                 : resetUtcNormalized;
-            aufgabe.PausiertBisUtc = effektiv;
-            _db.Protokolleintraege.Add(new Protokolleintrag
+            workItem.PausedUntilUtc = effektiv;
+            _db.LogEntries.Add(new LogEntry
             {
                 Id = Guid.NewGuid(),
-                AufgabeId = aufgabe.Id,
-                Typ = ProtokollTyp.SystemMeldung,
-                Inhalt = $"Aufgabe pausiert bis {effektiv:O} (Session-Limit des KI-Plugins '{prefix}').",
-                Zeitstempel = now
+                WorkItemId = workItem.Id,
+                Type = LogEntryType.SystemMessage,
+                Content = $"Aufgabe pausiert bis {effektiv:O} (Session-Limit des KI-Plugins '{prefix}').",
+                Timestamp = now
             });
         }
 
@@ -133,9 +133,9 @@ public sealed class KiPluginLimitService
             resetUtcNormalized.ToString("O"),
             betroffene.Count);
 
-        foreach (var aufgabe in betroffene)
+        foreach (var workItem in betroffene)
         {
-            _laufdatenChangedNotifier.NotifyLaufdatenChanged(aufgabe.Id);
+            _laufdatenChangedNotifier.NotifyLaufdatenChanged(workItem.Id);
         }
 
         // Pausen-Setzpfad der SCM-Startprüfung: Die Prüfung bewertet Priorisierung/Freigabe
@@ -147,7 +147,7 @@ public sealed class KiPluginLimitService
     /// Liest die persistierten Session-Limits mehrerer Plugin-Prefixe in einer Abfrage.
     /// Abgelaufene oder ungültig gespeicherte Werte werden nicht zurückgegeben.
     /// </summary>
-    /// <param name="prefixes">Die zu prüfenden <see cref="Aufgabe.KiPluginPrefix"/>-Werte.</param>
+    /// <param name="prefixes">Die zu prüfenden <see cref="WorkItem.AiPluginPrefix"/>-Werte.</param>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
     /// <returns>Zuordnung Prefix → Reset-Zeitpunkt (nur zukünftige Limits; Schlüsselvergleich OrdinalIgnoreCase).</returns>
     public async Task<IReadOnlyDictionary<string, DateTimeOffset>> GetAktiveSessionLimitsAsync(

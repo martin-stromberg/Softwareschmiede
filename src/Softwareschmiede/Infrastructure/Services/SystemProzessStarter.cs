@@ -5,25 +5,25 @@ using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Infrastructure.Services;
 
-/// <summary>Reale Implementierung von <see cref="IProzessStarter"/> via <see cref="Process.Start(ProcessStartInfo)"/>.</summary>
-public sealed class SystemProzessStarter(ILogger<SystemProzessStarter> logger) : IProzessStarter
+/// <summary>Reale Implementierung von <see cref="IProcessStarter"/> via <see cref="Process.Start(ProcessStartInfo)"/>.</summary>
+public sealed class SystemProzessStarter(ILogger<SystemProzessStarter> logger) : IProcessStarter
 {
     /// <inheritdoc/>
-    public void Starten(ProzessStartAnfrage anfrage)
+    public void Start(ProcessStartRequest request)
     {
-        ArgumentNullException.ThrowIfNull(anfrage);
+        ArgumentNullException.ThrowIfNull(request);
 
         logger.LogInformation(
             "Prozess wird gestartet: {DateiName} {Argumente} (ShellAusfuehren={ShellAusfuehren})",
-            anfrage.DateiName,
-            anfrage.Argumente,
-            anfrage.ShellAusfuehren);
+            request.FileName,
+            request.Arguments,
+            request.UseShellExecute);
 
         var processStartInfo = new ProcessStartInfo
         {
-            FileName = anfrage.DateiName,
-            Arguments = anfrage.Argumente ?? string.Empty,
-            UseShellExecute = anfrage.ShellAusfuehren,
+            FileName = request.FileName,
+            Arguments = request.Arguments ?? string.Empty,
+            UseShellExecute = request.UseShellExecute,
         };
 
         using var process = Process.Start(processStartInfo);

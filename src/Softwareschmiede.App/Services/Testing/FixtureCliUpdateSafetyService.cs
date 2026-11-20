@@ -26,7 +26,7 @@ public sealed class FixtureCliUpdateSafetyService : ICliUpdateSafetyService
     public Task<CliUpdateSafetyResult> CheckAsync(CancellationToken ct = default)
     {
         var sicherheit = _kontext.LeseSzenario()?.CliSicherheit;
-        var riskanteAufgaben = sicherheit is { Aktiv: true }
+        var riskanteAufgaben = sicherheit is { Active: true }
             ? (IReadOnlyList<string>)sicherheit.RiskanteAufgaben
             : [];
 

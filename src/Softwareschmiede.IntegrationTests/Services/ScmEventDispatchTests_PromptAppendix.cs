@@ -117,7 +117,7 @@ public sealed class ScmEventDispatchTests_PromptAppendix
         await fixture.DispatchAsync(eventId);
 
         using var verification = fixture.Services.CreateScope();
-        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, cancellationToken: TestContext.Current.CancellationToken);
         var observation = ScmEventStore.Observation(item);
         Assert.Equal(observation.EventKey, item.EventKey);

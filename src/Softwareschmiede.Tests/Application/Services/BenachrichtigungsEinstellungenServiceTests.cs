@@ -10,12 +10,12 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>BenachrichtigungsEinstellungenServiceTests.</summary>
 public sealed class BenachrichtigungsEinstellungenServiceTests
 {
-    private static SoftwareschmiededDbContext CreateDb()
+    private static SoftwareschmiedeDbContext CreateDb()
     {
-        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
+        var options = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        return new SoftwareschmiededDbContext(options);
+        return new SoftwareschmiedeDbContext(options);
     }
 
     /// <summary><summary>SaveAsync_ShouldPersistModesPerUser.</summary>.</summary>
@@ -25,11 +25,11 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         await using var db = CreateDb();
         var sut = new BenachrichtigungsEinstellungenService(db);
 
-        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Ton), TestContext.Current.CancellationToken);
+        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(NotificationMode.Disabled, NotificationMode.Sound), TestContext.Current.CancellationToken);
 
         var loaded = await sut.GetAsync("user-a", TestContext.Current.CancellationToken);
-        loaded.BannerModus.Should().Be(BenachrichtigungsModus.Deaktiviert);
-        loaded.TonModus.Should().Be(BenachrichtigungsModus.Ton);
+        loaded.BannerMode.Should().Be(NotificationMode.Disabled);
+        loaded.SoundMode.Should().Be(NotificationMode.Sound);
     }
 
     /// <summary><summary>GetAsync_ShouldReturnDefaults_WhenNoSettingsExist.</summary>.</summary>
@@ -41,8 +41,8 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
         var loaded = await sut.GetAsync("unknown-user", TestContext.Current.CancellationToken);
 
-        loaded.BannerModus.Should().Be(BenachrichtigungsModus.Banner);
-        loaded.TonModus.Should().Be(BenachrichtigungsModus.Deaktiviert);
+        loaded.BannerMode.Should().Be(NotificationMode.Banner);
+        loaded.SoundMode.Should().Be(NotificationMode.Disabled);
     }
 
     /// <summary><summary>SaveAsync_ShouldUpsertExistingUserSettings.</summary>.</summary>
@@ -52,13 +52,13 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         await using var db = CreateDb();
         var sut = new BenachrichtigungsEinstellungenService(db);
 
-        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Ton), TestContext.Current.CancellationToken);
-        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Banner, BenachrichtigungsModus.Deaktiviert), TestContext.Current.CancellationToken);
+        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(NotificationMode.Disabled, NotificationMode.Sound), TestContext.Current.CancellationToken);
+        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(NotificationMode.Banner, NotificationMode.Disabled), TestContext.Current.CancellationToken);
 
-        db.BenachrichtigungsEinstellungen.Should().ContainSingle(e => e.BenutzerId == "user-a");
+        db.NotificationSettings.Should().ContainSingle(e => e.UserId == "user-a");
         var loaded = await sut.GetAsync("user-a", TestContext.Current.CancellationToken);
-        loaded.BannerModus.Should().Be(BenachrichtigungsModus.Banner);
-        loaded.TonModus.Should().Be(BenachrichtigungsModus.Deaktiviert);
+        loaded.BannerMode.Should().Be(NotificationMode.Banner);
+        loaded.SoundMode.Should().Be(NotificationMode.Disabled);
     }
 
     /// <summary><summary>UploadAudioAsync_ShouldRejectOversizedFiles.</summary>.</summary>
@@ -198,15 +198,15 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
     public async Task GetAudioPayloadAsync_ShouldReturnNull_WhenStoredAudioContentIsEmpty()
     {
         await using var db = CreateDb();
-        db.BenachrichtigungsAudioDateien.Add(new BenachrichtigungsAudioDatei
+        db.NotificationAudioFiles.Add(new NotificationAudioFile
         {
             Id = Guid.NewGuid(),
-            BenutzerId = "user-a",
-            OriginalDateiname = "empty.mp3",
+            UserId = "user-a",
+            OriginalFileName = "empty.mp3",
             MimeType = "audio/mpeg",
-            GroesseBytes = 0,
-            Inhalt = [],
-            HochgeladenAm = DateTimeOffset.UtcNow
+            SizeBytes = 0,
+            Content = [],
+            UploadedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 

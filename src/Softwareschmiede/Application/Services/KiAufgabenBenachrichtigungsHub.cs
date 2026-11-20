@@ -35,7 +35,7 @@ public sealed class KiAufgabenBenachrichtigungsHub
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Fehler beim Verteilen eines KI-Abschlussereignisses für Aufgabe {AufgabeId}.", ereignis.AufgabeId);
+                _logger.LogWarning(ex, "Fehler beim Verteilen eines KI-Abschlussereignisses für Aufgabe {AufgabeId}.", ereignis.WorkItemId);
             }
         }
     }

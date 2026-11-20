@@ -26,7 +26,7 @@ public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
         var activeTasks = await _aufgabeService.GetAktiveAufgabenAsync(ct);
 
         var prefixes = activeTasks
-            .Select(a => a.KiPluginPrefix)
+            .Select(a => a.AiPluginPrefix)
             .Where(p => !string.IsNullOrWhiteSpace(p))
             .Select(p => p!)
             .Distinct(StringComparer.Ordinal)
@@ -42,15 +42,15 @@ public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
                 // Ein bekannt limitiertes Plugin kann die Ausführung bis zum Reset ohnehin nicht
                 // fortsetzen — die Aufgabe ist kein Update-Risiko, auch bei frischem Heartbeat
                 // (Heartbeat-Toleranz entfällt komplett).
-                if (!string.IsNullOrWhiteSpace(a.KiPluginPrefix)
-                    && sessionLimits.TryGetValue(a.KiPluginPrefix, out _))
+                if (!string.IsNullOrWhiteSpace(a.AiPluginPrefix)
+                    && sessionLimits.TryGetValue(a.AiPluginPrefix, out _))
                 {
                     return false;
                 }
 
-                return AufgabeLaufAktivitaet.IstAktiv(a.AktiveRunId, a.LastHeartbeatUtc, now);
+                return AufgabeLaufAktivitaet.IstAktiv(a.ActiveRunId, a.LastHeartbeatUtc, now);
             })
-            .Select(a => $"{a.Titel} ({a.Id})")
+            .Select(a => $"{a.Title} ({a.Id})")
             .ToList();
 
         if (riskyTasks.Count > 0)

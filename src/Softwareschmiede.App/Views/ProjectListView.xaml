@@ -36,7 +36,7 @@
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel>
                 <!-- Projektkacheln -->
-                <ItemsControl ItemsSource="{Binding Projekte}"
+                <ItemsControl ItemsSource="{Binding Projects}"
                               AutomationProperties.AutomationId="ProjektKachelnListe"
                               Margin="24,24,24,0">
                     <ItemsControl.ItemsPanel>
@@ -97,7 +97,7 @@
 
                                     <!-- Kurzbeschreibung -->
                                     <TextBlock Grid.Row="2"
-                                               Text="{Binding Beschreibung}"
+                                               Text="{Binding Description}"
                                                Foreground="{DynamicResource SecondaryTextBrush}"
                                                FontSize="13"
                                                TextWrapping="Wrap"

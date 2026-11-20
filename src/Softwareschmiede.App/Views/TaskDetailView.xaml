@@ -115,7 +115,7 @@
                                            FontSize="11"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            Margin="0,0,0,2" />
-                                <ComboBox ItemsSource="{Binding PromptVorlagen}"
+                                <ComboBox ItemsSource="{Binding PromptTemplates}"
                                           SelectedItem="{Binding SelectedPromptVorlage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           DisplayMemberPath="Name"
                                           AutomationProperties.Name="PromptVorlagenAuswahl"
@@ -392,11 +392,11 @@
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}"
                                            Margin="0,0,0,8" />
-                                <TextBlock Text="{Binding AufgabeStatus}"
+                                <TextBlock Text="{Binding WorkItemStatus}"
                                            FontSize="12"
                                            Foreground="{DynamicResource AccentBrush}"
                                            Margin="0,0,0,8" />
-                                <TextBlock Text="{Binding Aufgabe.AnforderungsBeschreibung}"
+                                <TextBlock Text="{Binding WorkItem.RequirementDescription}"
                                            FontSize="13"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            TextWrapping="Wrap" />
@@ -414,7 +414,7 @@
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}"
                                            Margin="0,0,0,8" />
-                                <ListBox ItemsSource="{Binding Protokolleintraege}"
+                                <ListBox ItemsSource="{Binding LogEntries}"
                                          AutomationProperties.Name="TaskProtocol"
                                          Background="Transparent"
                                          BorderThickness="0"
@@ -430,18 +430,18 @@
                                                     <ColumnDefinition Width="*" />
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0"
-                                                           Text="{Binding Zeitstempel, StringFormat='{}{0:dd.MM.yyyy HH:mm:ss}'}"
+                                                           Text="{Binding Timestamp, StringFormat='{}{0:dd.MM.yyyy HH:mm:ss}'}"
                                                            FontSize="11"
                                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                                            VerticalAlignment="Top" />
                                                 <TextBlock Grid.Column="1"
-                                                           Text="{Binding Typ}"
-                                                           AutomationProperties.Name="{Binding Typ, StringFormat={}ProtokollTyp-{0}}"
+                                                           Text="{Binding Type}"
+                                                           AutomationProperties.Name="{Binding Type, StringFormat={}ProtokollTyp-{0}}"
                                                            FontSize="11"
                                                            Foreground="{DynamicResource AccentBrush}"
                                                            VerticalAlignment="Top" />
                                                 <TextBlock Grid.Column="2"
-                                                           Text="{Binding Inhalt}"
+                                                           Text="{Binding Content}"
                                                            FontSize="12"
                                                            Foreground="{DynamicResource PrimaryTextBrush}"
                                                            TextWrapping="Wrap" />
@@ -515,7 +515,7 @@
                                                     Padding="0,0,0,12"
                                                     Margin="0,0,0,12">
                                                 <StackPanel>
-                                                    <TextBlock Text="{Binding Titel}"
+                                                    <TextBlock Text="{Binding Title}"
                                                                FontSize="15"
                                                                FontWeight="SemiBold"
                                                                Foreground="{DynamicResource PrimaryTextBrush}"
@@ -542,7 +542,7 @@
                                                         <TextBlock Text="{Binding ProviderText}"
                                                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                                                    FontSize="12" />
-                                                        <TextBlock Text="{Binding RolleText}"
+                                                        <TextBlock Text="{Binding RoleText}"
                                                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                                                    FontSize="12" />
                                                         <TextBlock Text="{Binding Status, StringFormat='Status: {0}'}"
@@ -625,7 +625,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <controls:StatusIndicatorControl Grid.Column="0"
-                                                 Status="{Binding AufgabeStatus, Mode=OneWay}"
+                                                 Status="{Binding WorkItemStatus, Mode=OneWay}"
                                                  BranchName="{Binding AufgabeBranchName, Mode=OneWay}" />
                 <TextBlock Grid.Column="1"
                            Text="{Binding CliStatusText}"

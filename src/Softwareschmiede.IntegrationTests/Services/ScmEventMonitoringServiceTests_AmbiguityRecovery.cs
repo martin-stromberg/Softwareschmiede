@@ -28,23 +28,23 @@ public sealed class ScmEventMonitoringServiceTests_AmbiguityRecovery
                 await fixture.InitializeAsync();
                 using (var scope = fixture.Services.CreateScope())
                 {
-                    var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-                    var project = new Projekt { Id = Guid.NewGuid(), Name = "Alias recovery" };
+                    var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+                    var project = new Project { Id = Guid.NewGuid(), Name = "Alias recovery" };
                     var tasks = new[] { "https://github.com/owner/repo", "git@github.com:owner/repo.git" }
-                        .Select(url => new Aufgabe
+                        .Select(url => new WorkItem
                         {
                             Id = Guid.NewGuid(),
-                            Projekt = project,
-                            Titel = url,
+                            Project = project,
+                            Title = url,
                             GitRepository = new GitRepository
                             {
                                 Id = Guid.NewGuid(),
-                                Projekt = project,
+                                Project = project,
                                 RepositoryUrl = url,
                                 RepositoryName = "repo",
-                                PluginTyp = fixture.Repository.ProviderPrefix
+                                PluginType = fixture.Repository.ProviderPrefix
                             },
-                            IssueReferenz = new IssueReferenz { Id = Guid.NewGuid(), IssueNummer = 7, Titel = "Issue" }
+                            IssueReference = new IssueReference { Id = Guid.NewGuid(), IssueNumber = 7, Title = "Issue" }
                         }).ToArray();
                     remainingTask = tasks[0].Id;
                     db.AddRange(tasks);
@@ -54,7 +54,7 @@ public sealed class ScmEventMonitoringServiceTests_AmbiguityRecovery
                 await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
                 using (var scope = fixture.Services.CreateScope())
                 {
-                    var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+                    var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
                     Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
                     Assert.Contains(await db.ScmObservationCheckpoints.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => x.Diagnostic == "Mehrdeutige Zuordnung zu Aufgaben");
                 }
@@ -68,15 +68,15 @@ public sealed class ScmEventMonitoringServiceTests_AmbiguityRecovery
                 await fixture.InitializeAsync();
                 using (var scope = fixture.Services.CreateScope())
                 {
-                    var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-                    db.IssueReferenzen.Remove(await db.IssueReferenzen.SingleAsync(x => x.AufgabeId != remainingTask, cancellationToken: TestContext.Current.CancellationToken));
+                    var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+                    db.IssueReferences.Remove(await db.IssueReferences.SingleAsync(x => x.WorkItemId != remainingTask, cancellationToken: TestContext.Current.CancellationToken));
                     await db.SaveChangesAsync(TestContext.Current.CancellationToken);
                 }
                 ConfigureSource(fixture, observedAt, includeComment: false);
                 await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
                 using (var scope = fixture.Services.CreateScope())
                 {
-                    var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+                    var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
                     Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
                     Assert.Contains(await db.ScmObservationCheckpoints.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => x.Diagnostic == "Mehrdeutige Zuordnung zu Aufgaben");
                 }
@@ -85,9 +85,9 @@ public sealed class ScmEventMonitoringServiceTests_AmbiguityRecovery
                 await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
                 await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
                 using var verification = fixture.Services.CreateScope();
-                var verifiedDb = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+                var verifiedDb = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
                 var item = Assert.Single(await verifiedDb.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-                Assert.Equal(remainingTask, item.AufgabeId);
+                Assert.Equal(remainingTask, item.WorkItemId);
                 Assert.Equal("$Softwareschmiede unchanged", ScmEventStore.Observation(item).Body);
                 Assert.All(await verifiedDb.ScmObservationCheckpoints.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => Assert.Null(x.Diagnostic));
                 Assert.All(await verifiedDb.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => Assert.Null(x.Diagnostic));

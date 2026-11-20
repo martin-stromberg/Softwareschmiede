@@ -68,18 +68,18 @@ public partial class End2EndTest
         // weiterlaufendem Prozess — Laufdaten direkt in der DB löschen. Die Kachel muss über den
         // Live-Zweig weiter "▶ Läuft" zeigen, und die Selbstheilung (Heartbeat-Tick/Abgleich,
         // Intervall 30 s) muss die Laufdaten wieder herstellen.
-        Guid aufgabeId;
+        Guid workItemId;
         using (var db = OpenTestDbContext())
         {
-            aufgabeId = db.Aufgaben.AsNoTracking().Single(a => a.Titel == AufgabenTitel).Id;
+            workItemId = db.WorkItems.AsNoTracking().Single(a => a.Title == AufgabenTitel).Id;
         }
         using (var db = OpenTestDbContext())
         {
-            var tracked = db.Aufgaben.Single(a => a.Id == aufgabeId);
-            tracked.AktiveRunId = null;
+            var tracked = db.WorkItems.Single(a => a.Id == workItemId);
+            tracked.ActiveRunId = null;
             tracked.LastHeartbeatUtc = null;
-            tracked.LaufStatus = null;
-            tracked.AusfuehrungsStatus = Softwareschmiede.Domain.Enums.AufgabeAusfuehrungsStatus.Beendet;
+            tracked.RunStatus = null;
+            tracked.ExecutionStatus = Softwareschmiede.Domain.Enums.WorkItemExecutionStatus.Completed;
             db.SaveChanges();
         }
 
@@ -90,7 +90,7 @@ public partial class End2EndTest
         while (DateTime.UtcNow < deadline && !laufdatenGeheilt)
         {
             using var db = OpenTestDbContext();
-            laufdatenGeheilt = db.Aufgaben.AsNoTracking().Single(a => a.Id == aufgabeId).AktiveRunId is not null;
+            laufdatenGeheilt = db.WorkItems.AsNoTracking().Single(a => a.Id == workItemId).ActiveRunId is not null;
             if (!laufdatenGeheilt)
                 Thread.Sleep(500);
         }

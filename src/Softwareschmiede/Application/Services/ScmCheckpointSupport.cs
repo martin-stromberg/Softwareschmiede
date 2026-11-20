@@ -25,7 +25,7 @@ internal static class ScmCheckpointSupport
         string diagnosticSuffix = "", bool retryPermanent = false)
     {
         using var failureScope = scopes.CreateScope();
-        var failureDb = failureScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var failureDb = failureScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var checkpoint = await failureDb.ScmObservationCheckpoints.FindAsync([sourceKey], ct);
         if (checkpoint is null)
         {
@@ -86,7 +86,7 @@ internal static class ScmCheckpointSupport
             repository.Host.ToLowerInvariant(), repository.RepositoryId }.Select(Uri.EscapeDataString));
         if (!enumerated.Add(enumerationKey)) return true;
         using var scope = scopes.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var checkpoint = await db.ScmObservationCheckpoints.FindAsync([enumerationKey], ct);
         var now = time.GetUtcNow();
         if (checkpoint?.NextAttemptUtc > now.ToUnixTimeMilliseconds()) return true;

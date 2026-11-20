@@ -39,14 +39,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     public Action? NavigateBackToProjectCallback { get; set; }
 
     private Guid _projektId;
-    private Projekt? _projekt;
+    private Project? _projekt;
     private bool _isLoading;
     private string? _fehlerMeldung;
     private CancellationTokenSource? _ladenCts;
     private string _projektName = string.Empty;
     private string? _projektBeschreibung;
     private GitRepository? _selectedRepository;
-    private AufgabenFilterTyp _aufgabenFilter = AufgabenFilterTyp.Alle;
+    private WorkItemFilterType _aufgabenFilter = WorkItemFilterType.All;
     private bool _isFilterOverlayVisible;
     private bool _isLoadingIssues;
     private bool _kannAnforderungenLaden;
@@ -68,7 +68,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private bool _isBackmergeModusProjektbezogen;
 
     /// <summary>Die Projekt-ID, deren Details angezeigt werden.</summary>
-    public Guid ProjektId
+    public Guid ProjectId
     {
         get => _projektId;
         set
@@ -85,7 +85,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Das geladene Projekt.</summary>
-    public Projekt? Projekt
+    public Project? Project
     {
         get => _projekt;
         private set => SetProperty(ref _projekt, value);
@@ -106,16 +106,16 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Liste der Aufgaben des Projekts.</summary>
-    public ObservableCollection<Aufgabe> Aufgaben { get; } = new();
+    public ObservableCollection<WorkItem> WorkItems { get; } = new();
 
     /// <summary>Gefilterte Aufgaben (entsprechend AufgabenFilter).</summary>
-    public ObservableCollection<Aufgabe> GefilterteAufgaben { get; } = new();
+    public ObservableCollection<WorkItem> GefilterteAufgaben { get; } = new();
 
     /// <summary>Nicht beendete Aufgaben der Projektdetailansicht.</summary>
-    public ObservableCollection<Aufgabe> NichtBeendeteAufgaben { get; } = new();
+    public ObservableCollection<WorkItem> NichtBeendeteAufgaben { get; } = new();
 
     /// <summary>Beendete Aufgaben der Projektdetailansicht.</summary>
-    public ObservableCollection<Aufgabe> BeendeteAufgaben { get; } = new();
+    public ObservableCollection<WorkItem> BeendeteAufgaben { get; } = new();
 
     /// <summary>Bearbeitbarer Projektname.</summary>
     public string ProjektName
@@ -149,13 +149,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 IsEditingInitialisierungsskript = false;
                 InitialisierungsskriptSuggestionen.Clear();
                 InitialisierungsskriptLoadingFailed = null;
-                SelectedInitialisierungsskript = value?.InitialisierungKonfiguration?.InitialisierungsskriptRelativePath;
+                SelectedInitialisierungsskript = value?.InitializationConfiguration?.InitializationScriptRelativePath;
             }
         }
     }
 
     /// <summary>Aktueller Aufgabenfilter.</summary>
-    public AufgabenFilterTyp AufgabenFilter
+    public WorkItemFilterType AufgabenFilter
     {
         get => _aufgabenFilter;
         set
@@ -404,18 +404,18 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            Projekt = await _projektService.GetDetailAsync(_projektId, ct);
-            var aufgaben = await _aufgabeService.GetByProjektAsync(_projektId, ct);
-            Aufgaben.Clear();
-            foreach (var aufgabe in aufgaben)
-                Aufgaben.Add(aufgabe);
+            Project = await _projektService.GetDetailAsync(_projektId, ct);
+            var workItems = await _aufgabeService.GetByProjektAsync(_projektId, ct);
+            WorkItems.Clear();
+            foreach (var workItem in workItems)
+                WorkItems.Add(workItem);
             AktualisiereAufgabenAnsichten();
 
-            if (Projekt != null)
+            if (Project != null)
             {
-                ProjektName = Projekt.Name;
-                ProjektBeschreibung = Projekt.Beschreibung;
-                SelectedRepository = Projekt.Repositories.FirstOrDefault();
+                ProjektName = Project.Name;
+                ProjektBeschreibung = Project.Description;
+                SelectedRepository = Project.Repositories.FirstOrDefault();
             }
 
             // Die Backmerge-Option ist nicht kritisch: Steht der Einstellungsdienst nicht zur
@@ -424,7 +424,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             {
                 using var einstellungenScope = _serviceProvider.CreateScope();
                 var einstellungen = einstellungenScope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-                _isBackmergeModusProjektbezogen = await einstellungen.GetScmBackmergeModusAsync(ct) == ScmBackmergeModus.Projektbezogen;
+                _isBackmergeModusProjektbezogen = await einstellungen.GetScmBackmergeModusAsync(ct) == ScmBackmergeMode.ProjectScoped;
                 _isBackmergeAutoMergeEnabled = await einstellungen.GetBackmergeProjektAktivAsync(_projektId, ct);
             }
             catch (OperationCanceledException)
@@ -462,17 +462,17 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var aufgabe = await _aufgabeService.CreateAsync(
+            var workItem = await _aufgabeService.CreateAsync(
                 _projektId,
                 "Neue Aufgabe",
                 string.Empty,
                 SelectedRepository?.Id,
                 ct);
 
-            Aufgaben.Add(aufgabe);
+            WorkItems.Add(workItem);
             AktualisiereAufgabenAnsichten();
 
-            OeffneAufgabe(aufgabe.Id);
+            OeffneAufgabe(workItem.Id);
         }
         catch (OperationCanceledException)
         {
@@ -634,10 +634,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         try
         {
             var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins()
-                .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginType, StringComparison.OrdinalIgnoreCase));
 
             var vm = _serviceProvider.GetRequiredService<ArbeitsverzeichnisBearbeitenViewModel>();
-            await vm.LadenAsync(gitPlugin, repository.RepositoryUrl, repository.StartKonfiguration?.WorkingDirectoryRelativePath, ct);
+            await vm.LadenAsync(gitPlugin, repository.RepositoryUrl, repository.StartConfiguration?.WorkingDirectoryRelativePath, ct);
 
             var confirmed = _dialogService.ArbeitsverzeichnisBearbeitenDialog(vm);
 
@@ -677,7 +677,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         try
         {
             var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins()
-                .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginType, StringComparison.OrdinalIgnoreCase));
 
             AvailableSourceBranchesForEdit.Clear();
 
@@ -766,7 +766,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
     private async Task LoadInitialisierungsskriptSuggestionenAsync(Guid repositoryId, CancellationToken ct)
     {
-        var repository = Projekt?.Repositories.FirstOrDefault(r => r.Id == repositoryId);
+        var repository = Project?.Repositories.FirstOrDefault(r => r.Id == repositoryId);
         if (repository == null)
             return;
 
@@ -776,7 +776,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         InitialisierungsskriptSuggestionen.Clear();
 
         var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins()
-            .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginType, StringComparison.OrdinalIgnoreCase));
 
         if (gitPlugin == null || _directoryStructureService == null || string.IsNullOrWhiteSpace(repository.RepositoryUrl))
         {
@@ -818,8 +818,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
             var updatedKonfiguration = await _projektService.SaveRepositoryInitialisierungskriptAsync(repository.Id, normalized, ct);
 
-            repository.InitialisierungKonfiguration = updatedKonfiguration;
-            SelectedInitialisierungsskript = updatedKonfiguration?.InitialisierungsskriptRelativePath;
+            repository.InitializationConfiguration = updatedKonfiguration;
+            SelectedInitialisierungsskript = updatedKonfiguration?.InitializationScriptRelativePath;
             IsEditingInitialisierungsskript = false;
         }
         catch (OperationCanceledException)
@@ -860,7 +860,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         _aktuelleAufgabeId = id;
         vm.AufgabeListeAktualisierenCallback = ReloadAufgabenListAsync;
         NavigateToTaskViewCallback?.Invoke(vm);
-        vm.AufgabeId = id;
+        vm.WorkItemId = id;
     }
 
     private async Task ReloadAufgabenListAsync()
@@ -873,17 +873,17 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         AktualisiereAufgabenAnsichten();
     }
 
-    private void ReplaceOrAddAufgabe(Aufgabe aufgabe)
+    private void ReplaceOrAddAufgabe(WorkItem workItem)
     {
-        for (var i = 0; i < Aufgaben.Count; i++)
+        for (var i = 0; i < WorkItems.Count; i++)
         {
-            if (Aufgaben[i].Id == aufgabe.Id)
+            if (WorkItems[i].Id == workItem.Id)
             {
-                Aufgaben[i] = aufgabe;
+                WorkItems[i] = workItem;
                 return;
             }
         }
-        Aufgaben.Add(aufgabe);
+        WorkItems.Add(workItem);
     }
 
     private void AktualisiereAufgabenAnsichten()
@@ -891,26 +891,26 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         GefilterteAufgaben.Clear();
         var quelle = _aufgabenFilter switch
         {
-            AufgabenFilterTyp.Aktiv => Aufgaben.Where(a => a.Status != AufgabeStatus.Archiviert),
-            AufgabenFilterTyp.Archiviert => Aufgaben.Where(a => a.Status == AufgabeStatus.Archiviert),
-            _ => Aufgaben
+            WorkItemFilterType.Active => WorkItems.Where(a => a.Status != WorkItemStatus.Archived),
+            WorkItemFilterType.Archived => WorkItems.Where(a => a.Status == WorkItemStatus.Archived),
+            _ => WorkItems
         };
-        foreach (var aufgabe in quelle)
-            GefilterteAufgaben.Add(aufgabe);
+        foreach (var workItem in quelle)
+            GefilterteAufgaben.Add(workItem);
 
         NichtBeendeteAufgaben.Clear();
         BeendeteAufgaben.Clear();
-        foreach (var aufgabe in Aufgaben)
+        foreach (var workItem in WorkItems)
         {
-            switch (aufgabe.Status)
+            switch (workItem.Status)
             {
-                case AufgabeStatus.Neu:
-                case AufgabeStatus.Gestartet:
-                case AufgabeStatus.Wartend:
-                    NichtBeendeteAufgaben.Add(aufgabe);
+                case WorkItemStatus.New:
+                case WorkItemStatus.Started:
+                case WorkItemStatus.Waiting:
+                    NichtBeendeteAufgaben.Add(workItem);
                     break;
-                case AufgabeStatus.Beendet:
-                    BeendeteAufgaben.Add(aufgabe);
+                case WorkItemStatus.Completed:
+                    BeendeteAufgaben.Add(workItem);
                     break;
             }
         }
@@ -924,7 +924,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
         var scmPlugins = _pluginManager.GetSourceCodeManagementPlugins();
         var gitPlugin = scmPlugins
-            .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginType, StringComparison.OrdinalIgnoreCase));
         if (gitPlugin == null)
             return;
 
@@ -934,17 +934,17 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var bereitsKonvertierteNummern = Aufgaben
-                .Where(a => a.IssueReferenz?.IssueNummer != null)
-                .Select(a => a.IssueReferenz!.IssueNummer!.Value)
+            var bereitsKonvertierteNummern = WorkItems
+                .Where(a => a.IssueReference?.IssueNumber != null)
+                .Select(a => a.IssueReference!.IssueNumber!.Value)
                 .ToHashSet();
-            var bereitsKonvertierteAlerts = Aufgaben
-                .Where(a => !string.IsNullOrWhiteSpace(a.AlertReferenz?.SourceKey))
-                .Select(a => a.AlertReferenz!.SourceKey)
+            var bereitsKonvertierteAlerts = WorkItems
+                .Where(a => !string.IsNullOrWhiteSpace(a.AlertReference?.SourceKey))
+                .Select(a => a.AlertReference!.SourceKey)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var repositoryContext = new ScmRepositoryContext(
                 repository.Id,
-                repository.PluginTyp,
+                repository.PluginType,
                 string.IsNullOrWhiteSpace(repository.RepositoryName) ? repository.RepositoryUrl : repository.RepositoryName);
 
             var issues = await gitPlugin.GetIssuesAsync(repository.RepositoryUrl, ct);
@@ -1031,13 +1031,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             return;
 
         if (!_dialogService.BestaetigenDialog(
-                $"Pull Request '{pullRequest.Titel}' als Review-Aufgabe erstellen?",
+                $"Pull Request '{pullRequest.Title}' als Review-Aufgabe erstellen?",
                 "Pull Request konvertieren"))
             return;
 
         try
         {
-            var aufgabe = await _aufgabeService.CreateFromPullRequestAsync(
+            var workItem = await _aufgabeService.CreateFromPullRequestAsync(
                 _projektId,
                 pullRequest,
                 repositoryContext,
@@ -1051,9 +1051,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             if (zuEntfernen != null)
                 OffeneAnforderungen.Remove(zuEntfernen);
 
-            Aufgaben.Add(aufgabe);
+            WorkItems.Add(workItem);
             AktualisiereAufgabenAnsichten();
-            OeffneAufgabe(aufgabe.Id);
+            OeffneAufgabe(workItem.Id);
         }
         catch (OperationCanceledException)
         {
@@ -1072,13 +1072,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             return;
 
         if (!_dialogService.BestaetigenDialog(
-                $"Issue '{issue.Titel}' als Aufgabe erstellen?",
+                $"Issue '{issue.Title}' als Aufgabe erstellen?",
                 "Issue konvertieren"))
             return;
 
         try
         {
-            var aufgabe = await _aufgabeService.CreateFromIssueAsync(
+            var workItem = await _aufgabeService.CreateFromIssueAsync(
                 _projektId,
                 issue,
                 _selectedRepository?.Id,
@@ -1091,7 +1091,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             if (anforderung != null)
                 OffeneAnforderungen.Remove(anforderung);
 
-            Aufgaben.Add(aufgabe);
+            WorkItems.Add(workItem);
             AktualisiereAufgabenAnsichten();
         }
         catch (OperationCanceledException)
@@ -1134,7 +1134,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             }
 
             var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins()
-                .FirstOrDefault(p => string.Equals(p.PluginPrefix, _selectedRepository.PluginTyp, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(p => string.Equals(p.PluginPrefix, _selectedRepository.PluginType, StringComparison.OrdinalIgnoreCase));
 
             if (gitPlugin is not IIssueCreateProvider issueCreateProvider)
             {
@@ -1156,18 +1156,18 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            var aufgabe = await _aufgabeService.CreateFromAlertAsync(
+            var workItem = await _aufgabeService.CreateFromAlertAsync(
                 _projektId,
                 alert,
                 createdIssueResult.Issue,
                 _selectedRepository.Id,
-                _selectedRepository.PluginTyp,
+                _selectedRepository.PluginType,
                 _selectedRepository.RepositoryUrl,
                 ct);
 
             EntferneOffeneAnforderung(alert.SourceKey);
 
-            ReplaceOrAddAufgabe(aufgabe);
+            ReplaceOrAddAufgabe(workItem);
             AktualisiereAufgabenAnsichten();
         }
         catch (OperationCanceledException)
@@ -1221,7 +1221,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     {
         KannAnforderungenLaden = _selectedRepository != null
             && _pluginManager.GetSourceCodeManagementPlugins()
-                .Any(p => string.Equals(p.PluginPrefix, _selectedRepository.PluginTyp, StringComparison.OrdinalIgnoreCase));
+                .Any(p => string.Equals(p.PluginPrefix, _selectedRepository.PluginType, StringComparison.OrdinalIgnoreCase));
     }
 
     private void SetFehler(Exception ex) => SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);

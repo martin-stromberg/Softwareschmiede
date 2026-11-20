@@ -43,7 +43,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
                 if (!visitedUris.Add(requestUri))
                 {
                     _logger.LogWarning("GitHub-Release-Pagination verweist erneut auf {Uri}.", requestUri);
-                    return UpdateReleaseLookupResult.Fehlgeschlagen;
+                    return UpdateReleaseLookupResult.Failed;
                 }
 
                 using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
@@ -54,7 +54,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogWarning("GitHub-Release-Prüfung lieferte HTTP {StatusCode}.", (int)response.StatusCode);
-                    return UpdateReleaseLookupResult.Fehlgeschlagen;
+                    return UpdateReleaseLookupResult.Failed;
                 }
 
                 await using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
@@ -62,7 +62,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
                 if (releases is null)
                 {
                     _logger.LogWarning("GitHub-Release-Prüfung lieferte keine Release-Liste.");
-                    return UpdateReleaseLookupResult.Fehlgeschlagen;
+                    return UpdateReleaseLookupResult.Failed;
                 }
 
                 foreach (var release in releases)
@@ -81,13 +81,13 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
                 if (!TryGetNextPageUri(response, out var nextUri))
                 {
                     _logger.LogWarning("GitHub-Release-Pagination enthält eine ungültige Folge-URL.");
-                    return UpdateReleaseLookupResult.Fehlgeschlagen;
+                    return UpdateReleaseLookupResult.Failed;
                 }
 
                 if (nextUri is not null && !IsAllowedFollowUpUri(nextUri))
                 {
                     _logger.LogWarning("GitHub-Release-Pagination verweist auf eine unzulässige Folge-URL {Uri}.", nextUri);
-                    return UpdateReleaseLookupResult.Fehlgeschlagen;
+                    return UpdateReleaseLookupResult.Failed;
                 }
 
                 requestUri = nextUri?.AbsoluteUri;
@@ -104,7 +104,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException or UriFormatException)
         {
             _logger.LogWarning(ex, "GitHub-Release-Prüfung ist fehlgeschlagen.");
-            return UpdateReleaseLookupResult.Fehlgeschlagen;
+            return UpdateReleaseLookupResult.Failed;
         }
     }
 
@@ -121,7 +121,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
         }
 
         var isPrerelease = release.Prerelease || parsed.IsPrerelease;
-        if (isPrerelease != (options.Kanal == UpdateKanal.ReleaseCandidate))
+        if (isPrerelease != (options.Channel == UpdateKanal.ReleaseCandidate))
             return null;
 
         var asset = release.Assets.FirstOrDefault(a =>

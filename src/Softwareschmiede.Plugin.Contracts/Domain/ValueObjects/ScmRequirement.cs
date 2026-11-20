@@ -9,10 +9,10 @@ public sealed record ScmRequirement(
     ScmRepositoryContext? RepositoryContext)
 {
     /// <summary>Titel der Anforderung.</summary>
-    public string Titel => Kind switch
+    public string Title => Kind switch
     {
-        ScmRequirementKind.Issue => Issue?.Titel ?? string.Empty,
-        ScmRequirementKind.PullRequest => PullRequest?.Titel ?? string.Empty,
+        ScmRequirementKind.Issue => Issue?.Title ?? string.Empty,
+        ScmRequirementKind.PullRequest => PullRequest?.Title ?? string.Empty,
         _ => Alert?.Title ?? string.Empty
     };
 
@@ -72,7 +72,7 @@ public sealed record ScmRequirement(
 
     /// <summary>Strukturierte Automatisierungskennung des Vorschlags.</summary>
     public string AutomationText => RepositoryContext is null
-        ? $"{Kind}:{NummerText}:{Titel}"
+        ? $"{Kind}:{NummerText}:{Title}"
         : $"{Kind}:{ProviderText}:{NummerText}:{RepositoryContext.GitRepositoryId:N}:{RepositoryContext.RepositoryId}";
 
     /// <summary>Erzeugt eine SCM-Anforderung aus einem Issue und Repository-Snapshot.</summary>

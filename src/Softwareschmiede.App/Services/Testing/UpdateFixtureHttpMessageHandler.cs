@@ -99,8 +99,8 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
 
     private byte[] LadeAntwortInhalt(UpdateE2EAntwort antwort)
     {
-        if (antwort.Inhalt is not null)
-            return Encoding.UTF8.GetBytes(antwort.Inhalt);
+        if (antwort.Content is not null)
+            return Encoding.UTF8.GetBytes(antwort.Content);
 
         if (antwort.BodyDatei is not null)
         {

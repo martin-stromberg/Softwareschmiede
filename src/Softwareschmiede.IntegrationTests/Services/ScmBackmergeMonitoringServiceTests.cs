@@ -25,7 +25,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryWithBasisbranchAsync(fixture);
-        await SetModusAsync(fixture, ScmBackmergeModus.Global);
+        await SetModusAsync(fixture, ScmBackmergeMode.Global);
         ConfigureBackmerge(fixture);
         ConfigureMerge(fixture, PullRequestCompletionResult.Completed("merge-sha"));
 
@@ -34,7 +34,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         VerifyMerge(fixture, allowProtectedBranchBypass: false, Times.Once());
         VerifyMerge(fixture, allowProtectedBranchBypass: true, Times.Never());
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var checkpoint = await db.ScmObservationCheckpoints
             .SingleAsync(x => x.SourceKey.StartsWith("backmerge/"), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(long.MaxValue, checkpoint.NextAttemptUtc);
@@ -69,7 +69,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryWithBasisbranchAsync(fixture);
-        await SetModusAsync(fixture, ScmBackmergeModus.Global);
+        await SetModusAsync(fixture, ScmBackmergeMode.Global);
         ConfigureBackmerge(fixture);
         ConfigureMerge(fixture, PullRequestCompletionResult.Completed("merge-sha"));
         using (var scope = fixture.Services.CreateScope())
@@ -89,7 +89,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryWithBasisbranchAsync(fixture);
-        await SetModusAsync(fixture, ScmBackmergeModus.Global);
+        await SetModusAsync(fixture, ScmBackmergeMode.Global);
         ConfigureBackmerge(fixture);
         ConfigureMerge(fixture, PullRequestCompletionResult.Completed("merge-sha"));
 
@@ -100,7 +100,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         fixture.Git.Verify(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
             It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()), Times.Never);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.False(await db.ScmObservationCheckpoints.AnyAsync(x => x.SourceKey.StartsWith("backmerge/"), cancellationToken: TestContext.Current.CancellationToken));
     }
 
@@ -112,7 +112,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryWithBasisbranchAsync(fixture);
-        await SetModusAsync(fixture, ScmBackmergeModus.Global);
+        await SetModusAsync(fixture, ScmBackmergeMode.Global);
         ConfigureBackmerge(fixture);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
@@ -138,9 +138,9 @@ public sealed class ScmBackmergeMonitoringServiceTests
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        var projektId = await AddRepositoryWithBasisbranchAsync(fixture);
-        await SetModusAsync(fixture, ScmBackmergeModus.Projektbezogen);
-        await SetProjektFlagAsync(fixture, projektId, true);
+        var projectId = await AddRepositoryWithBasisbranchAsync(fixture);
+        await SetModusAsync(fixture, ScmBackmergeMode.ProjectScoped);
+        await SetProjektFlagAsync(fixture, projectId, true);
         ConfigureBackmerge(fixture);
         ConfigureMerge(fixture, PullRequestCompletionResult.Completed("merge-sha"));
 
@@ -157,7 +157,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryWithBasisbranchAsync(fixture);
-        await SetModusAsync(fixture, ScmBackmergeModus.Global);
+        await SetModusAsync(fixture, ScmBackmergeMode.Global);
         ConfigureStatus(fixture, source: "feature/work", target: "staging");
         fixture.Git.As<IScmEventSource>().Setup(x => x.EnumerateReferencesAsync(
                 It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
@@ -168,7 +168,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         fixture.Git.Verify(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
             It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()), Times.Never);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var checkpoint = await db.ScmObservationCheckpoints
             .SingleAsync(x => x.SourceKey.StartsWith("backmerge/"), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(long.MaxValue, checkpoint.NextAttemptUtc);
@@ -182,7 +182,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryWithBasisbranchAsync(fixture);
-        await SetModusAsync(fixture, ScmBackmergeModus.Global);
+        await SetModusAsync(fixture, ScmBackmergeMode.Global);
         ConfigureBackmerge(fixture, mergeStatus: PullRequestMergeStatus.Blocked);
 
         await Monitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
@@ -190,7 +190,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         fixture.Git.Verify(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
             It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()), Times.Never);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var checkpoint = await db.ScmObservationCheckpoints
             .SingleAsync(x => x.SourceKey.StartsWith("backmerge/"), cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(checkpoint.NextAttemptUtc > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
@@ -206,7 +206,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryWithBasisbranchAsync(fixture);
-        await SetModusAsync(fixture, ScmBackmergeModus.Global);
+        await SetModusAsync(fixture, ScmBackmergeMode.Global);
         ConfigureBackmerge(fixture);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
@@ -223,7 +223,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         VerifyMerge(fixture, allowProtectedBranchBypass: false, Times.Once());
         VerifyMerge(fixture, allowProtectedBranchBypass: true, Times.Once());
         using var verification = fixture.Services.CreateScope();
-        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var checkpoint = await db.ScmObservationCheckpoints
             .SingleAsync(x => x.SourceKey.StartsWith("backmerge/"), cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(long.MaxValue, checkpoint.NextAttemptUtc);
@@ -237,7 +237,7 @@ public sealed class ScmBackmergeMonitoringServiceTests
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryWithBasisbranchAsync(fixture);
-        await SetModusAsync(fixture, ScmBackmergeModus.Global);
+        await SetModusAsync(fixture, ScmBackmergeMode.Global);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
                 .SetScmBackmergeDraftAktivierungAsync(true, TestContext.Current.CancellationToken);
@@ -282,16 +282,16 @@ public sealed class ScmBackmergeMonitoringServiceTests
     private static async Task<Guid> AddRepositoryWithBasisbranchAsync(ScmDispatchFixture fixture)
     {
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "Backmerge" };
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var project = new Project { Id = Guid.NewGuid(), Name = "Backmerge" };
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            Projekt = project,
+            Project = project,
             RepositoryUrl = "https://github.com/owner/repo",
             RepositoryName = "repo",
-            PluginTyp = fixture.Repository.ProviderPrefix,
-            Aktiv = true,
+            PluginType = fixture.Repository.ProviderPrefix,
+            Active = true,
             DefaultSourceBranchName = "staging"
         };
         db.AddRange(project, repository);
@@ -299,18 +299,18 @@ public sealed class ScmBackmergeMonitoringServiceTests
         return project.Id;
     }
 
-    private static async Task SetModusAsync(ScmDispatchFixture fixture, ScmBackmergeModus modus)
+    private static async Task SetModusAsync(ScmDispatchFixture fixture, ScmBackmergeMode modus)
     {
         using var scope = fixture.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
             .SetScmBackmergeModusAsync(modus);
     }
 
-    private static async Task SetProjektFlagAsync(ScmDispatchFixture fixture, Guid projektId, bool aktiv)
+    private static async Task SetProjektFlagAsync(ScmDispatchFixture fixture, Guid projectId, bool aktiv)
     {
         using var scope = fixture.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-            .SetBackmergeProjektAktivAsync(projektId, aktiv);
+            .SetBackmergeProjektAktivAsync(projectId, aktiv);
     }
 
     /// <summary>Konfiguriert Enumeration, Hauptbranch und PR-Status als mergebaren Backmerge (main → staging).</summary>

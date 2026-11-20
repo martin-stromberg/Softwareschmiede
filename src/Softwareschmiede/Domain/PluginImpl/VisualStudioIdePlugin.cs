@@ -6,7 +6,7 @@ namespace Softwareschmiede.Domain.PluginImpl;
 
 /// <summary>IDE-Plugin für Visual Studio. Prüft auf <c>.sln</c>/<c>.slnx</c>-Dateien im Repository-Root.</summary>
 /// <param name="prozessStarter">Startet den Öffnen-Befehl für die gefundene Solution-Datei.</param>
-public sealed class VisualStudioIdePlugin(IProzessStarter prozessStarter) : IIdePlugin
+public sealed class VisualStudioIdePlugin(IProcessStarter prozessStarter) : IIdePlugin
 {
     /// <inheritdoc/>
     public string PluginName => "Visual Studio";
@@ -49,8 +49,8 @@ public sealed class VisualStudioIdePlugin(IProzessStarter prozessStarter) : IIde
     /// <summary>Öffnet die übergebene Solution-Datei mit dem beim Betriebssystem registrierten Standardhandler.</summary>
     /// <param name="prozessStarter">Startet den Öffnen-Befehl für die Solution-Datei.</param>
     /// <param name="solutionPath">Der Pfad der zu öffnenden <c>*.sln</c>-Datei.</param>
-    internal static void OpenSolutionFile(IProzessStarter prozessStarter, string solutionPath)
-        => prozessStarter.Starten(new ProzessStartAnfrage(solutionPath, Argumente: null, ShellAusfuehren: true));
+    internal static void OpenSolutionFile(IProcessStarter prozessStarter, string solutionPath)
+        => prozessStarter.Start(new ProcessStartRequest(solutionPath, Arguments: null, UseShellExecute: true));
 
     /// <inheritdoc/>
     public Task<IReadOnlyList<IdeEntryPoint>> FindEntryPointsAsync(string repositoryPath, CancellationToken ct = default)

@@ -72,7 +72,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public async Task TestCliStartAsync()
     {
         // Arrange
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
@@ -84,12 +84,12 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             });
 
         // Act
-        var handle = await _sut.StartCliAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle = await _sut.StartCliAsync(workItemId, pluginMock.Object, Path.GetTempPath());
 
         // Assert
         handle.Should().NotBeNull();
-        handle.AufgabeId.Should().Be(aufgabeId);
-        _sut.IsRunning(aufgabeId).Should().BeTrue();
+        handle.WorkItemId.Should().Be(workItemId);
+        _sut.IsRunning(workItemId).Should().BeTrue();
         _sut.GetRunningCount().Should().BeGreaterThan(0);
     }
 
@@ -97,7 +97,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     [OsInterfaceFact]
     public async Task StartCliAsync_ShouldReturnHandle_WhenPluginProvidesValidProcessStartInfo()
     {
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
@@ -108,10 +108,10 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 CreateNoWindow = true,
             });
 
-        var handle = await _sut.StartCliAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle = await _sut.StartCliAsync(workItemId, pluginMock.Object, Path.GetTempPath());
 
         handle.Should().NotBeNull();
-        handle.AufgabeId.Should().Be(aufgabeId);
+        handle.WorkItemId.Should().Be(workItemId);
     }
 
     /// <summary>GetTerminalSession gibt null zurück wenn keine ConPTY-Session gestartet wurde.</summary>
@@ -138,7 +138,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
 
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
@@ -160,7 +160,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             }
         };
 
-        await sut.StartCliAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        await sut.StartCliAsync(workItemId, pluginMock.Object, Path.GetTempPath());
 
         var completed = await Task.WhenAny(fehlerSignal.Task, Task.Delay(TimeSpan.FromSeconds(10)));
         completed.Should().Be(fehlerSignal.Task, "der Exited-Handler sollte trotz disposed ScopeFactory ausgelöst werden, ohne die Anwendung zum Absturz zu bringen");
@@ -173,12 +173,12 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public async Task ProcessExited_ExitCodeZero_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden()
     {
         await using var provider = CreateAufgabeServiceProvider();
-        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        var (workItemId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
         using var sut = TestKiAusfuehrungsServiceFactory.Create(provider.GetRequiredService<IServiceScopeFactory>());
 
         await StartAndWaitForExitAsync(
             sut,
-            aufgabeId,
+            workItemId,
             new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "cmd.exe",
@@ -188,11 +188,11 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             },
             CliProcessStatus.Gestoppt);
 
-        var geladen = await WaitForAufgabeStatusAsync(provider, aufgabeId, AufgabeAusfuehrungsStatus.Beendet);
-        geladen.Status.Should().Be(AufgabeStatus.Gestartet);
-        geladen.AktiveRunId.Should().BeNull();
+        var geladen = await WaitForAufgabeStatusAsync(provider, workItemId, WorkItemExecutionStatus.Completed);
+        geladen.Status.Should().Be(WorkItemStatus.Started);
+        geladen.ActiveRunId.Should().BeNull();
         geladen.LastHeartbeatUtc.Should().BeNull();
-        geladen.LetzterCliStartUtc.Should().BeNull();
+        geladen.LastCliStartUtc.Should().BeNull();
     }
 
     /// <summary>Fehlerhaftes Prozessende beendet nur die Ausführung, nicht den Gesamtstatus.</summary>
@@ -200,12 +200,12 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public async Task ProcessExited_ExitCodeNonZero_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden()
     {
         await using var provider = CreateAufgabeServiceProvider();
-        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        var (workItemId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
         using var sut = TestKiAusfuehrungsServiceFactory.Create(provider.GetRequiredService<IServiceScopeFactory>());
 
         await StartAndWaitForExitAsync(
             sut,
-            aufgabeId,
+            workItemId,
             new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "cmd.exe",
@@ -215,8 +215,8 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             },
             CliProcessStatus.Fehler);
 
-        var geladen = await WaitForAufgabeStatusAsync(provider, aufgabeId, AufgabeAusfuehrungsStatus.Beendet);
-        geladen.Status.Should().Be(AufgabeStatus.Gestartet);
+        var geladen = await WaitForAufgabeStatusAsync(provider, workItemId, WorkItemExecutionStatus.Completed);
+        geladen.Status.Should().Be(WorkItemStatus.Started);
     }
 
     /// <summary>Manueller Stop persistiert den Ausführungsstatus zentral als Beendet.</summary>
@@ -224,7 +224,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public async Task StopCliAsync_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden()
     {
         await using var provider = CreateAufgabeServiceProvider();
-        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        var (workItemId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
         using var sut = TestKiAusfuehrungsServiceFactory.Create(provider.GetRequiredService<IServiceScopeFactory>());
 
         var gestoppt = new TaskCompletionSource();
@@ -242,14 +242,14 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             CreateNoWindow = true,
         });
 
-        await sut.StartCliAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
-        await sut.StopCliAsync(aufgabeId);
+        await sut.StartCliAsync(workItemId, pluginMock.Object, Path.GetTempPath());
+        await sut.StopCliAsync(workItemId);
 
         var completed = await Task.WhenAny(gestoppt.Task, Task.Delay(TimeSpan.FromSeconds(10)));
         completed.Should().Be(gestoppt.Task);
 
-        var geladen = await WaitForAufgabeStatusAsync(provider, aufgabeId, AufgabeAusfuehrungsStatus.Beendet);
-        geladen.Status.Should().Be(AufgabeStatus.Gestartet);
+        var geladen = await WaitForAufgabeStatusAsync(provider, workItemId, WorkItemExecutionStatus.Completed);
+        geladen.Status.Should().Be(WorkItemStatus.Started);
     }
 
     /// <summary>
@@ -262,7 +262,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         // Klassischer Pfad: der Plugin-ProcessStartInfo wird direkt als der überwachte Prozess gestartet
         // ("cmd.exe /c exit 0" terminiert diesen Prozess sofort selbst).
         await AssertSubscriberExceptionIsLoggedAsync(
-            (sut, aufgabeId, plugin) => sut.StartCliAsync(aufgabeId, plugin, Path.GetTempPath()),
+            (sut, workItemId, plugin) => sut.StartCliAsync(workItemId, plugin, Path.GetTempPath()),
             new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "cmd.exe",
@@ -284,7 +284,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         // TerminalSessionStartSpec (keine cmd.exe-Hülle mehr) — "cmd.exe /c exit 0" terminiert
         // den überwachten Prozess selbst und löst das Exited-Ereignis der Session aus.
         await AssertSubscriberExceptionIsLoggedAsync(
-            (sut, aufgabeId, plugin) => sut.StartTerminalSessionAsync(aufgabeId, plugin, Path.GetTempPath()),
+            (sut, workItemId, plugin) => sut.StartTerminalSessionAsync(workItemId, plugin, Path.GetTempPath()),
             new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "cmd.exe",
@@ -321,7 +321,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, loggerMock.Object, pseudoConsoleProcessLauncher);
 
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(pluginProcessStartInfo);
@@ -340,11 +340,11 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         {
             // Nur beim Exited-Handler werfen (Gestoppt/Fehler), nicht beim initialen Gestartet-Event,
             // das außerhalb des try-catch-geschützten Exited-Handlers liegt.
-            if (status != CliProcessStatus.Gestartet)
+            if (status != CliProcessStatus.Started)
                 throw new InvalidOperationException("Simulierter Subscriber-Fehler");
         };
 
-        await startAsync(sut, aufgabeId, pluginMock.Object);
+        await startAsync(sut, workItemId, pluginMock.Object);
 
         var finished = await Task.WhenAny(errorLogged.Task, Task.Delay(timeout));
         finished.Should().Be(errorLogged.Task, "der Exited-Handler muss die Exception des werfenden Subscribers loggen, statt die Anwendung abstürzen zu lassen");
@@ -362,12 +362,12 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var launcher = new SimulatedPseudoConsoleProcessLauncher(NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance, NullLoggerFactory.Instance, Options.Create(new TerminalSessionOptions()));
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, launcher: launcher);
 
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.SetupTerminalSpec("cmd.exe");
 
-        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
-        var session = sut.GetTerminalSession(aufgabeId);
+        await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath());
+        var session = sut.GetTerminalSession(workItemId);
         session.Should().NotBeNull("StartTerminalSessionAsync muss eine PseudoConsoleSession im Handle hinterlegen");
 
         var gestoppt = new TaskCompletionSource();
@@ -377,13 +377,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 gestoppt.TrySetResult();
         };
 
-        await sut.StopCliAsync(aufgabeId);
+        await sut.StopCliAsync(workItemId);
 
         var finished = await Task.WhenAny(gestoppt.Task, Task.Delay(TimeSpan.FromSeconds(15)));
         finished.Should().Be(gestoppt.Task, "StopCliAsync muss letztlich zu HandleProcessExited und damit zum Gestoppt-Status führen");
 
         AssertSessionDisposed(session!, "HandleProcessExited muss die PseudoConsoleSession disposen");
-        sut.GetTerminalSession(aufgabeId).Should().BeNull("nach HandleProcessExited darf das Handle nicht mehr in _handles vorhanden sein");
+        sut.GetTerminalSession(workItemId).Should().BeNull("nach HandleProcessExited darf das Handle nicht mehr in _handles vorhanden sein");
     }
 
     /// <summary>Ruft man <see cref="KiAusfuehrungsService.Dispose"/> auf, während noch eine Terminal-Session läuft,
@@ -397,12 +397,12 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var launcher = new SimulatedPseudoConsoleProcessLauncher(NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance, NullLoggerFactory.Instance, Options.Create(new TerminalSessionOptions()));
         var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, launcher: launcher);
 
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.SetupTerminalSpec("cmd.exe");
 
-        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
-        var session = sut.GetTerminalSession(aufgabeId);
+        await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath());
+        var session = sut.GetTerminalSession(workItemId);
         session.Should().NotBeNull("StartTerminalSessionAsync muss eine PseudoConsoleSession im Handle hinterlegen");
 
         sut.Dispose();
@@ -439,7 +439,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var launcher = new SimulatedPseudoConsoleProcessLauncher(NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance, NullLoggerFactory.Instance, Options.Create(new TerminalSessionOptions()));
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, loggerMock.Object, launcher: launcher);
 
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.SetupTerminalSpec("cmd.exe");
 
@@ -456,12 +456,12 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
             .Callback(() => objectDisposedGeloggt.TrySetResult());
 
-        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath());
 
         var exitStatus = new TaskCompletionSource<CliProcessStatus>();
         sut.CliProcessStatusChanged += (_, status) =>
         {
-            if (status != CliProcessStatus.Gestartet)
+            if (status != CliProcessStatus.Started)
                 exitStatus.TrySetResult(status);
         };
 
@@ -489,7 +489,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
     /// <summary>Wird ein <see cref="SimulatedPseudoConsoleProcessLauncher"/> injiziert, muss
     /// <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/> ohne echtes ConPTY bis zum Status
-    /// <see cref="CliProcessStatus.Gestartet"/> gelangen (siehe docs/features/e2e-korrektur/requirement.md).</summary>
+    /// <see cref="CliProcessStatus.Started"/> gelangen (siehe docs/features/e2e-korrektur/requirement.md).</summary>
     [OsInterfaceFact]
     public async Task StartTerminalSessionAsync_MitInjiziertemFakeLauncher_ErreichtGestartet()
     {
@@ -497,18 +497,18 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var launcher = new SimulatedPseudoConsoleProcessLauncher(NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance, NullLoggerFactory.Instance, Options.Create(new TerminalSessionOptions()));
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, launcher: launcher);
 
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.SetupTerminalSpec("cmd.exe", "/c echo simuliert");
 
         var gestartet = new TaskCompletionSource();
         sut.CliProcessStatusChanged += (_, status) =>
         {
-            if (status == CliProcessStatus.Gestartet)
+            if (status == CliProcessStatus.Started)
                 gestartet.TrySetResult();
         };
 
-        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath());
 
         var finished = await Task.WhenAny(gestartet.Task, Task.Delay(TimeSpan.FromSeconds(10)));
         finished.Should().Be(gestartet.Task, "der simulierte Launcher muss ohne echtes ConPTY bis zum Status Gestartet gelangen");
@@ -530,7 +530,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         await using var provider = CreateCliOutputServiceProvider();
 
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var launcher = new FixedOutputPseudoConsoleProcessLauncher("erste zeile\nzweite zeile\n");
         using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
@@ -538,11 +538,11 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.SetupTerminalSpec("echo", "irrelevant");
 
-        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath());
 
-        var eintraege = await WaitForCliOutputAsync(provider, aufgabeId, expectedCount: 2);
-        eintraege.Select(e => e.Inhalt).Should().Equal("erste zeile", "zweite zeile");
-        eintraege.All(e => e.Typ == ProtokollTyp.CliOutput).Should().BeTrue();
+        var eintraege = await WaitForCliOutputAsync(provider, workItemId, expectedCount: 2);
+        eintraege.Select(e => e.Content).Should().Equal("erste zeile", "zweite zeile");
+        eintraege.All(e => e.Type == LogEntryType.CliOutput).Should().BeTrue();
 
         try
         {
@@ -578,8 +578,8 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var eintraegeA = await WaitForCliOutputAsync(provider, aufgabeA, expectedCount: 2);
         var eintraegeB = await WaitForCliOutputAsync(provider, aufgabeB, expectedCount: 2);
 
-        eintraegeA.Select(e => e.Inhalt).Should().Equal("a-1", "a-2");
-        eintraegeB.Select(e => e.Inhalt).Should().Equal("b-1", "b-2");
+        eintraegeA.Select(e => e.Content).Should().Equal("a-1", "a-2");
+        eintraegeB.Select(e => e.Content).Should().Equal("b-1", "b-2");
 
         KillIfRunning(handleA.Process);
         KillIfRunning(handleB.Process);
@@ -590,18 +590,18 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public async Task AddCliOutputAsync_RateLimitMarkerAusConPtyOutput_ErzeugtRateLimitEintrag()
     {
         await using var provider = CreateCliOutputServiceProvider();
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var marker = "[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-15T10:00:00Z]]";
         var launcher = new FixedOutputPseudoConsoleProcessLauncher(marker + "\n");
         using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
             launcher: launcher);
 
-        var handle = await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
-        var eintraege = await WaitForProtokollEntriesAsync(provider, aufgabeId, expectedCount: 2);
-        eintraege.Should().Contain(e => e.Typ == ProtokollTyp.CliOutput && e.Inhalt == marker);
-        eintraege.Should().Contain(e => e.Typ == ProtokollTyp.RateLimit);
+        var eintraege = await WaitForProtokollEntriesAsync(provider, workItemId, expectedCount: 2);
+        eintraege.Should().Contain(e => e.Type == LogEntryType.CliOutput && e.Content == marker);
+        eintraege.Should().Contain(e => e.Type == LogEntryType.RateLimit);
 
         KillIfRunning(handle.Process);
     }
@@ -611,16 +611,16 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public async Task StartTerminalSessionAsync_RestzeileOhneZeilentrenner_PersistiertCliOutput()
     {
         await using var provider = CreateCliOutputServiceProvider();
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var launcher = new FixedOutputPseudoConsoleProcessLauncher("letzte restzeile");
         using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
             launcher: launcher);
 
-        var handle = await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
-        var eintraege = await WaitForCliOutputAsync(provider, aufgabeId, expectedCount: 1);
-        eintraege.Single().Inhalt.Should().Be("letzte restzeile");
+        var eintraege = await WaitForCliOutputAsync(provider, workItemId, expectedCount: 1);
+        eintraege.Single().Content.Should().Be("letzte restzeile");
 
         KillIfRunning(handle.Process);
     }
@@ -630,16 +630,16 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public async Task StartTerminalSessionAsync_ProzessEndeVorReadLoopDrain_VerliertTailOutputNicht()
     {
         await using var provider = CreateCliOutputServiceProvider();
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var launcher = new DelayedOutputPseudoConsoleProcessLauncher("tail-output\n", TimeSpan.FromMilliseconds(200));
         using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
             launcher: launcher);
 
-        await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+        await sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
-        var eintraege = await WaitForCliOutputAsync(provider, aufgabeId, expectedCount: 1);
-        eintraege.Single().Inhalt.Should().Be("tail-output");
+        var eintraege = await WaitForCliOutputAsync(provider, workItemId, expectedCount: 1);
+        eintraege.Single().Content.Should().Be("tail-output");
     }
 
     /// <summary>Regressionstest für den Early-Exit-Pfad in <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/>:
@@ -656,7 +656,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         CliProcessStatus erwarteterStatus)
     {
         await using var provider = CreateAufgabeServiceProvider();
-        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        var (workItemId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
         var launcher = new AlreadyExitedProcessLauncher(exitCode);
         using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
@@ -665,18 +665,18 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var statusEvents = new List<CliProcessStatus>();
         sut.CliProcessStatusChanged += (_, status) => statusEvents.Add(status);
 
-        await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+        await sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
         statusEvents.Should().Equal(
             new[] { erwarteterStatus },
             "der Early-Exit-Pfad muss denselben Endzustand wie ein reguläres Exited melden — ohne vorheriges Gestartet");
-        sut.GetTerminalSession(aufgabeId).Should().BeNull("das Handle muss im Early-Exit-Pfad entfernt worden sein");
+        sut.GetTerminalSession(workItemId).Should().BeNull("das Handle muss im Early-Exit-Pfad entfernt worden sein");
 
         if (erwarteterStatus == CliProcessStatus.Fehler)
         {
-            var eintraege = await WaitForProtokollEntriesAsync(provider, aufgabeId, 1, ProtokollTyp.SystemMeldung);
+            var eintraege = await WaitForProtokollEntriesAsync(provider, workItemId, 1, LogEntryType.SystemMessage);
             eintraege.Should().Contain(
-                e => e.Inhalt.Contains($"ExitCode: {exitCode}"),
+                e => e.Content.Contains($"ExitCode: {exitCode}"),
                 "der Fehler-Pfad muss den Exit-Code als SystemMeldung-Protokolleintrag persistieren");
         }
     }
@@ -690,7 +690,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public async Task StartTerminalSessionAsync_FailedVorVerdrahtung_WirdErkanntUndAlsFehlerGemeldet()
     {
         await using var provider = CreateAufgabeServiceProvider();
-        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        var (workItemId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
         var launcher = new FailingReadSessionLauncher();
         using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
@@ -699,19 +699,19 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var statusEvents = new List<CliProcessStatus>();
         sut.CliProcessStatusChanged += (_, status) => statusEvents.Add(status);
 
-        var handle = await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
         try
         {
             statusEvents.Should().Equal(
                 new[] { CliProcessStatus.Fehler },
                 "das vor der Verdrahtung ausgelöste Failed muss erkannt und als Fehler gemeldet werden — kein Gestartet");
-            sut.GetTerminalSession(aufgabeId).Should().BeNull("das Handle muss nach dem Session-Fehler entfernt worden sein");
+            sut.GetTerminalSession(workItemId).Should().BeNull("das Handle muss nach dem Session-Fehler entfernt worden sein");
             AssertSessionDisposed(handle.Session!, "der Fehler-Pfad muss die Session-Ressourcen aufräumen");
 
-            var eintraege = await WaitForProtokollEntriesAsync(provider, aufgabeId, 1, ProtokollTyp.SystemMeldung);
+            var eintraege = await WaitForProtokollEntriesAsync(provider, workItemId, 1, LogEntryType.SystemMessage);
             eintraege.Should().Contain(
-                e => e.Inhalt.Contains("Laufzeitfehler"),
+                e => e.Content.Contains("Laufzeitfehler"),
                 "ein fataler Session-Fehler ohne Exit-Code muss als SystemMeldung-Protokolleintrag persistiert werden");
         }
         finally
@@ -728,7 +728,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public async Task StartTerminalSessionAsync_SessionFailed_MeldetFehlerStattGestoppt()
     {
         await using var provider = CreateAufgabeServiceProvider();
-        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        var (workItemId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
         var launcher = new DelayedFailingReadSessionLauncher(TimeSpan.FromMilliseconds(300));
         using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
@@ -743,24 +743,24 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 fehlerSignal.TrySetResult();
         };
 
-        var handle = await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
         try
         {
             statusEvents.Should().Equal(
-                new[] { CliProcessStatus.Gestartet },
+                new[] { CliProcessStatus.Started },
                 "bei verzögertem Lesefehler ist der Start zunächst erfolgreich");
 
             var completed = await Task.WhenAny(fehlerSignal.Task, Task.Delay(TimeSpan.FromSeconds(10)));
             completed.Should().Be(fehlerSignal.Task,
                 "ein Laufzeitfehler der Leseschleife muss als Fehler gemeldet werden, nicht als Gestoppt");
 
-            statusEvents.Should().Equal(new[] { CliProcessStatus.Gestartet, CliProcessStatus.Fehler });
-            sut.GetTerminalSession(aufgabeId).Should().BeNull("das Handle muss nach dem Session-Fehler entfernt worden sein");
+            statusEvents.Should().Equal(new[] { CliProcessStatus.Started, CliProcessStatus.Fehler });
+            sut.GetTerminalSession(workItemId).Should().BeNull("das Handle muss nach dem Session-Fehler entfernt worden sein");
 
-            var eintraege = await WaitForProtokollEntriesAsync(provider, aufgabeId, 1, ProtokollTyp.SystemMeldung);
+            var eintraege = await WaitForProtokollEntriesAsync(provider, workItemId, 1, LogEntryType.SystemMessage);
             eintraege.Should().Contain(
-                e => e.Inhalt.Contains("Laufzeitfehler"),
+                e => e.Content.Contains("Laufzeitfehler"),
                 "ein fataler Session-Fehler ohne Exit-Code muss als SystemMeldung-Protokolleintrag persistiert werden");
         }
         finally
@@ -774,23 +774,23 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     [Fact]
     public async Task ZweiterStart_FeuertCliLaufAktiv_StattGestartet()
     {
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = CreateNoOpPlugin();
 
         var gestartetCount = 0;
         var laufAktivCount = 0;
         _sut.CliProcessStatusChanged += (_, status) =>
         {
-            if (status == CliProcessStatus.Gestartet)
+            if (status == CliProcessStatus.Started)
                 gestartetCount++;
         };
         _sut.CliLaufAktiv += _ => laufAktivCount++;
 
-        var handle = await _sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        var handle = await _sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
         gestartetCount.Should().Be(1);
 
-        var handle2 = await _sut.StartCliAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
-        var handle3 = await _sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        var handle2 = await _sut.StartCliAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        var handle3 = await _sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         handle2.Should().BeSameAs(handle, "der zweite Start liefert das bereits laufende Handle zurück");
         handle3.Should().BeSameAs(handle);
@@ -802,15 +802,15 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     [Fact]
     public async Task NotifyLaufAktiv_FeuertNur_BeiLaufendemProzess()
     {
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var laufAktivCount = 0;
         _sut.CliLaufAktiv += _ => laufAktivCount++;
 
-        _sut.NotifyLaufAktiv(aufgabeId);
+        _sut.NotifyLaufAktiv(workItemId);
         laufAktivCount.Should().Be(0, "ohne laufendes Handle ist NotifyLaufAktiv ein No-Op");
 
-        await _sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
-        _sut.NotifyLaufAktiv(aufgabeId);
+        await _sut.StartTerminalSessionAsync(workItemId, CreateNoOpPlugin().Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        _sut.NotifyLaufAktiv(workItemId);
 
         laufAktivCount.Should().Be(1);
     }
@@ -821,11 +821,11 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public void GetLiveLaufStatus_BildetSessionStatusAb()
     {
         var ohneHandle = Guid.NewGuid();
-        _sut.GetLiveLaufStatus(ohneHandle).Should().BeNull("ohne laufendes Handle gibt es keinen Live-Substatus");
+        _sut.GetLiveRunStatus(ohneHandle).Should().BeNull("ohne laufendes Handle gibt es keinen Live-Substatus");
 
         var laufendOhneSession = Guid.NewGuid();
         PlantHandle(laufendOhneSession, new CliProcessHandle(laufendOhneSession, System.Diagnostics.Process.GetCurrentProcess()));
-        _sut.GetLiveLaufStatus(laufendOhneSession).Should().Be(AufgabeLaufStatus.Laeuft);
+        _sut.GetLiveRunStatus(laufendOhneSession).Should().Be(WorkItemRunStatus.Running);
 
         var laufendMitSession = Guid.NewGuid();
         var session = TestPseudoConsoleSessionFactory.Create(
@@ -835,7 +835,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         PlantHandle(laufendMitSession, new CliProcessHandle(laufendMitSession, System.Diagnostics.Process.GetCurrentProcess()) { Session = session });
         try
         {
-            _sut.GetLiveLaufStatus(laufendMitSession).Should().Be(AufgabeLaufStatus.Laeuft);
+            _sut.GetLiveRunStatus(laufendMitSession).Should().Be(WorkItemRunStatus.Running);
         }
         finally
         {
@@ -858,52 +858,52 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             .Which.Should().Be(laufend);
     }
 
-    private void PlantHandle(Guid aufgabeId, CliProcessHandle handle)
+    private void PlantHandle(Guid workItemId, CliProcessHandle handle)
     {
         var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_sut)!;
-        handles[aufgabeId] = handle;
+        handles[workItemId] = handle;
     }
 
-    private static async Task<IReadOnlyList<Softwareschmiede.Domain.Entities.Protokolleintrag>> WaitForCliOutputAsync(
+    private static async Task<IReadOnlyList<Softwareschmiede.Domain.Entities.LogEntry>> WaitForCliOutputAsync(
         ServiceProvider provider,
-        Guid aufgabeId,
+        Guid workItemId,
         int expectedCount)
-        => (await WaitForProtokollEntriesAsync(provider, aufgabeId, expectedCount, ProtokollTyp.CliOutput)).Where(e => e.Typ == ProtokollTyp.CliOutput).ToList();
+        => (await WaitForProtokollEntriesAsync(provider, workItemId, expectedCount, LogEntryType.CliOutput)).Where(e => e.Type == LogEntryType.CliOutput).ToList();
 
-    private static async Task<IReadOnlyList<Softwareschmiede.Domain.Entities.Protokolleintrag>> WaitForProtokollEntriesAsync(
+    private static async Task<IReadOnlyList<Softwareschmiede.Domain.Entities.LogEntry>> WaitForProtokollEntriesAsync(
         ServiceProvider provider,
-        Guid aufgabeId,
+        Guid workItemId,
         int expectedCount,
-        ProtokollTyp? typ = null)
+        LogEntryType? typ = null)
     {
         for (var i = 0; i < 50; i++)
         {
-            var eintraege = GetProtokollEntries(provider, aufgabeId, typ);
+            var eintraege = GetProtokollEntries(provider, workItemId, typ);
             if (eintraege.Count >= expectedCount)
                 return eintraege;
 
             await Task.Delay(100);
         }
 
-        return GetProtokollEntries(provider, aufgabeId, typ);
+        return GetProtokollEntries(provider, workItemId, typ);
     }
 
-    private static IReadOnlyList<Softwareschmiede.Domain.Entities.Protokolleintrag> GetProtokollEntries(
+    private static IReadOnlyList<Softwareschmiede.Domain.Entities.LogEntry> GetProtokollEntries(
         ServiceProvider provider,
-        Guid aufgabeId,
-        ProtokollTyp? typ)
+        Guid workItemId,
+        LogEntryType? typ)
     {
         using var scope = provider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
-        var query = db.Protokolleintraege
+        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>();
+        var query = db.LogEntries
             .AsNoTracking()
-            .Where(e => e.AufgabeId == aufgabeId);
+            .Where(e => e.WorkItemId == workItemId);
         if (typ is not null)
-            query = query.Where(e => e.Typ == typ.Value);
+            query = query.Where(e => e.Type == typ.Value);
 
         return query
-            .OrderBy(e => e.Zeitstempel)
+            .OrderBy(e => e.Timestamp)
             .ToList();
     }
 
@@ -911,7 +911,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         var databaseName = Guid.NewGuid().ToString();
         return new ServiceCollection()
-            .AddDbContext<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>(options => options.UseInMemoryDatabase(databaseName))
+            .AddDbContext<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>(options => options.UseInMemoryDatabase(databaseName))
             .AddScoped<ProtokollService>()
             .AddSingleton<ILogger<ProtokollService>>(NullLogger<ProtokollService>.Instance)
             .BuildServiceProvider();
@@ -945,7 +945,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         var databaseName = Guid.NewGuid().ToString();
         return new ServiceCollection()
-            .AddDbContext<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>(options => options.UseInMemoryDatabase(databaseName))
+            .AddDbContext<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>(options => options.UseInMemoryDatabase(databaseName))
             .AddScoped<TodoService>()
             .AddScoped<AufgabeService>()
             .AddScoped<ProtokollService>()
@@ -955,31 +955,31 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             .BuildServiceProvider();
     }
 
-    private static async Task<(Guid AufgabeId, Guid ProjektId)> CreateGestarteteAufgabeMitAktivemLaufAsync(ServiceProvider provider)
+    private static async Task<(Guid WorkItemId, Guid ProjectId)> CreateGestarteteAufgabeMitAktivemLaufAsync(ServiceProvider provider)
     {
         await using var scope = provider.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
-        var projektId = Guid.NewGuid();
-        db.Projekte.Add(new Projekt
+        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>();
+        var projectId = Guid.NewGuid();
+        db.Projects.Add(new Project
         {
-            Id = projektId,
+            Id = projectId,
             Name = "Prozessende-Testprojekt",
-            Status = ProjektStatus.Aktiv,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Status = ProjectStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
 
         var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
-        var aufgabe = await aufgabeService.CreateAsync(projektId, "Prozessende-Aufgabe", "Beschreibung");
-        await aufgabeService.StartenAsync(aufgabe.Id, "feature/prozessende", Path.GetTempPath());
-        await aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, "lauf-prozessende");
+        var workItem = await aufgabeService.CreateAsync(projectId, "Prozessende-Aufgabe", "Beschreibung");
+        await aufgabeService.StartenAsync(workItem.Id, "feature/prozessende", Path.GetTempPath());
+        await aufgabeService.AktivenLaufSetzenAsync(workItem.Id, "lauf-prozessende");
 
-        return (aufgabe.Id, projektId);
+        return (workItem.Id, projectId);
     }
 
     private static async Task StartAndWaitForExitAsync(
         KiAusfuehrungsService sut,
-        Guid aufgabeId,
+        Guid workItemId,
         System.Diagnostics.ProcessStartInfo processStartInfo,
         CliProcessStatus expectedStatus)
     {
@@ -990,31 +990,31 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 exitSignal.TrySetResult();
         };
 
-        await sut.StartCliAsync(aufgabeId, CreatePlugin(processStartInfo).Object, Path.GetTempPath());
+        await sut.StartCliAsync(workItemId, CreatePlugin(processStartInfo).Object, Path.GetTempPath());
 
         var completed = await Task.WhenAny(exitSignal.Task, Task.Delay(TimeSpan.FromSeconds(10)));
         completed.Should().Be(exitSignal.Task);
     }
 
-    private static async Task<Aufgabe> WaitForAufgabeStatusAsync(
+    private static async Task<WorkItem> WaitForAufgabeStatusAsync(
         ServiceProvider provider,
-        Guid aufgabeId,
-        AufgabeAusfuehrungsStatus expectedStatus)
+        Guid workItemId,
+        WorkItemExecutionStatus expectedStatus)
     {
         for (var i = 0; i < 50; i++)
         {
             await using var scope = provider.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
-            var aufgabe = await db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == aufgabeId);
-            if (aufgabe.AusfuehrungsStatus == expectedStatus)
-                return aufgabe;
+            var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>();
+            var workItem = await db.WorkItems.AsNoTracking().SingleAsync(a => a.Id == workItemId);
+            if (workItem.ExecutionStatus == expectedStatus)
+                return workItem;
 
             await Task.Delay(100);
         }
 
         await using var finalScope = provider.CreateAsyncScope();
-        var finalDb = finalScope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
-        return await finalDb.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == aufgabeId);
+        var finalDb = finalScope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>();
+        return await finalDb.WorkItems.AsNoTracking().SingleAsync(a => a.Id == workItemId);
     }
 
     private static void KillIfRunning(System.Diagnostics.Process process)
@@ -1062,7 +1062,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         public bool IsPseudoTerminal => false;
 
         public TerminalSessionStartResult Start(
-            Guid aufgabeId,
+            Guid workItemId,
             TerminalSessionStartSpec spec,
             ITerminalOutputSink? outputSink = null)
         {
@@ -1097,7 +1097,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         public bool IsPseudoTerminal => false;
 
         public TerminalSessionStartResult Start(
-            Guid aufgabeId,
+            Guid workItemId,
             TerminalSessionStartSpec spec,
             ITerminalOutputSink? outputSink = null)
         {
@@ -1106,7 +1106,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 NullPseudoConsoleHandle.Instance,
                 process,
                 new MemoryStream(),
-                new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_outputFactory(aufgabeId))),
+                new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_outputFactory(workItemId))),
                 new PseudoConsoleSessionContext
                 {
                     Logger = NullLogger<PseudoConsoleSession>.Instance,
@@ -1131,7 +1131,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         public bool IsPseudoTerminal => false;
 
         public TerminalSessionStartResult Start(
-            Guid aufgabeId,
+            Guid workItemId,
             TerminalSessionStartSpec spec,
             ITerminalOutputSink? outputSink = null)
         {
@@ -1167,7 +1167,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         public bool IsPseudoTerminal => false;
 
         public TerminalSessionStartResult Start(
-            Guid aufgabeId,
+            Guid workItemId,
             TerminalSessionStartSpec spec,
             ITerminalOutputSink? outputSink = null)
         {
@@ -1205,7 +1205,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         public bool IsPseudoTerminal => false;
 
         public TerminalSessionStartResult Start(
-            Guid aufgabeId,
+            Guid workItemId,
             TerminalSessionStartSpec spec,
             ITerminalOutputSink? outputSink = null)
         {
@@ -1244,7 +1244,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         public bool IsPseudoTerminal => false;
 
         public TerminalSessionStartResult Start(
-            Guid aufgabeId,
+            Guid workItemId,
             TerminalSessionStartSpec spec,
             ITerminalOutputSink? outputSink = null)
         {

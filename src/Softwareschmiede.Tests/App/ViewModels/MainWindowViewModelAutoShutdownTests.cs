@@ -22,7 +22,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// </summary>
 public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
 {
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly string _einstellungenDbPath =
         Path.Combine(Path.GetTempPath(), $"sw-vm-autoshutdown-{Guid.NewGuid():N}.db");
     private readonly ServiceProvider _einstellungenProvider;
@@ -53,12 +53,12 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
             .Setup(sp => sp.GetService(typeof(IPluginManager)))
             .Returns(pluginManagerMock.Object);
 
-        _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
+        _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
             Id = _projektId,
             Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
 
@@ -70,13 +70,13 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
 
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddDbContext<SoftwareschmiededDbContext>(
+        services.AddDbContext<SoftwareschmiedeDbContext>(
             o => o.UseSqlite($"Data Source={_einstellungenDbPath};Pooling=False"));
         services.AddScoped<AppEinstellungService>();
         _einstellungenProvider = services.BuildServiceProvider();
         using (var initScope = _einstellungenProvider.CreateScope())
         {
-            initScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Database.EnsureCreated();
+            initScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().Database.EnsureCreated();
         }
 
         _einstellungenService = new AutoShutdownEinstellungenService(
@@ -115,11 +115,11 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
                 TimeProvider: _timeProvider));
     }
 
-    private async Task<Softwareschmiede.Domain.Entities.Aufgabe> ErstelleGestarteteAufgabeAsync(string titel)
+    private async Task<Softwareschmiede.Domain.Entities.WorkItem> ErstelleGestarteteAufgabeAsync(string titel)
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, titel, null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, $"feature/{Guid.NewGuid():N}", "/tmp/klon");
-        return aufgabe;
+        var workItem = await _aufgabeService.CreateAsync(_projektId, titel, null);
+        await _aufgabeService.StartenAsync(workItem.Id, $"feature/{Guid.NewGuid():N}", "/tmp/klon");
+        return workItem;
     }
 
     private async Task<(bool Erzwingen, int ToleranzMinuten)> LeseEinstellungenAsync()
@@ -135,8 +135,8 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     {
         var laufende = await ErstelleGestarteteAufgabeAsync("Laufende Aufgabe");
         var wartende = await ErstelleGestarteteAufgabeAsync("Wartende Aufgabe");
-        _runningStatusSourceMock.Setup(s => s.GetLiveLaufStatus(laufende.Id)).Returns(AufgabeLaufStatus.Laeuft);
-        _runningStatusSourceMock.Setup(s => s.GetLiveLaufStatus(wartende.Id)).Returns(AufgabeLaufStatus.WartetAufEingabe);
+        _runningStatusSourceMock.Setup(s => s.GetLiveRunStatus(laufende.Id)).Returns(WorkItemRunStatus.Running);
+        _runningStatusSourceMock.Setup(s => s.GetLiveRunStatus(wartende.Id)).Returns(WorkItemRunStatus.WaitingForInput);
         var sut = CreateSut();
 
         await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
@@ -248,9 +248,9 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
 
         sut.AutoShutdownToleranzFehler.Should().BeNull();
         _orchestratorMock.Verify(o => o.SetOptionen(7, false), Times.Once);
-        var (erzwingen, toleranz) = await LeseEinstellungenAsync();
+        var (force, toleranz) = await LeseEinstellungenAsync();
         toleranz.Should().Be(7);
-        erzwingen.Should().BeFalse();
+        force.Should().BeFalse();
     }
 
     /// <summary>Ungültige Eingaben werden weder persistiert noch an den Orchestrator weitergereicht und setzen den Fehlertext.</summary>

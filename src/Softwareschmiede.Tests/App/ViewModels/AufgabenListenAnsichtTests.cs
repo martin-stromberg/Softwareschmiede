@@ -52,9 +52,9 @@ public sealed class AufgabenListenAnsichtTests
     {
         var items = new List<AktiveAufgabePanelItem>
         {
-            new() { Id = Guid.NewGuid(), Titel = "C", RepositoryGruppenName = AufgabenListenAnsicht.OhneRepository, RepositoryGruppeIstFallback = true, SortierZeitpunkt = DateTimeOffset.UtcNow },
-            new() { Id = Guid.NewGuid(), Titel = "B", RepositoryGruppenName = "zeta-repo", SortierZeitpunkt = DateTimeOffset.UtcNow.AddHours(-1) },
-            new() { Id = Guid.NewGuid(), Titel = "A", RepositoryGruppenName = "alpha-repo", SortierZeitpunkt = DateTimeOffset.UtcNow.AddHours(-2) }
+            new() { Id = Guid.NewGuid(), Title = "C", RepositoryGruppenName = AufgabenListenAnsicht.OhneRepository, RepositoryGruppeIstFallback = true, SortierZeitpunkt = DateTimeOffset.UtcNow },
+            new() { Id = Guid.NewGuid(), Title = "B", RepositoryGruppenName = "zeta-repo", SortierZeitpunkt = DateTimeOffset.UtcNow.AddHours(-1) },
+            new() { Id = Guid.NewGuid(), Title = "A", RepositoryGruppenName = "alpha-repo", SortierZeitpunkt = DateTimeOffset.UtcNow.AddHours(-2) }
         };
         var view = new System.Windows.Data.ListCollectionView(items);
 
@@ -71,15 +71,15 @@ public sealed class AufgabenListenAnsichtTests
         var aelteste = DateTimeOffset.UtcNow.AddHours(-3);
         var items = new List<AktiveAufgabePanelItem>
         {
-            new() { Id = Guid.NewGuid(), Titel = "Alt", KiGruppenName = "KI Simulator", SortierZeitpunkt = aelteste },
-            new() { Id = Guid.NewGuid(), Titel = "Neu", KiGruppenName = "KI Simulator", SortierZeitpunkt = DateTimeOffset.UtcNow },
-            new() { Id = Guid.NewGuid(), Titel = "Mitte", KiGruppenName = "KI Simulator", SortierZeitpunkt = aelteste.AddHours(1) }
+            new() { Id = Guid.NewGuid(), Title = "Alt", KiGruppenName = "KI Simulator", SortierZeitpunkt = aelteste },
+            new() { Id = Guid.NewGuid(), Title = "Neu", KiGruppenName = "KI Simulator", SortierZeitpunkt = DateTimeOffset.UtcNow },
+            new() { Id = Guid.NewGuid(), Title = "Mitte", KiGruppenName = "KI Simulator", SortierZeitpunkt = aelteste.AddHours(1) }
         };
         var view = new System.Windows.Data.ListCollectionView(items);
 
         AufgabenListenAnsicht.Konfiguriere(view, AufgabenListenModus.Ki);
 
-        var titel = view.Cast<AktiveAufgabePanelItem>().Select(i => i.Titel).ToArray();
+        var titel = view.Cast<AktiveAufgabePanelItem>().Select(i => i.Title).ToArray();
         titel.Should().Equal("Neu", "Mitte", "Alt");
     }
 }

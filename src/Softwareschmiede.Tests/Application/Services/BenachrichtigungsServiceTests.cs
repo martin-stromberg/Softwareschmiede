@@ -10,25 +10,25 @@ public sealed class BenachrichtigungsServiceTests
     [Fact]
     public void TestBenachrichtigungNewEnum()
     {
-        var modi = Enum.GetValues<BenachrichtigungsModus>();
-        modi.Should().Contain(BenachrichtigungsModus.Deaktiviert);
-        modi.Should().Contain(BenachrichtigungsModus.Banner);
-        modi.Should().Contain(BenachrichtigungsModus.Ton);
+        var modi = Enum.GetValues<NotificationMode>();
+        modi.Should().Contain(NotificationMode.Disabled);
+        modi.Should().Contain(NotificationMode.Banner);
+        modi.Should().Contain(NotificationMode.Sound);
 
-        var kanaele = Enum.GetValues<BenachrichtigungsKanal>();
-        kanaele.Should().Contain(BenachrichtigungsKanal.Banner);
-        kanaele.Should().Contain(BenachrichtigungsKanal.Ton);
+        var kanaele = Enum.GetValues<NotificationChannel>();
+        kanaele.Should().Contain(NotificationChannel.Banner);
+        kanaele.Should().Contain(NotificationChannel.Sound);
     }
 
     /// <summary>Alte Enum-Werte (NurAufgabenseite, Global, Audio, System) sind nicht vorhanden.</summary>
     [Fact]
     public void OldBenachrichtigungsEnumValues_ShouldNotExist()
     {
-        var modusNames = Enum.GetNames<BenachrichtigungsModus>();
+        var modusNames = Enum.GetNames<NotificationMode>();
         modusNames.Should().NotContain("NurAufgabenseite");
         modusNames.Should().NotContain("Global");
 
-        var kanalNames = Enum.GetNames<BenachrichtigungsKanal>();
+        var kanalNames = Enum.GetNames<NotificationChannel>();
         kanalNames.Should().NotContain("Audio");
         kanalNames.Should().NotContain("System");
     }
@@ -37,34 +37,34 @@ public sealed class BenachrichtigungsServiceTests
     [Fact]
     public void BenachrichtigungsModus_ShouldHaveCorrectIntegerValues()
     {
-        ((int)BenachrichtigungsModus.Deaktiviert).Should().Be(0);
-        ((int)BenachrichtigungsModus.Banner).Should().Be(1);
-        ((int)BenachrichtigungsModus.Ton).Should().Be(2);
+        ((int)NotificationMode.Disabled).Should().Be(0);
+        ((int)NotificationMode.Banner).Should().Be(1);
+        ((int)NotificationMode.Sound).Should().Be(2);
     }
 
     /// <summary>BenachrichtigungsKanal-Werte haben korrekte Integer-Werte.</summary>
     [Fact]
     public void BenachrichtigungsKanal_ShouldHaveCorrectIntegerValues()
     {
-        ((int)BenachrichtigungsKanal.Banner).Should().Be(0);
-        ((int)BenachrichtigungsKanal.Ton).Should().Be(1);
+        ((int)NotificationChannel.Banner).Should().Be(0);
+        ((int)NotificationChannel.Sound).Should().Be(1);
     }
 
     /// <summary>Alle BenachrichtigungsModus-Werte sind gültige Enums.</summary>
     [Theory]
-    [InlineData(BenachrichtigungsModus.Deaktiviert)]
-    [InlineData(BenachrichtigungsModus.Banner)]
-    [InlineData(BenachrichtigungsModus.Ton)]
-    public void EachBenachrichtigungsModus_ShouldBeDefinedInEnum(BenachrichtigungsModus modus)
+    [InlineData(NotificationMode.Disabled)]
+    [InlineData(NotificationMode.Banner)]
+    [InlineData(NotificationMode.Sound)]
+    public void EachBenachrichtigungsModus_ShouldBeDefinedInEnum(NotificationMode modus)
     {
         Enum.IsDefined(modus).Should().BeTrue();
     }
 
     /// <summary>Alle BenachrichtigungsKanal-Werte sind gültige Enums.</summary>
     [Theory]
-    [InlineData(BenachrichtigungsKanal.Banner)]
-    [InlineData(BenachrichtigungsKanal.Ton)]
-    public void EachBenachrichtigungsKanal_ShouldBeDefinedInEnum(BenachrichtigungsKanal kanal)
+    [InlineData(NotificationChannel.Banner)]
+    [InlineData(NotificationChannel.Sound)]
+    public void EachBenachrichtigungsKanal_ShouldBeDefinedInEnum(NotificationChannel kanal)
     {
         Enum.IsDefined(kanal).Should().BeTrue();
     }

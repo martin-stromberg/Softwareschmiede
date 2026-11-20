@@ -18,8 +18,8 @@ public sealed class AufgabeService : IAktiveAufgabenService
     // wartend" (siehe AufgabeStatusExtensions.IstAktivOderWartend). Für EF-Core-Queries wird die Array-
     // Variante referenziert (Contains wird nach SQL IN übersetzt); außerhalb von Queries wird direkt
     // AufgabeStatus.IstAktivOderWartend() verwendet (z. B. in DeleteAsync).
-    private static readonly Expression<Func<Aufgabe, bool>> IstAktivOderWartendPredicate =
-        a => AufgabeStatusExtensions.AktivOderWartendStatus.Contains(a.Status);
+    private static readonly Expression<Func<WorkItem, bool>> IstAktivOderWartendPredicate =
+        a => WorkItemStatusExtensions.ActiveOrWaitingStatuses.Contains(a.Status);
 
     // Serialisiert prozessweit alle Laufdaten-Mutationen einer Aufgabe (AktivenLaufSetzen/
     // Sicherstellen/Beenden sowie die laufdatenrücksetzenden Lebenszyklus-Pfade Starten/
@@ -32,7 +32,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
     // der Speicherbedarf bleibt durch die Anzahl der Aufgaben begrenzt.
     private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> LaufGates = new();
 
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly ILogger<AufgabeService> _logger;
     private readonly TodoService _todoService;
     private readonly ScmStartPruefungsAusloeser? _startPruefungsAusloeser;
@@ -45,7 +45,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
     /// wird bei Pausenänderungen benachrichtigt. <see langword="null"/> in manuell
     /// aufgebauten Diensten (z. B. Tests) — dann entfällt die Benachrichtigung.</param>
     public AufgabeService(
-        SoftwareschmiededDbContext db,
+        SoftwareschmiedeDbContext db,
         ILogger<AufgabeService> logger,
         TodoService todoService,
         ScmStartPruefungsAusloeser? startPruefungsAusloeser = null)
@@ -57,82 +57,82 @@ public sealed class AufgabeService : IAktiveAufgabenService
     }
 
     /// <summary>Gibt alle aktiven (nicht archivierten) Aufgaben eines Projekts zurück.</summary>
-    public async Task<IReadOnlyList<Aufgabe>> GetByProjektAsync(Guid projektId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<WorkItem>> GetByProjektAsync(Guid projectId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Aufgaben für Projekt {ProjektId} abrufen.", projektId);
-        return await _db.Aufgaben
+        _logger.LogInformation("Aufgaben für Projekt {ProjektId} abrufen.", projectId);
+        return await _db.WorkItems
             .AsNoTracking()
-            .Include(a => a.IssueReferenz)
-            .Include(a => a.AlertReferenz)
+            .Include(a => a.IssueReference)
+            .Include(a => a.AlertReference)
             .Include(a => a.PullRequests)
-            .Where(a => a.ProjektId == projektId && a.Status != AufgabeStatus.Archiviert)
-            .OrderByDescending(a => a.ErstellungsDatum)
+            .Where(a => a.ProjectId == projectId && a.Status != WorkItemStatus.Archived)
+            .OrderByDescending(a => a.CreatedAt)
             .ToListAsync(ct);
     }
 
     /// <summary>Gibt alle archivierten Aufgaben eines Projekts zurück.</summary>
-    public async Task<IReadOnlyList<Aufgabe>> GetArchiviertByProjektAsync(Guid projektId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<WorkItem>> GetArchiviertByProjektAsync(Guid projectId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Archivierte Aufgaben für Projekt {ProjektId} abrufen.", projektId);
-        return await _db.Aufgaben
+        _logger.LogInformation("Archivierte Aufgaben für Projekt {ProjektId} abrufen.", projectId);
+        return await _db.WorkItems
             .AsNoTracking()
-            .Where(a => a.ProjektId == projektId && a.Status == AufgabeStatus.Archiviert)
-            .OrderByDescending(a => a.ErstellungsDatum)
+            .Where(a => a.ProjectId == projectId && a.Status == WorkItemStatus.Archived)
+            .OrderByDescending(a => a.CreatedAt)
             .ToListAsync(ct);
     }
 
     /// <summary>Gibt die Anzahl aktiver (Gestartet) und wartender (Wartend) Aufgaben als Tupel zurück — eine einzige Abfrage.</summary>
-    public async Task<(int Aktiv, int Wartend)> GetAktiveUndWartendeCountAsync(CancellationToken ct = default)
+    public async Task<(int Active, int Waiting)> GetAktiveUndWartendeCountAsync(CancellationToken ct = default)
     {
-        var counts = await _db.Aufgaben
+        var counts = await _db.WorkItems
             .AsNoTracking()
             .Where(IstAktivOderWartendPredicate)
             .GroupBy(a => a.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
-        var aktiv = counts.FirstOrDefault(c => c.Status == AufgabeStatus.Gestartet)?.Count ?? 0;
-        var wartend = counts.FirstOrDefault(c => c.Status == AufgabeStatus.Wartend)?.Count ?? 0;
+        var aktiv = counts.FirstOrDefault(c => c.Status == WorkItemStatus.Started)?.Count ?? 0;
+        var wartend = counts.FirstOrDefault(c => c.Status == WorkItemStatus.Waiting)?.Count ?? 0;
         return (aktiv, wartend);
     }
 
     /// <summary>Gibt eine Aufgabe anhand ihrer ID zurück.</summary>
-    public async Task<Aufgabe?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<WorkItem?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} abrufen.", id);
-        return await _db.Aufgaben
+        return await _db.WorkItems
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == id, ct);
     }
 
     /// <summary>Gibt eine Aufgabe mit IssueReferenz zurück (ohne Protokolleinträge).</summary>
-    public async Task<Aufgabe?> GetDetailAsync(Guid id, CancellationToken ct = default)
+    public async Task<WorkItem?> GetDetailAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} mit Details abrufen.", id);
-        return await _db.Aufgaben
+        return await _db.WorkItems
             .AsNoTracking()
-            .Include(a => a.Projekt)
-            .Include(a => a.IssueReferenz)
-            .Include(a => a.AlertReferenz)
+            .Include(a => a.Project)
+            .Include(a => a.IssueReference)
+            .Include(a => a.AlertReference)
             .Include(a => a.PullRequests)
             .Include(a => a.GitRepository)
-                .ThenInclude(r => r!.StartKonfiguration)
+                .ThenInclude(r => r!.StartConfiguration)
             .Include(a => a.GitRepository)
-                .ThenInclude(r => r!.InitialisierungKonfiguration)
+                .ThenInclude(r => r!.InitializationConfiguration)
             .Include(a => a.Todos)
             .FirstOrDefaultAsync(a => a.Id == id, ct);
     }
 
     /// <summary>Gibt eine bereits aus einem Alert erzeugte Aufgabe anhand des Alert-SourceKeys zurück.</summary>
-    public async Task<Aufgabe?> GetByAlertSourceKeyAsync(string sourceKey, CancellationToken ct = default)
+    public async Task<WorkItem?> GetByAlertSourceKeyAsync(string sourceKey, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceKey);
 
-        return await _db.Aufgaben
+        return await _db.WorkItems
             .AsNoTracking()
-            .Include(a => a.IssueReferenz)
-            .Include(a => a.AlertReferenz)
-            .FirstOrDefaultAsync(a => a.AlertReferenz != null && a.AlertReferenz.SourceKey == sourceKey, ct);
+            .Include(a => a.IssueReference)
+            .Include(a => a.AlertReference)
+            .FirstOrDefaultAsync(a => a.AlertReference != null && a.AlertReference.SourceKey == sourceKey, ct);
     }
 
     /// <summary>Prueft global, ob ein Pull Request bereits einer Aufgabe zugeordnet ist.</summary>
@@ -143,7 +143,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
         CancellationToken ct = default)
     {
         var normalizedRepositoryId = PullRequestRepositoryId.Normalize(provider, repositoryId);
-        return await _db.PullRequestReferenzen
+        return await _db.PullRequestReferences
             .AsNoTracking()
             .AnyAsync(p => p.Provider == provider
                            && p.RepositoryId == normalizedRepositoryId
@@ -152,32 +152,32 @@ public sealed class AufgabeService : IAktiveAufgabenService
     }
 
     /// <summary>Gibt die ID des zuletzt generierten Diff-Ergebnisses einer Aufgabe zurück.</summary>
-    public async Task<Guid?> GetLatestDiffResultIdAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task<Guid?> GetLatestDiffResultIdAsync(Guid workItemId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Letzte DiffResult-ID für Aufgabe {AufgabeId} abrufen.", aufgabeId);
+        _logger.LogInformation("Letzte DiffResult-ID für Aufgabe {AufgabeId} abrufen.", workItemId);
 
         return await _db.DiffResults
             .AsNoTracking()
-            .Where(dr => dr.AufgabeId == aufgabeId)
+            .Where(dr => dr.WorkItemId == workItemId)
             .OrderByDescending(dr => dr.GeneratedAt)
             .Select(dr => (Guid?)dr.Id)
             .FirstOrDefaultAsync(ct);
     }
 
     /// <summary>Gibt die ID des zuletzt generierten Diff-Ergebnisses einer Datei innerhalb einer Aufgabe zurück.</summary>
-    public async Task<Guid?> GetLatestDiffResultIdForFileAsync(Guid aufgabeId, string relativePath, CancellationToken ct = default)
+    public async Task<Guid?> GetLatestDiffResultIdForFileAsync(Guid workItemId, string relativePath, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
         var normalizedLookupPath = NormalizeRelativePathForLookup(relativePath);
 
         _logger.LogInformation(
             "Dateispezifische DiffResult-ID für Aufgabe {AufgabeId} und Datei {RelativePath} abrufen.",
-            aufgabeId,
+            workItemId,
             normalizedLookupPath);
 
         return await _db.DiffResults
             .AsNoTracking()
-            .Where(dr => dr.AufgabeId == aufgabeId
+            .Where(dr => dr.WorkItemId == workItemId
                 && dr.FilePath != null
                 && dr.FilePath.Replace("\\", "/").ToLower() == normalizedLookupPath)
             .OrderByDescending(dr => dr.GeneratedAt)
@@ -196,91 +196,91 @@ public sealed class AufgabeService : IAktiveAufgabenService
         return normalized.TrimStart('/').ToLowerInvariant();
     }
 
-    /// <summary>Erstellt eine neue Aufgabe mit Status <see cref="AufgabeStatus.Neu"/>.</summary>
-    public async Task<Aufgabe> CreateAsync(
-        Guid projektId,
+    /// <summary>Erstellt eine neue Aufgabe mit Status <see cref="WorkItemStatus.New"/>.</summary>
+    public async Task<WorkItem> CreateAsync(
+        Guid projectId,
         string titel,
         string? anforderungsBeschreibung,
         Guid? gitRepositoryId = null,
         CancellationToken ct = default)
     {
-        _logger.LogInformation("Aufgabe '{Titel}' für Projekt {ProjektId} erstellen.", titel, projektId);
+        _logger.LogInformation("Aufgabe '{Titel}' für Projekt {ProjektId} erstellen.", titel, projectId);
 
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = projektId,
+            ProjectId = projectId,
             GitRepositoryId = gitRepositoryId,
-            Titel = titel,
-            AnforderungsBeschreibung = anforderungsBeschreibung,
-            Status = AufgabeStatus.Neu,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Title = titel,
+            RequirementDescription = anforderungsBeschreibung,
+            Status = WorkItemStatus.New,
+            ExecutionStatus = WorkItemExecutionStatus.NotStarted,
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
-        _db.Aufgaben.Add(aufgabe);
+        _db.WorkItems.Add(workItem);
         await _db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Aufgabe '{Titel}' mit ID {AufgabeId} erstellt.", titel, aufgabe.Id);
-        return aufgabe;
+        _logger.LogInformation("Aufgabe '{Titel}' mit ID {AufgabeId} erstellt.", titel, workItem.Id);
+        return workItem;
     }
 
     /// <summary>Erstellt eine neue Aufgabe aus einem Issue.</summary>
-    public async Task<Aufgabe> CreateFromIssueAsync(
-        Guid projektId,
+    public async Task<WorkItem> CreateFromIssueAsync(
+        Guid projectId,
         Issue issue,
         Guid? gitRepositoryId = null,
         CancellationToken ct = default)
     {
-        _logger.LogInformation("Aufgabe aus Issue #{IssueNummer} für Projekt {ProjektId} erstellen.", issue.Nummer, projektId);
+        _logger.LogInformation("Aufgabe aus Issue #{IssueNummer} für Projekt {ProjektId} erstellen.", issue.Nummer, projectId);
 
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = projektId,
+            ProjectId = projectId,
             GitRepositoryId = gitRepositoryId,
-            Titel = issue.Titel,
-            AnforderungsBeschreibung = issue.Body,
-            Status = AufgabeStatus.Neu,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Title = issue.Title,
+            RequirementDescription = issue.Body,
+            Status = WorkItemStatus.New,
+            ExecutionStatus = WorkItemExecutionStatus.NotStarted,
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
-        var issueReferenz = new IssueReferenz
+        var issueReferenz = new IssueReference
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabe.Id,
-            IssueNummer = issue.Nummer,
-            Titel = issue.Titel,
+            WorkItemId = workItem.Id,
+            IssueNumber = issue.Nummer,
+            Title = issue.Title,
             Body = issue.Body,
             LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels),
             Milestone = issue.Milestone,
             IssueUrl = issue.IssueUrl
         };
 
-        aufgabe.IssueReferenz = issueReferenz;
+        workItem.IssueReference = issueReferenz;
 
-        _db.Aufgaben.Add(aufgabe);
+        _db.WorkItems.Add(workItem);
         await _db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Aufgabe aus Issue #{IssueNummer} mit ID {AufgabeId} erstellt.", issue.Nummer, aufgabe.Id);
-        return aufgabe;
+        _logger.LogInformation("Aufgabe aus Issue #{IssueNummer} mit ID {AufgabeId} erstellt.", issue.Nummer, workItem.Id);
+        return workItem;
     }
 
     /// <summary>Erstellt eine neue Aufgabe aus einer Issue-Ereignisreferenz. Der kanonische
     /// <paramref name="sourceKey"/> verhindert Anlageduplikate; bei paralleler Anlage wird die
     /// bestehende Aufgabe zurückgegeben.</summary>
-    /// <param name="projektId">ID des Projekts, dem die Aufgabe zugeordnet wird.</param>
+    /// <param name="projectId">ID des Projekts, dem die Aufgabe zugeordnet wird.</param>
     /// <param name="issue">Die Issue-Anlagedaten der Quelle.</param>
     /// <param name="gitRepositoryId">ID des lokalen Git-Repositorys.</param>
     /// <param name="sourceKey">Der deduplizierende Quellenschlüssel der Aufgabenreferenz.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    /// <param name="zweck">Optionale Zweck-Markierung der Aufgabe (siehe <see cref="Aufgabe.Zweck"/>);
+    /// <param name="zweck">Optionale Zweck-Markierung der Aufgabe (siehe <see cref="WorkItem.Purpose"/>);
     /// <see langword="null"/> legt eine reguläre Arbeitsaufgabe an.</param>
     /// <param name="kiPluginPrefix">Optionaler Plugin-Prefix für die funktionale Plugin-Zuordnung
-    /// (siehe <see cref="Aufgabe.KiPluginPrefix"/>).</param>
-    public async Task<Aufgabe> CreateFromIssueEventAsync(
-        Guid projektId,
+    /// (siehe <see cref="WorkItem.AiPluginPrefix"/>).</param>
+    public async Task<WorkItem> CreateFromIssueEventAsync(
+        Guid projectId,
         Issue issue,
         Guid gitRepositoryId,
         string sourceKey,
@@ -291,38 +291,38 @@ public sealed class AufgabeService : IAktiveAufgabenService
         ArgumentNullException.ThrowIfNull(issue);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceKey);
 
-        _logger.LogInformation("Aufgabe aus Issue-Ereignis {SourceKey} für Projekt {ProjektId} erstellen.", sourceKey, projektId);
+        _logger.LogInformation("Aufgabe aus Issue-Ereignis {SourceKey} für Projekt {ProjektId} erstellen.", sourceKey, projectId);
 
-        var existing = await _db.IssueReferenzen
+        var existing = await _db.IssueReferences
             .AsNoTracking()
             .Where(i => i.SourceKey == sourceKey)
-            .Select(i => (Guid?)i.AufgabeId)
+            .Select(i => (Guid?)i.WorkItemId)
             .FirstOrDefaultAsync(ct);
         if (existing is { } existingId)
         {
             _logger.LogInformation("Issue-Ereignis {SourceKey} ist bereits als Aufgabe {AufgabeId} angelegt.", sourceKey, existingId);
-            return await _db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == existingId, ct);
+            return await _db.WorkItems.AsNoTracking().SingleAsync(a => a.Id == existingId, ct);
         }
 
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = projektId,
+            ProjectId = projectId,
             GitRepositoryId = gitRepositoryId,
-            Titel = issue.Titel,
-            AnforderungsBeschreibung = issue.Body,
-            Status = AufgabeStatus.Neu,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Zweck = zweck,
-            KiPluginPrefix = kiPluginPrefix
+            Title = issue.Title,
+            RequirementDescription = issue.Body,
+            Status = WorkItemStatus.New,
+            ExecutionStatus = WorkItemExecutionStatus.NotStarted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            Purpose = zweck,
+            AiPluginPrefix = kiPluginPrefix
         };
 
-        var issueReferenz = CreateIssueReferenz(aufgabe.Id, issue);
+        var issueReferenz = CreateIssueReferenz(workItem.Id, issue);
         issueReferenz.SourceKey = sourceKey;
-        aufgabe.IssueReferenz = issueReferenz;
+        workItem.IssueReference = issueReferenz;
 
-        _db.Aufgaben.Add(aufgabe);
+        _db.WorkItems.Add(workItem);
 
         try
         {
@@ -331,27 +331,27 @@ public sealed class AufgabeService : IAktiveAufgabenService
         catch (DbUpdateException ex)
         {
             _db.ChangeTracker.Clear();
-            var concurrentlyCreated = await _db.IssueReferenzen
+            var concurrentlyCreated = await _db.IssueReferences
                 .AsNoTracking()
                 .Where(i => i.SourceKey == sourceKey)
-                .Select(i => (Guid?)i.AufgabeId)
+                .Select(i => (Guid?)i.WorkItemId)
                 .FirstOrDefaultAsync(ct);
-            if (concurrentlyCreated is { } aufgabeId)
+            if (concurrentlyCreated is { } workItemId)
             {
                 _logger.LogWarning(ex, "Issue-Ereignis {SourceKey} wurde parallel angelegt.", sourceKey);
-                return await _db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == aufgabeId, ct);
+                return await _db.WorkItems.AsNoTracking().SingleAsync(a => a.Id == workItemId, ct);
             }
 
             throw;
         }
 
-        _logger.LogInformation("Aufgabe aus Issue-Ereignis {SourceKey} mit ID {AufgabeId} erstellt.", sourceKey, aufgabe.Id);
-        return aufgabe;
+        _logger.LogInformation("Aufgabe aus Issue-Ereignis {SourceKey} mit ID {AufgabeId} erstellt.", sourceKey, workItem.Id);
+        return workItem;
     }
 
     /// <summary>Erstellt eine neue Aufgabe aus einem Pull-Request-Vorschlag.</summary>
-    public async Task<Aufgabe> CreateFromPullRequestAsync(
-        Guid projektId,
+    public async Task<WorkItem> CreateFromPullRequestAsync(
+        Guid projectId,
         PullRequest pullRequest,
         ScmRepositoryContext repositoryContext,
         CancellationToken ct = default)
@@ -376,14 +376,14 @@ public sealed class AufgabeService : IAktiveAufgabenService
         var repositoryExists = await _db.GitRepositories
             .AsNoTracking()
             .AnyAsync(r => r.Id == repositoryContext.GitRepositoryId
-                           && r.ProjektId == projektId
-                           && r.Aktiv
-                           && r.PluginTyp == repositoryContext.PluginPrefix,
+                           && r.ProjectId == projectId
+                           && r.Active
+                           && r.PluginType == repositoryContext.PluginPrefix,
                 ct);
         if (!repositoryExists)
             throw new InvalidOperationException("Der Repository-Kontext des Pull-Request-Vorschlags ist nicht mehr gueltig.");
 
-        var alreadyLinked = await _db.PullRequestReferenzen
+        var alreadyLinked = await _db.PullRequestReferences
             .AsNoTracking()
             .AnyAsync(p => p.Provider == provider
                            && p.RepositoryId == repositoryId
@@ -394,29 +394,29 @@ public sealed class AufgabeService : IAktiveAufgabenService
 
         var now = DateTimeOffset.UtcNow;
         var anforderungsBeschreibung = BuildPullRequestAnforderungsBeschreibung(pullRequest);
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = projektId,
+            ProjectId = projectId,
             GitRepositoryId = repositoryContext.GitRepositoryId,
-            Titel = pullRequest.Titel,
-            AnforderungsBeschreibung = anforderungsBeschreibung,
-            Status = AufgabeStatus.Neu,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = now
+            Title = pullRequest.Title,
+            RequirementDescription = anforderungsBeschreibung,
+            Status = WorkItemStatus.New,
+            ExecutionStatus = WorkItemExecutionStatus.NotStarted,
+            CreatedAt = now
         };
 
-        aufgabe.PullRequests.Add(new PullRequestReferenz
+        workItem.PullRequests.Add(new PullRequestReference
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabe.Id,
+            WorkItemId = workItem.Id,
             Provider = provider,
-            Rolle = PullRequestReferenzRolle.ReviewSource,
+            Role = PullRequestReferenzRolle.ReviewSource,
             RepositoryId = repositoryId,
             PullRequestNumber = pullRequest.Nummer,
             ProviderPullRequestId = pullRequest.ProviderPullRequestId,
             Url = pullRequest.Url,
-            Titel = pullRequest.Titel,
+            Title = pullRequest.Title,
             SourceBranch = pullRequest.BranchName,
             SourceRepositoryId = sourceRepositoryId,
             SourceRepositoryUrl = pullRequest.SourceRepositoryUrl,
@@ -431,7 +431,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
             CreatedUtc = now
         });
 
-        _db.Aufgaben.Add(aufgabe);
+        _db.WorkItems.Add(workItem);
 
         try
         {
@@ -440,7 +440,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
         catch (DbUpdateException ex)
         {
             _db.ChangeTracker.Clear();
-            var concurrentlyLinked = await _db.PullRequestReferenzen
+            var concurrentlyLinked = await _db.PullRequestReferences
                 .AsNoTracking()
                 .AnyAsync(p => p.Provider == provider
                                && p.RepositoryId == repositoryId
@@ -452,12 +452,12 @@ public sealed class AufgabeService : IAktiveAufgabenService
             throw;
         }
 
-        return aufgabe;
+        return workItem;
     }
 
     private static string BuildPullRequestAnforderungsBeschreibung(PullRequest pullRequest)
     {
-        var parts = new List<string> { pullRequest.Titel };
+        var parts = new List<string> { pullRequest.Title };
 
         if (!string.IsNullOrWhiteSpace(pullRequest.Body))
         {
@@ -496,8 +496,8 @@ public sealed class AufgabeService : IAktiveAufgabenService
     }
 
     /// <summary>Erstellt eine neue Aufgabe aus einem Alert und verknüpft sie mit dem bereits erstellten externen Issue.</summary>
-    public async Task<Aufgabe> CreateFromAlertAsync(
-        Guid projektId,
+    public async Task<WorkItem> CreateFromAlertAsync(
+        Guid projectId,
         ScmAlert alert,
         Issue createdIssue,
         Guid? gitRepositoryId = null,
@@ -508,51 +508,51 @@ public sealed class AufgabeService : IAktiveAufgabenService
         ArgumentNullException.ThrowIfNull(alert);
         ArgumentNullException.ThrowIfNull(createdIssue);
 
-        _logger.LogInformation("Aufgabe aus Alert {SourceKey} für Projekt {ProjektId} erstellen.", alert.SourceKey, projektId);
+        _logger.LogInformation("Aufgabe aus Alert {SourceKey} für Projekt {ProjektId} erstellen.", alert.SourceKey, projectId);
 
-        var existing = await _db.Aufgaben
+        var existing = await _db.WorkItems
             .AsNoTracking()
-            .Include(a => a.IssueReferenz)
-            .Include(a => a.AlertReferenz)
-            .FirstOrDefaultAsync(a => a.AlertReferenz != null && a.AlertReferenz.SourceKey == alert.SourceKey, ct);
+            .Include(a => a.IssueReference)
+            .Include(a => a.AlertReference)
+            .FirstOrDefaultAsync(a => a.AlertReference != null && a.AlertReference.SourceKey == alert.SourceKey, ct);
         if (existing != null)
         {
             _logger.LogInformation("Alert {SourceKey} ist bereits als Aufgabe {AufgabeId} konvertiert.", alert.SourceKey, existing.Id);
             return existing;
         }
 
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = projektId,
+            ProjectId = projectId,
             GitRepositoryId = gitRepositoryId,
-            Titel = alert.Title,
-            AnforderungsBeschreibung = string.IsNullOrWhiteSpace(createdIssue.Body)
+            Title = alert.Title,
+            RequirementDescription = string.IsNullOrWhiteSpace(createdIssue.Body)
                 ? alert.Description
                 : createdIssue.Body,
-            Status = AufgabeStatus.Neu,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Status = WorkItemStatus.New,
+            ExecutionStatus = WorkItemExecutionStatus.NotStarted,
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
-        aufgabe.IssueReferenz = CreateIssueReferenz(aufgabe.Id, createdIssue);
-        aufgabe.AlertReferenz = new AlertReferenz
+        workItem.IssueReference = CreateIssueReferenz(workItem.Id, createdIssue);
+        workItem.AlertReference = new AlertReference
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabe.Id,
+            WorkItemId = workItem.Id,
             Provider = provider,
             RepositoryId = repositoryId,
             AlertType = alert.AlertType.ToString(),
             SourceKey = alert.SourceKey,
             AlertUrl = alert.AlertUrl,
-            Titel = alert.Title,
+            Title = alert.Title,
             Severity = alert.Severity,
             State = alert.State,
             RuleId = alert.RuleId,
             ToolName = alert.ToolName
         };
 
-        _db.Aufgaben.Add(aufgabe);
+        _db.WorkItems.Add(workItem);
 
         try
         {
@@ -561,11 +561,11 @@ public sealed class AufgabeService : IAktiveAufgabenService
         catch (DbUpdateException ex)
         {
             _db.ChangeTracker.Clear();
-            var concurrentlyCreated = await _db.Aufgaben
+            var concurrentlyCreated = await _db.WorkItems
                 .AsNoTracking()
-                .Include(a => a.IssueReferenz)
-                .Include(a => a.AlertReferenz)
-                .FirstOrDefaultAsync(a => a.AlertReferenz != null && a.AlertReferenz.SourceKey == alert.SourceKey, ct);
+                .Include(a => a.IssueReference)
+                .Include(a => a.AlertReference)
+                .FirstOrDefaultAsync(a => a.AlertReference != null && a.AlertReference.SourceKey == alert.SourceKey, ct);
             if (concurrentlyCreated != null)
             {
                 _logger.LogWarning(ex, "Alert {SourceKey} wurde parallel konvertiert.", alert.SourceKey);
@@ -575,8 +575,8 @@ public sealed class AufgabeService : IAktiveAufgabenService
             throw;
         }
 
-        _logger.LogInformation("Aufgabe aus Alert {SourceKey} mit ID {AufgabeId} erstellt.", alert.SourceKey, aufgabe.Id);
-        return aufgabe;
+        _logger.LogInformation("Aufgabe aus Alert {SourceKey} mit ID {AufgabeId} erstellt.", alert.SourceKey, workItem.Id);
+        return workItem;
     }
 
     /// <summary>Aktualisiert Titel, Beschreibung und KI-Plugin-Prefix einer Aufgabe.</summary>
@@ -589,12 +589,12 @@ public sealed class AufgabeService : IAktiveAufgabenService
     {
         _logger.LogInformation("Aufgabe {AufgabeId} aktualisieren.", id);
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+        var workItem = await _db.WorkItems.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        aufgabe.Titel = titel;
-        aufgabe.AnforderungsBeschreibung = anforderungsBeschreibung;
-        aufgabe.KiPluginPrefix = kiPluginPrefix;
+        workItem.Title = titel;
+        workItem.RequirementDescription = anforderungsBeschreibung;
+        workItem.AiPluginPrefix = kiPluginPrefix;
 
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Aufgabe {AufgabeId} aktualisiert.", id);
@@ -605,43 +605,43 @@ public sealed class AufgabeService : IAktiveAufgabenService
     {
         _logger.LogInformation("IssueReferenz für Aufgabe {AufgabeId} aktualisieren.", id);
 
-        var aufgabe = await _db.Aufgaben
-            .Include(a => a.IssueReferenz)
+        var workItem = await _db.WorkItems
+            .Include(a => a.IssueReference)
             .FirstOrDefaultAsync(a => a.Id == id, ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
         if (issue == null)
         {
-            if (aufgabe.IssueReferenz != null)
-                _db.Remove(aufgabe.IssueReferenz);
-            aufgabe.IssueReferenz = null;
+            if (workItem.IssueReference != null)
+                _db.Remove(workItem.IssueReference);
+            workItem.IssueReference = null;
         }
         else
         {
-            if (aufgabe.IssueReferenz != null)
+            if (workItem.IssueReference != null)
             {
-                aufgabe.IssueReferenz.IssueNummer = issue.Nummer;
-                aufgabe.IssueReferenz.Titel = issue.Titel;
-                aufgabe.IssueReferenz.Body = issue.Body;
-                aufgabe.IssueReferenz.LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels);
-                aufgabe.IssueReferenz.Milestone = issue.Milestone;
-                aufgabe.IssueReferenz.IssueUrl = issue.IssueUrl;
+                workItem.IssueReference.IssueNumber = issue.Nummer;
+                workItem.IssueReference.Title = issue.Title;
+                workItem.IssueReference.Body = issue.Body;
+                workItem.IssueReference.LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels);
+                workItem.IssueReference.Milestone = issue.Milestone;
+                workItem.IssueReference.IssueUrl = issue.IssueUrl;
             }
             else
             {
-                var neueReferenz = new IssueReferenz
+                var neueReferenz = new IssueReference
                 {
                     Id = Guid.NewGuid(),
-                    AufgabeId = aufgabe.Id,
-                    IssueNummer = issue.Nummer,
-                    Titel = issue.Titel,
+                    WorkItemId = workItem.Id,
+                    IssueNumber = issue.Nummer,
+                    Title = issue.Title,
                     Body = issue.Body,
                     LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels),
                     Milestone = issue.Milestone,
                     IssueUrl = issue.IssueUrl
                 };
-                aufgabe.IssueReferenz = neueReferenz;
-                _db.IssueReferenzen.Add(neueReferenz);
+                workItem.IssueReference = neueReferenz;
+                _db.IssueReferences.Add(neueReferenz);
             }
         }
 
@@ -673,7 +673,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
 
         _logger.LogInformation("IssueReferenz für Aufgabe {AufgabeId} zuweisen, falls noch keine Referenz existiert.", id);
 
-        var aufgabeExists = await _db.Aufgaben
+        var aufgabeExists = await _db.WorkItems
             .AsNoTracking()
             .AnyAsync(a => a.Id == id, ct);
         if (!aufgabeExists)
@@ -681,20 +681,20 @@ public sealed class AufgabeService : IAktiveAufgabenService
             throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
         }
 
-        if (await _db.IssueReferenzen.AsNoTracking().AnyAsync(i => i.AufgabeId == id, ct))
+        if (await _db.IssueReferences.AsNoTracking().AnyAsync(i => i.WorkItemId == id, ct))
         {
             return false;
         }
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+        var workItem = await _db.WorkItems.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
         if (updateAnforderungsBeschreibung)
         {
-            aufgabe.AnforderungsBeschreibung = anforderungsBeschreibung;
+            workItem.RequirementDescription = anforderungsBeschreibung;
         }
 
-        _db.IssueReferenzen.Add(CreateIssueReferenz(id, issue));
+        _db.IssueReferences.Add(CreateIssueReferenz(id, issue));
 
         try
         {
@@ -707,7 +707,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
         {
             _db.ChangeTracker.Clear();
 
-            if (await _db.IssueReferenzen.AsNoTracking().AnyAsync(i => i.AufgabeId == id, ct))
+            if (await _db.IssueReferences.AsNoTracking().AnyAsync(i => i.WorkItemId == id, ct))
             {
                 _logger.LogWarning(ex, "IssueReferenz für Aufgabe {AufgabeId} wurde parallel zugewiesen.", id);
                 return false;
@@ -717,12 +717,12 @@ public sealed class AufgabeService : IAktiveAufgabenService
         }
     }
 
-    private static IssueReferenz CreateIssueReferenz(Guid aufgabeId, Issue issue) => new()
+    private static IssueReference CreateIssueReferenz(Guid workItemId, Issue issue) => new()
     {
         Id = Guid.NewGuid(),
-        AufgabeId = aufgabeId,
-        IssueNummer = issue.Nummer,
-        Titel = issue.Titel,
+        WorkItemId = workItemId,
+        IssueNumber = issue.Nummer,
+        Title = issue.Title,
         Body = issue.Body,
         LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels),
         Milestone = issue.Milestone,
@@ -734,16 +734,16 @@ public sealed class AufgabeService : IAktiveAufgabenService
     {
         _logger.LogInformation("Aufgabe {AufgabeId} löschen.", id);
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+        var workItem = await _db.WorkItems.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        if (aufgabe.Status.IstAktivOderWartend())
+        if (workItem.Status.IsActiveOrWaiting())
         {
             throw new InvalidOperationException(
-                $"Aufgabe {id} kann nicht gelöscht werden, da sie aktiv ist (Status: {aufgabe.Status}). Bitte zuerst abbrechen oder abschließen.");
+                $"Aufgabe {id} kann nicht gelöscht werden, da sie aktiv ist (Status: {workItem.Status}). Bitte zuerst abbrechen oder abschließen.");
         }
 
-        _db.Aufgaben.Remove(aufgabe);
+        _db.WorkItems.Remove(workItem);
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Aufgabe {AufgabeId} gelöscht.", id);
@@ -754,17 +754,17 @@ public sealed class AufgabeService : IAktiveAufgabenService
     {
         _logger.LogInformation("Aufgabe {AufgabeId} verwerfen (Aktion: {Aktion}).", id, aktion);
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+        var workItem = await _db.WorkItems.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        if (aufgabe.Status != AufgabeStatus.Neu)
+        if (workItem.Status != WorkItemStatus.New)
         {
             throw new InvalidOperationException("Nur neue Aufgaben können verworfen werden.");
         }
 
-        if (aktion == VerwerfenAktion.Archivieren)
+        if (aktion == VerwerfenAktion.Archive)
         {
-            aufgabe.Status = AufgabeStatus.Archiviert;
+            workItem.Status = WorkItemStatus.Archived;
             await _db.SaveChangesAsync(ct);
             _logger.LogInformation("Aufgabe {AufgabeId} verworfen und archiviert.", id);
             return;
@@ -779,15 +779,15 @@ public sealed class AufgabeService : IAktiveAufgabenService
     {
         _logger.LogInformation("Aufgabe {AufgabeId} archivieren.", id);
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+        var workItem = await _db.WorkItems.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        if (aufgabe.Status is not AufgabeStatus.Beendet)
+        if (workItem.Status is not WorkItemStatus.Completed)
         {
             throw new InvalidOperationException("Nur beendete Aufgaben können archiviert werden.");
         }
 
-        aufgabe.Status = AufgabeStatus.Archiviert;
+        workItem.Status = WorkItemStatus.Archived;
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Aufgabe {AufgabeId} archiviert.", id);
@@ -802,21 +802,21 @@ public sealed class AufgabeService : IAktiveAufgabenService
         await gate.WaitAsync(ct);
         try
         {
-            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            var workItem = await _db.WorkItems.FindAsync([id], ct)
                 ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-            if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+            if (workItem.Status is WorkItemStatus.Completed or WorkItemStatus.Archived)
             {
                 throw new InvalidOperationException("Beendete oder archivierte Aufgaben können nicht gestartet werden.");
             }
 
-            aufgabe.Status = AufgabeStatus.Gestartet;
-            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-            aufgabe.GitArbeitsbereich = new GitArbeitsbereich(branchName, lokalerKlonPfad, basisBranchName);
-            aufgabe.AktiveRunId = null;
-            aufgabe.LastHeartbeatUtc = null;
-            aufgabe.LetzterCliStartUtc = null;
-            aufgabe.LaufStatus = null;
+            workItem.Status = WorkItemStatus.Started;
+            workItem.ExecutionStatus = WorkItemExecutionStatus.Active;
+            workItem.GitWorkspace = new GitWorkspace(branchName, lokalerKlonPfad, basisBranchName);
+            workItem.ActiveRunId = null;
+            workItem.LastHeartbeatUtc = null;
+            workItem.LastCliStartUtc = null;
+            workItem.RunStatus = null;
 
             await _db.SaveChangesAsync(ct);
         }
@@ -833,15 +833,15 @@ public sealed class AufgabeService : IAktiveAufgabenService
     {
         _logger.LogInformation("Aufgabe {AufgabeId}: Vorschlagsprompt speichern.", id);
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+        var workItem = await _db.WorkItems.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
         var normalizedPrompt = string.IsNullOrWhiteSpace(prompt)
             ? null
             : prompt.Trim();
 
-        aufgabe.VorschlagPrompt = normalizedPrompt;
-        aufgabe.VorschlagAusfuehrenAbUtc = normalizedPrompt is null
+        workItem.SuggestedPrompt = normalizedPrompt;
+        workItem.SuggestedExecuteAfterUtc = normalizedPrompt is null
             ? null
             : ausfuehrenAbUtc;
 
@@ -853,41 +853,41 @@ public sealed class AufgabeService : IAktiveAufgabenService
     {
         _logger.LogInformation("Aufgabe {AufgabeId}: Vorschlagsprompt löschen.", id);
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+        var workItem = await _db.WorkItems.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        aufgabe.VorschlagPrompt = null;
-        aufgabe.VorschlagAusfuehrenAbUtc = null;
+        workItem.SuggestedPrompt = null;
+        workItem.SuggestedExecuteAfterUtc = null;
 
         await _db.SaveChangesAsync(ct);
     }
 
     /// <summary>
-    /// Setzt oder leert den Pausen-Endzeitpunkt (<see cref="Aufgabe.PausiertBisUtc"/>) einer Aufgabe.
-    /// Erlaubte Stati: <see cref="AufgabeStatus.Neu"/>, <see cref="AufgabeStatus.Gestartet"/> und
-    /// <see cref="AufgabeStatus.Wartend"/>. Beim Setzen muss der Zeitpunkt in der Zukunft liegen;
+    /// Setzt oder leert den Pausen-Endzeitpunkt (<see cref="WorkItem.PausedUntilUtc"/>) einer Aufgabe.
+    /// Erlaubte Stati: <see cref="WorkItemStatus.New"/>, <see cref="WorkItemStatus.Started"/> und
+    /// <see cref="WorkItemStatus.Waiting"/>. Beim Setzen muss der Zeitpunkt in der Zukunft liegen;
     /// <c>null</c> hebt eine bestehende Pause auf. Schreibt einen
-    /// <see cref="ProtokollTyp.SystemMeldung"/>-Eintrag.
+    /// <see cref="LogEntryType.SystemMessage"/>-Eintrag.
     /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="workItemId">ID der Aufgabe.</param>
     /// <param name="pausiertBisUtc">UTC-Zeitpunkt, bis zu dem pausiert wird, oder <c>null</c> zum Aufheben.</param>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    public async Task SetPauseAsync(Guid aufgabeId, DateTimeOffset? pausiertBisUtc, CancellationToken ct = default)
+    public async Task SetPauseAsync(Guid workItemId, DateTimeOffset? pausiertBisUtc, CancellationToken ct = default)
     {
         _logger.LogInformation(
             "Aufgabe {AufgabeId}: Pause {Aktion} (bis {PausiertBisUtc}).",
-            aufgabeId,
+            workItemId,
             pausiertBisUtc.HasValue ? "setzen" : "aufheben",
             pausiertBisUtc?.ToString("O") ?? "-");
 
-        var aufgabe = await _db.Aufgaben
-            .FirstOrDefaultAsync(a => a.Id == aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var workItem = await _db.WorkItems
+            .FirstOrDefaultAsync(a => a.Id == workItemId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
-        if (aufgabe.Status is not (AufgabeStatus.Neu or AufgabeStatus.Gestartet or AufgabeStatus.Wartend))
+        if (workItem.Status is not (WorkItemStatus.New or WorkItemStatus.Started or WorkItemStatus.Waiting))
         {
             throw new InvalidOperationException(
-                $"Aufgabe {aufgabeId} kann im Status {aufgabe.Status} nicht pausiert werden.");
+                $"Aufgabe {workItemId} kann im Status {workItem.Status} nicht pausiert werden.");
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -897,17 +897,17 @@ public sealed class AufgabeService : IAktiveAufgabenService
                 "Der Pausen-Endzeitpunkt muss in der Zukunft liegen.");
         }
 
-        aufgabe.PausiertBisUtc = pausiertBisUtc;
+        workItem.PausedUntilUtc = pausiertBisUtc;
 
-        _db.Protokolleintraege.Add(new Protokolleintrag
+        _db.LogEntries.Add(new LogEntry
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabeId,
-            Typ = ProtokollTyp.SystemMeldung,
-            Inhalt = pausiertBisUtc.HasValue
+            WorkItemId = workItemId,
+            Type = LogEntryType.SystemMessage,
+            Content = pausiertBisUtc.HasValue
                 ? $"Aufgabe pausiert bis {pausiertBisUtc.Value:O}."
                 : "Pause aufgehoben.",
-            Zeitstempel = now
+            Timestamp = now
         });
 
         await _db.SaveChangesAsync(ct);
@@ -927,17 +927,17 @@ public sealed class AufgabeService : IAktiveAufgabenService
         await gate.WaitAsync(ct);
         try
         {
-            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            var workItem = await _db.WorkItems.FindAsync([id], ct)
                 ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-            aufgabe.Status = AufgabeStatus.Beendet;
-            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
-            aufgabe.AbschlussDatum = DateTimeOffset.UtcNow;
-            aufgabe.GitArbeitsbereich = null;
-            aufgabe.AktiveRunId = null;
-            aufgabe.LastHeartbeatUtc = null;
-            aufgabe.LetzterCliStartUtc = null;
-            aufgabe.LaufStatus = null;
+            workItem.Status = WorkItemStatus.Completed;
+            workItem.ExecutionStatus = WorkItemExecutionStatus.Completed;
+            workItem.CompletedAt = DateTimeOffset.UtcNow;
+            workItem.GitWorkspace = null;
+            workItem.ActiveRunId = null;
+            workItem.LastHeartbeatUtc = null;
+            workItem.LastCliStartUtc = null;
+            workItem.RunStatus = null;
 
             await _db.SaveChangesAsync(ct);
         }
@@ -950,30 +950,30 @@ public sealed class AufgabeService : IAktiveAufgabenService
     }
 
     /// <summary>Setzt den Status einer Aufgabe mit Validierung der erlaubten Übergänge.</summary>
-    public async Task SetStatusAsync(Guid id, AufgabeStatus newStatus, CancellationToken ct = default)
+    public async Task SetStatusAsync(Guid id, WorkItemStatus newStatus, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId}: Status auf {Status} setzen.", id, newStatus);
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+        var workItem = await _db.WorkItems.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        ValidateStatusTransition(aufgabe.Status, newStatus);
+        ValidateStatusTransition(workItem.Status, newStatus);
 
-        aufgabe.Status = newStatus;
+        workItem.Status = newStatus;
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Aufgabe {AufgabeId}: Status auf {Status} gesetzt.", id, newStatus);
     }
 
     /// <summary>Setzt den Status einer Aufgabe generisch (ohne Transitions-Validierung).</summary>
-    public async Task StatusSetzenAsync(Guid id, AufgabeStatus status, CancellationToken ct = default)
+    public async Task StatusSetzenAsync(Guid id, WorkItemStatus status, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId}: Status auf {Status} setzen.", id, status);
 
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+        var workItem = await _db.WorkItems.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        aufgabe.Status = status;
+        workItem.Status = status;
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Aufgabe {AufgabeId}: Status auf {Status} gesetzt.", id, status);
@@ -988,16 +988,16 @@ public sealed class AufgabeService : IAktiveAufgabenService
         await gate.WaitAsync(ct);
         try
         {
-            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            var workItem = await _db.WorkItems.FindAsync([id], ct)
                 ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-            aufgabe.Status = AufgabeStatus.Neu;
-            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet;
-            aufgabe.GitArbeitsbereich = null;
-            aufgabe.AktiveRunId = null;
-            aufgabe.LastHeartbeatUtc = null;
-            aufgabe.LetzterCliStartUtc = null;
-            aufgabe.LaufStatus = null;
+            workItem.Status = WorkItemStatus.New;
+            workItem.ExecutionStatus = WorkItemExecutionStatus.NotStarted;
+            workItem.GitWorkspace = null;
+            workItem.ActiveRunId = null;
+            workItem.LastHeartbeatUtc = null;
+            workItem.LastCliStartUtc = null;
+            workItem.RunStatus = null;
 
             await _db.SaveChangesAsync(ct);
         }
@@ -1008,9 +1008,9 @@ public sealed class AufgabeService : IAktiveAufgabenService
     }
 
     /// <summary>
-    /// Markiert eine Aufgabe als aktuell aktiv ausgeführt: setzt <see cref="Aufgabe.AktiveRunId"/> auf die
-    /// übergebene Lauf-ID, aktualisiert <see cref="Aufgabe.LastHeartbeatUtc"/> für den Laufstatus und
-    /// speichert <see cref="Aufgabe.LetzterCliStartUtc"/> als Zeitstempel des echten CLI-Prozessstarts.
+    /// Markiert eine Aufgabe als aktuell aktiv ausgeführt: setzt <see cref="WorkItem.ActiveRunId"/> auf die
+    /// übergebene Lauf-ID, aktualisiert <see cref="WorkItem.LastHeartbeatUtc"/> für den Laufstatus und
+    /// speichert <see cref="WorkItem.LastCliStartUtc"/> als Zeitstempel des echten CLI-Prozessstarts.
     /// Wird von <c>CliProcessManager</c> beim Start eines CLI-Prozesses aufgerufen.
     /// </summary>
     /// <param name="id">ID der Aufgabe.</param>
@@ -1037,22 +1037,22 @@ public sealed class AufgabeService : IAktiveAufgabenService
                 return;
             }
 
-            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            var workItem = await _db.WorkItems.FindAsync([id], ct)
                 ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
             var now = DateTimeOffset.UtcNow;
-            if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+            if (workItem.Status is WorkItemStatus.Completed or WorkItemStatus.Archived)
             {
                 throw new InvalidOperationException("Für beendete oder archivierte Aufgaben kann kein aktiver Lauf gesetzt werden.");
             }
 
-            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-            aufgabe.AktiveRunId = laufId;
-            aufgabe.LastHeartbeatUtc = now;
-            aufgabe.LetzterCliStartUtc = now;
+            workItem.ExecutionStatus = WorkItemExecutionStatus.Active;
+            workItem.ActiveRunId = laufId;
+            workItem.LastHeartbeatUtc = now;
+            workItem.LastCliStartUtc = now;
             // LaufStatus startet mit Laeuft (Standardwert von PseudoConsoleSession.RuntimeStatus beim Start),
             // damit die Kachel unmittelbar "▶ Läuft" statt eines veralteten Werts eines vorherigen Laufs zeigt.
-            aufgabe.LaufStatus = AufgabeLaufStatus.Laeuft;
+            workItem.RunStatus = WorkItemRunStatus.Running;
             await _db.SaveChangesAsync(ct);
         }
         finally
@@ -1062,7 +1062,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
     }
 
     /// <summary>
-    /// Markiert eine Aufgabe als nicht mehr aktiv ausgeführt: entfernt <see cref="Aufgabe.AktiveRunId"/>.
+    /// Markiert eine Aufgabe als nicht mehr aktiv ausgeführt: entfernt <see cref="WorkItem.ActiveRunId"/>.
     /// Wird von <c>CliProcessManager</c> aufgerufen, sobald der zugehörige CLI-Prozess beendet wurde
     /// (regulär oder mit Fehler), damit der KI-Ausführungsstatus nicht länger "▶ Läuft" anzeigt.
     /// </summary>
@@ -1074,16 +1074,16 @@ public sealed class AufgabeService : IAktiveAufgabenService
         await gate.WaitAsync(ct);
         try
         {
-            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            var workItem = await _db.WorkItems.FindAsync([id], ct)
                 ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-            aufgabe.AktiveRunId = null;
-            aufgabe.LastHeartbeatUtc = null;
-            aufgabe.LetzterCliStartUtc = null;
+            workItem.ActiveRunId = null;
+            workItem.LastHeartbeatUtc = null;
+            workItem.LastCliStartUtc = null;
             // LaufStatus gehört nur zu einem aktiven Lauf (siehe AktivenLaufSetzenAsync) — beim Beenden
             // entfernen, damit kein veralteter Substatus eines beendeten Laufs zurückbleibt.
-            aufgabe.LaufStatus = null;
-            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
+            workItem.RunStatus = null;
+            workItem.ExecutionStatus = WorkItemExecutionStatus.Completed;
             await _db.SaveChangesAsync(ct);
         }
         finally
@@ -1093,14 +1093,14 @@ public sealed class AufgabeService : IAktiveAufgabenService
     }
 
     /// <summary>
-    /// Stellt die Laufdaten eines aktiven CLI-Laufs idempotent sicher: Fehlt <see cref="Aufgabe.AktiveRunId"/>
+    /// Stellt die Laufdaten eines aktiven CLI-Laufs idempotent sicher: Fehlt <see cref="WorkItem.ActiveRunId"/>
     /// (z. B. weil der Lauf über einen Wiederverwendungspfad ohne Gestartet-Ereignis zustande kam oder ein
     /// früherer Persistierungsversuch scheiterte), wird der vollständige Lauf-Zustand gesetzt
-    /// (<see cref="Aufgabe.AusfuehrungsStatus"/> = Aktiv, neue <see cref="Aufgabe.AktiveRunId"/>,
-    /// <see cref="Aufgabe.LastHeartbeatUtc"/>, <see cref="Aufgabe.LaufStatus"/>); bei bereits vorhandenem Lauf
+    /// (<see cref="WorkItem.ExecutionStatus"/> = Aktiv, neue <see cref="WorkItem.ActiveRunId"/>,
+    /// <see cref="WorkItem.LastHeartbeatUtc"/>, <see cref="WorkItem.RunStatus"/>); bei bereits vorhandenem Lauf
     /// wird nur der Heartbeat aufgefrischt (und optional der Substatus). Ein bekannter echter
-    /// <see cref="Aufgabe.LetzterCliStartUtc"/>-Wert bleibt erhalten (Sortierstabilität der Aufgabenliste).
-    /// Aufgaben in terminalem Status (<see cref="AufgabeStatus.Beendet"/>/<see cref="AufgabeStatus.Archiviert"/>)
+    /// <see cref="WorkItem.LastCliStartUtc"/>-Wert bleibt erhalten (Sortierstabilität der Aufgabenliste).
+    /// Aufgaben in terminalem Status (<see cref="WorkItemStatus.Completed"/>/<see cref="WorkItemStatus.Archived"/>)
     /// werden ohne Änderung übersprungen, damit der periodische Abgleich keine Warnungsflut erzeugt.
     /// Wird von <c>CliProcessManager</c> aus den Selbstheilungspfaden (CliLaufAktiv, RuntimeStatusChanged,
     /// Heartbeat-Tick, periodischer Abgleich) aufgerufen.
@@ -1112,7 +1112,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
     /// damit beim Schreiben der frischeste Session-Stand gilt und nicht ein vor dem Sperreintritt
     /// gelesener, möglicherweise veralteter Wert als letzter Schreiber landet (Issue 342,
     /// Stale-Write). Liefert er <c>null</c> (oder fehlt er), wird bei neu angelegtem Lauf
-    /// <see cref="AufgabeLaufStatus.Laeuft"/> gesetzt und bei bestehendem Lauf der Substatus nicht
+    /// <see cref="WorkItemRunStatus.Running"/> gesetzt und bei bestehendem Lauf der Substatus nicht
     /// verändert.
     /// </param>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
@@ -1124,7 +1124,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
     /// werden (Issue 342, TOCTOU). Aufrufer aus den Selbstheilungspfaden übergeben
     /// <c>KiAusfuehrungsService.IsRunning</c>.
     /// </param>
-    public async Task AktivenLaufSicherstellenAsync(Guid id, Func<AufgabeLaufStatus?>? laufStatusProvider = null, CancellationToken ct = default, Func<bool>? laeuftGuard = null)
+    public async Task AktivenLaufSicherstellenAsync(Guid id, Func<WorkItemRunStatus?>? laufStatusProvider = null, CancellationToken ct = default, Func<bool>? laeuftGuard = null)
     {
         var gate = LaufGates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(ct);
@@ -1138,35 +1138,35 @@ public sealed class AufgabeService : IAktiveAufgabenService
                 return;
             }
 
-            var laufStatus = laufStatusProvider?.Invoke();
+            var runStatus = laufStatusProvider?.Invoke();
 
-            var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            var workItem = await _db.WorkItems.FindAsync([id], ct)
                 ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-            if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+            if (workItem.Status is WorkItemStatus.Completed or WorkItemStatus.Archived)
             {
                 _logger.LogDebug(
                     "Laufdaten-Sicherstellung für Aufgabe {AufgabeId} übersprungen (terminaler Status {Status}).",
                     id,
-                    aufgabe.Status);
+                    workItem.Status);
                 return;
             }
 
             var now = DateTimeOffset.UtcNow;
-            if (aufgabe.AktiveRunId is null)
+            if (workItem.ActiveRunId is null)
             {
-                aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-                aufgabe.AktiveRunId = Guid.NewGuid().ToString("N");
-                aufgabe.LastHeartbeatUtc = now;
-                aufgabe.LetzterCliStartUtc ??= now;
-                aufgabe.LaufStatus = laufStatus ?? AufgabeLaufStatus.Laeuft;
+                workItem.ExecutionStatus = WorkItemExecutionStatus.Active;
+                workItem.ActiveRunId = Guid.NewGuid().ToString("N");
+                workItem.LastHeartbeatUtc = now;
+                workItem.LastCliStartUtc ??= now;
+                workItem.RunStatus = runStatus ?? WorkItemRunStatus.Running;
             }
             else
             {
-                aufgabe.LastHeartbeatUtc = now;
-                if (laufStatus is not null)
+                workItem.LastHeartbeatUtc = now;
+                if (runStatus is not null)
                 {
-                    aufgabe.LaufStatus = laufStatus;
+                    workItem.RunStatus = runStatus;
                 }
             }
 
@@ -1181,32 +1181,32 @@ public sealed class AufgabeService : IAktiveAufgabenService
     /// <summary>Gibt die Minuten seit dem letzten Heartbeat zurück (null wenn kein Heartbeat gesetzt).</summary>
     public async Task<int?> GetHeartbeatAgeMinutesAsync(Guid id, CancellationToken ct = default)
     {
-        var aufgabe = await _db.Aufgaben
+        var workItem = await _db.WorkItems
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == id, ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        if (aufgabe.LastHeartbeatUtc is null)
+        if (workItem.LastHeartbeatUtc is null)
         {
             return null;
         }
 
-        var ageMinutes = (int)(DateTimeOffset.UtcNow - aufgabe.LastHeartbeatUtc.Value).TotalMinutes;
+        var ageMinutes = (int)(DateTimeOffset.UtcNow - workItem.LastHeartbeatUtc.Value).TotalMinutes;
         return ageMinutes;
     }
 
     /// <summary>Gibt alle aktiven Aufgaben (Status Gestartet oder Wartend) zurück, sortiert nach letztem CLI-Start.</summary>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
     /// <returns>Die aktiven Aufgaben, absteigend nach letztem CLI-Start sortiert (maximal 20).</returns>
-    public async Task<List<Aufgabe>> GetAktiveAufgabenAsync(CancellationToken ct = default)
+    public async Task<List<WorkItem>> GetAktiveAufgabenAsync(CancellationToken ct = default)
     {
-        return await _db.Aufgaben
+        return await _db.WorkItems
             .AsNoTracking()
-            .Include(a => a.Projekt)
+            .Include(a => a.Project)
             .Include(a => a.GitRepository)
             .Where(IstAktivOderWartendPredicate)
-            .OrderByDescending(a => a.LetzterCliStartUtc ?? a.ErstellungsDatum)
-            .ThenBy(a => a.Titel)
+            .OrderByDescending(a => a.LastCliStartUtc ?? a.CreatedAt)
+            .ThenBy(a => a.Title)
             .ThenBy(a => a.Id)
             .Take(20)
             .ToListAsync(ct);
@@ -1216,27 +1216,27 @@ public sealed class AufgabeService : IAktiveAufgabenService
     public const string OffeneTodosFehlermeldungFormat = "Diese Aufgabe kann nicht beendet werden, solange noch {0} offene To-Do(s) vorhanden sind.";
 
     /// <summary>Validiert, ob eine Aufgabe beendet werden kann: gibt false zurück, wenn offene To-Dos existieren.</summary>
-    public async Task<bool> CanCompleteTaskAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task<bool> CanCompleteTaskAsync(Guid workItemId, CancellationToken ct = default)
     {
-        var offeneTodoCount = await _todoService.GetTodoCountAsync(aufgabeId, ct);
+        var offeneTodoCount = await _todoService.GetTodoCountAsync(workItemId, ct);
         return offeneTodoCount == 0;
     }
 
-    private static void ValidateStatusTransition(AufgabeStatus current, AufgabeStatus next)
+    private static void ValidateStatusTransition(WorkItemStatus current, WorkItemStatus next)
     {
-        if (next == AufgabeStatus.Archiviert)
+        if (next == WorkItemStatus.Archived)
         {
             return;
         }
 
         var allowed = current switch
         {
-            AufgabeStatus.Neu => new[] { AufgabeStatus.Gestartet },
-            AufgabeStatus.Gestartet => new[] { AufgabeStatus.Wartend, AufgabeStatus.Beendet },
-            AufgabeStatus.Wartend => new[] { AufgabeStatus.Gestartet, AufgabeStatus.Beendet },
-            AufgabeStatus.Beendet => Array.Empty<AufgabeStatus>(),
-            AufgabeStatus.Archiviert => Array.Empty<AufgabeStatus>(),
-            _ => Array.Empty<AufgabeStatus>()
+            WorkItemStatus.New => new[] { WorkItemStatus.Started },
+            WorkItemStatus.Started => new[] { WorkItemStatus.Waiting, WorkItemStatus.Completed },
+            WorkItemStatus.Waiting => new[] { WorkItemStatus.Started, WorkItemStatus.Completed },
+            WorkItemStatus.Completed => Array.Empty<WorkItemStatus>(),
+            WorkItemStatus.Archived => Array.Empty<WorkItemStatus>(),
+            _ => Array.Empty<WorkItemStatus>()
         };
 
         if (!allowed.Contains(next))

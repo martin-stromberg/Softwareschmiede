@@ -50,7 +50,7 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
 
     /// <inheritdoc/>
     public async Task<TerminalSessionStartResult> StartAsync(
-        Guid aufgabeId,
+        Guid workItemId,
         TerminalSessionStartSpec spec,
         ITerminalOutputSink? outputSink,
         Func<CancellationToken, Task<bool>>? healthCheck,
@@ -95,12 +95,12 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
         var launcher = SelectBackend(spec, preflight, outputSink);
         _logger.LogInformation(
             "Terminal-Session für Aufgabe {AufgabeId} starten (Backend: {Backend}, Executable: {FileName} {Arguments}).",
-            aufgabeId,
+            workItemId,
             launcher.IsPseudoTerminal ? "ConPTY" : "Pipe",
             resolution.NormalizedSpec.FileName,
             resolution.NormalizedSpec.Arguments);
 
-        return launcher.Start(aufgabeId, resolution.NormalizedSpec, outputSink);
+        return launcher.Start(workItemId, resolution.NormalizedSpec, outputSink);
     }
 
     /// <summary>Wählt das Backend: Der E2E-Testmodus erzwingt Pipe; ansonsten gilt die im Preflight

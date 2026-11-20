@@ -25,7 +25,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// App-Start/ConPTY-Abhängigkeit isoliert zu verifizieren; sie laufen deshalb in der regulären Testlane
 /// statt unter Category=OsInterface.
 ///
-/// Statt eines echten Prozessstarts wird <see cref="IProzessStarter"/> durch einen aufzeichnenden
+/// Statt eines echten Prozessstarts wird <see cref="IProcessStarter"/> durch einen aufzeichnenden
 /// Test-Double ersetzt (analog zu <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/>,
 /// der auch für echte FlaUI-E2E-Tests im Testmodus verwendet wird).
 /// </summary>
@@ -48,8 +48,8 @@ public sealed class E2E_IdePluginSelection : IDisposable
         await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
         prozessStarter.Aufrufe.Should().ContainSingle();
-        prozessStarter.Aufrufe[0].DateiName.Should().Be(Path.Combine(repository, "Loesung.sln"));
-        prozessStarter.Aufrufe[0].ShellAusfuehren.Should().BeTrue();
+        prozessStarter.Aufrufe[0].FileName.Should().Be(Path.Combine(repository, "Loesung.sln"));
+        prozessStarter.Aufrufe[0].UseShellExecute.Should().BeTrue();
     }
 
     /// <summary>Ein Repository ohne .sln-Datei wird automatisch mit Visual Studio Code geöffnet (Fallback).</summary>
@@ -63,9 +63,9 @@ public sealed class E2E_IdePluginSelection : IDisposable
         await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
         prozessStarter.Aufrufe.Should().ContainSingle();
-        prozessStarter.Aufrufe[0].DateiName.Should().Be("code.cmd");
-        prozessStarter.Aufrufe[0].Argumente.Should().Be($"\"{repository}\"");
-        prozessStarter.Aufrufe[0].ShellAusfuehren.Should().BeFalse();
+        prozessStarter.Aufrufe[0].FileName.Should().Be("code.cmd");
+        prozessStarter.Aufrufe[0].Arguments.Should().Be($"\"{repository}\"");
+        prozessStarter.Aufrufe[0].UseShellExecute.Should().BeFalse();
     }
 
     /// <summary>
@@ -84,8 +84,8 @@ public sealed class E2E_IdePluginSelection : IDisposable
         await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
         prozessStarter.Aufrufe.Should().ContainSingle();
-        prozessStarter.Aufrufe[0].DateiName.Should().Be("code.cmd");
-        prozessStarter.Aufrufe[0].ShellAusfuehren.Should().BeFalse();
+        prozessStarter.Aufrufe[0].FileName.Should().Be("code.cmd");
+        prozessStarter.Aufrufe[0].UseShellExecute.Should().BeFalse();
     }
 
     /// <summary>
@@ -117,7 +117,7 @@ public sealed class E2E_IdePluginSelection : IDisposable
 
         var services = new ServiceCollection()
             .AddLogging()
-            .AddSingleton<IProzessStarter>(prozessStarter)
+            .AddSingleton<IProcessStarter>(prozessStarter)
             .AddSingleton<IVisualStudioCodeLocator>(visualStudioCodeLocator)
             .BuildServiceProvider();
 
@@ -139,10 +139,10 @@ public sealed class E2E_IdePluginSelection : IDisposable
         return (pluginSelectionService, prozessStarter, pluginActivationService);
     }
 
-    private sealed class RecordingProzessStarter : IProzessStarter
+    private sealed class RecordingProzessStarter : IProcessStarter
     {
-        public List<ProzessStartAnfrage> Aufrufe { get; } = [];
+        public List<ProcessStartRequest> Aufrufe { get; } = [];
 
-        public void Starten(ProzessStartAnfrage anfrage) => Aufrufe.Add(anfrage);
+        public void Start(ProcessStartRequest request) => Aufrufe.Add(request);
     }
 }

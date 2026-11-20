@@ -56,12 +56,12 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
         // der anschließende SaveChangesAsync des Services schlägt mit SQLITE_BUSY fehl.
         await using var lockContext = CreateContext();
         await using var lockTransaction = await lockContext.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
-        lockContext.AppEinstellungen.Add(new AppEinstellung
+        lockContext.AppSettings.Add(new AppSetting
         {
             Id = Guid.NewGuid(),
-            Schluessel = "test.lock",
-            Wert = "1",
-            AktualisiertAm = DateTimeOffset.UtcNow
+            Key = "test.lock",
+            Value = "1",
+            UpdatedAt = DateTimeOffset.UtcNow
         });
         await lockContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -186,7 +186,7 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
             .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
     }
 
-    private SoftwareschmiededDbContext CreateContext(
+    private SoftwareschmiedeDbContext CreateContext(
         UpdateSettingsReadFailureInterceptor? interceptor = null,
         int? defaultTimeoutSeconds = null)
     {
@@ -199,6 +199,6 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
             interceptor is not null ? [interceptor] : []);
     }
 
-    private static AppEinstellungService CreateService(SoftwareschmiededDbContext db)
+    private static AppEinstellungService CreateService(SoftwareschmiedeDbContext db)
         => new(db, NullLogger<AppEinstellungService>.Instance);
 }

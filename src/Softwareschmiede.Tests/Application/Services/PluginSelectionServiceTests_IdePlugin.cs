@@ -198,7 +198,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>
     /// Erzeugt den SUT und konstruiert dabei <see cref="PluginDefaultSettingsService"/>, <see cref="PluginActivationService"/>
-    /// und <see cref="AppEinstellungService"/> aus demselben <see cref="SoftwareschmiededDbContext"/> — wie in der Produktion,
+    /// und <see cref="AppEinstellungService"/> aus demselben <see cref="SoftwareschmiedeDbContext"/> — wie in der Produktion,
     /// wo sich alle drei Dienste innerhalb eines <see cref="PluginSelectionService"/> denselben Scoped DbContext teilen.
     /// </summary>
     private static (PluginSelectionService Sut, AppEinstellungService AppEinstellungService) CreateSut(IPluginManager pluginManager)
@@ -211,7 +211,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         return (sut, appEinstellungService);
     }
 
-    private static SoftwareschmiededDbContext CreateDb() => TestDbContextFactory.Create();
+    private static SoftwareschmiedeDbContext CreateDb() => TestDbContextFactory.Create();
 
     private static Mock<IPluginManager> CreatePluginManager(IReadOnlyList<IIdePlugin> idePlugins, IIdePlugin? defaultIdePlugin = null)
     {

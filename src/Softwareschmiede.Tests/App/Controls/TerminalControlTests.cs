@@ -686,7 +686,7 @@ public sealed partial class TerminalControlTests
         return new TerminalReplaySession(
             new CliOutputAufzeichnung
             {
-                AufgabeId = Guid.NewGuid(),
+                WorkItemId = Guid.NewGuid(),
                 PluginName = "TestPlugin",
                 StartUtc = DateTimeOffset.UtcNow,
                 Cols = cols,

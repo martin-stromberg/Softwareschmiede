@@ -4,8 +4,8 @@ namespace Softwareschmiede.Domain.Enums;
 public enum VerwerfenAktion
 {
     /// <summary>Aufgabe wird archiviert.</summary>
-    Archivieren,
+    Archive,
 
     /// <summary>Aufgabe wird dauerhaft gelöscht.</summary>
-    Loeschen
+    Delete
 }

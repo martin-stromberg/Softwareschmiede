@@ -28,7 +28,7 @@ public sealed class CliReplayAufzeichnungStore
         {
             writer.Write(Magic);
             writer.Write(UnterstuetzteVersion);
-            writer.Write(aufzeichnung.AufgabeId.ToByteArray());
+            writer.Write(aufzeichnung.WorkItemId.ToByteArray());
             writer.Write(aufzeichnung.StartUtc.UtcTicks);
             writer.Write(aufzeichnung.EndeUtc?.UtcTicks ?? 0L);
             writer.Write(aufzeichnung.Cols);
@@ -100,7 +100,7 @@ public sealed class CliReplayAufzeichnungStore
             throw new InvalidDataException("Die Datei ist keine CLI-Aufzeichnung (ungültiges Magic).");
 
         int version;
-        Guid aufgabeId;
+        Guid workItemId;
         long startTicks;
         long endeTicks;
         int cols;
@@ -113,7 +113,7 @@ public sealed class CliReplayAufzeichnungStore
             var guidBytes = reader.ReadBytes(16);
             if (guidBytes.Length != 16)
                 throw new EndOfStreamException();
-            aufgabeId = new Guid(guidBytes);
+            workItemId = new Guid(guidBytes);
             startTicks = reader.ReadInt64();
             endeTicks = reader.ReadInt64();
             cols = reader.ReadInt32();
@@ -164,7 +164,7 @@ public sealed class CliReplayAufzeichnungStore
 
         return new CliOutputAufzeichnung
         {
-            AufgabeId = aufgabeId,
+            WorkItemId = workItemId,
             PluginName = Encoding.UTF8.GetString(pluginNameBytes),
             StartUtc = new DateTimeOffset(startTicks, TimeSpan.Zero),
             EndeUtc = endeTicks == 0 ? null : new DateTimeOffset(endeTicks, TimeSpan.Zero),

@@ -16,17 +16,17 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnLaeuftString_WhenAktiveRunIdPresentAndHeartbeatRecent()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Laufende Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-1",
+            Title = "Laufende Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-1",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-1)
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().Be("▶ Läuft");
     }
@@ -35,23 +35,23 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnWartetString_WhenStatusIstWartend()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Wartende Aufgabe",
-            Status = AufgabeStatus.Wartend,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv
+            Title = "Wartende Aufgabe",
+            Status = WorkItemStatus.Waiting,
+            ExecutionStatus = WorkItemExecutionStatus.Active
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().Be("⏸ Wartet");
     }
 
     /// <summary>
     /// Regressionstest (Issue 108, Folgefehler des Rückwegs Läuft → Wartet): Auch während ein CLI-Prozess
-    /// noch läuft (<see cref="Aufgabe.AktiveRunId"/> gesetzt, Heartbeat aktuell) muss die Kachel auf
-    /// "⏸ Wartet" umschalten, sobald der persistierte Laufzeit-Substatus <see cref="AufgabeLaufStatus.WartetAufEingabe"/>
+    /// noch läuft (<see cref="WorkItem.ActiveRunId"/> gesetzt, Heartbeat aktuell) muss die Kachel auf
+    /// "⏸ Wartet" umschalten, sobald der persistierte Laufzeit-Substatus <see cref="WorkItemRunStatus.WaitingForInput"/>
     /// meldet, dass die CLI auf Benutzereingabe wartet. Vor dem Fix konnte der Converter diesen Zustand
     /// strukturell nicht erkennen, weil ihm der Substatus nie zur Verfügung stand — er zeigte fälschlich
     /// dauerhaft "▶ Läuft", solange der Prozess lebte.
@@ -59,49 +59,49 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnWartetString_WhenAktiveRunIdPresentAndLaufStatusIstWartetAufEingabe()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Laufende, aber wartende Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-3",
+            Title = "Laufende, aber wartende Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-3",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
-            LaufStatus = AufgabeLaufStatus.WartetAufEingabe
+            RunStatus = WorkItemRunStatus.WaitingForInput
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().Be("⏸ Wartet");
     }
 
     /// <summary>
-    /// Ist der Laufzeit-Substatus explizit <see cref="AufgabeLaufStatus.Laeuft"/> (oder null, z. B. beim
+    /// Ist der Laufzeit-Substatus explizit <see cref="WorkItemRunStatus.Running"/> (oder null, z. B. beim
     /// klassischen Start ohne ConPTY-Sitzung), muss weiterhin "▶ Läuft" angezeigt werden — die Erweiterung
     /// um den Substatus darf das bisherige Verhalten für den Normalfall nicht verändern.
     /// </summary>
     [Fact]
     public void Convert_ShouldReturnLaeuftString_WhenAktiveRunIdPresentAndLaufStatusIstLaeuftOderNull()
     {
-        var aufgabeMitLaeuft = new Aufgabe
+        var aufgabeMitLaeuft = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Laufende Aufgabe (explizit Laeuft)",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-4",
+            Title = "Laufende Aufgabe (explizit Laeuft)",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-4",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
-            LaufStatus = AufgabeLaufStatus.Laeuft
+            RunStatus = WorkItemRunStatus.Running
         };
-        var aufgabeOhneLaufStatus = new Aufgabe
+        var aufgabeOhneLaufStatus = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Laufende Aufgabe (kein Substatus bekannt)",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-5",
+            Title = "Laufende Aufgabe (kein Substatus bekannt)",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-5",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
-            LaufStatus = null
+            RunStatus = null
         };
 
         _sut.Convert(aufgabeMitLaeuft, typeof(string), null!, CultureInfo.InvariantCulture).Should().Be("▶ Läuft");
@@ -112,17 +112,17 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnBereitString_WhenNoActiveRunOrHeartbeatExpired()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Aufgabe ohne aktiven Lauf",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-2",
+            Title = "Aufgabe ohne aktiven Lauf",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-2",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10)
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().Be("✓ Bereit");
     }
@@ -134,12 +134,12 @@ public sealed class KiAusfuehrungsStatusConverterTests
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Sidebar-Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-panel",
+            Title = "Sidebar-Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-panel",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-10),
-            LaufStatus = AufgabeLaufStatus.Laeuft
+            RunStatus = WorkItemRunStatus.Running
         };
 
         var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
@@ -154,12 +154,12 @@ public sealed class KiAusfuehrungsStatusConverterTests
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Wartende Sidebar-Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-panel-wartet",
+            Title = "Wartende Sidebar-Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-panel-wartet",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-10),
-            LaufStatus = AufgabeLaufStatus.WartetAufEingabe
+            RunStatus = WorkItemRunStatus.WaitingForInput
         };
 
         var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
@@ -178,12 +178,12 @@ public sealed class KiAusfuehrungsStatusConverterTests
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Aufgabe mit lebendem Prozess ohne Laufdaten",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet,
-            AktiveRunId = null,
+            Title = "Aufgabe mit lebendem Prozess ohne Laufdaten",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Completed,
+            ActiveRunId = null,
             LastHeartbeatUtc = null,
-            LiveLaufStatus = AufgabeLaufStatus.Laeuft
+            LiveLaufStatus = WorkItemRunStatus.Running
         };
 
         var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
@@ -198,10 +198,10 @@ public sealed class KiAusfuehrungsStatusConverterTests
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Aufgabe mit wartender Live-CLI",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet,
-            LiveLaufStatus = AufgabeLaufStatus.WartetAufEingabe
+            Title = "Aufgabe mit wartender Live-CLI",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Completed,
+            LiveLaufStatus = WorkItemRunStatus.WaitingForInput
         };
 
         var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
@@ -219,19 +219,19 @@ public sealed class KiAusfuehrungsStatusConverterTests
         var pausiert = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Pausierte Aufgabe mit Live-Prozess",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            LiveLaufStatus = AufgabeLaufStatus.Laeuft,
-            PausiertBisUtc = DateTimeOffset.UtcNow.AddMinutes(30)
+            Title = "Pausierte Aufgabe mit Live-Prozess",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            LiveLaufStatus = WorkItemRunStatus.Running,
+            PausedUntilUtc = DateTimeOffset.UtcNow.AddMinutes(30)
         };
         var wartestellung = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Aufgabe mit Prompt-Wartestellung",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            LiveLaufStatus = AufgabeLaufStatus.Laeuft,
+            Title = "Aufgabe mit Prompt-Wartestellung",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            LiveLaufStatus = WorkItemRunStatus.Running,
             HasScheduledPrompt = true
         };
 
@@ -251,9 +251,9 @@ public sealed class KiAusfuehrungsStatusConverterTests
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Beendete Aufgabe ohne Live-Prozess",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet,
+            Title = "Beendete Aufgabe ohne Live-Prozess",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Completed,
             LiveLaufStatus = null
         };
 
@@ -266,15 +266,15 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnBereitString_WhenWartendAufgabeHasBeendeteAusfuehrung()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Gestoppte wartende Aufgabe",
-            Status = AufgabeStatus.Wartend,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet
+            Title = "Gestoppte wartende Aufgabe",
+            Status = WorkItemStatus.Waiting,
+            ExecutionStatus = WorkItemExecutionStatus.Completed
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().Be("✓ Bereit");
     }
@@ -286,9 +286,9 @@ public sealed class KiAusfuehrungsStatusConverterTests
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Gestoppte Sidebar-Aufgabe",
-            Status = AufgabeStatus.Wartend,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet
+            Title = "Gestoppte Sidebar-Aufgabe",
+            Status = WorkItemStatus.Waiting,
+            ExecutionStatus = WorkItemExecutionStatus.Completed
         };
 
         var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
@@ -300,19 +300,19 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnPausiertCountdown_WhenPausiertBisUtcInFuture()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Pausierte Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-pausiert",
+            Title = "Pausierte Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-pausiert",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
-            LaufStatus = AufgabeLaufStatus.Laeuft,
-            PausiertBisUtc = DateTimeOffset.UtcNow.AddMinutes(90)
+            RunStatus = WorkItemRunStatus.Running,
+            PausedUntilUtc = DateTimeOffset.UtcNow.AddMinutes(90)
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().BeOfType<string>().Which.Should().StartWith("⏸ Pausiert (noch ");
     }
@@ -324,12 +324,12 @@ public sealed class KiAusfuehrungsStatusConverterTests
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Pausierte Sidebar-Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-panel-pausiert",
+            Title = "Pausierte Sidebar-Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-panel-pausiert",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
-            PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(3)
+            PausedUntilUtc = DateTimeOffset.UtcNow.AddHours(3)
         };
 
         var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
@@ -341,18 +341,18 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnPausiertCountdownMitTagen_WhenPauseUeber24Stunden()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Lange pausierte Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-lang",
+            Title = "Lange pausierte Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-lang",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
-            PausiertBisUtc = DateTimeOffset.UtcNow.AddDays(2)
+            PausedUntilUtc = DateTimeOffset.UtcNow.AddDays(2)
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().BeOfType<string>().Which.Should().MatchRegex(@"^⏸ Pausiert \(noch \d+\.\d{2}:\d{2}:\d{2}\)$");
     }
@@ -361,18 +361,18 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void Convert_ShouldReturnNormalStatus_WhenPausiertBisUtcAbgelaufen()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Aufgabe mit abgelaufener Pause",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-abgelaufen",
+            Title = "Aufgabe mit abgelaufener Pause",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-abgelaufen",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
-            PausiertBisUtc = DateTimeOffset.UtcNow.AddMinutes(-1)
+            PausedUntilUtc = DateTimeOffset.UtcNow.AddMinutes(-1)
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().Be("▶ Läuft");
     }
@@ -390,7 +390,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
     [Fact]
     public void ConvertBack_ShouldThrowNotSupportedException()
     {
-        var act = () => _sut.ConvertBack("▶ Läuft", typeof(Aufgabe), null!, CultureInfo.InvariantCulture);
+        var act = () => _sut.ConvertBack("▶ Läuft", typeof(WorkItem), null!, CultureInfo.InvariantCulture);
 
         act.Should().Throw<NotSupportedException>();
     }

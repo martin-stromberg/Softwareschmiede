@@ -62,7 +62,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly Action<Action> _dispatcherInvoke;
 
     private Guid _aufgabeId;
-    private Aufgabe? _aufgabe;
+    private WorkItem? _aufgabe;
     private bool _isLoading;
     private string? _fehlerMeldung;
     private bool _isCliRunning;
@@ -77,7 +77,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private string _cliStatusText = "CLI inaktiv";
     private string? _aktiverCliName;
     private ITerminalSession? _cliStatusSession;
-    private PromptVorlage? _selectedPromptVorlage;
+    private PromptTemplate? _selectedPromptVorlage;
     private DetailAnsicht _ausgewaehlteAnsicht = DetailAnsicht.Info;
     private int? _scheduledPromptTargetHours;
     private int? _scheduledPromptTargetMinutes;
@@ -99,7 +99,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public Action<string?>? DetailTitelAenderungAction { get; set; }
 
     /// <summary>Die ID der angezeigten Aufgabe.</summary>
-    public Guid AufgabeId
+    public Guid WorkItemId
     {
         get => _aufgabeId;
         set
@@ -116,15 +116,15 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Die geladene Aufgabe.</summary>
-    public Aufgabe? Aufgabe
+    public WorkItem? WorkItem
     {
         get => _aufgabe;
         private set
         {
             SetProperty(ref _aufgabe, value);
-            _showFileExplorerPanel = !string.IsNullOrEmpty(value?.LokalerKlonPfad) && Directory.Exists(value.LokalerKlonPfad);
+            _showFileExplorerPanel = !string.IsNullOrEmpty(value?.LocalClonePath) && Directory.Exists(value.LocalClonePath);
             OnPropertyChanged(nameof(AufgabeTitel));
-            OnPropertyChanged(nameof(AufgabeStatus));
+            OnPropertyChanged(nameof(WorkItemStatus));
             OnPropertyChanged(nameof(AufgabeBranchName));
             OnPropertyChanged(nameof(KannCliStoppen));
             OnPropertyChanged(nameof(KannCliNeuStarten));
@@ -145,16 +145,16 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowInfoPanel));
             OnPropertyChanged(nameof(IsPullRequestViewSelected));
             OnPropertyChanged(nameof(KannCliRawExportieren));
-            OnPropertyChanged(nameof(PausiertBisUtc));
+            OnPropertyChanged(nameof(PausedUntilUtc));
             OnPropertyChanged(nameof(IstPausiert));
             OnPropertyChanged(nameof(PauseAnzeigeText));
             OnPropertyChanged(nameof(KannPausieren));
             OnPropertyChanged(nameof(KannPromptVorlageSenden));
             OnPropertyChanged(nameof(KannPromptPlanen));
             WaehleStandardAnsicht();
-            DetailTitelAenderungAction?.Invoke(value?.Titel);
+            DetailTitelAenderungAction?.Invoke(value?.Title);
 
-            _fileExplorerViewModel.InitialisierenAsync(value?.LokalerKlonPfad, CancellationToken.None)
+            _fileExplorerViewModel.InitialisierenAsync(value?.LocalClonePath, CancellationToken.None)
                 .SafeFireAndForget(_logger, "TaskDetailViewModel.FileExplorer.InitialisierenAsync");
 
             CommandManager.InvalidateRequerySuggested();
@@ -163,10 +163,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Titel der Aufgabe.</summary>
     /// <value>Der Titel der Aufgabe, oder ein Platzhaltertext während des Ladens.</value>
-    public string AufgabeTitel => _aufgabe?.Titel ?? "(wird geladen…)";
+    public string AufgabeTitel => _aufgabe?.Title ?? "(wird geladen…)";
 
     /// <summary>Status der Aufgabe.</summary>
-    public AufgabeStatus AufgabeStatus => _aufgabe?.Status ?? Domain.Enums.AufgabeStatus.Neu;
+    public WorkItemStatus WorkItemStatus => _aufgabe?.Status ?? Domain.Enums.WorkItemStatus.New;
 
     /// <summary>Branch-Name der Aufgabe.</summary>
     public string AufgabeBranchName => _aufgabe?.BranchName ?? string.Empty;
@@ -232,12 +232,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public bool KannCliStoppen => _isCliRunning;
 
     /// <summary>Gibt an, ob die CLI fuer eine aktive Ausfuehrung wiederhergestellt werden kann.</summary>
-    public bool KannCliNeuStarten => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true
+    public bool KannCliNeuStarten => _aufgabe?.ExecutionStatus.ShouldShowCli(_aufgabe.Status) == true
         && !_isCliRunning
         && !IstPausiert;
 
     /// <summary>Gibt an, ob die Aufgabe endgueltig abgeschlossen werden kann.</summary>
-    public bool KannAufgabeAbschliessen => _aufgabe?.Status.IstAktivOderWartend() == true
+    public bool KannAufgabeAbschliessen => _aufgabe?.Status.IsActiveOrWaiting() == true
         && !_isCliRunning;
 
     /// <summary>Gewähltes KI-Plugin (Prefix).</summary>
@@ -263,10 +263,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Protokolleinträge der Aufgabe.</summary>
     /// <value>Die geladenen Protokolleinträge der Aufgabe.</value>
-    public ObservableCollection<Protokolleintrag> Protokolleintraege { get; } = new();
+    public ObservableCollection<LogEntry> LogEntries { get; } = new();
 
     /// <summary>Pull Requests der Aufgabe.</summary>
-    public ObservableCollection<PullRequestReferenz> PullRequests { get; } = new();
+    public ObservableCollection<PullRequestReference> PullRequests { get; } = new();
 
     /// <summary>Komponiertes Presentation Model der To-Do-Liste.</summary>
     public TodoListViewModel TodoList => _todoListViewModel;
@@ -276,10 +276,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public ObservableCollection<string> VerfuegbareKiPlugins { get; } = new();
 
     /// <summary>Verfügbare Promptvorlagen.</summary>
-    public ObservableCollection<PromptVorlage> PromptVorlagen { get; } = new();
+    public ObservableCollection<PromptTemplate> PromptTemplates { get; } = new();
 
     /// <summary>Aktuell gewählte Promptvorlage im Ribbon.</summary>
-    public PromptVorlage? SelectedPromptVorlage
+    public PromptTemplate? SelectedPromptVorlage
     {
         get => _selectedPromptVorlage;
         set
@@ -295,7 +295,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob eine Promptvorlage an die laufende CLI gesendet werden kann.</summary>
-    public bool KannPromptVorlageSenden => _isCliRunning && PromptVorlagen.Count > 0 && !IstPausiert;
+    public bool KannPromptVorlageSenden => _isCliRunning && PromptTemplates.Count > 0 && !IstPausiert;
 
     /// <summary>Bindung Stunde-Eingabefeld für den zeitgesteuerten Prompt-Versand (null bedeutet leer).</summary>
     public int? ScheduledPromptTargetHours
@@ -336,7 +336,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob die zeitgesteuerte Versendung aktuell geplant werden kann (CLI läuft, Vorlage gewählt, Zeit eingegeben).</summary>
     public bool KannPromptPlanen => _isCliRunning
         && _selectedPromptVorlage is not null
-        && !string.IsNullOrWhiteSpace(_selectedPromptVorlage.Prompttext)
+        && !string.IsNullOrWhiteSpace(_selectedPromptVorlage.PromptText)
         && (_scheduledPromptTargetHours.HasValue || _scheduledPromptTargetMinutes.HasValue)
         && !IstPausiert;
 
@@ -403,7 +403,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob Pull Requests manuell aktualisiert werden koennen.</summary>
     public bool CanRefreshPullRequests => _aufgabeId != Guid.Empty
         && !_isRefreshingPullRequests
-        && PullRequests.Any(p => PullRequestMonitoringPolicy.CanMonitor(p.Rolle, p.Provider));
+        && PullRequests.Any(p => PullRequestMonitoringPolicy.CanMonitor(p.Role, p.Provider));
 
     /// <summary>Editable Kopie von Aufgabe.Titel für den Edit-Modus (Two-Way-Binding).</summary>
     public string? EditTitel
@@ -424,15 +424,15 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>True wenn Status == Neu, sonst false.</summary>
-    public bool ShowEditPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Neu;
+    public bool ShowEditPanel => _aufgabe?.Status == Domain.Enums.WorkItemStatus.New;
 
     /// <summary>True wenn die Aufgabe eine aktive KI-Ausfuehrung anzeigen soll.</summary>
-    public bool ShowCliPanel => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true;
+    public bool ShowCliPanel => _aufgabe?.ExecutionStatus.ShouldShowCli(_aufgabe.Status) == true;
 
     /// <summary>True wenn Status == Beendet, sonst false.</summary>
-    public bool ShowDiffPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Beendet;
+    public bool ShowDiffPanel => _aufgabe?.Status == Domain.Enums.WorkItemStatus.Completed;
 
-    /// <summary>True wenn Aufgabe.LokalerKlonPfad gesetzt ist und das Verzeichnis existiert. Wird beim Setzen von <see cref="Aufgabe"/> einmalig ermittelt und gecacht, um wiederholte synchrone Dateisystemzugriffe bei jedem Property-Zugriff zu vermeiden.</summary>
+    /// <summary>True wenn Aufgabe.LokalerKlonPfad gesetzt ist und das Verzeichnis existiert. Wird beim Setzen von <see cref="WorkItem"/> einmalig ermittelt und gecacht, um wiederholte synchrone Dateisystemzugriffe bei jedem Property-Zugriff zu vermeiden.</summary>
     public bool ShowFileExplorerPanel => _showFileExplorerPanel;
 
     /// <summary>
@@ -461,13 +461,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public FileExplorerViewModel FileExplorer => _fileExplorerViewModel;
 
     /// <summary>CanExecute für SpeichernCommand: Status ∈ {Neu, Gestartet} &amp;&amp; !IsCliRunning &amp;&amp; Titel.Length > 0.</summary>
-    public bool KannSpeichern => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Neu or Domain.Enums.AufgabeStatus.Gestartet
+    public bool KannSpeichern => _aufgabe?.Status is Domain.Enums.WorkItemStatus.New or Domain.Enums.WorkItemStatus.Started
         && !_isCliRunning
         && !string.IsNullOrEmpty(_editTitel);
 
     /// <summary>CanExecute für LoeschenCommand: Status ∉ {Archiviert} &amp;&amp; !IsCliRunning.</summary>
     /// <value>true wenn die Aufgabe gelöscht werden kann.</value>
-    public bool KannLoeschen => _aufgabe?.Status is not Domain.Enums.AufgabeStatus.Archiviert
+    public bool KannLoeschen => _aufgabe?.Status is not Domain.Enums.WorkItemStatus.Archived
         && _aufgabe != null
         && !_isCliRunning;
 
@@ -486,7 +486,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public bool CanCreateIssue => _aufgabe != null
         && !_isLoading
         && !_isCliRunning
-        && _aufgabe.IssueReferenz is null
+        && _aufgabe.IssueReference is null
         && !string.IsNullOrWhiteSpace(_aufgabe.GitRepository?.RepositoryUrl)
         && _canCreateIssue;
 
@@ -494,7 +494,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public bool ShowIssueGroup => CanAssignIssue || CanCreateIssue || CurrentIssueReferenz?.IssueUrl is not null;
 
     /// <summary>Aktuelle Issue-Zuweisung der Aufgabe.</summary>
-    public IssueReferenz? CurrentIssueReferenz => _aufgabe?.IssueReferenz;
+    public IssueReference? CurrentIssueReferenz => _aufgabe?.IssueReference;
 
     /// <summary>Gibt an, ob die CLI-Rohausgabe exportiert werden kann.</summary>
     public bool KannCliRawExportieren => _aufgabe is not null && _aufgabeId != Guid.Empty;
@@ -503,20 +503,20 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public bool KannCliReplayExportieren => _aufgabe is not null && _aufgabeId != Guid.Empty;
 
     /// <summary>Der persistierte Pause-Endzeitpunkt der Aufgabe (UTC), oder null.</summary>
-    public DateTimeOffset? PausiertBisUtc => _aufgabe?.PausiertBisUtc;
+    public DateTimeOffset? PausedUntilUtc => _aufgabe?.PausedUntilUtc;
 
     /// <summary>true, wenn eine aktive Pause gesetzt ist (Ende liegt in der Zukunft).</summary>
-    public bool IstPausiert => _aufgabe?.PausiertBisUtc > DateTimeOffset.UtcNow;
+    public bool IstPausiert => _aufgabe?.PausedUntilUtc > DateTimeOffset.UtcNow;
 
     /// <summary>Anzeigetext der aktiven Pause für den Ribbon-Bereich, oder null wenn nicht pausiert.</summary>
     public string? PauseAnzeigeText => IstPausiert
-        ? $"⏸ Pausiert bis {_aufgabe!.PausiertBisUtc!.Value.ToLocalTime():dd.MM.yyyy HH:mm}"
+        ? $"⏸ Pausiert bis {_aufgabe!.PausedUntilUtc!.Value.ToLocalTime():dd.MM.yyyy HH:mm}"
         : null;
 
     /// <summary>true, wenn für die Aufgabe eine Pause eingestellt werden kann (Status ∈ {Neu, Gestartet, Wartend}, nicht am Laden).</summary>
-    public bool KannPausieren => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Neu
-            or Domain.Enums.AufgabeStatus.Gestartet
-            or Domain.Enums.AufgabeStatus.Wartend
+    public bool KannPausieren => _aufgabe?.Status is Domain.Enums.WorkItemStatus.New
+            or Domain.Enums.WorkItemStatus.Started
+            or Domain.Enums.WorkItemStatus.Waiting
         && !_isLoading;
 
     /// <summary>Lädt die Aufgabe.</summary>
@@ -682,10 +682,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         CliNeustartenCommand = new AsyncRelayCommand(CliNeustartenAsync, () => KannCliNeuStarten);
         StartenCommand = new AsyncRelayCommand(
             StartenAsync,
-            () => _aufgabe?.AusfuehrungsStatus.DarfAusfuehrungStarten(_aufgabe.Status) == true
+            () => _aufgabe?.ExecutionStatus.MayStartExecution(_aufgabe.Status) == true
                 && !_isCliRunning
                 && !IstPausiert);
-        PluginAendernCommand = new AsyncRelayCommand(PluginWechselAsync, () => AufgabeStatus is Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend && _isCliRunning);
+        PluginAendernCommand = new AsyncRelayCommand(PluginWechselAsync, () => WorkItemStatus is Domain.Enums.WorkItemStatus.Started or Domain.Enums.WorkItemStatus.Waiting && _isCliRunning);
         AufgabeAbschliessenCommand = new AsyncRelayCommand(AufgabeAbschliessenAsync, () => KannAufgabeAbschliessen);
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync, () => KannSpeichern);
         LoeschenCommand = new AsyncRelayCommand(LoeschenAsync, () => KannLoeschen);
@@ -709,7 +709,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         ExportCliRawCommand = new AsyncRelayCommand(ExportCliRawAsync, () => KannCliRawExportieren);
         ExportCliReplayCommand = new AsyncRelayCommand(ExportCliReplayAsync, () => KannCliReplayExportieren);
         PauseEinstellenCommand = new AsyncRelayCommand(PauseEinstellenAsync, () => KannPausieren);
-        PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
+        PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptTemplate>(
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
         SchedulePromptCommand = new AsyncRelayCommand(SchedulePromptAsync, () => KannPromptPlanen);
@@ -729,8 +729,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
-            var darfCliAnzeigen = Aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(Aufgabe.Status) == true;
+            WorkItem = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
+            var darfCliAnzeigen = WorkItem?.ExecutionStatus.ShouldShowCli(WorkItem.Status) == true;
             IsCliRunning = darfCliAnzeigen && _kiService.IsRunning(_aufgabeId);
 
             var session = darfCliAnzeigen ? _kiService.GetTerminalSession(_aufgabeId) : null;
@@ -748,8 +748,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             await AktualisiereAktivenCliNameAusAufgabeAsync(ct);
 
-            EditTitel = Aufgabe?.Titel;
-            EditAnforderungsBeschreibung = Aufgabe?.AnforderungsBeschreibung;
+            EditTitel = WorkItem?.Title;
+            EditAnforderungsBeschreibung = WorkItem?.RequirementDescription;
 
             _protokollLadenCts?.Cancel();
             _protokollLadenCts?.Dispose();
@@ -789,10 +789,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     private async Task LadeProtokolleAsync(CancellationToken ct)
     {
-        Protokolleintraege.Clear();
+        LogEntries.Clear();
         var protokolleintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, ct);
         foreach (var eintrag in protokolleintraege)
-            Protokolleintraege.Add(eintrag);
+            LogEntries.Add(eintrag);
     }
 
     private async Task LadeVerfuegbarePluginsAsync(CancellationToken ct)
@@ -877,16 +877,16 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private async Task LadePromptVorlagenAsync(CancellationToken ct)
     {
         var vorlagen = await _promptVorlagenService.GetAllAsync(ct);
-        PromptVorlagen.Clear();
+        PromptTemplates.Clear();
         foreach (var vorlage in vorlagen)
-            PromptVorlagen.Add(vorlage);
+            PromptTemplates.Add(vorlage);
 
         OnPropertyChanged(nameof(KannPromptVorlageSenden));
     }
 
-    private async Task PromptVorlageAuswaehlenAsync(PromptVorlage? vorlage, CancellationToken ct)
+    private async Task PromptVorlageAuswaehlenAsync(PromptTemplate? vorlage, CancellationToken ct)
     {
-        if (vorlage is null || string.IsNullOrWhiteSpace(vorlage.Prompttext))
+        if (vorlage is null || string.IsNullOrWhiteSpace(vorlage.PromptText))
             return;
 
         if (_scheduledPromptTargetHours.HasValue || _scheduledPromptTargetMinutes.HasValue)
@@ -896,7 +896,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (session is null || !_isCliRunning)
             return;
 
-        var prompt = _promptVorlagenPlatzhalterService.Resolve(vorlage.Prompttext, _aufgabe);
+        var prompt = _promptVorlagenPlatzhalterService.Resolve(vorlage.PromptText, _aufgabe);
         if (string.IsNullOrWhiteSpace(prompt))
             return;
 
@@ -935,7 +935,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 AktiverCliName = null;
                 if (_aufgabe is not null)
                 {
-                    _aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
+                    _aufgabe.ExecutionStatus = WorkItemExecutionStatus.Completed;
                     OnPropertyChanged(nameof(KannCliNeuStarten));
                     OnPropertyChanged(nameof(KannAufgabeAbschliessen));
                     OnPropertyChanged(nameof(ShowCliPanel));
@@ -964,14 +964,14 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             var pluginPrefix = await _pluginSelectionService.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(
-                _aufgabe.KiPluginPrefix,
-                _aufgabe.ProjektId,
+                _aufgabe.AiPluginPrefix,
+                _aufgabe.ProjectId,
                 ct);
 
             if (string.IsNullOrEmpty(pluginPrefix))
                 return;
 
-            await StartCliAndUpdateStateAsync(pluginPrefix, _aufgabe.LokalerKlonPfad ?? string.Empty, null, ct);
+            await StartCliAndUpdateStateAsync(pluginPrefix, _aufgabe.LocalClonePath ?? string.Empty, null, ct);
             await LadenAsync(ct);
         }
         catch (OperationCanceledException)
@@ -1006,7 +1006,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var capabilities = await gitPlugin.GetGitActionCapabilitiesAsync(_aufgabe.LokalerKlonPfad, ct);
+            var capabilities = await gitPlugin.GetGitActionCapabilitiesAsync(_aufgabe.LocalClonePath, ct);
             _canCreatePullRequest = capabilities.CanCreatePullRequest;
         }
         catch (OperationCanceledException)
@@ -1028,7 +1028,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _canCreateIssue = false;
 
         if (_aufgabe is null
-            || _aufgabe.IssueReferenz is not null
+            || _aufgabe.IssueReference is not null
             || string.IsNullOrWhiteSpace(_aufgabe.GitRepository?.RepositoryUrl))
         {
             OnPropertyChanged(nameof(CanCreateIssue));
@@ -1069,7 +1069,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (gitPlugins.Count == 0)
             return null;
 
-        var pluginTyp = _aufgabe?.GitRepository?.PluginTyp;
+        var pluginTyp = _aufgabe?.GitRepository?.PluginType;
         if (!string.IsNullOrWhiteSpace(pluginTyp))
         {
             var matchingPlugin = gitPlugins.FirstOrDefault(p =>
@@ -1081,10 +1081,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         return gitPlugins.FirstOrDefault();
     }
 
-    private static string GetRepositoryIdentifier(Aufgabe aufgabe)
-        => !string.IsNullOrWhiteSpace(aufgabe.GitRepository?.RepositoryUrl)
-            ? aufgabe.GitRepository.RepositoryUrl
-            : aufgabe.GitRepository?.RepositoryName ?? string.Empty;
+    private static string GetRepositoryIdentifier(WorkItem workItem)
+        => !string.IsNullOrWhiteSpace(workItem.GitRepository?.RepositoryUrl)
+            ? workItem.GitRepository.RepositoryUrl
+            : workItem.GitRepository?.RepositoryName ?? string.Empty;
 
     private async Task AufgabeAbschliessenAsync(CancellationToken ct)
     {
@@ -1206,8 +1206,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             var gitOrchestrationService = _serviceProvider.GetRequiredService<GitOrchestrationService>();
             var pullRequest = await gitOrchestrationService.PullRequestErstellenAsync(
                 _aufgabeId,
-                title: _aufgabe.Titel,
-                body: _aufgabe.AnforderungsBeschreibung ?? string.Empty,
+                title: _aufgabe.Title,
+                body: _aufgabe.RequirementDescription ?? string.Empty,
                 ct: ct);
 
             await LadenAsync(ct);
@@ -1254,7 +1254,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (_aufgabe == null)
             return;
 
-        var pluginTyp = _aufgabe.GitRepository?.PluginTyp;
+        var pluginTyp = _aufgabe.GitRepository?.PluginType;
         var gitPlugin = pluginTyp != null
             ? _pluginManager.GetSourceCodeManagementPlugins()
                 .FirstOrDefault(p => string.Equals(p.PluginPrefix, pluginTyp, StringComparison.OrdinalIgnoreCase))
@@ -1293,9 +1293,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             return;
 
         var aktuellerStand = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
-        if (aktuellerStand?.IssueReferenz is not null)
+        if (aktuellerStand?.IssueReference is not null)
         {
-            Aufgabe = aktuellerStand;
+            WorkItem = aktuellerStand;
             FehlerMeldung = "Der Aufgabe ist bereits ein Issue zugeordnet.";
             return;
         }
@@ -1320,11 +1320,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             issueCreateProvider,
             gitPlugin as IIssueTemplateProvider,
             repositoryId,
-            _aufgabe.Titel,
-            _aufgabe.AnforderungsBeschreibung,
+            _aufgabe.Title,
+            _aufgabe.RequirementDescription,
             preferredKiPluginPrefix,
-            () => _aufgabe?.IssueReferenz is not null,
-            async token => (await _aufgabeService.GetDetailAsync(_aufgabeId, token))?.IssueReferenz is not null,
+            () => _aufgabe?.IssueReference is not null,
+            async token => (await _aufgabeService.GetDetailAsync(_aufgabeId, token))?.IssueReference is not null,
             ct);
 
         var dialogResult = await _dialogService.ShowIssueCreateDialogAsync(dialogVm, ct);
@@ -1338,9 +1338,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             var standVorZuordnung = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
-            if (standVorZuordnung?.IssueReferenz is not null)
+            if (standVorZuordnung?.IssueReference is not null)
             {
-                Aufgabe = standVorZuordnung;
+                WorkItem = standVorZuordnung;
                 FehlerMeldung = $"Issue wurde extern erstellt ({DescribeIssue(createdIssue)}), aber nicht lokal zugeordnet, weil der Aufgabe inzwischen ein Issue zugeordnet ist.";
                 return;
             }
@@ -1361,7 +1361,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 var standNachFehlgeschlagenerZuordnung = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
                 if (standNachFehlgeschlagenerZuordnung is not null)
                 {
-                    Aufgabe = standNachFehlgeschlagenerZuordnung;
+                    WorkItem = standNachFehlgeschlagenerZuordnung;
                 }
 
                 FehlerMeldung = $"Issue wurde extern erstellt ({DescribeIssue(createdIssue)}), aber nicht lokal zugeordnet, weil der Aufgabe inzwischen ein Issue zugeordnet ist.";
@@ -1391,8 +1391,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             return await _pluginSelectionService.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(
-                _aufgabe.KiPluginPrefix,
-                _aufgabe.ProjektId,
+                _aufgabe.AiPluginPrefix,
+                _aufgabe.ProjectId,
                 ct);
         }
         catch (Exception ex)
@@ -1409,7 +1409,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             return issue.IssueUrl;
         }
 
-        return issue.Nummer > 0 ? $"#{issue.Nummer}" : issue.Titel;
+        return issue.Nummer > 0 ? $"#{issue.Nummer}" : issue.Title;
     }
 
     private void IssueBrowserOeffnen()
@@ -1444,9 +1444,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     {
         var standardAnsicht = ShowCliPanel
             ? DetailAnsicht.Cli
-            : AufgabeStatus switch
+            : WorkItemStatus switch
             {
-                Domain.Enums.AufgabeStatus.Beendet => DetailAnsicht.Diff,
+                Domain.Enums.WorkItemStatus.Completed => DetailAnsicht.Diff,
                 _ => DetailAnsicht.Info
             };
 
@@ -1493,8 +1493,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
 
         var pluginPrefix = await _pluginSelectionService.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(
-            _aufgabe?.KiPluginPrefix,
-            _aufgabe?.ProjektId ?? Guid.Empty,
+            _aufgabe?.AiPluginPrefix,
+            _aufgabe?.ProjectId ?? Guid.Empty,
             ct);
 
         SetAktiverCliName(pluginPrefix);
@@ -1515,9 +1515,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             ?.PluginName ?? pluginPrefix;
     }
 
-    private void OnCliProcessStatusChanged(Guid aufgabeId, CliProcessStatus status)
+    private void OnCliProcessStatusChanged(Guid workItemId, CliProcessStatus status)
     {
-        if (aufgabeId != _aufgabeId)
+        if (workItemId != _aufgabeId)
             return;
 
         _dispatcherInvoke(() =>
@@ -1528,18 +1528,18 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 IsCliRunning = isRunning;
                 if (_aufgabe is not null)
                 {
-                    _aufgabe.AusfuehrungsStatus = isRunning
-                        ? AufgabeAusfuehrungsStatus.Aktiv
-                        : AufgabeAusfuehrungsStatus.Beendet;
+                    _aufgabe.ExecutionStatus = isRunning
+                        ? WorkItemExecutionStatus.Active
+                        : WorkItemExecutionStatus.Completed;
                     OnPropertyChanged(nameof(KannCliNeuStarten));
                     OnPropertyChanged(nameof(KannAufgabeAbschliessen));
                     OnPropertyChanged(nameof(ShowCliPanel));
                     WaehleStandardAnsicht();
                 }
 
-                if (status == CliProcessStatus.Gestartet)
+                if (status == CliProcessStatus.Started)
                 {
-                    SetAktiverCliName(_aufgabe?.KiPluginPrefix);
+                    SetAktiverCliName(_aufgabe?.AiPluginPrefix);
                     CliStatusText = _kiService.GetTerminalSession(_aufgabeId) is { IsPseudoTerminal: false }
                         ? "Gestartet" + EingeschraenkterModusHinweis
                         : "Gestartet";
@@ -1562,7 +1562,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Fehler beim Verarbeiten des CLI-Status-Wechsels für Aufgabe {AufgabeId}.", aufgabeId);
+                _logger.LogError(ex, "Fehler beim Verarbeiten des CLI-Status-Wechsels für Aufgabe {AufgabeId}.", workItemId);
             }
         });
     }
@@ -1597,8 +1597,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             var pluginPrefix = await _pluginSelectionService.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(
-                _aufgabe.KiPluginPrefix,
-                _aufgabe.ProjektId,
+                _aufgabe.AiPluginPrefix,
+                _aufgabe.ProjectId,
                 ct);
 
             if (string.IsNullOrEmpty(pluginPrefix))
@@ -1610,9 +1610,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             var repositoryUrl = _aufgabe.GitRepository?.RepositoryUrl ?? string.Empty;
 
-            if (_aufgabe.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Beendet)
+            if (_aufgabe.ExecutionStatus == WorkItemExecutionStatus.Completed)
             {
-                await StartCliAndUpdateStateAsync(pluginPrefix, _aufgabe.LokalerKlonPfad ?? string.Empty, _optionalCliParameters, ct);
+                await StartCliAndUpdateStateAsync(pluginPrefix, _aufgabe.LocalClonePath ?? string.Empty, _optionalCliParameters, ct);
             }
             else
             {
@@ -1683,7 +1683,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 IsCliRunning = false;
             });
 
-            var lokalerKlonPfad = _aufgabe.LokalerKlonPfad ?? string.Empty;
+            var lokalerKlonPfad = _aufgabe.LocalClonePath ?? string.Empty;
             await StartCliAndUpdateStateAsync(pluginPrefix, lokalerKlonPfad, _optionalCliParameters, ct);
         }
         catch (OperationCanceledException)
@@ -1749,13 +1749,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task<string?> ResolvePluginViaDialogAsync(Aufgabe aufgabe, CancellationToken ct)
+    private async Task<string?> ResolvePluginViaDialogAsync(WorkItem workItem, CancellationToken ct)
     {
         if (VerfuegbareKiPlugins.Count == 1)
         {
             var einzigesPluginPrefix = VerfuegbareKiPlugins[0];
-            await _aufgabeService.UpdateAsync(_aufgabeId, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, einzigesPluginPrefix, ct);
-            aufgabe.KiPluginPrefix = einzigesPluginPrefix;
+            await _aufgabeService.UpdateAsync(_aufgabeId, workItem.Title, workItem.RequirementDescription, einzigesPluginPrefix, ct);
+            workItem.AiPluginPrefix = einzigesPluginPrefix;
             SelectedKiPluginPrefix = einzigesPluginPrefix;
             SetAktiverCliName(einzigesPluginPrefix);
             _laufdatenChangedNotifier?.NotifyLaufdatenChanged(_aufgabeId);
@@ -1772,11 +1772,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         if (dialogResult.SaveAsProjectDefault)
         {
-            await _pluginSelectionService.SaveProjectDefaultPluginPrefixAsync(aufgabe.ProjektId, PluginType.DevelopmentAutomation, dialogResult.SelectedPluginPrefix, ct);
+            await _pluginSelectionService.SaveProjectDefaultPluginPrefixAsync(workItem.ProjectId, PluginType.DevelopmentAutomation, dialogResult.SelectedPluginPrefix, ct);
         }
 
-        await _aufgabeService.UpdateAsync(_aufgabeId, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, dialogResult.SelectedPluginPrefix, ct);
-        aufgabe.KiPluginPrefix = dialogResult.SelectedPluginPrefix;
+        await _aufgabeService.UpdateAsync(_aufgabeId, workItem.Title, workItem.RequirementDescription, dialogResult.SelectedPluginPrefix, ct);
+        workItem.AiPluginPrefix = dialogResult.SelectedPluginPrefix;
         SelectedKiPluginPrefix = dialogResult.SelectedPluginPrefix;
         SetAktiverCliName(dialogResult.SelectedPluginPrefix);
         _laufdatenChangedNotifier?.NotifyLaufdatenChanged(_aufgabeId);
@@ -1817,8 +1817,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     {
         var statusText = status switch
         {
-            CliRuntimeStatus.Laeuft => "CLI-Status: Ausführung läuft",
-            CliRuntimeStatus.WartetAufEingabe => "CLI-Status: Wartet auf Eingabe",
+            CliRuntimeStatus.Running => "CLI-Status: Ausführung läuft",
+            CliRuntimeStatus.WaitingForInput => "CLI-Status: Wartet auf Eingabe",
             CliRuntimeStatus.Inaktiv => "CLI inaktiv",
             _ => "CLI-Status: unbekannt"
         };
@@ -1830,7 +1830,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     private async Task SchedulePromptAsync(CancellationToken ct)
     {
-        if (_selectedPromptVorlage is null || string.IsNullOrWhiteSpace(_selectedPromptVorlage.Prompttext))
+        if (_selectedPromptVorlage is null || string.IsNullOrWhiteSpace(_selectedPromptVorlage.PromptText))
             return;
 
         if (_scheduledPromptTargetHours is < 0 or > 23)
@@ -1855,7 +1855,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         var minute = _scheduledPromptTargetMinutes ?? 0;
         var targetTime = new DateTimeOffset(new DateTime(jetzt.Year, jetzt.Month, jetzt.Day, stunde, minute, 0), jetzt.Offset);
 
-        var prompt = _promptVorlagenPlatzhalterService.Resolve(_selectedPromptVorlage.Prompttext, _aufgabe);
+        var prompt = _promptVorlagenPlatzhalterService.Resolve(_selectedPromptVorlage.PromptText, _aufgabe);
         if (string.IsNullOrWhiteSpace(prompt))
             return;
 
@@ -1871,9 +1871,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         SelectedPromptVorlage = null;
     }
 
-    private void OnPromptSent(Guid aufgabeId)
+    private void OnPromptSent(Guid workItemId)
     {
-        if (aufgabeId != _aufgabeId)
+        if (workItemId != _aufgabeId)
             return;
 
         _dispatcherInvoke(() =>
@@ -1884,9 +1884,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         });
     }
 
-    private void OnScheduledPromptChanged(Guid aufgabeId)
+    private void OnScheduledPromptChanged(Guid workItemId)
     {
-        if (aufgabeId != _aufgabeId)
+        if (workItemId != _aufgabeId)
             return;
 
         _dispatcherInvoke(AktualisiereWartestellungsAnzeige);
@@ -1920,7 +1920,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     private Task<string> ErmittleEffektivesArbeitsverzeichnisAsync(string lokalerKlonPfad, CancellationToken ct)
     {
-        var startConfig = _aufgabe?.GitRepository?.StartKonfiguration;
+        var startConfig = _aufgabe?.GitRepository?.StartConfiguration;
 
         return WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(
             lokalerKlonPfad,
@@ -2014,7 +2014,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <param name="ct">Abbruchtoken.</param>
     private async Task AktualisiereKannIdeAuswaehlenAsync(CancellationToken ct)
     {
-        if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
+        if (_aufgabe?.LocalClonePath is not { } lokalerKlonPfad)
         {
             KannIdeAuswaehlen = false;
             return;
@@ -2039,7 +2039,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     private async Task OeffneArbeitsverzeichnisAsync(CancellationToken ct)
     {
-        if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
+        if (_aufgabe?.LocalClonePath is not { } lokalerKlonPfad)
             return;
 
         FehlerMeldung = null;
@@ -2102,7 +2102,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     {
         FehlerMeldung = null;
 
-        if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
+        if (_aufgabe?.LocalClonePath is not { } lokalerKlonPfad)
             return;
 
         try
@@ -2272,13 +2272,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             var dialogVm = _serviceProvider.GetRequiredService<AufgabePausierenDialogViewModel>();
-            dialogVm.Initialize(_aufgabe.PausiertBisUtc);
+            dialogVm.Initialize(_aufgabe.PausedUntilUtc);
 
             var ergebnis = await _dialogService.ShowAufgabePausierenDialogAsync(dialogVm, ct);
             if (ergebnis is null)
                 return;
 
-            var pausiertBisUtc = ergebnis.Aufheben ? null : ergebnis.PausiertBisUtc;
+            var pausiertBisUtc = ergebnis.Aufheben ? null : ergebnis.PausedUntilUtc;
             await _aufgabeService.SetPauseAsync(_aufgabeId, pausiertBisUtc, ct);
             await LadenAsync(ct);
             _laufdatenChangedNotifier?.NotifyLaufdatenChanged(_aufgabeId);

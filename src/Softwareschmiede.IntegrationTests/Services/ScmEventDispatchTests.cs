@@ -31,9 +31,9 @@ public sealed class ScmEventDispatchTests
         await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.All(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), task => Assert.Equal(AufgabeStatus.Neu, task.Status));
+        Assert.All(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), task => Assert.Equal(WorkItemStatus.New, task.Status));
         var checkpoints = await db.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(kind == ScmReferenceKind.Issue ? 2 : 4, checkpoints.Count);
         Assert.All(checkpoints, checkpoint => Assert.Equal("Mehrdeutige Zuordnung zu Aufgaben", checkpoint.Diagnostic));
@@ -55,11 +55,11 @@ public sealed class ScmEventDispatchTests
         await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var events = await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-        var references = await db.Aufgaben.Include(x => x.IssueReferenz).ToDictionaryAsync(x => x.Id, x => x.IssueReferenz!.IssueNummer, cancellationToken: TestContext.Current.CancellationToken);
+        var references = await db.WorkItems.Include(x => x.IssueReference).ToDictionaryAsync(x => x.Id, x => x.IssueReference!.IssueNumber, cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(2, events.Count);
-        Assert.All(events, item => Assert.Equal(references[item.AufgabeId], ScmEventStore.Observation(item).Reference.Number));
+        Assert.All(events, item => Assert.Equal(references[item.WorkItemId], ScmEventStore.Observation(item).Reference.Number));
         Assert.All(await db.ScmObservationCheckpoints.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), checkpoint => Assert.Null(checkpoint.Diagnostic));
     }
 
@@ -83,7 +83,7 @@ public sealed class ScmEventDispatchTests
             It.Is<ScmRepositoryContext>(context => context.RepositoryId == alias), It.IsAny<CancellationToken>()), Times.Once);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             var checkpoint = Assert.Single(await db.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal("Authentication", checkpoint.ErrorCode);
@@ -95,7 +95,7 @@ public sealed class ScmEventDispatchTests
             It.Is<ScmRepositoryContext>(context => context.RepositoryId == alias), It.IsAny<CancellationToken>())).ReturnsAsync(fixture.Repository);
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
         using var verification = fixture.Services.CreateScope();
-        var verifiedDb = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var verifiedDb = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Empty(await verifiedDb.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.All(await verifiedDb.ScmObservationCheckpoints.Where(x => !x.SourceKey.StartsWith("enumeration/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             checkpoint => Assert.Equal("Mehrdeutige Zuordnung zu Aufgaben", checkpoint.Diagnostic));
@@ -107,16 +107,16 @@ public sealed class ScmEventDispatchTests
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        var (_, firstId) = await fixture.AddAsync(AufgabeStatus.Beendet, cloned: false);
+        var (_, firstId) = await fixture.AddAsync(WorkItemStatus.Completed, cloned: false);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var first = await db.ScmIncomingEvents.AsNoTracking().SingleAsync(x => x.Id == firstId, cancellationToken: TestContext.Current.CancellationToken);
             for (var index = 1; index < 100; index++)
                 db.ScmIncomingEvents.Add(new ScmIncomingEvent
                 {
                     EventKey = "older-" + index,
-                    AufgabeId = first.AufgabeId,
+                    WorkItemId = first.WorkItemId,
                     ObservationJson = first.ObservationJson,
                     ReceivedUtc = first.ReceivedUtc
                 });
@@ -167,8 +167,8 @@ public sealed class ScmEventDispatchTests
         release.TrySetResult();
         await Task.WhenAll(automatic, manual).WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
         using var verification = fixture.Services.CreateScope();
-        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
-        Assert.Equal("preserve workspace", await File.ReadAllTextAsync(Path.Combine(task!.LokalerKlonPfad!, "owned.txt"), TestContext.Current.CancellationToken));
+        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
+        Assert.Equal("preserve workspace", await File.ReadAllTextAsync(Path.Combine(task!.LocalClonePath!, "owned.txt"), TestContext.Current.CancellationToken));
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
         fixture.Git.Verify(x => x.CloneRepositoryAsync(Moq.It.IsAny<string>(), Moq.It.IsAny<string>(), Moq.It.IsAny<CancellationToken>()), Moq.Times.Once);
@@ -178,23 +178,23 @@ public sealed class ScmEventDispatchTests
     private static async Task AddAliasLinksAsync(ScmDispatchFixture fixture, ScmReferenceKind kind, string alias, int secondNumber = 7)
     {
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "Repository aliases" };
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var project = new Project { Id = Guid.NewGuid(), Name = "Repository aliases" };
         foreach (var (address, plugin, number) in new[] { ("https://github.com/owner/repo.git", fixture.Repository.ProviderPrefix, 7), (alias, "Test SCM", secondNumber) })
         {
-            var repository = new GitRepository { Id = Guid.NewGuid(), Projekt = project, RepositoryUrl = address, RepositoryName = "repo", PluginTyp = plugin };
-            var task = new Aufgabe { Id = Guid.NewGuid(), Projekt = project, GitRepository = repository, Titel = "Alias " + address, Status = AufgabeStatus.Neu };
+            var repository = new GitRepository { Id = Guid.NewGuid(), Project = project, RepositoryUrl = address, RepositoryName = "repo", PluginType = plugin };
+            var task = new WorkItem { Id = Guid.NewGuid(), Project = project, GitRepository = repository, Title = "Alias " + address, Status = WorkItemStatus.New };
             if (kind == ScmReferenceKind.Issue)
-                task.IssueReferenz = new IssueReferenz { Id = Guid.NewGuid(), Aufgabe = task, IssueNummer = number, Titel = "Issue", IssueUrl = "https://github.com/owner/repo/issues/" + number };
+                task.IssueReference = new IssueReference { Id = Guid.NewGuid(), WorkItem = task, IssueNumber = number, Title = "Issue", IssueUrl = "https://github.com/owner/repo/issues/" + number };
             else
-                task.PullRequests.Add(new PullRequestReferenz
+                task.PullRequests.Add(new PullRequestReference
                 {
                     Id = Guid.NewGuid(),
-                    Aufgabe = task,
+                    WorkItem = task,
                     Provider = PullRequestProvider.GitHub,
                     RepositoryId = address,
                     PullRequestNumber = number,
-                    Titel = "PR",
+                    Title = "PR",
                     Url = "https://github.com/owner/repo/pull/" + number,
                     CreatedUtc = DateTimeOffset.UtcNow,
                     MonitoringPhase = PullRequestMonitoringPhase.NotMonitored

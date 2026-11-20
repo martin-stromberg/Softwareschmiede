@@ -19,12 +19,12 @@ public sealed class ProjektService
     private const string RepositoryUrlFieldKey = "RepositoryUrl";
     private const string RepositoryNameFieldKey = "RepositoryName";
 
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly ILogger<ProjektService> _logger;
     private readonly IPluginManager _pluginManager;
 
     /// <inheritdoc cref="ProjektService"/>
-    public ProjektService(SoftwareschmiededDbContext db, ILogger<ProjektService> logger, IPluginManager? pluginManager = null)
+    public ProjektService(SoftwareschmiedeDbContext db, ILogger<ProjektService> logger, IPluginManager? pluginManager = null)
     {
         _db = db;
         _logger = logger;
@@ -32,73 +32,73 @@ public sealed class ProjektService
     }
 
     /// <summary>Gibt alle Projekte zurück.</summary>
-    public async Task<IReadOnlyList<Projekt>> GetAllAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<Project>> GetAllAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Alle Projekte abrufen.");
-        return await _db.Projekte
+        return await _db.Projects
             .AsNoTracking()
             .OrderBy(p => p.Name)
             .ToListAsync(ct);
     }
 
     /// <summary>Gibt ein Projekt anhand seiner ID zurück.</summary>
-    public async Task<Projekt?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<Project?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Projekt {ProjektId} abrufen.", id);
-        return await _db.Projekte
+        return await _db.Projects
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == id, ct);
     }
 
     /// <summary>Gibt ein Projekt mit Repositories und Aufgaben zurück.</summary>
-    public async Task<Projekt?> GetDetailAsync(Guid id, CancellationToken ct = default)
+    public async Task<Project?> GetDetailAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Projekt {ProjektId} mit Details abrufen.", id);
-        return await _db.Projekte
+        return await _db.Projects
             .AsNoTracking()
             .Include(p => p.Repositories)
-                .ThenInclude(r => r.StartKonfiguration)
+                .ThenInclude(r => r.StartConfiguration)
             .Include(p => p.Repositories)
-                .ThenInclude(r => r.InitialisierungKonfiguration)
-            .Include(p => p.Aufgaben)
+                .ThenInclude(r => r.InitializationConfiguration)
+            .Include(p => p.WorkItems)
             .FirstOrDefaultAsync(p => p.Id == id, ct);
     }
 
     /// <summary>Erstellt ein neues Projekt.</summary>
-    public async Task<Projekt> CreateAsync(string name, string? beschreibung, CancellationToken ct = default)
+    public async Task<Project> CreateAsync(string name, string? beschreibung, CancellationToken ct = default)
     {
         _logger.LogInformation("Projekt '{Name}' erstellen.", name);
 
-        var projekt = new Projekt
+        var project = new Project
         {
             Id = Guid.NewGuid(),
             Name = name,
-            Beschreibung = beschreibung,
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            Description = beschreibung,
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         };
 
-        _db.Projekte.Add(projekt);
+        _db.Projects.Add(project);
         await _db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Projekt '{Name}' mit ID {ProjektId} erstellt.", name, projekt.Id);
-        return projekt;
+        _logger.LogInformation("Projekt '{Name}' mit ID {ProjektId} erstellt.", name, project.Id);
+        return project;
     }
 
     /// <summary>Aktualisiert Name und Beschreibung eines Projekts.</summary>
-    public async Task<Projekt> UpdateAsync(Guid id, string name, string? beschreibung, CancellationToken ct = default)
+    public async Task<Project> UpdateAsync(Guid id, string name, string? beschreibung, CancellationToken ct = default)
     {
         _logger.LogInformation("Projekt {ProjektId} aktualisieren.", id);
 
-        var projekt = await _db.Projekte.FindAsync([id], ct)
+        var project = await _db.Projects.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Projekt {id} nicht gefunden.");
 
-        projekt.Name = name;
-        projekt.Beschreibung = beschreibung;
+        project.Name = name;
+        project.Description = beschreibung;
 
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Projekt {ProjektId} aktualisiert.", id);
-        return projekt;
+        return project;
     }
 
     /// <summary>Archiviert ein Projekt.</summary>
@@ -106,10 +106,10 @@ public sealed class ProjektService
     {
         _logger.LogInformation("Projekt {ProjektId} archivieren.", id);
 
-        var projekt = await _db.Projekte.FindAsync([id], ct)
+        var project = await _db.Projects.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Projekt {id} nicht gefunden.");
 
-        projekt.Status = ProjektStatus.Archiviert;
+        project.Status = ProjectStatus.Archived;
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Projekt {ProjektId} archiviert.", id);
@@ -120,10 +120,10 @@ public sealed class ProjektService
     {
         _logger.LogInformation("Projekt {ProjektId} löschen.", id);
 
-        var projekt = await _db.Projekte.FindAsync([id], ct)
+        var project = await _db.Projects.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Projekt {id} nicht gefunden.");
 
-        _db.Projekte.Remove(projekt);
+        _db.Projects.Remove(project);
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Projekt {ProjektId} gelöscht.", id);
@@ -131,7 +131,7 @@ public sealed class ProjektService
 
     /// <summary>Fügt ein Git-Repository zu einem Projekt hinzu.</summary>
     public async Task<GitRepository> AddRepositoryAsync(
-        Guid projektId,
+        Guid projectId,
         string pluginTyp,
         string repositoryUrl,
         string repositoryName,
@@ -149,7 +149,7 @@ public sealed class ProjektService
             fieldValues[SourceDirectoryFieldKey] = repositoryUrl;
         }
 
-        var repository = await AddRepositoryAsync(projektId, pluginTyp, fieldValues, ct);
+        var repository = await AddRepositoryAsync(projectId, pluginTyp, fieldValues, ct);
 
         if (!string.IsNullOrWhiteSpace(defaultSourceBranchName))
         {
@@ -162,7 +162,7 @@ public sealed class ProjektService
 
     /// <summary>Fügt ein Git-Repository über pluginabhängige Eingabefelder zu einem Projekt hinzu.</summary>
     public async Task<GitRepository> AddRepositoryAsync(
-        Guid projektId,
+        Guid projectId,
         string pluginTyp,
         IReadOnlyDictionary<string, string> fieldValues,
         CancellationToken ct = default)
@@ -174,25 +174,25 @@ public sealed class ProjektService
         var repositoryUrl = ResolveRepositoryUrl(normalizedPluginType, normalizedFieldValues);
         var repositoryName = ResolveRepositoryName(normalizedPluginType, normalizedFieldValues, repositoryUrl);
 
-        _logger.LogInformation("Repository '{RepositoryName}' zu Projekt {ProjektId} hinzufügen.", repositoryName, projektId);
+        _logger.LogInformation("Repository '{RepositoryName}' zu Projekt {ProjektId} hinzufügen.", repositoryName, projectId);
 
-        var projekt = await _db.Projekte.FindAsync([projektId], ct)
-            ?? throw new InvalidOperationException($"Projekt {projektId} nicht gefunden.");
+        var project = await _db.Projects.FindAsync([projectId], ct)
+            ?? throw new InvalidOperationException($"Projekt {projectId} nicht gefunden.");
 
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjektId = projektId,
-            PluginTyp = normalizedPluginType,
+            ProjectId = projectId,
+            PluginType = normalizedPluginType,
             RepositoryUrl = repositoryUrl,
             RepositoryName = repositoryName,
-            Aktiv = true
+            Active = true
         };
 
         _db.GitRepositories.Add(repository);
         await _db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Repository '{RepositoryName}' mit ID {RepositoryId} zu Projekt {ProjektId} hinzugefügt.", repositoryName, repository.Id, projektId);
+        _logger.LogInformation("Repository '{RepositoryName}' mit ID {RepositoryId} zu Projekt {ProjektId} hinzugefügt.", repositoryName, repository.Id, projectId);
         return repository;
     }
 
@@ -215,7 +215,7 @@ public sealed class ProjektService
     {
         var repository = await _db.GitRepositories.FindAsync([repositoryId], ct)
             ?? throw new InvalidOperationException("Repository nicht gefunden.");
-        repository.IssueAufbereitungAktiv = aktiv;
+        repository.IssuePreparationEnabled = aktiv;
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Issue-Aufbereitung für Repository {RepositoryId} auf {Aktiv} gesetzt.", repositoryId, aktiv);
     }
@@ -269,7 +269,7 @@ public sealed class ProjektService
     }
 
     /// <summary>Speichert die Startkonfiguration für ein Repository.</summary>
-    public async Task<RepositoryStartKonfiguration> SaveRepositoryStartKonfigurationAsync(
+    public async Task<RepositoryStartConfiguration> SaveRepositoryStartKonfigurationAsync(
         Guid repositoryId,
         string startScriptRelativePath,
         bool aktiv,
@@ -280,20 +280,20 @@ public sealed class ProjektService
         ValidateStartConfiguration(startScriptRelativePath);
 
         var repository = await _db.GitRepositories
-            .Include(r => r.StartKonfiguration)
+            .Include(r => r.StartConfiguration)
             .FirstOrDefaultAsync(r => r.Id == repositoryId, ct)
             ?? throw new InvalidOperationException($"Repository {repositoryId} nicht gefunden.");
 
-        var configuration = repository.StartKonfiguration ?? new RepositoryStartKonfiguration
+        var configuration = repository.StartConfiguration ?? new RepositoryStartConfiguration
         {
             Id = Guid.NewGuid(),
             GitRepositoryId = repositoryId
         };
 
         configuration.StartScriptRelativePath = NormalizeRequiredValue(startScriptRelativePath, nameof(startScriptRelativePath));
-        configuration.Aktiv = aktiv;
+        configuration.Active = aktiv;
 
-        if (repository.StartKonfiguration is null)
+        if (repository.StartConfiguration is null)
         {
             _db.Add(configuration);
         }
@@ -305,11 +305,11 @@ public sealed class ProjektService
     }
 
     /// <summary>Liefert die Startkonfiguration eines Repositories.</summary>
-    public async Task<RepositoryStartKonfiguration?> GetRepositoryStartKonfigurationAsync(Guid repositoryId, CancellationToken ct = default)
+    public async Task<RepositoryStartConfiguration?> GetRepositoryStartKonfigurationAsync(Guid repositoryId, CancellationToken ct = default)
     {
         _logger.LogInformation("Startkonfiguration für Repository {RepositoryId} abrufen.", repositoryId);
 
-        return await _db.Set<RepositoryStartKonfiguration>()
+        return await _db.Set<RepositoryStartConfiguration>()
             .AsNoTracking()
             .FirstOrDefaultAsync(config => config.GitRepositoryId == repositoryId, ct);
     }
@@ -318,7 +318,7 @@ public sealed class ProjektService
     /// Speichert den relativen Pfad zum Initialisierungsskript für ein Repository. <c>null</c> oder ein leerer
     /// Wert löschen eine bestehende Konfiguration.
     /// </summary>
-    public async Task<RepositoryInitialisierungKonfiguration?> SaveRepositoryInitialisierungskriptAsync(
+    public async Task<RepositoryInitializationConfiguration?> SaveRepositoryInitialisierungskriptAsync(
         Guid repositoryId,
         string? initialisierungsskriptRelativePath,
         CancellationToken ct = default)
@@ -326,15 +326,15 @@ public sealed class ProjektService
         _logger.LogInformation("Initialisierungskonfiguration für Repository {RepositoryId} speichern.", repositoryId);
 
         var repository = await _db.GitRepositories
-            .Include(r => r.InitialisierungKonfiguration)
+            .Include(r => r.InitializationConfiguration)
             .FirstOrDefaultAsync(r => r.Id == repositoryId, ct)
             ?? throw new InvalidOperationException($"Repository {repositoryId} nicht gefunden.");
 
         if (string.IsNullOrWhiteSpace(initialisierungsskriptRelativePath))
         {
-            if (repository.InitialisierungKonfiguration is not null)
+            if (repository.InitializationConfiguration is not null)
             {
-                _db.Remove(repository.InitialisierungKonfiguration);
+                _db.Remove(repository.InitializationConfiguration);
                 await _db.SaveChangesAsync(ct);
                 _logger.LogInformation("Initialisierungskonfiguration für Repository {RepositoryId} gelöscht.", repositoryId);
             }
@@ -344,15 +344,15 @@ public sealed class ProjektService
 
         ValidateInitialisierungsKonfiguration(initialisierungsskriptRelativePath);
 
-        var configuration = repository.InitialisierungKonfiguration ?? new RepositoryInitialisierungKonfiguration
+        var configuration = repository.InitializationConfiguration ?? new RepositoryInitializationConfiguration
         {
             Id = Guid.NewGuid(),
             GitRepositoryId = repositoryId
         };
 
-        configuration.InitialisierungsskriptRelativePath = NormalizeRequiredValue(initialisierungsskriptRelativePath, nameof(initialisierungsskriptRelativePath));
+        configuration.InitializationScriptRelativePath = NormalizeRequiredValue(initialisierungsskriptRelativePath, nameof(initialisierungsskriptRelativePath));
 
-        if (repository.InitialisierungKonfiguration is null)
+        if (repository.InitializationConfiguration is null)
         {
             _db.Add(configuration);
         }
@@ -378,16 +378,16 @@ public sealed class ProjektService
             : workingDirectoryRelativePath;
 
         var repository = await _db.GitRepositories
-            .Include(r => r.StartKonfiguration)
+            .Include(r => r.StartConfiguration)
             .FirstOrDefaultAsync(r => r.Id == repositoryId, ct)
             ?? throw new InvalidOperationException($"Repository {repositoryId} nicht gefunden.");
 
-        if (repository.StartKonfiguration is null && normalized is null)
+        if (repository.StartConfiguration is null && normalized is null)
         {
             return;
         }
 
-        var configuration = repository.StartKonfiguration ?? new RepositoryStartKonfiguration
+        var configuration = repository.StartConfiguration ?? new RepositoryStartConfiguration
         {
             Id = Guid.NewGuid(),
             GitRepositoryId = repositoryId
@@ -395,7 +395,7 @@ public sealed class ProjektService
 
         configuration.WorkingDirectoryRelativePath = normalized;
 
-        if (repository.StartKonfiguration is null)
+        if (repository.StartConfiguration is null)
         {
             _db.Add(configuration);
         }

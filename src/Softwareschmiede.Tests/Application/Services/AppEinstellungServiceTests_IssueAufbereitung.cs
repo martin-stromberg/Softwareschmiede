@@ -10,7 +10,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// Kommentar-Schalter) in <see cref="AppEinstellungService"/>.</summary>
 public sealed class AppEinstellungServiceTests_IssueAufbereitung : IDisposable
 {
-    private readonly SoftwareschmiededDbContext _db = TestDbContextFactory.Create();
+    private readonly SoftwareschmiedeDbContext _db = TestDbContextFactory.Create();
     private readonly AppEinstellungService _sut;
 
     /// <inheritdoc cref="AppEinstellungServiceTests_IssueAufbereitung"/>

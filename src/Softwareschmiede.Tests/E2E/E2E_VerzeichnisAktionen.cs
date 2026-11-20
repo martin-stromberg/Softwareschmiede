@@ -179,12 +179,12 @@ public partial class End2EndTest
         await using var db = OpenTestDbContext();
         var repository = db.GitRepositories.Single();
 
-        db.Add(new RepositoryStartKonfiguration
+        db.Add(new RepositoryStartConfiguration
         {
             Id = Guid.NewGuid(),
             GitRepositoryId = repository.Id,
             WorkingDirectoryRelativePath = workingDirectoryRelativePath,
-            Aktiv = true
+            Active = true
         });
         await db.SaveChangesAsync();
     }

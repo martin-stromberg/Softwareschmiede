@@ -19,19 +19,19 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(arbeitsverzeichnis, "backend"));
-        var aufgabe = await ErstelleAufgabeMitRepositoryAsync("backend");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeMitRepositoryAsync("backend");
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
-        var prozessStarterMock = new Mock<IProzessStarter>();
+        var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.OeffneArbeitsverzeichnisCommand.Execute(null);
 
         var erwarteterPfad = Path.GetFullPath(Path.Combine(arbeitsverzeichnis, "backend"));
         prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.Argumente == $"\"{erwarteterPfad}\"")),
+            p => p.Start(It.Is<ProcessStartRequest>(a => a.Arguments == $"\"{erwarteterPfad}\"")),
             Times.Once);
     }
 
@@ -40,18 +40,18 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
     public async Task OeffneArbeitsverzeichnis_OhneKonfiguration_RuftServiceMitRepositoryRootAuf()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
-        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
-        var prozessStarterMock = new Mock<IProzessStarter>();
+        var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.OeffneArbeitsverzeichnisCommand.Execute(null);
 
         prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.Argumente == $"\"{arbeitsverzeichnis}\"")),
+            p => p.Start(It.Is<ProcessStartRequest>(a => a.Arguments == $"\"{arbeitsverzeichnis}\"")),
             Times.Once);
     }
 
@@ -60,18 +60,18 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
     public async Task OeffneArbeitsverzeichnis_MitUngueltigemArbeitsverzeichnis_ZeigtFehlermeldung()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
-        var aufgabe = await ErstelleAufgabeMitRepositoryAsync("does-not-exist");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeMitRepositoryAsync("does-not-exist");
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
-        var prozessStarterMock = new Mock<IProzessStarter>();
+        var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.OeffneArbeitsverzeichnisCommand.Execute(null);
 
         sut.FehlerMeldung.Should().StartWith("Arbeitsverzeichnis konnte nicht geöffnet werden:");
-        prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
+        prozessStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
     /// <summary>OeffneIdeAsync findet über das aufgelöste IDE-Plugin (FindEntryPointsAsync) eine Solution im über WorkingDirectoryResolver aufgelösten Arbeitsverzeichnis und öffnet sie, obwohl im Repository-Root keine .sln-Datei liegt.</summary>
@@ -84,12 +84,12 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         var solutionPfad = Path.Combine(unterverzeichnis, "MyApp.sln");
         File.WriteAllText(solutionPfad, string.Empty);
 
-        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(Path.Combine("src", "solutions"));
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeMitRepositoryAsync(Path.Combine("src", "solutions"));
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
-        var prozessStarterMock = new Mock<IProzessStarter>();
+        var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.KannIdeOeffnen.Should().BeTrue("das konfigurierte Arbeitsverzeichnis existiert");
@@ -98,7 +98,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.DateiName == solutionPfad && a.ShellAusfuehren)),
+            p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == solutionPfad && a.UseShellExecute)),
             Times.Once);
     }
 }

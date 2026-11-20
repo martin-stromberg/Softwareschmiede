@@ -31,7 +31,7 @@ public static class AufgabenListenAnsicht
                 new SortDescription(nameof(AktiveAufgabePanelItem.RepositoryGruppeIstFallback), ListSortDirection.Ascending),
                 new SortDescription(nameof(AktiveAufgabePanelItem.RepositoryGruppenName), ListSortDirection.Ascending),
                 new SortDescription(nameof(AktiveAufgabePanelItem.SortierZeitpunkt), ListSortDirection.Descending),
-                new SortDescription(nameof(AktiveAufgabePanelItem.Titel), ListSortDirection.Ascending),
+                new SortDescription(nameof(AktiveAufgabePanelItem.Title), ListSortDirection.Ascending),
                 new SortDescription(nameof(AktiveAufgabePanelItem.Id), ListSortDirection.Ascending),
             ],
             AufgabenListenModus.Ki =>
@@ -39,13 +39,13 @@ public static class AufgabenListenAnsicht
                 new SortDescription(nameof(AktiveAufgabePanelItem.KiGruppeIstFallback), ListSortDirection.Ascending),
                 new SortDescription(nameof(AktiveAufgabePanelItem.KiGruppenName), ListSortDirection.Ascending),
                 new SortDescription(nameof(AktiveAufgabePanelItem.SortierZeitpunkt), ListSortDirection.Descending),
-                new SortDescription(nameof(AktiveAufgabePanelItem.Titel), ListSortDirection.Ascending),
+                new SortDescription(nameof(AktiveAufgabePanelItem.Title), ListSortDirection.Ascending),
                 new SortDescription(nameof(AktiveAufgabePanelItem.Id), ListSortDirection.Ascending),
             ],
             _ =>
             [
                 new SortDescription(nameof(AktiveAufgabePanelItem.SortierZeitpunkt), ListSortDirection.Descending),
-                new SortDescription(nameof(AktiveAufgabePanelItem.Titel), ListSortDirection.Ascending),
+                new SortDescription(nameof(AktiveAufgabePanelItem.Title), ListSortDirection.Ascending),
                 new SortDescription(nameof(AktiveAufgabePanelItem.Id), ListSortDirection.Ascending),
             ]
         };

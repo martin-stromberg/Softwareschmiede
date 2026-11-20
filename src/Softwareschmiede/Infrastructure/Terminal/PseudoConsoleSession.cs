@@ -38,7 +38,7 @@ public sealed class PseudoConsoleSession : ITerminalSession
     private int _lastResizeCols;
     private int _lastResizeRows;
     private bool _lastResizeResult = true;
-    private CliRuntimeStatus _runtimeStatus = CliRuntimeStatus.Laeuft;
+    private CliRuntimeStatus _runtimeStatus = CliRuntimeStatus.Running;
     private DateTimeOffset? _lastOutputUtc;
     private DateTimeOffset? _lastInputUtc;
     private readonly TimeSpan _promptSubmitDelay;
@@ -159,7 +159,7 @@ public sealed class PseudoConsoleSession : ITerminalSession
             _lastOutputUtc = _timeProvider.GetUtcNow();
         }
 
-        SetRuntimeStatus(CliRuntimeStatus.Laeuft);
+        SetRuntimeStatus(CliRuntimeStatus.Running);
     }
 
     /// <summary>Meldet eine Benutzereingabe an die Status-Erkennung.</summary>
@@ -170,7 +170,7 @@ public sealed class PseudoConsoleSession : ITerminalSession
             _lastInputUtc = _timeProvider.GetUtcNow();
         }
 
-        SetRuntimeStatus(CliRuntimeStatus.Laeuft);
+        SetRuntimeStatus(CliRuntimeStatus.Running);
     }
 
     /// <summary>Ändert die Größe der Pseudo Console. Identische Dimensionsaufrufe werden dedupliziert
@@ -652,9 +652,9 @@ public enum CliRuntimeStatus
     /// <summary>Kein laufender CLI-Prozess ist aktiv.</summary>
     Inaktiv,
     /// <summary>Die CLI laeuft und hat kuerzlich Ausgabe oder Eingabe verarbeitet.</summary>
-    Laeuft,
+    Running,
     /// <summary>Die CLI laeuft, erzeugt aber seit laengerer Zeit keine Ausgabe und wartet vermutlich auf Benutzereingabe.</summary>
-    WartetAufEingabe
+    WaitingForInput
 }
 
 /// <summary>Argumente fuer Aenderungen des CLI-Laufzeitstatus.</summary>
@@ -700,7 +700,7 @@ public static class CliRuntimeStatusEvaluator
             lastActivityUtc = lastInputUtc.Value;
 
         return nowUtc - lastActivityUtc >= waitingThreshold
-            ? CliRuntimeStatus.WartetAufEingabe
-            : CliRuntimeStatus.Laeuft;
+            ? CliRuntimeStatus.WaitingForInput
+            : CliRuntimeStatus.Running;
     }
 }

@@ -11,7 +11,7 @@ namespace Softwareschmiede.Tests.Domain.Enums;
 /// <summary>Tests für Statusübergänge von Aufgaben.</summary>
 public sealed class AufgabeStatusTransitionTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AufgabeService _sut;
     private readonly Guid _projektId = Guid.NewGuid();
 
@@ -21,12 +21,12 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
         _db = TestDbContextFactory.Create();
         _sut = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
 
-        _db.Projekte.Add(new Projekt
+        _db.Projects.Add(new Project
         {
             Id = _projektId,
             Name = "Transition-Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
     }
@@ -38,35 +38,35 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     [Fact]
     public async Task TestStatusTransitions_NeuToGestartet_Direct_Succeeds()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Transition-Test", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Transition-Test", null, ct: TestContext.Current.CancellationToken);
 
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
+        await _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.Status.Should().Be(AufgabeStatus.Gestartet);
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.Status.Should().Be(WorkItemStatus.Started);
     }
 
     /// <summary>ArbeitsverzeichnisEingerichtet existiert nicht mehr im Enum.</summary>
     [Fact]
     public void TestStatusTransitions_OldArbeitsverzeichnisStatus_Removed()
     {
-        Enum.GetNames<AufgabeStatus>().Should().NotContain("ArbeitsverzeichnisEingerichtet");
+        Enum.GetNames<WorkItemStatus>().Should().NotContain("ArbeitsverzeichnisEingerichtet");
     }
 
     /// <summary>InArbeit existiert nicht mehr im Enum.</summary>
     [Fact]
     public void TestStatusTransitions_OldInArbeitStatus_Removed()
     {
-        Enum.GetNames<AufgabeStatus>().Should().NotContain("InArbeit");
+        Enum.GetNames<WorkItemStatus>().Should().NotContain("InArbeit");
     }
 
     /// <summary>Übergang Gestartet → Wartend ist erlaubt.</summary>
     [Fact]
     public async Task TestStatusValidation_GestartetToWartend_IsAllowed()
     {
-        var aufgabe = await ErstelleAufgabeInStatus(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeInStatus(WorkItemStatus.Started);
 
-        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend);
+        var act = () => _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Waiting);
         await act.Should().NotThrowAsync();
     }
 
@@ -74,9 +74,9 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     [Fact]
     public async Task TestStatusValidation_GestartetToBeendet_IsAllowed()
     {
-        var aufgabe = await ErstelleAufgabeInStatus(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeInStatus(WorkItemStatus.Started);
 
-        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
+        var act = () => _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Completed);
         await act.Should().NotThrowAsync();
     }
 
@@ -84,27 +84,27 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     [Fact]
     public async Task TestStatusTransitions_WartendSequence_Succeeds()
     {
-        var aufgabe = await ErstelleAufgabeInStatus(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeInStatus(WorkItemStatus.Started);
 
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend, TestContext.Current.CancellationToken);
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet, TestContext.Current.CancellationToken);
+        await _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Waiting, TestContext.Current.CancellationToken);
+        await _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Started, TestContext.Current.CancellationToken);
+        await _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Completed, TestContext.Current.CancellationToken);
 
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.Status.Should().Be(AufgabeStatus.Beendet);
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.Status.Should().Be(WorkItemStatus.Completed);
     }
 
     /// <summary>Übergang von jedem Status nach Archiviert ist erlaubt.</summary>
     [Theory]
-    [InlineData(AufgabeStatus.Neu)]
-    [InlineData(AufgabeStatus.Gestartet)]
-    [InlineData(AufgabeStatus.Wartend)]
-    [InlineData(AufgabeStatus.Beendet)]
-    public async Task TestStatusTransitions_AnyStatusToArchiviert_IsAllowed(AufgabeStatus fromStatus)
+    [InlineData(WorkItemStatus.New)]
+    [InlineData(WorkItemStatus.Started)]
+    [InlineData(WorkItemStatus.Waiting)]
+    [InlineData(WorkItemStatus.Completed)]
+    public async Task TestStatusTransitions_AnyStatusToArchiviert_IsAllowed(WorkItemStatus fromStatus)
     {
-        var aufgabe = await ErstelleAufgabeInStatus(fromStatus);
+        var workItem = await ErstelleAufgabeInStatus(fromStatus);
 
-        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Archiviert);
+        var act = () => _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Archived);
         await act.Should().NotThrowAsync();
     }
 
@@ -112,9 +112,9 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     [Fact]
     public async Task TestStatusValidation_InvalidTransition_ThrowsException()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Ungültiger Übergang", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Ungültiger Übergang", null, ct: TestContext.Current.CancellationToken);
 
-        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
+        var act = () => _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Completed);
         await act.Should().ThrowAsync<InvalidStatusTransitionException>();
     }
 
@@ -122,9 +122,9 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     [Fact]
     public async Task TestStatusValidation_BeendetToGestartet_ThrowsException()
     {
-        var aufgabe = await ErstelleAufgabeInStatus(AufgabeStatus.Beendet);
+        var workItem = await ErstelleAufgabeInStatus(WorkItemStatus.Completed);
 
-        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
+        var act = () => _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Started);
         await act.Should().ThrowAsync<InvalidStatusTransitionException>();
     }
 
@@ -132,24 +132,24 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     [Fact]
     public async Task TestStatusValidation_ArchiviertToNeu_ThrowsException()
     {
-        var aufgabe = await ErstelleAufgabeInStatus(AufgabeStatus.Archiviert);
+        var workItem = await ErstelleAufgabeInStatus(WorkItemStatus.Archived);
 
-        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Neu);
+        var act = () => _sut.SetStatusAsync(workItem.Id, WorkItemStatus.New);
         await act.Should().ThrowAsync<InvalidStatusTransitionException>();
     }
 
-    private async Task<Aufgabe> ErstelleAufgabeInStatus(AufgabeStatus status)
+    private async Task<WorkItem> ErstelleAufgabeInStatus(WorkItemStatus status)
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = $"Aufgabe-{status}",
+            ProjectId = _projektId,
+            Title = $"Aufgabe-{status}",
             Status = status,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
-        _db.Aufgaben.Add(aufgabe);
+        _db.WorkItems.Add(workItem);
         await _db.SaveChangesAsync();
-        return aufgabe;
+        return workItem;
     }
 }

@@ -8,7 +8,7 @@ namespace Softwareschmiede.Domain.PluginImpl;
 /// <param name="prozessStarter">Startet den Öffnen-Befehl für das Repository-Verzeichnis.</param>
 /// <param name="visualStudioCodeLocator">Ermittelt den startbaren Visual-Studio-Code-Befehl.</param>
 public sealed class VisualStudioCodeIdePlugin(
-    IProzessStarter prozessStarter,
+    IProcessStarter prozessStarter,
     IVisualStudioCodeLocator visualStudioCodeLocator) : IIdePlugin
 {
     /// <inheritdoc/>
@@ -35,16 +35,16 @@ public sealed class VisualStudioCodeIdePlugin(
     /// <param name="prozessStarter">Startet den Öffnen-Befehl für das Verzeichnis.</param>
     /// <param name="visualStudioCodeLocator">Ermittelt den startbaren Visual-Studio-Code-Befehl.</param>
     /// <param name="path">Der zu öffnende Ordner.</param>
-    internal static void OpenDirectory(IProzessStarter prozessStarter, IVisualStudioCodeLocator visualStudioCodeLocator, string path)
+    internal static void OpenDirectory(IProcessStarter prozessStarter, IVisualStudioCodeLocator visualStudioCodeLocator, string path)
     {
         var availability = visualStudioCodeLocator.Locate();
         if (!availability.IsAvailable || string.IsNullOrWhiteSpace(availability.ExecutablePath))
             throw new InvalidOperationException("Visual Studio Code wurde nicht gefunden.");
 
-        prozessStarter.Starten(new ProzessStartAnfrage(
+        prozessStarter.Start(new ProcessStartRequest(
             availability.ExecutablePath,
             QuoteArgument(path),
-            ShellAusfuehren: false));
+            UseShellExecute: false));
     }
 
     private static string QuoteArgument(string argument)

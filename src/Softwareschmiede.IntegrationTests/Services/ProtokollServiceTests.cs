@@ -5,7 +5,7 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.IntegrationTests.Infrastructure;
-using TestResult = Softwareschmiede.Domain.ValueObjects.TestResult;
+using TestRunResult = Softwareschmiede.Domain.ValueObjects.TestRunResult;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
@@ -18,9 +18,9 @@ public sealed class ProtokollServiceTests
         var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
-        var projekt = await projektService.CreateAsync("Testprojekt Protokoll", null);
-        var aufgabe = await aufgabeService.CreateAsync(projekt.Id, "Testaufgabe Protokoll", null);
-        return aufgabe.Id;
+        var project = await projektService.CreateAsync("Testprojekt Protokoll", null);
+        var workItem = await aufgabeService.CreateAsync(project.Id, "Testaufgabe Protokoll", null);
+        return workItem.Id;
     }
 
     /// <summary>
@@ -31,21 +31,21 @@ public sealed class ProtokollServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabeId = await CreateTestAufgabeAsync(db);
+        var workItemId = await CreateTestAufgabeAsync(db);
         var service = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
         // Act
-        var eintrag = await service.AddEintragAsync(aufgabeId, ProtokollTyp.Prompt, "Analysiere den Code und erstelle Tests.", "TestAgent", TestContext.Current.CancellationToken);
+        var eintrag = await service.AddEintragAsync(workItemId, LogEntryType.Prompt, "Analysiere den Code und erstelle Tests.", "TestAgent", TestContext.Current.CancellationToken);
 
         // Assert – Persistenz via neuem Context prüfen
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Protokolleintraege.FindAsync(new object?[] { eintrag.Id }, TestContext.Current.CancellationToken);
+        var loaded = await db2.LogEntries.FindAsync(new object?[] { eintrag.Id }, TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
-        loaded!.Inhalt.Should().Be("Analysiere den Code und erstelle Tests.");
-        loaded.Typ.Should().Be(ProtokollTyp.Prompt);
+        loaded!.Content.Should().Be("Analysiere den Code und erstelle Tests.");
+        loaded.Type.Should().Be(LogEntryType.Prompt);
         loaded.AgentName.Should().Be("TestAgent");
-        loaded.AufgabeId.Should().Be(aufgabeId);
+        loaded.WorkItemId.Should().Be(workItemId);
     }
 
     /// <summary>
@@ -56,23 +56,23 @@ public sealed class ProtokollServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabeId = await CreateTestAufgabeAsync(db);
+        var workItemId = await CreateTestAufgabeAsync(db);
         var service = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
-        await service.AddEintragAsync(aufgabeId, ProtokollTyp.Prompt, "Erster Eintrag", ct: TestContext.Current.CancellationToken);
+        await service.AddEintragAsync(workItemId, LogEntryType.Prompt, "Erster Eintrag", ct: TestContext.Current.CancellationToken);
         await Task.Delay(5, TestContext.Current.CancellationToken);
-        await service.AddEintragAsync(aufgabeId, ProtokollTyp.KiAntwort, "Zweiter Eintrag", ct: TestContext.Current.CancellationToken);
+        await service.AddEintragAsync(workItemId, LogEntryType.AiResponse, "Zweiter Eintrag", ct: TestContext.Current.CancellationToken);
         await Task.Delay(5, TestContext.Current.CancellationToken);
-        await service.AddEintragAsync(aufgabeId, ProtokollTyp.StatusUebergang, "Dritter Eintrag", ct: TestContext.Current.CancellationToken);
+        await service.AddEintragAsync(workItemId, LogEntryType.StatusTransition, "Dritter Eintrag", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var result = await service.GetByAufgabeAsync(aufgabeId, TestContext.Current.CancellationToken);
+        var result = await service.GetByAufgabeAsync(workItemId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(3);
-        result[0].Inhalt.Should().Be("Erster Eintrag");
-        result[1].Inhalt.Should().Be("Zweiter Eintrag");
-        result[2].Inhalt.Should().Be("Dritter Eintrag");
+        result[0].Content.Should().Be("Erster Eintrag");
+        result[1].Content.Should().Be("Zweiter Eintrag");
+        result[2].Content.Should().Be("Dritter Eintrag");
     }
 
     /// <summary>
@@ -83,19 +83,19 @@ public sealed class ProtokollServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabeId = await CreateTestAufgabeAsync(db);
+        var workItemId = await CreateTestAufgabeAsync(db);
         var service = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
-        await service.AddEintragAsync(aufgabeId, ProtokollTyp.Prompt, "Suche nach Fehler im Modul", ct: TestContext.Current.CancellationToken);
-        await service.AddEintragAsync(aufgabeId, ProtokollTyp.KiAntwort, "Nichts Relevantes hier", ct: TestContext.Current.CancellationToken);
-        await service.AddEintragAsync(aufgabeId, ProtokollTyp.Prompt, "Fehler gefunden: NullReference", ct: TestContext.Current.CancellationToken);
+        await service.AddEintragAsync(workItemId, LogEntryType.Prompt, "Suche nach Fehler im Modul", ct: TestContext.Current.CancellationToken);
+        await service.AddEintragAsync(workItemId, LogEntryType.AiResponse, "Nichts Relevantes hier", ct: TestContext.Current.CancellationToken);
+        await service.AddEintragAsync(workItemId, LogEntryType.Prompt, "Fehler gefunden: NullReference", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var result = await service.SuchenAsync(aufgabeId, "Fehler", TestContext.Current.CancellationToken);
+        var result = await service.SuchenAsync(workItemId, "Fehler", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(2);
-        result.Should().AllSatisfy(e => e.Inhalt.Should().Contain("Fehler"));
+        result.Should().AllSatisfy(e => e.Content.Should().Contain("Fehler"));
     }
 
     /// <summary>
@@ -106,15 +106,15 @@ public sealed class ProtokollServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabeId = await CreateTestAufgabeAsync(db);
+        var workItemId = await CreateTestAufgabeAsync(db);
         var service = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
-        await service.AddEintragAsync(aufgabeId, ProtokollTyp.Prompt, "Prompt von Agent A", "AgentA", TestContext.Current.CancellationToken);
-        await service.AddEintragAsync(aufgabeId, ProtokollTyp.Prompt, "Prompt von Agent B", "AgentB", TestContext.Current.CancellationToken);
-        await service.AddEintragAsync(aufgabeId, ProtokollTyp.KiAntwort, "Antwort von Agent A", "AgentA", TestContext.Current.CancellationToken);
+        await service.AddEintragAsync(workItemId, LogEntryType.Prompt, "Prompt von Agent A", "AgentA", TestContext.Current.CancellationToken);
+        await service.AddEintragAsync(workItemId, LogEntryType.Prompt, "Prompt von Agent B", "AgentB", TestContext.Current.CancellationToken);
+        await service.AddEintragAsync(workItemId, LogEntryType.AiResponse, "Antwort von Agent A", "AgentA", TestContext.Current.CancellationToken);
 
         // Act
-        var result = await service.SuchenAsync(aufgabeId, "AgentA", TestContext.Current.CancellationToken);
+        var result = await service.SuchenAsync(workItemId, "AgentA", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(2);
@@ -129,34 +129,34 @@ public sealed class ProtokollServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabeId = await CreateTestAufgabeAsync(db);
+        var workItemId = await CreateTestAufgabeAsync(db);
         var service = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
-        var testResult = new TestResult(
-            Bestanden: false,
+        var testResult = new TestRunResult(
+            Passed: false,
             Ergebnisse: new[]
             {
-                new TestErgebnisInfo("IntegrationTest.Test1", TestStatus.Bestanden, null, TimeSpan.FromMilliseconds(100)),
-                new TestErgebnisInfo("IntegrationTest.Test2", TestStatus.Fehlgeschlagen, "Expected true but was false", TimeSpan.FromMilliseconds(50)),
-                new TestErgebnisInfo("IntegrationTest.Test3", TestStatus.Uebersprungen, null, TimeSpan.Zero)
+                new TestErgebnisInfo("IntegrationTest.Test1", TestStatus.Passed, null, TimeSpan.FromMilliseconds(100)),
+                new TestErgebnisInfo("IntegrationTest.Test2", TestStatus.Failed, "Expected true but was false", TimeSpan.FromMilliseconds(50)),
+                new TestErgebnisInfo("IntegrationTest.Test3", TestStatus.Skipped, null, TimeSpan.Zero)
             });
 
         // Act
-        var eintrag = await service.AddTestErgebnisseAsync(aufgabeId, testResult, TestContext.Current.CancellationToken);
+        var eintrag = await service.AddTestErgebnisseAsync(workItemId, testResult, TestContext.Current.CancellationToken);
 
         // Assert – Persistenz via neuem Context prüfen
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Protokolleintraege
-            .Include(p => p.TestErgebnisse)
+        var loaded = await db2.LogEntries
+            .Include(p => p.TestResults)
             .FirstOrDefaultAsync(p => p.Id == eintrag.Id, cancellationToken: TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
-        loaded!.Typ.Should().Be(ProtokollTyp.TestErgebnis);
-        loaded.TestErgebnisse.Should().HaveCount(3);
+        loaded!.Type.Should().Be(LogEntryType.TestResult);
+        loaded.TestResults.Should().HaveCount(3);
 
-        var fehlgeschlagen = loaded.TestErgebnisse.Single(t => t.Status == TestStatus.Fehlgeschlagen);
+        var fehlgeschlagen = loaded.TestResults.Single(t => t.Status == TestStatus.Failed);
         fehlgeschlagen.TestName.Should().Be("IntegrationTest.Test2");
-        fehlgeschlagen.Fehlermeldung.Should().Be("Expected true but was false");
+        fehlgeschlagen.ErrorMessage.Should().Be("Expected true but was false");
     }
 
     /// <summary>
@@ -167,28 +167,28 @@ public sealed class ProtokollServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabeId = await CreateTestAufgabeAsync(db);
+        var workItemId = await CreateTestAufgabeAsync(db);
         var service = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
         var erwarteteDauer = TimeSpan.FromSeconds(1.5);
-        var testResult = new TestResult(
-            Bestanden: true,
+        var testResult = new TestRunResult(
+            Passed: true,
             Ergebnisse: new[]
             {
-                new TestErgebnisInfo("DauerTest", TestStatus.Bestanden, null, erwarteteDauer)
+                new TestErgebnisInfo("DauerTest", TestStatus.Passed, null, erwarteteDauer)
             });
 
         // Act
-        var eintrag = await service.AddTestErgebnisseAsync(aufgabeId, testResult, TestContext.Current.CancellationToken);
+        var eintrag = await service.AddTestErgebnisseAsync(workItemId, testResult, TestContext.Current.CancellationToken);
 
         // Assert – Überprüfen der TimeSpan-Konvertierung (Ticks → TimeSpan)
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Protokolleintraege
-            .Include(p => p.TestErgebnisse)
+        var loaded = await db2.LogEntries
+            .Include(p => p.TestResults)
             .FirstAsync(p => p.Id == eintrag.Id, cancellationToken: TestContext.Current.CancellationToken);
 
-        loaded.TestErgebnisse.Should().HaveCount(1);
-        loaded.TestErgebnisse[0].Dauer.Should().Be(erwarteteDauer);
+        loaded.TestResults.Should().HaveCount(1);
+        loaded.TestResults[0].Duration.Should().Be(erwarteteDauer);
     }
 
     /// <summary>
@@ -199,20 +199,20 @@ public sealed class ProtokollServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabeId = await CreateTestAufgabeAsync(db);
+        var workItemId = await CreateTestAufgabeAsync(db);
         var service = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
         // Act
-        var eintrag = await service.AddStatusUebergangAsync(aufgabeId, AufgabeStatus.Neu, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
+        var eintrag = await service.AddStatusUebergangAsync(workItemId, WorkItemStatus.New, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Protokolleintraege.FindAsync(new object?[] { eintrag.Id }, TestContext.Current.CancellationToken);
+        var loaded = await db2.LogEntries.FindAsync(new object?[] { eintrag.Id }, TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
-        loaded!.Typ.Should().Be(ProtokollTyp.StatusUebergang);
-        loaded.Inhalt.Should().Contain("Neu");
-        loaded.Inhalt.Should().Contain("Gestartet");
+        loaded!.Type.Should().Be(LogEntryType.StatusTransition);
+        loaded.Content.Should().Contain("Neu");
+        loaded.Content.Should().Contain("Gestartet");
     }
 
     /// <summary>
@@ -223,24 +223,24 @@ public sealed class ProtokollServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabeId = await CreateTestAufgabeAsync(db);
+        var workItemId = await CreateTestAufgabeAsync(db);
         var service = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
-        var testResult = new TestResult(
-            Bestanden: true,
+        var testResult = new TestRunResult(
+            Passed: true,
             Ergebnisse: new[]
             {
-                new TestErgebnisInfo("Test.A", TestStatus.Bestanden, null, TimeSpan.FromMilliseconds(10)),
-                new TestErgebnisInfo("Test.B", TestStatus.Bestanden, null, TimeSpan.FromMilliseconds(20))
+                new TestErgebnisInfo("Test.A", TestStatus.Passed, null, TimeSpan.FromMilliseconds(10)),
+                new TestErgebnisInfo("Test.B", TestStatus.Passed, null, TimeSpan.FromMilliseconds(20))
             });
 
-        await service.AddTestErgebnisseAsync(aufgabeId, testResult, TestContext.Current.CancellationToken);
+        await service.AddTestErgebnisseAsync(workItemId, testResult, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await service.GetByAufgabeAsync(aufgabeId, TestContext.Current.CancellationToken);
+        var result = await service.GetByAufgabeAsync(workItemId, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().HaveCount(1);
-        result[0].TestErgebnisse.Should().HaveCount(2);
+        result[0].TestResults.Should().HaveCount(2);
     }
 }

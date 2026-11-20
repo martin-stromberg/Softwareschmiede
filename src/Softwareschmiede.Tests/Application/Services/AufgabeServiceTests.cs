@@ -13,7 +13,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Tests für den AufgabeService.</summary>
 public sealed class AufgabeServiceTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly Mock<ILogger<AufgabeService>> _loggerMock;
     private readonly TodoService _todoService;
     private readonly AufgabeService _sut;
@@ -28,12 +28,12 @@ public sealed class AufgabeServiceTests : IDisposable
         _sut = new AufgabeService(_db, _loggerMock.Object, _todoService);
 
         // Seed a project for FK constraints
-        _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
+        _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
             Id = _projektId,
             Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
     }
@@ -51,10 +51,10 @@ public sealed class AufgabeServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.Id.Should().NotBeEmpty();
-        result.Titel.Should().Be("Test Aufgabe");
-        result.Status.Should().Be(AufgabeStatus.Neu);
-        result.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.NichtGestartet);
-        result.ProjektId.Should().Be(_projektId);
+        result.Title.Should().Be("Test Aufgabe");
+        result.Status.Should().Be(WorkItemStatus.New);
+        result.ExecutionStatus.Should().Be(WorkItemExecutionStatus.NotStarted);
+        result.ProjectId.Should().Be(_projektId);
     }
 
     /// <summary>CreateFromIssueAsync erstellt eine Aufgabe aus einem Issue mit IssueReferenz.</summary>
@@ -64,7 +64,7 @@ public sealed class AufgabeServiceTests : IDisposable
         // Arrange
         var issue = new Issue(
             Nummer: 42,
-            Titel: "Fix login bug",
+            Title: "Fix login bug",
             Body: "Der Login funktioniert nicht.",
             Labels: new[] { "bug", "priority-high" },
             Milestone: "v1.0",
@@ -74,10 +74,10 @@ public sealed class AufgabeServiceTests : IDisposable
         var result = await _sut.CreateFromIssueAsync(_projektId, issue, ct: TestContext.Current.CancellationToken);
 
         // Assert
-        result.Titel.Should().Be("Fix login bug");
-        result.IssueReferenz.Should().NotBeNull();
-        result.IssueReferenz!.IssueNummer.Should().Be(42);
-        result.IssueReferenz.Milestone.Should().Be("v1.0");
+        result.Title.Should().Be("Fix login bug");
+        result.IssueReference.Should().NotBeNull();
+        result.IssueReference!.IssueNumber.Should().Be(42);
+        result.IssueReference.Milestone.Should().Be("v1.0");
     }
 
     /// <summary>CreateFromPullRequestAsync erstellt eine Aufgabe mit ReviewSource-Referenz.</summary>
@@ -88,18 +88,18 @@ public sealed class AufgabeServiceTests : IDisposable
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
+            ProjectId = _projektId,
             RepositoryName = "owner/repo",
             RepositoryUrl = "https://github.com/owner/repo.git",
-            PluginTyp = "Softwareschmiede.GitHub",
-            Aktiv = true
+            PluginType = "Softwareschmiede.GitHub",
+            Active = true
         };
         _db.GitRepositories.Add(repository);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var pullRequest = new PullRequest(
             Nummer: 17,
-            Titel: "Review external change",
+            Title: "Review external change",
             Url: "https://github.com/owner/repo/pull/17",
             BranchName: "feature/external",
             Provider: PullRequestProvider.GitHub,
@@ -119,24 +119,24 @@ public sealed class AufgabeServiceTests : IDisposable
                 <!-- raw HTML omitted -->
                 </details>
                 """);
-        var context = new ScmRepositoryContext(repository.Id, repository.PluginTyp, "owner/repo");
+        var context = new ScmRepositoryContext(repository.Id, repository.PluginType, "owner/repo");
 
         // Act
         var result = await _sut.CreateFromPullRequestAsync(_projektId, pullRequest, context, TestContext.Current.CancellationToken);
 
         // Assert
-        result.Titel.Should().Be("Review external change");
-        result.AnforderungsBeschreibung.Should().Contain("Bitte diese Dependency-Aktualisierung reviewen.");
-        result.AnforderungsBeschreibung.Should().Contain("Release notes");
-        result.AnforderungsBeschreibung.Should().Contain("- fix `parser` output");
-        result.AnforderungsBeschreibung.Should().Contain("https://github.com/owner/repo/pull/17");
-        result.AnforderungsBeschreibung.Should().NotContain("<details>");
-        result.AnforderungsBeschreibung.Should().NotContain("<summary>");
-        result.AnforderungsBeschreibung.Should().NotContain("<a ");
+        result.Title.Should().Be("Review external change");
+        result.RequirementDescription.Should().Contain("Bitte diese Dependency-Aktualisierung reviewen.");
+        result.RequirementDescription.Should().Contain("Release notes");
+        result.RequirementDescription.Should().Contain("- fix `parser` output");
+        result.RequirementDescription.Should().Contain("https://github.com/owner/repo/pull/17");
+        result.RequirementDescription.Should().NotContain("<details>");
+        result.RequirementDescription.Should().NotContain("<summary>");
+        result.RequirementDescription.Should().NotContain("<a ");
         result.GitRepositoryId.Should().Be(repository.Id);
         result.PullRequests.Should().ContainSingle();
         var reference = result.PullRequests.Single();
-        reference.Rolle.Should().Be(PullRequestReferenzRolle.ReviewSource);
+        reference.Role.Should().Be(PullRequestReferenzRolle.ReviewSource);
         reference.RepositoryId.Should().Be("owner/repo");
         reference.SourceRepositoryId.Should().Be("fork/repo");
         reference.SourceRepositoryUrl.Should().Be("https://github.com/fork/repo.git");
@@ -181,13 +181,13 @@ public sealed class AufgabeServiceTests : IDisposable
 
         var result = await _sut.CreateFromAlertAsync(_projektId, alert, issue, provider: "Softwareschmiede.GitHub", repositoryId: "owner/repo", ct: TestContext.Current.CancellationToken);
 
-        result.Titel.Should().Be("SQL injection");
-        result.AnforderungsBeschreibung.Should().Be(issueBody);
-        result.IssueReferenz.Should().NotBeNull();
-        result.IssueReferenz!.IssueNummer.Should().Be(123);
-        result.AlertReferenz.Should().NotBeNull();
-        result.AlertReferenz!.SourceKey.Should().Be("github:code-scanning:owner/repo:7");
-        result.AlertReferenz.RuleId.Should().Be("cs/sql-injection");
+        result.Title.Should().Be("SQL injection");
+        result.RequirementDescription.Should().Be(issueBody);
+        result.IssueReference.Should().NotBeNull();
+        result.IssueReference!.IssueNumber.Should().Be(123);
+        result.AlertReference.Should().NotBeNull();
+        result.AlertReference!.SourceKey.Should().Be("github:code-scanning:owner/repo:7");
+        result.AlertReference.RuleId.Should().Be("cs/sql-injection");
     }
 
     /// <summary>CreateFromAlertAsync erzeugt bei gleicher SourceKey keine zweite Aufgabe.</summary>
@@ -202,8 +202,8 @@ public sealed class AufgabeServiceTests : IDisposable
         var second = await _sut.CreateFromAlertAsync(_projektId, alert, secondIssue, ct: TestContext.Current.CancellationToken);
 
         second.Id.Should().Be(first.Id);
-        var aufgaben = await _sut.GetByProjektAsync(_projektId, TestContext.Current.CancellationToken);
-        aufgaben.Count(a => a.AlertReferenz != null && a.AlertReferenz.SourceKey == alert.SourceKey).Should().Be(1);
+        var workItems = await _sut.GetByProjektAsync(_projektId, TestContext.Current.CancellationToken);
+        workItems.Count(a => a.AlertReference != null && a.AlertReference.SourceKey == alert.SourceKey).Should().Be(1);
     }
 
     /// <summary>DeleteAsync entfernt die AlertReferenz kaskadierend mit der Aufgabe.</summary>
@@ -212,109 +212,109 @@ public sealed class AufgabeServiceTests : IDisposable
     {
         var alert = new ScmAlert(7, "github:code-scanning:owner/repo:7", ScmAlertType.CodeScanning, "Alert", "Body", null, "medium", "open", "CodeQL", "rule", "Rule", null, null);
         var issue = new Issue(123, "Issue", "Body", [], null, "https://github.com/owner/repo/issues/123");
-        var aufgabe = await _sut.CreateFromAlertAsync(_projektId, alert, issue, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateFromAlertAsync(_projektId, alert, issue, ct: TestContext.Current.CancellationToken);
 
-        await _sut.DeleteAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        await _sut.DeleteAsync(workItem.Id, TestContext.Current.CancellationToken);
         _db.ChangeTracker.Clear();
 
-        _db.Aufgaben.Any(a => a.Id == aufgabe.Id).Should().BeFalse();
-        _db.AlertReferenzen.Any(a => a.SourceKey == alert.SourceKey).Should().BeFalse();
+        _db.WorkItems.Any(a => a.Id == workItem.Id).Should().BeFalse();
+        _db.AlertReferences.Any(a => a.SourceKey == alert.SourceKey).Should().BeFalse();
     }
 
     /// <summary>TryAssignIssueReferenzIfNoneAsync speichert eine IssueReferenz, wenn noch keine existiert.</summary>
     [Fact]
     public async Task TryAssignIssueReferenzIfNoneAsync_ShouldPersistIssueReference_WhenNoneExists()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Anlage", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Issue-Anlage", null, ct: TestContext.Current.CancellationToken);
         var issue = new Issue(23, "Neu", "Body", ["feature"], "v1", "https://example.test/23");
 
-        var assigned = await _sut.TryAssignIssueReferenzIfNoneAsync(aufgabe.Id, issue, TestContext.Current.CancellationToken);
+        var assigned = await _sut.TryAssignIssueReferenzIfNoneAsync(workItem.Id, issue, TestContext.Current.CancellationToken);
 
         assigned.Should().BeTrue();
-        var reloaded = await _sut.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        reloaded!.IssueReferenz.Should().NotBeNull();
-        reloaded.IssueReferenz!.IssueNummer.Should().Be(23);
-        reloaded.IssueReferenz.IssueUrl.Should().Be("https://example.test/23");
+        var reloaded = await _sut.GetDetailAsync(workItem.Id, TestContext.Current.CancellationToken);
+        reloaded!.IssueReference.Should().NotBeNull();
+        reloaded.IssueReference!.IssueNumber.Should().Be(23);
+        reloaded.IssueReference.IssueUrl.Should().Be("https://example.test/23");
     }
 
     /// <summary>Kombinierte Issue-Zuweisung speichert Referenz und Beschreibung gemeinsam.</summary>
     [Fact]
     public async Task TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync_ShouldPersistReferenceAndDescription_WhenNoneExists()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", ct: TestContext.Current.CancellationToken);
         var issue = new Issue(23, "Neu", "Issue Body", ["feature"], "v1", "https://example.test/23");
 
-        var assigned = await _sut.TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(aufgabe.Id, issue, true, "Neue Beschreibung", TestContext.Current.CancellationToken);
+        var assigned = await _sut.TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(workItem.Id, issue, true, "Neue Beschreibung", TestContext.Current.CancellationToken);
 
         assigned.Should().BeTrue();
-        var reloaded = await _sut.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        reloaded!.IssueReferenz!.IssueNummer.Should().Be(23);
-        reloaded.AnforderungsBeschreibung.Should().Be("Neue Beschreibung");
+        var reloaded = await _sut.GetDetailAsync(workItem.Id, TestContext.Current.CancellationToken);
+        reloaded!.IssueReference!.IssueNumber.Should().Be(23);
+        reloaded.RequirementDescription.Should().Be("Neue Beschreibung");
     }
 
     /// <summary>Kombinierte Issue-Zuweisung behält die Beschreibung bei deaktivierter Option unverändert.</summary>
     [Fact]
     public async Task TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync_ShouldKeepDescription_WhenUpdateFlagIsFalse()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", ct: TestContext.Current.CancellationToken);
         var issue = new Issue(23, "Neu", "Issue Body", [], null, "https://example.test/23");
 
-        var assigned = await _sut.TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(aufgabe.Id, issue, false, "Neue Beschreibung", TestContext.Current.CancellationToken);
+        var assigned = await _sut.TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(workItem.Id, issue, false, "Neue Beschreibung", TestContext.Current.CancellationToken);
 
         assigned.Should().BeTrue();
-        var reloaded = await _sut.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        reloaded!.IssueReferenz!.IssueNummer.Should().Be(23);
-        reloaded.AnforderungsBeschreibung.Should().Be("Alte Beschreibung");
+        var reloaded = await _sut.GetDetailAsync(workItem.Id, TestContext.Current.CancellationToken);
+        reloaded!.IssueReference!.IssueNumber.Should().Be(23);
+        reloaded.RequirementDescription.Should().Be("Alte Beschreibung");
     }
 
     /// <summary>Kombinierte Issue-Zuweisung überschreibt bei vorhandener Referenz weder Referenz noch Beschreibung.</summary>
     [Fact]
     public async Task TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync_ShouldReturnFalseAndKeepDescription_WhenReferenceExists()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", ct: TestContext.Current.CancellationToken);
         var existingIssue = new Issue(99, "Vorhanden", "Body", [], null, "https://example.test/99");
         var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://example.test/23");
-        await _sut.UpdateIssueReferenzAsync(aufgabe.Id, existingIssue, TestContext.Current.CancellationToken);
+        await _sut.UpdateIssueReferenzAsync(workItem.Id, existingIssue, TestContext.Current.CancellationToken);
 
-        var assigned = await _sut.TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(aufgabe.Id, createdIssue, true, "Neue Beschreibung", TestContext.Current.CancellationToken);
+        var assigned = await _sut.TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(workItem.Id, createdIssue, true, "Neue Beschreibung", TestContext.Current.CancellationToken);
 
         assigned.Should().BeFalse();
-        var reloaded = await _sut.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        reloaded!.IssueReferenz!.IssueNummer.Should().Be(99);
-        reloaded.AnforderungsBeschreibung.Should().Be("Alte Beschreibung");
+        var reloaded = await _sut.GetDetailAsync(workItem.Id, TestContext.Current.CancellationToken);
+        reloaded!.IssueReference!.IssueNumber.Should().Be(99);
+        reloaded.RequirementDescription.Should().Be("Alte Beschreibung");
     }
 
     /// <summary>TryAssignIssueReferenzIfNoneAsync überschreibt keine vorhandene IssueReferenz.</summary>
     [Fact]
     public async Task TryAssignIssueReferenzIfNoneAsync_ShouldReturnFalseAndKeepExistingReference_WhenReferenceExists()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Anlage", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Issue-Anlage", null, ct: TestContext.Current.CancellationToken);
         var existingIssue = new Issue(99, "Vorhanden", "Body", [], null, "https://example.test/99");
         var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://example.test/23");
-        await _sut.UpdateIssueReferenzAsync(aufgabe.Id, existingIssue, TestContext.Current.CancellationToken);
+        await _sut.UpdateIssueReferenzAsync(workItem.Id, existingIssue, TestContext.Current.CancellationToken);
 
-        var assigned = await _sut.TryAssignIssueReferenzIfNoneAsync(aufgabe.Id, createdIssue, TestContext.Current.CancellationToken);
+        var assigned = await _sut.TryAssignIssueReferenzIfNoneAsync(workItem.Id, createdIssue, TestContext.Current.CancellationToken);
 
         assigned.Should().BeFalse();
-        var reloaded = await _sut.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        reloaded!.IssueReferenz!.IssueNummer.Should().Be(99);
-        reloaded.IssueReferenz.IssueUrl.Should().Be("https://example.test/99");
+        var reloaded = await _sut.GetDetailAsync(workItem.Id, TestContext.Current.CancellationToken);
+        reloaded!.IssueReference!.IssueNumber.Should().Be(99);
+        reloaded.IssueReference.IssueUrl.Should().Be("https://example.test/99");
     }
 
     /// <summary>UpdateIssueReferenzAsync behält die bestehende Issue-zuweisen-Semantik bei und überschreibt vorhandene Referenzen.</summary>
     [Fact]
     public async Task UpdateIssueReferenzAsync_ShouldOverwriteExistingReference_WhenReferenceExists()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Zuweisung", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Issue-Zuweisung", null, ct: TestContext.Current.CancellationToken);
         var existingIssue = new Issue(99, "Vorhanden", "Body", [], null, "https://example.test/99");
         var selectedIssue = new Issue(42, "Auswahl", "Body", [], null, "https://example.test/42");
-        await _sut.UpdateIssueReferenzAsync(aufgabe.Id, existingIssue, TestContext.Current.CancellationToken);
+        await _sut.UpdateIssueReferenzAsync(workItem.Id, existingIssue, TestContext.Current.CancellationToken);
 
-        await _sut.UpdateIssueReferenzAsync(aufgabe.Id, selectedIssue, TestContext.Current.CancellationToken);
+        await _sut.UpdateIssueReferenzAsync(workItem.Id, selectedIssue, TestContext.Current.CancellationToken);
 
-        var reloaded = await _sut.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        reloaded!.IssueReferenz!.IssueNummer.Should().Be(42);
-        reloaded.IssueReferenz.IssueUrl.Should().Be("https://example.test/42");
+        var reloaded = await _sut.GetDetailAsync(workItem.Id, TestContext.Current.CancellationToken);
+        reloaded!.IssueReference!.IssueNumber.Should().Be(42);
+        reloaded.IssueReference.IssueUrl.Should().Be("https://example.test/42");
     }
 
     /// <summary>GetByProjektAsync gibt alle Aufgaben eines Projekts zurück.</summary>
@@ -337,27 +337,27 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task StartenAsync_ShouldSetStatusGestartetAndBranchName_WhenAufgabeExists()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Zu startende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Zu startende Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.StartenAsync(aufgabe.Id, "feature/test-branch", "/tmp/klon", ct: TestContext.Current.CancellationToken);
+        await _sut.StartenAsync(workItem.Id, "feature/test-branch", "/tmp/klon", ct: TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.Status.Should().Be(AufgabeStatus.Gestartet);
-        result.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.Status.Should().Be(WorkItemStatus.Started);
+        result.ExecutionStatus.Should().Be(WorkItemExecutionStatus.Active);
         result.BranchName.Should().Be("feature/test-branch");
-        result.LokalerKlonPfad.Should().Be("/tmp/klon");
+        result.LocalClonePath.Should().Be("/tmp/klon");
     }
 
     /// <summary>StartenAsync sperrt terminale Gesamtstatus unabhängig vom Ausführungsstatus.</summary>
     [Fact]
     public async Task StartenAsync_ShouldThrow_WhenAufgabeBeendetIst()
     {
-        var aufgabe = await _sut.CreateAsync(_projektId, "Beendete Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        await _sut.AbschliessenAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Beendete Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _sut.AbschliessenAsync(workItem.Id, TestContext.Current.CancellationToken);
 
-        var act = () => _sut.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon");
+        var act = () => _sut.StartenAsync(workItem.Id, "feature/test", "/tmp/klon");
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Beendete oder archivierte Aufgaben können nicht gestartet werden.");
@@ -368,16 +368,16 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task GetLatestDiffResultIdForFileAsync_ShouldReturnNewestMatchingDiff_WhenPathUsesDifferentSeparators()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Diff-Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        var older = CreateDiffResult(aufgabe.Id, @"src\module\alpha.cs", DateTimeOffset.UtcNow.AddMinutes(-5));
-        var newer = CreateDiffResult(aufgabe.Id, "src/module/alpha.cs", DateTimeOffset.UtcNow);
-        var otherFile = CreateDiffResult(aufgabe.Id, "src/module/beta.cs", DateTimeOffset.UtcNow.AddMinutes(1));
+        var workItem = await _sut.CreateAsync(_projektId, "Diff-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var older = CreateDiffResult(workItem.Id, @"src\module\alpha.cs", DateTimeOffset.UtcNow.AddMinutes(-5));
+        var newer = CreateDiffResult(workItem.Id, "src/module/alpha.cs", DateTimeOffset.UtcNow);
+        var otherFile = CreateDiffResult(workItem.Id, "src/module/beta.cs", DateTimeOffset.UtcNow.AddMinutes(1));
 
         _db.DiffResults.AddRange(older, newer, otherFile);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetLatestDiffResultIdForFileAsync(aufgabe.Id, "./src/module/alpha.cs", TestContext.Current.CancellationToken);
+        var result = await _sut.GetLatestDiffResultIdForFileAsync(workItem.Id, "./src/module/alpha.cs", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().Be(newer.Id);
@@ -388,12 +388,12 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task GetLatestDiffResultIdForFileAsync_ShouldReturnNull_WhenNoDiffForFileExists()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Diff-Aufgabe ohne Treffer", null, ct: TestContext.Current.CancellationToken);
-        _db.DiffResults.Add(CreateDiffResult(aufgabe.Id, "src/module/existing.cs", DateTimeOffset.UtcNow));
+        var workItem = await _sut.CreateAsync(_projektId, "Diff-Aufgabe ohne Treffer", null, ct: TestContext.Current.CancellationToken);
+        _db.DiffResults.Add(CreateDiffResult(workItem.Id, "src/module/existing.cs", DateTimeOffset.UtcNow));
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetLatestDiffResultIdForFileAsync(aufgabe.Id, "src/module/missing.cs", TestContext.Current.CancellationToken);
+        var result = await _sut.GetLatestDiffResultIdForFileAsync(workItem.Id, "src/module/missing.cs", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
@@ -404,14 +404,14 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task StatusSetzenAsync_ShouldSetStatusGestartet_WhenAufgabeExists()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "KI-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "KI-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
+        await _sut.StatusSetzenAsync(workItem.Id, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.Status.Should().Be(AufgabeStatus.Gestartet);
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.Status.Should().Be(WorkItemStatus.Started);
     }
 
     /// <summary>AbschliessenAsync setzt Status auf Beendet und setzt AbschlussDatum.</summary>
@@ -419,16 +419,16 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task AbschliessenAsync_ShouldSetStatusBeendetAndSetAbschlussDatum_WhenAufgabeExists()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Abzuschließende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Abzuschließende Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.AbschliessenAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        await _sut.AbschliessenAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.Status.Should().Be(AufgabeStatus.Beendet);
-        result.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);
-        result.AbschlussDatum.Should().NotBeNull();
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.Status.Should().Be(WorkItemStatus.Completed);
+        result.ExecutionStatus.Should().Be(WorkItemExecutionStatus.Completed);
+        result.CompletedAt.Should().NotBeNull();
     }
 
     /// <summary>UpdateAsync aktualisiert Titel, Agenteninfos und KI-Plugin.</summary>
@@ -436,16 +436,16 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task UpdateAsync_ShouldUpdateTitelAndAgentenInfos_WhenAufgabeExists()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Alter Titel", "Alte Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Alter Titel", "Alte Beschreibung", ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.UpdateAsync(aufgabe.Id, "Neuer Titel", "Neue Beschreibung", "Softwareschmiede.Ki", TestContext.Current.CancellationToken);
+        await _sut.UpdateAsync(workItem.Id, "Neuer Titel", "Neue Beschreibung", "Softwareschmiede.Ki", TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.Titel.Should().Be("Neuer Titel");
-        result.AnforderungsBeschreibung.Should().Be("Neue Beschreibung");
-        result.KiPluginPrefix.Should().Be("Softwareschmiede.Ki");
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.Title.Should().Be("Neuer Titel");
+        result.RequirementDescription.Should().Be("Neue Beschreibung");
+        result.AiPluginPrefix.Should().Be("Softwareschmiede.Ki");
     }
 
     /// <summary>DeleteAsync entfernt die Aufgabe aus der Datenbank.</summary>
@@ -453,13 +453,13 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task DeleteAsync_ShouldRemoveAufgabe_WhenAufgabeExists()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Zu löschende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Zu löschende Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.DeleteAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        await _sut.DeleteAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         result.Should().BeNull();
     }
 
@@ -468,16 +468,16 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task SavePromptVorschlagAsync_ShouldPersistPromptAndSchedule_WhenValuesAreProvided()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag", null, ct: TestContext.Current.CancellationToken);
         var ausfuehrenAbUtc = new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero);
 
         // Act
-        await _sut.SavePromptVorschlagAsync(aufgabe.Id, "Mach nun bitte weiter.", ausfuehrenAbUtc, TestContext.Current.CancellationToken);
+        await _sut.SavePromptVorschlagAsync(workItem.Id, "Mach nun bitte weiter.", ausfuehrenAbUtc, TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.VorschlagPrompt.Should().Be("Mach nun bitte weiter.");
-        result.VorschlagAusfuehrenAbUtc.Should().Be(ausfuehrenAbUtc);
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.SuggestedPrompt.Should().Be("Mach nun bitte weiter.");
+        result.SuggestedExecuteAfterUtc.Should().Be(ausfuehrenAbUtc);
     }
 
     /// <summary>SavePromptVorschlagAsync entfernt Zeitstempel, wenn der Prompt leer ist.</summary>
@@ -485,16 +485,16 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task SavePromptVorschlagAsync_ShouldClearSchedule_WhenPromptIsWhitespace()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag löschen", null, ct: TestContext.Current.CancellationToken);
-        await _sut.SavePromptVorschlagAsync(aufgabe.Id, "Mach nun bitte weiter.", new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag löschen", null, ct: TestContext.Current.CancellationToken);
+        await _sut.SavePromptVorschlagAsync(workItem.Id, "Mach nun bitte weiter.", new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.SavePromptVorschlagAsync(aufgabe.Id, "  ", new DateTimeOffset(2026, 06, 01, 12, 0, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
+        await _sut.SavePromptVorschlagAsync(workItem.Id, "  ", new DateTimeOffset(2026, 06, 01, 12, 0, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.VorschlagPrompt.Should().BeNull();
-        result.VorschlagAusfuehrenAbUtc.Should().BeNull();
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.SuggestedPrompt.Should().BeNull();
+        result.SuggestedExecuteAfterUtc.Should().BeNull();
     }
 
     /// <summary>ClearPromptVorschlagAsync entfernt Prompt und Ausführungszeitpunkt vollständig.</summary>
@@ -502,16 +502,16 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task ClearPromptVorschlagAsync_ShouldRemovePromptAndSchedule_WhenValuesExist()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag entfernen", null, ct: TestContext.Current.CancellationToken);
-        await _sut.SavePromptVorschlagAsync(aufgabe.Id, "Mach nun bitte weiter.", new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag entfernen", null, ct: TestContext.Current.CancellationToken);
+        await _sut.SavePromptVorschlagAsync(workItem.Id, "Mach nun bitte weiter.", new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.ClearPromptVorschlagAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        await _sut.ClearPromptVorschlagAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.VorschlagPrompt.Should().BeNull();
-        result.VorschlagAusfuehrenAbUtc.Should().BeNull();
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.SuggestedPrompt.Should().BeNull();
+        result.SuggestedExecuteAfterUtc.Should().BeNull();
     }
 
     /// <summary>VerwerfenAsync archiviert eine neue Aufgabe.</summary>
@@ -519,14 +519,14 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task VerwerfenAsync_ShouldSetStatusArchiviert_WhenNeueAufgabeArchiviertWird()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Archivieren, TestContext.Current.CancellationToken);
+        await _sut.VerwerfenAsync(workItem.Id, VerwerfenAktion.Archive, TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.Status.Should().Be(AufgabeStatus.Archiviert);
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.Status.Should().Be(WorkItemStatus.Archived);
     }
 
     /// <summary>VerwerfenAsync löscht eine neue Aufgabe dauerhaft.</summary>
@@ -534,13 +534,13 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task VerwerfenAsync_ShouldRemoveAufgabe_WhenNeueAufgabeGeloeschtWird()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Loeschen, TestContext.Current.CancellationToken);
+        await _sut.VerwerfenAsync(workItem.Id, VerwerfenAktion.Delete, TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         result.Should().BeNull();
     }
 
@@ -549,11 +549,11 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task VerwerfenAsync_ShouldThrowInvalidOperationException_WhenAufgabeIsNotNeu()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Bereits gestartete Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        await _sut.StartenAsync(aufgabe.Id, "feature/test", @"C:\klon", ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Bereits gestartete Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _sut.StartenAsync(workItem.Id, "feature/test", @"C:\klon", ct: TestContext.Current.CancellationToken);
 
         // Act
-        var act = () => _sut.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Archivieren);
+        var act = () => _sut.VerwerfenAsync(workItem.Id, VerwerfenAktion.Archive);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -579,14 +579,14 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task StatusSetzenAsync_ShouldSetGivenStatus_WhenAufgabeExists()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Status-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Status-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Beendet, TestContext.Current.CancellationToken);
+        await _sut.StatusSetzenAsync(workItem.Id, WorkItemStatus.Completed, TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.Status.Should().Be(AufgabeStatus.Beendet);
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.Status.Should().Be(WorkItemStatus.Completed);
     }
 
     /// <summary>GetHeartbeatAgeMinutesAsync berechnet das Alter bei gesetztem Heartbeat korrekt.
@@ -597,25 +597,25 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task GetHeartbeatAgeMinutesAsync_BerechnetAlter_BeiGesetztemHeartbeat()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Heartbeat-Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        aufgabe.LastHeartbeatUtc.Should().BeNull();
+        var workItem = await _sut.CreateAsync(_projektId, "Heartbeat-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        workItem.LastHeartbeatUtc.Should().BeNull();
 
         // Act – Heartbeat direkt an der Entity setzen
         var vorUpdate = DateTimeOffset.UtcNow;
-        var tracked = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
+        var tracked = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         tracked!.LastHeartbeatUtc = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
         var nachUpdate = DateTimeOffset.UtcNow;
 
         // Assert – Heartbeat wurde gesetzt
-        var geladen = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        var geladen = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
         geladen!.LastHeartbeatUtc.Should().NotBeNull();
         geladen.LastHeartbeatUtc!.Value.Should().BeOnOrAfter(vorUpdate.AddSeconds(-1));
         geladen.LastHeartbeatUtc!.Value.Should().BeOnOrBefore(nachUpdate.AddSeconds(1));
-        geladen.LetzterCliStartUtc.Should().BeNull("ein Heartbeat ist kein echter CLI-Start");
+        geladen.LastCliStartUtc.Should().BeNull("ein Heartbeat ist kein echter CLI-Start");
 
         // Alter ist 0 Minuten (frischer Heartbeat)
-        var ageMinutes = await _sut.GetHeartbeatAgeMinutesAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        var ageMinutes = await _sut.GetHeartbeatAgeMinutesAsync(workItem.Id, TestContext.Current.CancellationToken);
         ageMinutes.Should().NotBeNull();
         ageMinutes!.Value.Should().BeGreaterThanOrEqualTo(0);
         ageMinutes!.Value.Should().BeLessThan(2);
@@ -626,10 +626,10 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task GetHeartbeatAgeMinutesAsync_ShouldReturnNull_WhenNoHeartbeatSet()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "No-Heartbeat-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "No-Heartbeat-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.GetHeartbeatAgeMinutesAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        var result = await _sut.GetHeartbeatAgeMinutesAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
@@ -640,10 +640,10 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task TestStatusValidation()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Validierungs-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Validierungs-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act – ungültiger Übergang Neu → Beendet
-        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
+        var act = () => _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Completed);
 
         // Assert
         await act.Should().ThrowAsync<InvalidStatusTransitionException>()
@@ -655,14 +655,14 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task SetStatusAsync_ShouldSetStatus_WhenTransitionIsAllowed()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Gültiger-Übergang", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Gültiger-Übergang", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
+        await _sut.SetStatusAsync(workItem.Id, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
         // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id, TestContext.Current.CancellationToken);
-        result!.Status.Should().Be(AufgabeStatus.Gestartet);
+        var result = await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken);
+        result!.Status.Should().Be(WorkItemStatus.Started);
     }
 
     /// <summary>GetAktiveAufgabenAsync gibt nur Aufgaben mit Status Gestartet oder Wartend zurück.</summary>
@@ -670,12 +670,12 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task GetAktiveAufgabenAsync_ShouldReturnAufgabenWithStatusGestartetOrWartend_WhenCalled()
     {
         // Arrange
-        _db.Aufgaben.AddRange(
-            CreateAufgabeDirekt("Neu-Aufgabe", AufgabeStatus.Neu),
-            CreateAufgabeDirekt("Gestartet-Aufgabe", AufgabeStatus.Gestartet),
-            CreateAufgabeDirekt("Wartend-Aufgabe", AufgabeStatus.Wartend),
-            CreateAufgabeDirekt("Beendet-Aufgabe", AufgabeStatus.Beendet),
-            CreateAufgabeDirekt("Archiviert-Aufgabe", AufgabeStatus.Archiviert));
+        _db.WorkItems.AddRange(
+            CreateAufgabeDirekt("Neu-Aufgabe", WorkItemStatus.New),
+            CreateAufgabeDirekt("Gestartet-Aufgabe", WorkItemStatus.Started),
+            CreateAufgabeDirekt("Wartend-Aufgabe", WorkItemStatus.Waiting),
+            CreateAufgabeDirekt("Beendet-Aufgabe", WorkItemStatus.Completed),
+            CreateAufgabeDirekt("Archiviert-Aufgabe", WorkItemStatus.Archived));
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
@@ -683,7 +683,7 @@ public sealed class AufgabeServiceTests : IDisposable
 
         // Assert
         result.Should().HaveCount(2);
-        result.Should().OnlyContain(a => a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend);
+        result.Should().OnlyContain(a => a.Status == WorkItemStatus.Started || a.Status == WorkItemStatus.Waiting);
     }
 
     /// <summary>GetAktiveAufgabenAsync sortiert nach LetzterCliStartUtc absteigend, mit Fallback auf ErstellungsDatum.</summary>
@@ -692,11 +692,11 @@ public sealed class AufgabeServiceTests : IDisposable
     {
         // Arrange
         var jetzt = DateTimeOffset.UtcNow;
-        var alterStart = CreateAufgabeDirekt("Alter Start", AufgabeStatus.Gestartet, erstellungsDatum: jetzt.AddHours(-3), letzterCliStartUtc: jetzt.AddMinutes(-10));
-        var neuerStart = CreateAufgabeDirekt("Neuer Start", AufgabeStatus.Wartend, erstellungsDatum: jetzt.AddHours(-2), letzterCliStartUtc: jetzt.AddMinutes(-1));
-        var ohneStart = CreateAufgabeDirekt("Ohne Start", AufgabeStatus.Gestartet, erstellungsDatum: jetzt.AddMinutes(-5), letzterCliStartUtc: null);
+        var alterStart = CreateAufgabeDirekt("Alter Start", WorkItemStatus.Started, erstellungsDatum: jetzt.AddHours(-3), letzterCliStartUtc: jetzt.AddMinutes(-10));
+        var neuerStart = CreateAufgabeDirekt("Neuer Start", WorkItemStatus.Waiting, erstellungsDatum: jetzt.AddHours(-2), letzterCliStartUtc: jetzt.AddMinutes(-1));
+        var ohneStart = CreateAufgabeDirekt("Ohne Start", WorkItemStatus.Started, erstellungsDatum: jetzt.AddMinutes(-5), letzterCliStartUtc: null);
 
-        _db.Aufgaben.AddRange(alterStart, neuerStart, ohneStart);
+        _db.WorkItems.AddRange(alterStart, neuerStart, ohneStart);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
@@ -714,18 +714,18 @@ public sealed class AufgabeServiceTests : IDisposable
         var jetzt = DateTimeOffset.UtcNow;
         var a = CreateAufgabeDirekt(
             "A alter Heartbeat",
-            AufgabeStatus.Gestartet,
+            WorkItemStatus.Started,
             erstellungsDatum: jetzt.AddHours(-2),
             lastHeartbeatUtc: jetzt,
             letzterCliStartUtc: jetzt.AddMinutes(-20));
         var b = CreateAufgabeDirekt(
             "B neuerer Start",
-            AufgabeStatus.Gestartet,
+            WorkItemStatus.Started,
             erstellungsDatum: jetzt.AddHours(-1),
             lastHeartbeatUtc: jetzt.AddHours(-1),
             letzterCliStartUtc: jetzt.AddMinutes(-5));
 
-        _db.Aufgaben.AddRange(a, b);
+        _db.WorkItems.AddRange(a, b);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
@@ -741,7 +741,7 @@ public sealed class AufgabeServiceTests : IDisposable
     {
         // Arrange
         for (var i = 0; i < 25; i++)
-            _db.Aufgaben.Add(CreateAufgabeDirekt($"Aufgabe {i}", AufgabeStatus.Gestartet));
+            _db.WorkItems.Add(CreateAufgabeDirekt($"Aufgabe {i}", WorkItemStatus.Started));
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
@@ -756,7 +756,7 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task GetAktiveAufgabenAsync_ShouldIncludeProjekt_WhenCalled()
     {
         // Arrange
-        _db.Aufgaben.Add(CreateAufgabeDirekt("Aufgabe mit Projekt", AufgabeStatus.Gestartet));
+        _db.WorkItems.Add(CreateAufgabeDirekt("Aufgabe mit Projekt", WorkItemStatus.Started));
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
@@ -764,8 +764,8 @@ public sealed class AufgabeServiceTests : IDisposable
 
         // Assert
         result.Should().ContainSingle();
-        result[0].Projekt.Should().NotBeNull();
-        result[0].Projekt.Name.Should().Be("Testprojekt");
+        result[0].Project.Should().NotBeNull();
+        result[0].Project.Name.Should().Be("Testprojekt");
     }
 
     /// <summary>GetAktiveAufgabenAsync lädt das zugehörige GitRepository für die SCM-Plugin-Anzeige mit.</summary>
@@ -777,13 +777,13 @@ public sealed class AufgabeServiceTests : IDisposable
         _db.GitRepositories.Add(new GitRepository
         {
             Id = repositoryId,
-            ProjektId = _projektId,
+            ProjectId = _projektId,
             RepositoryName = "repo",
             RepositoryUrl = "https://example.invalid/repo.git",
-            PluginTyp = "Softwareschmiede.GitHub",
-            Aktiv = true
+            PluginType = "Softwareschmiede.GitHub",
+            Active = true
         });
-        _db.Aufgaben.Add(CreateAufgabeDirekt("Aufgabe mit Repository", AufgabeStatus.Gestartet, gitRepositoryId: repositoryId));
+        _db.WorkItems.Add(CreateAufgabeDirekt("Aufgabe mit Repository", WorkItemStatus.Started, gitRepositoryId: repositoryId));
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
@@ -792,7 +792,7 @@ public sealed class AufgabeServiceTests : IDisposable
         // Assert
         result.Should().ContainSingle();
         result[0].GitRepository.Should().NotBeNull();
-        result[0].GitRepository!.PluginTyp.Should().Be("Softwareschmiede.GitHub");
+        result[0].GitRepository!.PluginType.Should().Be("Softwareschmiede.GitHub");
     }
 
     /// <summary>CanCompleteTaskAsync gibt false zurück, wenn offene Todos existieren.</summary>
@@ -800,18 +800,18 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task CanCompleteTaskAsync_WithOpenTodos_ReturnsFalse()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Aufgabe mit offenen Todos", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Aufgabe mit offenen Todos", null, ct: TestContext.Current.CancellationToken);
         _db.Todos.Add(new Todo
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabe.Id,
-            Beschreibung = "Offenes Todo",
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            WorkItemId = workItem.Id,
+            Description = "Offenes Todo",
+            CreatedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.CanCompleteTaskAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        var result = await _sut.CanCompleteTaskAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeFalse();
@@ -822,10 +822,10 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task CanCompleteTaskAsync_WithoutTodos_ReturnsTrue()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Aufgabe ohne Todos", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Aufgabe ohne Todos", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.CanCompleteTaskAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        var result = await _sut.CanCompleteTaskAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeTrue();
@@ -836,43 +836,43 @@ public sealed class AufgabeServiceTests : IDisposable
     public async Task CanCompleteTaskAsync_WithOnlyCompletedTodos_ReturnsTrue()
     {
         // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Aufgabe mit erledigten Todos", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projektId, "Aufgabe mit erledigten Todos", null, ct: TestContext.Current.CancellationToken);
         _db.Todos.Add(new Todo
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabe.Id,
-            Beschreibung = "Erledigtes Todo",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            ErledigtAm = DateTimeOffset.UtcNow
+            WorkItemId = workItem.Id,
+            Description = "Erledigtes Todo",
+            CreatedAt = DateTimeOffset.UtcNow,
+            CompletedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _sut.CanCompleteTaskAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        var result = await _sut.CanCompleteTaskAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeTrue();
     }
 
-    private Aufgabe CreateAufgabeDirekt(
+    private WorkItem CreateAufgabeDirekt(
         string titel,
-        AufgabeStatus status,
+        WorkItemStatus status,
         DateTimeOffset? erstellungsDatum = null,
         DateTimeOffset? lastHeartbeatUtc = null,
         DateTimeOffset? letzterCliStartUtc = null,
         Guid? gitRepositoryId = null) => new()
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
+            ProjectId = _projektId,
             GitRepositoryId = gitRepositoryId,
-            Titel = titel,
+            Title = titel,
             Status = status,
-            ErstellungsDatum = erstellungsDatum ?? DateTimeOffset.UtcNow,
+            CreatedAt = erstellungsDatum ?? DateTimeOffset.UtcNow,
             LastHeartbeatUtc = lastHeartbeatUtc,
-            LetzterCliStartUtc = letzterCliStartUtc
+            LastCliStartUtc = letzterCliStartUtc
         };
 
-    private static DiffResult CreateDiffResult(Guid aufgabeId, string filePath, DateTimeOffset generatedAt)
+    private static DiffResult CreateDiffResult(Guid workItemId, string filePath, DateTimeOffset generatedAt)
     {
         var diffResultId = Guid.NewGuid();
         var blockId = Guid.NewGuid();
@@ -880,7 +880,7 @@ public sealed class AufgabeServiceTests : IDisposable
         return new DiffResult
         {
             Id = diffResultId,
-            AufgabeId = aufgabeId,
+            WorkItemId = workItemId,
             FilePath = filePath,
             SourceVersion = "HEAD~1",
             TargetVersion = "HEAD",

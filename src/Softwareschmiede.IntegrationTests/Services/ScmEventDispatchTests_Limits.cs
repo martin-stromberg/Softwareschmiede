@@ -123,7 +123,7 @@ public sealed class ScmEventDispatchTests_Limits
         Directory.CreateDirectory(exchangeDir);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             await db.ScmIncomingEvents.Where(x => x.Id == secondId).ExecuteUpdateAsync(x => x
                 .SetProperty(p => p.Status, "Zugestellt")
                 .SetProperty(p => p.DeliveryAttemptId, attemptId)
@@ -142,9 +142,9 @@ public sealed class ScmEventDispatchTests_Limits
 
     /// <summary>Ein Ereignis an einer beendeten/archivierten Aufgabe bleibt permanent gesperrt — auch bei freiem Platz.</summary>
     [Theory]
-    [InlineData(AufgabeStatus.Beendet)]
-    [InlineData(AufgabeStatus.Archiviert)]
-    public async Task Dispatch_EndedOrArchivedTask_StaysBlocked(AufgabeStatus status)
+    [InlineData(WorkItemStatus.Completed)]
+    [InlineData(WorkItemStatus.Archived)]
+    public async Task Dispatch_EndedOrArchivedTask_StaysBlocked(WorkItemStatus status)
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -177,16 +177,16 @@ public sealed class ScmEventDispatchTests_Limits
         var now = DateTimeOffset.UtcNow;
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             await db.ScmIncomingEvents.Where(x => x.Id == delayedFruehId).ExecuteUpdateAsync(x => x
                 .SetProperty(p => p.Status, "Verzögert")
                 .SetProperty(p => p.NextAttemptUtc, (long?)now.AddMinutes(-10).ToUnixTimeMilliseconds()), cancellationToken: TestContext.Current.CancellationToken);
             await db.ScmIncomingEvents.Where(x => x.Id == delayedSpaetId).ExecuteUpdateAsync(x => x
                 .SetProperty(p => p.Status, "Verzögert")
                 .SetProperty(p => p.NextAttemptUtc, (long?)now.AddMinutes(-5).ToUnixTimeMilliseconds()), cancellationToken: TestContext.Current.CancellationToken);
-            await db.Aufgaben.Where(x => x.Id == continuationTask).ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.Status, AufgabeStatus.Gestartet)
-                .SetProperty(p => p.AusfuehrungsStatus, AufgabeAusfuehrungsStatus.Beendet), cancellationToken: TestContext.Current.CancellationToken);
+            await db.WorkItems.Where(x => x.Id == continuationTask).ExecuteUpdateAsync(x => x
+                .SetProperty(p => p.Status, WorkItemStatus.Started)
+                .SetProperty(p => p.ExecutionStatus, WorkItemExecutionStatus.Completed), cancellationToken: TestContext.Current.CancellationToken);
         }
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
@@ -215,10 +215,10 @@ public sealed class ScmEventDispatchTests_Limits
         var (continuationTask, _) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            await db.Aufgaben.Where(x => x.Id == continuationTask).ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.Status, AufgabeStatus.Gestartet)
-                .SetProperty(p => p.AusfuehrungsStatus, AufgabeAusfuehrungsStatus.Beendet), cancellationToken: TestContext.Current.CancellationToken);
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            await db.WorkItems.Where(x => x.Id == continuationTask).ExecuteUpdateAsync(x => x
+                .SetProperty(p => p.Status, WorkItemStatus.Started)
+                .SetProperty(p => p.ExecutionStatus, WorkItemExecutionStatus.Completed), cancellationToken: TestContext.Current.CancellationToken);
         }
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
@@ -412,9 +412,9 @@ public sealed class ScmEventDispatchTests_Limits
         Assert.Equal("Zugestellt", (await fixture.EventAsync(firstId)).Status);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            await db.Aufgaben.Where(x => x.Id == firstTask)
-                .ExecuteUpdateAsync(x => x.SetProperty(p => p.PausiertBisUtc, DateTimeOffset.UtcNow.AddMinutes(-5)),
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            await db.WorkItems.Where(x => x.Id == firstTask)
+                .ExecuteUpdateAsync(x => x.SetProperty(p => p.PausedUntilUtc, DateTimeOffset.UtcNow.AddMinutes(-5)),
                     cancellationToken: TestContext.Current.CancellationToken);
         }
 

@@ -65,7 +65,7 @@ public sealed class DashboardViewModel : ViewModelBase
     public bool HatRecoveryKandidaten => RecoveryKandidaten.Count > 0;
 
     /// <summary>Liste der zuletzt aktiven Projekte.</summary>
-    public ObservableCollection<Projekt> LetzteProjects { get; } = new();
+    public ObservableCollection<Project> LetzteProjects { get; } = new();
 
     /// <summary>Liste der aktuell aktiven Aufgaben (Status Gestartet oder Wartend). Wird vom MainWindowViewModel über <see cref="Initialize"/> als gemeinsame Datenquelle gesetzt.</summary>
     public ObservableCollection<AktiveAufgabePanelItem> AktiveAufgabenListe
@@ -90,8 +90,8 @@ public sealed class DashboardViewModel : ViewModelBase
     /// </summary>
     public AufgabenListenModus AufgabenListenModus
     {
-        get => _modusBindung.Wert;
-        set => _modusBindung.Wert = value;
+        get => _modusBindung.Value;
+        set => _modusBindung.Value = value;
     }
 
     /// <inheritdoc cref="DashboardViewModel"/>
@@ -121,8 +121,8 @@ public sealed class DashboardViewModel : ViewModelBase
 
         try
         {
-            var projekte = await _projektService.GetAllAsync(ct);
-            ProjektAnzahl = projekte.Count;
+            var projects = await _projektService.GetAllAsync(ct);
+            ProjektAnzahl = projects.Count;
 
             RecoveryKandidaten.Clear();
             var kandidaten = await _recoveryService.ScanForRecoveryCandidatesAsync(ct);
@@ -130,8 +130,8 @@ public sealed class DashboardViewModel : ViewModelBase
                 RecoveryKandidaten.Add(id);
 
             LetzteProjects.Clear();
-            foreach (var projekt in projekte.Take(5))
-                LetzteProjects.Add(projekt);
+            foreach (var project in projects.Take(5))
+                LetzteProjects.Add(project);
 
             var (aktiveCount, wartendCount) = await _aufgabeService.GetAktiveUndWartendeCountAsync(ct);
             AktiveAufgaben = aktiveCount;

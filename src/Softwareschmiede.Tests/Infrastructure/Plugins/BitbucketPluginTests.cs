@@ -443,7 +443,7 @@ public sealed class BitbucketPluginTests
         var issues = (await _sut.GetIssuesAsync("any", TestContext.Current.CancellationToken)).ToList();
 
         issues.Should().HaveCount(1);
-        issues[0].Titel.Should().Be("PROJ-1: Ein Issue ohne Beschreibung");
+        issues[0].Title.Should().Be("PROJ-1: Ein Issue ohne Beschreibung");
         issues[0].Body.Should().BeNull();
     }
 
@@ -478,7 +478,7 @@ public sealed class BitbucketPluginTests
         var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Zeile 1\nZeile 2"), TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
-        result.Issue!.Titel.Should().Be("PROJ-42: Titel");
+        result.Issue!.Title.Should().Be("PROJ-42: Titel");
         result.Issue.IssueUrl.Should().Be("https://jira.example.test/browse/PROJ-42");
         capturedArgs.Should().NotBeNull();
         capturedArgs!.Should().Contain("POST");

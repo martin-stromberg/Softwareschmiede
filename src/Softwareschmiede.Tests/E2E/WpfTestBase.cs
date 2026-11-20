@@ -417,15 +417,15 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Öffnet einen <see cref="SoftwareschmiededDbContext"/> gegen die SQLite-Testdatenbank des laufenden
+    /// Öffnet einen <see cref="SoftwareschmiedeDbContext"/> gegen die SQLite-Testdatenbank des laufenden
     /// App-Prozesses (<see cref="TestDbPath"/>). Für Testvorbedingungen, die über die UI nicht abbildbar sind.
     /// </summary>
-    protected SoftwareschmiededDbContext OpenTestDbContext()
+    protected SoftwareschmiedeDbContext OpenTestDbContext()
     {
-        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
+        var options = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>()
             .UseSqlite($"Data Source={_testDbPath}")
             .Options;
-        return new SoftwareschmiededDbContext(options);
+        return new SoftwareschmiedeDbContext(options);
     }
 
     /// <inheritdoc/>

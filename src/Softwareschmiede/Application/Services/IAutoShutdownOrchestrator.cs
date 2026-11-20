@@ -12,8 +12,8 @@ public interface IAutoShutdownOrchestrator
 
     /// <summary>Setzt atomar Toleranzzeit und Erzwingen-Flag; bei laufendem Countdown und geänderter Toleranz wird der Countdown ab jetzt mit dem neuen Wert neu armiert.</summary>
     /// <param name="toleranzMinuten">Die Toleranzzeit des Countdowns in Minuten (negative Werte werden auf 0 normalisiert).</param>
-    /// <param name="erzwingen"><see langword="true"/> erzwingt das Herunterfahren.</param>
-    void SetOptionen(int toleranzMinuten, bool erzwingen);
+    /// <param name="force"><see langword="true"/> erzwingt das Herunterfahren.</param>
+    void SetOptionen(int toleranzMinuten, bool force);
 
     /// <summary>Der UTC-Endzeitpunkt des armierten Countdowns, oder <c>null</c>, wenn kein Countdown aktiv ist.</summary>
     DateTimeOffset? CountdownEndeUtc { get; }

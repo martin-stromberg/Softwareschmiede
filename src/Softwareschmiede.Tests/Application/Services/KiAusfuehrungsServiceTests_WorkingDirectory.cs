@@ -116,7 +116,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory : IDisposable
     {
         var subDirectory = Path.Combine(_tempRoot, "backend");
         Directory.CreateDirectory(subDirectory);
-        var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "backend" };
+        var startConfig = new RepositoryStartConfiguration { WorkingDirectoryRelativePath = "backend" };
 
         string? usedPath = null;
         var pluginMock = new Mock<IKiPlugin>();

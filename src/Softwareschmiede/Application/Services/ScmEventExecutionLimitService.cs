@@ -45,7 +45,7 @@ public sealed record CliStartPlatzZulassung(string? Wartegrund, IDisposable? Res
 /// damit alle Dispatch-Pfade desselben Providers denselben Bestand sehen.
 /// </remarks>
 public sealed class ScmEventExecutionLimitService(
-    SoftwareschmiededDbContext db,
+    SoftwareschmiedeDbContext db,
     AppEinstellungService einstellungen,
     ICliExecutionLimitSource cli,
     TimeProvider time,
@@ -191,25 +191,25 @@ public sealed class ScmEventExecutionLimitService(
         var laufendeIds = cli.GetLaufendeAufgabenIds();
         if (laufendeIds.Count == 0)
             return new(0, new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
-        var aufgaben = await db.Aufgaben.AsNoTracking()
+        var workItems = await db.WorkItems.AsNoTracking()
             .Where(x => laufendeIds.Contains(x.Id))
-            .Select(x => new { x.Id, x.KiPluginPrefix, x.PausiertBisUtc })
+            .Select(x => new { x.Id, x.AiPluginPrefix, x.PausedUntilUtc })
             .ToListAsync(ct);
         var jetzt = time.GetUtcNow();
-        var aktive = aufgaben.Where(x => !x.PausiertBisUtc.IstAktuellPausiert(jetzt)).ToList();
+        var aktive = workItems.Where(x => !x.PausedUntilUtc.IstAktuellPausiert(jetzt)).ToList();
         var proPlugin = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var aufgabe in aktive)
+        foreach (var workItem in aktive)
         {
-            var session = cli.GetScmPromptSession(aufgabe.Id);
+            var session = cli.GetScmPromptSession(workItem.Id);
             var prefix = session?.IsAlive == true && !string.IsNullOrWhiteSpace(session.PluginPrefix)
                 ? session.PluginPrefix
-                : aufgabe.KiPluginPrefix;
+                : workItem.AiPluginPrefix;
             if (string.IsNullOrWhiteSpace(prefix)) continue;
             proPlugin.TryGetValue(prefix, out var anzahl);
             proPlugin[prefix] = anzahl + 1;
         }
         // Global = aktive Aufgaben plus laufende Handles ohne auflösbare Aufgabenzeile
         // (letztere haben kein PausiertBisUtc und zählen bewusst weiterhin voll).
-        return new(aktive.Count + (laufendeIds.Count - aufgaben.Count), proPlugin);
+        return new(aktive.Count + (laufendeIds.Count - workItems.Count), proPlugin);
     }
 }

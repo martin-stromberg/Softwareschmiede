@@ -16,7 +16,7 @@ public sealed class SystemShutdownServiceTests
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows-spezifisches Mapping.");
 
-        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: true);
+        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(force: true);
 
         fileName.Should().Be("shutdown");
         arguments.Should().Be("/s /f /t 0");
@@ -28,7 +28,7 @@ public sealed class SystemShutdownServiceTests
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows-spezifisches Mapping.");
 
-        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: false);
+        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(force: false);
 
         fileName.Should().Be("shutdown");
         arguments.Should().Be("/s /t 0");
@@ -40,7 +40,7 @@ public sealed class SystemShutdownServiceTests
     {
         Assert.SkipUnless(OperatingSystem.IsLinux(), "Linux-spezifisches Mapping.");
 
-        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: true);
+        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(force: true);
 
         fileName.Should().Be("shutdown");
         arguments.Should().Be("-h now");
@@ -52,7 +52,7 @@ public sealed class SystemShutdownServiceTests
     {
         Assert.SkipUnless(OperatingSystem.IsMacOS(), "macOS-spezifisches Mapping.");
 
-        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: true);
+        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(force: true);
 
         fileName.Should().Be("osascript");
         arguments.Should().Contain("System Events");

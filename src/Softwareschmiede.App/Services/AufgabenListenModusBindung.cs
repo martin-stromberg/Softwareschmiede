@@ -95,7 +95,7 @@ public sealed class AufgabenListenModusBindung
     /// den Wert per Fire-and-Forget; ein so geänderter Wert wird von einer noch laufenden
     /// Wiederherstellung nicht mehr überschrieben.
     /// </summary>
-    public AufgabenListenModus Wert
+    public AufgabenListenModus Value
     {
         get => _wert;
         set

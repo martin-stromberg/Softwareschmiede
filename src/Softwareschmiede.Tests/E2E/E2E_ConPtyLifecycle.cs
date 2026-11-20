@@ -128,8 +128,8 @@ public partial class End2EndTest
             // Nach Prozessende ist die Aufgabe nicht mehr in der Seitenleistenliste der aktiven
             // Aufgaben. Über die Projektdetailansicht wird sie unabhängig vom Laufstatus geöffnet.
             var dashboard = Assert.IsType<DashboardView>(mainWindow.CurrentView());
-            var projekt = dashboard.Menu.NavigateToProjects().OpenProject("ConPty-Projekt");
-            _ = projekt.OpenTask(taskTitle);
+            var project = dashboard.Menu.NavigateToProjects().OpenProject("ConPty-Projekt");
+            _ = project.OpenTask(taskTitle);
         }
         finally
         {
@@ -344,9 +344,9 @@ public partial class End2EndTest
         Thread.Sleep(300); // cmd protokolliert Eingabezeile und Echo-Ausgabe in getrennten Chunks.
 
         await using var db = OpenTestDbContext();
-        var aufgabe = await db.Aufgaben.OrderByDescending(a => a.ErstellungsDatum).FirstAsync();
-        var trefferVorReattach = await db.Protokolleintraege
-            .CountAsync(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.CliOutput && p.Inhalt.Contains(marker));
+        var workItem = await db.WorkItems.OrderByDescending(a => a.CreatedAt).FirstAsync();
+        var trefferVorReattach = await db.LogEntries
+            .CountAsync(p => p.WorkItemId == workItem.Id && p.Type == LogEntryType.CliOutput && p.Content.Contains(marker));
 
         // Weg vom CLI-Panel (Info) und zurück (CLI) — TerminalControl wird neu an die Session gebunden.
         taskDetail.SwitchPanel("InfoCliToggle");
@@ -361,8 +361,8 @@ public partial class End2EndTest
         // Der Replay-Rebuild darf keine bereits vor dem Panelwechsel gespeicherten Chunks nochmals
         // protokollieren. Die konkrete Anzahl ist absichtlich nicht eins: cmd liefert sowohl
         // die eingegebene Echo-Zeile als auch deren Ausgabe.
-        var trefferNachReattach = await db.Protokolleintraege
-            .CountAsync(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.CliOutput && p.Inhalt.Contains(marker));
+        var trefferNachReattach = await db.LogEntries
+            .CountAsync(p => p.WorkItemId == workItem.Id && p.Type == LogEntryType.CliOutput && p.Content.Contains(marker));
         Assert.Equal(trefferVorReattach, trefferNachReattach);
     }
 
@@ -418,9 +418,9 @@ public partial class End2EndTest
         await WartenBisAsync(async () =>
         {
             await using var db = OpenTestDbContext();
-            var aufgabe = await db.Aufgaben.OrderByDescending(a => a.ErstellungsDatum).FirstAsync();
-            return await db.Protokolleintraege
-                .AnyAsync(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.CliOutput && p.Inhalt.Contains(erwarteterInhalt));
+            var workItem = await db.WorkItems.OrderByDescending(a => a.CreatedAt).FirstAsync();
+            return await db.LogEntries
+                .AnyAsync(p => p.WorkItemId == workItem.Id && p.Type == LogEntryType.CliOutput && p.Content.Contains(erwarteterInhalt));
         });
     }
 

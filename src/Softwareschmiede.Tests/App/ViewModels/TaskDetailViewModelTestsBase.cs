@@ -16,7 +16,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public abstract class TaskDetailViewModelTestsBase : IDisposable
 {
     /// <summary>_db.</summary>
-    protected readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    protected readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
 
     /// <summary>_aufgabeService.</summary>
     protected readonly AufgabeService _aufgabeService;
@@ -64,12 +64,12 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         _einstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
         _dialogServiceMock = new Mock<IDialogService>();
 
-        _db.Projekte.Add(new Projekt
+        _db.Projects.Add(new Project
         {
             Id = _projektId,
             Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
     }
@@ -97,7 +97,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     /// <param name="serviceProvider">Optionaler IServiceProvider (Standard: leerer Mock ohne Registrierungen).</param>
     /// <returns>Das erzeugte TaskDetailViewModel.</returns>
     protected TaskDetailViewModel CreateSut(
-        Mock<IProzessStarter>? prozessStarterMock = null,
+        Mock<IProcessStarter>? prozessStarterMock = null,
         IVisualStudioCodeLocator? visualStudioCodeLocator = null,
         IReadOnlyList<IIdePlugin>? idePlugins = null,
         IServiceProvider? serviceProvider = null)
@@ -106,9 +106,9 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
 
-        var visualStudioPlugin = new VisualStudioIdePlugin((prozessStarterMock ?? new Mock<IProzessStarter>()).Object);
+        var visualStudioPlugin = new VisualStudioIdePlugin((prozessStarterMock ?? new Mock<IProcessStarter>()).Object);
         var visualStudioCodePlugin = new VisualStudioCodeIdePlugin(
-            (prozessStarterMock ?? new Mock<IProzessStarter>()).Object,
+            (prozessStarterMock ?? new Mock<IProcessStarter>()).Object,
             visualStudioCodeLocator ?? new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
         var effectiveIdePlugins = idePlugins ?? [visualStudioPlugin, visualStudioCodePlugin];
         pluginManagerMock.Setup(p => p.GetIdePlugins()).Returns(effectiveIdePlugins);
@@ -120,7 +120,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance, appEinstellungService);
 
         var gitPluginMock = new Mock<IGitPlugin>();
-        var arbeitsverzeichnisMock = new Mock<IArbeitsverzeichnisResolver>();
+        var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
         var entwicklungsprozessService = new EntwicklungsprozessService(
             _aufgabeService,
             _protokollService,
@@ -156,27 +156,27 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     /// <summary>Legt ein GitRepository (optional mit RepositoryStartKonfiguration) sowie eine damit verknüpfte Aufgabe an.</summary>
     /// <param name="workingDirectoryRelativePath">Relativer Arbeitsverzeichnis-Pfad für die Startkonfiguration, oder null für keine Konfiguration.</param>
     /// <returns>Die neu angelegte, mit dem Repository verknüpfte Aufgabe.</returns>
-    protected async Task<Aufgabe> ErstelleAufgabeMitRepositoryAsync(string? workingDirectoryRelativePath)
+    protected async Task<WorkItem> ErstelleAufgabeMitRepositoryAsync(string? workingDirectoryRelativePath)
     {
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            PluginTyp = "Softwareschmiede.TestGit",
+            ProjectId = _projektId,
+            PluginType = "Softwareschmiede.TestGit",
             RepositoryUrl = "https://example.test/repo.git",
             RepositoryName = "TestRepo",
-            Aktiv = true
+            Active = true
         };
         _db.GitRepositories.Add(repository);
 
         if (workingDirectoryRelativePath is not null)
         {
-            _db.RepositoryStartKonfigurationen.Add(new RepositoryStartKonfiguration
+            _db.RepositoryStartConfigurations.Add(new RepositoryStartConfiguration
             {
                 Id = Guid.NewGuid(),
                 GitRepositoryId = repository.Id,
                 WorkingDirectoryRelativePath = workingDirectoryRelativePath,
-                Aktiv = true
+                Active = true
             });
         }
 

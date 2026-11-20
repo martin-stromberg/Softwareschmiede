@@ -11,7 +11,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>DiffCachingServiceTests.</summary>
 public sealed class DiffCachingServiceTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly IMemoryCache _memoryCache;
     private readonly DiffCachingService _sut;
 
@@ -31,8 +31,8 @@ public sealed class DiffCachingServiceTests : IDisposable
         var seeded = await SeedDiffResultAsync();
 
         // Act
-        await _sut.SetInCacheAsync(seeded.CachePayload, seeded.AufgabeId, seeded.FilePath, "v1", "v2", TestContext.Current.CancellationToken);
-        var loaded = await _sut.GetFromCacheAsync(seeded.CachePayload.Id, seeded.AufgabeId, seeded.FilePath, "v1", "v2", TestContext.Current.CancellationToken);
+        await _sut.SetInCacheAsync(seeded.CachePayload, seeded.WorkItemId, seeded.FilePath, "v1", "v2", TestContext.Current.CancellationToken);
+        var loaded = await _sut.GetFromCacheAsync(seeded.CachePayload.Id, seeded.WorkItemId, seeded.FilePath, "v1", "v2", TestContext.Current.CancellationToken);
 
         // Assert
         loaded.Should().NotBeNull();
@@ -60,7 +60,7 @@ public sealed class DiffCachingServiceTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
-        var loaded = await _sut.GetFromCacheAsync(seeded.CachePayload.Id, seeded.AufgabeId, seeded.FilePath, "v1", "v2", TestContext.Current.CancellationToken);
+        var loaded = await _sut.GetFromCacheAsync(seeded.CachePayload.Id, seeded.WorkItemId, seeded.FilePath, "v1", "v2", TestContext.Current.CancellationToken);
 
         // Assert
         loaded.Should().BeNull();
@@ -72,7 +72,7 @@ public sealed class DiffCachingServiceTests : IDisposable
     {
         // Arrange
         var seeded = await SeedDiffResultAsync();
-        await _sut.SetInCacheAsync(seeded.CachePayload, seeded.AufgabeId, seeded.FilePath, "v1", "v2", TestContext.Current.CancellationToken);
+        await _sut.SetInCacheAsync(seeded.CachePayload, seeded.WorkItemId, seeded.FilePath, "v1", "v2", TestContext.Current.CancellationToken);
 
         // Act
         await _sut.InvalidateCacheAsync(seeded.CachePayload.Id, TestContext.Current.CancellationToken);
@@ -80,7 +80,7 @@ public sealed class DiffCachingServiceTests : IDisposable
         // Assert
         var cacheEntry = _db.DiffCaches.Single(dc => dc.DiffResultId == seeded.CachePayload.Id);
         cacheEntry.IsValid.Should().BeFalse();
-        var loaded = await _sut.GetFromCacheAsync(seeded.CachePayload.Id, seeded.AufgabeId, seeded.FilePath, "v1", "v2", TestContext.Current.CancellationToken);
+        var loaded = await _sut.GetFromCacheAsync(seeded.CachePayload.Id, seeded.WorkItemId, seeded.FilePath, "v1", "v2", TestContext.Current.CancellationToken);
         loaded.Should().BeNull();
     }
 
@@ -130,30 +130,30 @@ public sealed class DiffCachingServiceTests : IDisposable
         _db.Dispose();
     }
 
-    private async Task<(Guid AufgabeId, string FilePath, DiffResult CachePayload)> SeedDiffResultAsync()
+    private async Task<(Guid WorkItemId, string FilePath, DiffResult CachePayload)> SeedDiffResultAsync()
     {
-        var projektId = Guid.NewGuid();
-        var aufgabeId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var diffId = Guid.NewGuid();
-        _db.Projekte.Add(new Projekt
+        _db.Projects.Add(new Project
         {
-            Id = projektId,
-            Name = $"Projekt-{projektId:N}",
-            Status = ProjektStatus.Aktiv,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Id = projectId,
+            Name = $"Projekt-{projectId:N}",
+            Status = ProjectStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow
         });
-        _db.Aufgaben.Add(new Aufgabe
+        _db.WorkItems.Add(new WorkItem
         {
-            Id = aufgabeId,
-            ProjektId = projektId,
-            Titel = "Aufgabe",
-            Status = AufgabeStatus.Neu,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Id = workItemId,
+            ProjectId = projectId,
+            Title = "Aufgabe",
+            Status = WorkItemStatus.New,
+            CreatedAt = DateTimeOffset.UtcNow
         });
         var persisted = new DiffResult
         {
             Id = diffId,
-            AufgabeId = aufgabeId,
+            WorkItemId = workItemId,
             FilePath = "src/file.cs",
             SourceVersion = "v1",
             TargetVersion = "v2",
@@ -168,7 +168,7 @@ public sealed class DiffCachingServiceTests : IDisposable
         var cachePayload = new DiffResult
         {
             Id = diffId,
-            AufgabeId = aufgabeId,
+            WorkItemId = workItemId,
             FilePath = "src/file.cs",
             SourceVersion = "v1",
             TargetVersion = "v2",
@@ -178,6 +178,6 @@ public sealed class DiffCachingServiceTests : IDisposable
             GeneratedBy = "test"
         };
 
-        return (aufgabeId, "src/file.cs", cachePayload);
+        return (workItemId, "src/file.cs", cachePayload);
     }
 }

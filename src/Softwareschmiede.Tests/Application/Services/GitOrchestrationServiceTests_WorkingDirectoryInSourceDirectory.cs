@@ -21,7 +21,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// </summary>
 public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirectory : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly GitOrchestrationService _sut;
     private readonly string _sourceDir;
     private readonly string _clonePath;
@@ -114,7 +114,7 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
     {
         // Arrange
         await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath, TestContext.Current.CancellationToken);
-        var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "backend" };
+        var startConfig = new RepositoryStartConfiguration { WorkingDirectoryRelativePath = "backend" };
 
         // Act
         var act = () => _sut.ValidateWorkingDirectoryAfterCloneAsync(_clonePath, startConfig, _gitPlugin);
@@ -132,7 +132,7 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
     {
         // Arrange
         await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath, TestContext.Current.CancellationToken);
-        var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "backend" };
+        var startConfig = new RepositoryStartConfiguration { WorkingDirectoryRelativePath = "backend" };
 
         // Act
         var act = () => _sut.ValidateWorkingDirectoryAfterCloneAsync(_clonePath, startConfig);

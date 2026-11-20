@@ -45,7 +45,7 @@ public sealed class ScmEventCancelTests
         var (_, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             await db.ScmIncomingEvents.Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(p => p.Status, status), cancellationToken: TestContext.Current.CancellationToken);
             Assert.False(await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId, TestContext.Current.CancellationToken));
         }
@@ -62,12 +62,12 @@ public sealed class ScmEventCancelTests
         Guid secondId;
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var first = await db.ScmIncomingEvents.AsNoTracking().SingleAsync(x => x.Id == firstId, cancellationToken: TestContext.Current.CancellationToken);
             var observation = ScmEventStore.Observation(first) with { RemoteNodeId = "second-node" };
             var time = DateTimeOffset.UtcNow;
             await scope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(taskId, "second-source", new(new(observation.Reference, observation.ContentKind, null, time), [observation]), ct: TestContext.Current.CancellationToken);
-            secondId = await db.ScmIncomingEvents.Where(x => x.AufgabeId == taskId && x.Id != firstId).Select(x => x.Id).SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
+            secondId = await db.ScmIncomingEvents.Where(x => x.WorkItemId == taskId && x.Id != firstId).Select(x => x.Id).SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         }
         using (var scope = fixture.Services.CreateScope())
             Assert.True(await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(firstId, TestContext.Current.CancellationToken));

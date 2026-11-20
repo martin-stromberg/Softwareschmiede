@@ -19,16 +19,16 @@ namespace Softwareschmiede.IntegrationTests.Services;
 public sealed class EntwicklungsprozessServiceTests
 {
     /// <summary>Hilfsmethode: Erstellt Testprojekt und Testaufgabe ohne AgentenpaketName.</summary>
-    private static async Task<(Guid ProjektId, Guid AufgabeId)> CreateTestDataAsync(
+    private static async Task<(Guid ProjectId, Guid WorkItemId)> CreateTestDataAsync(
         DatabaseFixture db,
         string aufgabeTitel = "Entwicklungsaufgabe")
     {
         var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
-        var projekt = await projektService.CreateAsync("Entwicklungstestprojekt", null);
-        var aufgabe = await aufgabeService.CreateAsync(projekt.Id, aufgabeTitel, "Mach etwas Tolles");
-        return (projekt.Id, aufgabe.Id);
+        var project = await projektService.CreateAsync("Entwicklungstestprojekt", null);
+        var workItem = await aufgabeService.CreateAsync(project.Id, aufgabeTitel, "Mach etwas Tolles");
+        return (project.Id, workItem.Id);
     }
 
     /// <summary>Erstellt eine konfigurierte Instanz von <see cref="EntwicklungsprozessService"/>.</summary>
@@ -36,7 +36,7 @@ public sealed class EntwicklungsprozessServiceTests
         DatabaseFixture db,
         Mock<IGitPlugin> gitMock,
         Mock<IKiPlugin> kiMock,
-        IArbeitsverzeichnisResolver? arbeitsverzeichnisResolver = null)
+        IWorkingDirectoryResolver? arbeitsverzeichnisResolver = null)
     {
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var protokollService = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
@@ -78,7 +78,7 @@ public sealed class EntwicklungsprozessServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var (_, aufgabeId) = await CreateTestDataAsync(db, "Login-Feature implementieren");
+        var (_, workItemId) = await CreateTestDataAsync(db, "Login-Feature implementieren");
 
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -91,16 +91,16 @@ public sealed class EntwicklungsprozessServiceTests
         var service = CreateService(db, gitMock, kiMock);
 
         // Act
-        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
+        await service.ProzessStartenAsync(workItemId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
 
         // Assert – Branch und Klonpfad wurden in der DB gespeichert
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.FindAsync(new object?[] { aufgabeId }, TestContext.Current.CancellationToken);
+        var loaded = await db2.WorkItems.FindAsync(new object?[] { workItemId }, TestContext.Current.CancellationToken);
 
-        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
+        loaded!.Status.Should().Be(WorkItemStatus.Started);
         loaded.BranchName.Should().StartWith("task/");
-        loaded.BranchName.Should().Contain(aufgabeId.ToString("N"));
-        loaded.LokalerKlonPfad.Should().NotBeNullOrEmpty();
+        loaded.BranchName.Should().Contain(workItemId.ToString("N"));
+        loaded.LocalClonePath.Should().NotBeNullOrEmpty();
     }
 
     /// <summary>Prüft, dass bei Issue-basierten Aufgaben ein Issue-Präfix im Branch-Namen persistiert wird.</summary>
@@ -110,9 +110,9 @@ public sealed class EntwicklungsprozessServiceTests
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        var projekt = await projektService.CreateAsync("Issue-Branch-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await projektService.CreateAsync("Issue-Branch-Projekt", null, TestContext.Current.CancellationToken);
         var issue = new Issue(55, "Issue-basierte Aufgabe", "Beschreibung", ["feature"], null, "https://github.com/test/repo/issues/55");
-        var aufgabe = await aufgabeService.CreateFromIssueAsync(projekt.Id, issue, ct: TestContext.Current.CancellationToken);
+        var workItem = await aufgabeService.CreateFromIssueAsync(project.Id, issue, ct: TestContext.Current.CancellationToken);
 
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -122,11 +122,11 @@ public sealed class EntwicklungsprozessServiceTests
 
         var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
 
-        await service.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
+        await service.ProzessStartenAsync(workItem.Id, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
 
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
-        loaded!.BranchName.Should().StartWith($"task/issue-55-{aufgabe.Id:N}");
+        var loaded = await db2.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        loaded!.BranchName.Should().StartWith($"task/issue-55-{workItem.Id:N}");
     }
 
     /// <summary>
@@ -137,7 +137,7 @@ public sealed class EntwicklungsprozessServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var (_, aufgabeId) = await CreateTestDataAsync(db, "Feature Aufgabe");
+        var (_, workItemId) = await CreateTestDataAsync(db, "Feature Aufgabe");
 
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -150,15 +150,15 @@ public sealed class EntwicklungsprozessServiceTests
         var service = CreateService(db, gitMock, kiMock);
 
         // Act
-        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
+        await service.ProzessStartenAsync(workItemId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
 
         // Assert – Protokolleintrag wurde angelegt
         await using var db2 = db.CreateNewContext();
-        var protokolle = await db2.Protokolleintraege
-            .Where(p => p.AufgabeId == aufgabeId && p.Typ == ProtokollTyp.GitAktion)
+        var protokolle = await db2.LogEntries
+            .Where(p => p.WorkItemId == workItemId && p.Type == LogEntryType.GitAction)
             .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
-        protokolle.Should().Contain(p => p.Inhalt.Contains("Klon und Branch angelegt"));
+        protokolle.Should().Contain(p => p.Content.Contains("Klon und Branch angelegt"));
     }
 
     /// <summary>
@@ -169,11 +169,11 @@ public sealed class EntwicklungsprozessServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var (_, aufgabeId) = await CreateTestDataAsync(db);
+        var (_, workItemId) = await CreateTestDataAsync(db);
 
         // Aufgabe zuerst starten
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        await aufgabeService.StartenAsync(aufgabeId, "task/test-branch", @"C:\nicht\vorhanden\pfad", ct: TestContext.Current.CancellationToken);
+        await aufgabeService.StartenAsync(workItemId, "task/test-branch", @"C:\nicht\vorhanden\pfad", ct: TestContext.Current.CancellationToken);
 
         var gitMock = new Mock<IGitPlugin>();
         var kiMock = new Mock<IKiPlugin>();
@@ -181,17 +181,17 @@ public sealed class EntwicklungsprozessServiceTests
         var service = CreateService(db, gitMock, kiMock);
 
         // Act
-        await service.AbschliessenAsync(aufgabeId, TestContext.Current.CancellationToken);
+        await service.AbschliessenAsync(workItemId, TestContext.Current.CancellationToken);
 
         // Assert – Status und Protokolleintrag
         await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.FindAsync(new object?[] { aufgabeId }, TestContext.Current.CancellationToken);
-        var statusEintrag = await db2.Protokolleintraege
-            .FirstOrDefaultAsync(p => p.AufgabeId == aufgabeId && p.Typ == ProtokollTyp.StatusUebergang, cancellationToken: TestContext.Current.CancellationToken);
+        var loaded = await db2.WorkItems.FindAsync(new object?[] { workItemId }, TestContext.Current.CancellationToken);
+        var statusEintrag = await db2.LogEntries
+            .FirstOrDefaultAsync(p => p.WorkItemId == workItemId && p.Type == LogEntryType.StatusTransition, cancellationToken: TestContext.Current.CancellationToken);
 
-        loaded!.Status.Should().Be(AufgabeStatus.Beendet);
+        loaded!.Status.Should().Be(WorkItemStatus.Completed);
         statusEintrag.Should().NotBeNull();
-        statusEintrag!.Inhalt.Should().Contain("Beendet");
+        statusEintrag!.Content.Should().Contain("Beendet");
     }
 
     /// <summary>Prüft, dass der konfigurierte Basispfad als Arbeitsverzeichnis verwendet wird.</summary>
@@ -200,7 +200,7 @@ public sealed class EntwicklungsprozessServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var (_, aufgabeId) = await CreateTestDataAsync(db, "Konfiguriertes Arbeitsverzeichnis");
+        var (_, workItemId) = await CreateTestDataAsync(db, "Konfiguriertes Arbeitsverzeichnis");
         var configuredBasePath = Path.Combine(Path.GetTempPath(), $"workdir-config-{Guid.NewGuid():N}");
 
         var workdirSettings = new ArbeitsverzeichnisSettingsService(db.Context, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
@@ -215,10 +215,10 @@ public sealed class EntwicklungsprozessServiceTests
         var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
 
         // Act
-        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
+        await service.ProzessStartenAsync(workItemId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
 
         // Assert
-        var expected = Path.Combine(configuredBasePath, "softwareschmiede", aufgabeId.ToString());
+        var expected = Path.Combine(configuredBasePath, "softwareschmiede", workItemId.ToString());
         gitMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", expected, It.IsAny<CancellationToken>()), Times.Once);
 
         // Cleanup
@@ -234,7 +234,7 @@ public sealed class EntwicklungsprozessServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var (_, aufgabeId) = await CreateTestDataAsync(db, "Fallback ohne Konfiguration");
+        var (_, workItemId) = await CreateTestDataAsync(db, "Fallback ohne Konfiguration");
 
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -245,10 +245,10 @@ public sealed class EntwicklungsprozessServiceTests
         var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
 
         // Act
-        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
+        await service.ProzessStartenAsync(workItemId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
 
         // Assert
-        var expected = Path.Combine(Path.GetTempPath(), "softwareschmiede", aufgabeId.ToString());
+        var expected = Path.Combine(Path.GetTempPath(), "softwareschmiede", workItemId.ToString());
         gitMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", expected, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -258,17 +258,17 @@ public sealed class EntwicklungsprozessServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var (_, aufgabeId) = await CreateTestDataAsync(db, "Fallback bei ungültigem Laufzeitpfad");
+        var (_, workItemId) = await CreateTestDataAsync(db, "Fallback bei ungültigem Laufzeitpfad");
 
         var invalidAsFile = Path.Combine(Path.GetTempPath(), $"workdir-file-{Guid.NewGuid():N}.txt");
         await File.WriteAllTextAsync(invalidAsFile, "not-a-directory", TestContext.Current.CancellationToken);
 
-        db.Context.AppEinstellungen.Add(new AppEinstellung
+        db.Context.AppSettings.Add(new AppSetting
         {
             Id = Guid.NewGuid(),
-            Schluessel = ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey,
-            Wert = invalidAsFile,
-            AktualisiertAm = DateTimeOffset.UtcNow
+            Key = ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey,
+            Value = invalidAsFile,
+            UpdatedAt = DateTimeOffset.UtcNow
         });
         await db.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -281,10 +281,10 @@ public sealed class EntwicklungsprozessServiceTests
         var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
 
         // Act
-        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
+        await service.ProzessStartenAsync(workItemId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
 
         // Assert
-        var expectedFallback = Path.Combine(Path.GetTempPath(), "softwareschmiede", aufgabeId.ToString());
+        var expectedFallback = Path.Combine(Path.GetTempPath(), "softwareschmiede", workItemId.ToString());
         gitMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", expectedFallback, It.IsAny<CancellationToken>()), Times.Once);
 
         // Cleanup
@@ -300,7 +300,7 @@ public sealed class EntwicklungsprozessServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var (_, aufgabeId) = await CreateTestDataAsync(db, "Fallback Log");
+        var (_, workItemId) = await CreateTestDataAsync(db, "Fallback Log");
 
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -308,20 +308,20 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        var resolverMock = new Mock<IWorkingDirectoryResolver>();
         resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), true, "no-configured-path", null));
+            .ReturnsAsync(new WorkingDirectoryResolutionResult(Path.GetTempPath(), true, "no-configured-path", null));
 
         var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), resolverMock.Object);
 
         // Act
-        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
+        await service.ProzessStartenAsync(workItemId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var eintraege = await db2.Protokolleintraege
-            .Where(p => p.AufgabeId == aufgabeId && p.Typ == ProtokollTyp.GitAktion)
-            .Select(p => p.Inhalt)
+        var eintraege = await db2.LogEntries
+            .Where(p => p.WorkItemId == workItemId && p.Type == LogEntryType.GitAction)
+            .Select(p => p.Content)
             .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         eintraege.Should().Contain(e => e.Contains("Arbeitsverzeichnis-Fallback aktiv"));
@@ -338,8 +338,8 @@ public sealed class EntwicklungsprozessServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var projekt = await projektService.CreateAsync("Basis-Branch-Persistenz-Projekt", null, TestContext.Current.CancellationToken);
-        var repository = await projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/persist-basis-branch", "test/persist-basis-branch", ct: TestContext.Current.CancellationToken);
+        var project = await projektService.CreateAsync("Basis-Branch-Persistenz-Projekt", null, TestContext.Current.CancellationToken);
+        var repository = await projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/persist-basis-branch", "test/persist-basis-branch", ct: TestContext.Current.CancellationToken);
 
         // Act
         var repositoryEntity = await db.Context.GitRepositories.FindAsync(new object?[] { repository.Id }, TestContext.Current.CancellationToken);
@@ -362,8 +362,8 @@ public sealed class EntwicklungsprozessServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
         var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var projekt = await projektService.CreateAsync("Basis-Branch-Default-Projekt", null, TestContext.Current.CancellationToken);
-        var repository = await projektService.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/test/default-basis-branch", "test/default-basis-branch", ct: TestContext.Current.CancellationToken);
+        var project = await projektService.CreateAsync("Basis-Branch-Default-Projekt", null, TestContext.Current.CancellationToken);
+        var repository = await projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/default-basis-branch", "test/default-basis-branch", ct: TestContext.Current.CancellationToken);
 
         // Act
         await using var db2 = db.CreateNewContext();

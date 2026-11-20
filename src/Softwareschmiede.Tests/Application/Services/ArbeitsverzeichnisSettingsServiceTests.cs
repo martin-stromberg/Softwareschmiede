@@ -9,12 +9,12 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>ArbeitsverzeichnisSettingsServiceTests.</summary>
 public sealed class ArbeitsverzeichnisSettingsServiceTests
 {
-    private static SoftwareschmiededDbContext CreateDb()
+    private static SoftwareschmiedeDbContext CreateDb()
     {
-        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
+        var options = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        return new SoftwareschmiededDbContext(options);
+        return new SoftwareschmiedeDbContext(options);
     }
 
     /// <summary><summary>SaveArbeitsverzeichnisAsync_ShouldPersistValueInAppEinstellung.</summary>.</summary>
@@ -30,9 +30,9 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
         var reloaded = await sut.GetArbeitsverzeichnisAsync(TestContext.Current.CancellationToken);
         reloaded.Should().Be(Path.GetFullPath(configuredPath));
 
-        var persisted = await db.AppEinstellungen.FirstOrDefaultAsync(a => a.Schluessel == ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey, cancellationToken: TestContext.Current.CancellationToken);
+        var persisted = await db.AppSettings.FirstOrDefaultAsync(a => a.Key == ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey, cancellationToken: TestContext.Current.CancellationToken);
         persisted.Should().NotBeNull();
-        persisted!.Wert.Should().Be(Path.GetFullPath(configuredPath));
+        persisted!.Value.Should().Be(Path.GetFullPath(configuredPath));
     }
 
     /// <summary><summary>SaveArbeitsverzeichnisAsync_ShouldAllowEmptyValue_ForFallbackUsage.</summary>.</summary>

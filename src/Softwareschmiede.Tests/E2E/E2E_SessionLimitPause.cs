@@ -70,11 +70,11 @@ public partial class End2EndTest
         var markerZeile = $"echo [[SOFTWARESCHMIEDE_RATE_LIMIT:{resetUtc:O}]]";
         await using (var db = OpenTestDbContext())
         {
-            db.PromptVorlagen.Add(new PromptVorlage
+            db.PromptTemplates.Add(new PromptTemplate
             {
                 Name = MarkerVorlagenName,
-                Prompttext = markerZeile,
-                Sortierung = 0
+                PromptText = markerZeile,
+                SortOrder = 0
             });
             await db.SaveChangesAsync();
         }
@@ -93,16 +93,16 @@ public partial class End2EndTest
         await WartenBisAsync(async () =>
         {
             await using var db = OpenTestDbContext();
-            var a = await db.Aufgaben.SingleOrDefaultAsync(x => x.Titel == LimitTitelA);
-            var b = await db.Aufgaben.SingleOrDefaultAsync(x => x.Titel == LimitTitelB);
-            return a?.AktiveRunId is not null && b?.AktiveRunId is not null;
+            var a = await db.WorkItems.SingleOrDefaultAsync(x => x.Title == LimitTitelA);
+            var b = await db.WorkItems.SingleOrDefaultAsync(x => x.Title == LimitTitelB);
+            return a?.ActiveRunId is not null && b?.ActiveRunId is not null;
         });
         await using (var db = OpenTestDbContext())
         {
-            idA = (await db.Aufgaben.SingleAsync(x => x.Titel == LimitTitelA)).Id;
-            var b = await db.Aufgaben.SingleAsync(x => x.Titel == LimitTitelB);
+            idA = (await db.WorkItems.SingleAsync(x => x.Title == LimitTitelA)).Id;
+            var b = await db.WorkItems.SingleAsync(x => x.Title == LimitTitelB);
             idB = b.Id;
-            runIdB = b.AktiveRunId!;
+            runIdB = b.ActiveRunId!;
         }
 
         // Zeitgesteuerter Versand mit bereits vergangener Zielzeit → der Service versendet sofort.
@@ -124,35 +124,35 @@ public partial class End2EndTest
         await WartenBisAsync(async () =>
         {
             await using var db = OpenTestDbContext();
-            var hatRateLimitEintrag = await db.Protokolleintraege
-                .AnyAsync(p => p.AufgabeId == idB && p.Typ == ProtokollTyp.RateLimit);
-            var a = await db.Aufgaben.SingleAsync(x => x.Id == idA);
-            var b = await db.Aufgaben.SingleAsync(x => x.Id == idB);
-            return hatRateLimitEintrag && a.PausiertBisUtc is not null && b.PausiertBisUtc is not null;
+            var hatRateLimitEintrag = await db.LogEntries
+                .AnyAsync(p => p.WorkItemId == idB && p.Type == LogEntryType.RateLimit);
+            var a = await db.WorkItems.SingleAsync(x => x.Id == idA);
+            var b = await db.WorkItems.SingleAsync(x => x.Id == idB);
+            return hatRateLimitEintrag && a.PausedUntilUtc is not null && b.PausedUntilUtc is not null;
         }, maxVersuche: 250);
 
         await using (var db = OpenTestDbContext())
         {
             // Plugin-weit persistiertes Session-Limit.
-            var limitEintrag = await db.AppEinstellungen
-                .SingleOrDefaultAsync(e => e.Schluessel == KiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
+            var limitEintrag = await db.AppSettings
+                .SingleOrDefaultAsync(e => e.Key == KiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
             Assert.NotNull(limitEintrag);
             Assert.True(
-                DateTimeOffset.TryParse(limitEintrag!.Wert, out var persistiertesLimit),
-                $"Persistierter Limit-Wert '{limitEintrag.Wert}' ist kein gültiger Zeitstempel.");
+                DateTimeOffset.TryParse(limitEintrag!.Value, out var persistiertesLimit),
+                $"Persistierter Limit-Wert '{limitEintrag.Value}' ist kein gültiger Zeitstempel.");
             Assert.True(
                 Math.Abs((persistiertesLimit - resetUtc).TotalSeconds) < 2,
                 $"Persistiertes Limit '{persistiertesLimit:O}' weicht vom Marker '{resetUtc:O}' ab.");
 
             // Beide Aufgaben desselben Prefix sind pausiert.
-            var a = await db.Aufgaben.SingleAsync(x => x.Id == idA);
-            var b = await db.Aufgaben.SingleAsync(x => x.Id == idB);
-            AssertPausiertBisUtc(a.PausiertBisUtc, resetUtc, LimitTitelA);
-            AssertPausiertBisUtc(b.PausiertBisUtc, resetUtc, LimitTitelB);
+            var a = await db.WorkItems.SingleAsync(x => x.Id == idA);
+            var b = await db.WorkItems.SingleAsync(x => x.Id == idB);
+            AssertPausiertBisUtc(a.PausedUntilUtc, resetUtc, LimitTitelA);
+            AssertPausiertBisUtc(b.PausedUntilUtc, resetUtc, LimitTitelB);
 
             // Kein Unterbrechen: AktiveRunId von B ist unverändert, Status weiterhin Gestartet/Aktiv.
-            Assert.Equal(runIdB, b.AktiveRunId);
-            Assert.Equal(AufgabeAusfuehrungsStatus.Aktiv, b.AusfuehrungsStatus);
+            Assert.Equal(runIdB, b.ActiveRunId);
+            Assert.Equal(WorkItemExecutionStatus.Active, b.ExecutionStatus);
         }
 
         // Die CLI von B läuft sichtbar weiter (Stoppen-Button).
@@ -168,18 +168,18 @@ public partial class End2EndTest
         // CliUpdateSafetyService bewertet ausschließlich persistierte Lauf-Indikatoren).
         await using (var db = OpenTestDbContext())
         {
-            var projekt = await db.Projekte.FirstAsync();
-            db.Aufgaben.Add(new Aufgabe
+            var project = await db.Projects.FirstAsync();
+            db.WorkItems.Add(new WorkItem
             {
                 Id = Guid.NewGuid(),
-                ProjektId = projekt.Id,
-                Titel = "Limit-FremdPrefix-Aufgabe",
-                Status = AufgabeStatus.Gestartet,
-                AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-                KiPluginPrefix = FremdPrefix,
-                AktiveRunId = Guid.NewGuid().ToString("N"),
+                ProjectId = project.Id,
+                Title = "Limit-FremdPrefix-Aufgabe",
+                Status = WorkItemStatus.Started,
+                ExecutionStatus = WorkItemExecutionStatus.Active,
+                AiPluginPrefix = FremdPrefix,
+                ActiveRunId = Guid.NewGuid().ToString("N"),
                 LastHeartbeatUtc = DateTimeOffset.UtcNow,
-                ErstellungsDatum = DateTimeOffset.UtcNow
+                CreatedAt = DateTimeOffset.UtcNow
             });
             await db.SaveChangesAsync();
         }
@@ -198,10 +198,10 @@ public partial class End2EndTest
         // Heartbeat-Bewertung wieder: die laufenden Simulator-Aufgaben sind wieder riskant.
         await using (var db = OpenTestDbContext())
         {
-            var eintrag = await db.AppEinstellungen
-                .SingleAsync(e => e.Schluessel == KiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
-            eintrag.Wert = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
-            eintrag.AktualisiertAm = DateTimeOffset.UtcNow;
+            var eintrag = await db.AppSettings
+                .SingleAsync(e => e.Key == KiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
+            eintrag.Value = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+            eintrag.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();
         }
 
@@ -241,7 +241,7 @@ public partial class End2EndTest
         return taskReopened;
     }
 
-    private static CliUpdateSafetyService ErstelleSafetyService(Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext db)
+    private static CliUpdateSafetyService ErstelleSafetyService(Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext db)
     {
         var aufgabeService = new AufgabeService(
             db,

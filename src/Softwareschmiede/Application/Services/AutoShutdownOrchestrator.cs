@@ -138,7 +138,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     }
 
     /// <inheritdoc/>
-    public void SetOptionen(int toleranzMinuten, bool erzwingen)
+    public void SetOptionen(int toleranzMinuten, bool force)
     {
         var zustandGeaendert = false;
         var neueToleranz = Math.Max(0, toleranzMinuten);
@@ -163,9 +163,9 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
                 }
             }
 
-            if (_erzwingen != erzwingen)
+            if (_erzwingen != force)
             {
-                _erzwingen = erzwingen;
+                _erzwingen = force;
                 zustandGeaendert = true;
             }
         }
@@ -179,7 +179,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     private void OnRunningCountChanged(int previousCount, int currentCount)
         => TriggerEvaluierung();
 
-    private void OnLaufdatenChanged(Guid aufgabeId)
+    private void OnLaufdatenChanged(Guid workItemId)
         => TriggerEvaluierung();
 
     private void OnSicherheitsTick()
@@ -363,18 +363,18 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
 
             ZustandGeaendert?.Invoke();
 
-            bool erzwingen;
+            bool force;
             lock (_syncLock)
             {
-                erzwingen = _erzwingen;
+                force = _erzwingen;
             }
 
             _logger.LogWarning(
                 "Auto-Shutdown wird ausgelöst (Toleranzzeit abgelaufen, Erzwingen={Erzwingen}).",
-                erzwingen);
+                force);
             try
             {
-                await _systemShutdownService.RequestShutdownAsync(erzwingen);
+                await _systemShutdownService.RequestShutdownAsync(force);
             }
             catch (Exception ex)
             {

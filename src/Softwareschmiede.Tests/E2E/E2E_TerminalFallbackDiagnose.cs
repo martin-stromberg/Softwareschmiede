@@ -96,13 +96,13 @@ public partial class End2EndTest
     private async Task SetForcePtyUnavailableAsync(bool? wert)
     {
         await using var db = OpenTestDbContext();
-        var eintrag = await db.AppEinstellungen
-            .FirstOrDefaultAsync(e => e.Schluessel == TerminalSessionService.ForcePtyUnavailableKey);
+        var eintrag = await db.AppSettings
+            .FirstOrDefaultAsync(e => e.Key == TerminalSessionService.ForcePtyUnavailableKey);
         if (wert is null)
         {
             if (eintrag is not null)
             {
-                db.AppEinstellungen.Remove(eintrag);
+                db.AppSettings.Remove(eintrag);
                 await db.SaveChangesAsync();
             }
             return;
@@ -110,15 +110,15 @@ public partial class End2EndTest
 
         if (eintrag is null)
         {
-            eintrag = new AppEinstellung
+            eintrag = new AppSetting
             {
                 Id = Guid.NewGuid(),
-                Schluessel = TerminalSessionService.ForcePtyUnavailableKey,
+                Key = TerminalSessionService.ForcePtyUnavailableKey,
             };
-            db.AppEinstellungen.Add(eintrag);
+            db.AppSettings.Add(eintrag);
         }
-        eintrag.Wert = wert.Value ? "true" : "false";
-        eintrag.AktualisiertAm = DateTimeOffset.UtcNow;
+        eintrag.Value = wert.Value ? "true" : "false";
+        eintrag.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
     }
 }

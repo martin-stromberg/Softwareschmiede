@@ -20,14 +20,14 @@ public static class UpdateModusTexte
 
 /// <summary>
 /// Auswahloption für den Update-Modus in den Einstellungen: der Steuerwert
-/// (<see cref="Modus"/>) zusammen mit dem sichtbaren Anzeige-Label.
+/// (<see cref="Mode"/>) zusammen mit dem sichtbaren Anzeige-Label.
 /// </summary>
-/// <param name="Modus">Der persistierte Update-Modus.</param>
+/// <param name="Mode">Der persistierte Update-Modus.</param>
 /// <param name="Label">Der in der Auswahlbox angezeigte Text.</param>
-public sealed record UpdateModusOption(UpdateMode Modus, string Label)
+public sealed record UpdateModusOption(UpdateMode Mode, string Label)
 {
     /// <summary>Alle wählbaren Update-Modi in Anzeigereihenfolge.</summary>
-    public static IReadOnlyList<UpdateModusOption> Alle { get; } =
+    public static IReadOnlyList<UpdateModusOption> All { get; } =
     [
         new(UpdateMode.Aus, UpdateModusTexte.Aus),
         new(UpdateMode.NurPruefen, UpdateModusTexte.NurPruefen),
@@ -36,7 +36,7 @@ public sealed record UpdateModusOption(UpdateMode Modus, string Label)
 
     /// <summary>Liefert die Auswahloption zu einem gespeicherten Modus.</summary>
     public static UpdateModusOption FuerModus(UpdateMode modus)
-        => Alle.First(o => o.Modus == modus);
+        => All.First(o => o.Mode == modus);
 
     /// <inheritdoc/>
     public override string ToString() => Label;

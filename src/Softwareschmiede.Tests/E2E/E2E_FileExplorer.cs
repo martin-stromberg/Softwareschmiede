@@ -204,8 +204,8 @@ public partial class End2EndTest
     private async Task<string> GetLokalerKlonPfadAsync()
     {
         await using var db = OpenTestDbContext();
-        var aufgabe = db.Aufgaben.Single();
-        return aufgabe.LokalerKlonPfad
+        var workItem = db.WorkItems.Single();
+        return workItem.LocalClonePath
             ?? throw new InvalidOperationException("LokalerKlonPfad wurde nach dem Starten der Aufgabe nicht gesetzt.");
     }
 }

@@ -143,7 +143,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
                     await File.WriteAllTextAsync(promptPath + ".tmp", prompt, token);
                     File.Move(promptPath + ".tmp", promptPath);
                 });
-            using var adapter = new ScmPromptSessionAdapter(request.AufgabeId, request.CliRunId, prefix, spec, session.Object, [], () => !process.HasExited);
+            using var adapter = new ScmPromptSessionAdapter(request.WorkItemId, request.CliRunId, prefix, spec, session.Object, [], () => !process.HasExited);
             var access = await adapter.CheckExchangeAccessAsync(directory, TestContext.Current.CancellationToken);
             access.Status.Should().Be(ScmExchangeAccessStatus.Unknown, "only the real file tool may complete the probe");
             var probeDeadline = DateTime.UtcNow.AddSeconds(HostPhaseTimeoutSeconds);

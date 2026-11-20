@@ -3,10 +3,10 @@ using Softwareschmiede.Domain.Interfaces;
 namespace Softwareschmiede.Infrastructure.Services;
 
 /// <summary>Einfacher Benutzerkontext basierend auf dem lokalen Benutzerkonto.</summary>
-public sealed class BenutzerkontextService : IBenutzerkontextService
+public sealed class BenutzerkontextService : IUserContextService
 {
     /// <inheritdoc/>
-    public string GetBenutzerId()
+    public string GetUserId()
     {
         var benutzer = Environment.UserName?.Trim();
         if (string.IsNullOrWhiteSpace(benutzer))

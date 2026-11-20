@@ -24,9 +24,9 @@ public partial class End2EndTest
         string? vorherigesDefault;
         using (var db = OpenTestDbContext())
         {
-            vorherigesDefault = db.AppEinstellungen
-                .Where(e => e.Schluessel == AppEinstellungService.DefaultKiPluginKey)
-                .Select(e => e.Wert)
+            vorherigesDefault = db.AppSettings
+                .Where(e => e.Key == AppEinstellungService.DefaultKiPluginKey)
+                .Select(e => e.Value)
                 .FirstOrDefault();
         }
 
@@ -67,21 +67,21 @@ public partial class End2EndTest
             try
             {
                 using var db = OpenTestDbContext();
-                var eintrag = db.AppEinstellungen
-                    .FirstOrDefault(e => e.Schluessel == AppEinstellungService.DefaultKiPluginKey);
+                var eintrag = db.AppSettings
+                    .FirstOrDefault(e => e.Key == AppEinstellungService.DefaultKiPluginKey);
                 if (eintrag is null && vorherigesDefault is not null)
                 {
-                    db.AppEinstellungen.Add(new Softwareschmiede.Domain.Entities.AppEinstellung
+                    db.AppSettings.Add(new Softwareschmiede.Domain.Entities.AppSetting
                     {
                         Id = Guid.NewGuid(),
-                        Schluessel = AppEinstellungService.DefaultKiPluginKey,
+                        Key = AppEinstellungService.DefaultKiPluginKey,
                     });
-                    eintrag = db.AppEinstellungen.Local.FirstOrDefault(e => e.Schluessel == AppEinstellungService.DefaultKiPluginKey);
+                    eintrag = db.AppSettings.Local.FirstOrDefault(e => e.Key == AppEinstellungService.DefaultKiPluginKey);
                 }
                 if (eintrag is not null)
                 {
-                    eintrag.Wert = vorherigesDefault;
-                    eintrag.AktualisiertAm = DateTimeOffset.UtcNow;
+                    eintrag.Value = vorherigesDefault;
+                    eintrag.UpdatedAt = DateTimeOffset.UtcNow;
                     db.SaveChanges();
                 }
             }

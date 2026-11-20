@@ -153,15 +153,15 @@ public sealed class VisualStudioIdePluginTests : IDisposable
         var verzeichnis = CreateTempDirectory();
         var solutionPfad = Path.Combine(verzeichnis, "Loesung.sln");
         File.WriteAllText(solutionPfad, string.Empty);
-        var prozessStarterMock = new Mock<IProzessStarter>();
+        var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = new VisualStudioIdePlugin(prozessStarterMock.Object);
 
         await sut.OpenEntryPointAsync(new IdeEntryPoint(solutionPfad), TestContext.Current.CancellationToken);
 
         prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a =>
-                a.DateiName == solutionPfad &&
-                a.ShellAusfuehren == true)),
+            p => p.Start(It.Is<ProcessStartRequest>(a =>
+                a.FileName == solutionPfad &&
+                a.UseShellExecute == true)),
             Times.Once);
     }
 
@@ -178,5 +178,5 @@ public sealed class VisualStudioIdePluginTests : IDisposable
 
     private string CreateTempDirectory() => _tempDirectoryFixture.CreateTempDirectory("visual_studio_ide_plugin_tests");
 
-    private static VisualStudioIdePlugin CreateSut() => new(new Mock<IProzessStarter>().Object);
+    private static VisualStudioIdePlugin CreateSut() => new(new Mock<IProcessStarter>().Object);
 }

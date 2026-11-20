@@ -51,7 +51,7 @@
                                     Binding="{Binding Nummer}"
                                     Width="50" />
                 <DataGridTextColumn Header="Titel"
-                                    Binding="{Binding Titel}"
+                                    Binding="{Binding Title}"
                                     Width="*" />
                 <DataGridTextColumn Header="Beschreibung"
                                     Binding="{Binding Body}"

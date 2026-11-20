@@ -71,7 +71,7 @@ public partial class End2EndTest
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = pluginName,
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow,
@@ -163,7 +163,7 @@ public partial class End2EndTest
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Diagnose",
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(50),
@@ -184,7 +184,7 @@ public partial class End2EndTest
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Pause",
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow.AddSeconds(3),
@@ -206,7 +206,7 @@ public partial class End2EndTest
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Schritt",
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(100),
@@ -229,7 +229,7 @@ public partial class End2EndTest
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Breit",
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(10),
@@ -249,7 +249,7 @@ public partial class End2EndTest
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Schmal",
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(10),

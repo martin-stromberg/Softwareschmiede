@@ -31,7 +31,7 @@ public static class UpdatePfadTexte
 public sealed record UpdatePfadOption(string Pfad, string Label)
 {
     /// <summary>Alle wählbaren Update-Pfade in Anzeigereihenfolge.</summary>
-    public static IReadOnlyList<UpdatePfadOption> Alle { get; } =
+    public static IReadOnlyList<UpdatePfadOption> All { get; } =
     [
         new(UpdatePfadKanalResolver.ProduktivversionenPfad, UpdatePfadTexte.Produktivversionen),
         new(UpdatePfadKanalResolver.VorabversionenPfad, UpdatePfadTexte.Vorabversionen)
@@ -41,7 +41,7 @@ public sealed record UpdatePfadOption(string Pfad, string Label)
     public static UpdatePfadOption FuerPfad(string? pfad)
     {
         var normalisiert = UpdatePfadKanalResolver.NormalisierePfad(pfad);
-        return Alle.First(o => o.Pfad == normalisiert);
+        return All.First(o => o.Pfad == normalisiert);
     }
 
     /// <inheritdoc/>

@@ -10,7 +10,7 @@ namespace Softwareschmiede.Application.Services;
 /// Singleton-Zähler der fachlich laufenden Automatisierungen: wendet die gemeinsame
 /// <see cref="KiAusfuehrungsStatusKlassifikation"/> auf die Kandidatenmenge der Seitenleiste
 /// (<see cref="IAktiveAufgabenService.GetAktiveAufgabenAsync"/>) an und zählt den Zustand
-/// <see cref="KiAusfuehrungsZustand.Laeuft"/>. Laufender gehandelter Prozess und
+/// <see cref="AiExecutionState.Running"/>. Laufender gehandelter Prozess und
 /// zeitgesteuerter Prompt werden dabei wie in der UI-Klassifikation berücksichtigt.
 /// Zusätzlich zählt jedes SCM-Ereignis im Status „Verzögert" als ausstehende
 /// Automatisierung, damit der Auto-Shutdown eine geplante Zustellung nicht überholt.
@@ -40,18 +40,18 @@ public sealed class LaufendeAutomatisierungenZaehlung : ILaufendeAutomatisierung
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var aktiveAufgabenService = scope.ServiceProvider.GetRequiredService<IAktiveAufgabenService>();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var aufgaben = await aktiveAufgabenService.GetAktiveAufgabenAsync(ct);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var workItems = await aktiveAufgabenService.GetAktiveAufgabenAsync(ct);
 
         var anzahl = 0;
-        foreach (var aufgabe in aufgaben)
+        foreach (var workItem in workItems)
         {
             var daten = KiAusfuehrungsStatusDaten.VonAufgabe(
-                aufgabe,
-                _statusSource.GetLiveLaufStatus(aufgabe.Id),
-                _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id) is not null);
+                workItem,
+                _statusSource.GetLiveRunStatus(workItem.Id),
+                _promptZeitVersandService.GetScheduledPromptStatus(workItem.Id) is not null);
 
-            if (KiAusfuehrungsStatusKlassifikation.Klassifiziere(daten, out _) == KiAusfuehrungsZustand.Laeuft)
+            if (KiAusfuehrungsStatusKlassifikation.Klassifiziere(daten, out _) == AiExecutionState.Running)
             {
                 anzahl++;
             }

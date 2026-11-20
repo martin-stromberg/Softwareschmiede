@@ -86,7 +86,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
         // Arrange
         await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath);
 
-        var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "backend" };
+        var startConfig = new RepositoryStartConfiguration { WorkingDirectoryRelativePath = "backend" };
 
         string? usedPath = null;
         var kiPluginMock = new Mock<IKiPlugin>();
@@ -124,7 +124,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
         // Arrange
         await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath, TestContext.Current.CancellationToken);
 
-        var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "backend" };
+        var startConfig = new RepositoryStartConfiguration { WorkingDirectoryRelativePath = "backend" };
 
         var kiPluginMock = new Mock<IKiPlugin>();
         kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))

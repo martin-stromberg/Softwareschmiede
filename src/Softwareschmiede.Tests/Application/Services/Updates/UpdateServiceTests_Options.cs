@@ -18,9 +18,9 @@ public sealed class UpdateServiceTests_Options
         versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new InstalledVersionInfo("1.2.0", "v1.2.0-rc.1", null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
-        releaseClient.Setup(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.Kanal == UpdateKanal.ReleaseCandidate), It.IsAny<CancellationToken>()))
+        releaseClient.Setup(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.Channel == UpdateKanal.ReleaseCandidate), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(prerelease));
-        releaseClient.Setup(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.Kanal == UpdateKanal.Produktiv), It.IsAny<CancellationToken>()))
+        releaseClient.Setup(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.Channel == UpdateKanal.Produktiv), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(stable));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 

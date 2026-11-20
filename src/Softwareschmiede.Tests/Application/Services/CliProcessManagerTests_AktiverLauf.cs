@@ -15,7 +15,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>
 /// Regressionstests für Issue 108 (Kundenrückmeldung): <see cref="CliProcessManager"/> muss beim Start und
-/// Stopp eines CLI-Prozesses <see cref="Aufgabe.AktiveRunId"/> über <see cref="AufgabeService"/> persistieren,
+/// Stopp eines CLI-Prozesses <see cref="WorkItem.ActiveRunId"/> über <see cref="AufgabeService"/> persistieren,
 /// damit der <c>KiAusfuehrungsStatusConverter</c> die Seitenleisten-Kachel korrekt auf "▶ Läuft" umschaltet.
 /// Vor dem Fix wurde <c>AktiveRunId</c> nirgends im Produktivcode gesetzt — der zugehörige E2E-Test simulierte
 /// den Heartbeat direkt in der Datenbank und deckte diese Lücke daher nicht auf.
@@ -34,7 +34,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     public CliProcessManagerTests_AktiverLauf()
     {
         var services = new ServiceCollection();
-        services.AddDbContext<SoftwareschmiededDbContext>(options => options.UseInMemoryDatabase(_dbName));
+        services.AddDbContext<SoftwareschmiedeDbContext>(options => options.UseInMemoryDatabase(_dbName));
         services.AddScoped<AufgabeService>();
         services.AddSingleton<ILogger<AufgabeService>>(NullLogger<AufgabeService>.Instance);
         services.AddScoped<TodoService>();
@@ -43,22 +43,22 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
 
         using (var scope = _provider.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             db.Database.EnsureCreated();
-            db.Projekte.Add(new Projekt
+            db.Projects.Add(new Project
             {
                 Id = _projektId,
                 Name = "Testprojekt",
-                ErstellungsDatum = DateTimeOffset.UtcNow,
-                Status = ProjektStatus.Aktiv
+                CreatedAt = DateTimeOffset.UtcNow,
+                Status = ProjectStatus.Active
             });
-            db.Aufgaben.Add(new Aufgabe
+            db.WorkItems.Add(new WorkItem
             {
                 Id = _aufgabeId,
-                ProjektId = _projektId,
-                Titel = "CLI-Prozess-Aufgabe",
-                Status = AufgabeStatus.Gestartet,
-                ErstellungsDatum = DateTimeOffset.UtcNow
+                ProjectId = _projektId,
+                Title = "CLI-Prozess-Aufgabe",
+                Status = WorkItemStatus.Started,
+                CreatedAt = DateTimeOffset.UtcNow
             });
             db.SaveChanges();
         }
@@ -81,11 +81,11 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         _provider.Dispose();
     }
 
-    private Aufgabe LadeAufgabe()
+    private WorkItem LadeAufgabe()
     {
         using var scope = _provider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        return db.Aufgaben.AsNoTracking().Single(a => a.Id == _aufgabeId);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        return db.WorkItems.AsNoTracking().Single(a => a.Id == _aufgabeId);
     }
 
     private async Task RaiseStatusChangedAsync(CliProcessStatus status)
@@ -95,7 +95,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
 
         // OnCliProcessStatusChanged persistiert über SafeFireAndForget asynchron im Hintergrund;
         // kurze Wartezeit, bis der Fire-and-Forget-Task abgeschlossen ist.
-        await PollUntilAsync(() => LadeAufgabe().AktiveRunId != null == (status == CliProcessStatus.Gestartet));
+        await PollUntilAsync(() => LadeAufgabe().ActiveRunId != null == (status == CliProcessStatus.Started));
     }
 
     private static async Task PollUntilAsync(Func<bool> condition)
@@ -111,7 +111,7 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
 
     /// <summary>
     /// Beim Start eines CLI-Prozesses (Status <c>Gestartet</c>) muss CliProcessManager sofort
-    /// <see cref="Aufgabe.AktiveRunId"/> setzen und <see cref="Aufgabe.LastHeartbeatUtc"/> aktualisieren —
+    /// <see cref="WorkItem.ActiveRunId"/> setzen und <see cref="WorkItem.LastHeartbeatUtc"/> aktualisieren —
     /// ohne auf den ersten periodischen 30s-Heartbeat zu warten.
     /// </summary>
     [Fact]
@@ -122,32 +122,32 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         // nur, solange der Prozess nachweislich läuft (Issue 342, TOCTOU).
         PlantLaufendesHandle(_aufgabeId);
 
-        await RaiseStatusChangedAsync(CliProcessStatus.Gestartet);
+        await RaiseStatusChangedAsync(CliProcessStatus.Started);
 
-        var aufgabe = LadeAufgabe();
-        aufgabe.AktiveRunId.Should().NotBeNull();
-        aufgabe.LastHeartbeatUtc.Should().NotBeNull();
-        aufgabe.LastHeartbeatUtc!.Value.Should().BeOnOrAfter(vorStart.AddSeconds(-1));
+        var workItem = LadeAufgabe();
+        workItem.ActiveRunId.Should().NotBeNull();
+        workItem.LastHeartbeatUtc.Should().NotBeNull();
+        workItem.LastHeartbeatUtc!.Value.Should().BeOnOrAfter(vorStart.AddSeconds(-1));
     }
 
     /// <summary>
     /// Beim regulären Stopp eines CLI-Prozesses (Status <c>Gestoppt</c>) muss CliProcessManager
-    /// <see cref="Aufgabe.AktiveRunId"/> wieder entfernen, damit die Kachel nicht dauerhaft "▶ Läuft" zeigt.
+    /// <see cref="WorkItem.ActiveRunId"/> wieder entfernen, damit die Kachel nicht dauerhaft "▶ Läuft" zeigt.
     /// </summary>
     [Fact]
     public async Task OnCliProcessStatusChanged_WithGestoppt_EntferntAktiveRunId()
     {
         PlantLaufendesHandle(_aufgabeId);
-        await RaiseStatusChangedAsync(CliProcessStatus.Gestartet);
-        LadeAufgabe().AktiveRunId.Should().NotBeNull();
+        await RaiseStatusChangedAsync(CliProcessStatus.Started);
+        LadeAufgabe().ActiveRunId.Should().NotBeNull();
 
         await RaiseStatusChangedAsync(CliProcessStatus.Gestoppt);
 
-        LadeAufgabe().AktiveRunId.Should().BeNull();
+        LadeAufgabe().ActiveRunId.Should().BeNull();
     }
 
     /// <summary>
-    /// Auch bei einem Fehler-Stopp (Status <c>Fehler</c>) muss <see cref="Aufgabe.AktiveRunId"/> entfernt
+    /// Auch bei einem Fehler-Stopp (Status <c>Fehler</c>) muss <see cref="WorkItem.ActiveRunId"/> entfernt
     /// werden — die Aufgabe bleibt zwar im Status Gestartet (CLI kann erneut gestartet werden), zeigt aber
     /// korrekt "✓ Bereit" statt fälschlich weiter "▶ Läuft".
     /// </summary>
@@ -155,19 +155,19 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     public async Task OnCliProcessStatusChanged_WithFehler_EntferntAktiveRunId()
     {
         PlantLaufendesHandle(_aufgabeId);
-        await RaiseStatusChangedAsync(CliProcessStatus.Gestartet);
-        LadeAufgabe().AktiveRunId.Should().NotBeNull();
+        await RaiseStatusChangedAsync(CliProcessStatus.Started);
+        LadeAufgabe().ActiveRunId.Should().NotBeNull();
 
         await RaiseStatusChangedAsync(CliProcessStatus.Fehler);
 
-        LadeAufgabe().AktiveRunId.Should().BeNull();
+        LadeAufgabe().ActiveRunId.Should().BeNull();
     }
 
-    private void PlantLaufendesHandle(Guid aufgabeId)
+    private void PlantLaufendesHandle(Guid workItemId)
     {
         var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
-        handles[aufgabeId] = new CliProcessHandle(aufgabeId, System.Diagnostics.Process.GetCurrentProcess());
+        handles[workItemId] = new CliProcessHandle(workItemId, System.Diagnostics.Process.GetCurrentProcess());
     }
 
     /// <summary>
@@ -179,18 +179,18 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     public async Task CliLaufAktiv_StelltLaufdatenSicher_BeiWiederverwendung()
     {
         PlantLaufendesHandle(_aufgabeId);
-        LadeAufgabe().AktiveRunId.Should().BeNull("Ausgangslage: keine persistierten Laufdaten");
+        LadeAufgabe().ActiveRunId.Should().BeNull("Ausgangslage: keine persistierten Laufdaten");
 
         var notifierFired = new ManualResetEventSlim(false);
         _laufdatenChangedNotifier.LaufdatenChanged += _ => notifierFired.Set();
 
         _kiService.NotifyLaufAktiv(_aufgabeId);
 
-        await PollUntilAsync(() => LadeAufgabe().AktiveRunId is not null);
-        var aufgabe = LadeAufgabe();
-        aufgabe.AktiveRunId.Should().NotBeNullOrEmpty();
-        aufgabe.LastHeartbeatUtc.Should().NotBeNull();
-        aufgabe.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+        await PollUntilAsync(() => LadeAufgabe().ActiveRunId is not null);
+        var workItem = LadeAufgabe();
+        workItem.ActiveRunId.Should().NotBeNullOrEmpty();
+        workItem.LastHeartbeatUtc.Should().NotBeNull();
+        workItem.ExecutionStatus.Should().Be(WorkItemExecutionStatus.Active);
         notifierFired.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken).Should().BeTrue(
             "erfolgreiche Laufdaten-Persistierung meldet die UI-Aktualisierung");
     }
@@ -204,29 +204,29 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     public async Task AktualisierungAsync_HeiltGeloeschteLaufdaten_BeiLaufendemProzess()
     {
         PlantLaufendesHandle(_aufgabeId);
-        await RaiseStatusChangedAsync(CliProcessStatus.Gestartet);
-        LadeAufgabe().AktiveRunId.Should().NotBeNull();
+        await RaiseStatusChangedAsync(CliProcessStatus.Started);
+        LadeAufgabe().ActiveRunId.Should().NotBeNull();
 
         // Laufdaten direkt in der DB löschen — simuliert einen verworfenen SaveChanges oder einen
         // früheren Persistierungsfehler, während der Prozess weiterläuft.
         using (var scope = _provider.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var tracked = await db.Aufgaben.FindAsync(new object?[] { _aufgabeId }, TestContext.Current.CancellationToken);
-            tracked!.AktiveRunId = null;
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            var tracked = await db.WorkItems.FindAsync(new object?[] { _aufgabeId }, TestContext.Current.CancellationToken);
+            tracked!.ActiveRunId = null;
             tracked.LastHeartbeatUtc = null;
-            tracked.LaufStatus = null;
-            tracked.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
+            tracked.RunStatus = null;
+            tracked.ExecutionStatus = WorkItemExecutionStatus.Completed;
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var method = typeof(CliProcessManager).GetMethod("AktualisierungAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         await (Task)method.Invoke(_sut, new object[] { _aufgabeId })!;
 
-        var aufgabe = LadeAufgabe();
-        aufgabe.AktiveRunId.Should().NotBeNullOrEmpty("der Tick stellt die vollständigen Laufdaten wieder her");
-        aufgabe.LastHeartbeatUtc.Should().NotBeNull();
-        aufgabe.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+        var workItem = LadeAufgabe();
+        workItem.ActiveRunId.Should().NotBeNullOrEmpty("der Tick stellt die vollständigen Laufdaten wieder her");
+        workItem.LastHeartbeatUtc.Should().NotBeNull();
+        workItem.ExecutionStatus.Should().Be(WorkItemExecutionStatus.Active);
     }
 
     /// <summary>
@@ -237,15 +237,15 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
     public async Task AbgleichAsync_StelltLaufdatenSicher_FuerLaufendeAufgaben()
     {
         PlantLaufendesHandle(_aufgabeId);
-        LadeAufgabe().AktiveRunId.Should().BeNull();
+        LadeAufgabe().ActiveRunId.Should().BeNull();
 
         var method = typeof(CliProcessManager).GetMethod("AbgleichAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         await (Task)method.Invoke(_sut, Array.Empty<object>())!;
 
-        var aufgabe = LadeAufgabe();
-        aufgabe.AktiveRunId.Should().NotBeNullOrEmpty();
-        aufgabe.LastHeartbeatUtc.Should().NotBeNull();
-        aufgabe.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+        var workItem = LadeAufgabe();
+        workItem.ActiveRunId.Should().NotBeNullOrEmpty();
+        workItem.LastHeartbeatUtc.Should().NotBeNull();
+        workItem.ExecutionStatus.Should().Be(WorkItemExecutionStatus.Active);
 
         // Der Abgleich hat zusätzlich den Heartbeat-Timer (Wiederherstellung der Beobachtungskette)
         // und — bei Session — die RuntimeStatus-Subscription sichergestellt; für das gepflanzte

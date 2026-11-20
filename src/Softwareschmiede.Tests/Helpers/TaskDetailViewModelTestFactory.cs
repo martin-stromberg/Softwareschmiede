@@ -18,7 +18,7 @@ public static class TaskDetailViewModelTestFactory
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
     /// <param name="aufgabeService">Der zu verwendende AufgabeService.</param>
     /// <returns>Ein vollständig konfiguriertes TaskDetailViewModel.</returns>
-    public static TaskDetailViewModel Create(SoftwareschmiededDbContext db, AufgabeService aufgabeService)
+    public static TaskDetailViewModel Create(SoftwareschmiedeDbContext db, AufgabeService aufgabeService)
     {
         var dialogServiceMock = new Mock<IDialogService>();
         dialogServiceMock
@@ -39,7 +39,7 @@ public static class TaskDetailViewModelTestFactory
         var promptVorlagenPlatzhalterService = new PromptVorlagenPlatzhalterService();
         var promptZeitVersandService = new PromptZeitVersandService(kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
         var gitPluginMock = new Mock<IGitPlugin>();
-        var arbeitsverzeichnisMock = new Mock<IArbeitsverzeichnisResolver>();
+        var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
         var entwicklungsprozessService = new EntwicklungsprozessService(
             aufgabeService,
             protokollService,
@@ -87,9 +87,9 @@ public static class TaskDetailViewModelTestFactory
     /// <param name="prozessStarterMock">Der zu verwendende IProzessStarter-Mock, oder null um einen neuen Mock zu erstellen.</param>
     /// <returns>Ein einsatzbereiter ArbeitsverzeichnisOeffnenService.</returns>
     public static ArbeitsverzeichnisOeffnenService CreateArbeitsverzeichnisOeffnenService(
-        Mock<IProzessStarter>? prozessStarterMock = null)
+        Mock<IProcessStarter>? prozessStarterMock = null)
     {
-        prozessStarterMock ??= new Mock<IProzessStarter>();
+        prozessStarterMock ??= new Mock<IProcessStarter>();
         return new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object);
     }
 }

@@ -57,7 +57,7 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
 
         var services = new ServiceCollection();
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddDbContext<SoftwareschmiededDbContext>(o =>
+        services.AddDbContext<SoftwareschmiedeDbContext>(o =>
         {
             o.UseSqlite($"Data Source={_dbPath}");
             ConfigureDbContext(o);
@@ -83,7 +83,7 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
         _provider = services.BuildServiceProvider();
 
         using var scope = _provider.CreateScope();
-        scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Database.EnsureCreated();
+        scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().Database.EnsureCreated();
     }
 
     /// <summary>Gibt den DI-Container und die SQLite-Datei frei.</summary>

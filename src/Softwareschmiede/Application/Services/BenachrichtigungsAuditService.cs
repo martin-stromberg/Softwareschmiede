@@ -9,12 +9,12 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Persistiert auditierbare Benachrichtigungsentscheidungen.</summary>
 public sealed class BenachrichtigungsAuditService
 {
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly ILogger<BenachrichtigungsAuditService> _logger;
 
     /// <inheritdoc cref="BenachrichtigungsAuditService"/>
     public BenachrichtigungsAuditService(
-        SoftwareschmiededDbContext db,
+        SoftwareschmiedeDbContext db,
         ILogger<BenachrichtigungsAuditService> logger)
     {
         _db = db;
@@ -24,28 +24,28 @@ public sealed class BenachrichtigungsAuditService
     /// <summary>Persistiert eine Benachrichtigungsentscheidung als Audit-Eintrag.</summary>
     public async Task LogAsync(
         Guid ereignisId,
-        Guid aufgabeId,
+        Guid workItemId,
         string benutzerId,
-        BenachrichtigungsKanal kanal,
-        BenachrichtigungsModus modus,
-        BenachrichtigungsEntscheidung entscheidung,
+        NotificationChannel kanal,
+        NotificationMode modus,
+        NotificationDecision entscheidung,
         string grund,
         CancellationToken ct = default)
     {
-        var eintrag = new BenachrichtigungsDispatchLog
+        var eintrag = new NotificationDispatchLog
         {
             Id = Guid.NewGuid(),
-            EreignisId = ereignisId,
-            AufgabeId = aufgabeId,
-            BenutzerId = benutzerId,
-            Kanal = kanal,
-            Modus = modus,
-            Entscheidung = entscheidung,
-            Grund = grund,
-            ErstelltAm = DateTimeOffset.UtcNow
+            EventId = ereignisId,
+            WorkItemId = workItemId,
+            UserId = benutzerId,
+            Channel = kanal,
+            Mode = modus,
+            Decision = entscheidung,
+            Reason = grund,
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
-        _db.BenachrichtigungsDispatchLogs.Add(eintrag);
+        _db.NotificationDispatchLogs.Add(eintrag);
         try
         {
             await _db.SaveChangesAsync(ct);

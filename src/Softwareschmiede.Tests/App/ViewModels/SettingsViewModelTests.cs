@@ -19,7 +19,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Unit-Tests für SettingsViewModel.</summary>
 public sealed class SettingsViewModelTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AppEinstellungService _einstellungService;
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
     private readonly DarkModeService _darkModeService;
@@ -392,9 +392,9 @@ public sealed class SettingsViewModelTests : IDisposable
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.PromptVorlagen.Should().ContainSingle();
-        sut.PromptVorlagen[0].Name.Should().Be("Vorlage");
-        sut.PromptVorlagen[0].Prompttext.Should().Be("Text");
+        sut.PromptTemplates.Should().ContainSingle();
+        sut.PromptTemplates[0].Name.Should().Be("Vorlage");
+        sut.PromptTemplates[0].PromptText.Should().Be("Text");
     }
 
     /// <summary>SpeichernAsync persistiert neue und geänderte Promptvorlagen.</summary>
@@ -407,17 +407,17 @@ public sealed class SettingsViewModelTests : IDisposable
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.PromptVorlagen[0].Name = "Neu";
-        sut.PromptVorlagen[0].Prompttext = "Neuer Text";
+        sut.PromptTemplates[0].Name = "Neu";
+        sut.PromptTemplates[0].PromptText = "Neuer Text";
         sut.PromptVorlageHinzufuegenCommand.Execute(null);
-        sut.PromptVorlagen[1].Name = "Zweite";
-        sut.PromptVorlagen[1].Prompttext = "Zweiter Text";
+        sut.PromptTemplates[1].Name = "Zweite";
+        sut.PromptTemplates[1].PromptText = "Zweiter Text";
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         var vorlagen = await _promptVorlagenService.GetAllAsync(TestContext.Current.CancellationToken);
         vorlagen.Should().HaveCount(2);
-        vorlagen.Should().Contain(v => v.Name == "Neu" && v.Prompttext == "Neuer Text");
-        vorlagen.Should().Contain(v => v.Name == "Zweite" && v.Prompttext == "Zweiter Text");
+        vorlagen.Should().Contain(v => v.Name == "Neu" && v.PromptText == "Neuer Text");
+        vorlagen.Should().Contain(v => v.Name == "Zweite" && v.PromptText == "Zweiter Text");
     }
 
     /// <summary>SpeichernAsync validiert leere Promptvorlagenfelder.</summary>
@@ -430,8 +430,8 @@ public sealed class SettingsViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.PromptVorlageHinzufuegenCommand.Execute(null);
-        sut.PromptVorlagen[0].Name = "Vorlage";
-        sut.PromptVorlagen[0].Prompttext = string.Empty;
+        sut.PromptTemplates[0].Name = "Vorlage";
+        sut.PromptTemplates[0].PromptText = string.Empty;
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().Contain("Prompttext");
@@ -760,7 +760,7 @@ public sealed class SettingsViewModelTests : IDisposable
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         // Probehalber vom gespeicherten Standard abweichende Werte setzen.
-        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Global);
+        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.Global);
         sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.SeparatesKonto);
         sut.IsScmMonitoringEnabled = false;
         sut.IsScmTaskCompletionEnabled = false;
@@ -769,8 +769,8 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
         await ((AsyncRelayCommand)sut.VerwerfenCommand).ExecuteAsync();
 
-        sut.SelectedBackmergeModus?.Modus.Should().Be(ScmBackmergeModus.Deaktiviert);
-        sut.SelectedKontoModus?.Modus.Should().Be(ScmKontoModus.Benutzerkonto);
+        sut.SelectedBackmergeModus?.Mode.Should().Be(ScmBackmergeMode.Disabled);
+        sut.SelectedKontoModus?.Mode.Should().Be(ScmKontoModus.Benutzerkonto);
         sut.IsProzessablaeufeFelderEnabled.Should().BeFalse();
         sut.ProzessablaeufeStatusText.Should().Be("deaktiviert");
         sut.IsTriggerKeywordSichtbar.Should().BeTrue();
@@ -794,7 +794,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SelectedBackmergeModus.Should().Be(ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Deaktiviert));
+        sut.SelectedBackmergeModus.Should().Be(ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.Disabled));
         sut.BackmergeModusOptionen.Should().HaveCount(3);
     }
 
@@ -807,14 +807,14 @@ public sealed class SettingsViewModelTests : IDisposable
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Projektbezogen);
+        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.ProjectScoped);
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _einstellungService.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeModus.Projektbezogen);
+        (await _einstellungService.GetScmBackmergeModusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeMode.ProjectScoped);
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.SelectedBackmergeModus.Should().Be(ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Projektbezogen));
+        sut.SelectedBackmergeModus.Should().Be(ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.ProjectScoped));
     }
 
     /// <summary>LadenCommand füllt die fünf SCM-Prompt-Anhänge mit leeren Feldern, wenn nichts gespeichert ist.</summary>
@@ -1012,7 +1012,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SelectedScmTaskCompletionPruefmodus.Should().Be(ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionPruefmodus.Ereignisgesteuert));
+        sut.SelectedScmTaskCompletionPruefmodus.Should().Be(ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionCheckMode.EventDriven));
         sut.ScmTaskCompletionPruefmodusOptionen.Should().HaveCount(2);
     }
 
@@ -1025,14 +1025,14 @@ public sealed class SettingsViewModelTests : IDisposable
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SelectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionPruefmodus.AlleAufgaben);
+        sut.SelectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionCheckMode.AllWorkItems);
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
-        (await _einstellungService.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionPruefmodus.AlleAufgaben);
+        (await _einstellungService.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionCheckMode.AllWorkItems);
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.SelectedScmTaskCompletionPruefmodus.Should().Be(ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionPruefmodus.AlleAufgaben));
+        sut.SelectedScmTaskCompletionPruefmodus.Should().Be(ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionCheckMode.AllWorkItems));
     }
 
     /// <summary>Eine fehlende Prüfmodus-Auswahl wird nicht gespeichert.</summary>
@@ -1048,7 +1048,7 @@ public sealed class SettingsViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().NotBeNullOrEmpty();
-        (await _einstellungService.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionPruefmodus.Ereignisgesteuert);
+        (await _einstellungService.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionCheckMode.EventDriven);
     }
 
     /// <summary>LadenCommand lädt die Backmerge-Optionen; ohne Eintrag sind beide deaktiviert.</summary>
@@ -1142,11 +1142,11 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.IsProzessablaeufeFelderEnabled.Should().BeFalse("Standard ist Deaktiviert");
         sut.ProzessablaeufeStatusText.Should().Be("deaktiviert");
 
-        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Global);
+        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.Global);
         sut.IsProzessablaeufeFelderEnabled.Should().BeTrue();
         sut.ProzessablaeufeStatusText.Should().Be("aktiviert");
 
-        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Projektbezogen);
+        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.ProjectScoped);
         sut.IsProzessablaeufeFelderEnabled.Should().BeTrue();
         sut.ProzessablaeufeStatusText.Should().Be("aktiviert");
     }

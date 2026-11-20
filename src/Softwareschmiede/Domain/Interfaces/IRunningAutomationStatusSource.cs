@@ -17,13 +17,13 @@ public interface IRunningAutomationStatusSource
     int GetRunningCount();
 
     /// <summary>Gibt an, ob für eine konkrete Aufgabe aktuell eine Automatisierung läuft.</summary>
-    bool IsRunning(Guid aufgabeId);
+    bool IsRunning(Guid workItemId);
 
     /// <summary>
     /// Liefert den Live-Lauf-Substatus einer Aufgabe: <c>null</c>, wenn kein gehandelter Prozess
-    /// für die Aufgabe läuft; <see cref="AufgabeLaufStatus.WartetAufEingabe"/>, wenn die Session
-    /// Warten auf Eingabe meldet; sonst <see cref="AufgabeLaufStatus.Laeuft"/> (inkl. laufendem
+    /// für die Aufgabe läuft; <see cref="WorkItemRunStatus.WaitingForInput"/>, wenn die Session
+    /// Warten auf Eingabe meldet; sonst <see cref="WorkItemRunStatus.Running"/> (inkl. laufendem
     /// Handle ohne Session).
     /// </summary>
-    AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId);
+    WorkItemRunStatus? GetLiveRunStatus(Guid workItemId);
 }

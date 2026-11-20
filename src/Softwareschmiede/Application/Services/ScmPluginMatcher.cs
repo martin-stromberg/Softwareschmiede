@@ -8,6 +8,6 @@ internal static class ScmPluginMatcher
 {
     /// <summary>Prüft, ob das Repository zum Plugin gehört — über Plugin-Prefix oder Anzeigename.</summary>
     internal static bool MatchesPlugin(IGitPlugin plugin, GitRepository repository)
-        => string.Equals(plugin.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(plugin.PluginName, repository.PluginTyp, StringComparison.OrdinalIgnoreCase);
+        => string.Equals(plugin.PluginPrefix, repository.PluginType, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(plugin.PluginName, repository.PluginType, StringComparison.OrdinalIgnoreCase);
 }

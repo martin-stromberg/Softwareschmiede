@@ -10,7 +10,7 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Migrations
 {
-    [DbContext(typeof(SoftwareschmiededDbContext))]
+    [DbContext(typeof(SoftwareschmiedeDbContext))]
     [Migration("20260514114235_202605141200_AddRepositoryStartKonfiguration")]
     partial class _202605141200_AddRepositoryStartKonfiguration
     {

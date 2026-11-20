@@ -51,7 +51,7 @@ public sealed class UpdateService : IUpdateService
             // Defensiver Ausschluss: Ein Client-Ergebnis, das nicht zum gewählten Kanal passt
             // (Prerelease im Produktiv-Kanal oder Stabiles im RC-Kanal), ist eine
             // Vertragsverletzung und wird nicht angeboten.
-            if (latest.IsPrerelease != (options.Kanal == UpdateKanal.ReleaseCandidate))
+            if (latest.IsPrerelease != (options.Channel == UpdateKanal.ReleaseCandidate))
                 return UpdateCheckResult.NichtPruefbar("GitHub-Release ist nicht prüfbar.");
 
             if (!UpdateVersionComparer.IsNewer(installed.Version, latest.Version))
@@ -61,11 +61,11 @@ public sealed class UpdateService : IUpdateService
             // das Update trotzdem angeboten — der Konflikt reist als nicht-blockierender
             // Hinweis auf dem Ergebnis mit.
             var installationsKanal = UpdatePfadKanalResolver.ErmittleKanalFuerTagName(installed.TagName);
-            if (installationsKanal != options.Kanal)
+            if (installationsKanal != options.Channel)
             {
                 _logger.LogWarning(
                     "Update-Kanal {GewaehlterKanal} passt nicht zum Kanal {InstallationsKanal} der installierten Version {TagName}.",
-                    options.Kanal, installationsKanal, installed.TagName);
+                    options.Channel, installationsKanal, installed.TagName);
                 return UpdateCheckResult.UpdateVerfuegbar(
                     latest,
                     "Der gewählte Update-Pfad passt nicht zur installierten Version. Das Update wird trotzdem angeboten.");
