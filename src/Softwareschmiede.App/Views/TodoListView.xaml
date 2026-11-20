@@ -13,8 +13,8 @@
                     Padding="16"
                     Margin="0,0,0,12">
                 <StackPanel Orientation="Horizontal">
-                    <TextBox Text="{Binding NeuesTodoBeschreibung, UpdateSourceTrigger=PropertyChanged}"
-                             AutomationProperties.Name="NeuesTodoBeschreibung"
+                    <TextBox Text="{Binding NewTodoDescription, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="NewTodoDescription"
                              FontSize="14"
                              Foreground="{DynamicResource PrimaryTextBrush}"
                              Background="{DynamicResource BackgroundBrush}"
@@ -24,12 +24,12 @@
                              Width="400"
                              HorizontalAlignment="Left">
                         <TextBox.InputBindings>
-                            <KeyBinding Key="Return" Command="{Binding TodoHinzufuegenCommand}" />
+                            <KeyBinding Key="Return" Command="{Binding AddTodoCommand}" />
                         </TextBox.InputBindings>
                     </TextBox>
                     <Button Content="Hinzufügen"
-                            AutomationProperties.Name="TodoHinzufuegen"
-                            Command="{Binding TodoHinzufuegenCommand}"
+                            AutomationProperties.Name="AddTodo"
+                            Command="{Binding AddTodoCommand}"
                             Padding="12,6"
                             Margin="8,0,0,0" />
                 </StackPanel>
@@ -51,11 +51,11 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <CheckBox Grid.Column="0"
-                                          IsChecked="{Binding IstErledigt, Mode=OneWay}"
-                                          AutomationProperties.Name="TodoErledigtCheckbox"
+                                          IsChecked="{Binding IsCompleted, Mode=OneWay}"
+                                          AutomationProperties.Name="TodoCompletedCheckbox"
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0"
-                                          Command="{Binding DataContext.TodoAlsErledigtMarkierenCommand, ElementName=Root}"
+                                          Command="{Binding DataContext.MarkTodoAsCompletedCommand, ElementName=Root}"
                                           CommandParameter="{Binding Id}">
                                     <CheckBox.Style>
                                         <Style TargetType="CheckBox">
@@ -63,7 +63,7 @@
                                                 <!-- Todos können laut Anforderung nur einmal abgehakt werden (kein Wiederöffnen).
                                                      Die Checkbox wird nach dem Abhaken deaktiviert, damit UI-Verhalten und
                                                      Backend-Fähigkeiten übereinstimmen (kein Un-Complete verfügbar). -->
-                                                <DataTrigger Binding="{Binding IstErledigt}" Value="True">
+                                                <DataTrigger Binding="{Binding IsCompleted}" Value="True">
                                                     <Setter Property="IsEnabled" Value="False" />
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -79,7 +79,7 @@
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IstErledigt}" Value="True">
+                                                <DataTrigger Binding="{Binding IsCompleted}" Value="True">
                                                     <Setter Property="TextDecorations" Value="Strikethrough" />
                                                     <Setter Property="Opacity" Value="0.5" />
                                                 </DataTrigger>
@@ -89,8 +89,8 @@
                                 </TextBlock>
                                 <Button Grid.Column="2"
                                         Content="🗑"
-                                        AutomationProperties.Name="TodoLoeschen"
-                                        Command="{Binding DataContext.TodoLoeschenCommand, ElementName=Root}"
+                                        AutomationProperties.Name="DeleteTodo"
+                                        Command="{Binding DataContext.DeleteTodoCommand, ElementName=Root}"
                                         CommandParameter="{Binding Id}"
                                         Padding="8,4"
                                         Margin="8,0,0,0" />

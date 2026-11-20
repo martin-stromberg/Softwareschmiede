@@ -18,7 +18,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly ProjectService _projektService;
+    private readonly ProjectService _projectService;
     private readonly WorkItemService _workItemService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
@@ -30,7 +30,7 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
     public ProjectDetailViewModelTests_Initialisierungsskript()
     {
         _db = TestDbContextFactory.Create();
-        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        _projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _serviceProviderMock = new Mock<IServiceProvider>();
         _dialogServiceMock = new Mock<IDialogService>();
@@ -49,7 +49,7 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
     private ProjectDetailViewModel CreateSut() =>
         new(
-            _projektService,
+            _projectService,
             _workItemService,
             _serviceProviderMock.Object,
             _dialogServiceMock.Object,
@@ -59,8 +59,8 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
     private async Task<(Softwareschmiede.Domain.Entities.Project Project, GitRepository Repository)> ErstelleProjektMitRepositoryAsync()
     {
-        var project = await _projektService.CreateAsync("Initialisierungsskript-Test-Projekt", null);
-        var repository = await _projektService.AddRepositoryAsync(
+        var project = await _projectService.CreateAsync("Initialisierungsskript-Test-Projekt", null);
+        var repository = await _projectService.AddRepositoryAsync(
             project.Id,
             "Softwareschmiede.GitHub",
             "https://github.com/test/repo",
@@ -96,14 +96,14 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.LoadInitialisierungsskriptSuggestionenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadInitializationScriptSuggestionsCommand).ExecuteAsync();
 
-        sut.IsEditingInitialisierungsskript.Should().BeTrue();
-        sut.InitialisierungsskriptSuggestionen.Should().Contain(["scripts/init.ps1", "scripts/setup.sh"]);
-        sut.InitialisierungsskriptSuggestionen.Should().NotContain(["scripts", "README.md"]);
-        sut.InitialisierungsskriptLoadingFailed.Should().BeFalse();
+        sut.IsEditingInitializationScript.Should().BeTrue();
+        sut.InitializationScriptSuggestions.Should().Contain(["scripts/init.ps1", "scripts/setup.sh"]);
+        sut.InitializationScriptSuggestions.Should().NotContain(["scripts", "README.md"]);
+        sut.InitializationScriptLoadingFailed.Should().BeFalse();
     }
 
     /// <summary>Ist am Repository ein Basis-Branch konfiguriert, wird dieser (statt des Remote-Standard-Branches) beim Laden der Vorschläge verwendet.</summary>
@@ -111,7 +111,7 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
     public async Task LoadInitialisierungsskriptSuggestionenAsync_ShouldUseConfiguredBasisBranch()
     {
         var (project, repository) = await ErstelleProjektMitRepositoryAsync();
-        await _projektService.UpdateRepositorySourceBranchAsync(repository.Id, "develop", CancellationToken.None);
+        await _projectService.UpdateRepositorySourceBranchAsync(repository.Id, "develop", CancellationToken.None);
         var pluginMock = CreatePluginMock("Softwareschmiede.GitHub");
         pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>(), "develop"))
             .ReturnsAsync(RepositoryStructureLoadResult.Success([new RepositoryDirectoryEntry("init.sh", IsDirectory: false)]));
@@ -119,14 +119,14 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.LoadInitialisierungsskriptSuggestionenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadInitializationScriptSuggestionsCommand).ExecuteAsync();
 
         pluginMock.Verify(
             p => p.GetRepositoryStructureLoadResultAsync(repository.RepositoryUrl!, It.IsAny<int>(), It.IsAny<CancellationToken>(), "develop"),
             Times.Once);
-        sut.InitialisierungsskriptSuggestionen.Should().Contain("init.sh");
+        sut.InitializationScriptSuggestions.Should().Contain("init.sh");
     }
 
     /// <summary>Die gefilterte Sicht auf die Vorschlagsliste engt sich beim Eingeben von Text auf passende Einträge ein (Live-Filter/Suchfeld-Verhalten).</summary>
@@ -146,14 +146,14 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        await ((AsyncRelayCommand)sut.LoadInitialisierungsskriptSuggestionenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadInitializationScriptSuggestionsCommand).ExecuteAsync();
 
-        sut.InitialisierungsskriptSuggestionenView.Cast<string>().Should().HaveCount(3);
+        sut.InitializationScriptSuggestionsView.Cast<string>().Should().HaveCount(3);
 
-        sut.SelectedInitialisierungsskript = "scripts/";
+        sut.SelectedInitializationScript = "scripts/";
 
-        sut.InitialisierungsskriptSuggestionenView.Cast<string>().Should().BeEquivalentTo(["scripts/init.ps1", "scripts/setup.sh"]);
+        sut.InitializationScriptSuggestionsView.Cast<string>().Should().BeEquivalentTo(["scripts/init.ps1", "scripts/setup.sh"]);
     }
 
     /// <summary>Schlägt der Remote-Zugriff fehl, bleibt die UI responsiv und der Fehler wird über ein Flag signalisiert.</summary>
@@ -168,13 +168,13 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        var act = () => ((AsyncRelayCommand)sut.LoadInitialisierungsskriptSuggestionenCommand).ExecuteAsync();
+        var act = () => ((AsyncRelayCommand)sut.LoadInitializationScriptSuggestionsCommand).ExecuteAsync();
 
         await act.Should().NotThrowAsync();
-        sut.InitialisierungsskriptLoadingFailed.Should().BeTrue();
-        sut.InitialisierungsskriptSuggestionen.Should().BeEmpty();
+        sut.InitializationScriptLoadingFailed.Should().BeTrue();
+        sut.InitializationScriptSuggestions.Should().BeEmpty();
     }
 
     /// <summary>Speichern des ausgewählten Skripts persistiert den Wert über den ProjektService.</summary>
@@ -182,7 +182,7 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
     public async Task SaveInitialisierungsskriptAsync_ShouldPersist_SelectedScript()
     {
         var (project, repository) = await ErstelleProjektMitRepositoryAsync();
-        await _projektService.SaveRepositoryInitializationScriptAsync(repository.Id, "scripts/old.ps1", CancellationToken.None);
+        await _projectService.SaveRepositoryInitializationScriptAsync(repository.Id, "scripts/old.ps1", CancellationToken.None);
         var pluginMock = CreatePluginMock("Softwareschmiede.GitHub");
         pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(RepositoryStructureLoadResult.Success([]));
@@ -190,17 +190,17 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.SelectedInitialisierungsskript.Should().Be("scripts/old.ps1");
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.SelectedInitializationScript.Should().Be("scripts/old.ps1");
 
-        await ((AsyncRelayCommand)sut.LoadInitialisierungsskriptSuggestionenCommand).ExecuteAsync();
-        sut.SelectedInitialisierungsskript = "scripts/new.ps1";
+        await ((AsyncRelayCommand)sut.LoadInitializationScriptSuggestionsCommand).ExecuteAsync();
+        sut.SelectedInitializationScript = "scripts/new.ps1";
 
-        await ((AsyncRelayCommand)sut.SaveInitialisierungsskriptCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveInitializationScriptCommand).ExecuteAsync();
 
-        sut.IsEditingInitialisierungsskript.Should().BeFalse();
-        sut.SelectedInitialisierungsskript.Should().Be("scripts/new.ps1");
-        var persisted = await _projektService.GetDetailAsync(project.Id, TestContext.Current.CancellationToken);
+        sut.IsEditingInitializationScript.Should().BeFalse();
+        sut.SelectedInitializationScript.Should().Be("scripts/new.ps1");
+        var persisted = await _projectService.GetDetailAsync(project.Id, TestContext.Current.CancellationToken);
         persisted!.Repositories.Single(r => r.Id == repository.Id).InitializationConfiguration!.InitializationScriptRelativePath.Should().Be("scripts/new.ps1");
     }
 
@@ -216,27 +216,27 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.SelectedInitialisierungsskript.Should().BeNull();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.SelectedInitializationScript.Should().BeNull();
 
-        await ((AsyncRelayCommand)sut.LoadInitialisierungsskriptSuggestionenCommand).ExecuteAsync();
-        sut.SelectedInitialisierungsskript = "scripts/init.ps1";
+        await ((AsyncRelayCommand)sut.LoadInitializationScriptSuggestionsCommand).ExecuteAsync();
+        sut.SelectedInitializationScript = "scripts/init.ps1";
 
-        await ((AsyncRelayCommand)sut.SaveInitialisierungsskriptCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveInitializationScriptCommand).ExecuteAsync();
 
-        var persisted = await _projektService.GetDetailAsync(project.Id, TestContext.Current.CancellationToken);
+        var persisted = await _projectService.GetDetailAsync(project.Id, TestContext.Current.CancellationToken);
         var configuration = persisted!.Repositories.Single(r => r.Id == repository.Id).InitializationConfiguration;
         configuration.Should().NotBeNull();
         configuration!.InitializationScriptRelativePath.Should().Be("scripts/init.ps1");
         configuration.Active.Should().BeTrue();
     }
 
-    /// <summary>Das Abbrechen der Bearbeitung verwirft Änderungen und schließt den Edit-Modus, ohne zu speichern.</summary>
+    /// <summary>Das Cancel der Bearbeitung verwirft Änderungen und schließt den Edit-Modus, ohne zu speichern.</summary>
     [Fact]
     public async Task CancelInitialisierungsskriptEdit_ShouldDiscardChanges()
     {
         var (project, repository) = await ErstelleProjektMitRepositoryAsync();
-        await _projektService.SaveRepositoryInitializationScriptAsync(repository.Id, "scripts/init.ps1", CancellationToken.None);
+        await _projectService.SaveRepositoryInitializationScriptAsync(repository.Id, "scripts/init.ps1", CancellationToken.None);
         var pluginMock = CreatePluginMock("Softwareschmiede.GitHub");
         pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(RepositoryStructureLoadResult.Success([]));
@@ -244,16 +244,16 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.LoadInitialisierungsskriptSuggestionenCommand).ExecuteAsync();
-        sut.SelectedInitialisierungsskript = "scripts/geaendert.ps1";
+        await ((AsyncRelayCommand)sut.LoadInitializationScriptSuggestionsCommand).ExecuteAsync();
+        sut.SelectedInitializationScript = "scripts/geaendert.ps1";
 
-        ((RelayCommand)sut.CancelInitialisierungsskriptEditCommand).Execute(null);
+        ((RelayCommand)sut.CancelInitializationScriptEditCommand).Execute(null);
 
-        sut.IsEditingInitialisierungsskript.Should().BeFalse();
-        sut.SelectedInitialisierungsskript.Should().Be("scripts/init.ps1");
-        var persisted = await _projektService.GetDetailAsync(project.Id, TestContext.Current.CancellationToken);
+        sut.IsEditingInitializationScript.Should().BeFalse();
+        sut.SelectedInitializationScript.Should().Be("scripts/init.ps1");
+        var persisted = await _projectService.GetDetailAsync(project.Id, TestContext.Current.CancellationToken);
         persisted!.Repositories.Single(r => r.Id == repository.Id).InitializationConfiguration!.InitializationScriptRelativePath.Should().Be("scripts/init.ps1");
     }
 }

@@ -6,7 +6,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für die Issue-Aufbereitungs-Einstellungen (Funktions-, Plugin- und
+/// <summary>Tests für die Issue-Aufbereitungs--Einstellungen (Funktions-, Plugin- und
 /// Kommentar-Schalter) in <see cref="AppSettingService"/>.</summary>
 public sealed class AppEinstellungServiceTests_IssueAufbereitung : IDisposable
 {

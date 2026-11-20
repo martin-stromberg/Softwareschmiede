@@ -7,7 +7,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für persistierte Standard-Plugin-Einstellungen.</summary>
+/// <summary>Tests für persistierte Standard-Plugin--Einstellungen.</summary>
 public sealed class PluginDefaultSettingsServiceTests
 {
     /// <summary>Speichert einen neuen Wert je Plugin-Typ.</summary>

@@ -12,7 +12,7 @@ public sealed partial class UpdateProgressDialog : Window
         InitializeComponent();
     }
 
-    private void OnSchliessenClick(object sender, RoutedEventArgs e) => Close();
+    private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
 
     /// <inheritdoc/>
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)

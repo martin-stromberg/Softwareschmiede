@@ -12,7 +12,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 public sealed class AufgabeRecoveryServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly Guid _projektId = Guid.NewGuid();
+    private readonly Guid _projectId = Guid.NewGuid();
 
     /// <summary>AufgabeRecoveryServiceTests.</summary>
     public AufgabeRecoveryServiceTests()
@@ -20,7 +20,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         _db = TestDbContextFactory.Create();
         _db.Projects.Add(new Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Recovery Projekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -124,7 +124,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var aufgabeAlt = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = "Alte InArbeit Aufgabe",
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Active,
@@ -136,7 +136,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var aufgabeWartend = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = "Alte Wartend Aufgabe",
             Status = WorkItemStatus.Waiting,
             ExecutionStatus = WorkItemExecutionStatus.Active,
@@ -148,7 +148,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var aufgabeFrisch = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = "Frische InArbeit Aufgabe",
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Active,
@@ -159,7 +159,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var aufgabeBeendeteAusfuehrung = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = "Beendete Ausfuehrung",
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Completed,
@@ -171,7 +171,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var aufgabeNeu = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = "Neue Aufgabe",
             Status = WorkItemStatus.New,
             ExecutionStatus = WorkItemExecutionStatus.NotStarted,
@@ -203,7 +203,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = "Laufende Aufgabe",
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Active,
@@ -228,7 +228,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var pausiert = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = "Pausierte Aufgabe",
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Active,
@@ -239,7 +239,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var abgelaufenePause = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = "Aufgabe mit abgelaufener Pause",
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Active,
@@ -285,7 +285,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Title = "Recovery Task",
             Status = status,
             ExecutionStatus = status.IsActiveOrWaiting()

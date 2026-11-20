@@ -11,9 +11,9 @@ namespace Softwareschmiede.Tests.E2E;
 public partial class End2EndTest
 {
     /// <summary>
-    /// Szenario: Öffnet die KI-Einstellungen für Codex CLI und prüft, dass das CommandLineParameters-
+    /// Szenario: Öffnet die KI--Einstellungen für Codex CLI und prüft, dass das CommandLineParameters-
     /// Feld angezeigt wird; speichert einen Wert und prüft, dass er nach erneutem Öffnen der
-    /// Einstellungen erhalten geblieben ist; klickt anschließend den Hilfe-Button (?) und prüft, dass
+    /// Settings erhalten geblieben ist; klickt anschließend den Hilfe-Button (?) und prüft, dass
     /// ein Dialog mit einem "Schließen"-Button erscheint, der den Dialog schließt.
     /// </summary>
     protected void CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(Window mainWindow)

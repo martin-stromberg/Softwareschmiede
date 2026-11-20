@@ -8,13 +8,13 @@ namespace Softwareschmiede.App.Services;
 public interface IDialogService
 {
     /// <summary>Zeigt eine Bestätigungsabfrage an und gibt zurück, ob der Benutzer bestätigt hat.</summary>
-    bool BestaetigenDialog(string nachricht, string title);
+    bool ConfirmDialog(string message, string title);
 
     /// <summary>Öffnet den Repository-Zuweisungs-Dialog und gibt zurück, ob der Benutzer bestätigt hat.</summary>
-    bool RepositoryZuweisenDialog(RepositoryAssignViewModel viewModel);
+    bool RepositoryAssignDialog(RepositoryAssignViewModel viewModel);
 
     /// <summary>Öffnet den Dialog zur Bearbeitung des Arbeitsverzeichnisses und gibt zurück, ob der Benutzer bestätigt hat.</summary>
-    bool ArbeitsverzeichnisBearbeitenDialog(ArbeitsverzeichnisBearbeitenViewModel viewModel);
+    bool WorkingDirectoryEditDialog(WorkingDirectoryEditViewModel viewModel);
 
     /// <summary>Zeigt den Plugin-Auswahl-Dialog und gibt das Ergebnis der Benutzerauswahl zurück.</summary>
     Task<PluginSelectionResult> ShowPluginSelectionDialogAsync(
@@ -39,12 +39,12 @@ public interface IDialogService
 
     /// <summary>Zeigt den Solution-Auswahl-Dialog und gibt den gewählten Solution-Pfad zurück, oder null wenn abgebrochen.</summary>
     Task<string?> ShowSolutionSelectionDialogAsync(
-        IReadOnlyList<string> solutionPfade,
+        IReadOnlyList<string> solutionPath,
         CancellationToken ct = default);
 
     /// <summary>Zeigt den Dialog zum Einstellen oder Aufheben einer Aufgaben-Pause und gibt das Ergebnis zurück, oder null wenn abgebrochen.</summary>
-    Task<AufgabePausierenErgebnis?> ShowAufgabePausierenDialogAsync(
-        AufgabePausierenDialogViewModel viewModel,
+    Task<PauseWorkItemResult?> ShowWorkItemPauseDialogAsync(
+        PauseWorkItemDialogViewModel viewModel,
         CancellationToken ct = default);
 
     /// <summary>Zeigt einen Speichern-Dialog und gibt den gewählten Dateipfad zurück, oder null wenn abgebrochen.</summary>
@@ -64,7 +64,7 @@ public interface IDialogService
 
     /// <summary>Zeigt das Konsolentestfenster für das CLI-Ausgabe-Replay nicht-modal an
     /// (kehrt nach dem Anzeigen zurück — das Fenster bleibt parallel zur Anwendung nutzbar).</summary>
-    Task ShowKonsolenTestDialogAsync(
-        KonsolenTestViewModel viewModel,
+    Task ShowConsoleTestDialogAsync(
+        ConsoleTestViewModel viewModel,
         CancellationToken ct = default);
 }

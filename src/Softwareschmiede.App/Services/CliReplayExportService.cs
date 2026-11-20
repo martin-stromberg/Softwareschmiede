@@ -17,23 +17,23 @@ public interface ICliReplayExportService
     /// <summary>Prüft, ob für die Aufgabe ein Mitschnitt vorliegt (Vorab-Prüfung vor dem Speicherdialog).</summary>
     /// <param name="workItemId">ID der Aufgabe.</param>
     /// <returns><c>true</c>, wenn eine Aufzeichnung exportiert werden kann.</returns>
-    bool HatAufzeichnung(Guid workItemId);
+    bool HasRecording(Guid workItemId);
 }
 
 /// <summary>Implementierung des CLI-Replay-Exports über den im <see cref="AiExecutionService"/> gehaltenen Mitschnitt.</summary>
 public sealed class CliReplayExportService : ICliReplayExportService
 {
-    private readonly AiExecutionService _kiAusfuehrungsService;
+    private readonly AiExecutionService _aiExecutionService;
     private readonly CliReplayRecordingStore _store;
     private readonly ILogger<CliReplayExportService> _logger;
 
     /// <inheritdoc cref="CliReplayExportService"/>
     public CliReplayExportService(
-        AiExecutionService kiAusfuehrungsService,
+        AiExecutionService aiExecutionService,
         CliReplayRecordingStore store,
         ILogger<CliReplayExportService> logger)
     {
-        _kiAusfuehrungsService = kiAusfuehrungsService;
+        _aiExecutionService = aiExecutionService;
         _store = store;
         _logger = logger;
     }
@@ -43,7 +43,7 @@ public sealed class CliReplayExportService : ICliReplayExportService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
 
-        var recording = _kiAusfuehrungsService.GetCliRecording(workItemId)
+        var recording = _aiExecutionService.GetCliRecording(workItemId)
             ?? throw new InvalidOperationException("Für diese Aufgabe liegt keine Aufzeichnung vor.");
 
         _logger.LogDebug(
@@ -53,6 +53,6 @@ public sealed class CliReplayExportService : ICliReplayExportService
     }
 
     /// <inheritdoc/>
-    public bool HatAufzeichnung(Guid workItemId)
-        => _kiAusfuehrungsService.GetCliRecording(workItemId) is not null;
+    public bool HasRecording(Guid workItemId)
+        => _aiExecutionService.GetCliRecording(workItemId) is not null;
 }

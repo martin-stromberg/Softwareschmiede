@@ -26,7 +26,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
     private readonly string _sourceDir;
     private readonly string _clonePath;
     private readonly LocalDirectoryPlugin _gitPlugin;
-    private readonly AiExecutionService _kiAusfuehrungsService;
+    private readonly AiExecutionService _aiExecutionService;
 
     /// <summary>KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirectory.</summary>
     public KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirectory()
@@ -57,13 +57,13 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
 
         _gitPlugin = new LocalDirectoryPlugin(cliRunnerMock.Object, credentialStoreMock.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        _kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
+        _aiExecutionService = TestKiAusfuehrungsServiceFactory.Create();
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiAusfuehrungsService.Dispose();
+        _aiExecutionService.Dispose();
         if (Directory.Exists(_sourceDir))
         {
             Directory.Delete(_sourceDir, recursive: true);
@@ -101,7 +101,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
             });
 
         // Act
-        await _kiAusfuehrungsService.StartCliAsync(
+        await _aiExecutionService.StartCliAsync(
             Guid.NewGuid(),
             kiPluginMock.Object,
             _clonePath,
@@ -137,7 +137,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
             });
 
         // Act
-        var act = () => _kiAusfuehrungsService.StartCliAsync(
+        var act = () => _aiExecutionService.StartCliAsync(
             Guid.NewGuid(),
             kiPluginMock.Object,
             _clonePath,

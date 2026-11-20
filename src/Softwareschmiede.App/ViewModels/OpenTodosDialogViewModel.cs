@@ -10,7 +10,7 @@ public sealed class OpenTodosDialogViewModel : ViewModelBase
     private readonly TodoService _todoService;
     private readonly ILogger<OpenTodosDialogViewModel> _logger;
     private Guid _workItemId;
-    private string _aufgabenTitel = string.Empty;
+    private string _workItemsTitle = string.Empty;
 
     /// <inheritdoc cref="OpenTodosDialogViewModel"/>
     public OpenTodosDialogViewModel(TodoService todoService, ILogger<OpenTodosDialogViewModel> logger)
@@ -27,10 +27,10 @@ public sealed class OpenTodosDialogViewModel : ViewModelBase
     }
 
     /// <summary>Titel der Aufgabe.</summary>
-    public string AufgabenTitel
+    public string WorkItemsTitle
     {
-        get => _aufgabenTitel;
-        private set => SetProperty(ref _aufgabenTitel, value);
+        get => _workItemsTitle;
+        private set => SetProperty(ref _workItemsTitle, value);
     }
 
     /// <summary>Offene To-Dos der Aufgabe.</summary>
@@ -43,12 +43,12 @@ public sealed class OpenTodosDialogViewModel : ViewModelBase
     public bool IsEmpty => !HasOpenTodos;
 
     /// <summary>Lädt die offenen To-Dos einer Aufgabe.</summary>
-    public async Task LoadAsync(Guid workItemId, string aufgabenTitel, CancellationToken ct = default)
+    public async Task LoadAsync(Guid workItemId, string workItemsTitle, CancellationToken ct = default)
     {
         _logger.LogInformation("Offene To-Dos für Aufgabe {AufgabeId} laden.", workItemId);
 
         WorkItemId = workItemId;
-        AufgabenTitel = aufgabenTitel;
+        WorkItemsTitle = workItemsTitle;
 
         Todos.Clear();
         var todos = await _todoService.GetOpenTodosAsync(workItemId, ct);

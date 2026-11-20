@@ -95,8 +95,8 @@ public sealed partial class App : System.Windows.Application
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             await db.Database.MigrateAsync();
 
-            var promptVorlagenService = scope.ServiceProvider.GetRequiredService<PromptTemplateService>();
-            await promptVorlagenService.EnsureInitialPromptTemplatesAsync();
+            var promptTemplatesService = scope.ServiceProvider.GetRequiredService<PromptTemplateService>();
+            await promptTemplatesService.EnsureInitialPromptTemplatesAsync();
         }
 
         // Re-Arm persistierter zeitgesteuerter Prompts bewusst NACH MigrateAsync: Bei einem Update,
@@ -117,8 +117,8 @@ public sealed partial class App : System.Windows.Application
         // (RunningCountChanged, LaufdatenChanged) bereits vor dem ersten UI-Schalter stehen.
         _host.Services.GetRequiredService<IAutoShutdownOrchestrator>();
 
-        _host.Services.GetService<UpdateE2ETestKontext>()
-            ?.Protokoll.Schreibe(UpdateE2EEreignisse.DatabaseInitializationCompleted);
+        _host.Services.GetService<UpdateE2ETestContext>()
+            ?.Log.Write(UpdateE2EEvents.DatabaseInitializationCompleted);
 
         try
         {
@@ -176,31 +176,31 @@ public sealed partial class App : System.Windows.Application
 
     private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
     {
-        var testDatenbankPfad = Environment.GetEnvironmentVariable(UpdateE2ETestConfiguration.TestDatenbankUmgebungsVariable);
+        var testDatabasePath = Environment.GetEnvironmentVariable(UpdateE2ETestConfiguration.TestDatabaseEnvironmentVariable);
         var dbPath = DatabasePathResolver.ResolvePath(
             AppContext.BaseDirectory,
-            testDatenbankPfad);
+            testDatabasePath);
 
         // Die kontrollierte Update-E2E-Umgebung aktiviert sich ausschließlich, wenn beide
         // Test-Umgebungsvariablen gesetzt sind und die referenzierte Konfiguration valide ist.
         // Bei gesetzter, aber ungültiger Konfiguration schlägt der Start mit klarer Diagnose fehl;
         // es wird niemals auf reale Releases, echte Updater-Pfade oder Produktionsquellen zurückgefallen.
-        var updateTestKonfiguration = UpdateE2ETestConfiguration.LadeAusUmgebung(testDatenbankPfad);
-        var updateTestKontext = updateTestKonfiguration is null ? null : new UpdateE2ETestKontext(updateTestKonfiguration);
+        var updateTestConfiguration = UpdateE2ETestConfiguration.LoadFromEnvironment(testDatabasePath);
+        var updateTestContext = updateTestConfiguration is null ? null : new UpdateE2ETestContext(updateTestConfiguration);
 
         Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 
         services.AddDbContext<SoftwareschmiedeDbContext>(options =>
         {
             options.UseSqlite($"Data Source={dbPath}");
-            if (updateTestKontext is not null)
-                options.AddInterceptors(new UpdateSettingsReadFailureInterceptor(updateTestKontext));
+            if (updateTestContext is not null)
+                options.AddInterceptors(new UpdateSettingsReadFailureInterceptor(updateTestContext));
         });
 
-        if (updateTestKontext is not null)
+        if (updateTestContext is not null)
         {
-            services.AddSingleton(updateTestKontext);
-            services.AddSingleton<IUpdateVersuchProtokoll>(updateTestKontext);
+            services.AddSingleton(updateTestContext);
+            services.AddSingleton<IUpdateAttemptLog>(updateTestContext);
         }
 
         services.AddMemoryCache();
@@ -325,7 +325,7 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<ICliExecutionLimitSource>(sp =>
             sp.GetRequiredService<AiExecutionService>());
         services.AddSingleton<DarkModeService>();
-        services.AddSingleton<AufgabenListenModusService>();
+        services.AddSingleton<WorkItemListModeService>();
 
         // Auto-Shutdown bei Abschluss: Zähler und Orchestrator sind Singletons (greifen für
         // scoped Dienste selbst über IServiceScopeFactory zu); der Einstellungen-Service
@@ -336,7 +336,7 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<AutoShutdownOrchestrator>();
         services.AddSingleton<IAutoShutdownOrchestrator>(sp =>
             sp.GetRequiredService<AutoShutdownOrchestrator>());
-        services.AddSingleton<AutoShutdownEinstellungenService>();
+        services.AddSingleton<AutoShutdownSettingsService>();
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<ICliRawExportService, CliRawExportService>();
         services.AddSingleton<CliReplayRecordingStore>();
@@ -350,19 +350,19 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<IUpdatePackageService, UpdatePackageService>();
         services.AddSingleton<IUpdateScriptService, UpdateScriptService>();
         services.AddSingleton<IUpdateProcessLauncher, UpdateProcessLauncher>();
-        services.AddTransient(sp => new MainWindowUpdateDienste(
+        services.AddTransient(sp => new MainWindowUpdateServices(
             sp.GetService<IUpdateService>(),
             sp.GetService<ICliUpdateSafetyService>(),
             sp.GetService<IUpdateProgressDialogService>(),
-            sp.GetService<IUpdateVersuchProtokoll>()));
-        services.AddTransient(sp => new MainWindowOptionaleDienste(
+            sp.GetService<IUpdateAttemptLog>()));
+        services.AddTransient(sp => new MainWindowOptionalServices(
             DialogService: sp.GetService<IDialogService>(),
             VersionProvider: sp.GetService<IApplicationVersionProvider>(),
             LaufdatenChangedNotifier: sp.GetService<WorkItemRunDataChangedNotifier>(),
-            UpdateDienste: sp.GetService<MainWindowUpdateDienste>(),
-            AufgabenListenModusService: sp.GetService<AufgabenListenModusService>(),
+            UpdateServices: sp.GetService<MainWindowUpdateServices>(),
+            WorkItemListModeService: sp.GetService<WorkItemListModeService>(),
             AutoShutdownOrchestrator: sp.GetService<IAutoShutdownOrchestrator>(),
-            AutoShutdownEinstellungenService: sp.GetService<AutoShutdownEinstellungenService>(),
+            AutoShutdownSettingsService: sp.GetService<AutoShutdownSettingsService>(),
             TimeProvider: sp.GetService<TimeProvider>()));
 
         // Plugin Infrastructure
@@ -386,7 +386,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<ProjectListViewModel>();
         services.AddTransient<ProjectDetailViewModel>();
         services.AddTransient<RepositoryAssignViewModel>();
-        services.AddTransient<ArbeitsverzeichnisBearbeitenViewModel>();
+        services.AddTransient<WorkingDirectoryEditViewModel>();
         services.AddTransient<TaskDetailViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<IssueSelectionDialogViewModel>();
@@ -394,14 +394,14 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<FileExplorerViewModel>();
         services.AddTransient<TodoListViewModel>();
         services.AddTransient<OpenTodosDialogViewModel>();
-        services.AddTransient<AufgabePausierenDialogViewModel>();
-        services.AddTransient<KonsolenTestViewModel>();
+        services.AddTransient<PauseWorkItemDialogViewModel>();
+        services.AddTransient<ConsoleTestViewModel>();
 
-        var scmTestConfiguration = ScmE2ETestConfiguration.LoadFromEnvironment(testDatenbankPfad);
+        var scmTestConfiguration = ScmE2ETestConfiguration.LoadFromEnvironment(testDatabasePath);
         if (scmTestConfiguration is not null)
         {
             services.AddSingleton(scmTestConfiguration);
-            // Prozessgebundener Credential-Store: Plugin-Einstellungen und das Fixture-Plugin
+            // Prozessgebundener Credential-Store: Plugin--Einstellungen und das Fixture-Plugin
             // teilen denselben Speicher; der echte WindowsCredentialStore bleibt unberührt.
             services.AddSingleton<ScmE2ECredentialStore>();
             services.AddSingleton<ICredentialStore>(sp => sp.GetRequiredService<ScmE2ECredentialStore>());
@@ -417,13 +417,13 @@ public sealed partial class App : System.Windows.Application
         // Update-E2E-Testmodus: Transport, Prozess-, Shutdown- und Sicherheitsgrenzen werden
         // kontrolliert ersetzt (letzte Registrierung gewinnt). Die Produktionsorchestrierung
         // (UpdateService, Release-Auswahl, Paket-/Skript-Pipeline, ViewModel-Ablauf) bleibt echt.
-        if (updateTestKontext is not null)
+        if (updateTestContext is not null)
         {
-            var updateContext = updateTestKontext;
+            var updateContext = updateTestContext;
             var testwurzel = updateContext.Configuration.Testwurzel;
 
             services.AddSingleton<IApplicationVersionProvider>(sp => new ApplicationVersionProvider(
-                updateContext.Configuration.InstallationsVerzeichnis,
+                updateContext.Configuration.InstallationDirectory,
                 sp.GetRequiredService<ILogger<ApplicationVersionProvider>>()));
 
             services.AddSingleton(sp => new HttpClient(new UpdateFixtureHttpMessageHandler(updateContext)));
@@ -442,7 +442,7 @@ public sealed partial class App : System.Windows.Application
             services.AddSingleton<IApplicationShutdownService>(_ => new RecordingApplicationShutdownService(updateContext));
             services.AddScoped<ICliUpdateSafetyService>(_ => new FixtureCliUpdateSafetyService(updateContext));
             services.AddSingleton<UpdateService>();
-            services.AddSingleton<IUpdateService>(sp => new ProtokollierenderUpdateService(
+            services.AddSingleton<IUpdateService>(sp => new LoggingUpdateService(
                 sp.GetRequiredService<UpdateService>(), updateContext));
         }
     }

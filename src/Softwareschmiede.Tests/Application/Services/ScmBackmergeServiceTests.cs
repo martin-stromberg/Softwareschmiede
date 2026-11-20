@@ -22,10 +22,10 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     private readonly FakeTimeProvider _time = new(DateTimeOffset.UtcNow);
     private readonly Mock<IGitPlugin> _plugin = new();
     private readonly ScmEventRepository _remote = new("github", "github.com", "R_1", "owner", "repo", "U_1", "U_1", "viewer", true);
-    private readonly Guid _projektId = Guid.NewGuid();
+    private readonly Guid _projectId = Guid.NewGuid();
     private readonly GitRepository _lokal;
 
-    /// <summary>Initialisiert DB, Einstellungen und das lokale Repository mit Basisbranch <c>staging</c>.</summary>
+    /// <summary>Initialisiert DB, Settings und das lokale Repository mit Basisbranch <c>staging</c>.</summary>
     public ScmBackmergeServiceTests()
     {
         _einstellungen = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
@@ -35,7 +35,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
         _lokal = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             PluginType = "github",
             RepositoryUrl = "https://github.com/owner/repo",
             RepositoryName = "repo",
@@ -149,7 +149,7 @@ public sealed class ScmBackmergeServiceTests : IDisposable
     public async Task Evaluate_ModusProjektbezogenMitFlag_WirdGemergt()
     {
         await _einstellungen.SetScmBackmergeModeAsync(ScmBackmergeMode.ProjectScoped, TestContext.Current.CancellationToken);
-        await _einstellungen.SetBackmergeProjectEnabledAsync(_projektId, true, TestContext.Current.CancellationToken);
+        await _einstellungen.SetBackmergeProjectEnabledAsync(_projectId, true, TestContext.Current.CancellationToken);
         SetStatus();
         _plugin.Setup(x => x.CompletePullRequestAsync(It.IsAny<string>(), It.IsAny<int>(),
                 It.IsAny<PullRequestCompletionOptions>(), It.IsAny<CancellationToken>()))

@@ -21,29 +21,29 @@ public sealed class PluginSelectionDialogView : DialogView
         if (IsVisible)
             return this;
 
-        WaitForElement(Window, cf => cf.ByName("Starten"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("Start"), Short).AsButton().ClickInForeground();
         GetDialogWindow();
 
         return this;
     }
 
     /// <summary>
-    /// Wählt das angegebene KI-Plugin in der "PluginAuswahl"-ComboBox aus und setzt optional die
-    /// "FuerProjektVerwenden"-Checkbox (Projekt-Standard speichern).
+    /// Wählt das angegebene KI-Plugin in der "PluginSelection"-ComboBox aus und setzt optional die
+    /// "UseForProject"-Checkbox (Projekt-Standard speichern).
     /// </summary>
     /// <param name="pluginName">Der Name des im Dialog auszuwählenden KI-Plugins.</param>
-    /// <param name="fuerProjektVerwenden">Wenn <c>true</c>, wird die "FuerProjektVerwenden"-Checkbox gesetzt.</param>
+    /// <param name="fuerProjektVerwenden">Wenn <c>true</c>, wird die "UseForProject"-Checkbox gesetzt.</param>
     /// <returns>Diese Instanz.</returns>
     public PluginSelectionDialogView SelectPlugin(string pluginName, bool fuerProjektVerwenden = false)
     {
         var dialog = GetDialogWindow();
-        var pluginAuswahlBox = WaitForElement(dialog, cf => cf.ByName("PluginAuswahl"), Short);
+        var pluginAuswahlBox = WaitForElement(dialog, cf => cf.ByName("PluginSelection"), Short);
         SelectComboBoxItemByClick(pluginAuswahlBox, pluginName, Short);
         ElementWaitHelper.WaitForSelectedComboBoxItem(pluginAuswahlBox, pluginName, Short);
 
         if (fuerProjektVerwenden)
         {
-            var checkbox = WaitForElement(dialog, cf => cf.ByName("FuerProjektVerwenden"), Short);
+            var checkbox = WaitForElement(dialog, cf => cf.ByName("UseForProject"), Short);
             checkbox.AsCheckBox().IsChecked = true;
         }
 
@@ -57,10 +57,10 @@ public sealed class PluginSelectionDialogView : DialogView
         WaitForElement(dialog, cf => cf.ByName("OK"), Short).AsButton().ClickInForeground();
     }
 
-    /// <summary>Bricht den Dialog über den "Abbrechen"-Button ab, ohne ein Plugin zu übernehmen.</summary>
+    /// <summary>Bricht den Dialog über den "Cancel"-Button ab, ohne ein Plugin zu übernehmen.</summary>
     public void Cancel()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short).AsButton().ClickInForeground();
+        WaitForElement(dialog, cf => cf.ByName("Cancel"), Short).AsButton().ClickInForeground();
     }
 }

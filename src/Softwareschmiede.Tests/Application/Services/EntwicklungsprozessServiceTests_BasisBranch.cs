@@ -24,7 +24,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly Mock<IWorkingDirectoryResolver> _arbeitsverzeichnisResolverMock;
     private readonly DevelopmentProcessService _sut;
-    private readonly Guid _projektId = new("77777777-7777-7777-7777-777777777777");
+    private readonly Guid _projectId = new("77777777-7777-7777-7777-777777777777");
 
     /// <summary>EntwicklungsprozessServiceTests_BasisBranch.</summary>
     public EntwicklungsprozessServiceTests_BasisBranch()
@@ -65,7 +65,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
 
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Basis-Branch-Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -106,7 +106,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             PluginType = "Mock.Git",
             RepositoryUrl = $"https://example.test/{Guid.NewGuid():N}",
             RepositoryName = "repo-basis-branch",
@@ -128,7 +128,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync("staging");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe mit fehlendem Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Aufgabe mit fehlendem Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.GetRemoteBranchesAsync(repository.RepositoryUrl, It.IsAny<CancellationToken>()))
             .ReturnsAsync(["main", "develop"]);
 
@@ -152,7 +152,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync("staging");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe mit vorhandenem Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Aufgabe mit vorhandenem Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.GetRemoteBranchesAsync(repository.RepositoryUrl, It.IsAny<CancellationToken>()))
             .ReturnsAsync(["main", "staging"]);
         _gitPluginMock.Setup(g => g.GetDefaultBranchAsync(repository.RepositoryUrl, It.IsAny<CancellationToken>()))
@@ -188,7 +188,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync(null);
-        var workItem = await _workItemService.CreateAsync(_projektId, "Aufgabe ohne Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Aufgabe ohne Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var clonePath = SetupCloneWithDirectoryCreation();
@@ -220,7 +220,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync("staging");
-        var workItem = await _workItemService.CreateAsync(_projektId, "Feature-Branch vom Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Feature-Branch vom Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.GetRemoteBranchesAsync(repository.RepositoryUrl, It.IsAny<CancellationToken>()))
             .ReturnsAsync(["main", "staging"]);
         _gitPluginMock.Setup(g => g.GetDefaultBranchAsync(repository.RepositoryUrl, It.IsAny<CancellationToken>()))
@@ -261,7 +261,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync(null);
-        var workItem = await _workItemService.CreateAsync(_projektId, "Bestehenden Pull Request reviewen", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Bestehenden Pull Request reviewen", null, repository.Id, TestContext.Current.CancellationToken);
         _db.PullRequestReferences.Add(new PullRequestReference
         {
             Id = Guid.NewGuid(),
@@ -327,7 +327,7 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
     {
         // Arrange
         var repository = await CreateRepositoryAsync(null);
-        var workItem = await _workItemService.CreateAsync(_projektId, "Feature-Branch vom HEAD", null, repository.Id, TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Feature-Branch vom HEAD", null, repository.Id, TestContext.Current.CancellationToken);
         _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var clonePath = SetupCloneWithDirectoryCreation();

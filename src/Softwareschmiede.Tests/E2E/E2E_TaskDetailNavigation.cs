@@ -44,7 +44,7 @@ public partial class End2EndTest
         // TaskDetailView zeigt eigenes Ribbon mit "Speichern"-Button (Edit-Panel bei Status Neu)
         Assert.True(taskDetailReopened.IsVisible);
 
-        // ProjectDetailView (u. a. "ProjektName") ist nicht mehr sichtbar - fensterumfassend
+        // ProjectDetailView (u. a. "ProjectName") ist nicht mehr sichtbar - fensterumfassend
         Assert.False(new ProjectDetailView(mainWindow).IsVisible);
     }
 }

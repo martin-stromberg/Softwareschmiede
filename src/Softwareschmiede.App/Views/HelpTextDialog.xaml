@@ -32,6 +32,6 @@
                 Width="100"
                 HorizontalAlignment="Right"
                 Margin="0,8,0,0"
-                Click="OnSchliessenClick" />
+                Click="OnCloseClick" />
     </Grid>
 </Window>

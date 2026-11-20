@@ -35,7 +35,7 @@ public partial class End2EndTest
 
     /// <summary>
     /// Szenario: Visual Studio Code wird über den Listeneintrag ausgewählt und im Inhaltsbereich über die
-    /// Checkbox "IdePluginAktiviert" deaktiviert, dann gespeichert - Persistenz wird über ein erneutes
+    /// Checkbox "IdePluginEnabled" deaktiviert, dann gespeichert - Persistenz wird über ein erneutes
     /// Öffnen der Einstellungen geprüft. Anschließend wird versucht, auch Visual Studio (das letzte noch
     /// aktive IDE-Plugin) zu deaktivieren: die Checkbox springt zurück auf aktiviert und eine
     /// Fehlermeldung erscheint. Am Ende wird Visual Studio Code wieder aktiviert, damit Phase 2 mit

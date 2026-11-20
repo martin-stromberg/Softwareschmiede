@@ -11,7 +11,7 @@ namespace Softwareschmiede.Tests.E2E;
 [Collection("E2E")]
 public partial class End2EndTest : WpfTestBase
 {
-    /// <summary>Prüft Start und Einstellungen in einem isolierten App-Lifecycle.</summary>
+    /// <summary>Prüft Start und Settings in einem isolierten App-Lifecycle.</summary>
     [Fact]
     public Task General_BasisUndEinstellungen_E2E()
         => MitFrischerAppAsync(mainWindow =>
@@ -87,12 +87,12 @@ public partial class End2EndTest : WpfTestBase
         await Startup_IsOnceAndCommandsStayBlocked();
     }
 
-    private async Task MitFrischerAppAsync(Func<Window, Task> szenario)
+    private async Task MitFrischerAppAsync(Func<Window, Task> scenario)
     {
         var app = LaunchApp(true);
         try
         {
-            await szenario(WarteAufEchtesHauptfenster(app));
+            await scenario(WarteAufEchtesHauptfenster(app));
         }
         finally
         {

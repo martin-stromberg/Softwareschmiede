@@ -61,7 +61,7 @@ public sealed class E2E_RepositoryInitialisierungAusfuehrungTests : WpfTestBase
 
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
 
-        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("StopCli"), Medium);
         Assert.NotNull(stoppenButton);
 
         var localClonePath = await WaitForLokalerKlonPfadAsync();
@@ -87,10 +87,10 @@ public sealed class E2E_RepositoryInitialisierungAusfuehrungTests : WpfTestBase
 
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
 
-        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("StopCli"), Medium);
         Assert.NotNull(stoppenButton);
 
-        var fehlerBanner = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+        var fehlerBanner = mainWindow.FindFirstDescendant(cf => cf.ByName("ErrorMessage"));
         Assert.Null(fehlerBanner);
 
         var hinweisGefunden = await WaitForInitialisierungsskriptFehlerProtokollAsync();
@@ -101,9 +101,9 @@ public sealed class E2E_RepositoryInitialisierungAusfuehrungTests : WpfTestBase
 
     private void StoppeCliUndRaeumeAuf(Window mainWindow)
     {
-        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Short);
+        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("StopCli"), Short);
         stoppenButton.AsButton().ClickInForeground();
-        WaitUntilGone(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        WaitUntilGone(mainWindow, cf => cf.ByName("StopCli"), Medium);
 
         NavigateBackFromTaskToProject(mainWindow);
         DeleteCurrentProject(mainWindow);

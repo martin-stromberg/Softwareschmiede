@@ -391,7 +391,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         settings.WaitForKontoModus("Benutzerkonto", Medium);
 
         settings.SwitchTab("Plugins");
-        WaitForElement(window, cf => cf.ByName("Softwareschmiede.GitHub.Eintrag"), Long).ClickInForeground();
+        WaitForElement(window, cf => cf.ByName("Softwareschmiede.GitHub.Entry"), Long).ClickInForeground();
         settings.SetPluginSecretField("AgentToken", "fixture-agent-token");
         settings.OpenAufgabenAusfuehren();
         settings.SetKontoModus("Separates Konto");
@@ -513,7 +513,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         SelectEvent(window, 14);
         Assert.Equal(missing.Id, (await fixture.WaitEventAsync(14, "Wartend")).Id);
         Click(window, "ScmEventOpen");
-        _ = WaitForElement(window, cf => cf.ByName("PluginAuswahl"), Long);
+        _ = WaitForElement(window, cf => cf.ByName("PluginSelection"), Long);
         var concurrent = fixture.BeginRuntimeCommand(14);
         await ScmE2EFixture.WaitFileAsync(concurrent + ".received");
         ChoosePlugin(window);
@@ -595,7 +595,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Click(window, "ScmEventTask");
         new TaskDetailView(window).StopCli();
         fixture.Control("read-only", false);
-        WaitForElement(window, cf => cf.ByName("CliNeustarten"), Long).AsButton().Invoke();
+        WaitForElement(window, cf => cf.ByName("RestartCli"), Long).AsButton().Invoke();
         new TaskDetailView(window).WaitForCliRunning();
         NavigateQueue(window);
         SelectEvent(window, 17);
@@ -634,7 +634,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Click(window, "ScmEventTask");
         new TaskDetailView(window).StopCli();
         fixture.Control("unknown-banner", false);
-        WaitForElement(window, cf => cf.ByName("CliNeustarten"), Long).AsButton().Invoke();
+        WaitForElement(window, cf => cf.ByName("RestartCli"), Long).AsButton().Invoke();
         new TaskDetailView(window).WaitForCliRunning();
         NavigateQueue(window);
         SelectEvent(window, 2);
@@ -724,13 +724,13 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
     {
         var dialog = WaitForElement(window, cf => cf.ByName("KI-Plugin auswählen")
             .And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Window)), Long);
-        var choices = WaitForElement(dialog, cf => cf.ByName("PluginAuswahl"), Long).AsComboBox();
+        var choices = WaitForElement(dialog, cf => cf.ByName("PluginSelection"), Long).AsComboBox();
         // The dialog is published to UIA before WPF has necessarily realized its items.
         var deadline = DateTime.UtcNow + Long;
         while (choices.Items.Length == 0 && DateTime.UtcNow < deadline) Thread.Sleep(100);
         Assert.Single(choices.Items);
         if (confirm) choices.Select(0);
-        WaitForElement(dialog, cf => cf.ByName(confirm ? "OK" : "Abbrechen"), Long).AsButton().Invoke();
+        WaitForElement(dialog, cf => cf.ByName(confirm ? "OK" : "Cancel"), Long).AsButton().Invoke();
     }
 
     private static void ConfirmResend(Window window, bool confirmed)

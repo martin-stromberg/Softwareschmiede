@@ -60,11 +60,11 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
                 await scope.ServiceProvider.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(ct);
             }
             // Der Backmerge-Prüfzyklus ist unabhängig vom Ereignisüberwachungs-Schalter;
-            // er prüft seinen eigenen Modus (Einstellungen → Automatisierung → Prozessabläufe).
+            // er prüft seinen eigenen Modus (Settings → Automatisierung → Prozessabläufe).
             await scope.ServiceProvider.GetRequiredService<ScmBackmergeMonitoringService>().RunOnceAsync(ct);
             // Der Aufbereitungs-Entdeckungszyklus ist ebenfalls unabhängig vom
             // Ereignisüberwachungs-Schalter; er prüft seinen eigenen Schalter
-            // (Einstellungen → Automatisierung → Issue-Aufbereitung).
+            // (Settings → Automatisierung → Issue-Aufbereitung).
             await scope.ServiceProvider.GetRequiredService<ScmIssuePreparationMonitoringService>().RunOnceAsync(ct);
         });
         OpenEventCommand = Command(OpenAsync, () => SelectedEvent is { IsFinal: false, IsBlocked: false, AttemptId: null });
@@ -85,14 +85,14 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
 
     /// <summary>Wird vom Hauptfenster auf dessen Aufgabennavigation gesetzt.</summary>
     public Action<Guid>? NavigateToTaskAction { get; set; }
-    /// <summary>Öffnet die regulären CLI-Einstellungen.</summary>
+    /// <summary>Öffnet die regulären CLI--Einstellungen.</summary>
     public Action? NavigateToSettingsAction { get; set; }
     /// <summary>Führt zum Dashboard zurück.</summary>
     public Action? BackAction { get; set; }
     /// <summary>Gefilterte, dauerhafte Ereignisse.</summary>
     public ObservableCollection<ScmEventQueueItem> Events { get; } = new();
     /// <summary>Verfügbare Anzeigefilter.</summary>
-    public IReadOnlyList<string> Filters { get; } = ["Wartend", "Verarbeitet", "Abgebrochen", "Alle"];
+    public IReadOnlyList<string> Filter { get; } = ["Wartend", "Verarbeitet", "Abgebrochen", "Alle"];
     /// <summary>Reiner Anzeigefilter; löst keine Ereignisverarbeitung aus.</summary>
     public string SelectedFilter
     {
@@ -219,7 +219,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
                 LoadError = null;
                 Diagnostics = diagnostic;
                 MonitoringNotice = !monitoringEnabled
-                    ? "Die SCM-Ereignisüberwachung ist deaktiviert; neue Anfragen werden nicht eingelesen oder automatisch zugestellt (Einstellungen → Automatisierung → Aufgaben ausführen)."
+                    ? "Die SCM-Ereignisüberwachung ist deaktiviert; neue Anfragen werden nicht eingelesen oder automatisch zugestellt (Settings → Automatisierung → Aufgaben ausführen)."
                     : alertErrors.Count == 0 ? null
                     : "Die GitHub-Überwachung ist für betroffene Quellen unterbrochen; neue Anfragen können fehlen. "
                       + alertErrors[0].Diagnostic
@@ -275,11 +275,11 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             if (session is not null)
             {
                 var confirmed = false;
-                _dispatch(() => confirmed = _dialogs.BestaetigenDialog(
+                _dispatch(() => confirmed = _dialogs.ConfirmDialog(
                     $"An laufende CLI übergeben: {session.PluginPrefix}\nSitzung: {session.CliRunId:D}\nEine beschäftigte CLI wartet auf Eingabebereitschaft.", "SCM-Ereignis öffnen"));
                 return confirmed ? session.PluginPrefix : null;
             }
-            var available = await selection.GetAvailableKiPluginPrefixesAsync(token);
+            var available = await selection.GetAvailableAiPluginPrefixesAsync(token);
             if (available.Count == 0)
             {
                 _dispatch(() => Message = "Keine aktivierte CLI verfügbar. Bitte in den Einstellungen eine CLI aktivieren.");
@@ -320,7 +320,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
     private async Task ResendAsync(CancellationToken ct)
     {
         if (SelectedEvent is not { CanResend: true, AttemptId: { } attempt } item) return;
-        if (!_dialogs.BestaetigenDialog("Der vorherige Versuch könnte bereits verarbeitet worden sein. Neu senden kann eine Doppelbearbeitung und doppelte Antworten verursachen. Trotzdem neu senden?", "Mögliche Doppelbearbeitung")) return;
+        if (!_dialogs.ConfirmDialog("Der vorherige Versuch könnte bereits verarbeitet worden sein. Neu senden kann eine Doppelbearbeitung und doppelte Antworten verursachen. Trotzdem neu senden?", "Mögliche Doppelbearbeitung")) return;
         using var scope = _scopes.CreateScope();
         await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ResendAsync(item.Id, attempt, ct);
     }
@@ -329,7 +329,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
     {
         if (SelectedEvent is not { IsFinal: false } item) return;
         var delivered = item.AttemptId is not null;
-        if (!_dialogs.BestaetigenDialog(
+        if (!_dialogs.ConfirmDialog(
                 "Das Ereignis wird endgültig abgebrochen: keine weiteren Zustell- oder Prüfversuche und keine weiteren GitHub-Antworten."
                 + (delivered ? "\nEine eventuell laufende CLI-Verarbeitung wird dadurch nicht beendet." : string.Empty)
                 + "\nEreignis abbrechen?", "SCM-Ereignis abbrechen")) return;

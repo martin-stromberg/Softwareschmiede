@@ -279,7 +279,7 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         await sut.CurrentLoadDirectoryStructureTask!;
         sut.WorkingDirectoryInputText = "backend\\api";
 
-        sut.BestaetigenCommand.Execute(null);
+        sut.ConfirmCommand.Execute(null);
 
         sut.SelectedWorkingDirectory.Should().Be("backend/api");
     }

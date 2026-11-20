@@ -15,7 +15,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly ProjectService _projektService;
+    private readonly ProjectService _projectService;
     private readonly WorkItemService _workItemService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
@@ -25,7 +25,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
     public ProjectDetailViewModelTests_Arbeitsverzeichnis()
     {
         _db = TestDbContextFactory.Create();
-        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        _projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _serviceProviderMock = new Mock<IServiceProvider>();
         _dialogServiceMock = new Mock<IDialogService>();
@@ -38,7 +38,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
 
     private ProjectDetailViewModel CreateSut() =>
         new(
-            _projektService,
+            _projectService,
             _workItemService,
             _serviceProviderMock.Object,
             _dialogServiceMock.Object,
@@ -47,15 +47,15 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
 
     private async Task<(Softwareschmiede.Domain.Entities.Project Project, GitRepository Repository)> ErstelleProjektMitRepositoryAsync(string? workingDirectory = null)
     {
-        var project = await _projektService.CreateAsync("Arbeitsverzeichnis-Test-Projekt", null);
-        var repository = await _projektService.AddRepositoryAsync(
+        var project = await _projectService.CreateAsync("Arbeitsverzeichnis-Test-Projekt", null);
+        var repository = await _projectService.AddRepositoryAsync(
             project.Id,
             "Softwareschmiede.GitHub",
             "https://github.com/test/repo",
             "test-repo");
 
         if (workingDirectory != null)
-            await _projektService.SaveRepositoryWorkingDirectoryAsync(repository.Id, workingDirectory);
+            await _projectService.SaveRepositoryWorkingDirectoryAsync(repository.Id, workingDirectory);
 
         return (project, repository);
     }
@@ -64,12 +64,12 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
     [Fact]
     public async Task ArbeitsverzeichnisBearbeitenCommand_CanExecuteFalse_OhneRepository()
     {
-        var project = await _projektService.CreateAsync("Ohne-Repository-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Ohne-Repository-Projekt", null, TestContext.Current.CancellationToken);
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.ArbeitsverzeichnisBearbeitenCommand.CanExecute(null).Should().BeFalse();
+        sut.WorkingDirectoryEditCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>ArbeitsverzeichnisBearbeitenCommand ist ausführbar, sobald ein Repository zugewiesen ist.</summary>
@@ -79,9 +79,9 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
         var (project, _) = await ErstelleProjektMitRepositoryAsync();
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.ArbeitsverzeichnisBearbeitenCommand.CanExecute(null).Should().BeTrue();
+        sut.WorkingDirectoryEditCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>Bestätigt der Benutzer den Dialog, wird das neue Arbeitsverzeichnis persistiert.</summary>
@@ -91,20 +91,20 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
         var (project, repository) = await ErstelleProjektMitRepositoryAsync(workingDirectory: "backend");
 
         _dialogServiceMock
-            .Setup(d => d.ArbeitsverzeichnisBearbeitenDialog(It.IsAny<ArbeitsverzeichnisBearbeitenViewModel>()))
-            .Callback<ArbeitsverzeichnisBearbeitenViewModel>(vm => vm.SelectedWorkingDirectory = "frontend")
+            .Setup(d => d.WorkingDirectoryEditDialog(It.IsAny<WorkingDirectoryEditViewModel>()))
+            .Callback<WorkingDirectoryEditViewModel>(vm => vm.SelectedWorkingDirectory = "frontend")
             .Returns(true);
         _serviceProviderMock
-            .Setup(sp => sp.GetService(typeof(ArbeitsverzeichnisBearbeitenViewModel)))
-            .Returns(() => new ArbeitsverzeichnisBearbeitenViewModel(NullLogger<ArbeitsverzeichnisBearbeitenViewModel>.Instance));
+            .Setup(sp => sp.GetService(typeof(WorkingDirectoryEditViewModel)))
+            .Returns(() => new WorkingDirectoryEditViewModel(NullLogger<WorkingDirectoryEditViewModel>.Instance));
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.WorkingDirectoryEditCommand).ExecuteAsync();
 
-        var startConfiguration = await _projektService.GetRepositoryStartConfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
+        var startConfiguration = await _projectService.GetRepositoryStartConfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
         startConfiguration.Should().NotBeNull();
         startConfiguration!.WorkingDirectoryRelativePath.Should().Be("frontend");
     }
@@ -116,20 +116,20 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
         var (project, repository) = await ErstelleProjektMitRepositoryAsync(workingDirectory: "backend");
 
         _dialogServiceMock
-            .Setup(d => d.ArbeitsverzeichnisBearbeitenDialog(It.IsAny<ArbeitsverzeichnisBearbeitenViewModel>()))
-            .Callback<ArbeitsverzeichnisBearbeitenViewModel>(vm => vm.SelectedWorkingDirectory = "frontend")
+            .Setup(d => d.WorkingDirectoryEditDialog(It.IsAny<WorkingDirectoryEditViewModel>()))
+            .Callback<WorkingDirectoryEditViewModel>(vm => vm.SelectedWorkingDirectory = "frontend")
             .Returns(false);
         _serviceProviderMock
-            .Setup(sp => sp.GetService(typeof(ArbeitsverzeichnisBearbeitenViewModel)))
-            .Returns(() => new ArbeitsverzeichnisBearbeitenViewModel(NullLogger<ArbeitsverzeichnisBearbeitenViewModel>.Instance));
+            .Setup(sp => sp.GetService(typeof(WorkingDirectoryEditViewModel)))
+            .Returns(() => new WorkingDirectoryEditViewModel(NullLogger<WorkingDirectoryEditViewModel>.Instance));
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.WorkingDirectoryEditCommand).ExecuteAsync();
 
-        var startConfiguration = await _projektService.GetRepositoryStartConfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
+        var startConfiguration = await _projectService.GetRepositoryStartConfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
         startConfiguration.Should().NotBeNull();
         startConfiguration!.WorkingDirectoryRelativePath.Should().Be("backend");
     }
@@ -141,20 +141,20 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
         var (project, repository) = await ErstelleProjektMitRepositoryAsync(workingDirectory: "backend");
 
         _dialogServiceMock
-            .Setup(d => d.ArbeitsverzeichnisBearbeitenDialog(It.IsAny<ArbeitsverzeichnisBearbeitenViewModel>()))
-            .Callback<ArbeitsverzeichnisBearbeitenViewModel>(vm => vm.SelectedWorkingDirectory = ".")
+            .Setup(d => d.WorkingDirectoryEditDialog(It.IsAny<WorkingDirectoryEditViewModel>()))
+            .Callback<WorkingDirectoryEditViewModel>(vm => vm.SelectedWorkingDirectory = ".")
             .Returns(true);
         _serviceProviderMock
-            .Setup(sp => sp.GetService(typeof(ArbeitsverzeichnisBearbeitenViewModel)))
-            .Returns(() => new ArbeitsverzeichnisBearbeitenViewModel(NullLogger<ArbeitsverzeichnisBearbeitenViewModel>.Instance));
+            .Setup(sp => sp.GetService(typeof(WorkingDirectoryEditViewModel)))
+            .Returns(() => new WorkingDirectoryEditViewModel(NullLogger<WorkingDirectoryEditViewModel>.Instance));
 
         var sut = CreateSut();
         sut.ProjectId = project.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.WorkingDirectoryEditCommand).ExecuteAsync();
 
-        var startConfiguration = await _projektService.GetRepositoryStartConfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
+        var startConfiguration = await _projectService.GetRepositoryStartConfigurationAsync(repository.Id, TestContext.Current.CancellationToken);
         startConfiguration!.WorkingDirectoryRelativePath.Should().BeNull();
     }
 }

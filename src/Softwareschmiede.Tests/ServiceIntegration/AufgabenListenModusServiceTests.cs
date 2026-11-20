@@ -11,7 +11,7 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 public sealed class AufgabenListenModusServiceTests : IDisposable
 {
     private readonly ServiceProvider _provider;
-    private readonly AufgabenListenModusService _sut;
+    private readonly WorkItemListModeService _sut;
 
     /// <summary>AufgabenListenModusServiceTests.</summary>
     public AufgabenListenModusServiceTests()
@@ -26,28 +26,28 @@ public sealed class AufgabenListenModusServiceTests : IDisposable
     [Fact]
     public async Task SpeichernUndLaden_MenueModus_RoundtripUeberGetrennteScopes()
     {
-        await _sut.SpeichereMenueModusAsync(AufgabenListenModus.Repository, TestContext.Current.CancellationToken);
+        await _sut.SaveMenuModeAsync(WorkItemListMode.Repository, TestContext.Current.CancellationToken);
 
-        var geladen = await _sut.LadeMenueModusAsync(TestContext.Current.CancellationToken);
-        geladen.Should().Be(AufgabenListenModus.Repository);
+        var geladen = await _sut.LoadMenuModeAsync(TestContext.Current.CancellationToken);
+        geladen.Should().Be(WorkItemListMode.Repository);
     }
 
     /// <summary>Der gespeicherte Dashboard-Modus wird über einen neuen Scope wiederhergestellt.</summary>
     [Fact]
     public async Task SpeichernUndLaden_DashboardModus_RoundtripUeberGetrennteScopes()
     {
-        await _sut.SpeichereDashboardModusAsync(AufgabenListenModus.Ki, TestContext.Current.CancellationToken);
+        await _sut.SaveDashboardModeAsync(WorkItemListMode.Ai, TestContext.Current.CancellationToken);
 
-        var geladen = await _sut.LadeDashboardModusAsync(TestContext.Current.CancellationToken);
-        geladen.Should().Be(AufgabenListenModus.Ki);
+        var geladen = await _sut.LoadDashboardModeAsync(TestContext.Current.CancellationToken);
+        geladen.Should().Be(WorkItemListMode.Ai);
     }
 
     /// <summary>Ohne gespeicherten Wert liefert das Laden den Default Datum.</summary>
     [Fact]
     public async Task Lade_MenueModus_ReturnsDatum_WhenMissing()
     {
-        var geladen = await _sut.LadeMenueModusAsync(TestContext.Current.CancellationToken);
-        geladen.Should().Be(AufgabenListenModus.Datum);
+        var geladen = await _sut.LoadMenuModeAsync(TestContext.Current.CancellationToken);
+        geladen.Should().Be(WorkItemListMode.Date);
     }
 
     /// <summary>Ein ungültiger gespeicherter Wert fällt auf den Default Datum zurück.</summary>
@@ -60,8 +60,8 @@ public sealed class AufgabenListenModusServiceTests : IDisposable
             await settingService.SetSettingAsync(AppSettingService.ActiveWorkItemsListModeKey, "UnbekannterModus", TestContext.Current.CancellationToken);
         }
 
-        var geladen = await _sut.LadeMenueModusAsync(TestContext.Current.CancellationToken);
-        geladen.Should().Be(AufgabenListenModus.Datum);
+        var geladen = await _sut.LoadMenuModeAsync(TestContext.Current.CancellationToken);
+        geladen.Should().Be(WorkItemListMode.Date);
     }
 
     /// <summary>Ein leerer gespeicherter Wert fällt auf den Default Datum zurück.</summary>
@@ -74,17 +74,17 @@ public sealed class AufgabenListenModusServiceTests : IDisposable
             await settingService.SetSettingAsync(AppSettingService.ActiveWorkItemsListModeDashboardKey, string.Empty, TestContext.Current.CancellationToken);
         }
 
-        var geladen = await _sut.LadeDashboardModusAsync(TestContext.Current.CancellationToken);
-        geladen.Should().Be(AufgabenListenModus.Datum);
+        var geladen = await _sut.LoadDashboardModeAsync(TestContext.Current.CancellationToken);
+        geladen.Should().Be(WorkItemListMode.Date);
     }
 
     /// <summary>Menü- und Dashboard-Schlüssel sind unabhängig voneinander.</summary>
     [Fact]
     public async Task SchluesselUnabhaengig_MenueUndDashboardBeeinflussenSichNicht()
     {
-        await _sut.SpeichereMenueModusAsync(AufgabenListenModus.Repository, TestContext.Current.CancellationToken);
+        await _sut.SaveMenuModeAsync(WorkItemListMode.Repository, TestContext.Current.CancellationToken);
 
-        (await _sut.LadeMenueModusAsync(TestContext.Current.CancellationToken)).Should().Be(AufgabenListenModus.Repository);
-        (await _sut.LadeDashboardModusAsync(TestContext.Current.CancellationToken)).Should().Be(AufgabenListenModus.Datum);
+        (await _sut.LoadMenuModeAsync(TestContext.Current.CancellationToken)).Should().Be(WorkItemListMode.Repository);
+        (await _sut.LoadDashboardModeAsync(TestContext.Current.CancellationToken)).Should().Be(WorkItemListMode.Date);
     }
 }

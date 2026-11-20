@@ -38,29 +38,29 @@ public sealed class TodoListView : BaseWindowView
     }
 
     /// <returns><c>true</c>, wenn das Badge mit der Anzahl offener To-Dos sichtbar ist.</returns>
-    public bool HasOpenCountBadge() => ElementExists(Window, cf => cf.ByName("OffeneTodoCountBadge"));
+    public bool HasOpenCountBadge() => ElementExists(Window, cf => cf.ByName("OpenTodoCountBadge"));
 
-    /// <returns>Der aktuelle Text des Offene-Todos-Badges ("OffeneTodoCountBadge").</returns>
-    public string GetOpenCount() => GetHelpTextOrName(WaitForElement(Window, cf => cf.ByName("OffeneTodoCountBadge"), Short));
+    /// <returns>Der aktuelle Text des Offene-Todos-Badges ("OpenTodoCountBadge").</returns>
+    public string GetOpenCount() => GetHelpTextOrName(WaitForElement(Window, cf => cf.ByName("OpenTodoCountBadge"), Short));
 
     /// <summary>Wartet, bis das Offene-Todos-Badge verschwindet.</summary>
     /// <returns>Diese Instanz.</returns>
     public TodoListView WaitUntilBadgeGone()
     {
-        WaitUntilGone(Window, cf => cf.ByName("OffeneTodoCountBadge"), Short);
+        WaitUntilGone(Window, cf => cf.ByName("OpenTodoCountBadge"), Short);
         return this;
     }
 
-    /// <summary>Erstellt ein neues To-Do über das Eingabefeld "NeuesTodoBeschreibung" und den "TodoHinzufuegen"-Button.</summary>
+    /// <summary>Erstellt ein neues To-Do über das Eingabefeld "NewTodoDescription" und den "AddTodo"-Button.</summary>
     /// <param name="description">Die Beschreibung des neuen To-Dos.</param>
     /// <returns>Diese Instanz.</returns>
     public TodoListView CreateTodo(string description)
     {
-        var eingabeFeld = WaitForElement(Window, cf => cf.ByName("NeuesTodoBeschreibung"), Short);
+        var eingabeFeld = WaitForElement(Window, cf => cf.ByName("NewTodoDescription"), Short);
         eingabeFeld.ClickInForeground();
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
         Keyboard.Type(description);
-        WaitForElement(Window, cf => cf.ByName("TodoHinzufuegen"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("AddTodo"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -72,7 +72,7 @@ public sealed class TodoListView : BaseWindowView
     {
         var entry = WaitForElement(Window, cf => cf.ByName(description), Short);
         var container = entry.Parent;
-        var checkbox = container?.FindFirstDescendant(cf => cf.ByName("TodoErledigtCheckbox"))
+        var checkbox = container?.FindFirstDescendant(cf => cf.ByName("TodoCompletedCheckbox"))
             ?? throw new InvalidOperationException($"Checkbox für To-Do '{description}' nicht gefunden.");
         checkbox.AsCheckBox().ClickInForeground();
         return this;
@@ -86,7 +86,7 @@ public sealed class TodoListView : BaseWindowView
     {
         var entry = WaitForElement(Window, cf => cf.ByName(description), Short);
         var container = entry.Parent;
-        var loeschenButton = container?.FindFirstDescendant(cf => cf.ByName("TodoLoeschen"))
+        var loeschenButton = container?.FindFirstDescendant(cf => cf.ByName("DeleteTodo"))
             ?? throw new InvalidOperationException($"Löschen-Button für To-Do '{description}' nicht gefunden.");
         loeschenButton.AsButton().ClickInForeground();
         return this;

@@ -32,7 +32,7 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
     {
         _db = TestDbContextFactory.Create();
         var workItemService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
-        var projektService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
+        var projectService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
         var logService = new LogService(_db, new Mock<ILogger<LogService>>().Object);
 
         var defaultPluginMock = new Mock<IGitPlugin>();
@@ -56,7 +56,7 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
 
         _sut = new GitOrchestrationService(
             workItemService,
-            projektService,
+            projectService,
             logService,
             defaultPluginMock.Object,
             pluginSelectionService,

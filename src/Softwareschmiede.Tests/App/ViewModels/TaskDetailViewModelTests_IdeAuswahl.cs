@@ -12,7 +12,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 
 /// <summary>
 /// Unit-Tests für das Split-Button-Verhalten der IDE-Öffnen-Funktion in TaskDetailViewModel:
-/// <see cref="TaskDetailViewModel.OeffneIdeAuswahlCommand"/>, <see cref="TaskDetailViewModel.KannIdeAuswaehlen"/>
+/// <see cref="TaskDetailViewModel.OpenIdeSelectionCommand"/>, <see cref="TaskDetailViewModel.SelectCanIde"/>
 /// und den waehleEntryPointAsync-Callback.
 /// </summary>
 public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTestsBase
@@ -39,9 +39,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeSelectionCommand).ExecuteAsync();
 
         _dialogServiceMock.Verify(
             d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()),
@@ -58,10 +58,10 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannIdeOeffnen.Should().BeFalse("ohne LokalerKlonPfad existiert noch kein Arbeitsverzeichnis");
-        sut.OeffneIdeAuswahlCommand.CanExecute(null).Should().BeFalse();
+        sut.OpenCanIde.Should().BeFalse("ohne LokalerKlonPfad existiert noch kein Arbeitsverzeichnis");
+        sut.OpenIdeSelectionCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>
@@ -81,11 +81,11 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var visualStudioPlugin = new VisualStudioIdePlugin(new Mock<IProcessStarter>().Object);
         var sut = CreateSut(idePlugins: [visualStudioPlugin]);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
-        sut.KannIdeAuswaehlen.Should().BeFalse();
+        sut.SelectCanIde.Should().BeFalse();
     }
 
     /// <summary>Bei mehreren gefundenen Einstiegspunkten wird KannIdeAuswaehlen true (Dropdown-Button sichtbar).</summary>
@@ -100,11 +100,11 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
-        sut.KannIdeAuswaehlen.Should().BeTrue();
+        sut.SelectCanIde.Should().BeTrue();
     }
 
     /// <summary>
@@ -125,9 +125,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannIdeAuswaehlen.Should().BeTrue();
+        sut.SelectCanIde.Should().BeTrue();
         prozessStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
@@ -147,12 +147,12 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var visualStudioPlugin = new VisualStudioIdePlugin(new Mock<IProcessStarter>().Object);
         var sut = CreateSut(idePlugins: [visualStudioPlugin]);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannIdeAuswaehlen.Should().BeFalse();
+        sut.SelectCanIde.Should().BeFalse();
     }
 
-    /// <summary>Regressionstest: Ohne gefundene Einstiegspunkte bleibt KannIdeAuswaehlen bereits nach LadenAsync false, ohne dass dabei eine FehlerMeldung angezeigt wird (das Laden der Aufgabe selbst war erfolgreich).</summary>
+    /// <summary>Regressionstest: Ohne gefundene Einstiegspunkte bleibt KannIdeAuswaehlen bereits nach LadenAsync false, ohne dass dabei eine ErrorMessage angezeigt wird (das Laden der Aufgabe selbst war erfolgreich).</summary>
     [Fact]
     public async Task KannIdeAuswaehlen_NachLadenAsync_WhenNoEntryPoints_ReturnsFalseOhneFehlerMeldung()
     {
@@ -162,10 +162,10 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         var sut = CreateSut(visualStudioCodeLocator: new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannIdeAuswaehlen.Should().BeFalse();
-        sut.FehlerMeldung.Should().BeNullOrEmpty("ein Ermittlungsfehler beim Laden darf nicht als FehlerMeldung angezeigt werden");
+        sut.SelectCanIde.Should().BeFalse();
+        sut.ErrorMessage.Should().BeNullOrEmpty("ein Ermittlungsfehler beim Laden darf nicht als ErrorMessage angezeigt werden");
     }
 
     /// <summary>Ohne gefundene Einstiegspunkte (kein .sln, Visual Studio Code nicht verfügbar) bleibt KannIdeAuswaehlen false und eine Fehlermeldung wird gesetzt.</summary>
@@ -178,12 +178,12 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         var sut = CreateSut(visualStudioCodeLocator: new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
-        sut.KannIdeAuswaehlen.Should().BeFalse();
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        sut.SelectCanIde.Should().BeFalse();
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
     }
 
     /// <summary>Bei mehreren Einstiegspunkten zeigt der waehleEntryPointAsync-Callback (über OeffneIdeAuswahlCommand) den Auswahl-Dialog an und öffnet den dort gewählten Einstiegspunkt.</summary>
@@ -205,9 +205,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeSelectionCommand).ExecuteAsync();
 
         _dialogServiceMock.Verify(
             d => d.ShowSolutionSelectionDialogAsync(
@@ -236,12 +236,12 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = CreateSut(prozessStarterMock);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeSelectionCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
-        sut.FehlerMeldung.Should().BeNullOrEmpty("ein Abbruch des Auswahl-Dialogs ist kein Fehler");
+        sut.ErrorMessage.Should().BeNullOrEmpty("ein Abbruch des Auswahl-Dialogs ist kein Fehler");
     }
 
     /// <summary>Der waehleEntryPointAsync-Callback nutzt IdeEntryPoint.DisplayName (statt Path) für die Anzeige im Auswahl-Dialog, sofern gesetzt.</summary>
@@ -264,9 +264,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         var sut = CreateSut(idePlugins: [idePluginMock.Object]);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeSelectionCommand).ExecuteAsync();
 
         _dialogServiceMock.Verify(
             d => d.ShowSolutionSelectionDialogAsync(
@@ -297,12 +297,12 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         var sut = CreateSut(idePlugins: [idePluginMock.Object]);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
-        sut.KannIdeAuswaehlen.Should().BeTrue("die Anzahl der gefundenen Einstiegspunkte hat sich durch den Öffnen-Fehler nicht geändert");
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
+        sut.SelectCanIde.Should().BeTrue("die Anzahl der gefundenen Einstiegspunkte hat sich durch den Öffnen-Fehler nicht geändert");
     }
 
     /// <summary>Ohne gefundene Einstiegspunkte zeigt OeffneIdeAuswahlAsync dieselbe Fehlermeldung wie OeffneIdeAsync.</summary>
@@ -318,11 +318,11 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
             prozessStarterMock,
             visualStudioCodeLocator: new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeSelectionCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
         prozessStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
@@ -345,9 +345,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeSelectionCommand).ExecuteAsync();
 
         _dialogServiceMock.Verify(
             d => d.ShowSolutionSelectionDialogAsync(
@@ -377,9 +377,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock, locator);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeSelectionCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(
             p => p.Start(It.Is<ProcessStartRequest>(a => a.FileName == "code.cmd" && !a.UseShellExecute)),
@@ -413,9 +413,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         // VS Code (Fallback) wird zuerst registriert, VS (Explicit) danach - die Rückgabeliste muss trotzdem Explicit-vor-Fallback ordnen.
         var sut = CreateSut(prozessStarterMock, idePlugins: [visualStudioCodePlugin, visualStudioPlugin]);
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeSelectionCommand).ExecuteAsync();
 
         angezeigteWerte.Should().NotBeNull();
         var werteListe = angezeigteWerte!.ToList();
@@ -439,9 +439,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeSelectionCommand).ExecuteAsync();
 
         angezeigteWerte.Should().Contain("Visual Studio: MyProject.sln");
     }
@@ -463,9 +463,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OpenIdeSelectionCommand).ExecuteAsync();
 
         angezeigteWerte.Should().Contain("Visual Studio Code");
         angezeigteWerte!.Should().NotContain(value => value.StartsWith("Visual Studio Code:", StringComparison.Ordinal));
@@ -486,9 +486,9 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         var sut = CreateSut();
         sut.WorkItemId = workItem.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannIdeAuswaehlen.Should().BeTrue(
+        sut.SelectCanIde.Should().BeTrue(
             "VS liefert 1 .sln und VS Code liefert 1 Fallback-Eintrag - aggregiert 2 Einstiegspunkte, obwohl kein einzelnes Plugin für sich genommen mehrere Einstiegspunkte hat");
     }
 

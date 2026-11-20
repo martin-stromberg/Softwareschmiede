@@ -27,7 +27,7 @@ public sealed class TodoViewModelTests
         sut.Id.Should().Be(todo.Id);
         sut.Description.Should().Be(todo.Description);
         sut.CreatedAt.Should().Be(todo.CreatedAt);
-        sut.IstErledigt.Should().BeFalse();
+        sut.IsCompleted.Should().BeFalse();
     }
 
     /// <summary>IstErledigt ist true, wenn ErledigtAm gesetzt ist.</summary>
@@ -37,7 +37,7 @@ public sealed class TodoViewModelTests
         var todo = CreateTodo(DateTimeOffset.UtcNow);
         var sut = new TodoViewModel(todo);
 
-        sut.IstErledigt.Should().BeTrue();
+        sut.IsCompleted.Should().BeTrue();
     }
 
     /// <summary>PropertyChanged wird ausgelöst, wenn Beschreibung geändert wird.</summary>
@@ -62,10 +62,10 @@ public sealed class TodoViewModelTests
         var raised = new List<string?>();
         sut.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
-        sut.IstErledigt = true;
+        sut.IsCompleted = true;
 
-        raised.Should().Contain(nameof(TodoViewModel.IstErledigt));
-        sut.IstErledigt.Should().BeTrue();
+        raised.Should().Contain(nameof(TodoViewModel.IsCompleted));
+        sut.IsCompleted.Should().BeTrue();
     }
 
     /// <summary>PropertyChanged wird nicht erneut ausgelöst, wenn sich der Wert nicht ändert.</summary>

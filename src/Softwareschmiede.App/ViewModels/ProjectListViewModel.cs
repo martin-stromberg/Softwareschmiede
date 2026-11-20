@@ -13,13 +13,13 @@ namespace Softwareschmiede.App.ViewModels;
 /// <summary>ViewModel für die Projektliste.</summary>
 public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 {
-    private readonly ProjectService _projektService;
+    private readonly ProjectService _projectService;
     private readonly IServiceProvider _serviceProvider;
     private readonly IPluginManager _pluginManager;
     private readonly ILogger<ProjectListViewModel> _logger;
-    private readonly SemaphoreSlim _ladenSemaphore = new(1, 1);
+    private readonly SemaphoreSlim _loadSemaphore = new(1, 1);
 
-    private Project? _selectedProjekt;
+    private Project? _selectedProject;
     private bool _isLoading;
     private bool _isLoadingRepositories;
     private string? _errorMessage;
@@ -33,15 +33,15 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     public ObservableCollection<AvailableRepository> UnassignedRepositories { get; } = new();
 
     /// <summary>Das aktuell ausgewählte Projekt.</summary>
-    public Project? SelectedProjekt
+    public Project? SelectedProject
     {
-        get => _selectedProjekt;
+        get => _selectedProject;
         set
         {
-            var changed = SetProperty(ref _selectedProjekt, value);
+            var changed = SetProperty(ref _selectedProject, value);
             if (value is not null && (changed || DetailViewModel is null))
             {
-                ZeigeDetail(value.Id);
+                ShowDetail(value.Id);
             }
         }
     }
@@ -88,74 +88,74 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Fehlermeldung bei Ladefehlern.</summary>
-    public string? FehlerMeldung
+    public string? ErrorMessage
     {
         get => _errorMessage;
         private set => SetProperty(ref _errorMessage, value);
     }
 
     /// <summary>Lädt die Projektliste.</summary>
-    public ICommand LadenCommand { get; }
+    public ICommand LoadCommand { get; }
 
     /// <summary>Öffnet die Detailansicht im Anlage-Modus.</summary>
-    public ICommand ZeigeErstellungsFormularCommand { get; }
+    public ICommand ShowCreationFormCommand { get; }
 
     /// <summary>Archiviert das ausgewählte Projekt.</summary>
-    public ICommand ProjektArchivierenCommand { get; }
+    public ICommand ProjectArchiveCommand { get; }
 
     /// <summary>Schließt die Detailansicht.</summary>
-    public ICommand SchliesseDetailCommand { get; }
+    public ICommand CloseDetailCommand { get; }
 
     /// <summary>Wählt ein Projekt aus und zeigt die Details.</summary>
-    public ICommand WaehleProjektCommand { get; }
+    public ICommand SelectProjectCommand { get; }
 
     /// <summary>Erstellt ein neues Projekt aus einem unzugeordneten Repository und ordnet das Repository zu.</summary>
     public AsyncRelayCommand<AvailableRepository> RepositoryDoubleclickCommand { get; }
 
     /// <summary>Wird aufgerufen, wenn sich der Titel des Detailbereichs ändert (z. B. Projektname). Null bedeutet, kein Detailtitel aktiv.</summary>
-    public Action<string?>? DetailTitelAenderungAction { get; set; }
+    public Action<string?>? DetailTitleChangeAction { get; set; }
 
     /// <inheritdoc cref="ProjectListViewModel"/>
     public ProjectListViewModel(
-        ProjectService projektService,
+        ProjectService projectService,
         IServiceProvider serviceProvider,
         IPluginManager pluginManager,
         ILogger<ProjectListViewModel> logger)
     {
-        _projektService = projektService;
+        _projectService = projectService;
         _serviceProvider = serviceProvider;
         _pluginManager = pluginManager;
         _logger = logger;
 
-        LadenCommand = new AsyncRelayCommand(LadenAsync);
-        ZeigeErstellungsFormularCommand = new RelayCommand(ZeigeDetailErstellungsFormular);
-        ProjektArchivierenCommand = new AsyncRelayCommand(
-            ProjektArchivierenAsync,
-            () => SelectedProjekt is not null);
-        SchliesseDetailCommand = new RelayCommand(() => DetailViewModel = null);
-        WaehleProjektCommand = new RelayCommand<Project>(project =>
+        LoadCommand = new AsyncRelayCommand(LoadAsync);
+        ShowCreationFormCommand = new RelayCommand(ShowDetailCreationForm);
+        ProjectArchiveCommand = new AsyncRelayCommand(
+            ProjectArchiveAsync,
+            () => SelectedProject is not null);
+        CloseDetailCommand = new RelayCommand(() => DetailViewModel = null);
+        SelectProjectCommand = new RelayCommand<Project>(project =>
         {
             if (project is not null)
             {
-                SelectedProjekt = project;
+                SelectedProject = project;
             }
         });
-        RepositoryDoubleclickCommand = new AsyncRelayCommand<AvailableRepository>(ProjektAusRepositoryErstellen);
+        RepositoryDoubleclickCommand = new AsyncRelayCommand<AvailableRepository>(CreateProjectFromRepository);
     }
 
-    private async Task LadenAsync(CancellationToken ct)
+    private async Task LoadAsync(CancellationToken ct)
     {
-        await _ladenSemaphore.WaitAsync(ct);
+        await _loadSemaphore.WaitAsync(ct);
         try
         {
             IsLoading = true;
-            FehlerMeldung = null;
+            ErrorMessage = null;
 
-            var projektTask = _projektService.GetAllAsync(ct);
-            var suggestionsTask = LadenRepositorienSuggestionsAsync(ct);
-            await Task.WhenAll(projektTask, suggestionsTask);
+            var projectTask = _projectService.GetAllAsync(ct);
+            var suggestionTask = LoadRepositoriesSuggestionsAsync(ct);
+            await Task.WhenAll(projectTask, suggestionTask);
 
-            var projects = projektTask.Result;
+            var projects = projectTask.Result;
             Projects.Clear();
             foreach (var project in projects)
                 Projects.Add(project);
@@ -167,21 +167,21 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden der Projekte.");
-            SetFehler(ref _errorMessage, nameof(FehlerMeldung), ex);
+            SetError(ref _errorMessage, nameof(ErrorMessage), ex);
         }
         finally
         {
             IsLoading = false;
-            _ladenSemaphore.Release();
+            _loadSemaphore.Release();
         }
     }
 
-    private async Task LadenRepositorienSuggestionsAsync(CancellationToken ct)
+    private async Task LoadRepositoriesSuggestionsAsync(CancellationToken ct)
     {
         IsLoadingRepositories = true;
         try
         {
-            var repos = await _projektService.GetUnassignedRepositoriesAsync(ct);
+            var repos = await _projectService.GetUnassignedRepositoriesAsync(ct);
             UnassignedRepositories.Clear();
             foreach (var repo in repos)
                 UnassignedRepositories.Add(repo);
@@ -200,7 +200,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task ProjektAusRepositoryErstellen(AvailableRepository? repo, CancellationToken ct)
+    private async Task CreateProjectFromRepository(AvailableRepository? repo, CancellationToken ct)
     {
         if (repo is null)
             return;
@@ -208,9 +208,9 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         try
         {
             var pluginPrefix = await FindPluginPrefixForRepositoryAsync(repo.Url, ct);
-            var project = await _projektService.CreateAsync(repo.Name, null, ct);
-            await _projektService.AddRepositoryAsync(project.Id, pluginPrefix, repo.Url, repo.Name, ct: ct);
-            await NeuesProjektHinzufuegen();
+            var project = await _projectService.CreateAsync(repo.Name, null, ct);
+            await _projectService.AddRepositoryAsync(project.Id, pluginPrefix, repo.Url, repo.Name, ct: ct);
+            await AddNewProject();
         }
         catch (OperationCanceledException)
         {
@@ -219,7 +219,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Erstellen eines Projekts aus Repository '{RepositoryName}'.", repo.Name);
-            SetFehler(ref _errorMessage, nameof(FehlerMeldung), ex);
+            SetError(ref _errorMessage, nameof(ErrorMessage), ex);
         }
     }
 
@@ -246,16 +246,16 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         return string.Empty;
     }
 
-    private async Task ProjektArchivierenAsync(CancellationToken ct)
+    private async Task ProjectArchiveAsync(CancellationToken ct)
     {
-        if (SelectedProjekt is null)
+        if (SelectedProject is null)
             return;
 
         try
         {
-            await _projektService.ArchiveAsync(SelectedProjekt.Id, ct);
-            Projects.Remove(SelectedProjekt);
-            SelectedProjekt = null;
+            await _projectService.ArchiveAsync(SelectedProject.Id, ct);
+            Projects.Remove(SelectedProject);
+            SelectedProject = null;
             DetailViewModel = null;
         }
         catch (OperationCanceledException)
@@ -265,7 +265,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Archivieren des Projekts.");
-            SetFehler(ref _errorMessage, nameof(FehlerMeldung), ex);
+            SetError(ref _errorMessage, nameof(ErrorMessage), ex);
         }
     }
 
@@ -278,27 +278,27 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 
         PropertyChangedEventHandler propertyChangedHandler = (_, e) =>
         {
-            if (e.PropertyName == nameof(ProjectDetailViewModel.ProjektName)
+            if (e.PropertyName == nameof(ProjectDetailViewModel.ProjectName)
                 && ReferenceEquals(DetailViewModel, viewModel))
             {
-                DetailTitelAenderungAction?.Invoke(viewModel.ProjektName);
+                DetailTitleChangeAction?.Invoke(viewModel.ProjectName);
             }
         };
         viewModel.PropertyChanged += propertyChangedHandler;
 
-        viewModel.ZurueckAction = () =>
+        viewModel.BackAction = () =>
         {
             viewModel.PropertyChanged -= propertyChangedHandler;
             DetailViewModel = null;
-            DetailTitelAenderungAction?.Invoke(null);
+            DetailTitleChangeAction?.Invoke(null);
         };
-        viewModel.ProjektListeAktualisierenCallback = NeuesProjektHinzufuegen;
-        viewModel.NavigateToTaskViewCallback = ZeigeTaskDetailView;
-        viewModel.NavigateBackToProjectCallback = KehreZuProjectZurueck;
+        viewModel.RefreshProjectListCallback = AddNewProject;
+        viewModel.NavigateToTaskViewCallback = ShowTaskDetailView;
+        viewModel.NavigateBackToProjectCallback = KehreToProjectBack;
         _currentProjectDetailViewModel = viewModel;
     }
 
-    private void ZeigeDetail(Guid projectId)
+    private void ShowDetail(Guid projectId)
     {
         var viewModel = _serviceProvider.GetRequiredService<ProjectDetailViewModel>();
         InitDetailViewModel(viewModel);
@@ -306,44 +306,44 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         DetailViewModel = viewModel;
     }
 
-    private void ZeigeDetailErstellungsFormular()
+    private void ShowDetailCreationForm()
     {
         var viewModel = _serviceProvider.GetRequiredService<ProjectDetailViewModel>();
         InitDetailViewModel(viewModel);
         viewModel.ProjectId = Guid.Empty;
-        viewModel.ProjektName = string.Empty;
+        viewModel.ProjectName = string.Empty;
         DetailViewModel = viewModel;
     }
 
-    private async Task NeuesProjektHinzufuegen()
+    private async Task AddNewProject()
     {
-        await LadenAsync(CancellationToken.None);
+        await LoadAsync(CancellationToken.None);
     }
 
-    private void ZeigeTaskDetailView(TaskDetailViewModel vm)
+    private void ShowTaskDetailView(TaskDetailViewModel vm)
     {
-        vm.DetailTitelAenderungAction = detailTitel =>
+        vm.DetailTitleChangeAction = detailTitle =>
         {
             if (!ReferenceEquals(DetailViewModel, vm))
                 return;
 
-            DetailTitelAenderungAction?.Invoke(string.IsNullOrWhiteSpace(detailTitel) ? "Aufgabe" : detailTitel);
+            DetailTitleChangeAction?.Invoke(string.IsNullOrWhiteSpace(detailTitle) ? "Aufgabe" : detailTitle);
         };
         DetailViewModel = vm;
-        DetailTitelAenderungAction?.Invoke(string.IsNullOrWhiteSpace(vm.WorkItem?.Title) ? "Aufgabe" : vm.WorkItem.Title);
+        DetailTitleChangeAction?.Invoke(string.IsNullOrWhiteSpace(vm.WorkItem?.Title) ? "Aufgabe" : vm.WorkItem.Title);
     }
 
-    private void KehreZuProjectZurueck()
+    private void KehreToProjectBack()
     {
         DetailViewModel = _currentProjectDetailViewModel;
         if (_currentProjectDetailViewModel is not null)
-            DetailTitelAenderungAction?.Invoke(_currentProjectDetailViewModel.ProjektName);
-        _ = LadenRepositorienSuggestionsAsync(CancellationToken.None);
+            DetailTitleChangeAction?.Invoke(_currentProjectDetailViewModel.ProjectName);
+        _ = LoadRepositoriesSuggestionsAsync(CancellationToken.None);
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        _ladenSemaphore.Dispose();
+        _loadSemaphore.Dispose();
     }
 }

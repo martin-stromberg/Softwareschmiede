@@ -11,10 +11,10 @@ public sealed class AufgabenListenAnsichtTests
     [Fact]
     public void Konfiguriere_ShouldApplyGroupingAndSorting_WhenModusIstDatum()
     {
-        var sortierungen = AufgabenListenAnsicht.ErstelleSortierDeskriptoren(AufgabenListenModus.Datum);
-        var grouping = AufgabenListenAnsicht.ErstelleGruppenDeskriptor(AufgabenListenModus.Datum);
+        var sortierungen = WorkItemListLayout.CreateSortDescriptors(WorkItemListMode.Date);
+        var grouping = WorkItemListLayout.CreateGroupDescriptor(WorkItemListMode.Date);
 
-        sortierungen[0].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.SortierZeitpunkt), ListSortDirection.Descending));
+        sortierungen[0].Should().Be(new SortDescription(nameof(ActiveWorkItemPanelItem.SortTimestamp), ListSortDirection.Descending));
         grouping.Should().BeNull();
     }
 
@@ -22,46 +22,46 @@ public sealed class AufgabenListenAnsichtTests
     [Fact]
     public void Konfiguriere_ShouldApplyGroupingAndSorting_WhenModusIstRepository()
     {
-        var sortierungen = AufgabenListenAnsicht.ErstelleSortierDeskriptoren(AufgabenListenModus.Repository);
-        var grouping = AufgabenListenAnsicht.ErstelleGruppenDeskriptor(AufgabenListenModus.Repository);
+        var sortierungen = WorkItemListLayout.CreateSortDescriptors(WorkItemListMode.Repository);
+        var grouping = WorkItemListLayout.CreateGroupDescriptor(WorkItemListMode.Repository);
 
         grouping.Should().NotBeNull();
-        grouping!.PropertyName.Should().Be(nameof(AktiveAufgabePanelItem.RepositoryGruppenName));
-        sortierungen[0].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.RepositoryGruppeIstFallback), ListSortDirection.Ascending));
-        sortierungen[1].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.RepositoryGruppenName), ListSortDirection.Ascending));
-        sortierungen[2].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.SortierZeitpunkt), ListSortDirection.Descending));
+        grouping!.PropertyName.Should().Be(nameof(ActiveWorkItemPanelItem.RepositoryGroupName));
+        sortierungen[0].Should().Be(new SortDescription(nameof(ActiveWorkItemPanelItem.RepositoryGroupIsFallback), ListSortDirection.Ascending));
+        sortierungen[1].Should().Be(new SortDescription(nameof(ActiveWorkItemPanelItem.RepositoryGroupName), ListSortDirection.Ascending));
+        sortierungen[2].Should().Be(new SortDescription(nameof(ActiveWorkItemPanelItem.SortTimestamp), ListSortDirection.Descending));
     }
 
     /// <summary>Konfiguriere im Modus Ki gruppiert nach KiGruppenName mit Fallback-Gruppe am Ende.</summary>
     [Fact]
     public void Konfiguriere_ShouldApplyGroupingAndSorting_WhenModusIstKi()
     {
-        var sortierungen = AufgabenListenAnsicht.ErstelleSortierDeskriptoren(AufgabenListenModus.Ki);
-        var grouping = AufgabenListenAnsicht.ErstelleGruppenDeskriptor(AufgabenListenModus.Ki);
+        var sortierungen = WorkItemListLayout.CreateSortDescriptors(WorkItemListMode.Ai);
+        var grouping = WorkItemListLayout.CreateGroupDescriptor(WorkItemListMode.Ai);
 
         grouping.Should().NotBeNull();
-        grouping!.PropertyName.Should().Be(nameof(AktiveAufgabePanelItem.KiGruppenName));
-        sortierungen[0].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.KiGruppeIstFallback), ListSortDirection.Ascending));
-        sortierungen[1].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.KiGruppenName), ListSortDirection.Ascending));
-        sortierungen[2].Should().Be(new SortDescription(nameof(AktiveAufgabePanelItem.SortierZeitpunkt), ListSortDirection.Descending));
+        grouping!.PropertyName.Should().Be(nameof(ActiveWorkItemPanelItem.AiGroupName));
+        sortierungen[0].Should().Be(new SortDescription(nameof(ActiveWorkItemPanelItem.AiGroupIsFallback), ListSortDirection.Ascending));
+        sortierungen[1].Should().Be(new SortDescription(nameof(ActiveWorkItemPanelItem.AiGroupName), ListSortDirection.Ascending));
+        sortierungen[2].Should().Be(new SortDescription(nameof(ActiveWorkItemPanelItem.SortTimestamp), ListSortDirection.Descending));
     }
 
     /// <summary>Die Fallback-Gruppe erscheint im gruppierten Modus als letzte Gruppe.</summary>
     [Fact]
     public void Konfiguriere_ShouldPlaceFallbackGroupLast_WhenGrouped()
     {
-        var items = new List<AktiveAufgabePanelItem>
+        var items = new List<ActiveWorkItemPanelItem>
         {
-            new() { Id = Guid.NewGuid(), Title = "C", RepositoryGruppenName = AufgabenListenAnsicht.OhneRepository, RepositoryGruppeIstFallback = true, SortierZeitpunkt = DateTimeOffset.UtcNow },
-            new() { Id = Guid.NewGuid(), Title = "B", RepositoryGruppenName = "zeta-repo", SortierZeitpunkt = DateTimeOffset.UtcNow.AddHours(-1) },
-            new() { Id = Guid.NewGuid(), Title = "A", RepositoryGruppenName = "alpha-repo", SortierZeitpunkt = DateTimeOffset.UtcNow.AddHours(-2) }
+            new() { Id = Guid.NewGuid(), Title = "C", RepositoryGroupName = WorkItemListLayout.WithoutRepository, RepositoryGroupIsFallback = true, SortTimestamp = DateTimeOffset.UtcNow },
+            new() { Id = Guid.NewGuid(), Title = "B", RepositoryGroupName = "zeta-repo", SortTimestamp = DateTimeOffset.UtcNow.AddHours(-1) },
+            new() { Id = Guid.NewGuid(), Title = "A", RepositoryGroupName = "alpha-repo", SortTimestamp = DateTimeOffset.UtcNow.AddHours(-2) }
         };
         var view = new System.Windows.Data.ListCollectionView(items);
 
-        AufgabenListenAnsicht.Konfiguriere(view, AufgabenListenModus.Repository);
+        WorkItemListLayout.Configure(view, WorkItemListMode.Repository);
 
         var groups = view.Groups!.Cast<System.Windows.Data.CollectionViewGroup>().Select(g => (string)g.Name!).ToArray();
-        groups.Should().Equal("alpha-repo", "zeta-repo", AufgabenListenAnsicht.OhneRepository);
+        groups.Should().Equal("alpha-repo", "zeta-repo", WorkItemListLayout.WithoutRepository);
     }
 
     /// <summary>Innerhalb einer Gruppe wird absteigend nach SortierZeitpunkt sortiert.</summary>
@@ -69,17 +69,17 @@ public sealed class AufgabenListenAnsichtTests
     public void Konfiguriere_ShouldSortWithinGroupBySortierZeitpunktDesc()
     {
         var aelteste = DateTimeOffset.UtcNow.AddHours(-3);
-        var items = new List<AktiveAufgabePanelItem>
+        var items = new List<ActiveWorkItemPanelItem>
         {
-            new() { Id = Guid.NewGuid(), Title = "Alt", KiGruppenName = "KI Simulator", SortierZeitpunkt = aelteste },
-            new() { Id = Guid.NewGuid(), Title = "Neu", KiGruppenName = "KI Simulator", SortierZeitpunkt = DateTimeOffset.UtcNow },
-            new() { Id = Guid.NewGuid(), Title = "Mitte", KiGruppenName = "KI Simulator", SortierZeitpunkt = aelteste.AddHours(1) }
+            new() { Id = Guid.NewGuid(), Title = "Alt", AiGroupName = "KI Simulator", SortTimestamp = aelteste },
+            new() { Id = Guid.NewGuid(), Title = "Neu", AiGroupName = "KI Simulator", SortTimestamp = DateTimeOffset.UtcNow },
+            new() { Id = Guid.NewGuid(), Title = "Mitte", AiGroupName = "KI Simulator", SortTimestamp = aelteste.AddHours(1) }
         };
         var view = new System.Windows.Data.ListCollectionView(items);
 
-        AufgabenListenAnsicht.Konfiguriere(view, AufgabenListenModus.Ki);
+        WorkItemListLayout.Configure(view, WorkItemListMode.Ai);
 
-        var title = view.Cast<AktiveAufgabePanelItem>().Select(i => i.Title).ToArray();
+        var title = view.Cast<ActiveWorkItemPanelItem>().Select(i => i.Title).ToArray();
         title.Should().Equal("Neu", "Mitte", "Alt");
     }
 }

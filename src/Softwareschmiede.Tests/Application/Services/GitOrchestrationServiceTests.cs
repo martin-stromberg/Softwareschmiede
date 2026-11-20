@@ -15,18 +15,18 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly WorkItemService _workItemService;
-    private readonly ProjectService _projektService;
+    private readonly ProjectService _projectService;
     private readonly LogService _logService;
     private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly GitOrchestrationService _sut;
-    private readonly Guid _projektId = new("55555555-5555-5555-5555-555555555555");
+    private readonly Guid _projectId = new("55555555-5555-5555-5555-555555555555");
 
     /// <summary>GitOrchestrationServiceTests.</summary>
     public GitOrchestrationServiceTests()
     {
         _db = TestDbContextFactory.Create();
         _workItemService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
-        _projektService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
+        _projectService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
         _logService = new LogService(_db, new Mock<ILogger<LogService>>().Object);
         _gitPluginMock = new Mock<IGitPlugin>();
         _gitPluginMock.SetupGet(plugin => plugin.PluginName).Returns("Mock Git");
@@ -49,7 +49,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             new Mock<ILogger<PluginSelectionService>>().Object);
         _sut = new GitOrchestrationService(
             _workItemService,
-            _projektService,
+            _projectService,
             _logService,
             _gitPluginMock.Object,
             pluginSelectionService,
@@ -57,7 +57,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
         _db.Projects.Add(new Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Git-Orchestration-Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -98,7 +98,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task CommitAsync_ShouldCommitAndAddLogEntry_WhenAufgabeHasKlonpfad()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Commit Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Commit Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/commit", @"C:\repos\task-1", ct: TestContext.Current.CancellationToken);
 
         // Act
@@ -118,8 +118,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var selectedPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
         var sut = CreateSutWithPlugins(defaultPluginMock, selectedPluginMock);
 
-        var project = await _projektService.CreateAsync("Projekt mit explizitem Plugin", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "LocalDirectoryPlugin", @"C:\repos\source", "source", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit explizitem Plugin", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "LocalDirectoryPlugin", @"C:\repos\source", "source", ct: TestContext.Current.CancellationToken);
         var repositoryEntity = await _db.GitRepositories.FindAsync(new object?[] { repository.Id }, TestContext.Current.CancellationToken);
         repositoryEntity!.PluginType = "  localdirectoryplugin  ";
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -142,7 +142,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task ResetAsync_ShouldLogHead_WhenTargetRefIsNull()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Reset Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Reset Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/reset", @"C:\repos\task-2", ct: TestContext.Current.CancellationToken);
 
         // Act
@@ -159,7 +159,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PushAsync_ShouldThrowInvalidOperationException_WhenBranchNameIsMissing()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Push Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Push Aufgabe", null, ct: TestContext.Current.CancellationToken);
         var entity = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         entity!.LocalClonePath = @"C:\repos\task-3";
         entity.BranchName = null;
@@ -177,7 +177,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Pull Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Pull Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/pull", @"C:\repos\task-pull", ct: TestContext.Current.CancellationToken);
         _gitPluginMock.SetupGet(g => g.PluginPrefix).Returns("LocalDirectoryPlugin");
 
@@ -192,7 +192,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Pull Aufgabe Remote", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Pull Aufgabe Remote", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/pull-remote", @"C:\repos\task-pull-remote", ct: TestContext.Current.CancellationToken);
         _gitPluginMock.SetupGet(g => g.PluginPrefix).Returns("GitHubPlugin");
 
@@ -212,8 +212,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var localPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
         var sut = CreateSutWithPlugins(defaultPluginMock, localPluginMock);
 
-        var project = await _projektService.CreateAsync("Projekt mit lokalem Repository", null, TestContext.Current.CancellationToken);
-        await _projektService.AddRepositoryAsync(project.Id, "LocalDirectoryPlugin", @"C:\repos\project-source", "source", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit lokalem Repository", null, TestContext.Current.CancellationToken);
+        await _projectService.AddRepositoryAsync(project.Id, "LocalDirectoryPlugin", @"C:\repos\project-source", "source", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "Pull ohne Repo-Verknüpfung", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/local-pull", @"C:\repos\task-local-pull", ct: TestContext.Current.CancellationToken);
@@ -238,8 +238,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var selectedPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
         var sut = CreateSutWithPlugins(defaultPluginMock, selectedPluginMock);
 
-        var project = await _projektService.CreateAsync("Projekt mit ungültigem Plugin", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "Unknown.Plugin", "https://example.com/repo.git", "repo", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit ungültigem Plugin", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "Unknown.Plugin", "https://example.com/repo.git", "repo", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "Commit mit ungültigem Plugin", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/fallback", @"C:\repos\task-fallback", ct: TestContext.Current.CancellationToken);
@@ -262,9 +262,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var selectedPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
         var sut = CreateSutWithPlugins(defaultPluginMock, selectedPluginMock);
 
-        var project = await _projektService.CreateAsync("Projekt mit mehreren Repositories", null, TestContext.Current.CancellationToken);
-        await _projektService.AddRepositoryAsync(project.Id, "LocalDirectoryPlugin", @"C:\repos\source-a", "source-a", ct: TestContext.Current.CancellationToken);
-        await _projektService.AddRepositoryAsync(project.Id, "Softwareschmiede.GitHub", "https://github.com/example/repo-b", "repo-b", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit mehreren Repositories", null, TestContext.Current.CancellationToken);
+        await _projectService.AddRepositoryAsync(project.Id, "LocalDirectoryPlugin", @"C:\repos\source-a", "source-a", ct: TestContext.Current.CancellationToken);
+        await _projectService.AddRepositoryAsync(project.Id, "Softwareschmiede.GitHub", "https://github.com/example/repo-b", "repo-b", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "Commit ohne Repo-Verknüpfung", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/ambiguous-selection", @"C:\repos\task-ambiguous", ct: TestContext.Current.CancellationToken);
@@ -283,7 +283,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Merge Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Merge Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/merge", @"C:\repos\task-merge", ct: TestContext.Current.CancellationToken);
 
         await _sut.MergeToSourceAsync(workItem.Id, TestContext.Current.CancellationToken);
@@ -297,7 +297,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task MergeToSourceAsync_ShouldThrowInvalidOperationException_WhenLocalPathIsMissing()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Merge ohne Pfad", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Merge ohne Pfad", null, ct: TestContext.Current.CancellationToken);
 
         var act = () => _sut.MergeToSourceAsync(workItem.Id);
 
@@ -310,7 +310,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Capabilities Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Capabilities Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/caps", @"C:\repos\task-caps", ct: TestContext.Current.CancellationToken);
         var expected = new GitActionCapabilities(
             RepositoryKind.LocalDirectory,
@@ -345,7 +345,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task GetGitActionCapabilitiesAsync_ShouldForwardNullLocalPath_WhenTaskHasNoLocalPath()
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, "Capabilities ohne Pfad", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Capabilities ohne Pfad", null, ct: TestContext.Current.CancellationToken);
         var expected = new GitActionCapabilities(
             RepositoryKind.RemoteGit,
             IsWorkingDirectoryCopy: false,
@@ -369,8 +369,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldUseTaskRepositoryAndLog_WhenAufgabeHasLinkedRepository()
     {
         // Arrange
-        var project = await _projektService.CreateAsync("Git-Orchestration-Testprojekt", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/repo", "test/repo", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Git-Orchestration-Testprojekt", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/repo", "test/repo", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR Aufgabe", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/pr", @"C:\repos\task-4", ct: TestContext.Current.CancellationToken);
@@ -401,8 +401,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldUseCommitListBody_WhenWorkspaceSnapshotAvailable()
     {
         // Arrange
-        var project = await _projektService.CreateAsync("Projekt mit Commitliste", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/commit-body", "test/commit-body", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit Commitliste", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/commit-body", "test/commit-body", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR mit Commits", "Alte Anforderung", repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/commit-body", @"C:\repos\task-commit-body", ct: TestContext.Current.CancellationToken);
@@ -429,7 +429,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
         var sut = new GitOrchestrationService(
             _workItemService,
-            _projektService,
+            _projectService,
             _logService,
             _gitPluginMock.Object,
             new PluginSelectionService(
@@ -476,8 +476,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldUseTaskBasisBranch_WhenLoadingWorkspaceSnapshotForBody()
     {
         // Arrange
-        var project = await _projektService.CreateAsync("Projekt mit Staging", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/basis-branch", "test/basis-branch", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit Staging", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/basis-branch", "test/basis-branch", ct: TestContext.Current.CancellationToken);
         repository.DefaultSourceBranchName = "main";
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -505,7 +505,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
         var sut = new GitOrchestrationService(
             _workItemService,
-            _projektService,
+            _projectService,
             _logService,
             _gitPluginMock.Object,
             new PluginSelectionService(
@@ -551,8 +551,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldUseProjectRepository_WhenAufgabeHasNoLinkedRepository()
     {
         // Arrange
-        var project = await _projektService.CreateAsync("Projekt mit Repository", null, TestContext.Current.CancellationToken);
-        await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/project-repo", "test/project-repo", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit Repository", null, TestContext.Current.CancellationToken);
+        await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/project-repo", "test/project-repo", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR ohne Repo", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/no-repo", @"C:\repos\task-5", ct: TestContext.Current.CancellationToken);
@@ -577,8 +577,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldCallPluginWithBaseBranch_WhenConfigured()
     {
         // Arrange
-        var project = await _projektService.CreateAsync("Projekt mit Basis-Branch", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/basis-branch-repo", "test/basis-branch-repo", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit Basis-Branch", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/basis-branch-repo", "test/basis-branch-repo", ct: TestContext.Current.CancellationToken);
         var repositoryEntity = await _db.GitRepositories.FindAsync(new object?[] { repository.Id }, TestContext.Current.CancellationToken);
         repositoryEntity!.DefaultSourceBranchName = "staging";
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -606,8 +606,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldCallPluginWithoutBaseBranch_WhenNotConfigured()
     {
         // Arrange
-        var project = await _projektService.CreateAsync("Projekt ohne Basis-Branch", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/no-basis-branch-repo", "test/no-basis-branch-repo", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt ohne Basis-Branch", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/no-basis-branch-repo", "test/no-basis-branch-repo", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR ohne Basis-Branch", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/no-basis-branch", @"C:\repos\task-no-basis-branch", ct: TestContext.Current.CancellationToken);
@@ -631,8 +631,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldAppendClosingDirectiveAndLogIssue_WhenAufgabeHasIssueReference()
     {
-        var project = await _projektService.CreateAsync("Projekt mit Issue", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/issue-repo", "test/issue-repo", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit Issue", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/issue-repo", "test/issue-repo", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR mit Issue", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/issue", @"C:\repos\task-issue", ct: TestContext.Current.CancellationToken);
@@ -674,8 +674,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyAlreadyContainsDirective()
     {
-        var project = await _projektService.CreateAsync("Projekt mit bestehender Direktive", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/existing-directive", "test/existing-directive", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit bestehender Direktive", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/existing-directive", "test/existing-directive", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR ohne Duplikat", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/no-dup", @"C:\repos\task-no-dup", ct: TestContext.Current.CancellationToken);
@@ -716,8 +716,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldUseOnlyClosingDirective_WhenBodyIsWhitespaceAndIssueExists()
     {
         // Arrange
-        var project = await _projektService.CreateAsync("Projekt mit Whitespace-Body", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/whitespace-body", "test/whitespace-body", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit Whitespace-Body", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/whitespace-body", "test/whitespace-body", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR mit Whitespace-Body", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/whitespace", @"C:\repos\task-whitespace", ct: TestContext.Current.CancellationToken);
@@ -759,8 +759,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldAppendClosingDirectiveForCurrentIssue_WhenBodyContainsDirectiveForAnotherIssue()
     {
         // Arrange
-        var project = await _projektService.CreateAsync("Projekt mit anderer Direktive", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/other-directive", "test/other-directive", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit anderer Direktive", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/other-directive", "test/other-directive", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR mit anderer Direktive", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/other-directive", @"C:\repos\task-other-directive", ct: TestContext.Current.CancellationToken);
@@ -803,8 +803,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldKeepBodyUnchanged_WhenIssueReferenceHasNoIssueNumber()
     {
-        var project = await _projektService.CreateAsync("Projekt mit Issue ohne Nummer", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/no-issue-number", "test/no-issue-number", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit Issue ohne Nummer", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/no-issue-number", "test/no-issue-number", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR ohne Issue-Nummer", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/no-issue-number", @"C:\repos\task-no-issue-number", ct: TestContext.Current.CancellationToken);
@@ -845,8 +845,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [InlineData(-7)]
     public async Task PullRequestErstellenAsync_ShouldKeepBodyUnchanged_WhenIssueNumberIsNotPositive(int issueNumber)
     {
-        var project = await _projektService.CreateAsync($"Projekt mit Issue {issueNumber}", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", $"https://github.com/test/non-positive-{Math.Abs(issueNumber)}", $"test/non-positive-{Math.Abs(issueNumber)}", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync($"Projekt mit Issue {issueNumber}", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", $"https://github.com/test/non-positive-{Math.Abs(issueNumber)}", $"test/non-positive-{Math.Abs(issueNumber)}", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, $"PR mit Issue {issueNumber}", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, $"feature/non-positive-{Math.Abs(issueNumber)}", @"C:\repos\task-non-positive", ct: TestContext.Current.CancellationToken);
@@ -885,8 +885,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyContainsQualifiedIssueReference()
     {
-        var project = await _projektService.CreateAsync("Projekt mit qualifizierter Direktive", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/qualified-directive", "test/qualified-directive", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit qualifizierter Direktive", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/qualified-directive", "test/qualified-directive", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR mit qualifizierter Direktive", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/qualified-directive", @"C:\repos\task-qualified-directive", ct: TestContext.Current.CancellationToken);
@@ -928,8 +928,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     [InlineData("Closed #654")]
     public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyUsesAlternativeClosingVerb(string directive)
     {
-        var project = await _projektService.CreateAsync($"Projekt mit Direktive {directive}", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/alternative-directive", "test/alternative-directive", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync($"Projekt mit Direktive {directive}", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/alternative-directive", "test/alternative-directive", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR mit alternativer Direktive", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/alternative-directive", @"C:\repos\task-alternative-directive", ct: TestContext.Current.CancellationToken);
@@ -970,9 +970,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldThrowInvalidOperationException_WhenMultipleActiveRepositoriesExist()
     {
         // Arrange
-        var project = await _projektService.CreateAsync("Projekt mit mehreren Repositories", null, TestContext.Current.CancellationToken);
-        await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/repo-a", "test/repo-a", ct: TestContext.Current.CancellationToken);
-        await _projektService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/repo-b", "test/repo-b", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit mehreren Repositories", null, TestContext.Current.CancellationToken);
+        await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/repo-a", "test/repo-a", ct: TestContext.Current.CancellationToken);
+        await _projectService.AddRepositoryAsync(project.Id, "GitHub", "https://github.com/test/repo-b", "test/repo-b", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR mehrdeutig", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/ambiguous", @"C:\repos\task-6", ct: TestContext.Current.CancellationToken);
@@ -993,7 +993,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldThrowInvalidOperationException_WhenNoActiveRepositoryExists()
     {
         // Arrange
-        var project = await _projektService.CreateAsync("Projekt ohne Repository", null, TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt ohne Repository", null, TestContext.Current.CancellationToken);
         var workItem = await _workItemService.CreateAsync(project.Id, "PR ohne Repository", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/no-active-repo", @"C:\repos\task-no-active-repo", ct: TestContext.Current.CancellationToken);
 
@@ -1013,8 +1013,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public async Task PullRequestErstellenAsync_ShouldResolveRepositoryId_FromSshRepositoryUrl()
     {
         // Arrange
-        var project = await _projektService.CreateAsync("Projekt mit SSH-Repository", null, TestContext.Current.CancellationToken);
-        var repository = await _projektService.AddRepositoryAsync(project.Id, "GitHub", "git@github.com:owner/repo.git", "owner/repo", ct: TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Projekt mit SSH-Repository", null, TestContext.Current.CancellationToken);
+        var repository = await _projectService.AddRepositoryAsync(project.Id, "GitHub", "git@github.com:owner/repo.git", "owner/repo", ct: TestContext.Current.CancellationToken);
 
         var workItem = await _workItemService.CreateAsync(project.Id, "PR mit SSH-URL", null, repository.Id, TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/ssh-url", @"C:\repos\task-ssh-url", ct: TestContext.Current.CancellationToken);
@@ -1118,7 +1118,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
         return new GitOrchestrationService(
             _workItemService,
-            _projektService,
+            _projectService,
             _logService,
             defaultPlugin.Object,
             pluginSelectionService,

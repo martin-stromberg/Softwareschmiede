@@ -17,23 +17,23 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class DashboardViewModelTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
-    private readonly ProjectService _projektService;
+    private readonly ProjectService _projectService;
     private readonly WorkItemService _workItemService;
     private readonly WorkItemRecoveryService _recoveryService;
-    private readonly Guid _projektId = new Guid("33333333-3333-3333-3333-333333333333");
+    private readonly Guid _projectId = new Guid("33333333-3333-3333-3333-333333333333");
 
     /// <summary>DashboardViewModelTests.</summary>
     public DashboardViewModelTests()
     {
         _db = TestDbContextFactory.Create();
-        _projektService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
+        _projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
         _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         var runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
         _recoveryService = new WorkItemRecoveryService(_db, runningStatusSourceMock.Object, NullLogger<WorkItemRecoveryService>.Instance);
 
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -44,9 +44,9 @@ public sealed class DashboardViewModelTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    private DashboardViewModel CreateSut(AufgabenListenModusService? aufgabenListenModusService = null) =>
-        new(_projektService, _workItemService, _recoveryService, NullLogger<DashboardViewModel>.Instance,
-            aufgabenListenModusService);
+    private DashboardViewModel CreateSut(WorkItemListModeService? workItemsListModeService = null) =>
+        new(_projectService, _workItemService, _recoveryService, NullLogger<DashboardViewModel>.Instance,
+            workItemsListModeService);
 
     /// <summary>Initialize setzt AktiveAufgabenListe auf die übergebene Instanz, um die gemeinsame Datenquelle des MainWindowViewModel zu übernehmen.</summary>
     [Fact]
@@ -54,13 +54,13 @@ public sealed class DashboardViewModelTests : IDisposable
     {
         // Arrange
         var sut = CreateSut();
-        var geteilteListe = new ObservableCollection<AktiveAufgabePanelItem>();
+        var geteilteListe = new ObservableCollection<ActiveWorkItemPanelItem>();
 
         // Act
         sut.Initialize(geteilteListe, _ => { });
 
         // Assert
-        sut.AktiveAufgabenListe.Should().BeSameAs(geteilteListe);
+        sut.ActiveWorkItemsList.Should().BeSameAs(geteilteListe);
     }
 
     /// <summary>LadenAsync lädt aktive Aufgaben nicht mehr selbst, sondern lässt die über Initialize gesetzte AktiveAufgabenListe unverändert (einzige gemeinsame Datenquelle im MainWindowViewModel).</summary>
@@ -68,18 +68,18 @@ public sealed class DashboardViewModelTests : IDisposable
     public async Task LadenAsync_ShouldNotModifyAktiveAufgabenListe_WhenCalled()
     {
         // Arrange
-        var workItem = await _workItemService.CreateAsync(_projektId, "Zu startende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(_projectId, "Zu startende Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        var geteilteListe = new ObservableCollection<AktiveAufgabePanelItem>();
+        var geteilteListe = new ObservableCollection<ActiveWorkItemPanelItem>();
         sut.Initialize(geteilteListe, _ => { });
 
         // Act
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         // Assert
-        sut.AktiveAufgabenListe.Should().BeSameAs(geteilteListe);
-        sut.AktiveAufgabenListe.Should().BeEmpty();
+        sut.ActiveWorkItemsList.Should().BeSameAs(geteilteListe);
+        sut.ActiveWorkItemsList.Should().BeEmpty();
     }
 
     /// <summary>NavigateZuAufgabeCommand delegiert an die über Initialize gesetzte NavigateZuAufgabeAction.</summary>
@@ -89,11 +89,11 @@ public sealed class DashboardViewModelTests : IDisposable
         // Arrange
         var sut = CreateSut();
         Guid? aufgerufeneAufgabeId = null;
-        sut.Initialize(new ObservableCollection<AktiveAufgabePanelItem>(), id => aufgerufeneAufgabeId = id);
+        sut.Initialize(new ObservableCollection<ActiveWorkItemPanelItem>(), id => aufgerufeneAufgabeId = id);
         var workItemId = Guid.NewGuid();
 
         // Act
-        ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(workItemId);
+        ((RelayCommand<Guid>)sut.NavigateToWorkItemCommand).Execute(workItemId);
 
         // Assert
         aufgerufeneAufgabeId.Should().Be(workItemId);
@@ -107,7 +107,7 @@ public sealed class DashboardViewModelTests : IDisposable
         var sut = CreateSut();
 
         // Act
-        var act = () => ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(Guid.NewGuid());
+        var act = () => ((RelayCommand<Guid>)sut.NavigateToWorkItemCommand).Execute(Guid.NewGuid());
 
         // Assert
         act.Should().NotThrow();
@@ -119,7 +119,7 @@ public sealed class DashboardViewModelTests : IDisposable
     {
         var sut = CreateSut();
 
-        sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Datum);
+        sut.WorkItemListMode.Should().Be(WorkItemListMode.Date);
     }
 
     /// <summary>AufgabenListenModus ist setzbar und löst PropertyChanged aus.</summary>
@@ -130,10 +130,10 @@ public sealed class DashboardViewModelTests : IDisposable
         var changed = new List<string?>();
         sut.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
-        sut.AufgabenListenModus = AufgabenListenModus.Repository;
+        sut.WorkItemListMode = WorkItemListMode.Repository;
 
-        sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Repository);
-        changed.Should().Contain(nameof(DashboardViewModel.AufgabenListenModus));
+        sut.WorkItemListMode.Should().Be(WorkItemListMode.Repository);
+        changed.Should().Contain(nameof(DashboardViewModel.WorkItemListMode));
     }
 
     /// <summary>Ein persistierter Dashboard-Modus wird über GespeichertenAufgabenListenModusLadenAsync wiederhergestellt.</summary>
@@ -141,7 +141,7 @@ public sealed class DashboardViewModelTests : IDisposable
     public async Task AufgabenListenModus_ShouldRestorePersistedDashboardModus()
     {
         // Arrange
-        var (modusService, provider) = AufgabenListenModusServiceTestFactory.ErstelleModusService();
+        var (modeService, provider) = AufgabenListenModusServiceTestFactory.ErstelleModusService();
         using (provider)
         {
             using (var scope = provider.CreateScope())
@@ -150,13 +150,13 @@ public sealed class DashboardViewModelTests : IDisposable
                 await settings.SetSettingAsync(AppSettingService.ActiveWorkItemsListModeDashboardKey, "Ki", TestContext.Current.CancellationToken);
             }
 
-            var sut = CreateSut(modusService);
+            var sut = CreateSut(modeService);
 
             // Act
-            await sut.GespeichertenAufgabenListenModusLadenAsync(TestContext.Current.CancellationToken);
+            await sut.LoadSavedWorkItemsListModeAsync(TestContext.Current.CancellationToken);
 
             // Assert
-            sut.AufgabenListenModus.Should().Be(AufgabenListenModus.Ki);
+            sut.WorkItemListMode.Should().Be(WorkItemListMode.Ai);
         }
     }
 
@@ -165,13 +165,13 @@ public sealed class DashboardViewModelTests : IDisposable
     public async Task AufgabenListenModus_ShouldPersistDashboardModusOnChange_WithoutTouchingMenueKey()
     {
         // Arrange
-        var (modusService, provider) = AufgabenListenModusServiceTestFactory.ErstelleModusService();
+        var (modeService, provider) = AufgabenListenModusServiceTestFactory.ErstelleModusService();
         using (provider)
         {
-            var sut = CreateSut(modusService);
+            var sut = CreateSut(modeService);
 
             // Act
-            sut.AufgabenListenModus = AufgabenListenModus.Repository;
+            sut.WorkItemListMode = WorkItemListMode.Repository;
 
             // Assert (Polling, da das Speichern fire-and-forget läuft)
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);

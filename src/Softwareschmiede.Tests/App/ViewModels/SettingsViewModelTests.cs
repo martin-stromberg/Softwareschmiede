@@ -21,20 +21,20 @@ public sealed class SettingsViewModelTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AppSettingService _settingService;
-    private readonly WorkingDirectorySettingsService _arbeitsverzeichnisService;
+    private readonly WorkingDirectorySettingsService _workingDirectoryService;
     private readonly DarkModeService _darkModeService;
     private readonly Mock<IPluginManager> _pluginManagerMock;
     private readonly PluginActivationService _pluginActivationService;
     private readonly InMemoryCredentialStoreForSettings _credentialStore;
     private readonly PluginSettingsService _pluginSettingsService;
-    private readonly PromptTemplateService _promptVorlagenService;
+    private readonly PromptTemplateService _promptTemplatesService;
 
     /// <summary>SettingsViewModelTests.</summary>
     public SettingsViewModelTests()
     {
         _db = TestDbContextFactory.Create();
         _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
-        _arbeitsverzeichnisService = new WorkingDirectorySettingsService(_db, NullLogger<WorkingDirectorySettingsService>.Instance);
+        _workingDirectoryService = new WorkingDirectorySettingsService(_db, NullLogger<WorkingDirectorySettingsService>.Instance);
 
         var scopeMock = new Mock<IServiceScope>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
@@ -50,7 +50,7 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginActivationService = new PluginActivationService(_settingService, _pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _credentialStore = new InMemoryCredentialStoreForSettings();
         _pluginSettingsService = new PluginSettingsService(_credentialStore, NullLogger<PluginSettingsService>.Instance);
-        _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
+        _promptTemplatesService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
@@ -59,12 +59,12 @@ public sealed class SettingsViewModelTests : IDisposable
     private SettingsViewModel CreateSut() =>
         new(
             _settingService,
-            _arbeitsverzeichnisService,
+            _workingDirectoryService,
             _darkModeService,
             _pluginManagerMock.Object,
             _pluginActivationService,
             _pluginSettingsService,
-            _promptVorlagenService,
+            _promptTemplatesService,
             new ProjectService(_db, NullLogger<ProjectService>.Instance),
             NullLogger<SettingsViewModel>.Instance,
             new Mock<IDialogService>().Object,
@@ -103,7 +103,7 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.ScmPluginSelectedCommand.Execute(plugin);
 
@@ -128,7 +128,7 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.ScmPluginSelectedCommand.Execute(plugin);
 
@@ -148,9 +148,9 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([plugin]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KiPluginSelectedCommand.Execute(plugin);
+        sut.AiPluginSelectedCommand.Execute(plugin);
 
         // Neben den Plugin-Gruppen enthält die Auswahl die hostseitige Gruppe
         // "Ausführungsbegrenzung" mit dem ParallelLimit-Feld (Issue 410).
@@ -161,7 +161,7 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.SelectedPluginSettings[1].Entries[0].Field.Key.Should().Be("ParallelLimit");
     }
 
-    /// <summary>LadenAsync lädt die gespeicherten Default-Plugins. Die Einstellungen selbst werden erst nach Auswahl eines Eintrags im Plugins-Register geladen (SelectedPluginSettings).</summary>
+    /// <summary>LadenAsync lädt die gespeicherten Default-Plugins. Die Settings selbst werden erst nach Auswahl eines Eintrags im Plugins-Register geladen (SelectedPluginSettings).</summary>
     [Fact]
     public async Task LadenAsync_LaedtDefaultPlugine()
     {
@@ -172,13 +172,13 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         await _settingService.SetSettingAsync(AppSettingService.DefaultScmPluginKey, "GitHub", TestContext.Current.CancellationToken);
-        await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Claude", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Claude", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.DefaultScmPlugin.Should().Be(scmPlugin);
-        sut.DefaultKiPlugin.Should().Be("Claude");
+        sut.DefaultAiPlugin.Should().Be("Claude");
     }
 
     /// <summary>LadenAsync verwendet erstes Plugin als Fallback, wenn der gespeicherte Name nicht existiert.</summary>
@@ -191,7 +191,7 @@ public sealed class SettingsViewModelTests : IDisposable
         await _settingService.SetSettingAsync(AppSettingService.DefaultScmPluginKey, "NichtExistierendesPlugin", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.DefaultScmPlugin.Should().Be(scmPlugin);
     }
@@ -206,11 +206,11 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.ScmPluginSelectedCommand.Execute(scmPlugin);
 
         sut.SelectedPluginSettings[0].Entries[0].Value = "mein-token";
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         var gespeicherterWert = _pluginSettingsService.GetValue(scmPlugin, field);
         gespeicherterWert.Should().Be("mein-token");
@@ -219,7 +219,7 @@ public sealed class SettingsViewModelTests : IDisposable
         gespeichertesPlugin.Should().Be("GitHub");
     }
 
-    /// <summary>SpeichernAsync speichert DefaultKiPlugin Name und alle KI-Einstellungswerte.</summary>
+    /// <summary>SpeichernAsync speichert DefaultAiPlugin Name und alle KI-Einstellungswerte.</summary>
     [Fact]
     public async Task SpeichernAsync_SpeichertDefaultPlugine_Und_EinstellungswerteFuerKi()
     {
@@ -228,13 +228,13 @@ public sealed class SettingsViewModelTests : IDisposable
         var aiPlugin = CreateKiPluginMock("Claude", [group]).Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
-        await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Claude", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Claude", TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(aiPlugin);
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.AiPluginSelectedCommand.Execute(aiPlugin);
 
         sut.SelectedPluginSettings[0].Entries[0].Value = "claude-opus";
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         var gespeicherterWert = _pluginSettingsService.GetValue(aiPlugin, field);
         gespeicherterWert.Should().Be("claude-opus");
@@ -253,15 +253,15 @@ public sealed class SettingsViewModelTests : IDisposable
         var aiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
-        await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(aiPlugin);
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.AiPluginSelectedCommand.Execute(aiPlugin);
 
         sut.SelectedPluginSettings[0].Entries[0].Value.Should().BeEmpty();
 
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         _credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters").Should().BeEmpty();
     }
@@ -279,15 +279,15 @@ public sealed class SettingsViewModelTests : IDisposable
         var aiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
-        await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(aiPlugin);
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.AiPluginSelectedCommand.Execute(aiPlugin);
         sut.SelectedPluginSettings[0].Entries[0].Value = "--user-choice --model custom";
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(aiPlugin);
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.AiPluginSelectedCommand.Execute(aiPlugin);
 
         _credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters")
             .Should().Be("--user-choice --model custom");
@@ -308,15 +308,15 @@ public sealed class SettingsViewModelTests : IDisposable
         _credentialStore.SetCredential("Softwareschmiede.Codex.CommandLineParameters", "--auto-old");
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
-        await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(aiPlugin);
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.AiPluginSelectedCommand.Execute(aiPlugin);
         sut.SelectedPluginSettings[0].Entries[0].Value = string.Empty;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.KiPluginSelectedCommand.Execute(aiPlugin);
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.AiPluginSelectedCommand.Execute(aiPlugin);
 
         _credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters").Should().BeEmpty();
         sut.SelectedPluginSettings[0].Entries[0].Value.Should().BeEmpty();
@@ -330,9 +330,9 @@ public sealed class SettingsViewModelTests : IDisposable
         var selectedPlugin = new TestCliPlugin("Devin CLI", "Softwareschmiede.Devin");
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([defaultPlugin, selectedPlugin]);
-        await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Codex CLI", TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.PluginSelectedCommand.Execute(sut.DevelopmentAutomationPlugins.Single(entry => entry.Plugin == selectedPlugin));
 
@@ -349,14 +349,14 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.ScmPluginSelectedCommand.Execute(scmPlugin);
 
         sut.SelectedPluginSettings[0].Entries[0].Value = string.Empty;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
-        sut.ErfolgsMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
+        sut.SuccessMessage.Should().BeNull();
         var gespeicherterWert = _pluginSettingsService.GetValue(scmPlugin, field);
         gespeicherterWert.Should().BeNull();
     }
@@ -371,11 +371,11 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.ScmPluginSelectedCommand.Execute(scmPlugin);
 
         sut.SelectedPluginSettings[0].Entries[0].BoolValue = true;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         var gespeicherterWert = _pluginSettingsService.GetValue(scmPlugin, field);
         gespeicherterWert.Should().Be("true");
@@ -385,12 +385,12 @@ public sealed class SettingsViewModelTests : IDisposable
     [Fact]
     public async Task LadenAsync_LaedtPromptVorlagen()
     {
-        await _promptVorlagenService.CreateAsync("Vorlage", "Text", TestContext.Current.CancellationToken);
+        await _promptTemplatesService.CreateAsync("Vorlage", "Text", TestContext.Current.CancellationToken);
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.PromptTemplates.Should().ContainSingle();
         sut.PromptTemplates[0].Name.Should().Be("Vorlage");
@@ -401,20 +401,20 @@ public sealed class SettingsViewModelTests : IDisposable
     [Fact]
     public async Task SpeichernAsync_SpeichertPromptVorlagen()
     {
-        await _promptVorlagenService.CreateAsync("Alt", "Alter Text", TestContext.Current.CancellationToken);
+        await _promptTemplatesService.CreateAsync("Alt", "Alter Text", TestContext.Current.CancellationToken);
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.PromptTemplates[0].Name = "Neu";
         sut.PromptTemplates[0].PromptText = "Neuer Text";
-        sut.PromptVorlageHinzufuegenCommand.Execute(null);
+        sut.AddPromptTemplateCommand.Execute(null);
         sut.PromptTemplates[1].Name = "Zweite";
         sut.PromptTemplates[1].PromptText = "Zweiter Text";
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        var templates = await _promptVorlagenService.GetAllAsync(TestContext.Current.CancellationToken);
+        var templates = await _promptTemplatesService.GetAllAsync(TestContext.Current.CancellationToken);
         templates.Should().HaveCount(2);
         templates.Should().Contain(v => v.Name == "Neu" && v.PromptText == "Neuer Text");
         templates.Should().Contain(v => v.Name == "Zweite" && v.PromptText == "Zweiter Text");
@@ -427,15 +427,15 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.PromptVorlageHinzufuegenCommand.Execute(null);
+        sut.AddPromptTemplateCommand.Execute(null);
         sut.PromptTemplates[0].Name = "Vorlage";
         sut.PromptTemplates[0].PromptText = string.Empty;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().Contain("Prompttext");
-        (await _promptVorlagenService.GetAllAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
+        sut.ErrorMessage.Should().Contain("Prompttext");
+        (await _promptTemplatesService.GetAllAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
     }
 
     /// <summary>LadenAsync befüllt die Aktivierungs-Collections mit dem aktuellen Status je Plugin.</summary>
@@ -449,7 +449,7 @@ public sealed class SettingsViewModelTests : IDisposable
         await _pluginActivationService.SetPluginEnabledAsync("github", false, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.SourceCodeManagementPlugins.Should().ContainSingle();
         sut.SourceCodeManagementPlugins[0].PluginPrefix.Should().Be("github");
@@ -468,10 +468,10 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin1, scmPlugin2]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.SourceCodeManagementPlugins.Single(p => p.PluginPrefix == "gitlab").IsEnabled = false;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         var gespeichertesStatus = await _pluginActivationService.IsPluginEnabledAsync("gitlab", TestContext.Current.CancellationToken);
         gespeichertesStatus.Should().BeFalse();
@@ -485,12 +485,12 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.SourceCodeManagementPlugins[0].IsEnabled = false;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().Contain("Mindestens ein");
+        sut.ErrorMessage.Should().Contain("Mindestens ein");
         var gespeichertesStatus = await _pluginActivationService.IsPluginEnabledAsync("github", TestContext.Current.CancellationToken);
         gespeichertesStatus.Should().BeTrue();
     }
@@ -504,36 +504,36 @@ public sealed class SettingsViewModelTests : IDisposable
         var sut = CreateSut();
 
         // Fehlende Werte -> Defaults (Nur prüfen / Produktivversionen)
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(UpdateMode.CheckOnly));
-        sut.SelectedUpdatePfad.Should().Be(UpdatePfadOption.FuerPfad(UpdatePathChannelResolver.StableVersionsPath));
-        sut.AbgeleiteterUpdateKanal.Should().Be(UpdatePfadTexte.KanalProduktiv);
+        sut.SelectedUpdateMode.Should().Be(UpdateModeOption.ForMode(UpdateMode.CheckOnly));
+        sut.SelectedUpdatePath.Should().Be(UpdatePathOption.ForPath(UpdatePathChannelResolver.StableVersionsPath));
+        sut.DerivedUpdateChannel.Should().Be(UpdatePathText.ChannelStable);
 
         // Unbekannte gespeicherte Werte -> Defaults
         await _settingService.SetSettingAsync(AppSettingService.UpdateModeKey, "unbekannt", TestContext.Current.CancellationToken);
         await _settingService.SetSettingAsync(AppSettingService.UpdatePathKey, "kein-pfad", TestContext.Current.CancellationToken);
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(UpdateMode.CheckOnly));
-        sut.SelectedUpdatePfad.Should().Be(UpdatePfadOption.FuerPfad(UpdatePathChannelResolver.StableVersionsPath));
+        sut.SelectedUpdateMode.Should().Be(UpdateModeOption.ForMode(UpdateMode.CheckOnly));
+        sut.SelectedUpdatePath.Should().Be(UpdatePathOption.ForPath(UpdatePathChannelResolver.StableVersionsPath));
 
         // Eine fehlende Auswahl (kein Eintrag aus UpdateModusOptionen) wird nicht gespeichert.
         UpdateSettings? published = null;
         sut.UpdateSettingsSaved += (_, s) => published = s;
         sut.SelectedUpdateMode = null;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         published.Should().BeNull("eine fehlende Modus-Auswahl darf nicht gespeichert werden");
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
 
         // Auch eine fehlende Pfad-Auswahl wird nicht gespeichert.
-        sut.SelectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.CheckOnly);
-        sut.SelectedUpdatePfad = null;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        sut.SelectedUpdateMode = UpdateModeOption.ForMode(UpdateMode.CheckOnly);
+        sut.SelectedUpdatePath = null;
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         published.Should().BeNull("eine fehlende Pfad-Auswahl darf nicht gespeichert werden");
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
         (await _settingService.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
             .Should().Be(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
     }
@@ -551,29 +551,29 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         UpdateSettings? published = null;
         sut.UpdateSettingsSaved += (_, s) => published = s;
 
-        sut.SelectedUpdateMode = UpdateModusOption.FuerModus(mode);
-        sut.SelectedUpdatePfad = UpdatePfadOption.FuerPfad(updatePath);
+        sut.SelectedUpdateMode = UpdateModeOption.ForMode(mode);
+        sut.SelectedUpdatePath = UpdatePathOption.ForPath(updatePath);
         var erwarteterKanal = updatePath == UpdatePathChannelResolver.PrereleaseVersionsPath
-            ? UpdatePfadTexte.KanalReleaseCandidate
-            : UpdatePfadTexte.KanalProduktiv;
-        sut.AbgeleiteterUpdateKanal.Should().Be(erwarteterKanal);
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+            ? UpdatePathText.ChannelReleaseCandidate
+            : UpdatePathText.ChannelStable;
+        sut.DerivedUpdateChannel.Should().Be(erwarteterKanal);
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         published.Should().Be(new UpdateSettings(mode, updatePath),
             "das Event muss den tatsächlich gespeicherten Snapshot liefern");
 
         var gespeichert = await _settingService.GetUpdateSettingsAsync(TestContext.Current.CancellationToken);
         gespeichert.Should().Be(new UpdateSettings(mode, updatePath));
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.SelectedUpdatePfad.Should().Be(UpdatePfadOption.FuerPfad(updatePath));
-        sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(mode));
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.SelectedUpdatePath.Should().Be(UpdatePathOption.ForPath(updatePath));
+        sut.SelectedUpdateMode.Should().Be(UpdateModeOption.ForMode(mode));
     }
 
     /// <summary>Das UpdateSettingsSaved-Event wird direkt nach dem Update-Speichern ausgelöst – auch wenn ein späterer Speicherschritt fehlschlägt.</summary>
@@ -583,7 +583,7 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         var eventCount = 0;
         UpdateSettings? published = null;
@@ -593,17 +593,17 @@ public sealed class SettingsViewModelTests : IDisposable
             published = s;
         };
 
-        sut.SelectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.Off);
+        sut.SelectedUpdateMode = UpdateModeOption.ForMode(UpdateMode.Off);
         // Relativer Pfad -> der spätere Arbeitsverzeichnis-Speicherschritt schlägt fehl.
         sut.WorkingDirectory = "relativer-pfad-ohne-root";
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
         eventCount.Should().Be(1, "das Event muss trotz des späteren Fehlers ausgelöst worden sein");
         published.Should().Be(new UpdateSettings(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath));
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
         (await _settingService.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
             .Should().Be(new UpdateSettings(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath),
-                "die Update-Einstellungen müssen trotz späterem Fehler persistiert sein");
+                "die Update--Einstellungen müssen trotz späterem Fehler persistiert sein");
     }
 
     /// <summary>VerwerfenAsync lädt neu, ohne das UpdateSettingsSaved-Event auszulösen oder Werte zu schreiben.</summary>
@@ -613,25 +613,25 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         var eventCount = 0;
         sut.UpdateSettingsSaved += (_, _) => eventCount++;
 
         // Ungespeicherte Änderungen -> Verwerfen lädt neu, ohne zu publizieren
-        sut.SelectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.Off);
-        sut.SelectedUpdatePfad = UpdatePfadOption.FuerPfad(UpdatePathChannelResolver.PrereleaseVersionsPath);
-        await ((AsyncRelayCommand)sut.VerwerfenCommand).ExecuteAsync();
+        sut.SelectedUpdateMode = UpdateModeOption.ForMode(UpdateMode.Off);
+        sut.SelectedUpdatePath = UpdatePathOption.ForPath(UpdatePathChannelResolver.PrereleaseVersionsPath);
+        await ((AsyncRelayCommand)sut.DiscardCommand).ExecuteAsync();
 
         eventCount.Should().Be(0, "Verwerfen darf kein UpdateSettingsSaved-Ereignis auslösen");
-        sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(UpdateMode.CheckOnly));
-        sut.SelectedUpdatePfad.Should().Be(UpdatePfadOption.FuerPfad(UpdatePathChannelResolver.StableVersionsPath));
+        sut.SelectedUpdateMode.Should().Be(UpdateModeOption.ForMode(UpdateMode.CheckOnly));
+        sut.SelectedUpdatePath.Should().Be(UpdatePathOption.ForPath(UpdatePathChannelResolver.StableVersionsPath));
         (await _settingService.GetUpdateSettingsAsync(TestContext.Current.CancellationToken))
             .Should().Be(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath),
                 "Verwerfen darf keine Update-Werte schreiben");
     }
 
-    /// <summary>LadenCommand füllt die SCM-Einstellungen mit den Defaults: Überwachung aktiv, Standard-Trigger.</summary>
+    /// <summary>LadenCommand füllt die SCM--Einstellungen mit den Defaults: Überwachung aktiv, Standard-Trigger.</summary>
     [Fact]
     public async Task LadenCommand_LoadsScmMonitoringDefaults()
     {
@@ -639,7 +639,7 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.IsScmMonitoringEnabled.Should().BeTrue();
         sut.ScmTriggerKeyword.Should().Be(ScmEventValidationService.DefaultTriggerKeyword);
@@ -652,19 +652,19 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.IsScmMonitoringEnabled = false;
         sut.ScmTriggerKeyword = "  !Bearbeite  ";
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         (await _settingService.GetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, TestContext.Current.CancellationToken))
             .Should().BeFalse();
         (await _settingService.GetSettingAsync(AppSettingService.ScmTriggerKeywordKey, TestContext.Current.CancellationToken))
             .Should().Be("!Bearbeite");
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.IsScmMonitoringEnabled.Should().BeFalse();
         sut.ScmTriggerKeyword.Should().Be("!Bearbeite");
     }
@@ -678,13 +678,13 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.ScmTriggerKeyword = keyword;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().Contain("Trigger-Keyword");
-        sut.ErfolgsMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().Contain("Trigger-Keyword");
+        sut.SuccessMessage.Should().BeNull();
         (await _settingService.GetSettingAsync(AppSettingService.ScmTriggerKeywordKey, TestContext.Current.CancellationToken))
             .Should().BeNull("ein ungültiges Keyword darf nicht persistiert werden");
     }
@@ -697,14 +697,14 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.IsScmMonitoringEnabled = false;
         sut.ScmTriggerKeyword = "   ";
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
-        sut.ErfolgsMeldung.Should().NotBeNull();
+        sut.ErrorMessage.Should().BeNull();
+        sut.SuccessMessage.Should().NotBeNull();
     }
 
     /// <summary>Im SeparatesKonto-Modus ist das Trigger-Keyword-Feld ausgeblendet; ein leerer
@@ -717,13 +717,13 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         _credentialStore.SetCredential("Softwareschmiede.GitHub.AgentToken", "bot-token");
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
+        sut.SelectedAccountMode = ScmAccountModeOption.ForMode(ScmAccountMode.SeparateAccount);
         sut.ScmTriggerKeyword = "   ";
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmAccountMode.SeparateAccount);
     }
 
@@ -736,14 +736,14 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.IsScmTaskCompletionEnabled = false;
         sut.ScmTaskCompletionWaitMinutes = "keine Zahl";
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
-        sut.ErfolgsMeldung.Should().NotBeNull();
+        sut.ErrorMessage.Should().BeNull();
+        sut.SuccessMessage.Should().NotBeNull();
         (await _settingService.GetScmTaskCompletionWaitMinutesAsync(TestContext.Current.CancellationToken))
             .Should().Be(AppSettingService.ScmTaskCompletionDefaultWaitMinutes,
                 "die nicht wirksame Wartezeit darf nicht überschrieben werden");
@@ -758,30 +758,30 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         // Probehalber vom gespeicherten Standard abweichende Werte setzen.
-        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.Global);
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
+        sut.SelectedBackmergeMode = ScmBackmergeModeOption.ForMode(ScmBackmergeMode.Global);
+        sut.SelectedAccountMode = ScmAccountModeOption.ForMode(ScmAccountMode.SeparateAccount);
         sut.IsScmMonitoringEnabled = false;
         sut.IsScmTaskCompletionEnabled = false;
 
         var changes = new List<string?>();
         sut.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
-        await ((AsyncRelayCommand)sut.VerwerfenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.DiscardCommand).ExecuteAsync();
 
-        sut.SelectedBackmergeModus?.Mode.Should().Be(ScmBackmergeMode.Disabled);
-        sut.SelectedKontoModus?.Mode.Should().Be(ScmAccountMode.UserAccount);
-        sut.IsProzessablaeufeFelderEnabled.Should().BeFalse();
-        sut.ProzessablaeufeStatusText.Should().Be("deaktiviert");
-        sut.IsTriggerKeywordSichtbar.Should().BeTrue();
-        changes.Should().Contain(nameof(sut.IsProzessablaeufeFelderEnabled));
-        changes.Should().Contain(nameof(sut.ProzessablaeufeStatusText));
-        changes.Should().Contain(nameof(sut.IsTriggerKeywordSichtbar));
-        changes.Should().Contain(nameof(sut.IsPromptAnhaengeSichtbar));
-        changes.Should().Contain(nameof(sut.IsUeberwachungsmodusEnabled));
-        changes.Should().Contain(nameof(sut.AufgabenAusfuehrenStatusText));
-        changes.Should().Contain(nameof(sut.IsTaskCompletionFelderEnabled));
-        changes.Should().Contain(nameof(sut.AufgabenBeendenStatusText));
+        sut.SelectedBackmergeMode?.Mode.Should().Be(ScmBackmergeMode.Disabled);
+        sut.SelectedAccountMode?.Mode.Should().Be(ScmAccountMode.UserAccount);
+        sut.IsProcessRunsFieldEnabled.Should().BeFalse();
+        sut.ProcessRunsStatusText.Should().Be("deaktiviert");
+        sut.IsTriggerKeywordVisible.Should().BeTrue();
+        changes.Should().Contain(nameof(sut.IsProcessRunsFieldEnabled));
+        changes.Should().Contain(nameof(sut.ProcessRunsStatusText));
+        changes.Should().Contain(nameof(sut.IsTriggerKeywordVisible));
+        changes.Should().Contain(nameof(sut.IsPromptAppendVisible));
+        changes.Should().Contain(nameof(sut.IsMonitoringModeEnabled));
+        changes.Should().Contain(nameof(sut.WorkItemsExecuteStatusText));
+        changes.Should().Contain(nameof(sut.IsTaskCompletionFieldEnabled));
+        changes.Should().Contain(nameof(sut.WorkItemsExitStatusText));
     }
 
     /// <summary>LadenCommand lädt den Backmerge-Modus; ohne gespeicherten Eintrag gilt „Deaktiviert“.</summary>
@@ -792,10 +792,10 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedBackmergeModus.Should().Be(ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.Disabled));
-        sut.BackmergeModusOptionen.Should().HaveCount(3);
+        sut.SelectedBackmergeMode.Should().Be(ScmBackmergeModeOption.ForMode(ScmBackmergeMode.Disabled));
+        sut.BackmergeModeOptions.Should().HaveCount(3);
     }
 
     /// <summary>SpeichernCommand persistiert den gewählten Backmerge-Modus und lädt ihn beim Neuladen zurück.</summary>
@@ -805,16 +805,16 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.ProjectScoped);
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        sut.SelectedBackmergeMode = ScmBackmergeModeOption.ForMode(ScmBackmergeMode.ProjectScoped);
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         (await _settingService.GetScmBackmergeModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmBackmergeMode.ProjectScoped);
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.SelectedBackmergeModus.Should().Be(ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.ProjectScoped));
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.SelectedBackmergeMode.Should().Be(ScmBackmergeModeOption.ForMode(ScmBackmergeMode.ProjectScoped));
     }
 
     /// <summary>LadenCommand füllt die fünf SCM-Prompt-Anhänge mit leeren Feldern, wenn nichts gespeichert ist.</summary>
@@ -825,7 +825,7 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.ScmPromptAppendixGeneral.Should().BeEmpty();
         sut.ScmPromptAppendixIssue.Should().BeEmpty();
@@ -842,16 +842,16 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         sut.ScmPromptAppendixGeneral = "Immer auf Deutsch antworten.";
         sut.ScmPromptAppendixIssue = "Issue:\nReproduktion prüfen.";
         sut.ScmPromptAppendixIssueComment = "Issue-Kommentar-Anhang";
         sut.ScmPromptAppendixPullRequest = "PR-Anhang";
         sut.ScmPromptAppendixPullRequestComment = "PR-Kommentar-Anhang";
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         (await _settingService.GetSettingAsync(AppSettingService.ScmPromptAppendGeneralKey, TestContext.Current.CancellationToken))
             .Should().Be("Immer auf Deutsch antworten.");
         (await _settingService.GetSettingAsync(AppSettingService.ScmPromptAppendIssueKey, TestContext.Current.CancellationToken))
@@ -863,7 +863,7 @@ public sealed class SettingsViewModelTests : IDisposable
         (await _settingService.GetSettingAsync(AppSettingService.ScmPromptAppendPullRequestCommentKey, TestContext.Current.CancellationToken))
             .Should().Be("PR-Kommentar-Anhang");
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.ScmPromptAppendixGeneral.Should().Be("Immer auf Deutsch antworten.");
         sut.ScmPromptAppendixIssue.Should().Be("Issue:\nReproduktion prüfen.");
         sut.ScmPromptAppendixIssueComment.Should().Be("Issue-Kommentar-Anhang");
@@ -882,14 +882,14 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         await _settingService.SetSettingAsync(AppSettingService.ScmPromptAppendIssueKey, "vorhanden", TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.ScmPromptAppendixIssue.Should().Be("vorhanden");
 
         sut.ScmPromptAppendixIssue = blank;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
-        sut.ErfolgsMeldung.Should().NotBeNull();
+        sut.ErrorMessage.Should().BeNull();
+        sut.SuccessMessage.Should().NotBeNull();
         (await _settingService.GetSettingAsync(AppSettingService.ScmPromptAppendIssueKey, TestContext.Current.CancellationToken))
             .Should().BeNull("ein leerer Anhang hängt nichts an und wird als leerer Wert persistiert");
     }
@@ -919,10 +919,10 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedKontoModus.Should().Be(ScmKontoModusOption.FuerModus(ScmAccountMode.UserAccount));
-        sut.KontoModusOptionen.Should().HaveCount(2);
+        sut.SelectedAccountMode.Should().Be(ScmAccountModeOption.ForMode(ScmAccountMode.UserAccount));
+        sut.AccountModeOptions.Should().HaveCount(2);
     }
 
     /// <summary>SpeichernCommand persistiert den gewählten Konto-Modus und lädt ihn beim Neuladen zurück.</summary>
@@ -934,16 +934,16 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         _credentialStore.SetCredential("Softwareschmiede.GitHub.AgentToken", "bot-token");
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        sut.SelectedAccountMode = ScmAccountModeOption.ForMode(ScmAccountMode.SeparateAccount);
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmAccountMode.SeparateAccount);
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.SelectedKontoModus.Should().Be(ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount));
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.SelectedAccountMode.Should().Be(ScmAccountModeOption.ForMode(ScmAccountMode.SeparateAccount));
     }
 
     /// <summary>Eine fehlende Konto-Modus-Auswahl wird nicht gespeichert.</summary>
@@ -953,12 +953,12 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedKontoModus = null;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        sut.SelectedAccountMode = null;
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
         (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmAccountMode.UserAccount);
     }
 
@@ -970,13 +970,13 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        sut.SelectedAccountMode = ScmAccountModeOption.ForMode(ScmAccountMode.SeparateAccount);
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().Contain("separaten Kontos").And.Contain("Authentifizierung");
-        sut.ErfolgsMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().Contain("separaten Kontos").And.Contain("Authentifizierung");
+        sut.SuccessMessage.Should().BeNull();
         (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmAccountMode.UserAccount);
     }
 
@@ -989,15 +989,15 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         sut.ScmPluginSelectedCommand.Execute(plugin);
         sut.SelectedPluginSettings.SelectMany(g => g.Entries).Single(e => e.Field.Key == "Token").Value = "user-token";
         sut.SelectedPluginSettings.SelectMany(g => g.Entries).Single(e => e.Field.Key == "AgentToken").Value = "bot-token";
 
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        sut.SelectedAccountMode = ScmAccountModeOption.ForMode(ScmAccountMode.SeparateAccount);
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         (await _settingService.GetScmAccountModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmAccountMode.SeparateAccount);
         _credentialStore.GetCredential("Softwareschmiede.GitHub.AgentToken").Should().Be("bot-token");
     }
@@ -1010,10 +1010,10 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedScmTaskCompletionPruefmodus.Should().Be(ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionCheckMode.EventDriven));
-        sut.ScmTaskCompletionPruefmodusOptionen.Should().HaveCount(2);
+        sut.SelectedScmTaskCompletionCheckmode.Should().Be(ScmTaskCompletionCheckModeOption.ForMode(ScmTaskCompletionCheckMode.EventDriven));
+        sut.ScmTaskCompletionCheckmodeOptions.Should().HaveCount(2);
     }
 
     /// <summary>SpeichernCommand persistiert den Prüfmodus und lädt ihn beim Neuladen zurück.</summary>
@@ -1023,16 +1023,16 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionCheckMode.AllWorkItems);
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        sut.SelectedScmTaskCompletionCheckmode = ScmTaskCompletionCheckModeOption.ForMode(ScmTaskCompletionCheckMode.AllWorkItems);
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         (await _settingService.GetScmTaskCompletionCheckModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionCheckMode.AllWorkItems);
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.SelectedScmTaskCompletionPruefmodus.Should().Be(ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionCheckMode.AllWorkItems));
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.SelectedScmTaskCompletionCheckmode.Should().Be(ScmTaskCompletionCheckModeOption.ForMode(ScmTaskCompletionCheckMode.AllWorkItems));
     }
 
     /// <summary>Eine fehlende Prüfmodus-Auswahl wird nicht gespeichert.</summary>
@@ -1042,12 +1042,12 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedScmTaskCompletionPruefmodus = null;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        sut.SelectedScmTaskCompletionCheckmode = null;
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        sut.ErrorMessage.Should().NotBeNullOrEmpty();
         (await _settingService.GetScmTaskCompletionCheckModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionCheckMode.EventDriven);
     }
 
@@ -1059,9 +1059,9 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.IsScmBackmergeDraftAktivierung.Should().BeFalse();
+        sut.IsScmBackmergeDraftActivation.Should().BeFalse();
         sut.IsScmBackmergeAdminMerge.Should().BeFalse();
     }
 
@@ -1072,18 +1072,18 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.IsScmBackmergeDraftAktivierung = true;
+        sut.IsScmBackmergeDraftActivation = true;
         sut.IsScmBackmergeAdminMerge = true;
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         (await _settingService.GetScmBackmergeDraftActivationAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
         (await _settingService.GetScmBackmergeAdminMergeAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.IsScmBackmergeDraftAktivierung.Should().BeTrue();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.IsScmBackmergeDraftActivation.Should().BeTrue();
         sut.IsScmBackmergeAdminMerge.Should().BeTrue();
     }
 
@@ -1095,22 +1095,22 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.IsUeberwachungsmodusEnabled.Should().BeTrue();
-        sut.IsTriggerKeywordSichtbar.Should().BeTrue("Benutzerkonto ist der Standard-Modus");
-        sut.IsPromptAnhaengeSichtbar.Should().BeTrue();
-        sut.AufgabenAusfuehrenStatusText.Should().Be("aktiviert");
+        sut.IsMonitoringModeEnabled.Should().BeTrue();
+        sut.IsTriggerKeywordVisible.Should().BeTrue("Benutzerkonto ist der Standard-Modus");
+        sut.IsPromptAppendVisible.Should().BeTrue();
+        sut.WorkItemsExecuteStatusText.Should().Be("aktiviert");
 
-        sut.SelectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.SeparateAccount);
-        sut.IsTriggerKeywordSichtbar.Should().BeFalse("im SeparatesKonto gilt die Erwähnung statt des Keywords");
-        sut.IsPromptAnhaengeSichtbar.Should().BeTrue();
+        sut.SelectedAccountMode = ScmAccountModeOption.ForMode(ScmAccountMode.SeparateAccount);
+        sut.IsTriggerKeywordVisible.Should().BeFalse("im SeparatesKonto gilt die Erwähnung statt des Keywords");
+        sut.IsPromptAppendVisible.Should().BeTrue();
 
         sut.IsScmMonitoringEnabled = false;
-        sut.IsUeberwachungsmodusEnabled.Should().BeFalse();
-        sut.IsTriggerKeywordSichtbar.Should().BeFalse();
-        sut.IsPromptAnhaengeSichtbar.Should().BeFalse();
-        sut.AufgabenAusfuehrenStatusText.Should().Be("deaktiviert");
+        sut.IsMonitoringModeEnabled.Should().BeFalse();
+        sut.IsTriggerKeywordVisible.Should().BeFalse();
+        sut.IsPromptAppendVisible.Should().BeFalse();
+        sut.WorkItemsExecuteStatusText.Should().Be("deaktiviert");
     }
 
     /// <summary>Prüfmodus und Wartezeit folgen dem Abschlussüberwachungs-Schalter; der Status zeigt den Schaltzustand.</summary>
@@ -1120,14 +1120,14 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.IsTaskCompletionFelderEnabled.Should().BeTrue();
-        sut.AufgabenBeendenStatusText.Should().Be("aktiviert");
+        sut.IsTaskCompletionFieldEnabled.Should().BeTrue();
+        sut.WorkItemsExitStatusText.Should().Be("aktiviert");
 
         sut.IsScmTaskCompletionEnabled = false;
-        sut.IsTaskCompletionFelderEnabled.Should().BeFalse();
-        sut.AufgabenBeendenStatusText.Should().Be("deaktiviert");
+        sut.IsTaskCompletionFieldEnabled.Should().BeFalse();
+        sut.WorkItemsExitStatusText.Should().Be("deaktiviert");
     }
 
     /// <summary>Die Backmerge-Optionen sind nur bedienbar, solange der Backmerge-Modus nicht „Deaktiviert“ ist.</summary>
@@ -1137,18 +1137,18 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.IsProzessablaeufeFelderEnabled.Should().BeFalse("Standard ist Deaktiviert");
-        sut.ProzessablaeufeStatusText.Should().Be("deaktiviert");
+        sut.IsProcessRunsFieldEnabled.Should().BeFalse("Standard ist Deaktiviert");
+        sut.ProcessRunsStatusText.Should().Be("deaktiviert");
 
-        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.Global);
-        sut.IsProzessablaeufeFelderEnabled.Should().BeTrue();
-        sut.ProzessablaeufeStatusText.Should().Be("aktiviert");
+        sut.SelectedBackmergeMode = ScmBackmergeModeOption.ForMode(ScmBackmergeMode.Global);
+        sut.IsProcessRunsFieldEnabled.Should().BeTrue();
+        sut.ProcessRunsStatusText.Should().Be("aktiviert");
 
-        sut.SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.ProjectScoped);
-        sut.IsProzessablaeufeFelderEnabled.Should().BeTrue();
-        sut.ProzessablaeufeStatusText.Should().Be("aktiviert");
+        sut.SelectedBackmergeMode = ScmBackmergeModeOption.ForMode(ScmBackmergeMode.ProjectScoped);
+        sut.IsProcessRunsFieldEnabled.Should().BeTrue();
+        sut.ProcessRunsStatusText.Should().Be("aktiviert");
     }
 }
 

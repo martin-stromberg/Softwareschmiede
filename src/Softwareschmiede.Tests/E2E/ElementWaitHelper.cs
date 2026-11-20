@@ -41,15 +41,15 @@ internal static class ElementWaitHelper
     /// </summary>
     /// <remarks>
     /// Als Fail-Fast-Diagnose wird bei jeder Polling-Iteration zusätzlich nach einem Fehlerbanner
-    /// ("FehlerMeldung") gesucht: Wer auf ein *anderes* Element wartet, soll sofort mit einer
+    /// ("ErrorMessage") gesucht: Wer auf ein *anderes* Element wartet, soll sofort mit einer
     /// aussagekräftigen Meldung abbrechen, statt erst nach Ablauf des vollen Timeouts. Da die Suche nach
-    /// <paramref name="conditionFunc"/> und die Suche nach "FehlerMeldung" zwei separate, nicht-atomare
+    /// <paramref name="conditionFunc"/> und die Suche nach "ErrorMessage" zwei separate, nicht-atomare
     /// UI-Automation-Aufrufe sind, kann es vorkommen, dass der erste Aufruf ein gerade erst erscheinendes
     /// Element knapp verpasst, während der zweite (Millisekunden später) es bereits findet. Für Aufrufer,
-    /// deren <paramref name="conditionFunc"/> selbst auf "FehlerMeldung" zielt (z. B. Fehlerfall-Tests, die
+    /// deren <paramref name="conditionFunc"/> selbst auf "ErrorMessage" zielt (z. B. Fehlerfall-Tests, die
     /// genau dieses Element als Erfolgskriterium erwarten), würde das fälschlich als Abbruchgrund statt als
     /// gefundenes Zielelement gewertet. Deshalb wird die Zielsuche unmittelbar vor dem Werfen der Exception
-    /// erneut versucht: Ist "FehlerMeldung" tatsächlich das gesuchte Zielelement, ist es zu diesem Zeitpunkt
+    /// erneut versucht: Ist "ErrorMessage" tatsächlich das gesuchte Zielelement, ist es zu diesem Zeitpunkt
     /// im Automation-Baum bereits vorhanden (der Fehlerbanner-Check hat es ja soeben gefunden) und die
     /// erneute Zielsuche liefert es als regulären Treffer zurück. Zielt <paramref name="conditionFunc"/> auf
     /// ein anderes Element, bleibt die erneute Suche erfolglos und die Fail-Fast-Diagnose greift wie bisher.
@@ -74,10 +74,10 @@ internal static class ElementWaitHelper
             if (element is not null && isVisible(element))
                 return element;
 
-            var errorMessage = parent.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+            var errorMessage = parent.FindFirstDescendant(cf => cf.ByName("ErrorMessage"));
             if (errorMessage is not null && isVisible(errorMessage))
             {
-                // Letzter Versuch: Falls conditionFunc selbst auf "FehlerMeldung" zielt, ist das Element
+                // Letzter Versuch: Falls conditionFunc selbst auf "ErrorMessage" zielt, ist das Element
                 // inzwischen sicher auffindbar (siehe Erklärung oben) und der Aufruf soll regulär mit
                 // diesem Treffer zurückkehren statt in den Fehlerpfad zu laufen.
                 element = parent.FindFirstDescendant(conditionFunc);
@@ -187,7 +187,7 @@ internal static class ElementWaitHelper
             if (element is not null && isVisible(element))
                 return element;
 
-            var errorMessage = scopeElement.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+            var errorMessage = scopeElement.FindFirstDescendant(cf => cf.ByName("ErrorMessage"));
             if (errorMessage is not null && isVisible(errorMessage))
                 throw new InvalidOperationException(
                     $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(errorMessage)}");

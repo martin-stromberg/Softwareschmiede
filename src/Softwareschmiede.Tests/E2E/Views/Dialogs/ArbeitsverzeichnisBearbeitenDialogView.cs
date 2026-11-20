@@ -20,21 +20,21 @@ public sealed class ArbeitsverzeichnisBearbeitenDialogView : DialogView
         if (IsVisible)
             return this;
 
-        WaitForElement(Window, cf => cf.ByName("ArbeitsverzeichnisBearbeiten"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("EditWorkingDirectory"), Short).AsButton().ClickInForeground();
         GetDialogWindow();
 
         return this;
     }
 
-    /// <returns>Der aktuelle Wert des "ArbeitsverzeichnisEingabe"-Feldes.</returns>
-    public string GetManualPath() => WaitForElement(GetDialogWindow(), cf => cf.ByName("ArbeitsverzeichnisEingabe"), Short).AsTextBox().Text;
+    /// <returns>Der aktuelle Wert des "WorkingDirectoryInput"-Feldes.</returns>
+    public string GetManualPath() => WaitForElement(GetDialogWindow(), cf => cf.ByName("WorkingDirectoryInput"), Short).AsTextBox().Text;
 
     /// <summary>Bestätigt die Bearbeitung über den "Speichern"-Button im Dialog.</summary>
     /// <returns>Die Projektdetailansicht, zu der nach dem Speichern zurückgekehrt wird.</returns>
     public ProjectDetailView Confirm()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("Speichern"), Short).AsButton().ClickInForeground();
+        WaitForElement(dialog, cf => cf.ByName("Save"), Short).AsButton().ClickInForeground();
 
         return new ProjectDetailView(Window);
     }

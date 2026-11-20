@@ -50,7 +50,7 @@ public sealed class PluginSelectionServiceTests
         var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance);
 
         // Act
-        var prefixe = await sut.GetAvailableKiPluginPrefixesAsync(TestContext.Current.CancellationToken);
+        var prefixe = await sut.GetAvailableAiPluginPrefixesAsync(TestContext.Current.CancellationToken);
 
         // Assert
         prefixe.Should().ContainSingle().Which.Should().Be("Softwareschmiede.Aktiv");
@@ -210,7 +210,7 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
-        await settings.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
+        await settings.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
         var pluginManager = CreatePluginManager([simulator]);
@@ -231,7 +231,7 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
-        await settings.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
+        await settings.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
         var pluginManager = CreatePluginManager([simulator]);
@@ -252,7 +252,7 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
-        await settings.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
+        await settings.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         var projectId = Guid.NewGuid();
         await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
@@ -269,14 +269,14 @@ public sealed class PluginSelectionServiceTests
     }
 
     /// <summary>Der gespeicherte Global-Default (plugins.default.*) hat Vorrang vor der
-    /// Einstellungen-Standard-CLI (ki.plugin.default).</summary>
+    /// Settings-Standard-CLI (ki.plugin.default).</summary>
     [Fact]
     public async Task TestResolvePluginWithProjectScope_StoredGlobalDefaultBeatsSettingsDefault()
     {
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
-        await settings.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
+        await settings.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.Stored", TestContext.Current.CancellationToken);
         var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
@@ -299,7 +299,7 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
-        await settings.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Nicht installiert", TestContext.Current.CancellationToken);
+        await settings.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Nicht installiert", TestContext.Current.CancellationToken);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");
         var pluginManager = CreatePluginManager([simulator]);
@@ -443,7 +443,7 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
-        await settings.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
+        await settings.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.GlobalKi", TestContext.Current.CancellationToken);
 
@@ -470,7 +470,7 @@ public sealed class PluginSelectionServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
-        await settings.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
+        await settings.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         var projectId = Guid.NewGuid();
         await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
@@ -517,14 +517,14 @@ public sealed class PluginSelectionServiceTests
     }
 
     /// <summary>Aktivierungsbewusste Auflösung: Ein auf ein deaktiviertes Plugin zeigender
-    /// Einstellungen-Default (ki.plugin.default) wird ignoriert und führt zu null.</summary>
+    /// Settings-Default (ki.plugin.default) wird ignoriert und führt zu null.</summary>
     [Fact]
     public async Task ResolveEnabledPlugin_SettingsDefaultDisabled_ReturnsNull()
     {
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
-        await settings.SetSettingAsync(AppSettingService.DefaultKiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
+        await settings.SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Simulator CLI", TestContext.Current.CancellationToken);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
 
         var simulator = CreateKiPlugin("Simulator CLI", "Softwareschmiede.KiSimulator");

@@ -17,7 +17,7 @@ public sealed class KiPluginLimitServiceTests : IDisposable
     private readonly WorkItemService _workItemService;
     private readonly WorkItemRunDataChangedNotifier _notifier;
     private readonly AiPluginLimitService _sut;
-    private readonly Guid _projektId = new Guid("55555555-5555-5555-5555-555555555555");
+    private readonly Guid _projectId = new Guid("55555555-5555-5555-5555-555555555555");
 
     /// <summary>KiPluginLimitServiceTests.</summary>
     public KiPluginLimitServiceTests()
@@ -33,7 +33,7 @@ public sealed class KiPluginLimitServiceTests : IDisposable
 
         _db.Projects.Add(new Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Limit-Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -69,7 +69,7 @@ public sealed class KiPluginLimitServiceTests : IDisposable
         var a1 = await ErstelleLaufendeAufgabeAsync("Peer A", TestPrefix);
         var a2 = await ErstelleLaufendeAufgabeAsync("Peer B", TestPrefix);
         var fremd = await ErstelleLaufendeAufgabeAsync("Fremdes Plugin", "Softwareschmiede.AnderesKi");
-        var nichtGestartet = await _workItemService.CreateAsync(_projektId, "Nicht gestartet", null, ct: TestContext.Current.CancellationToken);
+        var nichtGestartet = await _workItemService.CreateAsync(_projectId, "Nicht gestartet", null, ct: TestContext.Current.CancellationToken);
         var neuTracked = await _db.WorkItems.FindAsync(new object?[] { nichtGestartet.Id }, TestContext.Current.CancellationToken);
         neuTracked!.AiPluginPrefix = TestPrefix;
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -131,7 +131,7 @@ public sealed class KiPluginLimitServiceTests : IDisposable
     public async Task VerarbeiteRateLimitAsync_ShouldDoNothing_WhenAusloeserOhnePrefix()
     {
         var peer = await ErstelleLaufendeAufgabeAsync("Peer", TestPrefix);
-        var aufgabeOhnePrefix = await _workItemService.CreateAsync(_projektId, "Ohne Prefix", null, ct: TestContext.Current.CancellationToken);
+        var aufgabeOhnePrefix = await _workItemService.CreateAsync(_projectId, "Ohne Prefix", null, ct: TestContext.Current.CancellationToken);
         var tracked = await _db.WorkItems.FindAsync(new object?[] { aufgabeOhnePrefix.Id }, TestContext.Current.CancellationToken);
         tracked!.Status = WorkItemStatus.Started;
         tracked.ExecutionStatus = WorkItemExecutionStatus.Active;
@@ -158,7 +158,7 @@ public sealed class KiPluginLimitServiceTests : IDisposable
     public async Task VerarbeiteRateLimitAsync_ShouldNotPause_WhenAufgabeBeendet()
     {
         var trigger = await ErstelleLaufendeAufgabeAsync("Ausloeser", TestPrefix);
-        var beendet = await _workItemService.CreateAsync(_projektId, "Beendete Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var beendet = await _workItemService.CreateAsync(_projectId, "Beendete Aufgabe", null, ct: TestContext.Current.CancellationToken);
         var beendetTracked = await _db.WorkItems.FindAsync(new object?[] { beendet.Id }, TestContext.Current.CancellationToken);
         beendetTracked!.Status = WorkItemStatus.Completed;
         beendetTracked.ExecutionStatus = WorkItemExecutionStatus.Completed;
@@ -201,7 +201,7 @@ public sealed class KiPluginLimitServiceTests : IDisposable
 
     private async Task<WorkItem> ErstelleLaufendeAufgabeAsync(string title, string aiPluginPrefix)
     {
-        var workItem = await _workItemService.CreateAsync(_projektId, title, null);
+        var workItem = await _workItemService.CreateAsync(_projectId, title, null);
         var tracked = await _db.WorkItems.FindAsync(workItem.Id);
         tracked!.Status = WorkItemStatus.Started;
         tracked.ExecutionStatus = WorkItemExecutionStatus.Active;

@@ -39,7 +39,7 @@ public sealed class IssueSelectionDialogViewModelTests
         await sut.LoadAsync("owner/repo", TestContext.Current.CancellationToken);
 
         // Assert
-        sut.VerfuegbareIssues.Should().HaveCount(2);
+        sut.AvailableIssues.Should().HaveCount(2);
         sut.IsLoading.Should().BeFalse();
     }
 
@@ -58,7 +58,7 @@ public sealed class IssueSelectionDialogViewModelTests
 
         // Assert
         sut.IsLoading.Should().BeFalse();
-        sut.VerfuegbareIssues.Should().BeEmpty();
+        sut.AvailableIssues.Should().BeEmpty();
     }
 
     /// <summary>Wenn ein Issue selektiert wird, wird KannBestaetigen true.</summary>
@@ -67,13 +67,13 @@ public sealed class IssueSelectionDialogViewModelTests
     {
         // Arrange
         var sut = CreateSut();
-        sut.KannBestaetigen.Should().BeFalse();
+        sut.CanConfirm.Should().BeFalse();
 
         // Act
         sut.SelectedIssue = ErstelleIssue();
 
         // Assert
-        sut.KannBestaetigen.Should().BeTrue();
+        sut.CanConfirm.Should().BeTrue();
     }
 
     /// <summary>BestaetigenCommand löst CloseRequested mit true aus.</summary>
@@ -87,13 +87,13 @@ public sealed class IssueSelectionDialogViewModelTests
 
         var sut = CreateSut();
         await sut.LoadAsync("owner/repo", TestContext.Current.CancellationToken);
-        sut.SelectedIssue = sut.VerfuegbareIssues[0];
+        sut.SelectedIssue = sut.AvailableIssues[0];
 
         bool? closedWith = null;
         sut.CloseRequested += (_, result) => closedWith = result;
 
         // Act
-        sut.BestaetigenCommand.Execute(null);
+        sut.ConfirmCommand.Execute(null);
 
         // Assert
         closedWith.Should().BeTrue();
@@ -110,7 +110,7 @@ public sealed class IssueSelectionDialogViewModelTests
         sut.CloseRequested += (_, result) => closedWith = result;
 
         // Act
-        sut.AbbrechenCommand.Execute(null);
+        sut.CancelCommand.Execute(null);
 
         // Assert
         closedWith.Should().BeFalse();
@@ -124,6 +124,6 @@ public sealed class IssueSelectionDialogViewModelTests
         var sut = CreateSut();
 
         // Assert
-        sut.BestaetigenCommand.CanExecute(null).Should().BeFalse();
+        sut.ConfirmCommand.CanExecute(null).Should().BeFalse();
     }
 }

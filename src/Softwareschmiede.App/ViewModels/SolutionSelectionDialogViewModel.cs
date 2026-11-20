@@ -20,27 +20,27 @@ public sealed class SolutionSelectionDialogViewModel : ViewModelBase
         set
         {
             SetProperty(ref _selectedSolution, value);
-            OnPropertyChanged(nameof(KannBestaetigen));
+            OnPropertyChanged(nameof(CanConfirm));
         }
     }
 
     /// <summary>CanExecute für BestaetigenCommand: eine Solution muss gewählt sein.</summary>
-    public bool KannBestaetigen => _selectedSolution != null;
+    public bool CanConfirm => _selectedSolution != null;
 
     /// <summary>Bestätigt die Auswahl und schließt den Dialog.</summary>
-    public ICommand BestaetigenCommand { get; }
+    public ICommand ConfirmCommand { get; }
 
     /// <summary>Bricht die Auswahl ab und schließt den Dialog.</summary>
-    public ICommand AbbrechenCommand { get; }
+    public ICommand CancelCommand { get; }
 
     /// <inheritdoc cref="SolutionSelectionDialogViewModel"/>
     public SolutionSelectionDialogViewModel(IReadOnlyList<string> solutions)
     {
         Solutions = solutions;
 
-        BestaetigenCommand = new RelayCommand(
+        ConfirmCommand = new RelayCommand(
             () => CloseRequested?.Invoke(this, true),
-            () => KannBestaetigen);
-        AbbrechenCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false));
+            () => CanConfirm);
+        CancelCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false));
     }
 }

@@ -40,7 +40,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal readonly ScmKiProfile KiProfile;
     internal readonly string Root;
     internal readonly Mock<IGitPlugin> Git = new();
-    internal readonly Mock<IAiPlugin> Ki = new();
+    internal readonly Mock<IAiPlugin> Ai = new();
     /// <summary>Optionales zweites KI-Plugin (z. B. für Fallback-Tests mit deaktiviertem Prefix).</summary>
     internal readonly Mock<IAiPlugin>? Ki2;
     internal readonly ScmKiProfile? Ki2Profile;
@@ -94,10 +94,10 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 InitGit(directory);
                 await File.WriteAllTextAsync(Path.Combine(directory, "owned.txt"), "preserve workspace");
             });
-        Ki.SetupGet(x => x.PluginPrefix).Returns(KiProfile.Prefix);
-        Ki.SetupGet(x => x.PluginName).Returns("Simulator");
-        Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
-        Ki.Setup(x => x.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        Ai.SetupGet(x => x.PluginPrefix).Returns(KiProfile.Prefix);
+        Ai.SetupGet(x => x.PluginName).Returns("Simulator");
+        Ai.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        Ai.Setup(x => x.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns((string directory, string? _, CancellationToken _) => Task.FromResult(new TerminalSessionStartSpec
             {
                 FileName = "fixture",
@@ -105,7 +105,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 WorkingDirectory = directory,
                 EnvironmentVariables = KiProfile.EnvironmentVariables
             }));
-        var kiPlugins = new List<IAiPlugin> { Ki.Object };
+        var kiPlugins = new List<IAiPlugin> { Ai.Object };
         if (ki2 is not null)
         {
             Ki2 = new Mock<IAiPlugin>();

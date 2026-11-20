@@ -30,11 +30,11 @@ public sealed class ScmDelayDirectiveTests
     [InlineData("1w", 7, 0, 0)]
     [InlineData("32t", 32, 0, 0)]
     [InlineData("46080min", 32, 0, 0)] // exakt 32 Tage am Maximum
-    public void Parse_LiefertDeferred_BeiRelativerAngabe(string angabe, int tage, int stunden, int minuten)
+    public void Parse_LiefertDeferred_BeiRelativerAngabe(string angabe, int day, int hours, int minutes)
     {
         var result = ScmDelayDirective.Parse($"$Softwareschmiede #verzögert {angabe} bitte", null, Now);
         result.Kind.Should().Be(ScmDelayDirective.ResultKind.Deferred);
-        result.TargetUtc.Should().Be(Now + new TimeSpan(tage, stunden, minuten, 0));
+        result.TargetUtc.Should().Be(Now + new TimeSpan(day, hours, minutes, 0));
         result.Argument.Should().Be(angabe);
     }
 

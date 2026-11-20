@@ -88,7 +88,7 @@ public sealed class RepositoryAssignViewModelTests_BasisBranch
         sut.DefaultSourceBranchName = "staging";
 
         sut.SourceBranchInputError.Should().NotBeNullOrEmpty();
-        sut.BestaetigenCommand.CanExecute(null).Should().BeFalse();
+        sut.ConfirmCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>Die Validierung ist erfolgreich, wenn der eingegebene Branch in der geladenen Liste enthalten ist.</summary>
@@ -108,7 +108,7 @@ public sealed class RepositoryAssignViewModelTests_BasisBranch
         sut.DefaultSourceBranchName = "develop";
 
         sut.SourceBranchInputError.Should().BeNullOrEmpty();
-        sut.BestaetigenCommand.CanExecute(null).Should().BeTrue();
+        sut.ConfirmCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>Bei Bestätigung des Dialogs bleibt der gewählte Basis-Branch über die Eigenschaft abrufbar (an die View gebunden).</summary>
@@ -128,7 +128,7 @@ public sealed class RepositoryAssignViewModelTests_BasisBranch
 
         var confirmed = false;
         sut.CloseRequested += (_, result) => confirmed = result;
-        sut.BestaetigenCommand.Execute(null);
+        sut.ConfirmCommand.Execute(null);
 
         confirmed.Should().BeTrue();
         sut.DefaultSourceBranchName.Should().Be("develop");

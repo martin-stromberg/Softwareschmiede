@@ -13,27 +13,27 @@ namespace Softwareschmiede.App.Services.Testing;
 /// </summary>
 public sealed class FixtureCliUpdateSafetyService : ICliUpdateSafetyService
 {
-    private readonly UpdateE2ETestKontext _kontext;
+    private readonly UpdateE2ETestContext _context;
 
     /// <inheritdoc cref="FixtureCliUpdateSafetyService"/>
     /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public FixtureCliUpdateSafetyService(UpdateE2ETestKontext context)
+    public FixtureCliUpdateSafetyService(UpdateE2ETestContext context)
     {
-        _kontext = context;
+        _context = context;
     }
 
     /// <inheritdoc/>
     public Task<CliUpdateSafetyResult> CheckAsync(CancellationToken ct = default)
     {
-        var sicherheit = _kontext.LeseSzenario()?.CliSicherheit;
-        var riskanteAufgaben = sicherheit is { Active: true }
-            ? (IReadOnlyList<string>)sicherheit.RiskanteAufgaben
+        var safe = _context.ReadScenario()?.CliSafe;
+        var riskyWorkItems = safe is { Active: true }
+            ? (IReadOnlyList<string>)safe.RiskyWorkItems
             : [];
 
-        _kontext.Protokoll.Schreibe(
-            UpdateE2EEreignisse.CliSafetyChecked,
-            new { riskyTaskCount = riskanteAufgaben.Count });
+        _context.Log.Write(
+            UpdateE2EEvents.CliSafetyChecked,
+            new { riskyTaskCount = riskyWorkItems.Count });
 
-        return Task.FromResult(new CliUpdateSafetyResult(riskanteAufgaben.Count, riskanteAufgaben));
+        return Task.FromResult(new CliUpdateSafetyResult(riskyWorkItems.Count, riskyWorkItems));
     }
 }

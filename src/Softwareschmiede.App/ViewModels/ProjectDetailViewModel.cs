@@ -18,7 +18,7 @@ namespace Softwareschmiede.App.ViewModels;
 /// <summary>ViewModel für die Projektdetailansicht mit Aufgabenliste.</summary>
 public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 {
-    private readonly ProjectService _projektService;
+    private readonly ProjectService _projectService;
     private readonly WorkItemService _workItemService;
     private readonly IServiceProvider _serviceProvider;
     private readonly IDialogService _dialogService;
@@ -27,10 +27,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private readonly DirectoryStructureBrowserService? _directoryStructureService;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur Listenansicht zurückkehren möchte.</summary>
-    public Action? ZurueckAction { get; set; }
+    public Action? BackAction { get; set; }
 
     /// <summary>Wird nach dem Erstellen oder Löschen eines Projekts aufgerufen, damit die Listenansicht die Liste aktualisiert.</summary>
-    public Func<Task>? ProjektListeAktualisierenCallback { get; set; }
+    public Func<Task>? RefreshProjectListCallback { get; set; }
 
     /// <summary>Wird aufgerufen, um zur separaten Aufgabendetailansicht zu navigieren.</summary>
     public Action<TaskDetailViewModel>? NavigateToTaskViewCallback { get; set; }
@@ -38,21 +38,21 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Wird aufgerufen, um von der Aufgabendetailansicht zurück zur Projektdetailansicht zu navigieren.</summary>
     public Action? NavigateBackToProjectCallback { get; set; }
 
-    private Guid _projektId;
-    private Project? _projekt;
+    private Guid _projectId;
+    private Project? _project;
     private bool _isLoading;
     private string? _errorMessage;
-    private CancellationTokenSource? _ladenCts;
-    private string _projektName = string.Empty;
-    private string? _projektBeschreibung;
+    private CancellationTokenSource? _loadCts;
+    private string _projectName = string.Empty;
+    private string? _projectDescription;
     private GitRepository? _selectedRepository;
-    private WorkItemFilterType _aufgabenFilter = WorkItemFilterType.All;
+    private WorkItemFilterType _workItemsFilter = WorkItemFilterType.All;
     private bool _isFilterOverlayVisible;
     private bool _isLoadingIssues;
-    private bool _kannAnforderungenLaden;
+    private bool _canRequirementLoad;
     private bool _disposed;
-    private Guid _aktuelleAufgabeId;
-    private readonly HashSet<string> _laufendeAlertKonvertierungen = new(StringComparer.OrdinalIgnoreCase);
+    private Guid _currentWorkItemId;
+    private readonly HashSet<string> _runningAlertConversion = new(StringComparer.OrdinalIgnoreCase);
     private string? _selectedRepositorySourceBranchName;
     private bool _isEditingSourceBranch;
     private ObservableCollection<string> _availableSourceBranchesForEdit = new();
@@ -60,26 +60,26 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private string? _sourceBranchNameBeforeEdit;
     private bool _isLoadingSourceBranchesForEdit;
     private bool _isEditingSourceBranchManualInput;
-    private string? _selectedInitialisierungsskript;
-    private bool _isEditingInitialisierungsskript;
-    private bool? _initialisierungsskriptLoadingFailed;
-    private string? _initialisierungsskriptBeforeEdit;
+    private string? _selectedInitializationScript;
+    private bool _isEditingInitializationScript;
+    private bool? _initializationScriptLoadingFailed;
+    private string? _initializationScriptBeforeEdit;
     private bool _isBackmergeAutoMergeEnabled;
-    private bool _isBackmergeModusProjektbezogen;
+    private bool _isBackmergeModeProjektbezogen;
 
     /// <summary>Die Projekt-ID, deren Details angezeigt werden.</summary>
     public Guid ProjectId
     {
-        get => _projektId;
+        get => _projectId;
         set
         {
-            if (SetProperty(ref _projektId, value))
+            if (SetProperty(ref _projectId, value))
             {
                 OnPropertyChanged(nameof(IsNeuanlage));
-                _ladenCts?.Cancel();
-                _ladenCts?.Dispose();
-                _ladenCts = new CancellationTokenSource();
-                LadenAsync(_ladenCts.Token).SafeFireAndForget(_logger, "ProjectDetailViewModel.LadenAsync");
+                _loadCts?.Cancel();
+                _loadCts?.Dispose();
+                _loadCts = new CancellationTokenSource();
+                LoadAsync(_loadCts.Token).SafeFireAndForget(_logger, "ProjectDetailViewModel.LadenAsync");
             }
         }
     }
@@ -87,8 +87,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Das geladene Projekt.</summary>
     public Project? Project
     {
-        get => _projekt;
-        private set => SetProperty(ref _projekt, value);
+        get => _project;
+        private set => SetProperty(ref _project, value);
     }
 
     /// <summary>Gibt an, ob Daten geladen werden.</summary>
@@ -99,7 +99,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Fehlermeldung bei Ladefehlern.</summary>
-    public string? FehlerMeldung
+    public string? ErrorMessage
     {
         get => _errorMessage;
         private set => SetProperty(ref _errorMessage, value);
@@ -109,26 +109,26 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     public ObservableCollection<WorkItem> WorkItems { get; } = new();
 
     /// <summary>Gefilterte Aufgaben (entsprechend AufgabenFilter).</summary>
-    public ObservableCollection<WorkItem> GefilterteAufgaben { get; } = new();
+    public ObservableCollection<WorkItem> FilteredWorkItems { get; } = new();
 
     /// <summary>Nicht beendete Aufgaben der Projektdetailansicht.</summary>
-    public ObservableCollection<WorkItem> NichtBeendeteAufgaben { get; } = new();
+    public ObservableCollection<WorkItem> NotFinishedWorkItems { get; } = new();
 
     /// <summary>Beendete Aufgaben der Projektdetailansicht.</summary>
-    public ObservableCollection<WorkItem> BeendeteAufgaben { get; } = new();
+    public ObservableCollection<WorkItem> FinishedWorkItems { get; } = new();
 
     /// <summary>Bearbeitbarer Projektname.</summary>
-    public string ProjektName
+    public string ProjectName
     {
-        get => _projektName;
-        set => SetProperty(ref _projektName, value);
+        get => _projectName;
+        set => SetProperty(ref _projectName, value);
     }
 
     /// <summary>Bearbeitbare Projektbeschreibung.</summary>
-    public string? ProjektBeschreibung
+    public string? ProjectDescription
     {
-        get => _projektBeschreibung;
-        set => SetProperty(ref _projektBeschreibung, value);
+        get => _projectDescription;
+        set => SetProperty(ref _projectDescription, value);
     }
 
     /// <summary>Ausgewähltes Repository.</summary>
@@ -139,29 +139,29 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         {
             if (SetProperty(ref _selectedRepository, value))
             {
-                AktualisiereKannIssuesLaden();
+                UpdateCanLoadIssues();
                 IsEditingSourceBranch = false;
                 AvailableSourceBranchesForEdit.Clear();
                 IsEditingSourceBranchManualInput = false;
                 SourceBranchInputError = null;
                 SelectedRepositorySourceBranchName = value?.DefaultSourceBranchName;
                 OnPropertyChanged(nameof(IsBackmergeOptionVisible));
-                IsEditingInitialisierungsskript = false;
-                InitialisierungsskriptSuggestionen.Clear();
-                InitialisierungsskriptLoadingFailed = null;
-                SelectedInitialisierungsskript = value?.InitializationConfiguration?.InitializationScriptRelativePath;
+                IsEditingInitializationScript = false;
+                InitializationScriptSuggestions.Clear();
+                InitializationScriptLoadingFailed = null;
+                SelectedInitializationScript = value?.InitializationConfiguration?.InitializationScriptRelativePath;
             }
         }
     }
 
     /// <summary>Aktueller Aufgabenfilter.</summary>
-    public WorkItemFilterType AufgabenFilter
+    public WorkItemFilterType WorkItemsFilter
     {
-        get => _aufgabenFilter;
+        get => _workItemsFilter;
         set
         {
-            if (SetProperty(ref _aufgabenFilter, value))
-                AktualisiereAufgabenAnsichten();
+            if (SetProperty(ref _workItemsFilter, value))
+                UpdateWorkItemViews();
         }
     }
 
@@ -173,13 +173,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob die Ansicht im Neuanlage-Modus ist (noch kein persistiertes Projekt).</summary>
-    public bool IsNeuanlage => _projektId == Guid.Empty;
+    public bool IsNeuanlage => _projectId == Guid.Empty;
 
     /// <summary>Collection von geladenen Anforderungen aus dem SCM-Plugin.</summary>
-    public ObservableCollection<ScmRequirement> OffeneAnforderungen { get; } = new();
+    public ObservableCollection<ScmRequirement> OpenRequirement { get; } = new();
 
     /// <summary>Collection von geladenen Issues aus dem SCM-Plugin. Bleibt als kompatible Weiterleitung erhalten.</summary>
-    public ObservableCollection<Issue> IssueVorschlaege { get; } = new();
+    public ObservableCollection<Issue> IssueSuggestions { get; } = new();
 
     /// <summary>Gibt an, ob Issues gerade geladen werden.</summary>
     public bool IsLoadingIssues
@@ -189,20 +189,20 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>true wenn das Repository ein SCM-Plugin mit Anforderungssupport hat.</summary>
-    public bool KannAnforderungenLaden
+    public bool LoadCanRequirement
     {
-        get => _kannAnforderungenLaden;
+        get => _canRequirementLoad;
         private set
         {
-            if (SetProperty(ref _kannAnforderungenLaden, value))
+            if (SetProperty(ref _canRequirementLoad, value))
             {
-                OnPropertyChanged(nameof(KannIssuesLaden));
+                OnPropertyChanged(nameof(LoadCanIssues));
             }
         }
     }
 
     /// <summary>true wenn das Repository ein SCM-Plugin mit Issue-Support hat. Kompatible Weiterleitung.</summary>
-    public bool KannIssuesLaden => KannAnforderungenLaden;
+    public bool LoadCanIssues => LoadCanRequirement;
 
     /// <summary>Aktuell konfigurierter Basis-Branch des ausgewählten Repositories, von dem neue Feature-Branches abgezweigt werden. <c>null</c> bedeutet Standard-Branch.</summary>
     public string? SelectedRepositorySourceBranchName
@@ -222,14 +222,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         set
         {
             if (SetProperty(ref _isBackmergeAutoMergeEnabled, value))
-                SpeichereBackmergeAktivAsync(value).SafeFireAndForget(_logger, "ProjectDetailViewModel.SpeichereBackmergeAktivAsync");
+                SaveBackmergeActiveAsync(value).SafeFireAndForget(_logger, "ProjectDetailViewModel.SpeichereBackmergeAktivAsync");
         }
     }
 
     /// <summary>Gibt an, ob die projektbezogene Backmerge-Option angeboten wird: nur im globalen
     /// Modus „Projektbezogen aktivierbar“ und nur bei einem konfigurierten Basis-Branch.</summary>
     public bool IsBackmergeOptionVisible
-        => _isBackmergeModusProjektbezogen
+        => _isBackmergeModeProjektbezogen
            && _selectedRepository != null
            && !string.IsNullOrWhiteSpace(SelectedRepositorySourceBranchName);
 
@@ -269,67 +269,67 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Liste ausführbarer Dateien aus dem Remote-Repository für die Initialisierungsskript-Auswahl.</summary>
-    public ObservableCollection<string> InitialisierungsskriptSuggestionen { get; } = new();
+    public ObservableCollection<string> InitializationScriptSuggestions { get; } = new();
 
-    /// <summary>Gefilterte Sicht auf <see cref="InitialisierungsskriptSuggestionen"/>, eingeengt anhand des in <see cref="SelectedInitialisierungsskript"/> eingegebenen Texts.</summary>
-    public CollectionView InitialisierungsskriptSuggestionenView { get; }
+    /// <summary>Gefilterte Sicht auf <see cref="InitializationScriptSuggestions"/>, eingeengt anhand des in <see cref="SelectedInitializationScript"/> eingegebenen Texts.</summary>
+    public CollectionView InitializationScriptSuggestionsView { get; }
 
     /// <summary>Vom Benutzer ausgewähltes oder manuell eingegebenes Initialisierungsskript.</summary>
-    public string? SelectedInitialisierungsskript
+    public string? SelectedInitializationScript
     {
-        get => _selectedInitialisierungsskript;
-        set => SetProperty(ref _selectedInitialisierungsskript, value, () => InitialisierungsskriptSuggestionenView.Refresh());
+        get => _selectedInitializationScript;
+        set => SetProperty(ref _selectedInitializationScript, value, () => InitializationScriptSuggestionsView.Refresh());
     }
 
     /// <summary>Gibt an, ob das Initialisierungsskript des ausgewählten Repositories gerade bearbeitet wird.</summary>
-    public bool IsEditingInitialisierungsskript
+    public bool IsEditingInitializationScript
     {
-        get => _isEditingInitialisierungsskript;
-        private set => SetProperty(ref _isEditingInitialisierungsskript, value);
+        get => _isEditingInitializationScript;
+        private set => SetProperty(ref _isEditingInitializationScript, value);
     }
 
     /// <summary>Gibt an, ob das Laden der Initialisierungsskript-Vorschläge fehlgeschlagen ist. <c>null</c> bedeutet: noch nicht geladen.</summary>
-    public bool? InitialisierungsskriptLoadingFailed
+    public bool? InitializationScriptLoadingFailed
     {
-        get => _initialisierungsskriptLoadingFailed;
-        private set => SetProperty(ref _initialisierungsskriptLoadingFailed, value);
+        get => _initializationScriptLoadingFailed;
+        private set => SetProperty(ref _initializationScriptLoadingFailed, value);
     }
 
     /// <summary>Erstellt eine Aufgabe aus einer offenen SCM-Anforderung.</summary>
-    public AsyncRelayCommand<ScmRequirement> AufgabeAusAnforderungErstellenCommand { get; }
+    public AsyncRelayCommand<ScmRequirement> CreateWorkItemFromRequirementCommand { get; }
 
     /// <summary>Erstellt eine Aufgabe aus einem Issue-Vorschlag.</summary>
-    public AsyncRelayCommand<Issue> AufgabeAusIssueErstellenCommand { get; }
+    public AsyncRelayCommand<Issue> CreateWorkItemFromIssueCommand { get; }
 
     /// <summary>Lädt das Projekt neu.</summary>
-    public ICommand LadenCommand { get; }
+    public ICommand LoadCommand { get; }
 
     /// <summary>Erstellt eine neue Aufgabe für das Projekt.</summary>
-    public ICommand AufgabeErstellenCommand { get; }
+    public ICommand CreateWorkItemCommand { get; }
 
     /// <summary>Öffnet eine Aufgabe im Detail.</summary>
-    public ICommand AufgabeOeffnenCommand { get; }
+    public ICommand OpenWorkItemCommand { get; }
 
     /// <summary>Navigiert zurück zur Projektübersicht.</summary>
-    public ICommand ZurueckCommand { get; }
+    public ICommand BackCommand { get; }
 
     /// <summary>Speichert Projektänderungen.</summary>
-    public ICommand SpeichernCommand { get; }
+    public ICommand SaveCommand { get; }
 
     /// <summary>Löscht das Projekt.</summary>
-    public ICommand LoeschenCommand { get; }
+    public ICommand DeleteCommand { get; }
 
     /// <summary>Öffnet das Filter-Overlay.</summary>
     public ICommand FilterCommand { get; }
 
     /// <summary>Öffnet den Repository-Zuweisungs-Dialog.</summary>
-    public ICommand RepositoryZuweisenCommand { get; }
+    public ICommand AssignRepositoryCommand { get; }
 
     /// <summary>Öffnet das Repository im Browser.</summary>
-    public ICommand RepositoryOeffnenCommand { get; }
+    public ICommand OpenRepositoryCommand { get; }
 
     /// <summary>Öffnet den Dialog zur nachträglichen Bearbeitung des Arbeitsverzeichnisses des zugewiesenen Repositories.</summary>
-    public ICommand ArbeitsverzeichnisBearbeitenCommand { get; }
+    public ICommand WorkingDirectoryEditCommand { get; }
 
     /// <summary>Öffnet den Bearbeitungsmodus für den Basis-Branch des ausgewählten Repositories.</summary>
     public ICommand EditSourceBranchCommand { get; }
@@ -341,17 +341,17 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     public ICommand CancelSourceBranchEditCommand { get; }
 
     /// <summary>Lädt die Initialisierungsskript-Vorschläge des ausgewählten Repositories und öffnet den Bearbeitungsmodus.</summary>
-    public ICommand LoadInitialisierungsskriptSuggestionenCommand { get; }
+    public ICommand LoadInitializationScriptSuggestionsCommand { get; }
 
     /// <summary>Speichert das ausgewählte Initialisierungsskript des ausgewählten Repositories.</summary>
-    public ICommand SaveInitialisierungsskriptCommand { get; }
+    public ICommand SaveInitializationScriptCommand { get; }
 
     /// <summary>Bricht die Bearbeitung des Initialisierungsskripts ab und verwirft Änderungen.</summary>
-    public ICommand CancelInitialisierungsskriptEditCommand { get; }
+    public ICommand CancelInitializationScriptEditCommand { get; }
 
     /// <inheritdoc cref="ProjectDetailViewModel"/>
     public ProjectDetailViewModel(
-        ProjectService projektService,
+        ProjectService projectService,
         WorkItemService workItemService,
         IServiceProvider serviceProvider,
         IDialogService dialogService,
@@ -359,7 +359,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         ILogger<ProjectDetailViewModel> logger,
         DirectoryStructureBrowserService? directoryStructureService = null)
     {
-        _projektService = projektService;
+        _projectService = projectService;
         _workItemService = workItemService;
         _serviceProvider = serviceProvider;
         _dialogService = dialogService;
@@ -367,54 +367,54 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         _logger = logger;
         _directoryStructureService = directoryStructureService;
 
-        InitialisierungsskriptSuggestionenView = (CollectionView)CollectionViewSource.GetDefaultView(InitialisierungsskriptSuggestionen);
-        InitialisierungsskriptSuggestionenView.Filter = FilterInitialisierungsskriptSuggestion;
+        InitializationScriptSuggestionsView = (CollectionView)CollectionViewSource.GetDefaultView(InitializationScriptSuggestions);
+        InitializationScriptSuggestionsView.Filter = FilterInitializationScriptSuggestion;
 
-        LadenCommand = new AsyncRelayCommand(LadenAsync);
-        AufgabeErstellenCommand = new AsyncRelayCommand(
-            AufgabeErstellenAsync,
-            () => _projektId != Guid.Empty);
-        AufgabeOeffnenCommand = new RelayCommand<Guid>(id => OeffneAufgabe(id));
-        ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
-        SpeichernCommand = new AsyncRelayCommand(ProjektSpeichernAsync, () => !string.IsNullOrWhiteSpace(_projektName));
-        LoeschenCommand = new AsyncRelayCommand(ProjektLoeschenAsync, () => _projektId != Guid.Empty);
+        LoadCommand = new AsyncRelayCommand(LoadAsync);
+        CreateWorkItemCommand = new AsyncRelayCommand(
+            CreateWorkItemAsync,
+            () => _projectId != Guid.Empty);
+        OpenWorkItemCommand = new RelayCommand<Guid>(id => OpenWorkItem(id));
+        BackCommand = new RelayCommand(() => BackAction?.Invoke());
+        SaveCommand = new AsyncRelayCommand(SaveProjectAsync, () => !string.IsNullOrWhiteSpace(_projectName));
+        DeleteCommand = new AsyncRelayCommand(DeleteProjectAsync, () => _projectId != Guid.Empty);
         FilterCommand = new RelayCommand(() => IsFilterOverlayVisible = !IsFilterOverlayVisible);
-        RepositoryZuweisenCommand = new AsyncRelayCommand(RepositoryZuweisenAsync, () => _projektId != Guid.Empty);
-        RepositoryOeffnenCommand = new RelayCommand(RepositoryOeffnen, () => _selectedRepository != null);
-        ArbeitsverzeichnisBearbeitenCommand = new AsyncRelayCommand(ArbeitsverzeichnisBearbeitenAsync, () => _selectedRepository != null);
+        AssignRepositoryCommand = new AsyncRelayCommand(AssignRepositoryAsync, () => _projectId != Guid.Empty);
+        OpenRepositoryCommand = new RelayCommand(OpenRepository, () => _selectedRepository != null);
+        WorkingDirectoryEditCommand = new AsyncRelayCommand(WorkingDirectoryEditAsync, () => _selectedRepository != null);
         EditSourceBranchCommand = new AsyncRelayCommand(EditSourceBranchAsync, () => _selectedRepository != null);
         SaveSourceBranchCommand = new AsyncRelayCommand(SaveSourceBranchAsync, () => _isEditingSourceBranch);
         CancelSourceBranchEditCommand = new RelayCommand(CancelSourceBranchEdit, () => _isEditingSourceBranch);
-        LoadInitialisierungsskriptSuggestionenCommand = new AsyncRelayCommand(
-            ct => LoadInitialisierungsskriptSuggestionenAsync(_selectedRepository?.Id ?? Guid.Empty, ct),
+        LoadInitializationScriptSuggestionsCommand = new AsyncRelayCommand(
+            ct => LoadInitializationScriptSuggestionsAsync(_selectedRepository?.Id ?? Guid.Empty, ct),
             () => _selectedRepository != null);
-        SaveInitialisierungsskriptCommand = new AsyncRelayCommand(SaveInitialisierungsskriptAsync, () => _isEditingInitialisierungsskript);
-        CancelInitialisierungsskriptEditCommand = new RelayCommand(CancelInitialisierungsskriptEdit, () => _isEditingInitialisierungsskript);
-        AufgabeAusAnforderungErstellenCommand = new AsyncRelayCommand<ScmRequirement>(AufgabeAusAnforderungErstellenAsync);
-        AufgabeAusIssueErstellenCommand = new AsyncRelayCommand<Issue>(AufgabeAusIssueErstellenAsync);
+        SaveInitializationScriptCommand = new AsyncRelayCommand(SaveInitializationScriptAsync, () => _isEditingInitializationScript);
+        CancelInitializationScriptEditCommand = new RelayCommand(CancelInitializationScriptEdit, () => _isEditingInitializationScript);
+        CreateWorkItemFromRequirementCommand = new AsyncRelayCommand<ScmRequirement>(CreateWorkItemFromRequirementAsync);
+        CreateWorkItemFromIssueCommand = new AsyncRelayCommand<Issue>(CreateWorkItemFromIssueAsync);
     }
 
-    private async Task LadenAsync(CancellationToken ct)
+    private async Task LoadAsync(CancellationToken ct)
     {
-        if (_projektId == Guid.Empty)
+        if (_projectId == Guid.Empty)
             return;
 
         IsLoading = true;
-        FehlerMeldung = null;
+        ErrorMessage = null;
 
         try
         {
-            Project = await _projektService.GetDetailAsync(_projektId, ct);
-            var workItems = await _workItemService.GetByProjectAsync(_projektId, ct);
+            Project = await _projectService.GetDetailAsync(_projectId, ct);
+            var workItems = await _workItemService.GetByProjectAsync(_projectId, ct);
             WorkItems.Clear();
             foreach (var workItem in workItems)
                 WorkItems.Add(workItem);
-            AktualisiereAufgabenAnsichten();
+            UpdateWorkItemViews();
 
             if (Project != null)
             {
-                ProjektName = Project.Name;
-                ProjektBeschreibung = Project.Description;
+                ProjectName = Project.Name;
+                ProjectDescription = Project.Description;
                 SelectedRepository = Project.Repositories.FirstOrDefault();
             }
 
@@ -422,10 +422,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             // Verfügung, bleibt sie schlicht verborgen statt das Laden des Projekts zu verhindern.
             try
             {
-                using var einstellungenScope = _serviceProvider.CreateScope();
-                var settings = einstellungenScope.ServiceProvider.GetRequiredService<AppSettingService>();
-                _isBackmergeModusProjektbezogen = await settings.GetScmBackmergeModeAsync(ct) == ScmBackmergeMode.ProjectScoped;
-                _isBackmergeAutoMergeEnabled = await settings.GetBackmergeProjectEnabledAsync(_projektId, ct);
+                using var settingsScope = _serviceProvider.CreateScope();
+                var settings = settingsScope.ServiceProvider.GetRequiredService<AppSettingService>();
+                _isBackmergeModeProjektbezogen = await settings.GetScmBackmergeModeAsync(ct) == ScmBackmergeMode.ProjectScoped;
+                _isBackmergeAutoMergeEnabled = await settings.GetBackmergeProjectEnabledAsync(_projectId, ct);
             }
             catch (OperationCanceledException)
             {
@@ -433,12 +433,12 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Backmerge-Einstellungen für Projekt {ProjektId} konnten nicht geladen werden.", _projektId);
+                _logger.LogWarning(ex, "Backmerge--Einstellungen für Projekt {ProjektId} konnten nicht geladen werden.", _projectId);
             }
             OnPropertyChanged(nameof(IsBackmergeAutoMergeEnabled));
             OnPropertyChanged(nameof(IsBackmergeOptionVisible));
 
-            await LadenOffeneAnforderungenAsync(ct);
+            await LoadOpenRequirementAsync(ct);
         }
         catch (OperationCanceledException)
         {
@@ -446,8 +446,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Laden des Projekts {ProjektId}.", _projektId);
-            SetFehler(ex);
+            _logger.LogError(ex, "Fehler beim Laden des Projekts {ProjektId}.", _projectId);
+            SetError(ex);
         }
         finally
         {
@@ -455,24 +455,24 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task AufgabeErstellenAsync(CancellationToken ct)
+    private async Task CreateWorkItemAsync(CancellationToken ct)
     {
-        if (_projektId == Guid.Empty)
+        if (_projectId == Guid.Empty)
             return;
 
         try
         {
             var workItem = await _workItemService.CreateAsync(
-                _projektId,
+                _projectId,
                 "Neue Aufgabe",
                 string.Empty,
                 SelectedRepository?.Id,
                 ct);
 
             WorkItems.Add(workItem);
-            AktualisiereAufgabenAnsichten();
+            UpdateWorkItemViews();
 
-            OeffneAufgabe(workItem.Id);
+            OpenWorkItem(workItem.Id);
         }
         catch (OperationCanceledException)
         {
@@ -481,39 +481,39 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe.");
-            SetFehler(ex);
+            SetError(ex);
         }
     }
 
-    private async Task ProjektSpeichernAsync(CancellationToken ct)
+    private async Task SaveProjectAsync(CancellationToken ct)
     {
         try
         {
-            if (_projektId == Guid.Empty)
+            if (_projectId == Guid.Empty)
             {
-                await _projektService.CreateAsync(ProjektName.Trim(), ProjektBeschreibung?.Trim(), ct);
+                await _projectService.CreateAsync(ProjectName.Trim(), ProjectDescription?.Trim(), ct);
                 try
                 {
-                    await (ProjektListeAktualisierenCallback?.Invoke() ?? Task.CompletedTask);
+                    await (RefreshProjectListCallback?.Invoke() ?? Task.CompletedTask);
                 }
                 catch (Exception callbackEx)
                 {
-                    _logger.LogError(callbackEx, "Fehler im ProjektListeAktualisierenCallback nach Projekterstellung.");
+                    _logger.LogError(callbackEx, "Fehler im RefreshProjectListCallback nach Projekterstellung.");
                 }
-                ZurueckAction?.Invoke();
+                BackAction?.Invoke();
             }
             else
             {
-                await _projektService.UpdateAsync(_projektId, ProjektName.Trim(), ProjektBeschreibung?.Trim(), ct);
+                await _projectService.UpdateAsync(_projectId, ProjectName.Trim(), ProjectDescription?.Trim(), ct);
                 try
                 {
-                    await (ProjektListeAktualisierenCallback?.Invoke() ?? Task.CompletedTask);
+                    await (RefreshProjectListCallback?.Invoke() ?? Task.CompletedTask);
                 }
                 catch (Exception callbackEx)
                 {
-                    _logger.LogError(callbackEx, "Fehler im ProjektListeAktualisierenCallback nach Projektaktualisierung.");
+                    _logger.LogError(callbackEx, "Fehler im RefreshProjectListCallback nach Projektaktualisierung.");
                 }
-                await LadenAsync(ct);
+                await LoadAsync(ct);
             }
         }
         catch (OperationCanceledException)
@@ -522,31 +522,31 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Speichern des Projekts {ProjektId}.", _projektId);
-            SetFehler(ex);
+            _logger.LogError(ex, "Fehler beim Speichern des Projekts {ProjektId}.", _projectId);
+            SetError(ex);
         }
     }
 
-    private async Task ProjektLoeschenAsync(CancellationToken ct)
+    private async Task DeleteProjectAsync(CancellationToken ct)
     {
-        if (_projektId == Guid.Empty)
+        if (_projectId == Guid.Empty)
             return;
 
-        if (!_dialogService.BestaetigenDialog("Soll das Projekt wirklich gelöscht werden?", "Löschen bestätigen"))
+        if (!_dialogService.ConfirmDialog("Soll das Projekt wirklich gelöscht werden?", "Löschen bestätigen"))
             return;
 
         try
         {
-            await _projektService.DeleteAsync(_projektId, ct);
+            await _projectService.DeleteAsync(_projectId, ct);
             try
             {
-                await (ProjektListeAktualisierenCallback?.Invoke() ?? Task.CompletedTask);
+                await (RefreshProjectListCallback?.Invoke() ?? Task.CompletedTask);
             }
             catch (Exception callbackEx)
             {
-                _logger.LogError(callbackEx, "Fehler im ProjektListeAktualisierenCallback nach Projektlöschung.");
+                _logger.LogError(callbackEx, "Fehler im RefreshProjectListCallback nach Projektlöschung.");
             }
-            ZurueckAction?.Invoke();
+            BackAction?.Invoke();
         }
         catch (OperationCanceledException)
         {
@@ -554,39 +554,39 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Löschen des Projekts {ProjektId}.", _projektId);
-            SetFehler(ex);
+            _logger.LogError(ex, "Fehler beim Löschen des Projekts {ProjektId}.", _projectId);
+            SetError(ex);
         }
     }
 
-    private async Task RepositoryZuweisenAsync(CancellationToken ct)
+    private async Task AssignRepositoryAsync(CancellationToken ct)
     {
-        if (_projektId == Guid.Empty)
+        if (_projectId == Guid.Empty)
             return;
 
         try
         {
             var vm = _serviceProvider.GetRequiredService<RepositoryAssignViewModel>();
-            await vm.LadenAsync(ct);
-            var confirmed = _dialogService.RepositoryZuweisenDialog(vm);
+            await vm.LoadAsync(ct);
+            var confirmed = _dialogService.RepositoryAssignDialog(vm);
 
             if (_disposed || ct.IsCancellationRequested)
                 return;
 
             if (confirmed && vm.SelectedRepository is { } repo && vm.SelectedScmPlugin is { } scmPlugin)
             {
-                var gitRepository = await _projektService.AddRepositoryAsync(
-                    _projektId,
+                var gitRepository = await _projectService.AddRepositoryAsync(
+                    _projectId,
                     scmPlugin.PluginPrefix,
                     repo.Url,
                     repo.Name,
                     vm.DefaultSourceBranchName,
                     ct);
 
-                await _projektService.SaveRepositoryWorkingDirectoryAsync(gitRepository.Id, vm.SelectedWorkingDirectory, ct);
+                await _projectService.SaveRepositoryWorkingDirectoryAsync(gitRepository.Id, vm.SelectedWorkingDirectory, ct);
 
                 if (!_disposed && !ct.IsCancellationRequested)
-                    await LadenAsync(ct);
+                    await LoadAsync(ct);
             }
         }
         catch (OperationCanceledException)
@@ -596,11 +596,11 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Zuweisen des Repositories.");
-            SetFehler(ex);
+            SetError(ex);
         }
     }
 
-    private void RepositoryOeffnen()
+    private void OpenRepository()
     {
         if (_selectedRepository == null)
             return;
@@ -620,11 +620,11 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Öffnen der Repository-URL.");
-            SetFehler(ex);
+            SetError(ex);
         }
     }
 
-    private async Task ArbeitsverzeichnisBearbeitenAsync(CancellationToken ct)
+    private async Task WorkingDirectoryEditAsync(CancellationToken ct)
     {
         if (_selectedRepository == null)
             return;
@@ -636,20 +636,20 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins()
                 .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginType, StringComparison.OrdinalIgnoreCase));
 
-            var vm = _serviceProvider.GetRequiredService<ArbeitsverzeichnisBearbeitenViewModel>();
-            await vm.LadenAsync(gitPlugin, repository.RepositoryUrl, repository.StartConfiguration?.WorkingDirectoryRelativePath, ct);
+            var vm = _serviceProvider.GetRequiredService<WorkingDirectoryEditViewModel>();
+            await vm.LoadAsync(gitPlugin, repository.RepositoryUrl, repository.StartConfiguration?.WorkingDirectoryRelativePath, ct);
 
-            var confirmed = _dialogService.ArbeitsverzeichnisBearbeitenDialog(vm);
+            var confirmed = _dialogService.WorkingDirectoryEditDialog(vm);
 
             if (_disposed || ct.IsCancellationRequested)
                 return;
 
             if (confirmed)
             {
-                await _projektService.SaveRepositoryWorkingDirectoryAsync(repository.Id, vm.SelectedWorkingDirectory, ct);
+                await _projectService.SaveRepositoryWorkingDirectoryAsync(repository.Id, vm.SelectedWorkingDirectory, ct);
 
                 if (!_disposed && !ct.IsCancellationRequested)
-                    await LadenAsync(ct);
+                    await LoadAsync(ct);
             }
         }
         catch (OperationCanceledException)
@@ -659,7 +659,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Bearbeiten des Arbeitsverzeichnisses für Repository {RepositoryId}.", repository.Id);
-            SetFehler(ex);
+            SetError(ex);
         }
     }
 
@@ -721,7 +721,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 ? null
                 : SelectedRepositorySourceBranchName.Trim();
 
-            var updatedRepository = await _projektService.UpdateRepositorySourceBranchAsync(repository.Id, normalized, ct);
+            var updatedRepository = await _projectService.UpdateRepositorySourceBranchAsync(repository.Id, normalized, ct);
 
             repository.DefaultSourceBranchName = updatedRepository.DefaultSourceBranchName;
             SelectedRepositorySourceBranchName = updatedRepository.DefaultSourceBranchName;
@@ -740,14 +740,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Persistiert die projektbezogene Backmerge-Freigabe sofort beim Umschalten der Option.</summary>
-    private async Task SpeichereBackmergeAktivAsync(bool active)
+    private async Task SaveBackmergeActiveAsync(bool active)
     {
-        if (_projektId == Guid.Empty)
+        if (_projectId == Guid.Empty)
             return;
 
         using var scope = _serviceProvider.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AppSettingService>()
-            .SetBackmergeProjectEnabledAsync(_projektId, active, CancellationToken.None);
+            .SetBackmergeProjectEnabledAsync(_projectId, active, CancellationToken.None);
     }
 
     private void CancelSourceBranchEdit()
@@ -764,23 +764,23 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         return isValid;
     }
 
-    private async Task LoadInitialisierungsskriptSuggestionenAsync(Guid repositoryId, CancellationToken ct)
+    private async Task LoadInitializationScriptSuggestionsAsync(Guid repositoryId, CancellationToken ct)
     {
         var repository = Project?.Repositories.FirstOrDefault(r => r.Id == repositoryId);
         if (repository == null)
             return;
 
-        _initialisierungsskriptBeforeEdit = SelectedInitialisierungsskript;
-        IsEditingInitialisierungsskript = true;
-        InitialisierungsskriptLoadingFailed = null;
-        InitialisierungsskriptSuggestionen.Clear();
+        _initializationScriptBeforeEdit = SelectedInitializationScript;
+        IsEditingInitializationScript = true;
+        InitializationScriptLoadingFailed = null;
+        InitializationScriptSuggestions.Clear();
 
         var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins()
             .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginType, StringComparison.OrdinalIgnoreCase));
 
         if (gitPlugin == null || _directoryStructureService == null || string.IsNullOrWhiteSpace(repository.RepositoryUrl))
         {
-            InitialisierungsskriptLoadingFailed = true;
+            InitializationScriptLoadingFailed = true;
             return;
         }
 
@@ -789,21 +789,21 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
         if (result.Status != RepositoryStructureLoadStatus.Success)
         {
-            InitialisierungsskriptLoadingFailed = true;
+            InitializationScriptLoadingFailed = true;
             return;
         }
 
         foreach (var entry in result.Entries
-            .Where(entry => IstAusfuehrbareDatei(entry.Path))
+            .Where(entry => IsExecutableFile(entry.Path))
             .OrderBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase))
         {
-            InitialisierungsskriptSuggestionen.Add(entry.Path);
+            InitializationScriptSuggestions.Add(entry.Path);
         }
 
-        InitialisierungsskriptLoadingFailed = false;
+        InitializationScriptLoadingFailed = false;
     }
 
-    private async Task SaveInitialisierungsskriptAsync(CancellationToken ct)
+    private async Task SaveInitializationScriptAsync(CancellationToken ct)
     {
         if (_selectedRepository == null)
             return;
@@ -812,15 +812,15 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var normalized = string.IsNullOrWhiteSpace(SelectedInitialisierungsskript)
+            var normalized = string.IsNullOrWhiteSpace(SelectedInitializationScript)
                 ? null
-                : SelectedInitialisierungsskript.Trim();
+                : SelectedInitializationScript.Trim();
 
-            var updatedKonfiguration = await _projektService.SaveRepositoryInitializationScriptAsync(repository.Id, normalized, ct);
+            var updatedConfiguration = await _projectService.SaveRepositoryInitializationScriptAsync(repository.Id, normalized, ct);
 
-            repository.InitializationConfiguration = updatedKonfiguration;
-            SelectedInitialisierungsskript = updatedKonfiguration?.InitializationScriptRelativePath;
-            IsEditingInitialisierungsskript = false;
+            repository.InitializationConfiguration = updatedConfiguration;
+            SelectedInitializationScript = updatedConfiguration?.InitializationScriptRelativePath;
+            IsEditingInitializationScript = false;
         }
         catch (OperationCanceledException)
         {
@@ -829,51 +829,51 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Speichern des Initialisierungsskripts für Repository {RepositoryId}.", repository.Id);
-            SetFehler(ex);
+            SetError(ex);
         }
     }
 
-    private void CancelInitialisierungsskriptEdit()
+    private void CancelInitializationScriptEdit()
     {
-        SelectedInitialisierungsskript = _initialisierungsskriptBeforeEdit;
-        IsEditingInitialisierungsskript = false;
+        SelectedInitializationScript = _initializationScriptBeforeEdit;
+        IsEditingInitializationScript = false;
     }
 
-    private static bool IstAusfuehrbareDatei(string path)
+    private static bool IsExecutableFile(string path)
     {
         var extension = Path.GetExtension(path);
         return extension is ".ps1" or ".cmd" or ".bat" or ".sh" or ".exe";
     }
 
-    private bool FilterInitialisierungsskriptSuggestion(object item)
+    private bool FilterInitializationScriptSuggestion(object item)
     {
-        if (string.IsNullOrWhiteSpace(SelectedInitialisierungsskript))
+        if (string.IsNullOrWhiteSpace(SelectedInitializationScript))
             return true;
 
-        return item is string path && path.Contains(SelectedInitialisierungsskript, StringComparison.OrdinalIgnoreCase);
+        return item is string path && path.Contains(SelectedInitializationScript, StringComparison.OrdinalIgnoreCase);
     }
 
-    private void OeffneAufgabe(Guid id)
+    private void OpenWorkItem(Guid id)
     {
         var vm = _serviceProvider.GetRequiredService<TaskDetailViewModel>();
-        vm.ZurueckAction = () => NavigateBackToProjectCallback?.Invoke();
-        _aktuelleAufgabeId = id;
-        vm.AufgabeListeAktualisierenCallback = ReloadAufgabenListAsync;
+        vm.BackAction = () => NavigateBackToProjectCallback?.Invoke();
+        _currentWorkItemId = id;
+        vm.RefreshWorkItemListCallback = ReloadWorkItemsListAsync;
         NavigateToTaskViewCallback?.Invoke(vm);
         vm.WorkItemId = id;
     }
 
-    private async Task ReloadAufgabenListAsync()
+    private async Task ReloadWorkItemsListAsync()
     {
-        var aktualisiert = await _workItemService.GetByIdAsync(_aktuelleAufgabeId);
-        if (aktualisiert is null)
+        var updates = await _workItemService.GetByIdAsync(_currentWorkItemId);
+        if (updates is null)
             return;
 
-        ReplaceOrAddAufgabe(aktualisiert);
-        AktualisiereAufgabenAnsichten();
+        ReplaceOrAddWorkItem(updates);
+        UpdateWorkItemViews();
     }
 
-    private void ReplaceOrAddAufgabe(WorkItem workItem)
+    private void ReplaceOrAddWorkItem(WorkItem workItem)
     {
         for (var i = 0; i < WorkItems.Count; i++)
         {
@@ -886,20 +886,20 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         WorkItems.Add(workItem);
     }
 
-    private void AktualisiereAufgabenAnsichten()
+    private void UpdateWorkItemViews()
     {
-        GefilterteAufgaben.Clear();
-        var source = _aufgabenFilter switch
+        FilteredWorkItems.Clear();
+        var source = _workItemsFilter switch
         {
             WorkItemFilterType.Active => WorkItems.Where(a => a.Status != WorkItemStatus.Archived),
             WorkItemFilterType.Archived => WorkItems.Where(a => a.Status == WorkItemStatus.Archived),
             _ => WorkItems
         };
         foreach (var workItem in source)
-            GefilterteAufgaben.Add(workItem);
+            FilteredWorkItems.Add(workItem);
 
-        NichtBeendeteAufgaben.Clear();
-        BeendeteAufgaben.Clear();
+        NotFinishedWorkItems.Clear();
+        FinishedWorkItems.Clear();
         foreach (var workItem in WorkItems)
         {
             switch (workItem.Status)
@@ -907,16 +907,16 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 case WorkItemStatus.New:
                 case WorkItemStatus.Started:
                 case WorkItemStatus.Waiting:
-                    NichtBeendeteAufgaben.Add(workItem);
+                    NotFinishedWorkItems.Add(workItem);
                     break;
                 case WorkItemStatus.Completed:
-                    BeendeteAufgaben.Add(workItem);
+                    FinishedWorkItems.Add(workItem);
                     break;
             }
         }
     }
 
-    private async Task LadenOffeneAnforderungenAsync(CancellationToken ct)
+    private async Task LoadOpenRequirementAsync(CancellationToken ct)
     {
         var repository = _selectedRepository;
         if (repository == null)
@@ -929,16 +929,16 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             return;
 
         IsLoadingIssues = true;
-        OffeneAnforderungen.Clear();
-        IssueVorschlaege.Clear();
+        OpenRequirement.Clear();
+        IssueSuggestions.Clear();
 
         try
         {
-            var bereitsKonvertierteNummern = WorkItems
+            var readyConvertedNumbers = WorkItems
                 .Where(a => a.IssueReference?.IssueNumber != null)
                 .Select(a => a.IssueReference!.IssueNumber!.Value)
                 .ToHashSet();
-            var bereitsKonvertierteAlerts = WorkItems
+            var readyConvertedAlerts = WorkItems
                 .Where(a => !string.IsNullOrWhiteSpace(a.AlertReference?.SourceKey))
                 .Select(a => a.AlertReference!.SourceKey)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -950,10 +950,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             var issues = await gitPlugin.GetIssuesAsync(repository.RepositoryUrl, ct);
             foreach (var issue in issues)
             {
-                if (!bereitsKonvertierteNummern.Contains(issue.Number))
+                if (!readyConvertedNumbers.Contains(issue.Number))
                 {
-                    IssueVorschlaege.Add(issue);
-                    OffeneAnforderungen.Add(ScmRequirement.FromIssue(issue, repositoryContext));
+                    IssueSuggestions.Add(issue);
+                    OpenRequirement.Add(ScmRequirement.FromIssue(issue, repositoryContext));
                 }
             }
 
@@ -971,7 +971,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                     ct);
                 if (!alreadyLinked)
                 {
-                    OffeneAnforderungen.Add(ScmRequirement.FromPullRequest(
+                    OpenRequirement.Add(ScmRequirement.FromPullRequest(
                         pullRequest with { RepositoryId = normalizedRepositoryId },
                         new ScmRepositoryContext(repositoryContext.GitRepositoryId, repositoryContext.PluginPrefix, normalizedRepositoryId)));
                 }
@@ -982,9 +982,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 var alerts = await alertProvider.GetAlertsAsync(repository.RepositoryUrl, ct);
                 foreach (var alert in alerts)
                 {
-                    if (!bereitsKonvertierteAlerts.Contains(alert.SourceKey))
+                    if (!readyConvertedAlerts.Contains(alert.SourceKey))
                     {
-                        OffeneAnforderungen.Add(ScmRequirement.FromAlert(alert));
+                        OpenRequirement.Add(ScmRequirement.FromAlert(alert));
                     }
                 }
             }
@@ -1003,34 +1003,34 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task AufgabeAusAnforderungErstellenAsync(ScmRequirement? requirement, CancellationToken ct)
+    private async Task CreateWorkItemFromRequirementAsync(ScmRequirement? requirement, CancellationToken ct)
     {
         if (requirement == null)
             return;
 
         if (requirement.Kind == ScmRequirementKind.Issue)
         {
-            await AufgabeAusIssueErstellenAsync(requirement.Issue, ct);
+            await CreateWorkItemFromIssueAsync(requirement.Issue, ct);
             return;
         }
 
         if (requirement.Kind == ScmRequirementKind.PullRequest)
         {
-            await AufgabeAusPullRequestErstellenAsync(requirement, ct);
+            await CreateWorkItemFromPullRequestAsync(requirement, ct);
             return;
         }
 
-        await AufgabeAusAlertErstellenAsync(requirement, ct);
+        await CreateWorkItemFromAlertAsync(requirement, ct);
     }
 
-    private async Task AufgabeAusPullRequestErstellenAsync(ScmRequirement requirement, CancellationToken ct)
+    private async Task CreateWorkItemFromPullRequestAsync(ScmRequirement requirement, CancellationToken ct)
     {
         var pullRequest = requirement.PullRequest;
         var repositoryContext = requirement.RepositoryContext;
-        if (pullRequest == null || repositoryContext == null || _projektId == Guid.Empty)
+        if (pullRequest == null || repositoryContext == null || _projectId == Guid.Empty)
             return;
 
-        if (!_dialogService.BestaetigenDialog(
+        if (!_dialogService.ConfirmDialog(
                 $"Pull Request '{pullRequest.Title}' als Review-Aufgabe erstellen?",
                 "Pull Request konvertieren"))
             return;
@@ -1038,22 +1038,22 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         try
         {
             var workItem = await _workItemService.CreateFromPullRequestAsync(
-                _projektId,
+                _projectId,
                 pullRequest,
                 repositoryContext,
                 ct);
 
-            var zuEntfernen = OffeneAnforderungen.FirstOrDefault(a =>
+            var toRemove = OpenRequirement.FirstOrDefault(a =>
                 a.Kind == ScmRequirementKind.PullRequest
                 && a.PullRequest?.Provider == pullRequest.Provider
                 && a.PullRequest?.Number == pullRequest.Number
                 && string.Equals(a.RepositoryContext?.RepositoryId, repositoryContext.RepositoryId, StringComparison.OrdinalIgnoreCase));
-            if (zuEntfernen != null)
-                OffeneAnforderungen.Remove(zuEntfernen);
+            if (toRemove != null)
+                OpenRequirement.Remove(toRemove);
 
             WorkItems.Add(workItem);
-            AktualisiereAufgabenAnsichten();
-            OeffneAufgabe(workItem.Id);
+            UpdateWorkItemViews();
+            OpenWorkItem(workItem.Id);
         }
         catch (OperationCanceledException)
         {
@@ -1062,16 +1062,16 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Pull Request #{PullRequestNumber}.", pullRequest.Number);
-            SetFehler(ex);
+            SetError(ex);
         }
     }
 
-    private async Task AufgabeAusIssueErstellenAsync(Issue? issue, CancellationToken ct)
+    private async Task CreateWorkItemFromIssueAsync(Issue? issue, CancellationToken ct)
     {
-        if (issue == null || _projektId == Guid.Empty)
+        if (issue == null || _projectId == Guid.Empty)
             return;
 
-        if (!_dialogService.BestaetigenDialog(
+        if (!_dialogService.ConfirmDialog(
                 $"Issue '{issue.Title}' als Aufgabe erstellen?",
                 "Issue konvertieren"))
             return;
@@ -1079,20 +1079,20 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         try
         {
             var workItem = await _workItemService.CreateFromIssueAsync(
-                _projektId,
+                _projectId,
                 issue,
                 _selectedRepository?.Id,
                 ct);
 
-            var zuEntfernen = IssueVorschlaege.FirstOrDefault(i => i.Number == issue.Number);
-            if (zuEntfernen != null)
-                IssueVorschlaege.Remove(zuEntfernen);
-            var requirement = OffeneAnforderungen.FirstOrDefault(a => a.Kind == ScmRequirementKind.Issue && a.Issue?.Number == issue.Number);
+            var toRemove = IssueSuggestions.FirstOrDefault(i => i.Number == issue.Number);
+            if (toRemove != null)
+                IssueSuggestions.Remove(toRemove);
+            var requirement = OpenRequirement.FirstOrDefault(a => a.Kind == ScmRequirementKind.Issue && a.Issue?.Number == issue.Number);
             if (requirement != null)
-                OffeneAnforderungen.Remove(requirement);
+                OpenRequirement.Remove(requirement);
 
             WorkItems.Add(workItem);
-            AktualisiereAufgabenAnsichten();
+            UpdateWorkItemViews();
         }
         catch (OperationCanceledException)
         {
@@ -1100,36 +1100,36 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Issue #{IssueNummer}.", issue.Number);
-            SetFehler(ex);
+            _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Issue #{IssueNumber}.", issue.Number);
+            SetError(ex);
         }
     }
 
-    private async Task AufgabeAusAlertErstellenAsync(ScmRequirement requirement, CancellationToken ct)
+    private async Task CreateWorkItemFromAlertAsync(ScmRequirement requirement, CancellationToken ct)
     {
         var alert = requirement.Alert;
-        if (alert == null || _projektId == Guid.Empty || _selectedRepository == null)
+        if (alert == null || _projectId == Guid.Empty || _selectedRepository == null)
             return;
 
-        if (!_dialogService.BestaetigenDialog(
+        if (!_dialogService.ConfirmDialog(
                 $"Alert '{alert.Title}' als GitHub-Issue und Aufgabe erstellen?",
                 "Alert konvertieren"))
             return;
 
-        var konvertierungRegistriert = false;
+        var conversionRegistered = false;
 
         try
         {
-            konvertierungRegistriert = _laufendeAlertKonvertierungen.Add(alert.SourceKey);
-            if (!konvertierungRegistriert)
+            conversionRegistered = _runningAlertConversion.Add(alert.SourceKey);
+            if (!conversionRegistered)
                 return;
 
             var existing = await _workItemService.GetByAlertSourceKeyAsync(alert.SourceKey, ct);
             if (existing != null)
             {
-                EntferneOffeneAnforderung(alert.SourceKey);
-                ReplaceOrAddAufgabe(existing);
-                AktualisiereAufgabenAnsichten();
+                RemoveOpenRequirement(alert.SourceKey);
+                ReplaceOrAddWorkItem(existing);
+                UpdateWorkItemViews();
                 return;
             }
 
@@ -1138,13 +1138,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
             if (gitPlugin is not IIssueCreateProvider issueCreateProvider)
             {
-                FehlerMeldung = "Das ausgewählte SCM-Plugin kann keine Issues erstellen.";
+                ErrorMessage = "Das ausgewählte SCM-Plugin kann keine Issues erstellen.";
                 return;
             }
 
             if (!await issueCreateProvider.CanCreateIssueAsync(_selectedRepository.RepositoryUrl, ct))
             {
-                FehlerMeldung = "Für dieses Repository kann kein GitHub-Issue erstellt werden.";
+                ErrorMessage = "Für dieses Repository kann kein GitHub-Issue erstellt werden.";
                 return;
             }
 
@@ -1152,12 +1152,12 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             var createdIssueResult = await issueCreateProvider.CreateIssueAsync(_selectedRepository.RepositoryUrl, request, ct);
             if (!createdIssueResult.IsSuccess || createdIssueResult.Issue == null)
             {
-                FehlerMeldung = createdIssueResult.ErrorMessage ?? "GitHub-Issue konnte nicht erstellt werden.";
+                ErrorMessage = createdIssueResult.ErrorMessage ?? "GitHub-Issue konnte nicht erstellt werden.";
                 return;
             }
 
             var workItem = await _workItemService.CreateFromAlertAsync(
-                _projektId,
+                _projectId,
                 alert,
                 createdIssueResult.Issue,
                 _selectedRepository.Id,
@@ -1165,10 +1165,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 _selectedRepository.RepositoryUrl,
                 ct);
 
-            EntferneOffeneAnforderung(alert.SourceKey);
+            RemoveOpenRequirement(alert.SourceKey);
 
-            ReplaceOrAddAufgabe(workItem);
-            AktualisiereAufgabenAnsichten();
+            ReplaceOrAddWorkItem(workItem);
+            UpdateWorkItemViews();
         }
         catch (OperationCanceledException)
         {
@@ -1177,20 +1177,20 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Alert {SourceKey}.", alert.SourceKey);
-            SetFehler(ex);
+            SetError(ex);
         }
         finally
         {
-            if (konvertierungRegistriert)
-                _laufendeAlertKonvertierungen.Remove(alert.SourceKey);
+            if (conversionRegistered)
+                _runningAlertConversion.Remove(alert.SourceKey);
         }
     }
 
-    private void EntferneOffeneAnforderung(string sourceKey)
+    private void RemoveOpenRequirement(string sourceKey)
     {
-        var zuEntfernen = OffeneAnforderungen.FirstOrDefault(a => string.Equals(a.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase));
-        if (zuEntfernen != null)
-            OffeneAnforderungen.Remove(zuEntfernen);
+        var toRemove = OpenRequirement.FirstOrDefault(a => string.Equals(a.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase));
+        if (toRemove != null)
+            OpenRequirement.Remove(toRemove);
     }
 
     private static IssueCreateRequest BuildIssueCreateRequest(ScmAlert alert)
@@ -1217,14 +1217,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         return new IssueCreateRequest(title, body);
     }
 
-    private void AktualisiereKannIssuesLaden()
+    private void UpdateCanLoadIssues()
     {
-        KannAnforderungenLaden = _selectedRepository != null
+        LoadCanRequirement = _selectedRepository != null
             && _pluginManager.GetSourceCodeManagementPlugins()
                 .Any(p => string.Equals(p.PluginPrefix, _selectedRepository.PluginType, StringComparison.OrdinalIgnoreCase));
     }
 
-    private void SetFehler(Exception ex) => SetFehler(ref _errorMessage, nameof(FehlerMeldung), ex);
+    private void SetError(Exception ex) => SetError(ref _errorMessage, nameof(ErrorMessage), ex);
 
     /// <inheritdoc/>
     public void Dispose()
@@ -1233,8 +1233,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             return;
         _disposed = true;
 
-        _ladenCts?.Cancel();
-        _ladenCts?.Dispose();
-        _ladenCts = null;
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = null;
     }
 }

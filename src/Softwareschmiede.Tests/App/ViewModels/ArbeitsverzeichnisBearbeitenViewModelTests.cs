@@ -12,7 +12,7 @@ using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Tests.App.ViewModels;
 
-/// <summary>Tests für <see cref="ArbeitsverzeichnisBearbeitenViewModel"/>.</summary>
+/// <summary>Tests für <see cref="WorkingDirectoryEditViewModel"/>.</summary>
 public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
 {
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
@@ -23,10 +23,10 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
     private DirectoryStructureBrowserService CreateDirectoryStructureService() =>
         new(_cache, Options.Create(new DirectoryStructureOptions()), NullLogger<DirectoryStructureBrowserService>.Instance);
 
-    private ArbeitsverzeichnisBearbeitenViewModel CreateSut(
+    private WorkingDirectoryEditViewModel CreateSut(
         DirectoryStructureBrowserService? directoryStructureService = null,
-        ILogger<ArbeitsverzeichnisBearbeitenViewModel>? logger = null) =>
-        new(logger ?? NullLogger<ArbeitsverzeichnisBearbeitenViewModel>.Instance, directoryStructureService);
+        ILogger<WorkingDirectoryEditViewModel>? logger = null) =>
+        new(logger ?? NullLogger<WorkingDirectoryEditViewModel>.Instance, directoryStructureService);
 
     private static Mock<IGitPlugin> CreatePluginMock(IEnumerable<RepositoryDirectoryEntry> entries)
     {
@@ -50,7 +50,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
         ]);
         var sut = CreateSut(CreateDirectoryStructureService());
 
-        await sut.LadenAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
+        await sut.LoadAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
 
         sut.AvailableWorkingDirectories.Should().Equal(".", "backend", "frontend");
     }
@@ -65,7 +65,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
         ]);
         var sut = CreateSut(CreateDirectoryStructureService());
 
-        await sut.LadenAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: "backend", ct: TestContext.Current.CancellationToken);
+        await sut.LoadAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: "backend", ct: TestContext.Current.CancellationToken);
 
         sut.SelectedWorkingDirectory.Should().Be("backend");
     }
@@ -79,7 +79,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
         ]);
         var sut = CreateSut(CreateDirectoryStructureService());
 
-        await sut.LadenAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: "legacy/backend", ct: TestContext.Current.CancellationToken);
+        await sut.LoadAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: "legacy/backend", ct: TestContext.Current.CancellationToken);
 
         sut.AvailableWorkingDirectories.Should().Contain("legacy/backend");
         sut.SelectedWorkingDirectory.Should().Be("legacy/backend");
@@ -92,7 +92,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
         var pluginMock = CreatePluginMock([new RepositoryDirectoryEntry("backend", IsDirectory: true)]);
         var sut = CreateSut(CreateDirectoryStructureService());
 
-        await sut.LadenAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
+        await sut.LoadAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
 
         sut.SelectedWorkingDirectory.Should().Be(".");
     }
@@ -103,7 +103,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
     {
         var sut = CreateSut(CreateDirectoryStructureService());
 
-        await sut.LadenAsync(gitPlugin: null, repositoryUrl: "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
+        await sut.LoadAsync(gitPlugin: null, repositoryUrl: "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
 
         sut.IsWorkingDirectoryManualInput.Should().BeTrue();
         sut.WorkingDirectoryInputText.Should().Be(".");
@@ -121,7 +121,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
             .ReturnsAsync(RepositoryStructureLoadResult.Failed("Verbindungsfehler"));
         var sut = CreateSut(CreateDirectoryStructureService());
 
-        var act = () => sut.LadenAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: "backend");
+        var act = () => sut.LoadAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: "backend");
 
         await act.Should().NotThrowAsync();
         sut.IsWorkingDirectoryManualInput.Should().BeTrue();
@@ -148,7 +148,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
                 loadingWasTrue = true;
         };
 
-        var loadTask = sut.LadenAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
+        var loadTask = sut.LoadAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
         tcs.SetResult([]);
         await loadTask;
 
@@ -176,7 +176,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
         var sut = CreateSut(CreateDirectoryStructureService());
         using var cts = new CancellationTokenSource();
 
-        var loadTask = sut.LadenAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: "backend", cts.Token);
+        var loadTask = sut.LoadAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: "backend", cts.Token);
         cts.Cancel();
 
         await loadTask;
@@ -194,7 +194,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
         bool? result = null;
         sut.CloseRequested += (_, confirmed) => result = confirmed;
 
-        sut.BestaetigenCommand.Execute(null);
+        sut.ConfirmCommand.Execute(null);
 
         result.Should().BeTrue();
     }
@@ -204,13 +204,13 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
     public async Task BestaetigenCommand_ShouldRejectAbsoluteManualWorkingDirectory()
     {
         var sut = CreateSut(CreateDirectoryStructureService());
-        await sut.LadenAsync(gitPlugin: null, repositoryUrl: "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
+        await sut.LoadAsync(gitPlugin: null, repositoryUrl: "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
         sut.WorkingDirectoryInputText = "C:\\temp";
         bool? result = null;
         sut.CloseRequested += (_, confirmed) => result = confirmed;
 
-        sut.BestaetigenCommand.CanExecute(null).Should().BeFalse();
-        sut.BestaetigenCommand.Execute(null);
+        sut.ConfirmCommand.CanExecute(null).Should().BeFalse();
+        sut.ConfirmCommand.Execute(null);
 
         result.Should().BeNull();
         sut.WorkingDirectoryInputError.Should().NotBeNullOrWhiteSpace();
@@ -221,13 +221,13 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
     public async Task BestaetigenCommand_ShouldRejectTraversalManualWorkingDirectory()
     {
         var sut = CreateSut(CreateDirectoryStructureService());
-        await sut.LadenAsync(gitPlugin: null, repositoryUrl: "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
+        await sut.LoadAsync(gitPlugin: null, repositoryUrl: "https://example.com/repo.git", currentWorkingDirectory: null, ct: TestContext.Current.CancellationToken);
         sut.WorkingDirectoryInputText = "../backend";
         bool? result = null;
         sut.CloseRequested += (_, confirmed) => result = confirmed;
 
-        sut.BestaetigenCommand.CanExecute(null).Should().BeFalse();
-        sut.BestaetigenCommand.Execute(null);
+        sut.ConfirmCommand.CanExecute(null).Should().BeFalse();
+        sut.ConfirmCommand.Execute(null);
 
         result.Should().BeNull();
         sut.WorkingDirectoryInputError.Should().Contain("..");
@@ -241,7 +241,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
         bool? result = null;
         sut.CloseRequested += (_, confirmed) => result = confirmed;
 
-        sut.AbbrechenCommand.Execute(null);
+        sut.CancelCommand.Execute(null);
 
         result.Should().BeFalse();
     }

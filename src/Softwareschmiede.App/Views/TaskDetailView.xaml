@@ -25,80 +25,80 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
 
                 <!-- Gruppe: Navigation -->
-                <controls:RibbonGroup GruppenName="Navigation">
+                <controls:RibbonGroup GroupName="Navigation">
                     <controls:RibbonGroup.ItemsContent>
                         <controls:RibbonLargeButton ButtonIcon="←"
                                                     ButtonText="Zurück"
-                                                    AutomationName="Zurück"
-                                                    ButtonCommand="{Binding ZurueckCommand}" />
+                                                    AutomationName="Back"
+                                                    ButtonCommand="{Binding BackCommand}" />
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: Aufgabe -->
-                <controls:RibbonGroup GruppenName="Aufgabe">
+                <controls:RibbonGroup GroupName="Aufgabe">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="💾"
                                                         ButtonText="Speichern"
-                                                        AutomationName="Speichern"
-                                                        ButtonCommand="{Binding SpeichernCommand}" />
+                                                        AutomationName="Save"
+                                                        ButtonCommand="{Binding SaveCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="🗑"
                                                         ButtonText="Löschen"
-                                                        AutomationName="Löschen"
-                                                        ButtonCommand="{Binding LoeschenCommand}" />
+                                                        AutomationName="Delete"
+                                                        ButtonCommand="{Binding DeleteCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="▶"
                                                         ButtonText="Starten"
-                                                        AutomationName="Starten"
-                                                        ButtonCommand="{Binding StartenCommand}" />
+                                                        AutomationName="Start"
+                                                        ButtonCommand="{Binding StartCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="✓"
                                                         ButtonText="Beenden"
-                                                        AutomationName="Beenden"
-                                                        ButtonCommand="{Binding AufgabeAbschliessenCommand}" />
+                                                        AutomationName="Exit"
+                                                        ButtonCommand="{Binding CompleteWorkItemCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="⏸"
                                                         ButtonText="Pause einstellen"
-                                                        AutomationName="PauseEinstellen"
-                                                        ButtonCommand="{Binding PauseEinstellenCommand}"
-                                                        Visibility="{Binding KannPausieren, Converter={StaticResource BoolToVisibilityConverter}}" />
-                            <TextBlock Text="{Binding PauseAnzeigeText}"
-                                       AutomationProperties.Name="PauseAnzeigeText"
+                                                        AutomationName="SetPause"
+                                                        ButtonCommand="{Binding SetPauseCommand}"
+                                                        Visibility="{Binding PauseCan, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <TextBlock Text="{Binding PauseDisplayText}"
+                                       AutomationProperties.Name="PauseDisplayText"
                                        Foreground="{DynamicResource SecondaryTextBrush}"
                                        FontSize="12"
                                        VerticalAlignment="Center"
                                        Margin="8,0,0,0"
-                                       Visibility="{Binding PauseAnzeigeText, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
-                            <TextBlock Text="{Binding TodoList.OffeneTodoCount, StringFormat='⚠ {0} offen'}"
-                                       AutomationProperties.Name="OffeneTodoCountBadge"
-                                       AutomationProperties.HelpText="{Binding TodoList.OffeneTodoCount}"
+                                       Visibility="{Binding PauseDisplayText, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                            <TextBlock Text="{Binding TodoList.OpenTodoCount, StringFormat='⚠ {0} offen'}"
+                                       AutomationProperties.Name="OpenTodoCountBadge"
+                                       AutomationProperties.HelpText="{Binding TodoList.OpenTodoCount}"
                                        Foreground="{DynamicResource ErrorBrush}"
                                        FontSize="12"
                                        FontWeight="SemiBold"
                                        VerticalAlignment="Center"
                                        Margin="8,0,0,0"
-                                       Visibility="{Binding TodoList.OffeneTodoCount, Converter={StaticResource GreaterThanZeroToVisibilityConverter}}" />
+                                       Visibility="{Binding TodoList.OpenTodoCount, Converter={StaticResource GreaterThanZeroToVisibilityConverter}}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: CLI -->
-                <controls:RibbonGroup GruppenName="CLI"
+                <controls:RibbonGroup GroupName="CLI"
                                       Visibility="{Binding IsCliViewSelected, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="🔌"
                                                         ButtonText="Plugin ändern"
-                                                        AutomationName="PluginAendern"
-                                                        ButtonCommand="{Binding PluginAendernCommand}"
-                                                        Visibility="{Binding ZeigeKiPluginAuswahl, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        AutomationName="SwitchPlugin"
+                                                        ButtonCommand="{Binding SwitchPluginCommand}"
+                                                        Visibility="{Binding ShowAiPluginSelection, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="▶"
                                                         ButtonText="CLI starten"
-                                                        AutomationName="CliNeustarten"
-                                                        ButtonCommand="{Binding CliNeustartenCommand}"
-                                                        Visibility="{Binding KannCliNeuStarten, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        AutomationName="RestartCli"
+                                                        ButtonCommand="{Binding RestartCliCommand}"
+                                                        Visibility="{Binding StartCanCliNew, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="■"
                                                         ButtonText="Stoppen"
-                                                        AutomationName="CliStoppen"
-                                                        ButtonCommand="{Binding CliStoppenCommand}"
-                                                        Visibility="{Binding KannCliStoppen, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        AutomationName="StopCli"
+                                                        ButtonCommand="{Binding StopCliCommand}"
+                                                        Visibility="{Binding StopCanCli, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="🗎"
                                                         ButtonText="Rohausgabe exportieren"
                                                         AutomationName="CliRawExport"
@@ -116,11 +116,11 @@
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            Margin="0,0,0,2" />
                                 <ComboBox ItemsSource="{Binding PromptTemplates}"
-                                          SelectedItem="{Binding SelectedPromptVorlage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          SelectedItem="{Binding SelectedPromptTemplate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           DisplayMemberPath="Name"
-                                          AutomationProperties.Name="PromptVorlagenAuswahl"
+                                          AutomationProperties.Name="PromptTemplateSelection"
                                           Width="220"
-                                          IsEnabled="{Binding KannPromptVorlageSenden}"
+                                          IsEnabled="{Binding SendCanPromptTemplate}"
                                           Padding="6,4" />
                                 <StackPanel Orientation="Horizontal"
                                             Margin="0,6,0,0">
@@ -131,9 +131,9 @@
                                                    Margin="0,0,0,2" />
                                         <StackPanel Orientation="Horizontal">
                                             <TextBox Text="{Binding ScheduledPromptTargetHours, UpdateSourceTrigger=PropertyChanged}"
-                                                     AutomationProperties.Name="ScheduledPromptStunde"
+                                                     AutomationProperties.Name="ScheduledPromptHour"
                                                      Width="40"
-                                                     IsEnabled="{Binding KannPromptVorlageSenden}"
+                                                     IsEnabled="{Binding SendCanPromptTemplate}"
                                                      Padding="6,4" />
                                             <TextBlock Text=":"
                                                        VerticalAlignment="Center"
@@ -142,13 +142,13 @@
                                             <TextBox Text="{Binding ScheduledPromptTargetMinutes, UpdateSourceTrigger=PropertyChanged}"
                                                      AutomationProperties.Name="ScheduledPromptMinute"
                                                      Width="40"
-                                                     IsEnabled="{Binding KannPromptVorlageSenden}"
+                                                     IsEnabled="{Binding SendCanPromptTemplate}"
                                                      Padding="6,4" />
                                         </StackPanel>
                                     </StackPanel>
                                     <controls:RibbonLargeButton ButtonIcon="⏰"
                                                                 ButtonText="Zeitgesteuert senden"
-                                                                AutomationName="ZeitgesteuertSenden"
+                                                                AutomationName="ScheduledSend"
                                                                 ButtonCommand="{Binding SchedulePromptCommand}" />
                                 </StackPanel>
                                 <StackPanel Margin="0,4,0,0"
@@ -161,7 +161,7 @@
                                                FontSize="11"
                                                Foreground="{DynamicResource SecondaryTextBrush}" />
                                     <Button Content="Wartestellung aufheben"
-                                            AutomationProperties.Name="WartestellungAufheben"
+                                            AutomationProperties.Name="ReleaseWaiting"
                                             Command="{Binding CancelScheduledPromptCommand}"
                                             HorizontalAlignment="Left"
                                             Margin="0,2,0,0"
@@ -174,85 +174,85 @@
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: Dateien -->
-                <controls:RibbonGroup GruppenName="Dateien"
+                <controls:RibbonGroup GroupName="Dateien"
                                       Visibility="{Binding IsFileExplorerViewSelected, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="📁"
                                                         ButtonText="Standard"
-                                                        AutomationName="DateiStandard"
-                                                        ButtonCommand="{Binding FileExplorer.StandardAnsichtCommand}" />
+                                                        AutomationName="DefaultFile"
+                                                        ButtonCommand="{Binding FileExplorer.DefaultViewCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="🔀"
                                                         ButtonText="Vergleich"
-                                                        AutomationName="DateiVergleich"
-                                                        ButtonCommand="{Binding FileExplorer.VergleichCommand}" />
+                                                        AutomationName="FileDiff"
+                                                        ButtonCommand="{Binding FileExplorer.CompareCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="🔄"
                                                         ButtonText="Aktualisieren"
-                                                        AutomationName="DateiAktualisieren"
-                                                        ButtonCommand="{Binding FileExplorer.AktualisierenCommand}" />
+                                                        AutomationName="RefreshFile"
+                                                        ButtonCommand="{Binding FileExplorer.RefreshCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="📂"
                                                         ButtonText="Datei öffnen"
-                                                        AutomationName="DateiOeffnen"
-                                                        ButtonCommand="{Binding FileExplorer.DateiMitStandardanwendungOeffnenCommand}" />
+                                                        AutomationName="OpenFile"
+                                                        ButtonCommand="{Binding FileExplorer.OpenFileWithDefaultappCommand}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: Werkzeuge -->
-                <controls:RibbonGroup GruppenName="Werkzeuge">
+                <controls:RibbonGroup GroupName="Werkzeuge">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="🗀"
                                                         ButtonText="Arbeitsverzeichnis öffnen"
-                                                        AutomationName="ArbeitsverzeichnisOeffnen"
-                                                        ButtonCommand="{Binding OeffneArbeitsverzeichnisCommand}" />
+                                                        AutomationName="OpenWorkingDirectory"
+                                                        ButtonCommand="{Binding OpenWorkingDirectoryCommand}" />
                             <controls:RibbonSplitButton ButtonIcon="🛠"
                                                         ButtonText="IDE öffnen"
-                                                        AutomationName="IdeOeffnen"
-                                                        ButtonCommand="{Binding OeffneIdeCommand}"
-                                                        DropdownCommand="{Binding OeffneIdeAuswahlCommand}"
-                                                        CanShowDropdown="{Binding KannIdeAuswaehlen}" />
+                                                        AutomationName="OpenIde"
+                                                        ButtonCommand="{Binding OpenIdeCommand}"
+                                                        DropdownCommand="{Binding OpenIdeSelectionCommand}"
+                                                        CanShowDropdown="{Binding SelectCanIde}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: Issue -->
-                <controls:RibbonGroup GruppenName="Issue"
+                <controls:RibbonGroup GroupName="Issue"
                                       Visibility="{Binding ShowIssueGroup, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="＋"
                                                         ButtonText="Issue anlegen"
-                                                        AutomationName="IssueAnlegen"
+                                                        AutomationName="CreateIssue"
                                                         ButtonCommand="{Binding IssueAnlegenCommand}"
                                                         Visibility="{Binding CanCreateIssue, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="🔗"
                                                         ButtonText="Issue zuweisen"
-                                                        AutomationName="IssueZuweisen"
-                                                        ButtonCommand="{Binding IssueZuweisenCommand}" />
+                                                        AutomationName="AssignIssue"
+                                                        ButtonCommand="{Binding AssignIssueCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="🌐"
                                                         ButtonText="Issue öffnen"
-                                                        AutomationName="IssueOeffnen"
-                                                        ButtonCommand="{Binding IssueBrowserOeffnenCommand}"
-                                                        Visibility="{Binding CurrentIssueReferenz, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                                                        AutomationName="OpenIssue"
+                                                        ButtonCommand="{Binding OpenIssueBrowserCommand}"
+                                                        Visibility="{Binding CurrentIssueReference, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: Pull Request -->
-                <controls:RibbonGroup GruppenName="Pull Request"
+                <controls:RibbonGroup GroupName="Pull Request"
                                       Visibility="{Binding ShowPullRequestPanel, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="↗"
                                                         ButtonText="PR erstellen"
-                                                        AutomationName="PullRequestErstellen"
-                                                        ButtonCommand="{Binding PullRequestErstellenCommand}"
-                                                        Visibility="{Binding KannPullRequestErstellen, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        AutomationName="CreatePullRequest"
+                                                        ButtonCommand="{Binding CreatePullRequestCommand}"
+                                                        Visibility="{Binding CreateCanPullRequest, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="🔄"
                                                         ButtonText="Aktualisieren"
-                                                        AutomationName="PullRequestsAktualisieren"
-                                                        ButtonCommand="{Binding PullRequestsAktualisierenCommand}" />
+                                                        AutomationName="RefreshPullRequests"
+                                                        ButtonCommand="{Binding RefreshPullRequestsCommand}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
@@ -265,10 +265,10 @@
         <Border Grid.Row="1"
                 Background="{DynamicResource ErrorBrush}"
                 Padding="12,8"
-                Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
-            <TextBlock AutomationProperties.Name="FehlerMeldung"
-                       AutomationProperties.HelpText="{Binding FehlerMeldung}"
-                       Text="{Binding FehlerMeldung}" Foreground="White" />
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock AutomationProperties.Name="ErrorMessage"
+                       AutomationProperties.HelpText="{Binding ErrorMessage}"
+                       Text="{Binding ErrorMessage}" Foreground="White" />
         </Border>
 
         <!-- Hauptinhalt -->
@@ -308,8 +308,8 @@
                         FontSize="12"
                         Visibility="{Binding ShowDiffPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
                 <Button Content="Dateien"
-                        AutomationProperties.Name="DateiViewButton"
-                        Command="{Binding DateiViewCommand}"
+                        AutomationProperties.Name="FileViewButton"
+                        Command="{Binding FileViewCommand}"
                         Padding="12,4"
                         FontSize="12"
                         Visibility="{Binding ShowFileExplorerPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -322,7 +322,7 @@
                         Visibility="{Binding ShowPullRequestPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
                 <Button Content="Todos"
                         AutomationProperties.Name="TodoViewButton"
-                        Command="{Binding TodoList.TodoAnsichtCommand}"
+                        Command="{Binding TodoList.TodoViewCommand}"
                         Padding="12,4"
                         Margin="6,0,0,0"
                         FontSize="12" />
@@ -351,8 +351,8 @@
                                            FontSize="12"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            Margin="0,0,0,4" />
-                                <TextBox Text="{Binding EditTitel, UpdateSourceTrigger=PropertyChanged}"
-                                         AutomationProperties.Name="EditTitel"
+                                <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="EditTitle"
                                          FontSize="14"
                                          Foreground="{DynamicResource PrimaryTextBrush}"
                                          Background="{DynamicResource BackgroundBrush}"
@@ -365,8 +365,8 @@
                                            FontSize="12"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            Margin="0,0,0,4" />
-                                <TextBox Text="{Binding EditAnforderungsBeschreibung, UpdateSourceTrigger=PropertyChanged}"
-                                         AutomationProperties.Name="EditAnforderungsBeschreibung"
+                                <TextBox Text="{Binding EditRequirementDescription, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="EditRequirementDescription"
                                          FontSize="14"
                                          Foreground="{DynamicResource PrimaryTextBrush}"
                                          Background="{DynamicResource BackgroundBrush}"
@@ -386,8 +386,8 @@
                                 Padding="16"
                                 Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="{Binding AufgabeTitel}"
-                                           AutomationProperties.Name="AufgabeTitel"
+                                <TextBlock Text="{Binding WorkItemTitle}"
+                                           AutomationProperties.Name="WorkItemTitle"
                                            FontSize="16"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}"
@@ -520,9 +520,9 @@
                                                                FontWeight="SemiBold"
                                                                Foreground="{DynamicResource PrimaryTextBrush}"
                                                                TextWrapping="Wrap" />
-                                                    <Button Command="{Binding DataContext.PullRequestUrlOeffnenCommand, ElementName=Root}"
+                                                    <Button Command="{Binding DataContext.OpenPullRequestUrlCommand, ElementName=Root}"
                                                             CommandParameter="{Binding Url}"
-                                                            AutomationProperties.Name="PullRequestUrlOeffnen"
+                                                            AutomationProperties.Name="OpenPullRequestUrl"
                                                             HorizontalAlignment="Left"
                                                             Background="Transparent"
                                                             BorderThickness="0"
@@ -626,7 +626,7 @@
                 </Grid.ColumnDefinitions>
                 <controls:StatusIndicatorControl Grid.Column="0"
                                                  Status="{Binding WorkItemStatus, Mode=OneWay}"
-                                                 BranchName="{Binding AufgabeBranchName, Mode=OneWay}" />
+                                                 BranchName="{Binding WorkItemBranchName, Mode=OneWay}" />
                 <TextBlock Grid.Column="1"
                            Text="{Binding CliStatusText}"
                            Foreground="{DynamicResource SecondaryTextBrush}"
@@ -635,12 +635,12 @@
                            HorizontalAlignment="Center"
                            AutomationProperties.AutomationId="CliStatusText" />
                 <TextBlock Grid.Column="2"
-                           Text="{Binding AktiverCliName, StringFormat='CLI: {0}'}"
+                           Text="{Binding ActiveCliName, StringFormat='CLI: {0}'}"
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            FontSize="12"
                            VerticalAlignment="Center"
-                           AutomationProperties.AutomationId="AktiverCliName"
-                           Visibility="{Binding AktiverCliName, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                           AutomationProperties.AutomationId="ActiveCliName"
+                           Visibility="{Binding ActiveCliName, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
                 
             </Grid>            
         </Border>

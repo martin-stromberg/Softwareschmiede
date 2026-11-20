@@ -31,14 +31,14 @@ public sealed class CliRawExportService : ICliRawExportService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
 
-        var protokolle = await _logService.GetByWorkItemAsync(workItemId, ct);
+        var log = await _logService.GetByWorkItemAsync(workItemId, ct);
         var content = string.Join(
             Environment.NewLine,
-            protokolle
+            log
                 .Where(entry => entry.Type == LogEntryType.CliOutput)
                 .Select(entry => entry.Content));
 
-        _logger.LogDebug("Exportiere {Anzahl} CLI-Rohausgabezeilen nach {ZielPfad}.", protokolle.Count(e => e.Type == LogEntryType.CliOutput), targetPath);
+        _logger.LogDebug("Exportiere {Anzahl} CLI-Rohausgabezeilen nach {ZielPfad}.", log.Count(e => e.Type == LogEntryType.CliOutput), targetPath);
         await File.WriteAllTextAsync(targetPath, content, new UTF8Encoding(false), ct);
     }
 }

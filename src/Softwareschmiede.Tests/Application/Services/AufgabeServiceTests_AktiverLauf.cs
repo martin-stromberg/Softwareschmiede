@@ -23,7 +23,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly Mock<ILogger<WorkItemService>> _loggerMock;
     private readonly WorkItemService _sut;
-    private readonly Guid _projektId = new Guid("22222222-2222-2222-2222-222222222222");
+    private readonly Guid _projectId = new Guid("22222222-2222-2222-2222-222222222222");
 
     /// <summary>AufgabeServiceTests_AktiverLauf.</summary>
     public AufgabeServiceTests_AktiverLauf()
@@ -34,7 +34,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
 
         _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -54,7 +54,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     public async Task AktivenLaufSetzenAsync_ShouldSetAktiveRunIdAndHeartbeat_WhenCalled()
     {
         // Arrange
-        var workItem = await _sut.CreateAsync(_projektId, "Aktiver-Lauf-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Aktiver-Lauf-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         workItem.ActiveRunId.Should().BeNull();
 
         // Act
@@ -80,7 +80,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     public async Task AktivenLaufBeendenAsync_ShouldClearAktiveRunId_WhenPreviouslySet()
     {
         // Arrange
-        var workItem = await _sut.CreateAsync(_projektId, "Aktiver-Lauf-Beenden-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Aktiver-Lauf-Beenden-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _sut.SetActiveRunAsync(workItem.Id, "lauf-456", TestContext.Current.CancellationToken);
         (await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken))!.ActiveRunId.Should().Be("lauf-456");
 
@@ -105,7 +105,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     public async Task AktivenLaufBeendenAsync_ShouldClearLaufStatus_WhenPreviouslySetToWartetAufEingabe()
     {
         // Arrange
-        var workItem = await _sut.CreateAsync(_projektId, "Aktiver-Lauf-Beenden-LaufStatus-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Aktiver-Lauf-Beenden-LaufStatus-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _sut.SetActiveRunAsync(workItem.Id, "lauf-789", TestContext.Current.CancellationToken);
         await _sut.EnsureActiveRunAsync(workItem.Id, () => WorkItemRunStatus.WaitingForInput, TestContext.Current.CancellationToken);
         (await _sut.GetByIdAsync(workItem.Id, TestContext.Current.CancellationToken))!.RunStatus.Should().Be(WorkItemRunStatus.WaitingForInput);
@@ -127,7 +127,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     public async Task AktivenLaufSicherstellenAsync_SchreibtNichts_WennLaeuftGuardNichtMehrLaeuft()
     {
         // Arrange
-        var workItem = await _sut.CreateAsync(_projektId, "Guard-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Guard-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         // Act
         await _sut.EnsureActiveRunAsync(workItem.Id, runningGuard: () => false, ct: TestContext.Current.CancellationToken);
@@ -149,7 +149,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     public async Task LaufdatenSchreibpfade_SerialisierenProAufgabe()
     {
         // Arrange: eine Schreiboperation muss einmal gelaufen sein, damit der Gate-Eintrag existiert.
-        var workItem = await _sut.CreateAsync(_projektId, "Serialisierungs-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Serialisierungs-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _sut.SetActiveRunAsync(workItem.Id, "lauf-ser", TestContext.Current.CancellationToken);
 
         var gates = (ConcurrentDictionary<Guid, SemaphoreSlim>)typeof(WorkItemService)
@@ -189,7 +189,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     public async Task AktivenLaufSicherstellenAsync_WertetLaufStatusProvider_InDerSperreAus()
     {
         // Arrange: Schreiboperation einmal laufen lassen, damit der Gate-Eintrag existiert.
-        var workItem = await _sut.CreateAsync(_projektId, "Provider-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Provider-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _sut.SetActiveRunAsync(workItem.Id, "lauf-prov", TestContext.Current.CancellationToken);
 
         var gates = (ConcurrentDictionary<Guid, SemaphoreSlim>)typeof(WorkItemService)
@@ -235,7 +235,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     public async Task VollerZyklus_BereitLaeuftWartetBereit_PersistiertJedenSchrittKorrekt()
     {
         // Bereit: neue Aufgabe hat weder aktiven Lauf noch Substatus.
-        var workItem = await _sut.CreateAsync(_projektId, "Voller-Zyklus-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Voller-Zyklus-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         workItem.ActiveRunId.Should().BeNull();
         workItem.RunStatus.Should().BeNull();
 
@@ -267,7 +267,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     [Fact]
     public async Task AktivenLaufSicherstellenAsync_SetztVolleLaufdaten_BeiFehlenderAktiveRunId()
     {
-        var workItem = await _sut.CreateAsync(_projektId, "Sicherstellen-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Sicherstellen-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         workItem.ActiveRunId.Should().BeNull();
 
         var vorUpdate = DateTimeOffset.UtcNow;
@@ -289,7 +289,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     [Fact]
     public async Task AktivenLaufSicherstellenAsync_UebernimmtLaufStatus_BeiFehlenderAktiveRunId()
     {
-        var workItem = await _sut.CreateAsync(_projektId, "Sicherstellen-Substatus-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Sicherstellen-Substatus-Aufgabe", null, ct: TestContext.Current.CancellationToken);
 
         await _sut.EnsureActiveRunAsync(workItem.Id, () => WorkItemRunStatus.WaitingForInput, TestContext.Current.CancellationToken);
 
@@ -306,7 +306,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     [Fact]
     public async Task AktivenLaufSicherstellenAsync_BehaeltAktiveRunId_UndFrischtHeartbeat_BeiBestehendemLauf()
     {
-        var workItem = await _sut.CreateAsync(_projektId, "Idempotenz-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Idempotenz-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _sut.SetActiveRunAsync(workItem.Id, "lauf-bestehend", TestContext.Current.CancellationToken);
 
         var tracked = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
@@ -337,7 +337,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     [Fact]
     public async Task AktivenLaufSicherstellenAsync_SkipptOhneWurf_BeiTerminalemStatus()
     {
-        var workItem = await _sut.CreateAsync(_projektId, "Terminale-Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await _sut.CreateAsync(_projectId, "Terminale-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         var tracked = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
         tracked!.Status = WorkItemStatus.Completed;
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);

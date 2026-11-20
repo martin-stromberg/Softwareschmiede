@@ -17,9 +17,9 @@ namespace Softwareschmiede.App.ViewModels;
 /// <summary>ViewModel für das Hauptfenster: Navigation und Dark-Mode-Toggle.</summary>
 public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
-    private const int AktualisierungsIntervallSekunden = 5;
-    private const string AktiveAufgabenAktualisierenKontext = "MainWindowViewModel.AktiveAufgabenAktualisierenAsync";
-    private const string VersionUnbekanntText = "Version unbekannt";
+    private const int UpdateIntervalSeconds = 5;
+    private const string ActiveWorkItemsRefreshContext = "MainWindowViewModel.RefreshActiveWorkItemsAsync";
+    private const string VersionUnknownText = "Version unbekannt";
 
     private readonly DarkModeService _darkModeService;
     private readonly IServiceProvider _serviceProvider;
@@ -33,9 +33,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IApplicationVersionProvider? _versionProvider;
     private readonly IPluginManager? _pluginManager;
     private readonly WorkItemRunDataChangedNotifier? _runDataChangedNotifier;
-    private readonly AufgabenListenModusBindung _modusBindung;
+    private readonly WorkItemListModeBinding _modeBinding;
     private readonly Action<Action> _dispatcherInvoke;
-    private readonly DispatcherTimer _aktualisierungsTimer;
+    private readonly DispatcherTimer _updateTimer;
     private readonly MainWindowAutoShutdownFlow _autoShutdownFlow;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
 
@@ -47,7 +47,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly ScmEventChangeNotifier? _scmNotifier;
     private int _scmWaitingCount;
     private ScmEventQueueViewModel? _scmQueue;
-    private int _laufendeAutomatisierungenAnzahl;
+    private int _runningAutomationsCount;
 
     /// <summary>Gibt den Fenstertitel zurück.</summary>
     public string Title
@@ -63,7 +63,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _currentView, value, () =>
         {
             OnPropertyChanged(nameof(IsDashboardVisible));
-            AktiveAufgabenImHintergrundAktualisieren();
+            RefreshActiveWorkItemsInBackground();
         });
     }
 
@@ -78,19 +78,19 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool UpdateAvailable => _updateFlow.UpdateAvailable;
 
     /// <summary>Informationen zum aktuell verfügbaren Update.</summary>
-    public UpdateInfo? VerfuegbaresUpdate => _updateFlow.VerfuegbaresUpdate;
+    public UpdateInfo? AvailableUpdate => _updateFlow.AvailableUpdate;
 
     /// <summary>Gibt an, ob gerade eine Update-Prüfung läuft.</summary>
     public bool UpdateCheckLaeuft => _updateFlow.UpdateCheckLaeuft;
 
     /// <summary>Gibt an, ob gerade ein Update heruntergeladen oder vorbereitet wird.</summary>
-    public bool UpdateWirdVorbereitet => _updateFlow.UpdateWirdVorbereitet;
+    public bool UpdateWillPrepared => _updateFlow.UpdateWillPrepared;
 
     /// <summary>Optionaler Hinweis zur letzten Update-Prüfung.</summary>
-    public string? UpdateHinweis => _updateFlow.UpdateHinweis;
+    public string? UpdateNotice => _updateFlow.UpdateNotice;
 
     /// <summary>Tooltip der Prüfen-Schaltfläche (begründet eine Deaktivierung im Modus „Aus").</summary>
-    public string UpdatePruefenTooltip => _updateFlow.UpdatePruefenTooltip;
+    public string UpdateCheckTooltip => _updateFlow.UpdateCheckTooltip;
 
     /// <summary>Die aktuell installierte Programmversion als Anzeigetext.</summary>
     public string? CurrentVersion
@@ -100,16 +100,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Aktuell aktive Aufgaben (Status Gestartet oder Wartend) für die Seitenleisten-Anzeige.</summary>
-    public ObservableCollection<AktiveAufgabePanelItem> AktiveAufgabenListe { get; } = new();
+    public ObservableCollection<ActiveWorkItemPanelItem> ActiveWorkItemsList { get; } = new();
 
     /// <summary>
     /// Anzeigemodus der Seitenleisten-Aufgabenliste (flach nach Datum oder gruppiert nach Repository/KI).
-    /// Änderungen werden über den <see cref="AufgabenListenModusService"/> persistiert.
+    /// Änderungen werden über den <see cref="WorkItemListModeService"/> persistiert.
     /// </summary>
-    public AufgabenListenModus AufgabenListenModus
+    public WorkItemListMode WorkItemListMode
     {
-        get => _modusBindung.Value;
-        set => _modusBindung.Value = value;
+        get => _modeBinding.Value;
+        set => _modeBinding.Value = value;
     }
 
     /// <summary>Gibt an, ob aktuell das Dashboard angezeigt wird.</summary>
@@ -119,14 +119,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// Anzahl der fachlich laufenden Automatisierungen in der Seitenleiste — nur der
     /// klassifizierte Zustand <see cref="AiExecutionState.Running"/> zählt.
     /// </summary>
-    public int LaufendeAutomatisierungenAnzahl
+    public int RunningAutomationsCount
     {
-        get => _laufendeAutomatisierungenAnzahl;
+        get => _runningAutomationsCount;
         private set
         {
-            if (SetProperty(ref _laufendeAutomatisierungenAnzahl, value))
+            if (SetProperty(ref _runningAutomationsCount, value))
             {
-                OnPropertyChanged(nameof(AutoShutdownUiSichtbar));
+                OnPropertyChanged(nameof(AutoShutdownUiVisible));
             }
         }
     }
@@ -134,31 +134,31 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Schalter „Nach Leerlauf PC herunterfahren" (nur Session-Aktivierung, wird nicht persistiert).
     /// </summary>
-    public bool AutoShutdownAktiviert
+    public bool AutoShutdownEnabled
     {
-        get => _autoShutdownFlow.AutoShutdownAktiviert;
-        set => _autoShutdownFlow.AutoShutdownAktiviert = value;
+        get => _autoShutdownFlow.AutoShutdownEnabled;
+        set => _autoShutdownFlow.AutoShutdownEnabled = value;
     }
 
     /// <summary>Schalter „Herunterfahren erzwingen" (persistiert).</summary>
-    public bool AutoShutdownErzwingen
+    public bool ForceAutoShutdown
     {
-        get => _autoShutdownFlow.AutoShutdownErzwingen;
-        set => _autoShutdownFlow.AutoShutdownErzwingen = value;
+        get => _autoShutdownFlow.ForceAutoShutdown;
+        set => _autoShutdownFlow.ForceAutoShutdown = value;
     }
 
     /// <summary>
     /// Toleranzzeit des Auto-Shutdown-Countdowns in Minuten als Texteingabe (persistiert,
     /// gültig: ganzzahlig 0–<see cref="AppSettingService.AutoShutdownMaxToleranceMinutes"/>).
     /// </summary>
-    public string AutoShutdownToleranzMinuten
+    public string AutoShutdownToleranceMinutes
     {
-        get => _autoShutdownFlow.AutoShutdownToleranzMinuten;
-        set => _autoShutdownFlow.AutoShutdownToleranzMinuten = value;
+        get => _autoShutdownFlow.AutoShutdownToleranceMinutes;
+        set => _autoShutdownFlow.AutoShutdownToleranceMinutes = value;
     }
 
     /// <summary>Validierungsfehler der Toleranz-Eingabe; <c>null</c> bei gültigem Wert.</summary>
-    public string? AutoShutdownToleranzFehler => _autoShutdownFlow.AutoShutdownToleranzFehler;
+    public string? AutoShutdownToleranceError => _autoShutdownFlow.AutoShutdownToleranceError;
 
     /// <summary>Angezeigter Countdown-Text („Herunterfahren in 5 Min. 0 Sek."); <c>null</c>, wenn kein Countdown armiert ist.</summary>
     public string? AutoShutdownCountdownText => _autoShutdownFlow.AutoShutdownCountdownText;
@@ -167,16 +167,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// Sichtbarkeit des Auto-Shutdown-Blocks in der Seitenleisten-Fußzeile:
     /// bei fachlich laufenden Automatisierungen, aktiviertem Schalter oder armiertem Countdown.
     /// </summary>
-    public bool AutoShutdownUiSichtbar =>
-        _laufendeAutomatisierungenAnzahl > 0
-        || _autoShutdownFlow.AutoShutdownAktiviert
-        || _autoShutdownFlow.AutoShutdownCountdownAktiv;
+    public bool AutoShutdownUiVisible =>
+        _runningAutomationsCount > 0
+        || _autoShutdownFlow.AutoShutdownEnabled
+        || _autoShutdownFlow.AutoShutdownCountdownActive;
 
     /// <summary>Sichtbarkeit der Auto-Shutdown-Optionen (Toleranz, Erzwingen) — nur bei aktiviertem Schalter.</summary>
-    public bool AutoShutdownOptionenSichtbar => _autoShutdownFlow.AutoShutdownOptionenSichtbar;
+    public bool AutoShutdownOptionsVisible => _autoShutdownFlow.AutoShutdownOptionsVisible;
 
     /// <summary>Ob aktuell ein Auto-Shutdown-Countdown armiert ist.</summary>
-    public bool AutoShutdownCountdownAktiv => _autoShutdownFlow.AutoShutdownCountdownAktiv;
+    public bool AutoShutdownCountdownActive => _autoShutdownFlow.AutoShutdownCountdownActive;
 
     /// <summary>Navigiert zum Dashboard.</summary>
     public ICommand NavigateToDashboardCommand { get; }
@@ -200,13 +200,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public ICommand ToggleNavigationCommand { get; }
 
     /// <summary>Navigiert zur Aufgabendetailansicht einer aktiven Aufgabe.</summary>
-    public ICommand NavigateZuAufgabeCommand { get; }
+    public ICommand NavigateToWorkItemCommand { get; }
 
     /// <summary>Startet den geführten Update-Ablauf.</summary>
-    public ICommand UpdateStartenCommand { get; }
+    public ICommand StartUpdateCommand { get; }
 
     /// <summary>Prüft manuell erneut auf Programmupdates.</summary>
-    public ICommand UpdatePruefenCommand { get; }
+    public ICommand CheckUpdateCommand { get; }
 
     /// <inheritdoc cref="MainWindowViewModel"/>
     public MainWindowViewModel(
@@ -217,7 +217,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         PromptScheduleDispatchService promptScheduleDispatchService,
         ILogger<MainWindowViewModel> logger,
         IRunningAutomationStatusSource runningStatusSource,
-        MainWindowOptionaleDienste? optionaleDienste = null)
+        MainWindowOptionalServices? optionalServices = null)
     {
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
@@ -226,16 +226,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _promptScheduleDispatchService = promptScheduleDispatchService;
         _logger = logger;
         _runningStatusSource = runningStatusSource;
-        _dialogService = optionaleDienste?.DialogService;
-        _versionProvider = optionaleDienste?.VersionProvider;
-        _runDataChangedNotifier = optionaleDienste?.LaufdatenChangedNotifier;
+        _dialogService = optionalServices?.DialogService;
+        _versionProvider = optionalServices?.VersionProvider;
+        _runDataChangedNotifier = optionalServices?.LaufdatenChangedNotifier;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
         _scmNotifier = serviceProvider.GetService<ScmEventChangeNotifier>();
-        _dispatcherInvoke = DispatcherInvokeFactory.Create(optionaleDienste?.DispatcherInvoke);
+        _dispatcherInvoke = DispatcherInvokeFactory.Create(optionalServices?.DispatcherInvoke);
         _autoShutdownFlow = new MainWindowAutoShutdownFlow(
-            optionaleDienste?.AutoShutdownOrchestrator,
-            optionaleDienste?.AutoShutdownEinstellungenService,
-            optionaleDienste?.TimeProvider ?? TimeProvider.System,
+            optionalServices?.AutoShutdownOrchestrator,
+            optionalServices?.AutoShutdownSettingsService,
+            optionalServices?.TimeProvider ?? TimeProvider.System,
             logger,
             _dispatcherInvoke);
         _autoShutdownFlow.PropertyChanged += (_, e) =>
@@ -243,17 +243,17 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(e.PropertyName);
             // Die Blocksichtbarkeit hängt zusätzlich an Aktivierung und Countdown —
             // VM-seitig kommt die fachliche Lauf-Anzahl als dritter Faktor dazu.
-            if (e.PropertyName is nameof(MainWindowAutoShutdownFlow.AutoShutdownAktiviert)
-                or nameof(MainWindowAutoShutdownFlow.AutoShutdownCountdownAktiv))
+            if (e.PropertyName is nameof(MainWindowAutoShutdownFlow.AutoShutdownEnabled)
+                or nameof(MainWindowAutoShutdownFlow.AutoShutdownCountdownActive))
             {
-                OnPropertyChanged(nameof(AutoShutdownUiSichtbar));
+                OnPropertyChanged(nameof(AutoShutdownUiVisible));
             }
         };
-        _modusBindung = AufgabenListenModusBindung.FuerMenue(
-            optionaleDienste?.AufgabenListenModusService, logger, _dispatcherInvoke);
-        _modusBindung.WertGeaendert += () => OnPropertyChanged(nameof(AufgabenListenModus));
+        _modeBinding = WorkItemListModeBinding.ForMenu(
+            optionalServices?.WorkItemListModeService, logger, _dispatcherInvoke);
+        _modeBinding.ValueChanged += () => OnPropertyChanged(nameof(WorkItemListMode));
         _updateFlow = new MainWindowUpdateFlow(
-            serviceProvider, logger, optionaleDienste?.UpdateDienste, optionaleDienste?.DialogService);
+            serviceProvider, logger, optionalServices?.UpdateServices, optionalServices?.DialogService);
         _updateFlow.PropertyChanged += (_, e) => OnPropertyChanged(e.PropertyName);
 
         NavigateToDashboardCommand = new RelayCommand(NavigateToDashboard);
@@ -263,9 +263,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         ToggleDarkModeCommand = new AsyncRelayCommand(async ct =>
             await _darkModeService.SetModeAsync(_darkModeService.Current == "Dark" ? "Light" : "Dark", ct));
         ToggleNavigationCommand = new RelayCommand(() => IsNavigationExpanded = !IsNavigationExpanded);
-        NavigateZuAufgabeCommand = new RelayCommand<Guid>(NavigateZuAufgabe);
-        UpdatePruefenCommand = new AsyncRelayCommand(_updateFlow.PruefenAsync, _updateFlow.KannPruefen);
-        UpdateStartenCommand = new AsyncRelayCommand(_updateFlow.StartAsync, _updateFlow.KannStarten);
+        NavigateToWorkItemCommand = new RelayCommand<Guid>(NavigateToWorkItem);
+        CheckUpdateCommand = new AsyncRelayCommand(_updateFlow.CheckAsync, _updateFlow.CheckCan);
+        StartUpdateCommand = new AsyncRelayCommand(_updateFlow.StartAsync, _updateFlow.StartCan);
 
         _runningStatusSource.RunningCountChanged += OnRunningCountChanged;
         if (_scmNotifier is not null) _scmNotifier.Changed += OnScmChanged;
@@ -274,19 +274,19 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             _runDataChangedNotifier.RunDataChanged += OnRunDataChanged;
         }
 
-        _aktualisierungsTimer = new DispatcherTimer
+        _updateTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(AktualisierungsIntervallSekunden)
+            Interval = TimeSpan.FromSeconds(UpdateIntervalSeconds)
         };
-        _aktualisierungsTimer.Tick += OnAktualisierungsTimerTick;
-        _aktualisierungsTimer.Start();
+        _updateTimer.Tick += OnUpdateTimerTick;
+        _updateTimer.Start();
 
         NavigateToDashboard();
-        VersionLadenImHintergrund();
-        GespeichertenAufgabenListenModusLadenAsync()
+        VersionLoadInBackground();
+        LoadSavedWorkItemsListModeAsync()
             .SafeFireAndForget(_logger, "Aufgabenlisten-Modus laden");
-        AutoShutdownEinstellungenLadenAsync()
-            .SafeFireAndForget(_logger, "Auto-Shutdown-Einstellungen laden");
+        LoadAutoShutdownSettingsAsync()
+            .SafeFireAndForget(_logger, "Auto-Shutdown--Einstellungen laden");
         OnScmChanged();
     }
 
@@ -294,11 +294,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// Lädt den persistierten Anzeigemodus der Seitenleisten-Aufgabenliste und wendet ihn an,
     /// ohne den Wert zurückzuschreiben. Wird im Konstruktor per <c>SafeFireAndForget</c> gestartet
     /// und ist für Tests direkt awaitbar. Ein zwischenzeitlich vom Anwender gewählter Modus wird
-    /// nicht überschrieben (Race-Guard in <see cref="AufgabenListenModusBindung"/>).
+    /// nicht überschrieben (Race-Guard in <see cref="WorkItemListModeBinding"/>).
     /// </summary>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    public Task GespeichertenAufgabenListenModusLadenAsync(CancellationToken ct = default)
-        => _modusBindung.GespeichertenWertLadenAsync(ct);
+    public Task LoadSavedWorkItemsListModeAsync(CancellationToken ct = default)
+        => _modeBinding.LoadSavedValueAsync(ct);
 
     /// <summary>
     /// Lädt die persistierten Auto-Shutdown-Nebenwerte (Erzwingen, Toleranz) einmalig und
@@ -308,8 +308,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// zwischenzeitlich vom Anwender geänderter Wert wird nicht überschrieben.
     /// </summary>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    public Task AutoShutdownEinstellungenLadenAsync(CancellationToken ct = default)
-        => _autoShutdownFlow.EinstellungenLadenAsync(ct);
+    public Task LoadAutoShutdownSettingsAsync(CancellationToken ct = default)
+        => _autoShutdownFlow.LoadSettingsAsync(ct);
 
     private DashboardViewModel? _dashboardViewModel;
 
@@ -318,7 +318,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (_dashboardViewModel is null)
         {
             _dashboardViewModel = _serviceProvider.GetRequiredService<DashboardViewModel>();
-            _dashboardViewModel.Initialize(AktiveAufgabenListe, NavigateZuAufgabe);
+            _dashboardViewModel.Initialize(ActiveWorkItemsList, NavigateToWorkItem);
         }
         CurrentView = _dashboardViewModel;
         Title = "Softwareschmiede – Dashboard";
@@ -331,33 +331,33 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (_projectListViewModel is null)
         {
             _projectListViewModel = _serviceProvider.GetRequiredService<ProjectListViewModel>();
-            _projectListViewModel.DetailTitelAenderungAction = detailTitel =>
+            _projectListViewModel.DetailTitleChangeAction = detailTitle =>
             {
                 if (!ReferenceEquals(CurrentView, _projectListViewModel))
                     return;
 
-                Title = string.IsNullOrWhiteSpace(detailTitel)
-                    ? "Softwareschmiede – Projekte"
-                    : $"Softwareschmiede – {detailTitel}";
+                Title = string.IsNullOrWhiteSpace(detailTitle)
+                    ? "Softwareschmiede – Projects"
+                    : $"Softwareschmiede – {detailTitle}";
             };
         }
         else if (_projectListViewModel.DetailViewModel is not null)
         {
-            // Die Seitenleisten-Navigation "Projekte" ist eine explizite Rückkehr zur Projektübersicht.
+            // Die Seitenleisten-Navigation "Projects" ist eine explizite Rückkehr zur Projektübersicht.
             // _projectListViewModel wird über die Lebensdauer des Fensters wiederverwendet (siehe oben) -
             // ein zuvor über das Vollbild-Overlay geöffnetes Projekt- oder Aufgabendetail (siehe
             // ProjectListView.xaml / ProjectListViewModel.DetailViewModel) bleibt sonst bestehen, auch
             // wenn es nie explizit über "Zurück" geschlossen wurde. Ohne dieses Zurücksetzen zeigt das
-            // Fenster nach einem erneuten Klick auf "Projekte" weiterhin die alte Detailansicht statt der
+            // Fenster nach einem erneuten Klick auf "Projects" weiterhin die alte Detailansicht statt der
             // Projektliste (Issue #231-Fortsetzung: WindowExtensions.CurrentView() erkannte dadurch
             // reproduzierbar fälschlich TaskDetailView statt ProjectListView). SchliesseDetailCommand ist
             // der bereits vorhandene, sichere Weg dafür - er disposed sowohl das aktuell offene
             // Detail-ViewModel als auch ein ggf. zurückgehaltenes ProjectDetailViewModel korrekt
             // (siehe ProjectListViewModel.DetailViewModel-Setter).
-            _projectListViewModel.SchliesseDetailCommand.Execute(null);
+            _projectListViewModel.CloseDetailCommand.Execute(null);
         }
         CurrentView = _projectListViewModel;
-        Title = "Softwareschmiede – Projekte";
+        Title = "Softwareschmiede – Projects";
     }
 
     private SettingsViewModel? _settingsViewModel;
@@ -371,8 +371,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             _scmQueue.NavigateToSettingsAction = NavigateToSettings;
             _scmQueue.NavigateToTaskAction = id =>
             {
-                NavigateZuAufgabe(id);
-                if (CurrentView is TaskDetailViewModel task) task.ZurueckAction = NavigateToScmEventQueue;
+                NavigateToWorkItem(id);
+                if (CurrentView is TaskDetailViewModel task) task.BackAction = NavigateToScmEventQueue;
             };
         }
         CurrentView = _scmQueue;
@@ -407,15 +407,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             _settingsViewModel.UpdateSettingsSaved += OnUpdateSettingsSaved;
         }
         CurrentView = _settingsViewModel;
-        Title = "Softwareschmiede – Einstellungen";
+        Title = "Softwareschmiede – Settings";
     }
 
     private void OnUpdateSettingsSaved(object? sender, UpdateSettings settings)
-        => _dispatcherInvoke(() => _updateFlow.ApplyGespeicherteUpdateSettings(settings));
+        => _dispatcherInvoke(() => _updateFlow.ApplySavedUpdateSettings(settings));
 
     /// <summary>Lädt die aktuell aktiven Aufgaben und aktualisiert die Seitenleisten-Anzeige.</summary>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    public async Task AktiveAufgabenAktualisierenAsync(CancellationToken ct = default)
+    public async Task RefreshActiveWorkItemsAsync(CancellationToken ct = default)
     {
         if (!await _refreshGate.WaitAsync(0, ct))
             return;
@@ -423,10 +423,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         try
         {
             var workItems = await _workItemService.GetActiveWorkItemsAsync(ct);
-            var offeneTodoCounts = await _todoService.GetOpenTodoCountsAsync(workItems.Select(a => a.Id), ct);
-            AktiveAufgabenListe.ReplaceAll(workItems.Select(a => MapAktiveAufgabePanelItem(a, offeneTodoCounts)));
-            LaufendeAutomatisierungenAnzahl = AktiveAufgabenListe.Count(item =>
-                Softwareschmiede.App.Converters.KiAusfuehrungsStatusAdapter.Klassifiziere(item, out _)
+            var openTodoCounts = await _todoService.GetOpenTodoCountsAsync(workItems.Select(a => a.Id), ct);
+            ActiveWorkItemsList.ReplaceAll(workItems.Select(a => MapActiveWorkItemPanelItem(a, openTodoCounts)));
+            RunningAutomationsCount = ActiveWorkItemsList.Count(item =>
+                Softwareschmiede.App.Converters.AiExecutionStatusAdapter.Klassifiziere(item, out _)
                     == AiExecutionState.Running);
         }
         catch (OperationCanceledException)
@@ -443,39 +443,39 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void NavigateZuAufgabe(Guid workItemId)
+    private void NavigateToWorkItem(Guid workItemId)
     {
         var viewModel = _serviceProvider.GetRequiredService<TaskDetailViewModel>();
-        viewModel.ZurueckAction = NavigateToDashboard;
-        viewModel.DetailTitelAenderungAction = detailTitel =>
+        viewModel.BackAction = NavigateToDashboard;
+        viewModel.DetailTitleChangeAction = detailTitle =>
         {
             if (!ReferenceEquals(CurrentView, viewModel))
                 return;
 
-            Title = string.IsNullOrWhiteSpace(detailTitel)
+            Title = string.IsNullOrWhiteSpace(detailTitle)
                 ? "Softwareschmiede – Aufgabe"
-                : $"Softwareschmiede – {detailTitel}";
+                : $"Softwareschmiede – {detailTitle}";
         };
         Title = "Softwareschmiede – Aufgabe";
         CurrentView = viewModel;
         viewModel.WorkItemId = workItemId;
     }
 
-    private AktiveAufgabePanelItem MapAktiveAufgabePanelItem(
+    private ActiveWorkItemPanelItem MapActiveWorkItemPanelItem(
         WorkItem workItem,
-        IReadOnlyDictionary<Guid, int> offeneTodoCounts)
+        IReadOnlyDictionary<Guid, int> openTodoCounts)
     {
-        var openTodoCount = offeneTodoCounts.GetValueOrDefault(workItem.Id);
-        var offeneTodosCommand = new AsyncRelayCommand(
-            ct => OffeneTodosDialogOeffnenAsync(workItem.Id, workItem.Title, ct));
-        offeneTodosCommand.OnError = ex =>
+        var openTodoCount = openTodoCounts.GetValueOrDefault(workItem.Id);
+        var openTodosCommand = new AsyncRelayCommand(
+            ct => OpenOpenTodosDialogAsync(workItem.Id, workItem.Title, ct));
+        openTodosCommand.OnError = ex =>
             _logger.LogWarning(ex, "Fehler beim Öffnen des offene To-Dos-Dialogs für Aufgabe {AufgabeId}.", workItem.Id);
 
         var (scmPluginName, scmPluginSymbol) = ResolvePlugin(PluginType.SourceCodeManagement, workItem.GitRepository?.PluginType);
-        var (kiPluginName, kiPluginSymbol) = ResolvePlugin(PluginType.DevelopmentAutomation, workItem.AiPluginPrefix);
+        var (aiPluginName, aiPluginSymbol) = ResolvePlugin(PluginType.DevelopmentAutomation, workItem.AiPluginPrefix);
         var repositoryName = workItem.GitRepository?.RepositoryName;
 
-        return new AktiveAufgabePanelItem
+        return new ActiveWorkItemPanelItem
         {
             Id = workItem.Id,
             Title = workItem.Title,
@@ -484,15 +484,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
                 : repositoryName!,
             ScmPluginName = scmPluginName,
             ScmPluginSymbol = scmPluginSymbol,
-            KiPluginName = kiPluginName,
-            KiPluginSymbol = kiPluginSymbol,
-            RepositoryGruppenName = string.IsNullOrWhiteSpace(repositoryName)
-                ? AufgabenListenAnsicht.OhneRepository
+            AiPluginName = aiPluginName,
+            AiPluginSymbol = aiPluginSymbol,
+            RepositoryGroupName = string.IsNullOrWhiteSpace(repositoryName)
+                ? WorkItemListLayout.WithoutRepository
                 : repositoryName!,
-            RepositoryGruppeIstFallback = string.IsNullOrWhiteSpace(repositoryName),
-            KiGruppenName = kiPluginName ?? AufgabenListenAnsicht.NichtAusgefuehrt,
-            KiGruppeIstFallback = kiPluginName is null,
-            SortierZeitpunkt = workItem.LastCliStartUtc ?? workItem.CreatedAt,
+            RepositoryGroupIsFallback = string.IsNullOrWhiteSpace(repositoryName),
+            AiGroupName = aiPluginName ?? WorkItemListLayout.NotExecuted,
+            AiGroupIsFallback = aiPluginName is null,
+            SortTimestamp = workItem.LastCliStartUtc ?? workItem.CreatedAt,
             Status = workItem.Status,
             ExecutionStatus = workItem.ExecutionStatus,
             ActiveRunId = workItem.ActiveRunId,
@@ -501,20 +501,20 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             LiveRunStatus = _runningStatusSource.GetLiveRunStatus(workItem.Id),
             LastCliStartUtc = workItem.LastCliStartUtc,
             PausedUntilUtc = workItem.PausedUntilUtc,
-            IsAktiv = GetAktiveAufgabeId() == workItem.Id,
+            IsActive = GetActiveWorkItemId() == workItem.Id,
             HasScheduledPrompt = _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id) is not null,
-            OffeneTodoCount = openTodoCount,
-            OffeneTodosAnzeigenCommand = offeneTodosCommand
+            OpenTodoCount = openTodoCount,
+            ShowOpenTodosCommand = openTodosCommand
         };
     }
 
-    private async Task OffeneTodosDialogOeffnenAsync(Guid workItemId, string aufgabenTitel, CancellationToken ct)
+    private async Task OpenOpenTodosDialogAsync(Guid workItemId, string workItemsTitle, CancellationToken ct)
     {
         if (_dialogService is null)
             return;
 
         var viewModel = _serviceProvider.GetRequiredService<OpenTodosDialogViewModel>();
-        await viewModel.LoadAsync(workItemId, aufgabenTitel, ct);
+        await viewModel.LoadAsync(workItemId, workItemsTitle, ct);
         await _dialogService.ShowOpenTodosDialogAsync(viewModel, ct);
     }
 
@@ -540,7 +540,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         return (plugin?.PluginName ?? pluginPrefix, string.IsNullOrWhiteSpace(symbol) ? IPlugin.FallbackSymbol : symbol);
     }
 
-    private Guid? GetAktiveAufgabeId()
+    private Guid? GetActiveWorkItemId()
     {
         return CurrentView is TaskDetailViewModel { WorkItemId: var workItemId } && workItemId != Guid.Empty
             ? workItemId
@@ -549,22 +549,22 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void OnRunningCountChanged(int previousCount, int currentCount)
     {
-        _dispatcherInvoke(AktiveAufgabenImHintergrundAktualisieren);
+        _dispatcherInvoke(RefreshActiveWorkItemsInBackground);
     }
 
     private void OnRunDataChanged(Guid workItemId)
     {
-        _dispatcherInvoke(AktiveAufgabenImHintergrundAktualisieren);
+        _dispatcherInvoke(RefreshActiveWorkItemsInBackground);
     }
 
-    private void OnAktualisierungsTimerTick(object? sender, EventArgs e)
+    private void OnUpdateTimerTick(object? sender, EventArgs e)
     {
-        AktiveAufgabenImHintergrundAktualisieren();
+        RefreshActiveWorkItemsInBackground();
     }
 
-    private void AktiveAufgabenImHintergrundAktualisieren()
+    private void RefreshActiveWorkItemsInBackground()
     {
-        AktiveAufgabenAktualisierenAsync().SafeFireAndForget(_logger, AktiveAufgabenAktualisierenKontext);
+        RefreshActiveWorkItemsAsync().SafeFireAndForget(_logger, ActiveWorkItemsRefreshContext);
     }
 
     /// <summary>
@@ -583,8 +583,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         _disposed = true;
 
-        _aktualisierungsTimer.Stop();
-        _aktualisierungsTimer.Tick -= OnAktualisierungsTimerTick;
+        _updateTimer.Stop();
+        _updateTimer.Tick -= OnUpdateTimerTick;
         _autoShutdownFlow.Dispose();
         _runningStatusSource.RunningCountChanged -= OnRunningCountChanged;
         if (_scmNotifier is not null) _scmNotifier.Changed -= OnScmChanged;
@@ -599,7 +599,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             _settingsViewModel.UpdateSettingsSaved -= OnUpdateSettingsSaved;
         }
 
-        _updateFlow.CancelLaufendenUpdateAblauf();
+        _updateFlow.CancelRunningUpdateFlow();
 
         // _refreshGate wird bewusst nicht disposed: Ein noch laufender Fire-and-Forget-Refresh
         // (Timer-Tick oder RunningCountChanged kurz vor dem Schließen) würde in seinem finally-Block
@@ -607,14 +607,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         // WaitAsync(0)/Release()-Nutzung ohne Zugriff auf AvailableWaitHandle benötigt kein Dispose.
     }
 
-    private void VersionLadenImHintergrund()
+    private void VersionLoadInBackground()
     {
-        VersionLadenAsync(CancellationToken.None).SafeFireAndForget(_logger, "MainWindowViewModel.VersionLadenAsync");
+        LoadVersionAsync(CancellationToken.None).SafeFireAndForget(_logger, "MainWindowViewModel.VersionLadenAsync");
     }
 
-    private async Task VersionLadenAsync(CancellationToken ct)
+    private async Task LoadVersionAsync(CancellationToken ct)
     {
-        var versionText = VersionUnbekanntText;
+        var versionText = VersionUnknownText;
         try
         {
             var versionInfo = _versionProvider is not null

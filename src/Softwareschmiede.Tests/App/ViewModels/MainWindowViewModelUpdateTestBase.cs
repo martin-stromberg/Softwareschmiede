@@ -17,7 +17,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>
 /// Gemeinsame Test-Infrastruktur für Update-Tests des <see cref="MainWindowViewModel"/>:
 /// echter DI-Container mit SQLite-Dateidatenbank, die Update-Kollaborateure als Mocks und
-/// Hilfsmethoden zum Setzen/Speichern der Update-Einstellungen über Service und UI.
+/// Hilfsmethoden zum Setzen/Speichern der Update--Einstellungen über Service und UI.
 /// </summary>
 public abstract class MainWindowViewModelUpdateTestBase : IDisposable
 {
@@ -107,9 +107,9 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
     /// <summary>Erstellt ein MainWindowViewModel mit den konfigurierten Update-Mocks.</summary>
     protected MainWindowViewModel CreateSut()
     {
-        var kiService = TestKiAusfuehrungsServiceFactory.Create();
+        var aiService = TestKiAusfuehrungsServiceFactory.Create();
         var promptZeitVersand = new PromptScheduleDispatchService(
-            kiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
+            aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
         return new MainWindowViewModel(
             _provider.GetRequiredService<DarkModeService>(),
             _provider,
@@ -118,17 +118,17 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
             promptZeitVersand,
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
-            new MainWindowOptionaleDienste(
+            new MainWindowOptionalServices(
                 DispatcherInvoke: action => action(),
                 DialogService: _dialogServiceMock.Object,
-                UpdateDienste: new MainWindowUpdateDienste(
+                UpdateServices: new MainWindowUpdateServices(
                     _updateServiceMock.Object,
                     _safetyServiceMock.Object,
                     _progressDialogMock.Object,
-                    VersuchProtokoll: null)));
+                    AttemptLog: null)));
     }
 
-    /// <summary>Speichert Update-Einstellungen über den echten AppEinstellungService.</summary>
+    /// <summary>Speichert Update--Einstellungen über den echten AppEinstellungService.</summary>
     protected async Task SetUpdateSettingsAsync(UpdateSettings settings)
     {
         using var scope = _provider.CreateScope();
@@ -137,19 +137,19 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
     }
 
     /// <summary>
-    /// Speichert Update-Einstellungen über die echte Settings-UI (gleicher Pfad wie in der Anwendung),
+    /// Speichert Update--Einstellungen über die echte Settings-UI (gleicher Pfad wie in der Anwendung),
     /// sodass das UpdateSettingsSaved-Ereignis im MainWindowViewModel ausgelöst wird.
     /// </summary>
     protected async Task SpeichereUpdateEinstellungenUeberUiAsync(
-        MainWindowViewModel sut, UpdateModusOption mode, string updatePath)
+        MainWindowViewModel sut, UpdateModeOption mode, string updatePath)
     {
         sut.NavigateToSettingsCommand.Execute(null);
         var settingsViewModel = sut.CurrentView.Should().BeOfType<SettingsViewModel>().Subject;
-        await ((AsyncRelayCommand)settingsViewModel.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)settingsViewModel.LoadCommand).ExecuteAsync();
         settingsViewModel.SelectedUpdateMode = mode;
-        settingsViewModel.SelectedUpdatePfad = UpdatePfadOption.FuerPfad(updatePath);
-        await ((AsyncRelayCommand)settingsViewModel.SpeichernCommand).ExecuteAsync();
-        settingsViewModel.FehlerMeldung.Should().BeNull(
-            "das Speichern der Update-Einstellungen muss im Test erfolgreich sein");
+        settingsViewModel.SelectedUpdatePath = UpdatePathOption.ForPath(updatePath);
+        await ((AsyncRelayCommand)settingsViewModel.SaveCommand).ExecuteAsync();
+        settingsViewModel.ErrorMessage.Should().BeNull(
+            "das Speichern der Update--Einstellungen muss im Test erfolgreich sein");
     }
 }

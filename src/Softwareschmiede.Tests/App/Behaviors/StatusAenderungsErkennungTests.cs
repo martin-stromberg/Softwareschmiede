@@ -6,7 +6,7 @@ namespace Softwareschmiede.Tests.App.Behaviors;
 /// <summary>Tests für StatusAenderungsErkennung.</summary>
 public sealed class StatusAenderungsErkennungTests
 {
-    private readonly StatusAenderungsErkennung _sut = new();
+    private readonly StatusChangeDetection _sut = new();
 
     /// <summary>Die Erstbeobachtung einer Id gilt als Baseline und löst keine Animation aus.</summary>
     [Fact]
@@ -16,7 +16,7 @@ public sealed class StatusAenderungsErkennungTests
         var workItemId = Guid.NewGuid();
 
         // Act
-        var result = _sut.HatSichGeaendert(workItemId, "▶ Läuft");
+        var result = _sut.HasSichChanged(workItemId, "▶ Läuft");
 
         // Assert
         result.Should().BeFalse();
@@ -28,10 +28,10 @@ public sealed class StatusAenderungsErkennungTests
     {
         // Arrange
         var workItemId = Guid.NewGuid();
-        _sut.HatSichGeaendert(workItemId, "▶ Läuft");
+        _sut.HasSichChanged(workItemId, "▶ Läuft");
 
         // Act
-        var result = _sut.HatSichGeaendert(workItemId, "▶ Läuft");
+        var result = _sut.HasSichChanged(workItemId, "▶ Läuft");
 
         // Assert
         result.Should().BeFalse();
@@ -43,10 +43,10 @@ public sealed class StatusAenderungsErkennungTests
     {
         // Arrange
         var workItemId = Guid.NewGuid();
-        _sut.HatSichGeaendert(workItemId, "▶ Läuft");
+        _sut.HasSichChanged(workItemId, "▶ Läuft");
 
         // Act
-        var result = _sut.HatSichGeaendert(workItemId, "⏸ Wartet");
+        var result = _sut.HasSichChanged(workItemId, "⏸ Wartet");
 
         // Assert
         result.Should().BeTrue();
@@ -59,12 +59,12 @@ public sealed class StatusAenderungsErkennungTests
         // Arrange
         var aufgabeIdA = Guid.NewGuid();
         var aufgabeIdB = Guid.NewGuid();
-        _sut.HatSichGeaendert(aufgabeIdA, "▶ Läuft");
-        _sut.HatSichGeaendert(aufgabeIdB, "▶ Läuft");
+        _sut.HasSichChanged(aufgabeIdA, "▶ Läuft");
+        _sut.HasSichChanged(aufgabeIdB, "▶ Läuft");
 
         // Act
-        var resultA = _sut.HatSichGeaendert(aufgabeIdA, "⏸ Wartet");
-        var resultB = _sut.HatSichGeaendert(aufgabeIdB, "▶ Läuft");
+        var resultA = _sut.HasSichChanged(aufgabeIdA, "⏸ Wartet");
+        var resultB = _sut.HasSichChanged(aufgabeIdB, "▶ Läuft");
 
         // Assert
         resultA.Should().BeTrue();

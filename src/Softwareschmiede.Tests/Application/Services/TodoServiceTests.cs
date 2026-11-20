@@ -86,9 +86,9 @@ public sealed class TodoServiceTests : IDisposable
         await _sut.MarkTodoAsCompletedAsync(todo.Id, TestContext.Current.CancellationToken);
 
         // Assert
-        var aktualisiert = _db.Todos.Find(todo.Id);
-        aktualisiert!.CompletedAt.Should().NotBeNull();
-        aktualisiert.CompletedAt!.Value.Should().BeOnOrAfter(vorMarkierung.AddSeconds(-1));
+        var updates = _db.Todos.Find(todo.Id);
+        updates!.CompletedAt.Should().NotBeNull();
+        updates.CompletedAt!.Value.Should().BeOnOrAfter(vorMarkierung.AddSeconds(-1));
     }
 
     /// <summary>DeleteTodoAsync entfernt das Todo aus der Datenbank.</summary>

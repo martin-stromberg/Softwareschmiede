@@ -64,7 +64,7 @@
                                 Width="28"
                                 Margin="4,0,0,0"
                                 VerticalAlignment="Center"
-                                Click="OnDateiAuswaehlenClick" />
+                                Click="OnFileSelectClick" />
                     </StackPanel>
                 </DataTemplate>
             </local:PluginSettingFieldTemplateSelector.FilePathTemplate>
@@ -76,11 +76,11 @@
                                  Width="280"
                                  VerticalAlignment="Center" />
                         <Button Content="?"
-                                AutomationProperties.Name="CliHilfeButton"
+                                AutomationProperties.Name="CliHelpButton"
                                 Width="28"
                                 Margin="4,0,0,0"
                                 VerticalAlignment="Center"
-                                Click="OnHilfeButtonClick" />
+                                Click="OnHelpButtonClick" />
                     </StackPanel>
                 </DataTemplate>
             </local:PluginSettingFieldTemplateSelector.CommandLineParametersTemplate>
@@ -164,18 +164,18 @@
                 Padding="8,8,8,8">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
 
-                <!-- Gruppe: Einstellungen -->
-                <controls:RibbonGroup GruppenName="Projekt">
+                <!-- Gruppe: Settings -->
+                <controls:RibbonGroup GroupName="Projekt">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="💾"
                                                 ButtonText="Speichern"
-                                                AutomationName="Speichern"
-                                                ButtonCommand="{Binding SpeichernCommand}" />
+                                                AutomationName="Save"
+                                                ButtonCommand="{Binding SaveCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="↺"
                                                 ButtonText="Verwerfen"
-                                                AutomationName="Verwerfen"
-                                                ButtonCommand="{Binding VerwerfenCommand}" />
+                                                AutomationName="Discard"
+                                                ButtonCommand="{Binding DiscardCommand}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
@@ -189,17 +189,17 @@
                     CornerRadius="4"
                     Padding="12,8"
                     Margin="0,8,0,8"
-                    Visibility="{Binding ErfolgsMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
-                <TextBlock Text="{Binding ErfolgsMeldung}" Foreground="White" />
+                    Visibility="{Binding SuccessMessage, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+                <TextBlock Text="{Binding SuccessMessage}" Foreground="White" />
             </Border>
             <Border Background="{DynamicResource ErrorBrush}"
                     CornerRadius="4"
                     Padding="12,8"
                     Margin="0,8,0,8"
-                    Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
-                <TextBlock AutomationProperties.Name="FehlerMeldung"
-                           AutomationProperties.HelpText="{Binding FehlerMeldung}"
-                           Text="{Binding FehlerMeldung}" Foreground="White" />
+                    Visibility="{Binding ErrorMessage, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+                <TextBlock AutomationProperties.Name="ErrorMessage"
+                           AutomationProperties.HelpText="{Binding ErrorMessage}"
+                           Text="{Binding ErrorMessage}" Foreground="White" />
             </Border>
         </StackPanel>
 
@@ -289,7 +289,7 @@
                                    Margin="0,0,0,8" />
                         <ComboBox SelectedItem="{Binding SelectedUpdateMode, UpdateSourceTrigger=PropertyChanged}"
                                   AutomationProperties.Name="Update-Modus"
-                                  ItemsSource="{Binding UpdateModusOptionen}"
+                                  ItemsSource="{Binding UpdateModeOptions}"
                                   HorizontalAlignment="Stretch"
                                   Margin="0,0,0,12"
                                   Padding="8,6">
@@ -302,9 +302,9 @@
                         <TextBlock Text="Update-Pfad"
                                    Foreground="{DynamicResource PrimaryTextBrush}"
                                    Margin="0,0,0,4" />
-                        <ComboBox SelectedItem="{Binding SelectedUpdatePfad, UpdateSourceTrigger=PropertyChanged}"
+                        <ComboBox SelectedItem="{Binding SelectedUpdatePath, UpdateSourceTrigger=PropertyChanged}"
                                   AutomationProperties.Name="Update-Pfad"
-                                  ItemsSource="{Binding UpdatePfadOptionen}"
+                                  ItemsSource="{Binding UpdatePathOptions}"
                                   HorizontalAlignment="Stretch"
                                   Margin="0,0,0,8"
                                   Padding="8,6">
@@ -317,11 +317,11 @@
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                             <TextBlock Text="Kanal: "
                                        Foreground="{DynamicResource PrimaryTextBrush}" />
-                            <TextBlock Text="{Binding AbgeleiteterUpdateKanal}"
-                                       AutomationProperties.AutomationId="Update-Kanal"
+                            <TextBlock Text="{Binding DerivedUpdateChannel}"
+                                       AutomationProperties.AutomationId="UpdateChannel"
                                        Foreground="{DynamicResource SecondaryTextBrush}" />
                         </StackPanel>
-                        <TextBlock Text="Der Update-Pfad legt ausschließlich den Update-Kanal fest: „Produktivversionen“ berücksichtigt nur stabile Versionen, „Vorabversionen“ nur Release-Kandidaten — niemals gemischt. Vorabversionen können noch Fehler enthalten."
+                        <TextBlock Text="Der Update-Pfad legt ausschließlich den UpdateChannel fest: „StableVersions“ berücksichtigt nur stabile Versionen, „Vorabversionen“ nur Release-Kandidaten — niemals gemischt. Vorabversionen können noch Fehler enthalten."
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    TextWrapping="Wrap" />
                     </StackPanel>
@@ -337,8 +337,8 @@
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,8" />
                         <Button Content="Konsolentestfenster öffnen"
-                                AutomationProperties.Name="KonsolenTestOeffnen"
-                                Command="{Binding KonsolenTestOeffnenCommand}"
+                                AutomationProperties.Name="OpenConsoleTest"
+                                Command="{Binding OpenConsoleTestCommand}"
                                 Padding="12,6"
                                 HorizontalAlignment="Left" />
                     </StackPanel>
@@ -355,7 +355,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="16" MaxWidth="640" HorizontalAlignment="Left">
                     <!-- Aufgaben ausführen -->
-                    <Expander AutomationProperties.Name="AufgabenAusfuehrenExpander"
+                    <Expander AutomationProperties.Name="WorkItemsExecuteExpander"
                               IsExpanded="False"
                               Foreground="{DynamicResource PrimaryTextBrush}"
                               Margin="0,0,0,16">
@@ -364,9 +364,9 @@
                                 <TextBlock Text="Aufgaben ausführen"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}" />
-                                <TextBlock Text="{Binding AufgabenAusfuehrenStatusText}"
-                                           AutomationProperties.Name="AufgabenAusfuehrenStatus"
-                                           AutomationProperties.HelpText="{Binding AufgabenAusfuehrenStatusText}"
+                                <TextBlock Text="{Binding WorkItemsExecuteStatusText}"
+                                           AutomationProperties.Name="WorkItemsExecuteStatus"
+                                           AutomationProperties.HelpText="{Binding WorkItemsExecuteStatusText}"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            Margin="8,0,0,0" />
                             </StackPanel>
@@ -376,7 +376,7 @@
                                       AutomationProperties.Name="IsScmMonitoringEnabled"
                                       Content="Aufgaben automatisch starten"
                                       Foreground="{DynamicResource PrimaryTextBrush}" />
-                            <TextBlock Text="Bei deaktivierter Funktion werden keine SCM-Quellen abgefragt und keine Aufgaben automatisch gestartet. Bereits eingegangene Ereignisse bleiben erhalten und können weiterhin manuell geöffnet, geprüft oder abgebrochen werden. Die Änderung wirkt ohne Neustart."
+                            <TextBlock Text="Bei deaktivierter Funktion werden keine SCM-Sources abgefragt und keine Aufgaben automatisch gestartet. Bereits eingegangene Ereignisse bleiben erhalten und können weiterhin manuell geöffnet, geprüft oder abgebrochen werden. Die Änderung wirkt ohne Neustart."
                                        Foreground="{DynamicResource SecondaryTextBrush}"
                                        TextWrapping="Wrap"
                                        Margin="22,4,0,0" />
@@ -384,10 +384,10 @@
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        Margin="0,12,0,4" />
-                            <ComboBox SelectedItem="{Binding SelectedKontoModus, UpdateSourceTrigger=PropertyChanged}"
-                                      AutomationProperties.Name="Ueberwachungsmodus"
-                                      ItemsSource="{Binding KontoModusOptionen}"
-                                      IsEnabled="{Binding IsUeberwachungsmodusEnabled}"
+                            <ComboBox SelectedItem="{Binding SelectedAccountMode, UpdateSourceTrigger=PropertyChanged}"
+                                      AutomationProperties.Name="MonitoringMode"
+                                      ItemsSource="{Binding AccountModeOptions}"
+                                      IsEnabled="{Binding IsMonitoringModeEnabled}"
                                       HorizontalAlignment="Stretch"
                                       Padding="8,6">
                                 <ComboBox.ItemTemplate>
@@ -400,8 +400,8 @@
                                        Foreground="{DynamicResource SecondaryTextBrush}"
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,0" />
-                            <StackPanel AutomationProperties.Name="TriggerKeywordBereich"
-                                        Visibility="{Binding IsTriggerKeywordSichtbar, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel AutomationProperties.Name="TriggerKeywordArea"
+                                        Visibility="{Binding IsTriggerKeywordVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <TextBlock Text="Trigger-Keyword"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}"
@@ -415,8 +415,8 @@
                                            TextWrapping="Wrap"
                                            Margin="0,4,0,0" />
                             </StackPanel>
-                            <StackPanel AutomationProperties.Name="DelayKeywordBereich"
-                                        Visibility="{Binding IsDelayKeywordSichtbar, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel AutomationProperties.Name="DelayKeywordArea"
+                                        Visibility="{Binding IsDelayKeywordVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <TextBlock Text="Verzögerungs-Keyword"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}"
@@ -430,13 +430,13 @@
                                            TextWrapping="Wrap"
                                            Margin="0,4,0,0" />
                             </StackPanel>
-                            <StackPanel AutomationProperties.Name="MaxParalleleAusfuehrungenBereich">
+                            <StackPanel AutomationProperties.Name="MaxParallelExecutionsArea">
                                 <TextBlock Text="Maximale parallele Ausführungen"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}"
                                            Margin="0,12,0,4" />
-                                <TextBox Text="{Binding MaxParalleleAusfuehrungen, UpdateSourceTrigger=PropertyChanged}"
-                                         AutomationProperties.Name="MaxParalleleAusfuehrungen"
+                                <TextBox Text="{Binding MaxParallelExecutions, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="MaxParallelExecutions"
                                          Padding="8,6"
                                          BorderBrush="{DynamicResource BorderBrush}" />
                                 <TextBlock Text="Globales Limit gleichzeitig laufender KI-CLI-Ausführungen aus SCM-Ereignissen. Ganzzahl ≥ 1; leer = unbegrenzt. Bei Erreichen des Limits warten weitere Ereignisse mit Wartegrund, bis ein Platz frei wird; die Reihenfolge folgt der Priorisierung (Fortsetzungen vor fälligen Verzögerungen vor Eingangsreihenfolge). Pro KI-Plugin lässt sich zusätzlich ein eigenes Limit unter „Plugins“ festlegen."
@@ -444,8 +444,8 @@
                                            TextWrapping="Wrap"
                                            Margin="0,4,0,0" />
                             </StackPanel>
-                            <StackPanel AutomationProperties.Name="PromptAnhaengeBereich"
-                                        Visibility="{Binding IsPromptAnhaengeSichtbar, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel AutomationProperties.Name="PromptAttachmentsArea"
+                                        Visibility="{Binding IsPromptAppendVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <TextBlock Text="Prompt-Anhänge"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}"
@@ -514,7 +514,7 @@
                     </Expander>
 
                     <!-- Issue-Aufbereitung -->
-                    <Expander AutomationProperties.Name="IssueAufbereitungExpander"
+                    <Expander AutomationProperties.Name="IssuePreparationExpander"
                               IsExpanded="False"
                               Foreground="{DynamicResource PrimaryTextBrush}"
                               Margin="0,0,0,16">
@@ -523,16 +523,16 @@
                                 <TextBlock Text="Issue-Aufbereitung"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}" />
-                                <TextBlock Text="{Binding IssueAufbereitungStatusText}"
-                                           AutomationProperties.Name="IssueAufbereitungStatus"
-                                           AutomationProperties.HelpText="{Binding IssueAufbereitungStatusText}"
+                                <TextBlock Text="{Binding IssuePreparationStatusText}"
+                                           AutomationProperties.Name="IssuePreparationStatus"
+                                           AutomationProperties.HelpText="{Binding IssuePreparationStatusText}"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            Margin="8,0,0,0" />
                             </StackPanel>
                         </Expander.Header>
                         <StackPanel Margin="0,8,0,0">
-                            <CheckBox IsChecked="{Binding IsIssueAufbereitungEnabled, Mode=TwoWay}"
-                                      AutomationProperties.Name="IssueAufbereitungEnabledCheckBox"
+                            <CheckBox IsChecked="{Binding IsIssuePreparationEnabled, Mode=TwoWay}"
+                                      AutomationProperties.Name="IssuePreparationEnabledCheckBox"
                                       Content="Neu angelegte Issues automatisch analysieren und verbessern"
                                       Foreground="{DynamicResource PrimaryTextBrush}" />
                             <TextBlock Text="Wenn aktiviert, werden neu angelegte Issues der ausgewählten Repositories automatisch von einer KI-CLI analysiert: Die Beschreibung wird auf Verständlichkeit, Vollständigkeit, offene Fragen, Risiken und Zielkonflikte geprüft und remote durch eine optimierte Fassung ersetzt (der Titel bleibt unverändert). Die Ausführung zählt in die Ausführungsbegrenzung aus „Aufgaben ausführen“. Die Änderung wirkt ohne Neustart."
@@ -543,10 +543,10 @@
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        Margin="0,12,0,4" />
-                            <ComboBox SelectedItem="{Binding SelectedIssueAufbereitungKiPlugin, UpdateSourceTrigger=PropertyChanged}"
-                                      AutomationProperties.Name="IssueAufbereitungPluginComboBox"
-                                      ItemsSource="{Binding IssueAufbereitungKiPluginOptionen}"
-                                      IsEnabled="{Binding IsIssueAufbereitungFelderEnabled}"
+                            <ComboBox SelectedItem="{Binding SelectedIssuePreparationAiPlugin, UpdateSourceTrigger=PropertyChanged}"
+                                      AutomationProperties.Name="IssuePreparationPluginComboBox"
+                                      ItemsSource="{Binding IssuePreparationAiPluginOptions}"
+                                      IsEnabled="{Binding IsIssuePreparationFieldEnabled}"
                                       HorizontalAlignment="Stretch"
                                       Padding="8,6">
                                 <ComboBox.ItemTemplate>
@@ -563,9 +563,9 @@
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        Margin="0,12,0,4" />
-                            <ItemsControl ItemsSource="{Binding IssueAufbereitungRepositories}"
-                                          AutomationProperties.Name="IssueAufbereitungRepositoriesList"
-                                          IsEnabled="{Binding IsIssueAufbereitungFelderEnabled}">
+                            <ItemsControl ItemsSource="{Binding IssuePreparationRepositories}"
+                                          AutomationProperties.Name="IssuePreparationRepositoriesList"
+                                          IsEnabled="{Binding IsIssuePreparationFieldEnabled}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -579,10 +579,10 @@
                                        Foreground="{DynamicResource SecondaryTextBrush}"
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,0" />
-                            <CheckBox IsChecked="{Binding IsIssueAufbereitungKommentarEnabled, Mode=TwoWay}"
-                                      AutomationProperties.Name="IssueAufbereitungCommentCheckBox"
+                            <CheckBox IsChecked="{Binding IsIssuePreparationCommentEnabled, Mode=TwoWay}"
+                                      AutomationProperties.Name="IssuePreparationCommentCheckBox"
                                       Content="Analyseergebnisse als Issue-Kommentar dokumentieren"
-                                      IsEnabled="{Binding IsIssueAufbereitungFelderEnabled}"
+                                      IsEnabled="{Binding IsIssuePreparationFieldEnabled}"
                                       Foreground="{DynamicResource PrimaryTextBrush}"
                                       Margin="0,12,0,0" />
                             <TextBlock Text="Zusätzlich zur ersetzten Beschreibung wird ein Kommentar mit Schwachstellen, offenen Fragen, Lösungsansätzen, Risiken, Zielkonflikten und Verbesserungsvorschlägen angelegt. Fehler werden dagegen nie als Kommentar am Issue gemeldet."
@@ -593,7 +593,7 @@
                     </Expander>
 
                     <!-- Aufgaben beenden -->
-                    <Expander AutomationProperties.Name="AufgabenBeendenExpander"
+                    <Expander AutomationProperties.Name="WorkItemsExitExpander"
                               IsExpanded="False"
                               Foreground="{DynamicResource PrimaryTextBrush}"
                               Margin="0,0,0,16">
@@ -602,9 +602,9 @@
                                 <TextBlock Text="Aufgaben beenden"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}" />
-                                <TextBlock Text="{Binding AufgabenBeendenStatusText}"
-                                           AutomationProperties.Name="AufgabenBeendenStatus"
-                                           AutomationProperties.HelpText="{Binding AufgabenBeendenStatusText}"
+                                <TextBlock Text="{Binding WorkItemsExitStatusText}"
+                                           AutomationProperties.Name="WorkItemsExitStatus"
+                                           AutomationProperties.HelpText="{Binding WorkItemsExitStatusText}"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            Margin="8,0,0,0" />
                             </StackPanel>
@@ -621,10 +621,10 @@
                             <TextBlock Text="Prüfmodus"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        Margin="22,8,0,4" />
-                            <ComboBox SelectedItem="{Binding SelectedScmTaskCompletionPruefmodus, UpdateSourceTrigger=PropertyChanged}"
-                                      AutomationProperties.Name="Pruefmodus"
-                                      ItemsSource="{Binding ScmTaskCompletionPruefmodusOptionen}"
-                                      IsEnabled="{Binding IsTaskCompletionFelderEnabled}"
+                            <ComboBox SelectedItem="{Binding SelectedScmTaskCompletionCheckmode, UpdateSourceTrigger=PropertyChanged}"
+                                      AutomationProperties.Name="CheckMode"
+                                      ItemsSource="{Binding ScmTaskCompletionCheckmodeOptions}"
+                                      IsEnabled="{Binding IsTaskCompletionFieldEnabled}"
                                       HorizontalAlignment="Stretch"
                                       Margin="22,0,0,0"
                                       Padding="8,6">
@@ -643,7 +643,7 @@
                                        Margin="22,8,0,4" />
                             <TextBox Text="{Binding ScmTaskCompletionWaitMinutes, UpdateSourceTrigger=PropertyChanged}"
                                      AutomationProperties.Name="ScmTaskCompletionWaitMinutes"
-                                     IsEnabled="{Binding IsTaskCompletionFelderEnabled}"
+                                     IsEnabled="{Binding IsTaskCompletionFieldEnabled}"
                                      Width="120"
                                      HorizontalAlignment="Left"
                                      Margin="22,0,0,0"
@@ -657,7 +657,7 @@
                     </Expander>
 
                     <!-- Prozessabläufe -->
-                    <Expander AutomationProperties.Name="ProzessablaeufeExpander"
+                    <Expander AutomationProperties.Name="ProcessRunsExpander"
                               IsExpanded="False"
                               Foreground="{DynamicResource PrimaryTextBrush}"
                               Margin="0,0,0,16">
@@ -666,9 +666,9 @@
                                 <TextBlock Text="Prozessabläufe"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}" />
-                                <TextBlock Text="{Binding ProzessablaeufeStatusText}"
-                                           AutomationProperties.Name="ProzessablaeufeStatus"
-                                           AutomationProperties.HelpText="{Binding ProzessablaeufeStatusText}"
+                                <TextBlock Text="{Binding ProcessRunsStatusText}"
+                                           AutomationProperties.Name="ProcessRunsStatus"
+                                           AutomationProperties.HelpText="{Binding ProcessRunsStatusText}"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            Margin="8,0,0,0" />
                             </StackPanel>
@@ -678,9 +678,9 @@
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        Margin="0,0,0,4" />
-                            <ComboBox SelectedItem="{Binding SelectedBackmergeModus, UpdateSourceTrigger=PropertyChanged}"
+                            <ComboBox SelectedItem="{Binding SelectedBackmergeMode, UpdateSourceTrigger=PropertyChanged}"
                                       AutomationProperties.Name="Backmerge-Modus"
-                                      ItemsSource="{Binding BackmergeModusOptionen}"
+                                      ItemsSource="{Binding BackmergeModeOptions}"
                                       HorizontalAlignment="Stretch"
                                       Padding="8,6">
                                 <ComboBox.ItemTemplate>
@@ -693,9 +693,9 @@
                                        Foreground="{DynamicResource SecondaryTextBrush}"
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,0" />
-                            <CheckBox IsChecked="{Binding IsScmBackmergeDraftAktivierung, Mode=TwoWay}"
-                                      AutomationProperties.Name="IsScmBackmergeDraftAktivierung"
-                                      IsEnabled="{Binding IsProzessablaeufeFelderEnabled}"
+                            <CheckBox IsChecked="{Binding IsScmBackmergeDraftActivation, Mode=TwoWay}"
+                                      AutomationProperties.Name="IsScmBackmergeDraftActivation"
+                                      IsEnabled="{Binding IsProcessRunsFieldEnabled}"
                                       Content="Draft-Pull-Requests vor dem Merge automatisch aktivieren"
                                       Foreground="{DynamicResource PrimaryTextBrush}"
                                       Margin="0,12,0,0" />
@@ -705,7 +705,7 @@
                                        Margin="22,4,0,0" />
                             <CheckBox IsChecked="{Binding IsScmBackmergeAdminMerge, Mode=TwoWay}"
                                       AutomationProperties.Name="IsScmBackmergeAdminMerge"
-                                      IsEnabled="{Binding IsProzessablaeufeFelderEnabled}"
+                                      IsEnabled="{Binding IsProcessRunsFieldEnabled}"
                                       Content="Bei blockiertem Merge Admin-Merge erlauben"
                                       Foreground="{DynamicResource PrimaryTextBrush}"
                                       Margin="0,12,0,0" />
@@ -758,10 +758,10 @@
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource PrimaryTextBrush}"
                                            Margin="0,0,0,4" />
-                                <ComboBox SelectedValue="{Binding DefaultKiPlugin, UpdateSourceTrigger=PropertyChanged}"
+                                <ComboBox SelectedValue="{Binding DefaultAiPlugin, UpdateSourceTrigger=PropertyChanged}"
                                           SelectedValuePath="PluginName"
-                                          AutomationProperties.Name="DefaultKiPlugin"
-                                          ItemsSource="{Binding KiPlugins}"
+                                          AutomationProperties.Name="DefaultAiPlugin"
+                                          ItemsSource="{Binding AiPlugins}"
                                           Padding="8,6"
                                           SelectionChanged="OnPluginSelectionChanged">
                                     <ComboBox.ItemTemplate>
@@ -788,7 +788,7 @@
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="{Binding PluginName}"
-                                                       AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.Eintrag}"
+                                                       AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.Entry}"
                                                        Margin="6,0,0,0"
                                                        VerticalAlignment="Center" />
                                         </StackPanel>
@@ -812,7 +812,7 @@
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="{Binding PluginName}"
-                                                       AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.Eintrag}"
+                                                       AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.Entry}"
                                                        Margin="6,0,0,0"
                                                        VerticalAlignment="Center" />
                                         </StackPanel>
@@ -826,7 +826,7 @@
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        Margin="0,0,0,4" />
                             <ListBox ItemsSource="{Binding DevelopmentEnvironmentPlugins}"
-                                     AutomationProperties.Name="IdePluginListe"
+                                     AutomationProperties.Name="IdePluginList"
                                      Background="{DynamicResource SurfaceBrush}"
                                      Foreground="{DynamicResource PrimaryTextBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
@@ -842,18 +842,18 @@
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0"
                                                        Text="{Binding PluginName}"
-                                                       AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.Eintrag}"
+                                                       AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.Entry}"
                                                        Margin="6,0,0,0"
                                                        VerticalAlignment="Center" />
                                             <StackPanel Grid.Column="1" Orientation="Horizontal">
                                                 <Button Content="↑"
-                                                        AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.NachOben}"
+                                                        AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.MoveUp}"
                                                         Margin="12,0,0,0"
                                                         Padding="6,0"
                                                         Command="{Binding DataContext.IdePluginMoveUpCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
                                                         CommandParameter="{Binding}" />
                                                 <Button Content="↓"
-                                                        AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.NachUnten}"
+                                                        AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.MoveDown}"
                                                         Margin="4,0,0,0"
                                                         Padding="6,0"
                                                         Command="{Binding DataContext.IdePluginMoveDownCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
@@ -866,16 +866,16 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <!-- Rechte Spalte: Einstellungen des im Aktivierungsregister ausgewählten Plugins -->
+                    <!-- Rechte Spalte: Settings des im Aktivierungsregister ausgewählten Plugins -->
                     <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <controls:PluginDetailPanel
-                                Visibility="{Binding IsScmKiPluginContentVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Visibility="{Binding IsScmAiPluginContentVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                                 HeaderText="{Binding SelectedPlugin.PluginName}"
                                 IsEnabledChecked="{Binding SelectedPlugin.IsEnabled, Mode=TwoWay}"
                                 SettingsSource="{Binding SelectedPluginSettings}"
                                 SettingsItemTemplate="{StaticResource PluginSettingGroupsItemTemplate}"
-                                CheckboxAutomationName="PluginAktiviert" />
+                                CheckboxAutomationName="PluginEnabled" />
 
                             <controls:PluginDetailPanel
                                 Visibility="{Binding IsIdePluginContentVisible, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -883,7 +883,7 @@
                                 IsEnabledChecked="{Binding SelectedIdePlugin.IsEnabled, Mode=TwoWay}"
                                 SettingsSource="{Binding SelectedIdePluginSettings}"
                                 SettingsItemTemplate="{StaticResource PluginSettingGroupsItemTemplate}"
-                                CheckboxAutomationName="IdePluginAktiviert" />
+                                CheckboxAutomationName="IdePluginEnabled" />
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>
@@ -898,8 +898,8 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16" MaxWidth="900" HorizontalAlignment="Left">
                         <Button Content="Hinzufügen"
-                                AutomationProperties.Name="PromptVorlageHinzufuegen"
-                                Command="{Binding PromptVorlageHinzufuegenCommand}"
+                                AutomationProperties.Name="AddPromptTemplate"
+                                Command="{Binding AddPromptTemplateCommand}"
                                 Padding="12,6"
                                 HorizontalAlignment="Left"
                                 Margin="0,0,0,12" />
@@ -926,7 +926,7 @@
                                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                                            Margin="0,0,0,4" />
                                                 <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                                                         AutomationProperties.Name="PromptVorlageName"
+                                                         AutomationProperties.Name="PromptTemplateName"
                                                          Padding="8,6" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="2">
@@ -935,7 +935,7 @@
                                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                                            Margin="0,0,0,4" />
                                                 <TextBox Text="{Binding PromptText, UpdateSourceTrigger=PropertyChanged}"
-                                                         AutomationProperties.Name="PromptVorlagePrompttext"
+                                                         AutomationProperties.Name="PromptTemplatePromptText"
                                                          Padding="8,6"
                                                          MinHeight="72"
                                                          AcceptsReturn="True"
@@ -944,8 +944,8 @@
                                             </StackPanel>
                                             <Button Grid.Column="3"
                                                     Content="Löschen"
-                                                    AutomationProperties.Name="PromptVorlageLoeschen"
-                                                    Command="{Binding DataContext.PromptVorlageLoeschenCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
+                                                    AutomationProperties.Name="DeletePromptTemplate"
+                                                    Command="{Binding DataContext.DeletePromptTemplateCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
                                                     CommandParameter="{Binding}"
                                                     Padding="12,6"
                                                     Margin="12,20,0,0"

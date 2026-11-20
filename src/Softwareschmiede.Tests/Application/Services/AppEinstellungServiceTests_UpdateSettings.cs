@@ -11,7 +11,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für die Update-Einstellungen in <see cref="AppSettingService"/> mit echter SQLite-Datei-Datenbank.</summary>
+/// <summary>Tests für die Update--Einstellungen in <see cref="AppSettingService"/> mit echter SQLite-Datei-Datenbank.</summary>
 public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
 {
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"sw-updatesettings-{Guid.NewGuid():N}.db");

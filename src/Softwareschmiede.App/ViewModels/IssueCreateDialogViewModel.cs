@@ -22,7 +22,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
     private IssueTemplate? _selectedTemplate;
     private string? _title;
     private string? _body;
-    private string? _selectedKiPluginPrefix;
+    private string? _selectedAiPluginPrefix;
     private string? _errorMessage;
     private bool _isLoadingTemplates;
     private bool _isSubmitting;
@@ -36,7 +36,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
     public ObservableCollection<IssueTemplate> Templates { get; } = new();
 
     /// <summary>Verfügbare KI-Provider mit Textgenerierungsfähigkeit.</summary>
-    public ObservableCollection<string> VerfuegbareKiPlugins { get; } = new();
+    public ObservableCollection<string> AvailableAiPlugins { get; } = new();
 
     /// <summary>Das erfolgreich beim Provider angelegte Issue.</summary>
     public Issue? CreatedIssue { get; private set; }
@@ -64,7 +64,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
                 Body = ComposeTemplateBody(value.Body, _originalRequirement);
             }
 
-            AktualisiereAbhaengigeZustaende();
+            UpdateDependentStates();
         }
     }
 
@@ -75,7 +75,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         set
         {
             SetProperty(ref _title, value);
-            AktualisiereAbhaengigeZustaende();
+            UpdateDependentStates();
         }
     }
 
@@ -86,18 +86,18 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         set
         {
             SetProperty(ref _body, value);
-            AktualisiereAbhaengigeZustaende();
+            UpdateDependentStates();
         }
     }
 
     /// <summary>Ausgewähltes KI-Plugin.</summary>
-    public string? SelectedKiPluginPrefix
+    public string? SelectedAiPluginPrefix
     {
-        get => _selectedKiPluginPrefix;
+        get => _selectedAiPluginPrefix;
         set
         {
-            SetProperty(ref _selectedKiPluginPrefix, value);
-            AktualisiereAbhaengigeZustaende();
+            SetProperty(ref _selectedAiPluginPrefix, value);
+            UpdateDependentStates();
         }
     }
 
@@ -115,7 +115,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         private set
         {
             SetProperty(ref _isLoadingTemplates, value);
-            AktualisiereAbhaengigeZustaende();
+            UpdateDependentStates();
         }
     }
 
@@ -126,7 +126,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         private set
         {
             SetProperty(ref _isSubmitting, value);
-            AktualisiereAbhaengigeZustaende();
+            UpdateDependentStates();
         }
     }
 
@@ -137,7 +137,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         private set
         {
             SetProperty(ref _isGenerating, value);
-            AktualisiereAbhaengigeZustaende();
+            UpdateDependentStates();
         }
     }
 
@@ -154,7 +154,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
 
     /// <summary>Gibt an, ob die KI-Ausfüllhilfe genutzt werden kann.</summary>
     public bool CanUseAi => SelectedTemplate is not null
-        && !string.IsNullOrWhiteSpace(SelectedKiPluginPrefix)
+        && !string.IsNullOrWhiteSpace(SelectedAiPluginPrefix)
         && !IsLoadingTemplates
         && !IsSubmitting
         && !IsGenerating
@@ -164,13 +164,13 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
     public ICommand LoadTemplatesCommand { get; }
 
     /// <summary>Füllt das Template per KI aus.</summary>
-    public ICommand KiAusfuellenCommand { get; }
+    public ICommand AiAusfuellenCommand { get; }
 
     /// <summary>Legt das Issue beim Provider an.</summary>
-    public ICommand ErstellenCommand { get; }
+    public ICommand CreateCommand { get; }
 
     /// <summary>Bricht den Dialog ab.</summary>
-    public ICommand AbbrechenCommand { get; }
+    public ICommand CancelCommand { get; }
 
     /// <inheritdoc cref="IssueCreateDialogViewModel"/>
     public IssueCreateDialogViewModel(
@@ -183,9 +183,9 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         _pluginActivationService = pluginActivationService;
 
         LoadTemplatesCommand = new AsyncRelayCommand(LoadTemplatesAsync);
-        KiAusfuellenCommand = new AsyncRelayCommand(KiAusfuellenAsync, () => CanUseAi);
-        ErstellenCommand = new AsyncRelayCommand(ErstellenAsync, () => CanSubmit);
-        AbbrechenCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false), () => !IsSubmitting && !IsGenerating);
+        AiAusfuellenCommand = new AsyncRelayCommand(AiAusfuellenAsync, () => CanUseAi);
+        CreateCommand = new AsyncRelayCommand(CreateAsync, () => CanSubmit);
+        CancelCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false), () => !IsSubmitting && !IsGenerating);
     }
 
     /// <summary>Initialisiert den Dialog mit Provider- und Aufgabendaten.</summary>
@@ -195,7 +195,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         string repositoryId,
         string? initialTitle,
         string? originalRequirement,
-        string? preferredKiPluginPrefix,
+        string? preferredAiPluginPrefix,
         Func<bool>? issueAlreadyAssigned = null,
         Func<CancellationToken, Task<bool>>? issueAlreadyAssignedLive = null)
     {
@@ -214,23 +214,23 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         Body = _originalRequirement ?? string.Empty;
         SelectedTemplate = null;
 
-        VerfuegbareKiPlugins.Clear();
+        AvailableAiPlugins.Clear();
         foreach (var prefix in _pluginManager.GetDevelopmentAutomationPlugins()
                      .Where(p => p is IIssueTemplateTextGenerator)
                      .Select(p => p.PluginPrefix)
                      .Where(p => !string.IsNullOrWhiteSpace(p))
                      .Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            VerfuegbareKiPlugins.Add(prefix);
+            AvailableAiPlugins.Add(prefix);
         }
 
-        SelectedKiPluginPrefix = VerfuegbareKiPlugins.FirstOrDefault(p =>
-                                     string.Equals(p, preferredKiPluginPrefix, StringComparison.OrdinalIgnoreCase))
-                                 ?? VerfuegbareKiPlugins.FirstOrDefault();
-        AktualisiereAbhaengigeZustaende();
+        SelectedAiPluginPrefix = AvailableAiPlugins.FirstOrDefault(p =>
+                                     string.Equals(p, preferredAiPluginPrefix, StringComparison.OrdinalIgnoreCase))
+                                 ?? AvailableAiPlugins.FirstOrDefault();
+        UpdateDependentStates();
     }
 
-    /// <summary>Initialisiert den Dialog wie <see cref="Initialize"/> und filtert <see cref="VerfuegbareKiPlugins"/>
+    /// <summary>Initialisiert den Dialog wie <see cref="Initialize"/> und filtert <see cref="AvailableAiPlugins"/>
     /// anschließend in einem Schritt auf aktive Plugins, sodass beide Schritte nicht mehr einzeln in der
     /// richtigen Reihenfolge aufgerufen werden müssen.</summary>
     /// <param name="issueProvider">Der Provider zum Anlegen des Issues.</param>
@@ -238,7 +238,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
     /// <param name="repositoryId">Die Kennung des Repositories.</param>
     /// <param name="initialTitle">Der initial vorbelegte Titel.</param>
     /// <param name="originalRequirement">Die ursprüngliche Anforderungsbeschreibung.</param>
-    /// <param name="preferredKiPluginPrefix">Der bevorzugte KI-Plugin-Prefix.</param>
+    /// <param name="preferredAiPluginPrefix">Der bevorzugte KI-Plugin-Prefix.</param>
     /// <param name="issueAlreadyAssigned">Prüfung, ob bereits ein Issue zugeordnet ist.</param>
     /// <param name="issueAlreadyAssignedLive">Asynchrone Live-Prüfung, ob bereits ein Issue zugeordnet ist.</param>
     /// <param name="ct">Abbruchtoken.</param>
@@ -248,7 +248,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         string repositoryId,
         string? initialTitle,
         string? originalRequirement,
-        string? preferredKiPluginPrefix,
+        string? preferredAiPluginPrefix,
         Func<bool>? issueAlreadyAssigned = null,
         Func<CancellationToken, Task<bool>>? issueAlreadyAssignedLive = null,
         CancellationToken ct = default)
@@ -259,34 +259,34 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
             repositoryId,
             initialTitle,
             originalRequirement,
-            preferredKiPluginPrefix,
+            preferredAiPluginPrefix,
             issueAlreadyAssigned,
             issueAlreadyAssignedLive);
-        await FiltereAktivePluginsAsync(ct);
+        await FilterActivePluginsAsync(ct);
     }
 
-    /// <summary>Filtert <see cref="VerfuegbareKiPlugins"/> zusätzlich auf aktive Plugins. Ohne konfigurierten <see cref="PluginActivationService"/> bleibt die Liste unverändert.</summary>
+    /// <summary>Filtert <see cref="AvailableAiPlugins"/> zusätzlich auf aktive Plugins. Ohne konfigurierten <see cref="PluginActivationService"/> bleibt die Liste unverändert.</summary>
     /// <param name="ct">Abbruchtoken.</param>
-    public async Task FiltereAktivePluginsAsync(CancellationToken ct = default)
+    public async Task FilterActivePluginsAsync(CancellationToken ct = default)
     {
         if (_pluginActivationService is null)
         {
             return;
         }
 
-        var aktivePrefixe = (await _pluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync(ct))
+        var activePrefixe = (await _pluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync(ct))
             .Select(p => p.PluginPrefix)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var deaktiviertePrefixe = VerfuegbareKiPlugins.Where(p => !aktivePrefixe.Contains(p)).ToList();
-        foreach (var prefix in deaktiviertePrefixe)
+        var disabledPrefixe = AvailableAiPlugins.Where(p => !activePrefixe.Contains(p)).ToList();
+        foreach (var prefix in disabledPrefixe)
         {
-            VerfuegbareKiPlugins.Remove(prefix);
+            AvailableAiPlugins.Remove(prefix);
         }
 
-        if (SelectedKiPluginPrefix is not null && !aktivePrefixe.Contains(SelectedKiPluginPrefix))
+        if (SelectedAiPluginPrefix is not null && !activePrefixe.Contains(SelectedAiPluginPrefix))
         {
-            SelectedKiPluginPrefix = VerfuegbareKiPlugins.FirstOrDefault();
+            SelectedAiPluginPrefix = AvailableAiPlugins.FirstOrDefault();
         }
     }
 
@@ -342,7 +342,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         }
     }
 
-    private async Task KiAusfuellenAsync(CancellationToken ct)
+    private async Task AiAusfuellenAsync(CancellationToken ct)
     {
         var generator = FindSelectedTextGenerator();
         if (generator is null || SelectedTemplate is null)
@@ -371,7 +371,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         }
     }
 
-    private async Task ErstellenAsync(CancellationToken ct)
+    private async Task CreateAsync(CancellationToken ct)
     {
         if (_issueProvider is null || !CanSubmit)
         {
@@ -421,17 +421,17 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
 
     private IIssueTemplateTextGenerator? FindSelectedTextGenerator()
     {
-        if (string.IsNullOrWhiteSpace(SelectedKiPluginPrefix))
+        if (string.IsNullOrWhiteSpace(SelectedAiPluginPrefix))
         {
             return null;
         }
 
         return _pluginManager.GetDevelopmentAutomationPlugins()
-            .FirstOrDefault(p => string.Equals(p.PluginPrefix, SelectedKiPluginPrefix, StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault(p => string.Equals(p.PluginPrefix, SelectedAiPluginPrefix, StringComparison.OrdinalIgnoreCase))
             as IIssueTemplateTextGenerator;
     }
 
-    private void AktualisiereAbhaengigeZustaende()
+    private void UpdateDependentStates()
     {
         OnPropertyChanged(nameof(CanSubmit));
         OnPropertyChanged(nameof(CanUseAi));

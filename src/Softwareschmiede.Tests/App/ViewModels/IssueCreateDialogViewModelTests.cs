@@ -140,7 +140,7 @@ public sealed class IssueCreateDialogViewModelTests
         bool? closed = null;
         sut.CloseRequested += (_, result) => closed = result;
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         _issueProvider.Request.Should().Be(new IssueCreateRequest("Aufgabe", "Original"));
         sut.UpdateTaskDescriptionAfterCreate.Should().BeTrue();
@@ -162,7 +162,7 @@ public sealed class IssueCreateDialogViewModelTests
             null,
             issueAlreadyAssignedLive: _ => Task.FromResult(true));
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         _issueProvider.Request.Should().BeNull();
         sut.ErrorMessage.Should().Contain("bereits ein Issue");
@@ -176,7 +176,7 @@ public sealed class IssueCreateDialogViewModelTests
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
         sut.Title = " ";
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         sut.CanSubmit.Should().BeFalse();
         _issueProvider.Request.Should().BeNull();
@@ -192,7 +192,7 @@ public sealed class IssueCreateDialogViewModelTests
         bool? closed = null;
         sut.CloseRequested += (_, result) => closed = result;
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         _issueProvider.Request.Should().Be(new IssueCreateRequest("Aufgabe", "Original"));
         sut.CreatedIssue.Should().BeNull();
@@ -213,7 +213,7 @@ public sealed class IssueCreateDialogViewModelTests
         bool? closed = null;
         sut.CloseRequested += (_, result) => closed = result;
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         sut.CreatedIssue.Should().BeNull();
         sut.ErrorMessage.Should().Contain("Netzwerkfehler");
@@ -229,7 +229,7 @@ public sealed class IssueCreateDialogViewModelTests
         _issueProvider.ExceptionToThrow = new OperationCanceledException();
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         sut.CreatedIssue.Should().BeNull();
         sut.ErrorMessage.Should().BeNull();
@@ -245,13 +245,13 @@ public sealed class IssueCreateDialogViewModelTests
         _issueProvider.Release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
 
-        var first = ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        var first = ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
         await _issueProvider.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         sut.CanSubmit.Should().BeFalse();
-        sut.ErstellenCommand.CanExecute(null).Should().BeFalse();
+        sut.CreateCommand.CanExecute(null).Should().BeFalse();
 
-        var second = ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        var second = ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
         _issueProvider.Release.SetResult(null);
         await Task.WhenAll(first, second);
 
@@ -285,7 +285,7 @@ public sealed class IssueCreateDialogViewModelTests
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
 
-        await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.AiAusfuellenCommand).ExecuteAsync();
 
         aiPlugin.ReceivedTemplateBody.Should().Be("Template");
         aiPlugin.ReceivedOriginalRequirement.Should().Be("Original");
@@ -303,7 +303,7 @@ public sealed class IssueCreateDialogViewModelTests
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
 
-        await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.AiAusfuellenCommand).ExecuteAsync();
 
         sut.Body.Should().Be(generatedBody);
         sut.Body.Should().NotContain("plÃ");
@@ -326,13 +326,13 @@ public sealed class IssueCreateDialogViewModelTests
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "Softwareschmiede.Devin");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
 
-        sut.VerfuegbareKiPlugins.Should().BeEquivalentTo([
+        sut.AvailableAiPlugins.Should().BeEquivalentTo([
             "Softwareschmiede.Codex",
             "Softwareschmiede.ClaudeCli",
             "Softwareschmiede.Devin",
             "Softwareschmiede.GitHubCopilot"
         ], options => options.WithStrictOrdering());
-        sut.SelectedKiPluginPrefix.Should().Be("Softwareschmiede.Devin");
+        sut.SelectedAiPluginPrefix.Should().Be("Softwareschmiede.Devin");
         sut.CanUseAi.Should().BeTrue();
     }
 
@@ -346,8 +346,8 @@ public sealed class IssueCreateDialogViewModelTests
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "PlainKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
 
-        sut.VerfuegbareKiPlugins.Should().BeEmpty();
-        sut.SelectedKiPluginPrefix.Should().BeNull();
+        sut.AvailableAiPlugins.Should().BeEmpty();
+        sut.SelectedAiPluginPrefix.Should().BeNull();
         sut.CanUseAi.Should().BeFalse();
     }
 
@@ -367,11 +367,11 @@ public sealed class IssueCreateDialogViewModelTests
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance, activationService);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
 
-        await sut.FiltereAktivePluginsAsync(TestContext.Current.CancellationToken);
+        await sut.FilterActivePluginsAsync(TestContext.Current.CancellationToken);
 
-        sut.VerfuegbareKiPlugins.Should().ContainSingle();
-        sut.VerfuegbareKiPlugins.Should().Contain("FakeKi");
-        sut.SelectedKiPluginPrefix.Should().Be("FakeKi");
+        sut.AvailableAiPlugins.Should().ContainSingle();
+        sut.AvailableAiPlugins.Should().Contain("FakeKi");
+        sut.SelectedAiPluginPrefix.Should().Be("FakeKi");
     }
 
     /// <summary>KI-Fehler bleiben im Dialog und verlieren den bisherigen Body nicht.</summary>
@@ -385,7 +385,7 @@ public sealed class IssueCreateDialogViewModelTests
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
         sut.Body = "Bisheriger Body";
 
-        await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.AiAusfuellenCommand).ExecuteAsync();
 
         sut.Body.Should().Be("Bisheriger Body");
         sut.ErrorMessage.Should().Contain("KI-Ausfüllhilfe fehlgeschlagen");
@@ -402,7 +402,7 @@ public sealed class IssueCreateDialogViewModelTests
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
         sut.Body = "Bisheriger Body";
 
-        await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.AiAusfuellenCommand).ExecuteAsync();
 
         sut.Body.Should().Be("Bisheriger Body");
         sut.ErrorMessage.Should().BeNull();

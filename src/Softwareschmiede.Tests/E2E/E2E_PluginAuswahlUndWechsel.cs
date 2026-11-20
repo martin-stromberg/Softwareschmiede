@@ -23,7 +23,7 @@ namespace Softwareschmiede.Tests.E2E;
 public partial class End2EndTest
 {
     /// <summary>
-    /// Führt die Plugin-Auswahl (Abbrechen, dann OK) und den anschließenden Plugin-Wechsel bei
+    /// Führt die Plugin-Auswahl (Cancel, dann OK) und den anschließenden Plugin-Wechsel bei
     /// laufender CLI als zwei Phasen an derselben Aufgabe aus.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem beide Phasen ausgeführt werden.</param>
@@ -44,9 +44,9 @@ public partial class End2EndTest
     /// <summary>
     /// Szenario: Beim ersten Start einer Aufgabe ohne gespeichertes Plugin (kein Aufgaben-,
     /// Projekt- oder globaler Default) wird der Plugin-Auswahl-Dialog angezeigt. Zunächst wird die
-    /// Auswahl über "Abbrechen" verworfen (Phase Abbrechen); anschließend wird derselbe Start erneut
+    /// Auswahl über "Cancel" verworfen (Phase Cancel); anschließend wird derselbe Start erneut
     /// versucht, ein Plugin ausgewählt und mit "OK" bestätigt (Phase OK).
-    /// Prüft: Im Abbrechen-Pfad wird der Start-Ablauf nicht fortgesetzt (Aufgabe bleibt im Status
+    /// Prüft: Im Cancel-Pfad wird der Start-Ablauf nicht fortgesetzt (Aufgabe bleibt im Status
     /// "Neu", Edit-Panel weiterhin sichtbar). Im OK-Pfad wird nach Auswahl und Bestätigung der
     /// kombinierte Start-Ablauf fortgesetzt (CLI startet).
     /// </summary>
@@ -54,7 +54,7 @@ public partial class End2EndTest
     /// <returns>Die Aufgabendetailansicht mit laufender CLI (Softwareschmiede.KiSimulator).</returns>
     private TaskDetailView PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E(Window mainWindow)
     {
-        // Phase Abbrechen
+        // Phase Cancel
         var taskDetail = new TaskDetailView(mainWindow);
         var abbrechenDialog = new Views.Dialogs.PluginSelectionDialogView(mainWindow).ForceShow();
         abbrechenDialog.Cancel();

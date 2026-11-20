@@ -28,7 +28,7 @@ public sealed class AppSettingService
     public const string DesignModeKey = "ui.designmode.name";
 
     /// <summary>Schlüssel für das Standard-KI-Plugin.</summary>
-    public const string DefaultKiPluginKey = "ki.plugin.default";
+    public const string DefaultAiPluginKey = "ki.plugin.default";
 
     /// <summary>Schlüssel für das Standard-SCM-Plugin.</summary>
     public const string DefaultScmPluginKey = "scm.plugin.default";

@@ -22,13 +22,13 @@
     <Color x:Key="InfoColor">#4CC2FF</Color>
 
     <!-- Status-Farben -->
-    <Color x:Key="StatusNeuColor">#909090</Color>
-    <Color x:Key="StatusArbeitsverzeichnisColor">#4CC2FF</Color>
-    <Color x:Key="StatusGestartetColor">#00D5E0</Color>
-    <Color x:Key="StatusInArbeitColor">#6CCB5F</Color>
-    <Color x:Key="StatusWartendColor">#FCE100</Color>
-    <Color x:Key="StatusBeendetColor">#909090</Color>
-    <Color x:Key="StatusArchiviertColor">#606060</Color>
+    <Color x:Key="StatusNewColor">#909090</Color>
+    <Color x:Key="StatusWorkingDirectoryColor">#4CC2FF</Color>
+    <Color x:Key="StatusStartedColor">#00D5E0</Color>
+    <Color x:Key="StatusInProgressColor">#6CCB5F</Color>
+    <Color x:Key="StatusWaitingColor">#FCE100</Color>
+    <Color x:Key="StatusCompletedColor">#909090</Color>
+    <Color x:Key="StatusArchivedColor">#606060</Color>
 
     <!-- Diff-Farben -->
     <Color x:Key="DiffAddedColor">#1E3320</Color>

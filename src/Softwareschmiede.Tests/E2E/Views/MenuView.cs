@@ -3,7 +3,7 @@ using FlaUI.Core.Definitions;
 
 namespace Softwareschmiede.Tests.E2E.Views;
 
-/// <summary>View für das persistente Navigationsmenü der Anwendung (Dashboard/Projekte/Einstellungen).</summary>
+/// <summary>View für das persistente Navigationsmenü der Anwendung (Dashboard/Projects/Settings).</summary>
 public sealed class MenuView : BaseWindowView
 {
     private static readonly string[] DashboardButtonNamen = ["Dashboard"];
@@ -11,10 +11,10 @@ public sealed class MenuView : BaseWindowView
     private static readonly string[] EinstellungenButtonNamen = [" Einstellungen", "Einstellungen"];
 
     /// <summary>AutomationId der Aufgabenliste in der Seitenleiste.</summary>
-    private const string AufgabenListeAutomationId = "AktiveAufgabenListeMenue";
+    private const string AufgabenListeAutomationId = "ActiveWorkItemsListMenu";
 
     /// <summary>Namenspräfix der Modus-Umschalter der Seitenleisten-Aufgabenliste.</summary>
-    private const string AufgabenModusPraefix = "AufgabenModus:";
+    private const string WorkItemsModePrefix = "WorkItemsMode:";
 
     /// <param name="window">Das Hauptfenster der Anwendung.</param>
     public MenuView(Window window) : base(window)
@@ -45,7 +45,7 @@ public sealed class MenuView : BaseWindowView
         return dashboard;
     }
 
-    /// <summary>Klickt den "Projekte"-Button und wartet auf die Projektliste.</summary>
+    /// <summary>Klickt den "Projects"-Button und wartet auf die Projektliste.</summary>
     /// <returns>Die Projektlisten-Ansicht.</returns>
     public ProjectListView NavigateToProjects()
     {
@@ -53,29 +53,29 @@ public sealed class MenuView : BaseWindowView
         NavigiereBisSichtbar(
             ProjekteButtonNamen,
             () => projectList.IsVisible,
-            "Projektliste sollte nach Klick auf 'Projekte' sichtbar sein.");
+            "Projektliste sollte nach Klick auf 'Projects' sichtbar sein.");
         return projectList;
     }
 
-    /// <summary>Klickt den "Einstellungen"-Button und wartet auf die Einstellungs-Tabs.</summary>
-    /// <returns>Die Einstellungen-Ansicht.</returns>
+    /// <summary>Klickt den "Settings"-Button und wartet auf die Einstellungs-Tabs.</summary>
+    /// <returns>Die Settings-Ansicht.</returns>
     public SettingsView NavigateToSettings()
     {
         var settings = new SettingsView(Window);
         NavigiereBisSichtbar(
             EinstellungenButtonNamen,
             () => settings.IsVisible,
-            "Einstellungen sollten nach Klick auf 'Einstellungen' sichtbar sein.");
+            "Settings sollten nach Klick auf 'Settings' sichtbar sein.");
         return settings;
     }
 
     /// <returns>Der in der Fußzeile der Navigations-Seitenleiste angezeigte Versionstext ("AppVersionText").</returns>
     public string GetVersionText() => WaitForElement(Window, cf => cf.ByAutomationId("AppVersionText"), Short).Name;
 
-    /// <summary>Liest den Anzahl-Text des Auto-Shutdown-Blocks ("AutoShutdownLaufendeAnzahl").</summary>
+    /// <summary>Liest den Anzahl-Text des Auto-Shutdown-Blocks ("AutoShutdownRunningCount").</summary>
     /// <returns>Der Anzeigetext oder <c>null</c>, wenn das Element nicht sichtbar ist.</returns>
     public string? GetAutoShutdownLaufendeAnzahlText()
-        => LiesElementText("AutoShutdownLaufendeAnzahl");
+        => LiesElementText("AutoShutdownRunningCount");
 
     /// <summary>Wartet, bis der Anzahl-Text des Auto-Shutdown-Blocks <paramref name="teilText"/> enthält.</summary>
     /// <param name="teilText">Der erwartete Teiltext (z. B. "1 laufende").</param>
@@ -83,24 +83,24 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Der vollständige Anzeigetext.</returns>
     /// <exception cref="TimeoutException">Der Text erschien nicht rechtzeitig.</exception>
     public string WaitForAutoShutdownLaufendeAnzahlText(string teilText, TimeSpan timeout)
-        => WarteAufElementText("AutoShutdownLaufendeAnzahl", teilText, timeout);
+        => WarteAufElementText("AutoShutdownRunningCount", teilText, timeout);
 
     /// <summary>Gibt an, ob die Aktivierungs-Checkbox des Auto-Shutdowns sichtbar ist.</summary>
     /// <returns><c>true</c>, wenn die Checkbox vorhanden und nicht ausgeblendet ist.</returns>
     public bool IsAutoShutdownAktivierenVisible()
-        => IstElementSichtbar("AutoShutdownAktivieren");
+        => IstElementSichtbar("ActivateAutoShutdown");
 
     /// <summary>Wartet, bis die Aktivierungs-Checkbox des Auto-Shutdowns nicht mehr sichtbar ist.</summary>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Diese Instanz.</returns>
     /// <exception cref="TimeoutException">Die Checkbox blieb sichtbar.</exception>
     public MenuView WaitForAutoShutdownAktivierenVerschwunden(TimeSpan timeout)
-        => WarteAufElementUnsichtbar("AutoShutdownAktivieren", timeout);
+        => WarteAufElementUnsichtbar("ActivateAutoShutdown", timeout);
 
     /// <summary>Liest den gesetzten Zustand der Aktivierungs-Checkbox (<c>null</c> bei nicht gefundener Checkbox).</summary>
     /// <returns>Der Checked-Zustand oder <c>null</c>.</returns>
     public bool? GetAutoShutdownAktiviertChecked()
-        => GetCheckBoxChecked("AutoShutdownAktivieren");
+        => GetCheckBoxChecked("ActivateAutoShutdown");
 
     /// <summary>Setzt die Aktivierungs-Checkbox auf den gewünschten Zustand (Togglen nur bei Abweichung).</summary>
     /// <param name="aktiviert">Der Zielzustand.</param>
@@ -108,14 +108,14 @@ public sealed class MenuView : BaseWindowView
     /// <exception cref="TimeoutException">Die Checkbox wurde nicht rechtzeitig sichtbar.</exception>
     public MenuView SetzeAutoShutdownAktiviert(bool aktiviert)
         => SetzeCheckBoxZustand(
-            "AutoShutdownAktivieren",
+            "ActivateAutoShutdown",
             aktiviert,
             "Die Auto-Shutdown-Aktivierungs-Checkbox wurde nicht rechtzeitig sichtbar.");
 
     /// <summary>Gibt an, ob das Toleranz-Textfeld sichtbar ist (Optionen nur bei aktiviertem Schalter).</summary>
     /// <returns><c>true</c>, wenn das Feld vorhanden und nicht ausgeblendet ist.</returns>
     public bool IsAutoShutdownToleranzVisible()
-        => IstElementSichtbar("AutoShutdownToleranzMinuten");
+        => IstElementSichtbar("AutoShutdownToleranceMinutes");
 
     /// <summary>
     /// Wartet, bis das Toleranz-Textfeld sichtbar ist. Das Options-Panel blendet sich über
@@ -128,31 +128,31 @@ public sealed class MenuView : BaseWindowView
     /// <exception cref="TimeoutException">Das Toleranz-Feld wurde nicht rechtzeitig sichtbar.</exception>
     public MenuView WaitForAutoShutdownToleranzSichtbar(TimeSpan timeout)
     {
-        WaitForElement(Window, cf => cf.ByAutomationId("AutoShutdownToleranzMinuten"), timeout);
+        WaitForElement(Window, cf => cf.ByAutomationId("AutoShutdownToleranceMinutes"), timeout);
         return this;
     }
 
     /// <summary>Setzt den Toleranzwert (Minuten) im Auto-Shutdown-Optionsfeld.</summary>
-    /// <param name="minuten">Der einzugebende Wert als Text.</param>
+    /// <param name="minutes">Der einzugebende Wert als Text.</param>
     /// <returns>Diese Instanz.</returns>
-    public MenuView SetzeAutoShutdownToleranz(string minuten)
+    public MenuView SetzeAutoShutdownToleranz(string minutes)
     {
-        var field = WaitForElement(Window, cf => cf.ByAutomationId("AutoShutdownToleranzMinuten"), Medium).AsTextBox();
+        var field = WaitForElement(Window, cf => cf.ByAutomationId("AutoShutdownToleranceMinutes"), Medium).AsTextBox();
         field.Focus();
-        field.Text = minuten;
+        field.Text = minutes;
         return this;
     }
 
     /// <summary>Liest den aktuellen Text des Toleranz-Feldes.</summary>
     /// <returns>Der Feldtext oder <c>null</c>, wenn das Feld nicht gefunden wurde.</returns>
     public string? GetAutoShutdownToleranzText()
-        => Window.FindFirstDescendant(cf => cf.ByAutomationId("AutoShutdownToleranzMinuten"))
+        => Window.FindFirstDescendant(cf => cf.ByAutomationId("AutoShutdownToleranceMinutes"))
             ?.AsTextBox().Text;
 
     /// <summary>Liest den gesetzten Zustand der Erzwingen-Checkbox (<c>null</c> bei nicht gefundener Checkbox).</summary>
     /// <returns>Der Checked-Zustand oder <c>null</c>.</returns>
     public bool? GetAutoShutdownErzwingenChecked()
-        => GetCheckBoxChecked("AutoShutdownErzwingen");
+        => GetCheckBoxChecked("ForceAutoShutdown");
 
     /// <summary>Setzt die Erzwingen-Checkbox auf den gewünschten Zustand (Togglen nur bei Abweichung).</summary>
     /// <param name="force">Der Zielzustand.</param>
@@ -160,7 +160,7 @@ public sealed class MenuView : BaseWindowView
     /// <exception cref="TimeoutException">Die Checkbox wurde nicht rechtzeitig sichtbar.</exception>
     public MenuView SetzeAutoShutdownErzwingen(bool force)
         => SetzeCheckBoxZustand(
-            "AutoShutdownErzwingen",
+            "ForceAutoShutdown",
             force,
             "Die Auto-Shutdown-Erzwingen-Checkbox wurde nicht rechtzeitig sichtbar.");
 
@@ -186,7 +186,7 @@ public sealed class MenuView : BaseWindowView
 
     /// <summary>
     /// Klickt den "Programmupdate prüfen"-Button der Seitenleiste. Der Button ist erst nach dem
-    /// Laden der Update-Einstellungen aktiviert - der Klick wartet daher begrenzt auf die
+    /// Laden der Update--Einstellungen aktiviert - der Klick wartet daher begrenzt auf die
     /// Aktivierung, damit ein Klick nicht wirkungslos auf einen noch gesperrten Button trifft.
     /// </summary>
     /// <returns>Diese Instanz.</returns>
@@ -329,7 +329,7 @@ public sealed class MenuView : BaseWindowView
             $"Hinweis='{GetUpdateHinweis()}'");
     }
 
-    /// <summary>Liest den aktuellen "UpdateHinweis"-Text der Seitenleiste.</summary>
+    /// <summary>Liest den aktuellen "UpdateNotice"-Text der Seitenleiste.</summary>
     /// <returns>Der Hinweistext oder <c>null</c>, wenn kein Hinweis angezeigt wird.</returns>
     /// <remarks>
     /// Das Element trägt kein <c>AutomationProperties.Name</c> - der gebundene Hinweistext ist
@@ -337,14 +337,14 @@ public sealed class MenuView : BaseWindowView
     /// </remarks>
     public string? GetUpdateHinweis()
     {
-        var element = Window.FindFirstDescendant(cf => cf.ByAutomationId("UpdateHinweis"));
+        var element = Window.FindFirstDescendant(cf => cf.ByAutomationId("UpdateNotice"));
         if (element is null || element.IsOffscreen)
             return null;
 
         return element.Name;
     }
 
-    /// <summary>Wartet, bis der "UpdateHinweis" einen Text enthält, der <paramref name="teilText"/> umfasst.</summary>
+    /// <summary>Wartet, bis der "UpdateNotice" einen Text enthält, der <paramref name="teilText"/> umfasst.</summary>
     /// <param name="teilText">Der erwartete Teiltext.</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <returns>Der vollständige Hinweistext.</returns>
@@ -363,7 +363,7 @@ public sealed class MenuView : BaseWindowView
         }
 
         throw new TimeoutException(
-            $"UpdateHinweis enthielt nicht innerhalb von {timeout.TotalSeconds}s '{teilText}'. Zuletzt gesehen: '{zuletzt}'.");
+            $"UpdateNotice enthielt nicht innerhalb von {timeout.TotalSeconds}s '{teilText}'. Zuletzt gesehen: '{zuletzt}'.");
     }
 
     /// <summary>
@@ -374,14 +374,14 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Die Aufgabendetailansicht der Zielaufgabe.</returns>
     public TaskDetailView NavigateToTask(string taskTitle)
     {
-        WaitForElement(AktiveAufgabenListeMenueElement(), cf => cf.ByName($"AufgabeNavigieren:{taskTitle}"), Medium).AsButton().ClickInForeground();
+        WaitForElement(AktiveAufgabenListeMenueElement(), cf => cf.ByName($"WorkItemNavigate:{taskTitle}"), Medium).AsButton().ClickInForeground();
         return new TaskDetailView(Window);
     }
 
     /// <summary>
     /// Klappt die Navigation aus, falls sie eingeklappt ist (in der 48-px-Leiste sind die
     /// Modus-Umschalter der Aufgabenliste verborgen). Erkennt den Zustand an der Sichtbarkeit
-    /// des 'AufgabenModus:Datum'-Umschalters.
+    /// des 'WorkItemsMode:Date'-Umschalters.
     /// </summary>
     /// <returns>Diese Instanz.</returns>
     public MenuView EnsureNavigationExpanded()
@@ -390,7 +390,7 @@ public sealed class MenuView : BaseWindowView
         var toggleGeklickt = false;
         while (DateTime.UtcNow < deadline)
         {
-            var modusButton = Window.FindFirstDescendant(cf => cf.ByName($"{AufgabenModusPraefix}Datum"));
+            var modusButton = Window.FindFirstDescendant(cf => cf.ByName($"{WorkItemsModePrefix}Date"));
             if (modusButton is not null && !modusButton.IsOffscreen)
                 return this;
 
@@ -408,32 +408,32 @@ public sealed class MenuView : BaseWindowView
             Thread.Sleep(200);
         }
 
-        throw new TimeoutException("Die Navigation konnte nicht ausgeklappt werden (AufgabenModus:Datum nicht sichtbar).");
+        throw new TimeoutException("Die Navigation konnte nicht ausgeklappt werden (WorkItemsMode:Date nicht sichtbar).");
     }
 
     /// <summary>
     /// Schaltet den Anzeigemodus der Seitenleisten-Aufgabenliste um (Klick auf den
-    /// 'AufgabenModus:{modus}'-Umschalter). Fensterweit eindeutig, da die Dashboard-Umschalter
-    /// 'DashboardAufgabenModus:*' heißen.
+    /// 'WorkItemsMode:{modus}'-Umschalter). Fensterweit eindeutig, da die Dashboard-Umschalter
+    /// 'DashboardWorkItemsMode:*' heißen.
     /// </summary>
     /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
     /// <returns>Diese Instanz.</returns>
     public MenuView SetzeAufgabenListenModus(string mode)
     {
-        KlickeAufgabenModusUmschalter(AufgabenModusPraefix, mode);
+        KlickeAufgabenModusUmschalter(WorkItemsModePrefix, mode);
         return this;
     }
 
     /// <summary>
     /// Liest die Gruppennamen der Seitenleisten-Aufgabenliste im gruppierten Modus
-    /// (UIA-Namen 'AufgabenGruppe:{Name}' der Gruppenheader, gescoped unter 'AktiveAufgabenListeMenue').
+    /// (UIA-Namen 'WorkItemsGroup:{Name}' der Gruppenheader, gescoped unter 'ActiveWorkItemsListMenu').
     /// </summary>
-    /// <returns>Die Gruppennamen ohne das 'AufgabenGruppe:'-Präfix; leer im flachen Modus.</returns>
+    /// <returns>Die Gruppennamen ohne das 'WorkItemsGroup:'-Präfix; leer im flachen Modus.</returns>
     public string[] GetAufgabenGruppenNamen() => GetAufgabenGruppenNamen(AufgabenListeAutomationId);
 
     /// <summary>
-    /// Wartet, bis der Gruppenheader 'AufgabenGruppe:{name}' in der Seitenleisten-Aufgabenliste
-    /// erscheint (gescoped unter 'AktiveAufgabenListeMenue').
+    /// Wartet, bis der Gruppenheader 'WorkItemsGroup:{name}' in der Seitenleisten-Aufgabenliste
+    /// erscheint (gescoped unter 'ActiveWorkItemsListMenu').
     /// </summary>
     /// <param name="name">Der erwartete Gruppenname (z. B. ein Repository-Name).</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
@@ -455,7 +455,7 @@ public sealed class MenuView : BaseWindowView
     {
         var kiPluginText = WaitForElement(
             AktiveAufgabenListeMenueElement(),
-            cf => cf.ByAutomationId($"AktiveAufgabeKiPlugin_{taskTitle}"),
+            cf => cf.ByAutomationId($"ActiveWorkItemAiPlugin_{taskTitle}"),
             Short);
         var helpText = kiPluginText.HelpText;
         if (helpText is not null && helpText.StartsWith("KI: ", StringComparison.Ordinal))
@@ -466,26 +466,26 @@ public sealed class MenuView : BaseWindowView
         throw new InvalidOperationException($"Für Aufgabe '{taskTitle}' wurde kein 'KI: '-Eintrag in der Seitenleiste gefunden. Gesehen: '{helpText}'.");
     }
 
-    /// <summary>Liest den KI-Plugin-Glyph (UIA-Name des 'AktiveAufgabeKiPlugin_{titel}'-Elements) der Kachel.</summary>
+    /// <summary>Liest den KI-Plugin-Glyph (UIA-Name des 'ActiveWorkItemAiPlugin_{titel}'-Elements) der Kachel.</summary>
     /// <param name="taskTitle">Der Titel der Aufgabe.</param>
     /// <returns>Der angezeigte Glyph.</returns>
     public string GetActiveTaskKiPluginSymbol(string taskTitle)
         => WaitForElement(
             AktiveAufgabenListeMenueElement(),
-            cf => cf.ByAutomationId($"AktiveAufgabeKiPlugin_{taskTitle}"),
+            cf => cf.ByAutomationId($"ActiveWorkItemAiPlugin_{taskTitle}"),
             Short).Name;
 
-    /// <summary>Liest den SCM-Plugin-Glyph (UIA-Name des 'AktiveAufgabeScmPlugin_{titel}'-Elements) der Kachel.</summary>
+    /// <summary>Liest den SCM-Plugin-Glyph (UIA-Name des 'ActiveWorkItemScmPlugin_{titel}'-Elements) der Kachel.</summary>
     /// <param name="taskTitle">Der Titel der Aufgabe.</param>
     /// <returns>Der angezeigte Glyph.</returns>
     public string GetActiveTaskScmPluginSymbol(string taskTitle)
         => WaitForElement(
             AktiveAufgabenListeMenueElement(),
-            cf => cf.ByAutomationId($"AktiveAufgabeScmPlugin_{taskTitle}"),
+            cf => cf.ByAutomationId($"ActiveWorkItemScmPlugin_{taskTitle}"),
             Short).Name;
 
     /// <summary>
-    /// Liest den Status-Glyph der Kachel. Der UIA-Name des Elements 'AufgabeStatus:{titel}' ist der
+    /// Liest den Status-Glyph der Kachel. Der UIA-Name des Elements 'WorkItemStatus:{titel}' ist der
     /// E2E-Anker selbst - der sichtbare Text (Glyph) wird daher über das TextPattern gelesen.
     /// </summary>
     /// <param name="taskTitle">Der Titel der Aufgabe.</param>
@@ -494,7 +494,7 @@ public sealed class MenuView : BaseWindowView
     {
         var element = WaitForElement(
             AktiveAufgabenListeMenueElement(),
-            cf => cf.ByName($"AufgabeStatus:{taskTitle}"),
+            cf => cf.ByName($"WorkItemStatus:{taskTitle}"),
             Short);
         if (element.Patterns.Text.IsSupported)
         {
@@ -503,7 +503,7 @@ public sealed class MenuView : BaseWindowView
 
         // Fallback: AutomationId-Element ohne Name-Überschreibung lesen.
         var glyphElement = AktiveAufgabenListeMenueElement()
-            .FindFirstDescendant(cf => cf.ByAutomationId($"AktiveAufgabeStatusGlyph_{taskTitle}"));
+            .FindFirstDescendant(cf => cf.ByAutomationId($"ActiveWorkItemStatusGlyph_{taskTitle}"));
         return glyphElement?.Name ?? string.Empty;
     }
 
@@ -541,7 +541,7 @@ public sealed class MenuView : BaseWindowView
         string? lastStatus = null;
         while (DateTime.UtcNow < deadline)
         {
-            var statusElement = AktiveAufgabenListeMenueElement().FindFirstDescendant(cf => cf.ByName($"AufgabeStatus:{taskTitle}"));
+            var statusElement = AktiveAufgabenListeMenueElement().FindFirstDescendant(cf => cf.ByName($"WorkItemStatus:{taskTitle}"));
             lastStatus = statusElement?.HelpText;
             if (lastStatus == expectedStatus)
                 return this;
@@ -559,8 +559,8 @@ public sealed class MenuView : BaseWindowView
     /// gefunden, die Command-Auslösung führte jedoch nicht zum Ansichtswechsel) - der Klick
     /// wird deshalb innerhalb des Gesamtzeitfensters in Intervallen wiederholt. Das ist für
     /// alle drei Navigationsziele idempotent (erneuter <c>CurrentView</c>-Wechsel auf dieselbe
-    /// Ansicht; bei "Projekte" schließt ein Wiederholungsklick lediglich ein ggf. offenes
-    /// Detail). Das Fehlerbanner-Fail-Fast ("FehlerMeldung") bleibt während des Wartens aktiv.
+    /// Ansicht; bei "Projects" schließt ein Wiederholungsklick lediglich ein ggf. offenes
+    /// Detail). Das Fehlerbanner-Fail-Fast ("ErrorMessage") bleibt während des Wartens aktiv.
     /// </summary>
     /// <param name="buttonNamen">Akzeptierte UIA-Namen des Navigations-Buttons.</param>
     /// <param name="zielSichtbar">Prädikat für die sichtbare Zielansicht.</param>
@@ -581,7 +581,7 @@ public sealed class MenuView : BaseWindowView
             if (zielSichtbar())
                 return;
 
-            var errorMessage = Window.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+            var errorMessage = Window.FindFirstDescendant(cf => cf.ByName("ErrorMessage"));
             if (errorMessage is not null && !errorMessage.IsOffscreen)
             {
                 throw new InvalidOperationException(

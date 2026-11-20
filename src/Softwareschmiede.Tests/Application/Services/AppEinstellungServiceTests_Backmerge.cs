@@ -7,7 +7,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für die Backmerge-Einstellungen (Modus und Projekt-Freigabe) in <see cref="AppSettingService"/>.</summary>
+/// <summary>Tests für die Backmerge--Einstellungen (Modus und Projekt-Freigabe) in <see cref="AppSettingService"/>.</summary>
 public sealed class AppEinstellungServiceTests_Backmerge : IDisposable
 {
     private readonly SoftwareschmiedeDbContext _db = TestDbContextFactory.Create();

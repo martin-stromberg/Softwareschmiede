@@ -52,7 +52,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// <summary>
     /// Szenario: Projekt anlegen; Neuanlage starten und über "Zurück" abbrechen; erstes Projekt
     /// öffnen und wieder verlassen; erneut öffnen; zuletzt zur Übersicht zurücknavigieren.
-    /// Prüft: Nach Abbrechen der Neuanlage ist das erste Projekt noch in der Liste aufrufbar; das
+    /// Prüft: Nach Cancel der Neuanlage ist das erste Projekt noch in der Liste aufrufbar; das
     /// wiederholte Öffnen/Verlassen der Detailansicht funktioniert; die Übersicht zeigt die
     /// Projektkachel nach dem finalen "Zurück".
     /// </summary>
@@ -64,10 +64,10 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         // Erstes Projekt anlegen
         projectList.CreateProject("Bestehendes-Projekt");
 
-        // Neuanlage starten und über Zurück abbrechen (kein Speichern, direkter ForceClose reicht als "Abbrechen")
-        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), Short);
+        // Neuanlage starten und über Zurück abbrechen (kein Speichern, direkter ForceClose reicht als "Cancel")
+        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("New"), Short);
         neuButton.AsButton().ClickInForeground();
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("Save"), Short);
 
         // ForceClose(false) gibt laut Vertrag stets die ursprüngliche Instanz zurück (siehe
         // BaseWindowView.ForceClose), nicht die tatsächlich erreichte Ansicht - deshalb wird der
@@ -155,10 +155,10 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         await using (var db = OpenTestDbContext())
         {
-            var projektService = new ProjectService(db, NullLogger<ProjectService>.Instance);
+            var projectService = new ProjectService(db, NullLogger<ProjectService>.Instance);
             var workItemService = new WorkItemService(db, NullLogger<WorkItemService>.Instance, new TodoService(db, NullLogger<TodoService>.Instance));
 
-            var project = await projektService.CreateAsync(projektName, null);
+            var project = await projectService.CreateAsync(projektName, null);
             await workItemService.CreateAsync(project.Id, offeneAufgabeTitel, null);
             var beendeteAufgabe = await workItemService.CreateAsync(project.Id, beendeteAufgabeTitel, null);
             await workItemService.SetStatusUncheckedAsync(beendeteAufgabe.Id, WorkItemStatus.Completed);
@@ -217,10 +217,10 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// <summary>
     /// Szenario: "Öffnen"-Button in der Detailansicht prüfen; anschließend den
     /// Repository-Zuweisungs-Dialog öffnen und die Arbeitsverzeichnis-ComboBox prüfen;
-    /// Dialog über "Abbrechen" schließen.
+    /// Dialog über "Cancel" schließen.
     /// Prüft: Der "Öffnen"-Button existiert; der Dialog enthält das Label und die ComboBox für die
     /// Arbeitsverzeichnis-Auswahl (die Plugin-Auswahl-ComboBox ist bei nur einem aktiven SCM-Plugin
-    /// ausgeblendet); nach "Abbrechen" bleibt das Hauptfenster-Overlay ("Speichern") weiterhin sichtbar.
+    /// ausgeblendet); nach "Cancel" bleibt das Hauptfenster-Overlay ("Speichern") weiterhin sichtbar.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
     private void RepositoryDialog_OeffnenButtonZuweisenPluginUndArbeitsverzeichnis_E2E(Window mainWindow)

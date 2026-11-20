@@ -20,7 +20,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     private readonly Mock<ICliExecutionLimitSource> _cli;
     private readonly ScmEventExecutionLimitService _sut;
     private readonly ScmStartSlotReservationPool _pool = new();
-    private readonly Guid _projektId = new Guid("77777777-7777-7777-7777-777777777777");
+    private readonly Guid _projectId = new Guid("77777777-7777-7777-7777-777777777777");
 
     /// <summary>ScmEventExecutionLimitServiceTests.</summary>
     public ScmEventExecutionLimitServiceTests()
@@ -33,7 +33,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
 
         _db.Projects.Add(new Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Limit-Testprojekt",
             CreatedAt = DateTimeOffset.UtcNow,
             Status = ProjectStatus.Active
@@ -54,7 +54,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Title = title,
-            ProjectId = _projektId,
+            ProjectId = _projectId,
             Status = WorkItemStatus.Started,
             ExecutionStatus = WorkItemExecutionStatus.Active,
             AiPluginPrefix = aiPluginPrefix,
@@ -283,9 +283,9 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     [Fact]
     public async Task PruefeUndReserviereStartPlatzAsync_ParalleleVersuche_NurEineReservierung()
     {
-        const int versuche = 8;
+        const int attempt = 8;
         await _einstellungen.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
-        var dienste = Enumerable.Range(0, versuche).Select(_ =>
+        var services = Enumerable.Range(0, attempt).Select(_ =>
         {
             var db = TestDbContextFactory.Create();
             var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
@@ -294,7 +294,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         }).ToList();
         try
         {
-            var zulassungen = await Task.WhenAll(dienste.Select(x =>
+            var zulassungen = await Task.WhenAll(services.Select(x =>
                 Task.Run(() => x.Dienst.CheckAndReserveStartSlotAsync(PrefixA))));
 
             zulassungen.Count(x => x.Reservation is not null).Should().Be(1);
@@ -308,7 +308,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         }
         finally
         {
-            foreach (var x in dienste) x.Db.Dispose();
+            foreach (var x in services) x.Db.Dispose();
         }
     }
 

@@ -19,8 +19,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private const string CodexPluginPrefix = "Softwareschmiede.Codex";
     private const string GitHubPluginPrefix = "Softwareschmiede.GitHub";
     private const string GitHubAgentTokenFieldKey = "AgentToken";
-    private const string CommandLineParametersKey = "CommandLineParameters";
-    private const string ParallelLimitGruppenName = "Ausführungsbegrenzung";
+    private const string CommandLineParameterKey = "CommandLineParameters";
+    private const string ParallelLimitGroupName = "Ausführungsbegrenzung";
 
     /// <summary>Host-seitig deklariertes Limit-Feld für KI-Plugins; persistiert über
     /// <see cref="ScmEventExecutionLimitService.PluginLimitKey(string)"/> in <see cref="AppSettingService"/>,
@@ -33,29 +33,29 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         Description: "Ganzzahl ≥ 1; leer = unbegrenzt. Begrenzt die laufenden CLI-Ausführungen dieses KI-Plugins zusätzlich zum globalen Limit in „Aufgaben ausführen“.");
 
     private readonly AppSettingService _settingService;
-    private readonly WorkingDirectorySettingsService _arbeitsverzeichnisService;
+    private readonly WorkingDirectorySettingsService _workingDirectoryService;
     private readonly DarkModeService _darkModeService;
     private readonly IPluginManager _pluginManager;
     private readonly PluginActivationService _pluginActivationService;
     private readonly PluginSettingsService _pluginSettingsService;
-    private readonly PromptTemplateService _promptVorlagenService;
-    private readonly ProjectService _projektService;
+    private readonly PromptTemplateService _promptTemplatesService;
+    private readonly ProjectService _projectService;
     private readonly ILogger<SettingsViewModel> _logger;
     private readonly IDialogService _dialogService;
     private readonly IServiceProvider _serviceProvider;
-    private readonly List<Guid> _geloeschtePromptVorlagenIds = [];
+    private readonly List<Guid> _deletedPromptTemplatesIds = [];
 
-    private string? _arbeitsverzeichnis;
+    private string? _workingDirectory;
     private string _designMode;
-    private string? _defaultKiPlugin;
+    private string? _defaultAiPlugin;
     private IGitPlugin? _defaultScmPlugin;
-    private NotificationMode _benachrichtigungsModus;
+    private NotificationMode _notificationMode;
     private bool _isLoading;
     private string? _errorMessage;
-    private string? _erfolgsMeldung;
+    private string? _successMessage;
     private PluginActivationEntry? _selectedPlugin;
     private IReadOnlyList<PluginSettingGroupEntry> _selectedPluginSettings = [];
-    private bool _isScmKiPluginContentVisible;
+    private bool _isScmAiPluginContentVisible;
     private bool _isIdePluginContentVisible;
     private List<string> _idePluginOrder = [];
     private PluginActivationEntry? _selectedIdePlugin;
@@ -65,101 +65,101 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private string _scmTaskCompletionWaitMinutes = AppSettingService.ScmTaskCompletionDefaultWaitMinutes.ToString(System.Globalization.CultureInfo.InvariantCulture);
     private string _scmTriggerKeyword = ScmEventValidationService.DefaultTriggerKeyword;
     private string _scmDelayKeyword = ScmDelayDirective.DefaultDelayKeyword;
-    private string _maxParalleleAusfuehrungen = string.Empty;
-    private bool _isIssueAufbereitungEnabled;
-    private bool _isIssueAufbereitungKommentarEnabled = true;
-    private IssueAufbereitungKiPluginOption? _selectedIssueAufbereitungKiPlugin;
-    private readonly Dictionary<string, string?> _kiPluginParallelLimits = new(StringComparer.Ordinal);
+    private string _maxParallelExecutions = string.Empty;
+    private bool _isIssuePreparationEnabled;
+    private bool _isIssuePreparationCommentEnabled = true;
+    private IssuePreparationAiPluginOption? _selectedIssuePreparationAiPlugin;
+    private readonly Dictionary<string, string?> _aiPluginParallelLimit = new(StringComparer.Ordinal);
     private string _scmPromptAppendixGeneral = string.Empty;
     private string _scmPromptAppendixIssue = string.Empty;
     private string _scmPromptAppendixIssueComment = string.Empty;
     private string _scmPromptAppendixPullRequest = string.Empty;
     private string _scmPromptAppendixPullRequestComment = string.Empty;
-    private UpdateModusOption? _selectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.CheckOnly);
-    private UpdatePfadOption? _selectedUpdatePfad = UpdatePfadOption.FuerPfad(null);
-    private ScmBackmergeModusOption? _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.Disabled);
-    private ScmKontoModusOption? _selectedKontoModus = ScmKontoModusOption.FuerModus(ScmAccountMode.UserAccount);
-    private ScmTaskCompletionPruefmodusOption? _selectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionCheckMode.EventDriven);
-    private bool _isScmBackmergeDraftAktivierung;
+    private UpdateModeOption? _selectedUpdateMode = UpdateModeOption.ForMode(UpdateMode.CheckOnly);
+    private UpdatePathOption? _selectedUpdatePath = UpdatePathOption.ForPath(null);
+    private ScmBackmergeModeOption? _selectedBackmergeMode = ScmBackmergeModeOption.ForMode(ScmBackmergeMode.Disabled);
+    private ScmAccountModeOption? _selectedAccountMode = ScmAccountModeOption.ForMode(ScmAccountMode.UserAccount);
+    private ScmTaskCompletionCheckModeOption? _selectedScmTaskCompletionCheckmode = ScmTaskCompletionCheckModeOption.ForMode(ScmTaskCompletionCheckMode.EventDriven);
+    private bool _isScmBackmergeDraftActivation;
     private bool _isScmBackmergeAdminMerge;
 
-    /// <summary>Wird direkt nach erfolgreichem Speichern der Update-Einstellungen mit dem gespeicherten Snapshot ausgelöst.</summary>
+    /// <summary>Wird direkt nach erfolgreichem Speichern der Update--Einstellungen mit dem gespeicherten Snapshot ausgelöst.</summary>
     public event EventHandler<UpdateSettings>? UpdateSettingsSaved;
 
     /// <summary>Feste Auswahlliste der Update-Modi (Steuerwert + Anzeige-Label).</summary>
-    public IReadOnlyList<UpdateModusOption> UpdateModusOptionen => UpdateModusOption.All;
+    public IReadOnlyList<UpdateModeOption> UpdateModeOptions => UpdateModeOption.All;
 
-    /// <summary>Aktuell ausgewählte Update-Modus-Option aus <see cref="UpdateModusOptionen"/>.</summary>
-    public UpdateModusOption? SelectedUpdateMode
+    /// <summary>Aktuell ausgewählte Update-Modus-Option aus <see cref="UpdateModeOptions"/>.</summary>
+    public UpdateModeOption? SelectedUpdateMode
     {
         get => _selectedUpdateMode;
         set => SetProperty(ref _selectedUpdateMode, value);
     }
 
     /// <summary>Feste Auswahlliste der Update-Pfade (Steuerwert + Anzeige-Label).</summary>
-    public IReadOnlyList<UpdatePfadOption> UpdatePfadOptionen => UpdatePfadOption.All;
+    public IReadOnlyList<UpdatePathOption> UpdatePathOptions => UpdatePathOption.All;
 
-    /// <summary>Aktuell ausgewählte Update-Pfad-Option aus <see cref="UpdatePfadOptionen"/>.</summary>
-    public UpdatePfadOption? SelectedUpdatePfad
+    /// <summary>Aktuell ausgewählte Update-Pfad-Option aus <see cref="UpdatePathOptions"/>.</summary>
+    public UpdatePathOption? SelectedUpdatePath
     {
-        get => _selectedUpdatePfad;
+        get => _selectedUpdatePath;
         set
         {
-            if (SetProperty(ref _selectedUpdatePfad, value))
-                OnPropertyChanged(nameof(AbgeleiteterUpdateKanal));
+            if (SetProperty(ref _selectedUpdatePath, value))
+                OnPropertyChanged(nameof(DerivedUpdateChannel));
         }
     }
 
-    /// <summary>Schreibgeschützter Anzeigetext des aus der Pfad-Auswahl resultierenden exklusiven Update-Kanals.</summary>
-    public string AbgeleiteterUpdateKanal
-        => UpdatePathChannelResolver.ResolveChannel(SelectedUpdatePfad?.Path) == UpdateChannel.ReleaseCandidate
-            ? UpdatePfadTexte.KanalReleaseCandidate
-            : UpdatePfadTexte.KanalProduktiv;
+    /// <summary>Schreibgeschützter Anzeigetext des aus der Pfad-Auswahl resultierenden exklusiven UpdateChannels.</summary>
+    public string DerivedUpdateChannel
+        => UpdatePathChannelResolver.ResolveChannel(SelectedUpdatePath?.Path) == UpdateChannel.ReleaseCandidate
+            ? UpdatePathText.ChannelReleaseCandidate
+            : UpdatePathText.ChannelStable;
 
     /// <summary>Feste Auswahlliste der Backmerge-Modi (Steuerwert + Anzeige-Label).</summary>
-    public IReadOnlyList<ScmBackmergeModusOption> BackmergeModusOptionen => ScmBackmergeModusOption.All;
+    public IReadOnlyList<ScmBackmergeModeOption> BackmergeModeOptions => ScmBackmergeModeOption.All;
 
-    /// <summary>Aktuell ausgewählte Backmerge-Modus-Option aus <see cref="BackmergeModusOptionen"/>.</summary>
-    public ScmBackmergeModusOption? SelectedBackmergeModus
+    /// <summary>Aktuell ausgewählte Backmerge-Modus-Option aus <see cref="BackmergeModeOptions"/>.</summary>
+    public ScmBackmergeModeOption? SelectedBackmergeMode
     {
-        get => _selectedBackmergeModus;
+        get => _selectedBackmergeMode;
         set
         {
-            if (!SetProperty(ref _selectedBackmergeModus, value)) return;
-            OnPropertyChanged(nameof(IsProzessablaeufeFelderEnabled));
-            OnPropertyChanged(nameof(ProzessablaeufeStatusText));
+            if (!SetProperty(ref _selectedBackmergeMode, value)) return;
+            OnPropertyChanged(nameof(IsProcessRunsFieldEnabled));
+            OnPropertyChanged(nameof(ProcessRunsStatusText));
         }
     }
 
     /// <summary>Feste Auswahlliste der SCM-Überwachungsmodi (Steuerwert + Anzeige-Label).</summary>
-    public IReadOnlyList<ScmKontoModusOption> KontoModusOptionen => ScmKontoModusOption.All;
+    public IReadOnlyList<ScmAccountModeOption> AccountModeOptions => ScmAccountModeOption.All;
 
-    /// <summary>Aktuell ausgewählte Überwachungsmodus-Option aus <see cref="KontoModusOptionen"/>.</summary>
-    public ScmKontoModusOption? SelectedKontoModus
+    /// <summary>Aktuell ausgewählte Überwachungsmodus-Option aus <see cref="AccountModeOptions"/>.</summary>
+    public ScmAccountModeOption? SelectedAccountMode
     {
-        get => _selectedKontoModus;
+        get => _selectedAccountMode;
         set
         {
-            if (SetProperty(ref _selectedKontoModus, value))
-                OnPropertyChanged(nameof(IsTriggerKeywordSichtbar));
+            if (SetProperty(ref _selectedAccountMode, value))
+                OnPropertyChanged(nameof(IsTriggerKeywordVisible));
         }
     }
 
     /// <summary>Feste Auswahlliste der Prüfmodi der SCM-Abschlussüberwachung (Steuerwert + Anzeige-Label).</summary>
-    public IReadOnlyList<ScmTaskCompletionPruefmodusOption> ScmTaskCompletionPruefmodusOptionen => ScmTaskCompletionPruefmodusOption.All;
+    public IReadOnlyList<ScmTaskCompletionCheckModeOption> ScmTaskCompletionCheckmodeOptions => ScmTaskCompletionCheckModeOption.All;
 
-    /// <summary>Aktuell ausgewählte Prüfmodus-Option aus <see cref="ScmTaskCompletionPruefmodusOptionen"/>.</summary>
-    public ScmTaskCompletionPruefmodusOption? SelectedScmTaskCompletionPruefmodus
+    /// <summary>Aktuell ausgewählte Prüfmodus-Option aus <see cref="ScmTaskCompletionCheckmodeOptions"/>.</summary>
+    public ScmTaskCompletionCheckModeOption? SelectedScmTaskCompletionCheckmode
     {
-        get => _selectedScmTaskCompletionPruefmodus;
-        set => SetProperty(ref _selectedScmTaskCompletionPruefmodus, value);
+        get => _selectedScmTaskCompletionCheckmode;
+        set => SetProperty(ref _selectedScmTaskCompletionCheckmode, value);
     }
 
     /// <summary>Gibt an, ob Draft-Backmerge-Pull-Requests vor dem Merge automatisch aktiviert werden.</summary>
-    public bool IsScmBackmergeDraftAktivierung
+    public bool IsScmBackmergeDraftActivation
     {
-        get => _isScmBackmergeDraftAktivierung;
-        set => SetProperty(ref _isScmBackmergeDraftAktivierung, value);
+        get => _isScmBackmergeDraftActivation;
+        set => SetProperty(ref _isScmBackmergeDraftActivation, value);
     }
 
     /// <summary>Gibt an, ob nach einem blockierten regulären Merge ein Admin-Merge-Fallback erlaubt ist.</summary>
@@ -172,8 +172,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     /// <summary>Arbeitsverzeichnis für Repository-Klone.</summary>
     public string? WorkingDirectory
     {
-        get => _arbeitsverzeichnis;
-        set => SetProperty(ref _arbeitsverzeichnis, value);
+        get => _workingDirectory;
+        set => SetProperty(ref _workingDirectory, value);
     }
 
     /// <summary>Aktuell gewählter Design-Modus (z. B. "Hell", "Dunkel", "System").</summary>
@@ -188,17 +188,17 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public IEnumerable<string> DesignModes => _darkModeService.GetAvailableModes();
 
     /// <summary>Standard-KI-Plugin-Prefix.</summary>
-    public string? DefaultKiPlugin
+    public string? DefaultAiPlugin
     {
-        get => _defaultKiPlugin;
-        set => SetProperty(ref _defaultKiPlugin, value);
+        get => _defaultAiPlugin;
+        set => SetProperty(ref _defaultAiPlugin, value);
     }
 
     /// <summary>Alle verfügbaren SCM-Plugins.</summary>
     public IReadOnlyList<IGitPlugin> ScmPlugins { get; private set; } = [];
 
     /// <summary>Alle verfügbaren KI-Plugins.</summary>
-    public IReadOnlyList<IAiPlugin> KiPlugins { get; private set; } = [];
+    public IReadOnlyList<IAiPlugin> AiPlugins { get; private set; } = [];
 
     /// <summary>Aktuell gewähltes Standard-SCM-Plugin.</summary>
     public IGitPlugin? DefaultScmPlugin
@@ -210,8 +210,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     /// <summary>Benachrichtigungsmodus.</summary>
     public NotificationMode NotificationMode
     {
-        get => _benachrichtigungsModus;
-        set => SetProperty(ref _benachrichtigungsModus, value);
+        get => _notificationMode;
+        set => SetProperty(ref _notificationMode, value);
     }
 
     /// <summary>Gibt an, ob Daten geladen werden.</summary>
@@ -222,17 +222,17 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Fehlermeldung.</summary>
-    public string? FehlerMeldung
+    public string? ErrorMessage
     {
         get => _errorMessage;
         private set => SetProperty(ref _errorMessage, value);
     }
 
     /// <summary>Erfolgsmeldung nach dem Speichern.</summary>
-    public string? ErfolgsMeldung
+    public string? SuccessMessage
     {
-        get => _erfolgsMeldung;
-        private set => SetProperty(ref _erfolgsMeldung, value);
+        get => _successMessage;
+        private set => SetProperty(ref _successMessage, value);
     }
 
     /// <summary>SCM-Plugins mit Aktivierungsstatus für das Plugins-Register.</summary>
@@ -256,13 +256,13 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob im Inhaltsbereich die Einstellungen des ausgewählten SCM-/KI-Plugins angezeigt werden (exklusiv zu <see cref="IsIdePluginContentVisible"/>).</summary>
-    public bool IsScmKiPluginContentVisible
+    public bool IsScmAiPluginContentVisible
     {
-        get => _isScmKiPluginContentVisible;
-        private set => SetProperty(ref _isScmKiPluginContentVisible, value);
+        get => _isScmAiPluginContentVisible;
+        private set => SetProperty(ref _isScmAiPluginContentVisible, value);
     }
 
-    /// <summary>Gibt an, ob im Inhaltsbereich die Einstellungen des ausgewählten IDE-Plugins angezeigt werden (exklusiv zu <see cref="IsScmKiPluginContentVisible"/>).</summary>
+    /// <summary>Gibt an, ob im Inhaltsbereich die Einstellungen des ausgewählten IDE-Plugins angezeigt werden (exklusiv zu <see cref="IsScmAiPluginContentVisible"/>).</summary>
     public bool IsIdePluginContentVisible
     {
         get => _isIdePluginContentVisible;
@@ -306,11 +306,11 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         set
         {
             if (!SetProperty(ref _isScmMonitoringEnabled, value)) return;
-            OnPropertyChanged(nameof(IsUeberwachungsmodusEnabled));
-            OnPropertyChanged(nameof(IsTriggerKeywordSichtbar));
-            OnPropertyChanged(nameof(IsDelayKeywordSichtbar));
-            OnPropertyChanged(nameof(IsPromptAnhaengeSichtbar));
-            OnPropertyChanged(nameof(AufgabenAusfuehrenStatusText));
+            OnPropertyChanged(nameof(IsMonitoringModeEnabled));
+            OnPropertyChanged(nameof(IsTriggerKeywordVisible));
+            OnPropertyChanged(nameof(IsDelayKeywordVisible));
+            OnPropertyChanged(nameof(IsPromptAppendVisible));
+            OnPropertyChanged(nameof(WorkItemsExecuteStatusText));
         }
     }
 
@@ -321,38 +321,38 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         set
         {
             if (!SetProperty(ref _isScmTaskCompletionEnabled, value)) return;
-            OnPropertyChanged(nameof(IsTaskCompletionFelderEnabled));
-            OnPropertyChanged(nameof(AufgabenBeendenStatusText));
+            OnPropertyChanged(nameof(IsTaskCompletionFieldEnabled));
+            OnPropertyChanged(nameof(WorkItemsExitStatusText));
         }
     }
 
     /// <summary>Der Überwachungsmodus ist nur bei aktivierter Ereignisüberwachung bedienbar.</summary>
-    public bool IsUeberwachungsmodusEnabled => IsScmMonitoringEnabled;
+    public bool IsMonitoringModeEnabled => IsScmMonitoringEnabled;
 
     /// <summary>Das Trigger-Keyword wird nur bei aktivierter Ereignisüberwachung im Benutzerkonto-Modus benötigt.</summary>
-    public bool IsTriggerKeywordSichtbar => IsScmMonitoringEnabled && SelectedKontoModus?.Mode == ScmAccountMode.UserAccount;
+    public bool IsTriggerKeywordVisible => IsScmMonitoringEnabled && SelectedAccountMode?.Mode == ScmAccountMode.UserAccount;
 
     /// <summary>Das Verzögerungs-Keyword ist in beiden Kontomodi wirksam, weil es aus dem
     /// jeweils akzeptierten Triggertext gelesen wird; sichtbar bei aktiver Überwachung.</summary>
-    public bool IsDelayKeywordSichtbar => IsScmMonitoringEnabled;
+    public bool IsDelayKeywordVisible => IsScmMonitoringEnabled;
 
     /// <summary>Die Prompt-Anhänge sind nur bei aktivierter Ereignisüberwachung relevant.</summary>
-    public bool IsPromptAnhaengeSichtbar => IsScmMonitoringEnabled;
+    public bool IsPromptAppendVisible => IsScmMonitoringEnabled;
 
     /// <summary>Prüfmodus und Wartezeit sind nur bei aktivierter Abschlussüberwachung bedienbar.</summary>
-    public bool IsTaskCompletionFelderEnabled => IsScmTaskCompletionEnabled;
+    public bool IsTaskCompletionFieldEnabled => IsScmTaskCompletionEnabled;
 
     /// <summary>Die Backmerge-Optionen sind nur bei aktiviertem Backmerge-Modus bedienbar.</summary>
-    public bool IsProzessablaeufeFelderEnabled => SelectedBackmergeModus?.Mode != ScmBackmergeMode.Disabled;
+    public bool IsProcessRunsFieldEnabled => SelectedBackmergeMode?.Mode != ScmBackmergeMode.Disabled;
 
     /// <summary>Statuszeile des „Aufgaben ausführen“-Bereichs im Ausklapp-Header.</summary>
-    public string AufgabenAusfuehrenStatusText => IsScmMonitoringEnabled ? "aktiviert" : "deaktiviert";
+    public string WorkItemsExecuteStatusText => IsScmMonitoringEnabled ? "aktiviert" : "deaktiviert";
 
     /// <summary>Statuszeile des „Aufgaben beenden“-Bereichs im Ausklapp-Header.</summary>
-    public string AufgabenBeendenStatusText => IsScmTaskCompletionEnabled ? "aktiviert" : "deaktiviert";
+    public string WorkItemsExitStatusText => IsScmTaskCompletionEnabled ? "aktiviert" : "deaktiviert";
 
     /// <summary>Statuszeile des „Prozessabläufe“-Bereichs im Ausklapp-Header.</summary>
-    public string ProzessablaeufeStatusText => SelectedBackmergeModus?.Mode != ScmBackmergeMode.Disabled ? "aktiviert" : "deaktiviert";
+    public string ProcessRunsStatusText => SelectedBackmergeMode?.Mode != ScmBackmergeMode.Disabled ? "aktiviert" : "deaktiviert";
 
     /// <summary>Wartezeit in Minuten zwischen dem erkannten Referenz-Schluss und dem automatischen Beenden der Aufgabe.</summary>
     public string ScmTaskCompletionWaitMinutes
@@ -378,53 +378,53 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Globales Limit paralleler CLI-Ausführungen für SCM-Ereignisse
     /// (leer = unbegrenzt; gültig: Ganzzahl ≥ 1).</summary>
-    public string MaxParalleleAusfuehrungen
+    public string MaxParallelExecutions
     {
-        get => _maxParalleleAusfuehrungen;
-        set => SetProperty(ref _maxParalleleAusfuehrungen, value);
+        get => _maxParallelExecutions;
+        set => SetProperty(ref _maxParallelExecutions, value);
     }
 
     /// <summary>Gibt an, ob die automatische Issue-Aufbereitung aktiviert ist (Laufzeit-Schalter).</summary>
-    public bool IsIssueAufbereitungEnabled
+    public bool IsIssuePreparationEnabled
     {
-        get => _isIssueAufbereitungEnabled;
+        get => _isIssuePreparationEnabled;
         set
         {
-            if (!SetProperty(ref _isIssueAufbereitungEnabled, value)) return;
-            OnPropertyChanged(nameof(IsIssueAufbereitungFelderEnabled));
-            OnPropertyChanged(nameof(IssueAufbereitungStatusText));
+            if (!SetProperty(ref _isIssuePreparationEnabled, value)) return;
+            OnPropertyChanged(nameof(IsIssuePreparationFieldEnabled));
+            OnPropertyChanged(nameof(IssuePreparationStatusText));
         }
     }
 
     /// <summary>Gibt an, ob die Analyseergebnisse zusätzlich als Issue-Kommentar dokumentiert werden.</summary>
-    public bool IsIssueAufbereitungKommentarEnabled
+    public bool IsIssuePreparationCommentEnabled
     {
-        get => _isIssueAufbereitungKommentarEnabled;
-        set => SetProperty(ref _isIssueAufbereitungKommentarEnabled, value);
+        get => _isIssuePreparationCommentEnabled;
+        set => SetProperty(ref _isIssuePreparationCommentEnabled, value);
     }
 
     /// <summary>Ausgewähltes Funktions-Plugin der Issue-Aufbereitung
-    /// (<see cref="IssueAufbereitungKiPluginOption.PluginPrefix"/> = <c>null</c> bedeutet:
+    /// (<see cref="IssuePreparationAiPluginOption.PluginPrefix"/> = <c>null</c> bedeutet:
     /// Fallback auf die globale Standard-CLI).</summary>
-    public IssueAufbereitungKiPluginOption? SelectedIssueAufbereitungKiPlugin
+    public IssuePreparationAiPluginOption? SelectedIssuePreparationAiPlugin
     {
-        get => _selectedIssueAufbereitungKiPlugin;
-        set => SetProperty(ref _selectedIssueAufbereitungKiPlugin, value);
+        get => _selectedIssuePreparationAiPlugin;
+        set => SetProperty(ref _selectedIssuePreparationAiPlugin, value);
     }
 
     /// <summary>Verfügbare KI-Plugin-Auswahl für die Aufbereitung, beginnend mit dem
     /// Standard-Eintrag für den Fallback auf die globale Standard-CLI.</summary>
-    public ObservableCollection<IssueAufbereitungKiPluginOption> IssueAufbereitungKiPluginOptionen { get; } = [];
+    public ObservableCollection<IssuePreparationAiPluginOption> IssuePreparationAiPluginOptions { get; } = [];
 
     /// <summary>Überwachte Repositories mit Aufbereitungs-Auswahl (persistiertes Flag
     /// <see cref="GitRepository.IssuePreparationEnabled"/>).</summary>
-    public ObservableCollection<IssueAufbereitungRepositoryEntry> IssueAufbereitungRepositories { get; } = [];
+    public ObservableCollection<IssuePreparationRepositoryEntry> IssuePreparationRepositories { get; } = [];
 
     /// <summary>Die Detail-Felder der Aufbereitung sind nur bei aktivierter Funktion bedienbar.</summary>
-    public bool IsIssueAufbereitungFelderEnabled => IsIssueAufbereitungEnabled;
+    public bool IsIssuePreparationFieldEnabled => IsIssuePreparationEnabled;
 
     /// <summary>Statuszeile des „Issue-Aufbereitung“-Bereichs im Ausklapp-Header.</summary>
-    public string IssueAufbereitungStatusText => IsIssueAufbereitungEnabled ? "aktiviert" : "deaktiviert";
+    public string IssuePreparationStatusText => IsIssuePreparationEnabled ? "aktiviert" : "deaktiviert";
 
     /// <summary>Prompt-Anhang, der bei jeder SCM-Ereignisart an den Prompt angehängt wird (leer = keiner).</summary>
     public string ScmPromptAppendixGeneral
@@ -462,22 +462,22 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Editierbare Promptvorlagen.</summary>
-    public ObservableCollection<PromptVorlageEntry> PromptTemplates { get; } = [];
+    public ObservableCollection<PromptTemplateEntry> PromptTemplates { get; } = [];
 
     /// <summary>Lädt alle Einstellungen.</summary>
-    public ICommand LadenCommand { get; }
+    public ICommand LoadCommand { get; }
 
     /// <summary>Speichert alle Einstellungen.</summary>
-    public ICommand SpeichernCommand { get; }
+    public ICommand SaveCommand { get; }
 
     /// <summary>Verwirft alle nicht gespeicherten Einstellungen.</summary>
-    public ICommand VerwerfenCommand { get; }
+    public ICommand DiscardCommand { get; }
 
     /// <summary>Wird ausgelöst wenn der Nutzer ein SCM-Plugin wählt. Lädt die Einstellungsgruppen des Plugins.</summary>
     public ICommand ScmPluginSelectedCommand { get; }
 
     /// <summary>Wird ausgelöst wenn der Nutzer ein KI-Plugin wählt. Lädt die Einstellungsgruppen des Plugins.</summary>
-    public ICommand KiPluginSelectedCommand { get; }
+    public ICommand AiPluginSelectedCommand { get; }
 
     /// <summary>Wird ausgelöst wenn der Nutzer im Plugins-Register einen Listeneintrag wählt. Lädt dessen Einstellungsgruppen.</summary>
     public ICommand PluginSelectedCommand { get; }
@@ -492,36 +492,36 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public ICommand IdePluginMoveDownCommand { get; }
 
     /// <summary>Fügt eine neue Promptvorlage hinzu.</summary>
-    public ICommand PromptVorlageHinzufuegenCommand { get; }
+    public ICommand AddPromptTemplateCommand { get; }
 
     /// <summary>Entfernt eine Promptvorlage aus der Liste.</summary>
-    public ICommand PromptVorlageLoeschenCommand { get; }
+    public ICommand DeletePromptTemplateCommand { get; }
 
     /// <summary>Öffnet das nicht-modale Konsolentestfenster (Diagnose-Werkzeug für das CLI-Ausgabe-Replay).</summary>
-    public ICommand KonsolenTestOeffnenCommand { get; }
+    public ICommand OpenConsoleTestCommand { get; }
 
     /// <inheritdoc cref="SettingsViewModel"/>
     public SettingsViewModel(
         AppSettingService settingService,
-        WorkingDirectorySettingsService arbeitsverzeichnisService,
+        WorkingDirectorySettingsService workingDirectoryService,
         DarkModeService darkModeService,
         IPluginManager pluginManager,
         PluginActivationService pluginActivationService,
         PluginSettingsService pluginSettingsService,
-        PromptTemplateService promptVorlagenService,
-        ProjectService projektService,
+        PromptTemplateService promptTemplatesService,
+        ProjectService projectService,
         ILogger<SettingsViewModel> logger,
         IDialogService dialogService,
         IServiceProvider serviceProvider)
     {
         _settingService = settingService;
-        _arbeitsverzeichnisService = arbeitsverzeichnisService;
+        _workingDirectoryService = workingDirectoryService;
         _darkModeService = darkModeService;
         _pluginManager = pluginManager;
         _pluginActivationService = pluginActivationService;
         _pluginSettingsService = pluginSettingsService;
-        _promptVorlagenService = promptVorlagenService;
-        _projektService = projektService;
+        _promptTemplatesService = promptTemplatesService;
+        _projectService = projectService;
         _logger = logger;
         _dialogService = dialogService;
         _serviceProvider = serviceProvider;
@@ -529,11 +529,11 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         _designMode = darkModeService.Current;
         _darkModeService.ModeChanged += OnDarkModeChanged;
 
-        LadenCommand = new AsyncRelayCommand(LadenAsync);
-        SpeichernCommand = new AsyncRelayCommand(SaveAsync);
-        VerwerfenCommand = new AsyncRelayCommand(DiscardAsync);
+        LoadCommand = new AsyncRelayCommand(LoadAsync);
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        DiscardCommand = new AsyncRelayCommand(DiscardAsync);
         ScmPluginSelectedCommand = new RelayCommand<IGitPlugin>(SelectPluginByReference);
-        KiPluginSelectedCommand = new RelayCommand<IAiPlugin>(SelectPluginByReference);
+        AiPluginSelectedCommand = new RelayCommand<IAiPlugin>(SelectPluginByReference);
         PluginSelectedCommand = new RelayCommand<PluginActivationEntry>(entry =>
         {
             if (entry is not null)
@@ -546,17 +546,17 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         });
         IdePluginMoveUpCommand = new RelayCommand<PluginActivationEntry>(entry => MoveIdePlugin(entry, -1), entry => CanMoveIdePlugin(entry, -1));
         IdePluginMoveDownCommand = new RelayCommand<PluginActivationEntry>(entry => MoveIdePlugin(entry, 1), entry => CanMoveIdePlugin(entry, 1));
-        PromptVorlageHinzufuegenCommand = new RelayCommand(PromptVorlageHinzufuegen);
-        PromptVorlageLoeschenCommand = new RelayCommand<PromptVorlageEntry>(PromptVorlageLoeschen, entry => entry is not null);
-        KonsolenTestOeffnenCommand = new AsyncRelayCommand(KonsolenTestOeffnenAsync);
+        AddPromptTemplateCommand = new RelayCommand(AddPromptTemplate);
+        DeletePromptTemplateCommand = new RelayCommand<PromptTemplateEntry>(DeletePromptTemplate, entry => entry is not null);
+        OpenConsoleTestCommand = new AsyncRelayCommand(OpenConsoleTestAsync);
     }
 
-    private async Task KonsolenTestOeffnenAsync(CancellationToken ct)
+    private async Task OpenConsoleTestAsync(CancellationToken ct)
     {
         try
         {
-            var viewModel = _serviceProvider.GetRequiredService<KonsolenTestViewModel>();
-            await _dialogService.ShowKonsolenTestDialogAsync(viewModel, ct);
+            var viewModel = _serviceProvider.GetRequiredService<ConsoleTestViewModel>();
+            await _dialogService.ShowConsoleTestDialogAsync(viewModel, ct);
         }
         catch (OperationCanceledException)
         {
@@ -565,22 +565,22 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Das Konsolentestfenster konnte nicht geöffnet werden.");
-            FehlerMeldung = $"Konsolentestfenster konnte nicht geöffnet werden: {ex.Message}";
+            ErrorMessage = $"Konsolentestfenster konnte nicht geöffnet werden: {ex.Message}";
         }
     }
 
-    private async Task LadenAsync(CancellationToken ct)
+    private async Task LoadAsync(CancellationToken ct)
     {
         IsLoading = true;
-        FehlerMeldung = null;
+        ErrorMessage = null;
 
         try
         {
-            _arbeitsverzeichnis = await _arbeitsverzeichnisService.GetWorkingDirectoryAsync(ct);
+            _workingDirectory = await _workingDirectoryService.GetWorkingDirectoryAsync(ct);
             OnPropertyChanged(nameof(WorkingDirectory));
 
-            _defaultKiPlugin = await _settingService.GetSettingAsync(AppSettingService.DefaultKiPluginKey, ct);
-            OnPropertyChanged(nameof(DefaultKiPlugin));
+            _defaultAiPlugin = await _settingService.GetSettingAsync(AppSettingService.DefaultAiPluginKey, ct);
+            OnPropertyChanged(nameof(DefaultAiPlugin));
 
             var savedMode = await _settingService.GetSettingAsync(AppSettingService.DesignModeKey, ct);
             _designMode = savedMode ?? _darkModeService.Current;
@@ -589,21 +589,21 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             ScmPlugins = _pluginManager.GetSourceCodeManagementPlugins();
             OnPropertyChanged(nameof(ScmPlugins));
 
-            KiPlugins = _pluginManager.GetDevelopmentAutomationPlugins();
-            OnPropertyChanged(nameof(KiPlugins));
+            AiPlugins = _pluginManager.GetDevelopmentAutomationPlugins();
+            OnPropertyChanged(nameof(AiPlugins));
 
             IdePlugins = _pluginManager.GetIdePlugins();
             OnPropertyChanged(nameof(IdePlugins));
 
-            await LadePluginAktivierungAsync(ct);
-            await LadeIdePluginAktivierungAsync(ct);
+            await LoadPluginActivationAsync(ct);
+            await LoadIdePluginActivationAsync(ct);
 
             var savedScmPluginName = await _settingService.GetSettingAsync(AppSettingService.DefaultScmPluginKey, ct);
             _defaultScmPlugin = ScmPlugins.FirstOrDefault(p => p.PluginName == savedScmPluginName)
                 ?? ScmPlugins.FirstOrDefault();
             OnPropertyChanged(nameof(DefaultScmPlugin));
 
-            await LadePromptVorlagenAsync(ct);
+            await LoadPromptTemplatesAsync(ct);
 
             IsScmMonitoringEnabled = await _settingService.GetScmMonitoringEnabledAsync(ct);
             IsScmTaskCompletionEnabled = await _settingService.GetScmTaskCompletionEnabledAsync(ct);
@@ -613,54 +613,54 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             ScmDelayKeyword = await _settingService.GetScmDelayKeywordAsync(ct);
 
             var globalLimit = await _settingService.GetIntSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, ct);
-            MaxParalleleAusfuehrungen = globalLimit is >= 1
+            MaxParallelExecutions = globalLimit is >= 1
                 ? globalLimit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
                 : string.Empty;
 
             // Issue-Aufbereitung: Funktionsschalter, Funktions-Plugin (leer = globale
             // Standard-CLI), Repository-Auswahl und Kommentar-Schalter.
-            IsIssueAufbereitungEnabled = await _settingService.GetScmIssuePreparationEnabledAsync(ct);
-            IsIssueAufbereitungKommentarEnabled = await _settingService.GetScmIssuePreparationCommentEnabledAsync(ct);
-            var aufbereitungsPrefix = await _settingService.GetScmIssuePreparationPluginPrefixAsync(ct);
-            IssueAufbereitungKiPluginOptionen.Clear();
-            IssueAufbereitungKiPluginOptionen.Add(IssueAufbereitungKiPluginOption.Default);
-            foreach (var aiPlugin in KiPlugins)
-                IssueAufbereitungKiPluginOptionen.Add(new IssueAufbereitungKiPluginOption(aiPlugin.PluginPrefix, aiPlugin.PluginName));
-            SelectedIssueAufbereitungKiPlugin = IssueAufbereitungKiPluginOptionen
-                .FirstOrDefault(x => string.Equals(x.PluginPrefix, aufbereitungsPrefix, StringComparison.Ordinal))
-                ?? IssueAufbereitungKiPluginOption.Default;
+            IsIssuePreparationEnabled = await _settingService.GetScmIssuePreparationEnabledAsync(ct);
+            IsIssuePreparationCommentEnabled = await _settingService.GetScmIssuePreparationCommentEnabledAsync(ct);
+            var preparationPrefix = await _settingService.GetScmIssuePreparationPluginPrefixAsync(ct);
+            IssuePreparationAiPluginOptions.Clear();
+            IssuePreparationAiPluginOptions.Add(IssuePreparationAiPluginOption.Default);
+            foreach (var aiPlugin in AiPlugins)
+                IssuePreparationAiPluginOptions.Add(new IssuePreparationAiPluginOption(aiPlugin.PluginPrefix, aiPlugin.PluginName));
+            SelectedIssuePreparationAiPlugin = IssuePreparationAiPluginOptions
+                .FirstOrDefault(x => string.Equals(x.PluginPrefix, preparationPrefix, StringComparison.Ordinal))
+                ?? IssuePreparationAiPluginOption.Default;
 
-            IssueAufbereitungRepositories.Clear();
-            foreach (var repository in await _projektService.GetAllRepositoriesAsync(ct))
-                IssueAufbereitungRepositories.Add(new IssueAufbereitungRepositoryEntry(repository, repository.IssuePreparationEnabled));
-            _kiPluginParallelLimits.Clear();
-            var pluginLimitWerte = await _settingService.GetSettingsAsync(
-                KiPlugins.Select(x => ScmEventExecutionLimitService.PluginLimitKey(x.PluginPrefix)).ToList(), ct);
-            foreach (var aiPlugin in KiPlugins)
-                _kiPluginParallelLimits[aiPlugin.PluginPrefix] =
-                    pluginLimitWerte.GetValueOrDefault(ScmEventExecutionLimitService.PluginLimitKey(aiPlugin.PluginPrefix));
+            IssuePreparationRepositories.Clear();
+            foreach (var repository in await _projectService.GetAllRepositoriesAsync(ct))
+                IssuePreparationRepositories.Add(new IssuePreparationRepositoryEntry(repository, repository.IssuePreparationEnabled));
+            _aiPluginParallelLimit.Clear();
+            var pluginLimitValues = await _settingService.GetSettingsAsync(
+                AiPlugins.Select(x => ScmEventExecutionLimitService.PluginLimitKey(x.PluginPrefix)).ToList(), ct);
+            foreach (var aiPlugin in AiPlugins)
+                _aiPluginParallelLimit[aiPlugin.PluginPrefix] =
+                    pluginLimitValues.GetValueOrDefault(ScmEventExecutionLimitService.PluginLimitKey(aiPlugin.PluginPrefix));
 
-            var promptAnhaenge = await _settingService.GetScmPromptAppendicesAsync(ct);
-            ScmPromptAppendixGeneral = promptAnhaenge.GetValueOrDefault(AppSettingService.ScmPromptAppendGeneralKey) ?? string.Empty;
-            ScmPromptAppendixIssue = promptAnhaenge.GetValueOrDefault(AppSettingService.ScmPromptAppendIssueKey) ?? string.Empty;
-            ScmPromptAppendixIssueComment = promptAnhaenge.GetValueOrDefault(AppSettingService.ScmPromptAppendIssueCommentKey) ?? string.Empty;
-            ScmPromptAppendixPullRequest = promptAnhaenge.GetValueOrDefault(AppSettingService.ScmPromptAppendPullRequestKey) ?? string.Empty;
-            ScmPromptAppendixPullRequestComment = promptAnhaenge.GetValueOrDefault(AppSettingService.ScmPromptAppendPullRequestCommentKey) ?? string.Empty;
+            var promptAppend = await _settingService.GetScmPromptAppendicesAsync(ct);
+            ScmPromptAppendixGeneral = promptAppend.GetValueOrDefault(AppSettingService.ScmPromptAppendGeneralKey) ?? string.Empty;
+            ScmPromptAppendixIssue = promptAppend.GetValueOrDefault(AppSettingService.ScmPromptAppendIssueKey) ?? string.Empty;
+            ScmPromptAppendixIssueComment = promptAppend.GetValueOrDefault(AppSettingService.ScmPromptAppendIssueCommentKey) ?? string.Empty;
+            ScmPromptAppendixPullRequest = promptAppend.GetValueOrDefault(AppSettingService.ScmPromptAppendPullRequestKey) ?? string.Empty;
+            ScmPromptAppendixPullRequestComment = promptAppend.GetValueOrDefault(AppSettingService.ScmPromptAppendPullRequestCommentKey) ?? string.Empty;
 
             // Die öffentlichen Setter benachrichtigen die abgeleiteten Anzeige-Properties
             // (Sichtbarkeit, Enabled, Panel-Status) — nach „Verwerfen“ bleibt die UI sonst
             // auf dem Stand der verworfenen Auswahl.
-            SelectedBackmergeModus = ScmBackmergeModusOption.FuerModus(await _settingService.GetScmBackmergeModeAsync(ct));
-            SelectedKontoModus = ScmKontoModusOption.FuerModus(await _settingService.GetScmAccountModeAsync(ct));
-            SelectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(
+            SelectedBackmergeMode = ScmBackmergeModeOption.ForMode(await _settingService.GetScmBackmergeModeAsync(ct));
+            SelectedAccountMode = ScmAccountModeOption.ForMode(await _settingService.GetScmAccountModeAsync(ct));
+            SelectedScmTaskCompletionCheckmode = ScmTaskCompletionCheckModeOption.ForMode(
                 await _settingService.GetScmTaskCompletionCheckModeAsync(ct));
-            IsScmBackmergeDraftAktivierung = await _settingService.GetScmBackmergeDraftActivationAsync(ct);
+            IsScmBackmergeDraftActivation = await _settingService.GetScmBackmergeDraftActivationAsync(ct);
             IsScmBackmergeAdminMerge = await _settingService.GetScmBackmergeAdminMergeAsync(ct);
 
             var updateSettings = await _settingService.GetUpdateSettingsAsync(ct);
-            _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Mode);
+            _selectedUpdateMode = UpdateModeOption.ForMode(updateSettings.Mode);
             OnPropertyChanged(nameof(SelectedUpdateMode));
-            SelectedUpdatePfad = UpdatePfadOption.FuerPfad(updateSettings.UpdatePath);
+            SelectedUpdatePath = UpdatePathOption.ForPath(updateSettings.UpdatePath);
         }
         catch (OperationCanceledException)
         {
@@ -669,7 +669,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden der Einstellungen.");
-            FehlerMeldung = $"Fehler beim Laden: {ex.Message}";
+            ErrorMessage = $"Fehler beim Laden: {ex.Message}";
         }
         finally
         {
@@ -679,57 +679,57 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     private async Task SaveAsync(CancellationToken ct)
     {
-        FehlerMeldung = null;
-        ErfolgsMeldung = null;
+        ErrorMessage = null;
+        SuccessMessage = null;
 
         try
         {
-            if (!ValidierePflichtfelder())
+            if (!ValidatePflichtfelder())
                 return;
 
-            if (SelectedUpdateMode is not { Mode: var updateModus })
+            if (SelectedUpdateMode is not { Mode: var updateMode })
             {
-                FehlerMeldung = "Der ausgewählte Update-Modus ist ungültig.";
+                ErrorMessage = "Der ausgewählte Update-Modus ist ungültig.";
                 return;
             }
 
-            if (SelectedUpdatePfad is not { Path: var updatePath })
+            if (SelectedUpdatePath is not { Path: var updatePath })
             {
-                FehlerMeldung = "Der ausgewählte Update-Pfad ist ungültig.";
+                ErrorMessage = "Der ausgewählte Update-Pfad ist ungültig.";
                 return;
             }
 
-            if (SelectedBackmergeModus is not { Mode: var backmergeModus })
+            if (SelectedBackmergeMode is not { Mode: var backmergeMode })
             {
-                FehlerMeldung = "Der ausgewählte Backmerge-Modus ist ungültig.";
+                ErrorMessage = "Der ausgewählte Backmerge-Modus ist ungültig.";
                 return;
             }
 
-            if (SelectedKontoModus is not { Mode: var accountMode })
+            if (SelectedAccountMode is not { Mode: var accountMode })
             {
-                FehlerMeldung = "Der ausgewählte Überwachungsmodus ist ungültig.";
+                ErrorMessage = "Der ausgewählte Überwachungsmodus ist ungültig.";
                 return;
             }
 
-            if (SelectedScmTaskCompletionPruefmodus is not { Mode: var checkMode })
+            if (SelectedScmTaskCompletionCheckmode is not { Mode: var checkMode })
             {
-                FehlerMeldung = "Der ausgewählte Prüfmodus ist ungültig.";
+                ErrorMessage = "Der ausgewählte Prüfmodus ist ungültig.";
                 return;
             }
 
-            var updateSettings = new UpdateSettings(updateModus, updatePath);
+            var updateSettings = new UpdateSettings(updateMode, updatePath);
             await _settingService.SetUpdateSettingsAsync(updateSettings, ct);
             UpdateSettingsSaved?.Invoke(this, updateSettings);
 
             foreach (var entry in SourceCodeManagementPlugins.Concat(DevelopmentAutomationPlugins).Concat(DevelopmentEnvironmentPlugins))
                 await _pluginActivationService.SetPluginEnabledAsync(entry.PluginPrefix, entry.IsEnabled, ct);
 
-            await SpeicherePluginEinstellungenAsync(_selectedPlugin?.Plugin, _selectedPluginSettings, ct);
+            await SavePluginSettingsAsync(_selectedPlugin?.Plugin, _selectedPluginSettings, ct);
 
-            await _arbeitsverzeichnisService.SaveWorkingDirectoryAsync(_arbeitsverzeichnis, ct);
-            await _settingService.SetSettingAsync(AppSettingService.DefaultKiPluginKey, _defaultKiPlugin, ct);
+            await _workingDirectoryService.SaveWorkingDirectoryAsync(_workingDirectory, ct);
+            await _settingService.SetSettingAsync(AppSettingService.DefaultAiPluginKey, _defaultAiPlugin, ct);
             await _settingService.SetSettingAsync(AppSettingService.DefaultScmPluginKey, _defaultScmPlugin?.PluginName, ct);
-            await SpeicherePromptVorlagenAsync(ct);
+            await SavePromptTemplatesAsync(ct);
 
             await _settingService.SetBoolSettingAsync(
                 AppSettingService.ScmMonitoringEnabledKey,
@@ -758,46 +758,46 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 ct);
             await _settingService.SetSettingAsync(
                 ScmEventExecutionLimitService.GlobalLimitKey,
-                NullWennLeer(MaxParalleleAusfuehrungen?.Trim()),
+                NullWhenEmpty(MaxParallelExecutions?.Trim()),
                 ct);
             await _settingService.SetBoolSettingAsync(
                 AppSettingService.ScmIssuePreparationEnabledKey,
-                IsIssueAufbereitungEnabled,
+                IsIssuePreparationEnabled,
                 ct);
             await _settingService.SetBoolSettingAsync(
                 AppSettingService.ScmIssuePreparationCommentEnabledKey,
-                IsIssueAufbereitungKommentarEnabled,
+                IsIssuePreparationCommentEnabled,
                 ct);
             await _settingService.SetSettingAsync(
                 AppSettingService.ScmIssuePreparationPluginKey,
-                SelectedIssueAufbereitungKiPlugin?.PluginPrefix,
+                SelectedIssuePreparationAiPlugin?.PluginPrefix,
                 ct);
-            foreach (var repositoryEntry in IssueAufbereitungRepositories)
-                await _projektService.SetIssuePreparationEnabledAsync(repositoryEntry.Repository.Id, repositoryEntry.IsSelected, ct);
-            await _settingService.SetScmBackmergeModeAsync(backmergeModus, ct);
+            foreach (var repositoryEntry in IssuePreparationRepositories)
+                await _projectService.SetIssuePreparationEnabledAsync(repositoryEntry.Repository.Id, repositoryEntry.IsSelected, ct);
+            await _settingService.SetScmBackmergeModeAsync(backmergeMode, ct);
             await _settingService.SetScmAccountModeAsync(accountMode, ct);
             await _settingService.SetScmTaskCompletionCheckModeAsync(checkMode, ct);
-            await _settingService.SetScmBackmergeDraftActivationAsync(IsScmBackmergeDraftAktivierung, ct);
+            await _settingService.SetScmBackmergeDraftActivationAsync(IsScmBackmergeDraftActivation, ct);
             await _settingService.SetScmBackmergeAdminMergeAsync(IsScmBackmergeAdminMerge, ct);
             await _settingService.SetSettingAsync(
                 AppSettingService.ScmPromptAppendGeneralKey,
-                NullWennLeer(ScmPromptAppendixGeneral),
+                NullWhenEmpty(ScmPromptAppendixGeneral),
                 ct);
             await _settingService.SetSettingAsync(
                 AppSettingService.ScmPromptAppendIssueKey,
-                NullWennLeer(ScmPromptAppendixIssue),
+                NullWhenEmpty(ScmPromptAppendixIssue),
                 ct);
             await _settingService.SetSettingAsync(
                 AppSettingService.ScmPromptAppendIssueCommentKey,
-                NullWennLeer(ScmPromptAppendixIssueComment),
+                NullWhenEmpty(ScmPromptAppendixIssueComment),
                 ct);
             await _settingService.SetSettingAsync(
                 AppSettingService.ScmPromptAppendPullRequestKey,
-                NullWennLeer(ScmPromptAppendixPullRequest),
+                NullWhenEmpty(ScmPromptAppendixPullRequest),
                 ct);
             await _settingService.SetSettingAsync(
                 AppSettingService.ScmPromptAppendPullRequestCommentKey,
-                NullWennLeer(ScmPromptAppendixPullRequestComment),
+                NullWhenEmpty(ScmPromptAppendixPullRequestComment),
                 ct);
 
             try
@@ -813,7 +813,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 _logger.LogWarning(ex, "Design-Modus konnte nicht angewendet werden.");
             }
 
-            ErfolgsMeldung = "Einstellungen gespeichert.";
+            SuccessMessage = "Settings gespeichert.";
         }
         catch (OperationCanceledException)
         {
@@ -822,24 +822,24 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Speichern der Einstellungen.");
-            FehlerMeldung = $"Fehler beim Speichern: {ex.Message}";
+            ErrorMessage = $"Fehler beim Speichern: {ex.Message}";
         }
     }
 
     private async Task DiscardAsync(CancellationToken ct)
     {
-        await LadenAsync(ct);
+        await LoadAsync(ct);
     }
 
     private void LoadSelectedPluginSettings(PluginActivationEntry entry)
     {
         SelectedPlugin = entry;
-        SelectedPluginSettings = LadePluginEinstellungen(entry.Plugin);
-        IsScmKiPluginContentVisible = true;
+        SelectedPluginSettings = LoadPluginSettings(entry.Plugin);
+        IsScmAiPluginContentVisible = true;
         IsIdePluginContentVisible = false;
     }
 
-    /// <summary>Sucht den zu <paramref name="plugin"/> gehörenden Aktivierungseintrag über beide Kategorien und lädt dessen Einstellungen.</summary>
+    /// <summary>Sucht den zu <paramref name="plugin"/> gehörenden Aktivierungseintrag über beide Kategorien und lädt dessen Settings.</summary>
     /// <param name="plugin">Das über eine der Standard-Plugin-ComboBoxen ausgewählte Plugin.</param>
     private void SelectPluginByReference(IPlugin? plugin)
     {
@@ -848,7 +848,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             LoadSelectedPluginSettings(entry);
     }
 
-    private async Task LadePluginAktivierungAsync(CancellationToken ct)
+    private async Task LoadPluginActivationAsync(CancellationToken ct)
     {
         SourceCodeManagementPlugins.Clear();
         foreach (var plugin in ScmPlugins)
@@ -858,7 +858,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         }
 
         DevelopmentAutomationPlugins.Clear();
-        foreach (var plugin in KiPlugins)
+        foreach (var plugin in AiPlugins)
         {
             var enabled = await _pluginActivationService.IsPluginEnabledAsync(plugin.PluginPrefix, ct);
             DevelopmentAutomationPlugins.Add(new PluginActivationEntry(plugin, enabled));
@@ -868,15 +868,15 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private void LoadSelectedIdePluginSettings(PluginActivationEntry entry)
     {
         SelectedIdePlugin = entry;
-        SelectedIdePluginSettings = LadePluginEinstellungen(entry.Plugin);
+        SelectedIdePluginSettings = LoadPluginSettings(entry.Plugin);
         IsIdePluginContentVisible = true;
-        IsScmKiPluginContentVisible = false;
+        IsScmAiPluginContentVisible = false;
     }
 
-    private async Task LadeIdePluginAktivierungAsync(CancellationToken ct)
+    private async Task LoadIdePluginActivationAsync(CancellationToken ct)
     {
-        foreach (var vorhandenerEintrag in DevelopmentEnvironmentPlugins)
-            vorhandenerEintrag.PropertyChanged -= OnIdePluginEntryPropertyChanged;
+        foreach (var existingEntry in DevelopmentEnvironmentPlugins)
+            existingEntry.PropertyChanged -= OnIdePluginEntryPropertyChanged;
         DevelopmentEnvironmentPlugins.Clear();
 
         var orderSetting = await _settingService.GetSettingAsync(AppSettingService.IdePluginOrderKey, ct);
@@ -915,11 +915,11 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         if (!entry.IsEnabled && DevelopmentEnvironmentPlugins.All(p => !p.IsEnabled))
         {
             entry.IsEnabled = true;
-            FehlerMeldung = "Mindestens ein IDE-Plugin muss aktiv bleiben.";
+            ErrorMessage = "Mindestens ein IDE-Plugin muss aktiv bleiben.";
         }
     }
 
-    private bool CanMoveIdePlugin(PluginActivationEntry? entry, int richtung)
+    private bool CanMoveIdePlugin(PluginActivationEntry? entry, int direction)
     {
         if (entry is null)
             return false;
@@ -928,17 +928,17 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         if (index < 0)
             return false;
 
-        var zielIndex = index + richtung;
-        return zielIndex >= 0 && zielIndex < DevelopmentEnvironmentPlugins.Count;
+        var targetIndex = index + direction;
+        return targetIndex >= 0 && targetIndex < DevelopmentEnvironmentPlugins.Count;
     }
 
-    private void MoveIdePlugin(PluginActivationEntry? entry, int richtung)
+    private void MoveIdePlugin(PluginActivationEntry? entry, int direction)
     {
-        if (!CanMoveIdePlugin(entry, richtung))
+        if (!CanMoveIdePlugin(entry, direction))
             return;
 
         var index = DevelopmentEnvironmentPlugins.IndexOf(entry!);
-        DevelopmentEnvironmentPlugins.Move(index, index + richtung);
+        DevelopmentEnvironmentPlugins.Move(index, index + direction);
 
         IdePluginOrder = DevelopmentEnvironmentPlugins.Select(e => e.PluginPrefix).ToList();
         OnPropertyChanged(nameof(DefaultIdePlugin));
@@ -958,7 +958,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private IReadOnlyList<PluginSettingGroupEntry> LadePluginEinstellungen(IPlugin plugin)
+    private IReadOnlyList<PluginSettingGroupEntry> LoadPluginSettings(IPlugin plugin)
     {
         var groups = plugin.GetSettingGroups()
             .Select(group => new PluginSettingGroupEntry(
@@ -972,18 +972,18 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         // Das Plugin-Parallel-Limit ist eine Host-Einstellung (AppEinstellung), kein
         // plugindeklariertes Credential-Store-Feld — daher wird es hier eingespeist.
         if (plugin is IAiPlugin)
-            groups.Add(new PluginSettingGroupEntry(ParallelLimitGruppenName,
+            groups.Add(new PluginSettingGroupEntry(ParallelLimitGroupName,
                 [new PluginSettingEntry(HostParallelLimitField,
-                    _kiPluginParallelLimits.GetValueOrDefault(plugin.PluginPrefix),
+                    _aiPluginParallelLimit.GetValueOrDefault(plugin.PluginPrefix),
                     useDefaultValue: false)]));
         return groups;
     }
 
     private static bool IsCodexCommandLineParameters(IPlugin plugin, PluginSettingField field) =>
         string.Equals(plugin.PluginPrefix, CodexPluginPrefix, StringComparison.Ordinal)
-        && string.Equals(field.Key, CommandLineParametersKey, StringComparison.Ordinal);
+        && string.Equals(field.Key, CommandLineParameterKey, StringComparison.Ordinal);
 
-    private async Task SpeicherePluginEinstellungenAsync(IPlugin? plugin, IReadOnlyList<PluginSettingGroupEntry> settings, CancellationToken ct)
+    private async Task SavePluginSettingsAsync(IPlugin? plugin, IReadOnlyList<PluginSettingGroupEntry> settings, CancellationToken ct)
     {
         if (plugin is null)
             return;
@@ -994,10 +994,10 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             {
                 if (ReferenceEquals(entry.Field, HostParallelLimitField))
                 {
-                    var value = NullWennLeer(entry.Value.Trim());
+                    var value = NullWhenEmpty(entry.Value.Trim());
                     await _settingService.SetSettingAsync(
                         ScmEventExecutionLimitService.PluginLimitKey(plugin.PluginPrefix), value, ct);
-                    _kiPluginParallelLimits[plugin.PluginPrefix] = value;
+                    _aiPluginParallelLimit[plugin.PluginPrefix] = value;
                     continue;
                 }
                 _pluginSettingsService.SetValue(plugin, entry.Field, entry.Value);
@@ -1005,24 +1005,24 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private bool ValidierePflichtfelder()
+    private bool ValidatePflichtfelder()
     {
-        return ValidierePluginAktivierung()
-            && ValidierePflichtfelderFuerSettings(_selectedPluginSettings)
-            && ValidierePromptVorlagen()
-            && ValidiereScmTriggerKeyword()
-            && ValidiereScmDelayKeyword()
-            && ValidiereMaxParalleleAusfuehrungen()
-            && ValidiereScmTaskCompletionWait()
-            && ValidiereScmKontoModus();
+        return ValidatePluginActivation()
+            && ValidatePflichtfelderForSettings(_selectedPluginSettings)
+            && ValidatePromptTemplates()
+            && ValidateScmTriggerKeyword()
+            && ValidateScmDelayKeyword()
+            && ValidateMaxParallelExecutions()
+            && ValidateScmTaskCompletionWait()
+            && ValidateScmAccountMode();
     }
 
     /// <summary>Im Kontomodus „Separates Konto“ ist ein effektives Agent-Token Pflicht — ein gerade
     /// eingegebener, noch ungespeicherter Wert im geöffneten GitHub-Einstellungspanel zählt bereits.</summary>
-    private bool ValidiereScmKontoModus()
+    private bool ValidateScmAccountMode()
     {
         // Der Überwachungsmodus ist nur bei aktivierter Ereignisüberwachung wirksam.
-        if (!IsScmMonitoringEnabled || SelectedKontoModus?.Mode != ScmAccountMode.SeparateAccount)
+        if (!IsScmMonitoringEnabled || SelectedAccountMode?.Mode != ScmAccountMode.SeparateAccount)
             return true;
 
         var github = SourceCodeManagementPlugins.FirstOrDefault(x =>
@@ -1040,7 +1040,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
         if (string.IsNullOrWhiteSpace(effektiv))
         {
-            FehlerMeldung = "Für den Überwachungsmodus „Separates Konto“ ist ein Personal Access Token des separaten Kontos erforderlich. Tragen Sie ihn unter Einstellungen → Plugins → GitHub → Authentifizierung im Feld „Personal Access Token des separaten Kontos“ ein.";
+            ErrorMessage = "Für den Überwachungsmodus „Separates Konto“ ist ein Personal Access Token des separaten Kontos erforderlich. Tragen Sie ihn unter Einstellungen → Plugins → GitHub → Authentifizierung im Feld „Personal Access Token des separaten Kontos“ ein.";
             return false;
         }
 
@@ -1049,15 +1049,15 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Die Abschluss-Wartezeit muss eine nicht negative Ganzzahl in Minuten sein;
     /// bei deaktivierter Abschlussüberwachung ist das Feld deaktiviert und nicht wirksam.</summary>
-    private bool ValidiereScmTaskCompletionWait()
+    private bool ValidateScmTaskCompletionWait()
     {
-        if (!IsTaskCompletionFelderEnabled)
+        if (!IsTaskCompletionFieldEnabled)
             return true;
 
         if (!int.TryParse(ScmTaskCompletionWaitMinutes?.Trim(), System.Globalization.NumberStyles.Integer,
-                System.Globalization.CultureInfo.InvariantCulture, out var minuten) || minuten < 0)
+                System.Globalization.CultureInfo.InvariantCulture, out var minutes) || minutes < 0)
         {
-            FehlerMeldung = $"Die Wartezeit für die SCM-Abschlussüberwachung muss eine nicht negative Ganzzahl in Minuten sein. Standard: {AppSettingService.ScmTaskCompletionDefaultWaitMinutes}";
+            ErrorMessage = $"Die Wartezeit für die SCM-Abschlussüberwachung muss eine nicht negative Ganzzahl in Minuten sein. Standard: {AppSettingService.ScmTaskCompletionDefaultWaitMinutes}";
             return false;
         }
 
@@ -1065,14 +1065,14 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Das globale Parallel-Limit ist entweder leer (unbegrenzt) oder eine Ganzzahl ≥ 1.</summary>
-    private bool ValidiereMaxParalleleAusfuehrungen()
+    private bool ValidateMaxParallelExecutions()
     {
-        var value = MaxParalleleAusfuehrungen?.Trim();
+        var value = MaxParallelExecutions?.Trim();
         if (!string.IsNullOrEmpty(value)
             && (!int.TryParse(value, System.Globalization.NumberStyles.Integer,
                     System.Globalization.CultureInfo.InvariantCulture, out var limit) || limit < 1))
         {
-            FehlerMeldung = "Das globale Limit paralleler CLI-Ausführungen muss leer (unbegrenzt) oder eine Ganzzahl größer oder gleich 1 sein.";
+            ErrorMessage = "Das globale Limit paralleler CLI-Ausführungen muss leer (unbegrenzt) oder eine Ganzzahl größer oder gleich 1 sein.";
             return false;
         }
 
@@ -1080,19 +1080,19 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Leere oder nur aus Leerraum bestehende Prompt-Anhänge werden nicht gespeichert (leer = nichts anhängen).</summary>
-    private static string? NullWennLeer(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+    private static string? NullWhenEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     /// <summary>Das Trigger-Keyword darf nicht leer sein; der Dienst fällt sonst auf den Standard
     /// zurück. Das Feld ist nur wirksam, wenn es auch sichtbar ist (aktive Überwachung im
     /// Benutzerkonto-Modus).</summary>
-    private bool ValidiereScmTriggerKeyword()
+    private bool ValidateScmTriggerKeyword()
     {
-        if (!IsTriggerKeywordSichtbar)
+        if (!IsTriggerKeywordVisible)
             return true;
 
         if (string.IsNullOrWhiteSpace(ScmTriggerKeyword))
         {
-            FehlerMeldung = $"Das Trigger-Keyword für SCM-Ereignisse darf nicht leer sein. Standard: {ScmEventValidationService.DefaultTriggerKeyword}";
+            ErrorMessage = $"Das Trigger-Keyword für SCM-Ereignisse darf nicht leer sein. Standard: {ScmEventValidationService.DefaultTriggerKeyword}";
             return false;
         }
 
@@ -1101,44 +1101,44 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Das Verzögerungs-Keyword darf nicht leer sein; der Dienst fällt sonst auf den
     /// Standard zurück. Das Feld ist nur wirksam, wenn die Ereignisüberwachung aktiv ist.</summary>
-    private bool ValidiereScmDelayKeyword()
+    private bool ValidateScmDelayKeyword()
     {
-        if (!IsDelayKeywordSichtbar)
+        if (!IsDelayKeywordVisible)
             return true;
 
         if (string.IsNullOrWhiteSpace(ScmDelayKeyword))
         {
-            FehlerMeldung = $"Das Verzögerungs-Keyword für SCM-Ereignisse darf nicht leer sein. Standard: {ScmDelayDirective.DefaultDelayKeyword}";
+            ErrorMessage = $"Das Verzögerungs-Keyword für SCM-Ereignisse darf nicht leer sein. Standard: {ScmDelayDirective.DefaultDelayKeyword}";
             return false;
         }
 
         return true;
     }
 
-    private bool ValidierePluginAktivierung()
+    private bool ValidatePluginActivation()
     {
         if (SourceCodeManagementPlugins.Count > 0 && SourceCodeManagementPlugins.All(entry => !entry.IsEnabled))
         {
-            FehlerMeldung = "Mindestens ein Quellcodeverwaltungs-Plugin muss aktiv bleiben.";
+            ErrorMessage = "Mindestens ein Quellcodeverwaltungs-Plugin muss aktiv bleiben.";
             return false;
         }
 
         if (DevelopmentAutomationPlugins.Count > 0 && DevelopmentAutomationPlugins.All(entry => !entry.IsEnabled))
         {
-            FehlerMeldung = "Mindestens ein KI-Plugin muss aktiv bleiben.";
+            ErrorMessage = "Mindestens ein KI-Plugin muss aktiv bleiben.";
             return false;
         }
 
         if (DevelopmentEnvironmentPlugins.Count > 0 && DevelopmentEnvironmentPlugins.All(entry => !entry.IsEnabled))
         {
-            FehlerMeldung = "Mindestens ein IDE-Plugin muss aktiv bleiben.";
+            ErrorMessage = "Mindestens ein IDE-Plugin muss aktiv bleiben.";
             return false;
         }
 
         return true;
     }
 
-    private bool ValidierePflichtfelderFuerSettings(IReadOnlyList<PluginSettingGroupEntry> settings)
+    private bool ValidatePflichtfelderForSettings(IReadOnlyList<PluginSettingGroupEntry> settings)
     {
         foreach (var group in settings)
         {
@@ -1146,16 +1146,16 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             {
                 if (entry.Field.IsRequired && string.IsNullOrEmpty(entry.Value))
                 {
-                    FehlerMeldung = $"Pflichtfeld '{entry.Field.Label}' darf nicht leer sein.";
+                    ErrorMessage = $"Pflichtfeld '{entry.Field.Label}' darf nicht leer sein.";
                     return false;
                 }
 
                 if (entry.Field.FieldType == PluginSettingFieldType.Integer
                     && !string.IsNullOrEmpty(entry.Value)
-                    && (!int.TryParse(entry.Value, out var zahl)
-                        || (ReferenceEquals(entry.Field, HostParallelLimitField) && zahl < 1)))
+                    && (!int.TryParse(entry.Value, out var number)
+                        || (ReferenceEquals(entry.Field, HostParallelLimitField) && number < 1)))
                 {
-                    FehlerMeldung = ReferenceEquals(entry.Field, HostParallelLimitField)
+                    ErrorMessage = ReferenceEquals(entry.Field, HostParallelLimitField)
                         ? $"Feld '{entry.Field.Label}' muss leer (unbegrenzt) oder eine Ganzzahl größer oder gleich 1 sein."
                         : $"Feld '{entry.Field.Label}' muss eine gültige Ganzzahl sein.";
                     return false;
@@ -1166,7 +1166,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                     && entry.Field.EnumOptions is not null
                     && !entry.Field.EnumOptions.Contains(entry.Value))
                 {
-                    FehlerMeldung = $"Feld '{entry.Field.Label}' enthält einen ungültigen Wert.";
+                    ErrorMessage = $"Feld '{entry.Field.Label}' enthält einen ungültigen Wert.";
                     return false;
                 }
             }
@@ -1175,15 +1175,15 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         return true;
     }
 
-    private async Task LadePromptVorlagenAsync(CancellationToken ct)
+    private async Task LoadPromptTemplatesAsync(CancellationToken ct)
     {
-        var templates = await _promptVorlagenService.GetAllAsync(ct);
+        var templates = await _promptTemplatesService.GetAllAsync(ct);
         PromptTemplates.Clear();
-        _geloeschtePromptVorlagenIds.Clear();
+        _deletedPromptTemplatesIds.Clear();
 
         foreach (var template in templates)
         {
-            PromptTemplates.Add(new PromptVorlageEntry(
+            PromptTemplates.Add(new PromptTemplateEntry(
                 template.Id,
                 template.Name,
                 template.PromptText,
@@ -1191,40 +1191,40 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task SpeicherePromptVorlagenAsync(CancellationToken ct)
+    private async Task SavePromptTemplatesAsync(CancellationToken ct)
     {
-        foreach (var id in _geloeschtePromptVorlagenIds)
-            await _promptVorlagenService.DeleteAsync(id, ct);
+        foreach (var id in _deletedPromptTemplatesIds)
+            await _promptTemplatesService.DeleteAsync(id, ct);
 
         foreach (var entry in PromptTemplates)
         {
-            if (entry.IsNeu)
+            if (entry.IsNew)
             {
-                await _promptVorlagenService.CreateAsync(entry.Name, entry.PromptText, ct);
+                await _promptTemplatesService.CreateAsync(entry.Name, entry.PromptText, ct);
             }
             else
             {
-                await _promptVorlagenService.UpdateAsync(entry.Id, entry.Name, entry.PromptText, ct);
+                await _promptTemplatesService.UpdateAsync(entry.Id, entry.Name, entry.PromptText, ct);
             }
         }
 
-        _geloeschtePromptVorlagenIds.Clear();
-        await LadePromptVorlagenAsync(ct);
+        _deletedPromptTemplatesIds.Clear();
+        await LoadPromptTemplatesAsync(ct);
     }
 
-    private bool ValidierePromptVorlagen()
+    private bool ValidatePromptTemplates()
     {
         foreach (var template in PromptTemplates)
         {
             if (string.IsNullOrWhiteSpace(template.Name))
             {
-                FehlerMeldung = "Der Name einer Promptvorlage darf nicht leer sein.";
+                ErrorMessage = "Der Name einer Promptvorlage darf nicht leer sein.";
                 return false;
             }
 
             if (string.IsNullOrWhiteSpace(template.PromptText))
             {
-                FehlerMeldung = $"Der Prompttext der Vorlage '{template.Name}' darf nicht leer sein.";
+                ErrorMessage = $"Der Prompttext der Vorlage '{template.Name}' darf nicht leer sein.";
                 return false;
             }
         }
@@ -1232,18 +1232,18 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         return true;
     }
 
-    private void PromptVorlageHinzufuegen()
+    private void AddPromptTemplate()
     {
-        PromptTemplates.Add(new PromptVorlageEntry(Guid.NewGuid(), "Neue Promptvorlage", string.Empty, true));
+        PromptTemplates.Add(new PromptTemplateEntry(Guid.NewGuid(), "Neue Promptvorlage", string.Empty, true));
     }
 
-    private void PromptVorlageLoeschen(PromptVorlageEntry? entry)
+    private void DeletePromptTemplate(PromptTemplateEntry? entry)
     {
         if (entry is null)
             return;
 
-        if (!entry.IsNeu)
-            _geloeschtePromptVorlagenIds.Add(entry.Id);
+        if (!entry.IsNew)
+            _deletedPromptTemplatesIds.Add(entry.Id);
 
         PromptTemplates.Remove(entry);
     }
@@ -1261,25 +1261,25 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 }
 
 /// <summary>Editierbarer Eintrag fuer eine Promptvorlage in den Einstellungen.</summary>
-public sealed class PromptVorlageEntry : ViewModelBase
+public sealed class PromptTemplateEntry : ViewModelBase
 {
     private string _name;
     private string _prompttext;
 
-    /// <inheritdoc cref="PromptVorlageEntry"/>
-    public PromptVorlageEntry(Guid id, string name, string prompttext, bool isNeu)
+    /// <inheritdoc cref="PromptTemplateEntry"/>
+    public PromptTemplateEntry(Guid id, string name, string prompttext, bool isNew)
     {
         Id = id;
         _name = name;
         _prompttext = prompttext;
-        IsNeu = isNeu;
+        IsNew = isNew;
     }
 
     /// <summary>ID der Promptvorlage.</summary>
     public Guid Id { get; }
 
     /// <summary>Gibt an, ob der Eintrag noch nicht persistiert ist.</summary>
-    public bool IsNeu { get; }
+    public bool IsNew { get; }
 
     /// <summary>Anzeigename.</summary>
     public string Name
@@ -1301,11 +1301,11 @@ public sealed class PromptVorlageEntry : ViewModelBase
 /// „Globale Standard-CLI verwenden" (Fallback-Kette der Plugin-Auflösung).</summary>
 /// <param name="PluginPrefix">Der Plugin-Prefix oder <c>null</c> für die globale Standard-CLI.</param>
 /// <param name="Label">Der Anzeigename der Option.</param>
-public sealed record IssueAufbereitungKiPluginOption(string? PluginPrefix, string Label)
+public sealed record IssuePreparationAiPluginOption(string? PluginPrefix, string Label)
 {
     /// <summary>Der Standard-Eintrag: Kein dediziertes Funktions-Plugin — es greift die
     /// Plugin-Auflösungskette (Projekt-Default → Global-Default → konfigurierter Standard).</summary>
-    public static IssueAufbereitungKiPluginOption Default { get; } = new(null, "Globale Standard-CLI verwenden");
+    public static IssuePreparationAiPluginOption Default { get; } = new(null, "Globale Standard-CLI verwenden");
 
     /// <inheritdoc />
     public override string ToString() => Label;
@@ -1314,12 +1314,12 @@ public sealed record IssueAufbereitungKiPluginOption(string? PluginPrefix, strin
 /// <summary>Editierbarer Repository-Eintrag der Issue-Aufbereitung (persistiertes Flag
 /// <see cref="GitRepository.IssuePreparationEnabled"/>). Der Anzeigename ist der
 /// Repository-Name — keine internen Kennungen als Benutzereingabe.</summary>
-public sealed class IssueAufbereitungRepositoryEntry : ViewModelBase
+public sealed class IssuePreparationRepositoryEntry : ViewModelBase
 {
     private bool _isSelected;
 
-    /// <inheritdoc cref="IssueAufbereitungRepositoryEntry"/>
-    public IssueAufbereitungRepositoryEntry(GitRepository repository, bool isSelected)
+    /// <inheritdoc cref="IssuePreparationRepositoryEntry"/>
+    public IssuePreparationRepositoryEntry(GitRepository repository, bool isSelected)
     {
         Repository = repository;
         _isSelected = isSelected;

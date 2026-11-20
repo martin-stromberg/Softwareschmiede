@@ -22,19 +22,19 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
 
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AppSettingService _settingService;
-    private readonly WorkingDirectorySettingsService _arbeitsverzeichnisService;
+    private readonly WorkingDirectorySettingsService _workingDirectoryService;
     private readonly DarkModeService _darkModeService;
     private readonly Mock<IPluginManager> _pluginManagerMock;
     private readonly PluginActivationService _pluginActivationService;
     private readonly PluginSettingsService _pluginSettingsService;
-    private readonly PromptTemplateService _promptVorlagenService;
+    private readonly PromptTemplateService _promptTemplatesService;
 
     /// <summary>SettingsViewModelTests_IssueAufbereitung.</summary>
     public SettingsViewModelTests_IssueAufbereitung()
     {
         _db = TestDbContextFactory.Create();
         _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
-        _arbeitsverzeichnisService = new WorkingDirectorySettingsService(_db, NullLogger<WorkingDirectorySettingsService>.Instance);
+        _workingDirectoryService = new WorkingDirectorySettingsService(_db, NullLogger<WorkingDirectorySettingsService>.Instance);
 
         var scopeMock = new Mock<IServiceScope>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
@@ -51,7 +51,7 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
         _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([]);
         _pluginActivationService = new PluginActivationService(_settingService, _pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _pluginSettingsService = new PluginSettingsService(new InMemoryCredentialStoreForSettings(), NullLogger<PluginSettingsService>.Instance);
-        _promptVorlagenService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
+        _promptTemplatesService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
@@ -60,12 +60,12 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
     private SettingsViewModel CreateSut() =>
         new(
             _settingService,
-            _arbeitsverzeichnisService,
+            _workingDirectoryService,
             _darkModeService,
             _pluginManagerMock.Object,
             _pluginActivationService,
             _pluginSettingsService,
-            _promptVorlagenService,
+            _promptTemplatesService,
             new ProjectService(_db, NullLogger<ProjectService>.Instance),
             NullLogger<SettingsViewModel>.Instance,
             new Mock<IDialogService>().Object,
@@ -104,14 +104,14 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
     {
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.IsIssueAufbereitungEnabled.Should().BeFalse();
-        sut.IsIssueAufbereitungKommentarEnabled.Should().BeTrue();
-        sut.SelectedIssueAufbereitungKiPlugin.Should().Be(IssueAufbereitungKiPluginOption.Default);
-        sut.IssueAufbereitungKiPluginOptionen.Should().ContainSingle(x => x.PluginPrefix == null);
-        sut.IssueAufbereitungStatusText.Should().Be("deaktiviert");
-        sut.IsIssueAufbereitungFelderEnabled.Should().BeFalse();
+        sut.IsIssuePreparationEnabled.Should().BeFalse();
+        sut.IsIssuePreparationCommentEnabled.Should().BeTrue();
+        sut.SelectedIssuePreparationAiPlugin.Should().Be(IssuePreparationAiPluginOption.Default);
+        sut.IssuePreparationAiPluginOptions.Should().ContainSingle(x => x.PluginPrefix == null);
+        sut.IssuePreparationStatusText.Should().Be("deaktiviert");
+        sut.IsIssuePreparationFieldEnabled.Should().BeFalse();
     }
 
     /// <summary>Die Plugin-Auswahl enthält den Standard-Eintrag plus jedes KI-Plugin mit Namen.</summary>
@@ -121,12 +121,12 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([CreateKiPlugin()]);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.IssueAufbereitungKiPluginOptionen.Should().HaveCount(2);
-        sut.IssueAufbereitungKiPluginOptionen[0].PluginPrefix.Should().BeNull();
-        sut.IssueAufbereitungKiPluginOptionen[1].PluginPrefix.Should().Be(KiPrefix);
-        sut.IssueAufbereitungKiPluginOptionen[1].Label.Should().Be("TestKI");
+        sut.IssuePreparationAiPluginOptions.Should().HaveCount(2);
+        sut.IssuePreparationAiPluginOptions[0].PluginPrefix.Should().BeNull();
+        sut.IssuePreparationAiPluginOptions[1].PluginPrefix.Should().Be(KiPrefix);
+        sut.IssuePreparationAiPluginOptions[1].Label.Should().Be("TestKI");
     }
 
     /// <summary>Gespeichertes Plugin-Prefix wird in der Auswahl vorgewählt.</summary>
@@ -137,27 +137,27 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
         await _settingService.SetSettingAsync(AppSettingService.ScmIssuePreparationPluginKey, KiPrefix, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.SelectedIssueAufbereitungKiPlugin.Should().Be(sut.IssueAufbereitungKiPluginOptionen[1]);
+        sut.SelectedIssuePreparationAiPlugin.Should().Be(sut.IssuePreparationAiPluginOptions[1]);
     }
 
-    /// <summary>Speichern persistiert alle vier Einstellungen (Schalter, Plugin, Repositories, Kommentar).</summary>
+    /// <summary>Speichern persistiert alle vier Settings (Schalter, Plugin, Repositories, Kommentar).</summary>
     [Fact]
     public async Task SpeichernAsync_PersistiertAlleEinstellungen()
     {
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([CreateKiPlugin()]);
         var repository = await AddRepositoryAsync();
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.IsIssueAufbereitungEnabled = true;
-        sut.IsIssueAufbereitungKommentarEnabled = false;
-        sut.SelectedIssueAufbereitungKiPlugin = sut.IssueAufbereitungKiPluginOptionen[1];
-        sut.IssueAufbereitungRepositories.Single().IsSelected = true;
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.IsIssuePreparationEnabled = true;
+        sut.IsIssuePreparationCommentEnabled = false;
+        sut.SelectedIssuePreparationAiPlugin = sut.IssuePreparationAiPluginOptions[1];
+        sut.IssuePreparationRepositories.Single().IsSelected = true;
 
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         (await _settingService.GetSettingAsync(AppSettingService.ScmIssuePreparationEnabledKey, TestContext.Current.CancellationToken)).Should().Be("True");
         (await _settingService.GetSettingAsync(AppSettingService.ScmIssuePreparationCommentEnabledKey, TestContext.Current.CancellationToken)).Should().Be("False");
         (await _settingService.GetSettingAsync(AppSettingService.ScmIssuePreparationPluginKey, TestContext.Current.CancellationToken)).Should().Be(KiPrefix);
@@ -171,13 +171,13 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
     {
         await _settingService.SetSettingAsync(AppSettingService.ScmIssuePreparationPluginKey, "alt.wert", TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
         // „alt.wert" ist kein installiertes Plugin → Standard-Auswahl.
-        sut.SelectedIssueAufbereitungKiPlugin.Should().Be(IssueAufbereitungKiPluginOption.Default);
+        sut.SelectedIssuePreparationAiPlugin.Should().Be(IssuePreparationAiPluginOption.Default);
 
-        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
         (await _settingService.GetSettingAsync(AppSettingService.ScmIssuePreparationPluginKey, TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
@@ -186,15 +186,15 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
     public async Task Schalter_SteuertFelderEnabledUndStatus()
     {
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.IsIssueAufbereitungFelderEnabled.Should().BeFalse();
-        sut.IssueAufbereitungStatusText.Should().Be("deaktiviert");
+        sut.IsIssuePreparationFieldEnabled.Should().BeFalse();
+        sut.IssuePreparationStatusText.Should().Be("deaktiviert");
 
-        sut.IsIssueAufbereitungEnabled = true;
+        sut.IsIssuePreparationEnabled = true;
 
-        sut.IsIssueAufbereitungFelderEnabled.Should().BeTrue();
-        sut.IssueAufbereitungStatusText.Should().Be("aktiviert");
+        sut.IsIssuePreparationFieldEnabled.Should().BeTrue();
+        sut.IssuePreparationStatusText.Should().Be("aktiviert");
     }
 
     /// <summary>Überwachte Repositories erscheinen benannt in der Auswahl; ihre Flags laden/speichern.</summary>
@@ -205,9 +205,9 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
         await new ProjectService(_db, NullLogger<ProjectService>.Instance).SetIssuePreparationEnabledAsync(repository.Id, true, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        var entry = Assert.Single(sut.IssueAufbereitungRepositories);
+        var entry = Assert.Single(sut.IssuePreparationRepositories);
         entry.RepositoryName.Should().Be("mein-repo");
         entry.IsSelected.Should().BeTrue();
     }

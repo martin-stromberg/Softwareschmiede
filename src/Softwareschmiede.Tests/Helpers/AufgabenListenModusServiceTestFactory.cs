@@ -8,7 +8,7 @@ using Softwareschmiede.Infrastructure.Data;
 namespace Softwareschmiede.Tests.Helpers;
 
 /// <summary>
-/// Gemeinsame Test-Factory für <see cref="AufgabenListenModusService"/>: baut einen
+/// Gemeinsame Test-Factory für <see cref="WorkItemListModeService"/>: baut einen
 /// DI-Container (DbContext auf temporärer SQLite-Datei + scoped <see cref="AppSettingService"/>),
 /// dessen <see cref="IServiceScopeFactory"/> der Service für seine Scope-Operationen nutzt.
 /// Der zurückgegebene <see cref="ServiceProvider"/> gehört dem Aufrufer (Dispose-Verantwortung).
@@ -16,11 +16,11 @@ namespace Softwareschmiede.Tests.Helpers;
 public static class AufgabenListenModusServiceTestFactory
 {
     /// <summary>
-    /// Erstellt einen <see cref="AufgabenListenModusService"/> über einer frischen, leeren
+    /// Erstellt einen <see cref="WorkItemListModeService"/> über einer frischen, leeren
     /// SQLite-Testdatenbank.
     /// </summary>
     /// <returns>Der Service und der zugrundeliegende ServiceProvider (für direkte DB-/Scope-Zugriffe in Tests).</returns>
-    public static (AufgabenListenModusService Service, ServiceProvider Provider) ErstelleModusService()
+    public static (WorkItemListModeService Service, ServiceProvider Provider) ErstelleModusService()
     {
         var dbPath = Path.Combine(Path.GetTempPath(), $"sws-mods-{Guid.NewGuid():N}.db");
         var services = new ServiceCollection();
@@ -34,9 +34,9 @@ public static class AufgabenListenModusServiceTestFactory
             initScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().Database.EnsureCreated();
         }
 
-        var service = new AufgabenListenModusService(
+        var service = new WorkItemListModeService(
             provider.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<AufgabenListenModusService>.Instance);
+            NullLogger<WorkItemListModeService>.Instance);
         return (service, provider);
     }
 }

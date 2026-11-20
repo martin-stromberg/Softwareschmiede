@@ -78,11 +78,11 @@ public abstract class BaseWindowView
     /// </summary>
     /// <remarks>
     /// Übernimmt das Fail-Fast-Verhalten von <see cref="Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement"/>:
-    /// bei jeder Polling-Iteration wird zusätzlich nach einem sichtbaren Fehlerbanner ("FehlerMeldung")
+    /// bei jeder Polling-Iteration wird zusätzlich nach einem sichtbaren Fehlerbanner ("ErrorMessage")
     /// gesucht. Erscheint es, während auf ein *anderes* Element gewartet wird, bricht die Wartezeit sofort
     /// mit einer aussagekräftigen <see cref="InvalidOperationException"/> (inkl. Fehlertext) ab, statt bis
     /// zum vollen Timeout stur weiterzuwarten. Zielt <paramref name="conditionFunc"/> selbst auf
-    /// "FehlerMeldung" (z. B. Fehlerfall-Tests, die genau dieses Element als Erfolgskriterium erwarten), wird
+    /// "ErrorMessage" (z. B. Fehlerfall-Tests, die genau dieses Element als Erfolgskriterium erwarten), wird
     /// die Zielsuche unmittelbar vor dem Werfen der Exception erneut versucht und liefert in diesem Fall das
     /// gefundene Element als regulären Treffer zurück, statt fälschlich in den Fehlerpfad zu laufen.
     /// </remarks>
@@ -144,22 +144,22 @@ public abstract class BaseWindowView
     /// <summary>
     /// Klickt den Modus-Umschalter '<paramref name="umschalterPraefix"/>{modus}' einer
     /// Aufgabenliste. Gemeinsame Logik für die ansichtsspezifischen Umschalter der
-    /// Seitenleiste ('AufgabenModus:*') und des Dashboards ('DashboardAufgabenModus:*').
+    /// Seitenleiste ('WorkItemsMode:*') und des Dashboards ('DashboardWorkItemsMode:*').
     /// </summary>
-    /// <param name="umschalterPraefix">Das ansichtsspezifische Namenspräfix inkl. Doppelpunkt (z. B. "AufgabenModus:").</param>
+    /// <param name="umschalterPraefix">Das ansichtsspezifische Namenspräfix inkl. Doppelpunkt (z. B. "WorkItemsMode:").</param>
     /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
     protected void KlickeAufgabenModusUmschalter(string umschalterPraefix, string mode)
         => WaitForElement(Window, cf => cf.ByName($"{umschalterPraefix}{mode}"), Medium).ClickInForeground();
 
     /// <summary>
     /// Liest die Gruppennamen einer Aufgabenliste im gruppierten Modus (UIA-Namen
-    /// 'AufgabenGruppe:{Name}' der Gruppenheader, gescoped unter der Listenwurzel).
+    /// 'WorkItemsGroup:{Name}' der Gruppenheader, gescoped unter der Listenwurzel).
     /// </summary>
-    /// <param name="listenAutomationId">Die AutomationId der Listenwurzel (z. B. "AktiveAufgabenListeMenue").</param>
-    /// <returns>Die Gruppennamen ohne das 'AufgabenGruppe:'-Präfix; leer im flachen Modus.</returns>
+    /// <param name="listenAutomationId">Die AutomationId der Listenwurzel (z. B. "ActiveWorkItemsListMenu").</param>
+    /// <returns>Die Gruppennamen ohne das 'WorkItemsGroup:'-Präfix; leer im flachen Modus.</returns>
     protected string[] GetAufgabenGruppenNamen(string listenAutomationId)
     {
-        const string praefix = "AufgabenGruppe:";
+        const string praefix = "WorkItemsGroup:";
         var list = Window.FindFirstDescendant(cf => cf.ByAutomationId(listenAutomationId));
         if (list is null)
             return [];
@@ -172,7 +172,7 @@ public abstract class BaseWindowView
     }
 
     /// <summary>
-    /// Wartet, bis der Gruppenheader 'AufgabenGruppe:{name}' in einer Aufgabenliste
+    /// Wartet, bis der Gruppenheader 'WorkItemsGroup:{name}' in einer Aufgabenliste
     /// erscheint (gescoped unter der Listenwurzel).
     /// </summary>
     /// <param name="listenAutomationId">Die AutomationId der Listenwurzel.</param>
@@ -193,7 +193,7 @@ public abstract class BaseWindowView
         }
 
         throw new TimeoutException(
-            $"Gruppenheader 'AufgabenGruppe:{name}' erschien nicht innerhalb von {timeout.TotalSeconds}s. Vorhandene Gruppen: {string.Join(", ", zuletzt ?? [])}");
+            $"Gruppenheader 'WorkItemsGroup:{name}' erschien nicht innerhalb von {timeout.TotalSeconds}s. Vorhandene Gruppen: {string.Join(", ", zuletzt ?? [])}");
     }
 
     /// <summary>Liest den <c>HelpText</c> eines Elements aus; fällt auf <c>Name</c> zurück, falls leer oder nicht unterstützt.</summary>

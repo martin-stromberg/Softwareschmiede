@@ -20,7 +20,7 @@ public sealed class AufgabePausierenDialogView : DialogView
     /// <returns>Diese Instanz, sobald das Dialogfenster sichtbar ist.</returns>
     public override AufgabePausierenDialogView ForceShow()
     {
-        WaitForElement(Window, cf => cf.ByName("PauseEinstellen"), Medium).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("SetPause"), Medium).AsButton().Click();
         GetDialogWindow(Medium);
         return this;
     }
@@ -29,9 +29,9 @@ public sealed class AufgabePausierenDialogView : DialogView
     public (int Stunde, int Minute) GetVorbelegteZeit()
     {
         var dialog = GetDialogWindow();
-        var stunde = WaitForElement(dialog, cf => cf.ByName("PausierenStunde"), Short).AsTextBox().Text;
-        var minute = WaitForElement(dialog, cf => cf.ByName("PausierenMinute"), Short).AsTextBox().Text;
-        return (int.Parse(stunde, CultureInfo.InvariantCulture), int.Parse(minute, CultureInfo.InvariantCulture));
+        var hour = WaitForElement(dialog, cf => cf.ByName("PauseHour"), Short).AsTextBox().Text;
+        var minute = WaitForElement(dialog, cf => cf.ByName("PauseMinute"), Short).AsTextBox().Text;
+        return (int.Parse(hour, CultureInfo.InvariantCulture), int.Parse(minute, CultureInfo.InvariantCulture));
     }
 
     /// <summary>
@@ -44,14 +44,14 @@ public sealed class AufgabePausierenDialogView : DialogView
     {
         var dialog = GetDialogWindow();
 
-        var datumPicker = WaitForElement(dialog, cf => cf.ByName("PausierenDatum"), Short);
+        var datumPicker = WaitForElement(dialog, cf => cf.ByName("PauseDate"), Short);
         datumPicker.Click();
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
         Keyboard.Type(target.ToString("d", CultureInfo.CurrentCulture));
         Keyboard.Press(VirtualKeyShort.TAB);
 
-        SetTextBoxValue(dialog, "PausierenStunde", target.Hour.ToString("00", CultureInfo.InvariantCulture));
-        SetTextBoxValue(dialog, "PausierenMinute", target.Minute.ToString("00", CultureInfo.InvariantCulture));
+        SetTextBoxValue(dialog, "PauseHour", target.Hour.ToString("00", CultureInfo.InvariantCulture));
+        SetTextBoxValue(dialog, "PauseMinute", target.Minute.ToString("00", CultureInfo.InvariantCulture));
 
         return this;
     }
@@ -59,15 +59,15 @@ public sealed class AufgabePausierenDialogView : DialogView
     /// <returns><c>true</c>, wenn der „Pause aufheben"-Button aktuell aktiviert ist (nur bei bestehender Pause).</returns>
     public bool IsAufhebenEnabled()
     {
-        var button = WaitForElement(GetDialogWindow(), cf => cf.ByName("PausierenAufheben"), Short);
+        var button = WaitForElement(GetDialogWindow(), cf => cf.ByName("LiftPause"), Short);
         return button.Properties.IsEnabled.Value;
     }
 
-    /// <summary>Wartet, bis die Anzeige der aktuell gesetzten Pause („AktuellePauseAnzeige") sichtbar ist.</summary>
+    /// <summary>Wartet, bis die Anzeige der aktuell gesetzten Pause („CurrentPauseDisplay") sichtbar ist.</summary>
     /// <returns>Diese Instanz.</returns>
     public AufgabePausierenDialogView WaitForAktuellePauseAnzeige()
     {
-        WaitForElement(GetDialogWindow(), cf => cf.ByName("AktuellePauseAnzeige"), Short);
+        WaitForElement(GetDialogWindow(), cf => cf.ByName("CurrentPauseDisplay"), Short);
         return this;
     }
 
@@ -75,7 +75,7 @@ public sealed class AufgabePausierenDialogView : DialogView
     /// <returns>Die danach sichtbare Aufgabendetailansicht.</returns>
     public TaskDetailView Confirm()
     {
-        WaitForElement(GetDialogWindow(), cf => cf.ByName("PausierenBestaetigen"), Short).AsButton().Click();
+        WaitForElement(GetDialogWindow(), cf => cf.ByName("ConfirmPause"), Short).AsButton().Click();
         ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
         return new TaskDetailView(Window);
     }
@@ -84,16 +84,16 @@ public sealed class AufgabePausierenDialogView : DialogView
     /// <returns>Die danach sichtbare Aufgabendetailansicht.</returns>
     public TaskDetailView Aufheben()
     {
-        WaitForElement(GetDialogWindow(), cf => cf.ByName("PausierenAufheben"), Short).AsButton().Click();
+        WaitForElement(GetDialogWindow(), cf => cf.ByName("LiftPause"), Short).AsButton().Click();
         ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
         return new TaskDetailView(Window);
     }
 
-    /// <summary>Bricht den Dialog über „Abbrechen" ab und wartet, bis das Dialogfenster geschlossen ist.</summary>
+    /// <summary>Bricht den Dialog über „Cancel" ab und wartet, bis das Dialogfenster geschlossen ist.</summary>
     /// <returns>Die danach sichtbare Aufgabendetailansicht.</returns>
     public TaskDetailView Cancel()
     {
-        WaitForElement(GetDialogWindow(), cf => cf.ByName("PausierenAbbrechen"), Short).AsButton().Click();
+        WaitForElement(GetDialogWindow(), cf => cf.ByName("CancelPause"), Short).AsButton().Click();
         ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
         return new TaskDetailView(Window);
     }

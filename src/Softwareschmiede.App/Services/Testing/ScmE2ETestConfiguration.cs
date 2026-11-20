@@ -52,7 +52,7 @@ internal sealed class ScmE2EScenario
     public bool CanWrite { get; set; } = true;
     public bool RejectAiResponse { get; set; }
     public bool PluginAvailable { get; set; } = true;
-    public List<ScmE2EText> Texts { get; set; } = [];
+    public List<ScmE2EText> Text { get; set; } = [];
     public List<ScmE2ENotification> Notifications { get; set; } = [];
 }
 

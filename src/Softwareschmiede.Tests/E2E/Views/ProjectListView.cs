@@ -6,7 +6,7 @@ namespace Softwareschmiede.Tests.E2E.Views;
 /// <summary>View für die Projektlisten-Ansicht.</summary>
 public sealed class ProjectListView : BaseWindowView
 {
-    private static readonly string[] StaticLabels = ["Neu", "Dashboard", " Projekte", "Projekte", " Einstellungen", "Einstellungen", "FehlerMeldung"];
+    private static readonly string[] StaticLabels = ["Neu", "Dashboard", " Projekte", "Projekte", " Einstellungen", "Einstellungen", "ErrorMessage"];
 
     /// <param name="window">Das Hauptfenster der Anwendung.</param>
     public ProjectListView(Window window) : base(window)
@@ -14,7 +14,7 @@ public sealed class ProjectListView : BaseWindowView
     }
 
     /// <inheritdoc/>
-    public override bool IsVisible => ElementExists(Window, cf => cf.ByName("Neu"));
+    public override bool IsVisible => ElementExists(Window, cf => cf.ByName("New"));
 
     /// <inheritdoc/>
     public override ProjectListView ForceShow()
@@ -35,7 +35,7 @@ public sealed class ProjectListView : BaseWindowView
 
     /// <summary>
     /// Sucht Projekt-Kacheln anhand ihrer Titel-Textelemente, beschränkt auf den Projektkacheln-Container
-    /// ("ProjektKachelnListe"). Eine ungezielte Suche über das gesamte Fenster würde auch gleichnamige
+    /// ("ProjectTilesList"). Eine ungezielte Suche über das gesamte Fenster würde auch gleichnamige
     /// Text-Elemente aus der Seitenleiste treffen - z. B. den Aufgabentitel einer aktiven Aufgabe in
     /// "Aktive Aufgaben", der standardmäßig mit dem Projektnamen vorbelegt ist (siehe
     /// <see cref="OpenProject"/>).
@@ -47,9 +47,9 @@ public sealed class ProjectListView : BaseWindowView
             .Where(e => !string.IsNullOrWhiteSpace(e.Name) && !StaticLabels.Contains(e.Name))
             .ToArray();
 
-    /// <returns>Der Container-Element der Projektkacheln-Liste (AutomationId "ProjektKachelnListe").</returns>
+    /// <returns>Der Container-Element der Projektkacheln-Liste (AutomationId "ProjectTilesList").</returns>
     private AutomationElement GetProjectTilesContainer()
-        => WaitForElement(Window, cf => cf.ByAutomationId("ProjektKachelnListe"), Short);
+        => WaitForElement(Window, cf => cf.ByAutomationId("ProjectTilesList"), Short);
 
     /// <summary>
     /// Erstellt ein neues Projekt über den "Neu"-Button und speichert es. Bildet dieselbe fachliche
@@ -58,7 +58,7 @@ public sealed class ProjectListView : BaseWindowView
     /// (<see cref="BaseWindowView.WaitForElement"/>, <see cref="BaseWindowView.WaitUntilGone"/>) ist
     /// bereits über <see cref="ElementWaitHelper"/> geteilt (siehe <see cref="BaseWindowView"/>); die
     /// verbleibende Duplikation betrifft nur die Reihenfolge der fachlichen UI-Schritte (Button- und
-    /// Feldnamen wie "Neu"/"ProjektName"/"Speichern"). Eine weitere Extraktion in
+    /// Feldnamen wie "Neu"/"ProjectName"/"Speichern"). Eine weitere Extraktion in
     /// <see cref="ElementWaitHelper"/> wäre unpassend, da dieser Helper bewusst generisch (ohne
     /// Kenntnis fachlicher Button-/Feldnamen) bleiben soll; eine Abhängigkeit auf
     /// <see cref="Softwareschmiede.Tests.E2E.WpfTestBase"/> scheidet aus, da <see cref="BaseWindowView"/>
@@ -68,16 +68,16 @@ public sealed class ProjectListView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public ProjectListView CreateProject(string name)
     {
-        WaitForElement(Window, cf => cf.ByName("Neu"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("New"), Short).AsButton().ClickInForeground();
 
         var projectView = new ProjectDetailView(Window);
-        WaitForElement(Window, cf => cf.ByName("ProjektName"), Medium);
-        WaitForElement(Window, cf => cf.ByName("Speichern"), Medium);
+        WaitForElement(Window, cf => cf.ByName("ProjectName"), Medium);
+        WaitForElement(Window, cf => cf.ByName("Save"), Medium);
         Assert.True(projectView.IsVisible, "Projekt-Detailansicht sollte nach Klick auf 'Neu' sichtbar sein.");
         projectView.SetProjectName(name);
         projectView.SaveChanges();
 
-        WaitUntilGone(Window, cf => cf.ByName("ProjektName"), Medium);
+        WaitUntilGone(Window, cf => cf.ByName("ProjectName"), Medium);
         WaitForElement(GetProjectTilesContainer(), cf => cf.ByName(name), Medium);
         Assert.True(IsVisible, "Projektlisten-Ansicht sollte nach Speichern des neuen Projekts sichtbar sein.");
         Assert.Contains(name, GetProjectNames());
@@ -118,7 +118,7 @@ public sealed class ProjectListView : BaseWindowView
     public ProjectDetailView OpenProject(string name)
     {
         WaitForElement(GetProjectTilesContainer(), cf => cf.ByName(name), Short).ClickInForeground();
-        WaitForElement(Window, cf => cf.ByName("Speichern"), Medium);
+        WaitForElement(Window, cf => cf.ByName("Save"), Medium);
 
         return new ProjectDetailView(Window);
     }

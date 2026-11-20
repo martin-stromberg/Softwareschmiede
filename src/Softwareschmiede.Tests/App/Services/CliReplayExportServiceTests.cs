@@ -41,23 +41,23 @@ public sealed class CliReplayExportServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    /// <summary><see cref="CliReplayExportService.HatAufzeichnung"/> spiegelt die Verfügbarkeit des
+    /// <summary><see cref="CliReplayExportService.HasRecording"/> spiegelt die Verfügbarkeit des
     /// Mitschnitts wider — false ohne Session-Start, true nach einem Start.</summary>
     [Fact]
     public async Task HatAufzeichnung_SpiegeltVerfuegbarkeitDesMitschnitts()
     {
         var workItemId = Guid.NewGuid();
-        _sut.HatAufzeichnung(workItemId).Should().BeFalse("ohne Session-Start liegt kein Mitschnitt vor");
+        _sut.HasRecording(workItemId).Should().BeFalse("ohne Session-Start liegt kein Mitschnitt vor");
 
-        var kiService = TestKiAusfuehrungsServiceFactory.Create(
+        var aiService = TestKiAusfuehrungsServiceFactory.Create(
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher([Encoding.UTF8.GetBytes("x")]));
-        var sut = new CliReplayExportService(kiService, _store, NullLogger<CliReplayExportService>.Instance);
+        var sut = new CliReplayExportService(aiService, _store, NullLogger<CliReplayExportService>.Instance);
         var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec();
-        await kiService.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        await aiService.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        sut.HatAufzeichnung(workItemId).Should().BeTrue();
+        sut.HasRecording(workItemId).Should().BeTrue();
     }
 
     /// <summary>Der Export schreibt den Mitschnitt der laufenden Session als .clireplay — inklusive
@@ -71,14 +71,14 @@ public sealed class CliReplayExportServiceTests : IDisposable
             Encoding.UTF8.GetBytes("chunk-eins"),
             Encoding.UTF8.GetBytes("\x1b[31mchunk-zwei"),
         };
-        var kiService = TestKiAusfuehrungsServiceFactory.Create(
+        var aiService = TestKiAusfuehrungsServiceFactory.Create(
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher(chunks));
-        var sut = new CliReplayExportService(kiService, _store, NullLogger<CliReplayExportService>.Instance);
+        var sut = new CliReplayExportService(aiService, _store, NullLogger<CliReplayExportService>.Instance);
         var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec();
 
-        await kiService.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        await aiService.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
         var targetPath = Path.Combine(Path.GetTempPath(), $"cli-replay-{Guid.NewGuid():N}.clireplay");
         try

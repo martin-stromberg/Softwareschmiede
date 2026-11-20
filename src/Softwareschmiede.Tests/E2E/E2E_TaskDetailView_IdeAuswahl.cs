@@ -38,7 +38,7 @@ public partial class End2EndTest
         taskDetail.ForceClose(recurseToDashboard: false);
         var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
-        // Phase 1: Visual-Studio-Code-Plugin deaktivieren (Einstellungen), damit ohne .sln-Datei kein
+        // Phase 1: Visual-Studio-Code-Plugin deaktivieren (Settings), damit ohne .sln-Datei kein
         // Fallback-Plugin mehr existiert und FindEntryPointsAsync 0 Einstiegspunkte liefert.
         var settings = projectDetail.Menu.NavigateToSettings();
         settings.SwitchTab("Plugins");

@@ -34,7 +34,7 @@ internal sealed class ScmE2EFixture
         await db.Database.MigrateAsync();
         var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
         await settings.SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath));
-        await settings.SetSettingAsync(AppSettingService.DefaultKiPluginKey, null);
+        await settings.SetSettingAsync(AppSettingService.DefaultAiPluginKey, null);
         await settings.SetSettingAsync(WorkingDirectorySettingsService.RepositoriesWorkdirKey, Configuration.TestRoot);
         var origin = Path.Combine(Configuration.TestRoot, "origin");
         Directory.CreateDirectory(origin);
@@ -98,7 +98,7 @@ internal sealed class ScmE2EFixture
 
     public void AddText(int number, long id, string body, string kind = "IssueComment", IEnumerable<string>? viewerReactions = null)
     {
-        Scenario.Texts.Add(new ScmE2EText { Number = number, Id = id, Body = body, Kind = kind, PullRequest = number is 7 or 9, ViewerReactions = viewerReactions?.ToList() ?? [] });
+        Scenario.Text.Add(new ScmE2EText { Number = number, Id = id, Body = body, Kind = kind, PullRequest = number is 7 or 9, ViewerReactions = viewerReactions?.ToList() ?? [] });
         SaveScenario();
     }
 

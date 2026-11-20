@@ -10,7 +10,7 @@ namespace Softwareschmiede.Tests.App.Converters;
 /// <summary>Tests für KiAusfuehrungsStatusSymbolConverter (nur Glyph, kein Text/Countdown).</summary>
 public sealed class KiAusfuehrungsStatusSymbolConverterTests
 {
-    private readonly KiAusfuehrungsStatusSymbolConverter _sut = new();
+    private readonly AiExecutionStatusSymbolConverter _sut = new();
 
     /// <summary>Convert gibt "▶" zurück, wenn AktiveRunId gesetzt und der Heartbeat aktuell ist.</summary>
     [Fact]
@@ -35,7 +35,7 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
     [Fact]
     public void Convert_ShouldReturnSymbolOnly_WhenScheduledPrompt()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Prompt-Aufgabe",
@@ -75,7 +75,7 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
     [Fact]
     public void Convert_ShouldReturnSymbolOnly_WhenLiveLaufStatusWartetAufEingabe()
     {
-        var item = new AktiveAufgabePanelItem
+        var item = new ActiveWorkItemPanelItem
         {
             Id = Guid.NewGuid(),
             Title = "Aufgabe mit wartender Live-CLI",
