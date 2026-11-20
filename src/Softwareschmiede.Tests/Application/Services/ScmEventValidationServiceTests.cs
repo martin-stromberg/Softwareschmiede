@@ -244,7 +244,7 @@ public sealed class ScmEventValidationServiceTests
     {
         var date = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
         var repository = new ScmEventRepository("test", "host", "repo42", "OWNER", "repo", "42", "bot-id", "scm-bot", true,
-            Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto);
+            Softwareschmiede.Domain.Enums.ScmAccountMode.SeparateAccount);
         return new(new(repository, ScmReferenceKind.Issue, 1),
             kind, "node", "1", date, date, edited ? date : null, author, authorLogin, editor, editorLogin, body, "https://host/OWNER/repo/issues/1", date,
             viewerReactions);

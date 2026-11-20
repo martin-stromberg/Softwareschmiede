@@ -261,7 +261,7 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
             .ReturnsAsync((ScmEventReference reference, CancellationToken _) => new Issue(reference.Number,
                 "Issue Titel " + reference.Number, "Beschreibungstext", Array.Empty<string>(), null,
                 "https://github.com/owner/repo/issues/" + reference.Number)
-            { IstGeschlossen = true });
+            { IsClosed = true });
         var (taskId, eventId) = await AddAufbereitungAsync(fixture, ScmDispatchFixture.KiPrefix);
 
         await fixture.DispatchAsync(eventId);

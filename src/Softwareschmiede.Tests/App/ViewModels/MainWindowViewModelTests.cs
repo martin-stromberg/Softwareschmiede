@@ -486,7 +486,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         scmPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
         scmPlugin.SetupGet(p => p.PluginName).Returns("GitHub");
         scmPlugin.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
-        var aiPlugin = new Mock<IKiPlugin>();
+        var aiPlugin = new Mock<IAiPlugin>();
         aiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
         aiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
         aiPlugin.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
@@ -544,7 +544,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         scmPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
         scmPlugin.SetupGet(p => p.PluginName).Returns("GitHub");
         scmPlugin.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
-        var aiPlugin = new Mock<IKiPlugin>();
+        var aiPlugin = new Mock<IAiPlugin>();
         aiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
         aiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
         aiPlugin.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
@@ -837,7 +837,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         scmPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
         scmPlugin.SetupGet(p => p.PluginName).Returns("GitHub");
         scmPlugin.SetupGet(p => p.PluginSymbol).Returns("🐙");
-        var aiPlugin = new Mock<IKiPlugin>();
+        var aiPlugin = new Mock<IAiPlugin>();
         aiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
         aiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
         // PluginSymbol absichtlich nicht aufgesetzt: Moq liefert null statt des Interface-Defaults.
@@ -882,7 +882,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     public async Task AktiveAufgabenAktualisierenAsync_ShouldMapKiGruppenName()
     {
         // Arrange
-        var aiPlugin = new Mock<IKiPlugin>();
+        var aiPlugin = new Mock<IAiPlugin>();
         aiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
         aiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aiPlugin.Object]);

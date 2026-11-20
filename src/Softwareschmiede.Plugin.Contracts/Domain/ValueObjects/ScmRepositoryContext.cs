@@ -7,7 +7,7 @@ public sealed record ScmRepositoryContext
 {
     /// <summary>Erstellt einen vollstaendigen Repository-Snapshot.</summary>
     public ScmRepositoryContext(Guid gitRepositoryId, string pluginPrefix, string repositoryId,
-        ScmKontoModus account = ScmKontoModus.Benutzerkonto)
+        ScmAccountMode account = ScmAccountMode.UserAccount)
     {
         if (gitRepositoryId == Guid.Empty)
             throw new ArgumentException("Die lokale Repository-ID darf nicht leer sein.", nameof(gitRepositoryId));
@@ -30,5 +30,5 @@ public sealed record ScmRepositoryContext
     public string RepositoryId { get; }
 
     /// <summary>Kontomodus, unter dem Provider-Aufrufe dieses Kontexts laufen.</summary>
-    public ScmKontoModus Account { get; }
+    public ScmAccountMode Account { get; }
 }

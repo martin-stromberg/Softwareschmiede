@@ -108,7 +108,7 @@ public sealed class AppSettingService
     /// <summary>Schlüssel für die Admin-Merge-Fallback-Option des Backmerge-Dienstes.</summary>
     public const string ScmBackmergeAdminMergeKey = "scm.backmerge.admin_merge";
 
-    /// <summary>Schlüssel für den Kontomodus der SCM-Ereignisüberwachung (<see cref="ScmKontoModus"/>-Wert als Zahl gespeichert).</summary>
+    /// <summary>Schlüssel für den Kontomodus der SCM-Ereignisüberwachung (<see cref="ScmAccountMode"/>-Wert als Zahl gespeichert).</summary>
     public const string ScmAccountModeKey = "scm.monitoring.accountmode";
 
     /// <summary>Schlüsselpräfix für die projektbezogene Backmerge-Freigabe; der vollständige Schlüssel ist <c>plugins.backmerge.project.{projektId}</c>.</summary>
@@ -275,23 +275,23 @@ public sealed class AppSettingService
     /// <summary>
     /// Liest den Kontomodus der SCM-Ereignisüberwachung unter <see cref="ScmAccountModeKey"/>.
     /// Fehlende oder ungültige gespeicherte Werte fallen auf
-    /// <see cref="ScmKontoModus.Benutzerkonto"/> zurück.
+    /// <see cref="ScmAccountMode.UserAccount"/> zurück.
     /// </summary>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Der effektive Kontomodus.</returns>
-    public async Task<ScmKontoModus> GetScmAccountModeAsync(CancellationToken ct = default)
+    public async Task<ScmAccountMode> GetScmAccountModeAsync(CancellationToken ct = default)
     {
         var value = await GetSettingAsync(ScmAccountModeKey, ct);
-        return int.TryParse(value, out var mode) && Enum.IsDefined((ScmKontoModus)mode)
-            ? (ScmKontoModus)mode
-            : ScmKontoModus.Benutzerkonto;
+        return int.TryParse(value, out var mode) && Enum.IsDefined((ScmAccountMode)mode)
+            ? (ScmAccountMode)mode
+            : ScmAccountMode.UserAccount;
     }
 
     /// <summary>Speichert den Kontomodus der SCM-Ereignisüberwachung unter <see cref="ScmAccountModeKey"/>.</summary>
     /// <param name="mode">Der zu speichernde Modus.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="mode"/> ist kein definierter <see cref="ScmKontoModus"/>-Wert.</exception>
-    public Task SetScmAccountModeAsync(ScmKontoModus mode, CancellationToken ct = default)
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="mode"/> ist kein definierter <see cref="ScmAccountMode"/>-Wert.</exception>
+    public Task SetScmAccountModeAsync(ScmAccountMode mode, CancellationToken ct = default)
     {
         if (!Enum.IsDefined(mode))
             throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unbekannter SCM-Kontomodus.");

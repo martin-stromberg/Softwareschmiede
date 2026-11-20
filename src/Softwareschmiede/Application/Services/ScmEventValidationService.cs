@@ -10,7 +10,7 @@ public sealed class ScmEventValidationService
     /// (Einstellung <see cref="AppSettingService.ScmTriggerKeywordKey"/>).</summary>
     public const string DefaultTriggerKeyword = "$Softwareschmiede";
 
-    /// <summary>Ablehnungsgrund, wenn im Modus <see cref="ScmKontoModus.SeparatesKonto"/> keine frei
+    /// <summary>Ablehnungsgrund, wenn im Modus <see cref="ScmAccountMode.SeparateAccount"/> keine frei
     /// stehende Erwähnung des separaten Kontos vorliegt.</summary>
     public const string NoMentionRejection = "Keine Erwähnung des separaten Kontos";
 
@@ -39,7 +39,7 @@ public sealed class ScmEventValidationService
     public static string? GetRejection(ScmEventObservation observation, string? triggerKeyword = null)
     {
         var repository = observation.Reference.Repository;
-        var separate = repository.Account == ScmKontoModus.SeparatesKonto;
+        var separate = repository.Account == ScmAccountMode.SeparateAccount;
         // Trigger je Modus: Benutzerkonto = konfiguriertes Keyword, SeparatesKonto = frei stehende
         // Erwähnung des separaten Kontos (Viewer = Bot-Identität).
         if (separate

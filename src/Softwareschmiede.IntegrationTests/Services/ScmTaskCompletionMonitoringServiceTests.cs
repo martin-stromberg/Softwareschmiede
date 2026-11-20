@@ -38,7 +38,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         Assert.Equal(taskId, reference.WorkItemId);
         Assert.Equal(7, reference.PullRequestNumber);
         Assert.Equal("owner/repo", reference.RepositoryId);
-        Assert.Equal(PullRequestReferenzRolle.CreatedByTask, reference.Role);
+        Assert.Equal(PullRequestReferenceRole.CreatedByTask, reference.Role);
         Assert.Equal("https://github.com/owner/repo/pull/7", reference.Url);
         Assert.NotNull((await db.LogEntries.ToListAsync(cancellationToken: TestContext.Current.CancellationToken))
             .FirstOrDefault(x => x.Content.Contains("Pull Request #7")));
@@ -141,7 +141,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await SetWaitAsync(fixture, 5);
         fixture.Git.As<IScmEventSource>().Setup(x => x.ReadIssueAsync(
                 It.Is<ScmEventReference>(r => r.Number == 7), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Issue(7, "Issue", null, [], null, null) { IstGeschlossen = true });
+            .ReturnsAsync(new Issue(7, "Issue", null, [], null, null) { IsClosed = true });
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
@@ -158,7 +158,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
 
     /// <summary>Der Issue-Abschlusspfad läuft stets unter dem Benutzerkonto: Auch bei konfiguriertem
     /// SeparatesKonto der Ereignisüberwachung wird der Repository-Kontext der Abschlussprüfung mit
-    /// <see cref="ScmKontoModus.Benutzerkonto"/> aufgebaut.</summary>
+    /// <see cref="ScmAccountMode.UserAccount"/> aufgebaut.</summary>
     [Fact]
     public async Task CompletionService_IssueCheck_UsesBenutzerkontoContext()
     {
@@ -169,7 +169,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await AddIssueReferenceAsync(fixture, taskId, 7);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppSettingService>()
-                .SetScmAccountModeAsync(ScmKontoModus.SeparatesKonto, TestContext.Current.CancellationToken);
+                .SetScmAccountModeAsync(ScmAccountMode.SeparateAccount, TestContext.Current.CancellationToken);
         var contexts = new List<ScmRepositoryContext>();
         fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
                 It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
@@ -183,7 +183,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         var context = Assert.Single(contexts);
-        Assert.Equal(ScmKontoModus.Benutzerkonto, context.Account);
+        Assert.Equal(ScmAccountMode.UserAccount, context.Account);
         Assert.Equal("https://github.com/owner/repo", context.RepositoryId);
     }
 
@@ -306,7 +306,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         await SetWaitAsync(fixture, 5);
         fixture.Git.As<IScmEventSource>().Setup(x => x.ReadIssueAsync(
                 It.Is<ScmEventReference>(r => r.Number == 7), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Issue(7, "Issue", null, [], null, null) { IstGeschlossen = true });
+            .ReturnsAsync(new Issue(7, "Issue", null, [], null, null) { IsClosed = true });
         var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
 
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
@@ -479,7 +479,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
                 {
                     Id = Guid.NewGuid(),
                     Provider = PullRequestProvider.GitHub,
-                    Role = PullRequestReferenzRolle.CreatedByTask,
+                    Role = PullRequestReferenceRole.CreatedByTask,
                     RepositoryId = "owner/repo",
                     PullRequestNumber = 42,
                     CreatedUtc = DateTimeOffset.UtcNow,

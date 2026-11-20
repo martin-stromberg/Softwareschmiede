@@ -19,7 +19,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     private readonly WorkItemService _workItemService;
     private readonly LogService _logService;
     private readonly Mock<IGitPlugin> _gitPluginMock;
-    private readonly Mock<IKiPlugin> _kiPluginMock;
+    private readonly Mock<IAiPlugin> _kiPluginMock;
     private readonly Mock<IWorkingDirectoryResolver> _arbeitsverzeichnisResolverMock;
     private readonly AiExecutionService _kiAusfuehrungsService;
     private readonly DevelopmentProcessService _sut;
@@ -33,7 +33,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _workItemService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
         _logService = new LogService(_db, new Mock<ILogger<LogService>>().Object);
         _gitPluginMock = new Mock<IGitPlugin>();
-        _kiPluginMock = new Mock<IKiPlugin>();
+        _kiPluginMock = new Mock<IAiPlugin>();
         _kiPluginMock.SetupGet(p => p.PluginName).Returns("Test KI");
         _kiPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestKi");
         _kiPluginMock.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
@@ -70,7 +70,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _db.Dispose();
     }
 
-    private PluginSelectionService CreatePluginSelectionService(params IKiPlugin[] kiPlugins)
+    private PluginSelectionService CreatePluginSelectionService(params IAiPlugin[] kiPlugins)
     {
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);

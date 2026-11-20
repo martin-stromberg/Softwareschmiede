@@ -63,7 +63,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         Assert.Equal("PR Titel 5", task.Title);
         Assert.Equal(repositoryId, task.GitRepositoryId);
         var reference = Assert.Single(task.PullRequests);
-        Assert.Equal(PullRequestReferenzRolle.ReviewSource, reference.Role);
+        Assert.Equal(PullRequestReferenceRole.ReviewSource, reference.Role);
         Assert.Equal(PullRequestProvider.GitHub, reference.Provider);
         Assert.Equal("owner/repo", reference.RepositoryId);
         Assert.Equal(5, reference.PullRequestNumber);
@@ -303,7 +303,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         Assert.Equal(2, tasks.Count);
         var created = Assert.Single(tasks, x => x.Id != endedTaskId);
         var reference = Assert.Single(created.PullRequests);
-        Assert.Equal(PullRequestReferenzRolle.ReviewSource, reference.Role);
+        Assert.Equal(PullRequestReferenceRole.ReviewSource, reference.Role);
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(created.Id, item.WorkItemId);
     }
@@ -355,7 +355,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         Assert.Equal(2, tasks.Count);
         var created = Assert.Single(tasks, x => x.Id != taskId);
         var reference = Assert.Single(created.PullRequests);
-        Assert.Equal(PullRequestReferenzRolle.ReviewSource, reference.Role);
+        Assert.Equal(PullRequestReferenceRole.ReviewSource, reference.Role);
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(created.Id, item.WorkItemId);
     }

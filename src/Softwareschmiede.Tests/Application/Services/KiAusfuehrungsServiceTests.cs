@@ -73,7 +73,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         // Arrange
         var workItemId = Guid.NewGuid();
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
             {
@@ -98,7 +98,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public async Task StartCliAsync_ShouldReturnHandle_WhenPluginProvidesValidProcessStartInfo()
     {
         var workItemId = Guid.NewGuid();
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
             {
@@ -139,7 +139,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
 
         var workItemId = Guid.NewGuid();
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
             {
@@ -312,7 +312,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// <param name="pseudoConsoleProcessLauncher">Optionaler Launcher für den PseudoConsole-Pfad, damit Tests keinen
     /// echten Win32-ConPTY-Launcher verwenden müssen.</param>
     private static async Task AssertSubscriberExceptionIsLoggedAsync(
-        Func<AiExecutionService, Guid, IKiPlugin, Task> startAsync,
+        Func<AiExecutionService, Guid, IAiPlugin, Task> startAsync,
         System.Diagnostics.ProcessStartInfo pluginProcessStartInfo,
         TimeSpan timeout,
         IPseudoConsoleProcessLauncher? pseudoConsoleProcessLauncher = null)
@@ -322,7 +322,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, loggerMock.Object, pseudoConsoleProcessLauncher);
 
         var workItemId = Guid.NewGuid();
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(pluginProcessStartInfo);
         pluginMock.SetupTerminalSpec(pluginProcessStartInfo.FileName, pluginProcessStartInfo.Arguments);
@@ -363,7 +363,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, launcher: launcher);
 
         var workItemId = Guid.NewGuid();
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec("cmd.exe");
 
         await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath());
@@ -398,7 +398,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, launcher: launcher);
 
         var workItemId = Guid.NewGuid();
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec("cmd.exe");
 
         await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath());
@@ -440,7 +440,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, loggerMock.Object, launcher: launcher);
 
         var workItemId = Guid.NewGuid();
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec("cmd.exe");
 
         // Bewusst auf jedem Log-Level geprüft (nicht nur Warning): Ziel des Fixes ist, dass die
@@ -498,7 +498,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, launcher: launcher);
 
         var workItemId = Guid.NewGuid();
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec("cmd.exe", "/c echo simuliert");
 
         var gestartet = new TaskCompletionSource();
@@ -535,7 +535,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
             launcher: launcher);
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec("echo", "irrelevant");
 
         var handle = await sut.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath());
@@ -917,9 +917,9 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             .BuildServiceProvider();
     }
 
-    private static Mock<IKiPlugin> CreateNoOpPlugin()
+    private static Mock<IAiPlugin> CreateNoOpPlugin()
     {
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
             {
@@ -932,9 +932,9 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         return pluginMock;
     }
 
-    private static Mock<IKiPlugin> CreatePlugin(System.Diagnostics.ProcessStartInfo processStartInfo)
+    private static Mock<IAiPlugin> CreatePlugin(System.Diagnostics.ProcessStartInfo processStartInfo)
     {
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(processStartInfo);
         pluginMock.SetupTerminalSpec(processStartInfo.FileName, processStartInfo.Arguments);

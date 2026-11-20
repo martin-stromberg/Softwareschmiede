@@ -99,7 +99,7 @@ public sealed class IssueCreateDialogUiTests
             => Task.FromResult(IssueTemplateLoadResult.Success([]));
     }
 
-    private sealed class UiTestKiPlugin : IKiPlugin, IIssueTemplateTextGenerator
+    private sealed class UiTestKiPlugin : IAiPlugin, IIssueTemplateTextGenerator
     {
         public UiTestKiPlugin(string prefix)
         {

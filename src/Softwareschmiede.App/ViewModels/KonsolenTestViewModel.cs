@@ -114,7 +114,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Pfad der geladenen Aufzeichnungsdatei, oder null.</summary>
-    public string? DateiPfad
+    public string? FilePath
     {
         get => _dateiPfad;
         private set => SetProperty(ref _dateiPfad, value);
@@ -246,7 +246,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         _recording = recording;
         _replaySession = ErzeugeReplaySession(recording);
 
-        DateiPfad = path;
+        FilePath = path;
         QuellEintraege.Clear();
         foreach (var entry in entries)
             QuellEintraege.Add(entry);

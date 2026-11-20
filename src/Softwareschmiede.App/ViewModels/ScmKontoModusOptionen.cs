@@ -9,10 +9,10 @@ namespace Softwareschmiede.App.ViewModels;
 public static class ScmKontoModusTexte
 {
     /// <summary>Überwachung und Antworten laufen unter dem Benutzer-Token.</summary>
-    public const string Benutzerkonto = "Benutzerkonto";
+    public const string UserAccount = "Benutzerkonto";
 
     /// <summary>Überwachung und Antworten laufen unter dem Token eines separaten Kontos (Notifications-Inbox).</summary>
-    public const string SeparatesKonto = "Separates Konto";
+    public const string SeparateAccount = "Separates Konto";
 }
 
 /// <summary>
@@ -21,17 +21,17 @@ public static class ScmKontoModusTexte
 /// </summary>
 /// <param name="Mode">Der persistierte Konto-Modus.</param>
 /// <param name="Label">Der in der Auswahlbox angezeigte Text.</param>
-public sealed record ScmKontoModusOption(ScmKontoModus Mode, string Label)
+public sealed record ScmKontoModusOption(ScmAccountMode Mode, string Label)
 {
     /// <summary>Alle wählbaren Konto-Modi in Anzeigereihenfolge.</summary>
     public static IReadOnlyList<ScmKontoModusOption> All { get; } =
     [
-        new(ScmKontoModus.Benutzerkonto, ScmKontoModusTexte.Benutzerkonto),
-        new(ScmKontoModus.SeparatesKonto, ScmKontoModusTexte.SeparatesKonto)
+        new(ScmAccountMode.UserAccount, ScmKontoModusTexte.UserAccount),
+        new(ScmAccountMode.SeparateAccount, ScmKontoModusTexte.SeparateAccount)
     ];
 
     /// <summary>Liefert die Auswahloption zu einem gespeicherten Modus.</summary>
-    public static ScmKontoModusOption FuerModus(ScmKontoModus mode)
+    public static ScmKontoModusOption FuerModus(ScmAccountMode mode)
         => All.First(o => o.Mode == mode);
 
     /// <inheritdoc/>

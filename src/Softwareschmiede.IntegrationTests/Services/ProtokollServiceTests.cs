@@ -136,9 +136,9 @@ public sealed class ProtokollServiceTests
             Passed: false,
             Results: new[]
             {
-                new TestErgebnisInfo("IntegrationTest.Test1", TestStatus.Passed, null, TimeSpan.FromMilliseconds(100)),
-                new TestErgebnisInfo("IntegrationTest.Test2", TestStatus.Failed, "Expected true but was false", TimeSpan.FromMilliseconds(50)),
-                new TestErgebnisInfo("IntegrationTest.Test3", TestStatus.Skipped, null, TimeSpan.Zero)
+                new TestResultInfo("IntegrationTest.Test1", TestStatus.Passed, null, TimeSpan.FromMilliseconds(100)),
+                new TestResultInfo("IntegrationTest.Test2", TestStatus.Failed, "Expected true but was false", TimeSpan.FromMilliseconds(50)),
+                new TestResultInfo("IntegrationTest.Test3", TestStatus.Skipped, null, TimeSpan.Zero)
             });
 
         // Act
@@ -175,7 +175,7 @@ public sealed class ProtokollServiceTests
             Passed: true,
             Results: new[]
             {
-                new TestErgebnisInfo("DauerTest", TestStatus.Passed, null, erwarteteDauer)
+                new TestResultInfo("DauerTest", TestStatus.Passed, null, erwarteteDauer)
             });
 
         // Act
@@ -230,8 +230,8 @@ public sealed class ProtokollServiceTests
             Passed: true,
             Results: new[]
             {
-                new TestErgebnisInfo("Test.A", TestStatus.Passed, null, TimeSpan.FromMilliseconds(10)),
-                new TestErgebnisInfo("Test.B", TestStatus.Passed, null, TimeSpan.FromMilliseconds(20))
+                new TestResultInfo("Test.A", TestStatus.Passed, null, TimeSpan.FromMilliseconds(10)),
+                new TestResultInfo("Test.B", TestStatus.Passed, null, TimeSpan.FromMilliseconds(20))
             });
 
         await service.AddTestResultsAsync(workItemId, testResult, TestContext.Current.CancellationToken);

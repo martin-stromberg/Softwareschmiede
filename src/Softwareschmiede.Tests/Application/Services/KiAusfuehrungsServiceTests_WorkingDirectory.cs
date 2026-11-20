@@ -119,7 +119,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory : IDisposable
         var startConfig = new RepositoryStartConfiguration { WorkingDirectoryRelativePath = "backend" };
 
         string? usedPath = null;
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Callback<string, string?, CancellationToken>((path, _, _) => usedPath = path)
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
@@ -140,7 +140,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory : IDisposable
     public async Task StartCliAsync_ShouldUseRepoRootWhenConfigNull()
     {
         string? usedPath = null;
-        var pluginMock = new Mock<IKiPlugin>();
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Callback<string, string?, CancellationToken>((path, _, _) => usedPath = path)
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo

@@ -7,7 +7,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Domain.Abstractions;
 
 /// <summary>Gemeinsame Basisklasse für CLI-basierte KI-Plugins.</summary>
-public abstract class CliKiPluginBase : IKiPlugin
+public abstract class CliAiPluginBase : IAiPlugin
 {
     /// <summary>
     /// Provider-spezifischer Bezeichner für Dateinamen.

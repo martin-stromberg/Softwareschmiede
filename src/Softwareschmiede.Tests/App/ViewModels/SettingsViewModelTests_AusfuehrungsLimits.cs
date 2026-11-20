@@ -73,9 +73,9 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
             new Mock<IDialogService>().Object,
             new Mock<IServiceProvider>().Object);
 
-    private static IKiPlugin CreateKiPlugin(IReadOnlyList<PluginSettingGroup>? groups = null)
+    private static IAiPlugin CreateKiPlugin(IReadOnlyList<PluginSettingGroup>? groups = null)
     {
-        var mock = new Mock<IKiPlugin>();
+        var mock = new Mock<IAiPlugin>();
         mock.Setup(p => p.PluginName).Returns("TestKI");
         mock.Setup(p => p.PluginPrefix).Returns(KiPrefix);
         mock.Setup(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);

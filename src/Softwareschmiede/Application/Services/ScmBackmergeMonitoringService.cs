@@ -13,7 +13,7 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Eigenständiger Prüfzyklus der Backmerge-Automatisierung („Prozessabläufe"): enumeriert
 /// repository-weit alle Referenzen aktiver Projekt-Repositories und bewertet Pull Requests auf das
 /// Backmerge-Muster. Läuft unabhängig von der SCM-Ereignisüberwachung und immer unter dem
-/// Benutzerkonto (<see cref="ScmKontoModus.Benutzerkonto"/>), damit die Entdeckung auch im
+/// Benutzerkonto (<see cref="ScmAccountMode.UserAccount"/>), damit die Entdeckung auch im
 /// SeparatesKonto-Modus der Ereignisüberwachung repository-weit funktioniert.</summary>
 /// <remarks>
 /// Repository-Auflösungen werden je Alias unter <c>backmerge-repository/{prefix}/{alias}</c> und die
@@ -68,7 +68,7 @@ public sealed class ScmBackmergeMonitoringService(
                     // Die Backmerge-Prüfung läuft immer unter dem Benutzerkonto — unabhängig vom
                     // konfigurierten Überwachungsmodus der Ereignisüberwachung.
                     var repository = await source.GetEventRepositoryAsync(
-                        new ScmRepositoryContext(aliasGroup[0].Id, plugin.PluginPrefix, alias, ScmKontoModus.Benutzerkonto), ct);
+                        new ScmRepositoryContext(aliasGroup[0].Id, plugin.PluginPrefix, alias, ScmAccountMode.UserAccount), ct);
                     if (!localRepositories.TryGetValue(repository, out var candidates))
                         localRepositories[repository] = candidates = [];
                     foreach (var lokal in aliasGroup)

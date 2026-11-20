@@ -122,7 +122,7 @@ public sealed class AufgabeServiceTests
             true,
             new[]
             {
-                new TestErgebnisInfo("Test1", TestStatus.Passed, null, TimeSpan.FromMilliseconds(42))
+                new TestResultInfo("Test1", TestStatus.Passed, null, TimeSpan.FromMilliseconds(42))
             });
         await logService.AddTestResultsAsync(workItem.Id, testResult, TestContext.Current.CancellationToken);
 

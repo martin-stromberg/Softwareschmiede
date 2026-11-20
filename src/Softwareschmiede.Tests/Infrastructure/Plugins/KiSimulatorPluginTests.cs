@@ -8,13 +8,13 @@ namespace Softwareschmiede.Tests.Infrastructure.Plugins;
 /// <summary>KiSimulatorPluginTests.</summary>
 public sealed class KiSimulatorPluginTests
 {
-    private readonly KiSimulatorPlugin _sut;
+    private readonly AiSimulatorPlugin _sut;
 
     /// <summary>KiSimulatorPluginTests.</summary>
     public KiSimulatorPluginTests()
     {
-        _sut = new KiSimulatorPlugin(
-            new Mock<ILogger<KiSimulatorPlugin>>().Object);
+        _sut = new AiSimulatorPlugin(
+            new Mock<ILogger<AiSimulatorPlugin>>().Object);
     }
 
     /// <summary>PluginMetadata_ShouldExposeExpectedValues.</summary>

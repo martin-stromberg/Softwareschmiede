@@ -1460,7 +1460,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
 
         environment["GH_TOKEN"].Should().Be("agent-token");
         environment["GIT_TERMINAL_PROMPT"].Should().Be("0");
@@ -1478,7 +1478,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://ghe.example.com/owner/repo.git", TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, "https://ghe.example.com/owner/repo.git", TestContext.Current.CancellationToken);
 
         environment["GH_TOKEN"].Should().Be("agent-token");
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
@@ -1494,7 +1494,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl, TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, repositoryUrl, TestContext.Current.CancellationToken);
 
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
         environment["GIT_CONFIG_KEY_0"].Should().Be(expectedKey);
@@ -1507,7 +1507,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://oauth2:geheim@ghe.example.com/o/r.git", TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, "https://oauth2:geheim@ghe.example.com/o/r.git", TestContext.Current.CancellationToken);
 
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
         environment["GIT_CONFIG_KEY_0"].Should().Be("http.https://ghe.example.com/.extraheader");
@@ -1523,7 +1523,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl, TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, repositoryUrl, TestContext.Current.CancellationToken);
 
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
         environment["GIT_CONFIG_KEY_0"].Should().Be("http.https://ghe.example.com/.extraheader");
@@ -1540,7 +1540,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl, TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, repositoryUrl, TestContext.Current.CancellationToken);
 
         environment["GIT_TERMINAL_PROMPT"].Should().Be("0");
         environment["GH_TOKEN"].Should().Be("agent-token");
@@ -1556,7 +1556,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
 
         environment.Should().ContainKey("GIT_TERMINAL_PROMPT").WhoseValue.Should().Be("0");
         environment.Should().NotContainKey("GH_TOKEN");
@@ -1571,7 +1571,7 @@ public sealed class GitHubPluginTests
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("user-token");
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.AgentToken")).Returns("bot-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.SeparateAccount, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
 
         environment["GH_TOKEN"].Should().Be("bot-token");
         var expected = "AUTHORIZATION: basic " + Convert.ToBase64String(
@@ -1617,7 +1617,7 @@ public sealed class GitHubPluginTests
     public async Task SeparatesKonto_WithoutAgentToken_ThrowsAuthenticationBeforeAnyCall()
     {
         var repository = new ScmEventRepository("Softwareschmiede.GitHub", "github.com", "R_1", "owner", "repo",
-            "U_1", "BOT", "scm-bot", true, Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto);
+            "U_1", "BOT", "scm-bot", true, Softwareschmiede.Domain.Enums.ScmAccountMode.SeparateAccount);
 
         var error = await Assert.ThrowsAsync<ScmProviderException>(
             () => _sut.ReadEventsAsync(new(new(repository, ScmReferenceKind.Issue, 1), ScmContentKind.Description,

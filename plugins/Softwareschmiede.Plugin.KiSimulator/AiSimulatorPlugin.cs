@@ -10,9 +10,9 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>Deterministisches KI-Simulator-Plugin für Tests und lokale Entwicklung.</summary>
-public sealed class KiSimulatorPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
+public sealed class AiSimulatorPlugin : CliAiPluginBase, IIssueTemplateTextGenerator
 {
-    private readonly ILogger<KiSimulatorPlugin> _logger;
+    private readonly ILogger<AiSimulatorPlugin> _logger;
 
     /// <inheritdoc/>
     public override string PluginName => "KI Simulator";
@@ -29,8 +29,8 @@ public sealed class KiSimulatorPlugin : CliKiPluginBase, IIssueTemplateTextGener
     /// <inheritdoc/>
     public override string PluginSymbol => "🧪";
 
-    /// <summary>Erstellt eine neue Instanz von <see cref="KiSimulatorPlugin"/>.</summary>
-    public KiSimulatorPlugin(ILogger<KiSimulatorPlugin> logger)
+    /// <summary>Erstellt eine neue Instanz von <see cref="AiSimulatorPlugin"/>.</summary>
+    public AiSimulatorPlugin(ILogger<AiSimulatorPlugin> logger)
     {
         _logger = logger;
     }

@@ -73,7 +73,7 @@ public sealed class ScmEventMonitoringService(
             // Im SeparatesKonto ordnet die Inbox über Repository-Node-IDs zu, es wird nichts geraten.
             // Ein für das Konto unsichtbares Repository (404/403) liefert ihm auch keine Notifications
             // und wird daher nur ausgelassen, statt die Überwachung aller Repositories anzuhalten.
-            var inboxMode = accountMode == ScmKontoModus.SeparatesKonto && plugin is IScmNotificationSource;
+            var inboxMode = accountMode == ScmAccountMode.SeparateAccount && plugin is IScmNotificationSource;
             // Die gesamte lokale Referenzmenge auflösen, bevor irgendein eingehendes Ereignis zugeordnet
             // wird. Rohe HTTPS/SSH-Adressen und Plugin-Anzeigenamen sind keine Repository-Identitäten.
             var aliasGroups = linked.Where(x => ScmPluginMatcher.MatchesPlugin(plugin, x.Repository))
@@ -130,7 +130,7 @@ public sealed class ScmEventMonitoringService(
             }
             // Ein unaufgelöster Alias könnte jedes der aufgelösten Repositories meinen. Keine Zuordnung raten.
             if (!complete) continue;
-            if (accountMode == ScmKontoModus.SeparatesKonto && plugin is IScmNotificationSource notificationSource)
+            if (accountMode == ScmAccountMode.SeparateAccount && plugin is IScmNotificationSource notificationSource)
             {
                 // Im SeparatesKonto ersetzt die Inbox des separaten Kontos die repository-weite
                 // Enumeration; verknüpfte Referenzen aus Aufgaben werden nicht als Quellen übernommen.

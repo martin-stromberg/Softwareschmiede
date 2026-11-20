@@ -10,7 +10,7 @@ public interface ITerminalSessionFactory
     /// <param name="workItemId">ID der Aufgabe (für Logging/Protokoll).</param>
     /// <param name="spec">Die vom Plugin gelieferte Startbeschreibung.</param>
     /// <param name="outputSink">Optionale Senke für Terminal-Ausgabe (Protokoll-Pfad).</param>
-    /// <param name="healthCheck">Optionale Plugin-Health-Probe (<c>IKiPlugin.CheckHealthAsync</c> als Delegate).</param>
+    /// <param name="healthCheck">Optionale Plugin-Health-Probe (<c>IAiPlugin.CheckHealthAsync</c> als Delegate).</param>
     /// <param name="ct">Abbruch-Token.</param>
     /// <returns>Das <see cref="TerminalSessionStartResult"/> der gestarteten Session.</returns>
     Task<TerminalSessionStartResult> StartAsync(

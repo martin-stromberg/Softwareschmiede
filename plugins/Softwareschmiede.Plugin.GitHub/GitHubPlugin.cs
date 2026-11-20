@@ -181,7 +181,7 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     /// ausschließlich als Prozessumgebung des CLI-Kindprozesses gesetzt — niemals in
     /// Prompts, Logs oder Persistenz.
     /// </remarks>
-    public Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(ScmKontoModus account, string? repositoryUrl, CancellationToken ct = default)
+    public Task<IReadOnlyDictionary<string, string?>> GetAgentEnvironmentAsync(ScmAccountMode account, string? repositoryUrl, CancellationToken ct = default)
     {
         var environment = new Dictionary<string, string?>
         {

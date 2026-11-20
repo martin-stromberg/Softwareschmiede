@@ -204,10 +204,10 @@ public sealed class ScmTaskCompletionMonitoringService(
             // Überwachungsmodus der Ereignisüberwachung.
             var repository = await source.GetEventRepositoryAsync(
                 new ScmRepositoryContext(task.GitRepository.Id, plugin.PluginPrefix,
-                    task.GitRepository.RepositoryUrl, ScmKontoModus.Benutzerkonto), ct);
+                    task.GitRepository.RepositoryUrl, ScmAccountMode.UserAccount), ct);
             var issue = await source.ReadIssueAsync(
                 new ScmEventReference(repository, ScmReferenceKind.Issue, task.IssueReference.IssueNumber.Value), ct);
-            return issue?.IstGeschlossen == true
+            return issue?.IsClosed == true
                 ? $"Issue #{task.IssueReference.IssueNumber.Value}"
                 : null;
         }

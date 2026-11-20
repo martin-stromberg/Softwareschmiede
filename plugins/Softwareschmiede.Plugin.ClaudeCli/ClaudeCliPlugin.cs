@@ -8,7 +8,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>Claude-CLI Plugin für KI-gestützte Entwicklung.</summary>
-public sealed class ClaudeCliPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
+public sealed class ClaudeCliPlugin : CliAiPluginBase, IIssueTemplateTextGenerator
 {
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<ClaudeCliPlugin> _logger;

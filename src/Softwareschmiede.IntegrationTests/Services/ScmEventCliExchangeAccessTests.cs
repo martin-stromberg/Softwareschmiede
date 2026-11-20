@@ -307,7 +307,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         var credentials = new Mock<ICredentialStore>(MockBehavior.Strict);
         credentials.Setup(value => value.GetCredential(It.IsAny<string>())).Returns((string?)null);
         credentials.Setup(value => value.GetCredential("Softwareschmiede." + provider + ".CommandLineParameters")).Returns(arguments);
-        IKiPlugin plugin = provider switch
+        IAiPlugin plugin = provider switch
         {
             "Codex" => new CodexPlugin(credentials.Object, NullLogger<CodexPlugin>.Instance),
             "Devin" => new DevinPlugin(credentials.Object, NullLogger<DevinPlugin>.Instance),

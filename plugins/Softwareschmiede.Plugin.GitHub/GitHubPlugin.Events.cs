@@ -149,7 +149,7 @@ public sealed partial class GitHubPlugin
             String(element, "title") ?? string.Empty, String(element, "body"), labels,
             String(Object(element, "milestone"), "title"), String(element, "html_url") ?? String(element, "url"))
         {
-            IstGeschlossen = string.Equals(String(element, "state"), "closed", StringComparison.OrdinalIgnoreCase)
+            IsClosed = string.Equals(String(element, "state"), "closed", StringComparison.OrdinalIgnoreCase)
         };
     }
 
@@ -174,7 +174,7 @@ public sealed partial class GitHubPlugin
         var endpoint = "notifications?all=true&participating=true&per_page=100";
         if (sinceUtc is { } since)
             endpoint += SinceParameter(since);
-        var threads = await RestPagesAsync(ClientFor(ScmKontoModus.SeparatesKonto), host, endpoint, ct);
+        var threads = await RestPagesAsync(ClientFor(ScmAccountMode.SeparateAccount), host, endpoint, ct);
         var notifications = new List<ScmNotification>();
         foreach (var thread in threads)
         {
@@ -331,19 +331,19 @@ public sealed partial class GitHubPlugin
     /// gh-/git-Schreib- und Arbeitskopien-Pfade (<c>issue create</c>, <c>pr create</c>, <c>pr merge</c>,
     /// Clone/Push/Pull, <c>git ls-remote</c>) laufen bewusst weiter unter dem Benutzer-Token —
     /// siehe <c>_eventApiClient</c>/<c>GetGhEnvironment</c>/<c>GetGitEnvironment</c>.</summary>
-    private IGitHubEventApiClient ClientFor(ScmKontoModus account)
+    private IGitHubEventApiClient ClientFor(ScmAccountMode account)
     {
-        if (account == ScmKontoModus.SeparatesKonto
+        if (account == ScmAccountMode.SeparateAccount
             && string.IsNullOrEmpty(_credentialStore.GetCredential(GitHubAgentTokenCredentialKey)))
             throw new ScmProviderException(ScmProviderFailureKind.Authentication,
                 "Für den Kontomodus „Separates Konto“ fehlt der Personal Access Token des separaten Kontos. Öffnen Sie Einstellungen → Plugins → GitHub → Authentifizierung und tragen Sie den Token ein. Bis dahin werden keine Benachrichtigungen eingelesen.");
-        return account == ScmKontoModus.SeparatesKonto ? _agentEventApiClient : _eventApiClient;
+        return account == ScmAccountMode.SeparateAccount ? _agentEventApiClient : _eventApiClient;
     }
 
     /// <summary>Wählt den Credential-Key zum Konto; dieselbe Token-Grenze wie bei
     /// <see cref="ClientFor"/> — Nicht-Ereignis-Pfade nutzen weiterhin <c>GitHubTokenCredentialKey</c>.</summary>
-    private static string CredentialKeyFor(ScmKontoModus account)
-        => account == ScmKontoModus.SeparatesKonto ? GitHubAgentTokenCredentialKey : GitHubTokenCredentialKey;
+    private static string CredentialKeyFor(ScmAccountMode account)
+        => account == ScmAccountMode.SeparateAccount ? GitHubAgentTokenCredentialKey : GitHubTokenCredentialKey;
 
     private async Task<GitHubEventApiResponse> SendEventApiAsync(IGitHubEventApiClient client, GitHubEventApiRequest request, bool mutation, CancellationToken ct)
     {

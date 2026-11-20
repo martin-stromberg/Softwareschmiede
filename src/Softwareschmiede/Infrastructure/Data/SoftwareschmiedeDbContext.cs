@@ -292,7 +292,7 @@ public sealed class SoftwareschmiedeDbContext : DbContext
             e.Property(p => p.Provider).HasConversion<string>();
             e.Property(p => p.Role)
                 .HasConversion<string>()
-                .HasDefaultValue(PullRequestReferenzRolle.CreatedByTask);
+                .HasDefaultValue(PullRequestReferenceRole.CreatedByTask);
             e.Property(p => p.RepositoryId).IsRequired().HasMaxLength(500);
             e.Property(p => p.ProviderPullRequestId).HasMaxLength(200);
             e.Property(p => p.Url).IsRequired().HasMaxLength(1000);

@@ -35,7 +35,7 @@ public sealed class EntwicklungsprozessServiceTests
     private static DevelopmentProcessService CreateService(
         DatabaseFixture db,
         Mock<IGitPlugin> gitMock,
-        Mock<IKiPlugin> kiMock,
+        Mock<IAiPlugin> kiMock,
         IWorkingDirectoryResolver? workingDirectoryResolver = null)
     {
         var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
@@ -56,7 +56,7 @@ public sealed class EntwicklungsprozessServiceTests
     private static PluginSelectionService CreatePluginSelectionService(
         DatabaseFixture db,
         IGitPlugin gitPlugin,
-        IKiPlugin aiPlugin)
+        IAiPlugin aiPlugin)
     {
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([gitPlugin]);
@@ -86,7 +86,7 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var kiMock = new Mock<IKiPlugin>();
+        var kiMock = new Mock<IAiPlugin>();
 
         var service = CreateService(db, gitMock, kiMock);
 
@@ -120,7 +120,7 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
+        var service = CreateService(db, gitMock, new Mock<IAiPlugin>());
 
         await service.StartProcessAsync(workItem.Id, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
 
@@ -145,7 +145,7 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var kiMock = new Mock<IKiPlugin>();
+        var kiMock = new Mock<IAiPlugin>();
 
         var service = CreateService(db, gitMock, kiMock);
 
@@ -176,7 +176,7 @@ public sealed class EntwicklungsprozessServiceTests
         await workItemService.StartAsync(workItemId, "task/test-branch", @"C:\nicht\vorhanden\pfad", ct: TestContext.Current.CancellationToken);
 
         var gitMock = new Mock<IGitPlugin>();
-        var kiMock = new Mock<IKiPlugin>();
+        var kiMock = new Mock<IAiPlugin>();
 
         var service = CreateService(db, gitMock, kiMock);
 
@@ -212,7 +212,7 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
+        var service = CreateService(db, gitMock, new Mock<IAiPlugin>());
 
         // Act
         await service.StartProcessAsync(workItemId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
@@ -242,7 +242,7 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
+        var service = CreateService(db, gitMock, new Mock<IAiPlugin>());
 
         // Act
         await service.StartProcessAsync(workItemId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
@@ -278,7 +278,7 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
+        var service = CreateService(db, gitMock, new Mock<IAiPlugin>());
 
         // Act
         await service.StartProcessAsync(workItemId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);
@@ -312,7 +312,7 @@ public sealed class EntwicklungsprozessServiceTests
         resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkingDirectoryResolutionResult(Path.GetTempPath(), true, "no-configured-path", null));
 
-        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), resolverMock.Object);
+        var service = CreateService(db, gitMock, new Mock<IAiPlugin>(), resolverMock.Object);
 
         // Act
         await service.StartProcessAsync(workItemId, "https://github.com/test/repo", ct: TestContext.Current.CancellationToken);

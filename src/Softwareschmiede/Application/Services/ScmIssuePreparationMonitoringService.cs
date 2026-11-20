@@ -14,7 +14,7 @@ namespace Softwareschmiede.Application.Services;
 /// freigeschaltete Projekt-Repositories repository-weit und reiht neu angelegte Issues über
 /// <see cref="ScmIssuePreparationService.DetectAndEnqueueAsync"/> ein. Läuft unabhängig vom
 /// konfigurierten Überwachungsmodus und immer unter dem Benutzerkonto
-/// (<see cref="ScmKontoModus.Benutzerkonto"/>), damit die Entdeckung auch im SeparatesKonto-Modus
+/// (<see cref="ScmAccountMode.UserAccount"/>), damit die Entdeckung auch im SeparatesKonto-Modus
 /// funktioniert, in dem die Notifications-Inbox die Enumeration der Ereignisüberwachung ersetzt.</summary>
 /// <remarks>
 /// Repository-Auflösungen werden je Alias unter <c>issueaufbereitung-repository/{prefix}/{alias}</c>,
@@ -75,7 +75,7 @@ public sealed class ScmIssuePreparationMonitoringService(
                     // Die Aufbereitungs-Entdeckung läuft immer unter dem Benutzerkonto — unabhängig
                     // vom konfigurierten Überwachungsmodus der Ereignisüberwachung.
                     var repository = await source.GetEventRepositoryAsync(
-                        new ScmRepositoryContext(aliasGroup[0].Id, plugin.PluginPrefix, alias, ScmKontoModus.Benutzerkonto), ct);
+                        new ScmRepositoryContext(aliasGroup[0].Id, plugin.PluginPrefix, alias, ScmAccountMode.UserAccount), ct);
                     if (!localRepositories.TryGetValue(repository, out var candidates))
                         localRepositories[repository] = candidates = [];
                     foreach (var lokal in aliasGroup)
@@ -137,7 +137,7 @@ public sealed class ScmIssuePreparationMonitoringService(
     private async Task EvaluateDiscoveredIssuesAsync(
         IScmEventSource source, ScmEventRepository repository,
         IReadOnlyList<ScmEventReference> discovered, IReadOnlyList<GitRepository> localRepositories,
-        ScmKontoModus accountMode, CancellationToken ct)
+        ScmAccountMode accountMode, CancellationToken ct)
     {
         var issues = discovered.Where(x => x.Kind == ScmReferenceKind.Issue).ToList();
         using var scope = scopes.CreateScope();
@@ -174,7 +174,7 @@ public sealed class ScmIssuePreparationMonitoringService(
     /// Auswertungs-Checkpoint auf Endzustand.</summary>
     private async Task EvaluateIssueAsync(
         IScmEventSource source, ScmEventReference issue,
-        IReadOnlyList<GitRepository> localRepositories, ScmKontoModus accountMode, CancellationToken ct)
+        IReadOnlyList<GitRepository> localRepositories, ScmAccountMode accountMode, CancellationToken ct)
     {
         using var scope = scopes.CreateScope();
         var preparation = scope.ServiceProvider.GetRequiredService<ScmIssuePreparationService>();
@@ -183,7 +183,7 @@ public sealed class ScmIssuePreparationMonitoringService(
         if (await preparation.SkipEvaluationAsync(issue, ct))
             return;
         // Die erzeugte Referenz trägt das konfigurierte Monitoring-Konto: Remote-Aktionen des
-        // Ausführungspfads wählen ihr Credential über ScmEventRepository.Konto.
+        // Ausführungspfads wählen ihr Credential über ScmEventRepository.Account.
         var tagged = issue with { Repository = issue.Repository with { Account = accountMode } };
         var batch = await source.ReadEventsAsync(
             new ScmEventReadRequest(tagged, ScmContentKind.Description, null, _time.GetUtcNow()), ct);

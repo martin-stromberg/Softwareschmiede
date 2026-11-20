@@ -415,7 +415,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         }, "Aufgabe für Issue 18 nicht angelegt");
         Assert.NotNull(botTask);
         var waiting = await fixture.WaitEventForTaskAsync(botTask!.Id, "Wartend");
-        Assert.Equal(ScmKontoModus.SeparatesKonto, ScmEventStore.Observation(waiting).Reference.Repository.Account);
+        Assert.Equal(ScmAccountMode.SeparateAccount, ScmEventStore.Observation(waiting).Reference.Repository.Account);
         SelectEventByTitle(window, "SCM Referenz 18", "/issues/18");
         StartSelected(window);
         await fixture.WaitEventForTaskAsync(botTask.Id, "Verarbeitet");
@@ -473,7 +473,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
 
         // Rückschaltung: der nächste Poll enumeriert wieder repository-weit, der Keyword-
         // Trigger läuft wie bisher.
-        await fixture.SetKontoModus(ScmKontoModus.Benutzerkonto);
+        await fixture.SetKontoModus(ScmAccountMode.UserAccount);
         fixture.AddText(1, 106, "$Softwareschmiede Zurück im Benutzerkonto");
         await fixture.WaitEventAsync(1, "Verarbeitet", 106);
         output.WriteLine("Bot: Rückschaltung auf Benutzerkonto — Enumeration und Keyword-Pfad laufen wieder.");

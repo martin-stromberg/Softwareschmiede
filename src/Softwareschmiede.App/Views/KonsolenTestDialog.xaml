@@ -28,10 +28,10 @@
                         AutomationProperties.Name="AufzeichnungOeffnen"
                         Command="{Binding AufzeichnungOeffnenCommand}"
                         Padding="10,4" />
-                <TextBlock Text="{Binding DateiPfad}"
+                <TextBlock Text="{Binding FilePath}"
                            AutomationProperties.Name="AufzeichnungPfad"
-                           AutomationProperties.HelpText="{Binding DateiPfad}"
-                           ToolTip="{Binding DateiPfad}"
+                           AutomationProperties.HelpText="{Binding FilePath}"
+                           ToolTip="{Binding FilePath}"
                            FontSize="11"
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            VerticalAlignment="Center"

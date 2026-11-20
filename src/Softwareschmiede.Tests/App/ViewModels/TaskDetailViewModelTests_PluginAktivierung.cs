@@ -54,7 +54,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         _db.Dispose();
     }
 
-    private TaskDetailViewModel CreateSut(params IKiPlugin[] kiPlugins)
+    private TaskDetailViewModel CreateSut(params IAiPlugin[] kiPlugins)
     {
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
@@ -102,9 +102,9 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     private async Task<WorkItem> ErstelleAufgabe()
         => await _workItemService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
 
-    private static Mock<IKiPlugin> CreateKiPluginMock(string name, string prefix)
+    private static Mock<IAiPlugin> CreateKiPluginMock(string name, string prefix)
     {
-        var mock = new Mock<IKiPlugin>();
+        var mock = new Mock<IAiPlugin>();
         mock.SetupGet(p => p.PluginName).Returns(name);
         mock.SetupGet(p => p.PluginPrefix).Returns(prefix);
         mock.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
