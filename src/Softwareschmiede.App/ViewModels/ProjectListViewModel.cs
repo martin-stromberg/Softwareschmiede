@@ -19,7 +19,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     private readonly ILogger<ProjectListViewModel> _logger;
     private readonly SemaphoreSlim _ladenSemaphore = new(1, 1);
 
-    private Projekt? _selectedProjekt;
+    private Project? _selectedProjekt;
     private bool _isLoading;
     private bool _isLoadingRepositories;
     private string? _fehlerMeldung;
@@ -27,13 +27,13 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     private ProjectDetailViewModel? _currentProjectDetailViewModel;
 
     /// <summary>Liste aller Projekte.</summary>
-    public ObservableCollection<Projekt> Projekte { get; } = new();
+    public ObservableCollection<Project> Projects { get; } = new();
 
     /// <summary>Liste der unzugeordneten Repositories aus allen SCM-Plugins.</summary>
     public ObservableCollection<AvailableRepository> UnassignedRepositories { get; } = new();
 
     /// <summary>Das aktuell ausgewählte Projekt.</summary>
-    public Projekt? SelectedProjekt
+    public Project? SelectedProjekt
     {
         get => _selectedProjekt;
         set
@@ -133,11 +133,11 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
             ProjektArchivierenAsync,
             () => SelectedProjekt is not null);
         SchliesseDetailCommand = new RelayCommand(() => DetailViewModel = null);
-        WaehleProjektCommand = new RelayCommand<Projekt>(projekt =>
+        WaehleProjektCommand = new RelayCommand<Project>(project =>
         {
-            if (projekt is not null)
+            if (project is not null)
             {
-                SelectedProjekt = projekt;
+                SelectedProjekt = project;
             }
         });
         RepositoryDoubleclickCommand = new AsyncRelayCommand<AvailableRepository>(ProjektAusRepositoryErstellen);
@@ -155,10 +155,10 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
             var suggestionsTask = LadenRepositorienSuggestionsAsync(ct);
             await Task.WhenAll(projektTask, suggestionsTask);
 
-            var projekte = projektTask.Result;
-            Projekte.Clear();
-            foreach (var projekt in projekte)
-                Projekte.Add(projekt);
+            var projects = projektTask.Result;
+            Projects.Clear();
+            foreach (var project in projects)
+                Projects.Add(project);
         }
         catch (OperationCanceledException)
         {
@@ -208,8 +208,8 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         try
         {
             var pluginPrefix = await FindPluginPrefixForRepositoryAsync(repo.Url, ct);
-            var projekt = await _projektService.CreateAsync(repo.Name, null, ct);
-            await _projektService.AddRepositoryAsync(projekt.Id, pluginPrefix, repo.Url, repo.Name, ct: ct);
+            var project = await _projektService.CreateAsync(repo.Name, null, ct);
+            await _projektService.AddRepositoryAsync(project.Id, pluginPrefix, repo.Url, repo.Name, ct: ct);
             await NeuesProjektHinzufuegen();
         }
         catch (OperationCanceledException)
@@ -254,7 +254,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         try
         {
             await _projektService.ArchivierenAsync(SelectedProjekt.Id, ct);
-            Projekte.Remove(SelectedProjekt);
+            Projects.Remove(SelectedProjekt);
             SelectedProjekt = null;
             DetailViewModel = null;
         }
@@ -298,11 +298,11 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         _currentProjectDetailViewModel = viewModel;
     }
 
-    private void ZeigeDetail(Guid projektId)
+    private void ZeigeDetail(Guid projectId)
     {
         var viewModel = _serviceProvider.GetRequiredService<ProjectDetailViewModel>();
         InitDetailViewModel(viewModel);
-        viewModel.ProjektId = projektId;
+        viewModel.ProjectId = projectId;
         DetailViewModel = viewModel;
     }
 
@@ -310,7 +310,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     {
         var viewModel = _serviceProvider.GetRequiredService<ProjectDetailViewModel>();
         InitDetailViewModel(viewModel);
-        viewModel.ProjektId = Guid.Empty;
+        viewModel.ProjectId = Guid.Empty;
         viewModel.ProjektName = string.Empty;
         DetailViewModel = viewModel;
     }
@@ -330,7 +330,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
             DetailTitelAenderungAction?.Invoke(string.IsNullOrWhiteSpace(detailTitel) ? "Aufgabe" : detailTitel);
         };
         DetailViewModel = vm;
-        DetailTitelAenderungAction?.Invoke(string.IsNullOrWhiteSpace(vm.Aufgabe?.Titel) ? "Aufgabe" : vm.Aufgabe.Titel);
+        DetailTitelAenderungAction?.Invoke(string.IsNullOrWhiteSpace(vm.WorkItem?.Title) ? "Aufgabe" : vm.WorkItem.Title);
     }
 
     private void KehreZuProjectZurueck()

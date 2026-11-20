@@ -20,15 +20,15 @@ public sealed class RepositoryInitialisierungService
     }
 
     /// <summary>Führt das konfigurierte Initialisierungsskript für ein Repository aus.</summary>
-    public async Task RunAsync(string repositoryRootPath, RepositoryInitialisierungKonfiguration configuration, CancellationToken ct = default)
+    public async Task RunAsync(string repositoryRootPath, RepositoryInitializationConfiguration configuration, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRootPath);
         ArgumentNullException.ThrowIfNull(configuration);
 
         await RepositoryScriptExecutor.RunAsync(
             repositoryRootPath,
-            configuration.Aktiv,
-            configuration.InitialisierungsskriptRelativePath,
+            configuration.Active,
+            configuration.InitializationScriptRelativePath,
             "Initialisierungsskript",
             _cliRunner,
             _logger,

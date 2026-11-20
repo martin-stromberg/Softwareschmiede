@@ -92,7 +92,7 @@ public sealed partial class App : System.Windows.Application
 
         using (var scope = _host.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             await db.Database.MigrateAsync();
 
             var promptVorlagenService = scope.ServiceProvider.GetRequiredService<PromptVorlagenService>();
@@ -177,7 +177,7 @@ public sealed partial class App : System.Windows.Application
     private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
     {
         var testDatenbankPfad = Environment.GetEnvironmentVariable(UpdateE2ETestConfiguration.TestDatenbankUmgebungsVariable);
-        var dbPath = DatenbankPfadResolver.ErmittlePfad(
+        var dbPath = DatabasePathResolver.ErmittlePfad(
             AppContext.BaseDirectory,
             testDatenbankPfad);
 
@@ -190,7 +190,7 @@ public sealed partial class App : System.Windows.Application
 
         Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 
-        services.AddDbContext<SoftwareschmiededDbContext>(options =>
+        services.AddDbContext<SoftwareschmiedeDbContext>(options =>
         {
             options.UseSqlite($"Data Source={dbPath}");
             if (updateTestKontext is not null)
@@ -246,7 +246,7 @@ public sealed partial class App : System.Windows.Application
             sp.GetRequiredService<ProtokollService>(),
             sp.GetRequiredService<IGitPlugin>(),
             sp.GetRequiredService<PluginSelectionService>(),
-            sp.GetRequiredService<IArbeitsverzeichnisResolver>(),
+            sp.GetRequiredService<IWorkingDirectoryResolver>(),
             new EntwicklungsprozessServiceOptions(
                 ProjektService: sp.GetRequiredService<ProjektService>(),
                 RepositoryStartskriptService: sp.GetRequiredService<RepositoryStartskriptService>(),
@@ -280,7 +280,7 @@ public sealed partial class App : System.Windows.Application
         // Infrastructure Services
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(TerminalSessionService.TestDatenbankPfadVariable)))
         {
-            services.AddSingleton<IProzessStarter>(sp => new AufzeichnenderProzessStarter(
+            services.AddSingleton<IProcessStarter>(sp => new AufzeichnenderProzessStarter(
                 sp.GetRequiredService<ILogger<AufzeichnenderProzessStarter>>(),
                 AufzeichnenderProzessStarter.ResolveLogDateiPfad(dbPath)));
             // Testmodus: kein echter OS-Shutdown — Anforderungen landen in der Logdatei neben der Test-DB.
@@ -290,7 +290,7 @@ public sealed partial class App : System.Windows.Application
         }
         else
         {
-            services.AddSingleton<IProzessStarter, SystemProzessStarter>();
+            services.AddSingleton<IProcessStarter, SystemProzessStarter>();
             services.AddSingleton<ISystemShutdownService, SystemShutdownService>();
         }
 
@@ -318,8 +318,8 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<ScmStartPruefungsService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmStartPruefungsService>());
         services.AddSingleton<CliProcessManager>();
-        services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
-        services.AddSingleton<IBenachrichtigungsBannerService, WpfBannerService>();
+        services.AddSingleton<INotificationAudioService, WpfAudioService>();
+        services.AddSingleton<INotificationBannerService, WpfBannerService>();
         services.AddSingleton<IRunningAutomationStatusSource>(sp =>
             sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<ICliExecutionLimitSource>(sp =>
@@ -374,8 +374,8 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<ICliRunner>(sp => sp.GetRequiredService<CliRunner>());
 
         // Infrastructure implementations for domain interfaces
-        services.AddScoped<IBenutzerkontextService, BenutzerkontextService>();
-        services.AddScoped<IArbeitsverzeichnisResolver, ArbeitsverzeichnisResolver>();
+        services.AddScoped<IUserContextService, BenutzerkontextService>();
+        services.AddScoped<IWorkingDirectoryResolver, ArbeitsverzeichnisResolver>();
         services.AddScoped<PluginDefaultSettingsService>();
         services.AddScoped<IGitPlugin>(sp => sp.GetRequiredService<IPluginManager>().GetDefaultSourceCodeManagementPlugin());
 

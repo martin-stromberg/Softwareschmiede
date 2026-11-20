@@ -121,7 +121,7 @@ public sealed class PluginManagerTests_Whitelist : IDisposable
             .AddLogging()
             .AddSingleton(new Mock<ICliRunner>().Object)
             .AddSingleton(new Mock<ICredentialStore>().Object)
-            .AddSingleton(new Mock<IProzessStarter>().Object)
+            .AddSingleton(new Mock<IProcessStarter>().Object)
             .AddSingleton(new Mock<IVisualStudioCodeLocator>().Object)
             .BuildServiceProvider();
         return new PluginManager(services,

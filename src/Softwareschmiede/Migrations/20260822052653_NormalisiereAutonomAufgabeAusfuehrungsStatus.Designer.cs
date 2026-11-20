@@ -10,7 +10,7 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Migrations
 {
-    [DbContext(typeof(SoftwareschmiededDbContext))]
+    [DbContext(typeof(SoftwareschmiedeDbContext))]
     [Migration("20260822052653_NormalisiereAutonomAufgabeAusfuehrungsStatus")]
     partial class NormalisiereAutonomAufgabeAusfuehrungsStatus
     {

@@ -100,9 +100,9 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     private void DeleteProzessStartLog()
     {
-        var pfad = ResolveProzessStartLogPfad();
-        if (File.Exists(pfad))
-            File.Delete(pfad);
+        var path = ResolveProzessStartLogPfad();
+        if (File.Exists(path))
+            File.Delete(path);
     }
 
     /// <summary>Löst den Pfad der Prozessstart-Logdatei für die Testdatenbank dieser Instanz auf.</summary>
@@ -117,9 +117,9 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     private void DeleteSystemShutdownLog()
     {
-        var pfad = ResolveSystemShutdownLogPfad();
-        if (File.Exists(pfad))
-            File.Delete(pfad);
+        var path = ResolveSystemShutdownLogPfad();
+        if (File.Exists(path))
+            File.Delete(path);
     }
 
     /// <summary>Löst den Pfad der System-Shutdown-Logdatei für die Testdatenbank dieser Instanz auf.</summary>
@@ -139,16 +139,16 @@ public abstract class WpfTestBase : IDisposable
     protected async Task WaitForSystemShutdownEintragAsync(string substring, TimeSpan? timeout = null)
     {
         var effectiveTimeout = timeout ?? Short;
-        var pfad = ResolveSystemShutdownLogPfad();
+        var path = ResolveSystemShutdownLogPfad();
         var deadline = DateTime.UtcNow + effectiveTimeout;
 
         while (DateTime.UtcNow < deadline)
         {
-            if (File.Exists(pfad))
+            if (File.Exists(path))
             {
                 try
                 {
-                    var inhalt = await File.ReadAllTextAsync(pfad);
+                    var inhalt = await File.ReadAllTextAsync(path);
                     if (inhalt.Contains(substring, StringComparison.Ordinal))
                         return;
                 }
@@ -183,16 +183,16 @@ public abstract class WpfTestBase : IDisposable
     protected async Task WaitForProzessStartEintragAsync(string substring, TimeSpan? timeout = null, string sinceContent = "")
     {
         var effectiveTimeout = timeout ?? Short;
-        var pfad = ResolveProzessStartLogPfad();
+        var path = ResolveProzessStartLogPfad();
         var deadline = DateTime.UtcNow + effectiveTimeout;
 
         while (DateTime.UtcNow < deadline)
         {
-            if (File.Exists(pfad))
+            if (File.Exists(path))
             {
                 try
                 {
-                    var inhalt = await File.ReadAllTextAsync(pfad);
+                    var inhalt = await File.ReadAllTextAsync(path);
                     if (inhalt.Length > sinceContent.Length
                         && inhalt[sinceContent.Length..].Contains(substring, StringComparison.Ordinal))
                         return;
@@ -417,15 +417,15 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Öffnet einen <see cref="SoftwareschmiededDbContext"/> gegen die SQLite-Testdatenbank des laufenden
+    /// Öffnet einen <see cref="SoftwareschmiedeDbContext"/> gegen die SQLite-Testdatenbank des laufenden
     /// App-Prozesses (<see cref="TestDbPath"/>). Für Testvorbedingungen, die über die UI nicht abbildbar sind.
     /// </summary>
-    protected SoftwareschmiededDbContext OpenTestDbContext()
+    protected SoftwareschmiedeDbContext OpenTestDbContext()
     {
-        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
+        var options = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>()
             .UseSqlite($"Data Source={_testDbPath}")
             .Options;
-        return new SoftwareschmiededDbContext(options);
+        return new SoftwareschmiedeDbContext(options);
     }
 
     /// <inheritdoc/>

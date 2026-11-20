@@ -126,8 +126,8 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         plugins.Setup(x => x.GetSourceCodeManagementPlugins()).Returns([Git.Object]);
         plugins.Setup(x => x.GetDefaultSourceCodeManagementPlugin()).Returns(Git.Object);
         plugins.Setup(x => x.GetDevelopmentAutomationPlugins()).Returns(kiPlugins);
-        var directories = new Mock<IArbeitsverzeichnisResolver>();
-        directories.Setup(x => x.ResolveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Root, false, "test", Root));
+        var directories = new Mock<IWorkingDirectoryResolver>();
+        directories.Setup(x => x.ResolveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new WorkingDirectoryResolutionResult(Root, false, "test", Root));
         var factory = new Mock<ITerminalSessionFactory>();
         factory.Setup(x => x.StartAsync(It.IsAny<Guid>(), It.IsAny<TerminalSessionStartSpec>(), It.IsAny<ITerminalOutputSink?>(), It.IsAny<Func<CancellationToken, Task<bool>>?>(), It.IsAny<CancellationToken>()))
             .Returns((Guid taskId, TerminalSessionStartSpec spec, ITerminalOutputSink? _, Func<CancellationToken, Task<bool>>? _, CancellationToken _) =>
@@ -149,7 +149,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
             });
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddDbContext<SoftwareschmiededDbContext>(options => options.UseSqlite($"Data Source={Path.Combine(Root, "events.db")};Pooling=False"));
+        services.AddDbContext<SoftwareschmiedeDbContext>(options => options.UseSqlite($"Data Source={Path.Combine(Root, "events.db")};Pooling=False"));
         services.AddSingleton(plugins.Object);
         services.AddSingleton(Git.Object);
         services.AddSingleton(directories.Object);
@@ -200,20 +200,20 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal async Task InitializeAsync()
     {
         using var scope = Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Database.EnsureCreatedAsync();
+        await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().Database.EnsureCreatedAsync();
         Services.GetRequiredService<ScmEventStartupGate>().Ready();
     }
 
-    internal async Task<(Guid TaskId, Guid EventId)> AddAsync(AufgabeStatus status = AufgabeStatus.Neu, bool configured = false, bool cloned = true,
+    internal async Task<(Guid TaskId, Guid EventId)> AddAsync(WorkItemStatus status = WorkItemStatus.New, bool configured = false, bool cloned = true,
         ScmReferenceKind referenceKind = ScmReferenceKind.Issue, ScmContentKind contentKind = ScmContentKind.IssueComment, string body = "$Softwareschmiede test",
         ScmEventRepository? eventRepository = null, string? authorId = "U_1", string? authorLogin = "owner", string? kiPluginPrefix = null)
     {
         using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "SCM" };
-        var repository = new GitRepository { Id = Guid.NewGuid(), ProjektId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginTyp = Repository.ProviderPrefix, RepositoryName = "repo" };
-        var task = new Aufgabe { Id = Guid.NewGuid(), Titel = "SCM task", ProjektId = project.Id, GitRepositoryId = repository.Id, Status = status, KiPluginPrefix = configured ? (kiPluginPrefix ?? KiProfile.Prefix) : null };
-        if (cloned) { task.LokalerKlonPfad = Path.Combine(Root, task.Id.ToString("N")); InitGit(task.LokalerKlonPfad); }
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var project = new Project { Id = Guid.NewGuid(), Name = "SCM" };
+        var repository = new GitRepository { Id = Guid.NewGuid(), ProjectId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginType = Repository.ProviderPrefix, RepositoryName = "repo" };
+        var task = new WorkItem { Id = Guid.NewGuid(), Title = "SCM task", ProjectId = project.Id, GitRepositoryId = repository.Id, Status = status, AiPluginPrefix = configured ? (kiPluginPrefix ?? KiProfile.Prefix) : null };
+        if (cloned) { task.LocalClonePath = Path.Combine(Root, task.Id.ToString("N")); InitGit(task.LocalClonePath); }
         db.AddRange(project, repository, task);
         await db.SaveChangesAsync();
         var time = DateTimeOffset.UtcNow;
@@ -223,7 +223,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         var observation = new ScmEventObservation(new(eventRepository ?? Repository, referenceKind, 7), contentKind, Guid.NewGuid().ToString(), "42",
             time, time, null, authorId, authorLogin, null, null, body, url, time);
         await scope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(task.Id, task.Id.ToString(), new(new(observation.Reference, observation.ContentKind, null, time), [observation]));
-        return (task.Id, await db.ScmIncomingEvents.Where(x => x.AufgabeId == task.Id).Select(x => x.Id).SingleAsync());
+        return (task.Id, await db.ScmIncomingEvents.Where(x => x.WorkItemId == task.Id).Select(x => x.Id).SingleAsync());
     }
 
     /// <summary>Registriert eine Inbox-Notification, die die gemockte <see cref="IScmNotificationSource"/> liefert.</summary>
@@ -288,7 +288,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal async Task<ScmIncomingEvent> EventAsync(Guid id)
     {
         using var scope = Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents.AsNoTracking().SingleAsync(x => x.Id == id);
+        return await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents.AsNoTracking().SingleAsync(x => x.Id == id);
     }
 
     /// <summary>Vollzieht die Dateitool-Kanalprobe wie ein echtes CLI-Dateitool: Challenge lesen,

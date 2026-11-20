@@ -74,17 +74,17 @@ public partial class End2EndTest
     /// <param name="taskTitle">Der vor dem Terminal-Lifecycle ermittelte Titel der Aufgabe.</param>
     private async Task ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E(Window mainWindow, TaskDetailView taskDetail, string taskTitle)
     {
-        var pfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
+        var path = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         SettingsView? settings = null;
         KonsolenTestDialogView? dialog = null;
         try
         {
             // Abbruch-Subphase: Save-Dialog per ESC schließen — keine Datei, kein Fehlerbanner.
             taskDetail.ExportCliReplay(null);
-            Assert.False(File.Exists(pfad), "Der abgebrochene Export darf keine Datei erzeugen.");
+            Assert.False(File.Exists(path), "Der abgebrochene Export darf keine Datei erzeugen.");
             Assert.False(new ErrorView(mainWindow).IsVisible);
 
-            taskDetail.ExportCliReplay(pfad);
+            taskDetail.ExportCliReplay(path);
 
             // Der Export läuft nach dem Schließen des Save-Dialogs asynchron weiter -
             // erst auf Existenz und vollständige Schreibweise des Dateiheaders warten.
@@ -93,7 +93,7 @@ public partial class End2EndTest
             {
                 try
                 {
-                    if (File.Exists(pfad) && new FileInfo(pfad).Length >= 8)
+                    if (File.Exists(path) && new FileInfo(path).Length >= 8)
                         break;
                 }
                 catch (IOException)
@@ -103,10 +103,10 @@ public partial class End2EndTest
 
                 await Task.Delay(100);
             }
-            Assert.True(File.Exists(pfad), "Die .clireplay-Exportdatei wurde nicht erzeugt.");
+            Assert.True(File.Exists(path), "Die .clireplay-Exportdatei wurde nicht erzeugt.");
 
             var magic = new byte[8];
-            await using (var stream = File.OpenRead(pfad))
+            await using (var stream = File.OpenRead(path))
             {
                 await stream.ReadExactlyAsync(magic);
             }
@@ -116,7 +116,7 @@ public partial class End2EndTest
             settings = new Views.SettingsView(mainWindow).ForceShow();
             dialog = settings.OpenKonsolenTestDialog();
             dialog.SetZeitrafferSchwelle("0");
-            dialog.OeffneAufzeichnung(pfad);
+            dialog.OeffneAufzeichnung(path);
             dialog.WarteAufQuellEintraege(1);
 
             dialog.StartWiedergabe();
@@ -128,8 +128,8 @@ public partial class End2EndTest
             // Nach Prozessende ist die Aufgabe nicht mehr in der Seitenleistenliste der aktiven
             // Aufgaben. Über die Projektdetailansicht wird sie unabhängig vom Laufstatus geöffnet.
             var dashboard = Assert.IsType<DashboardView>(mainWindow.CurrentView());
-            var projekt = dashboard.Menu.NavigateToProjects().OpenProject("ConPty-Projekt");
-            _ = projekt.OpenTask(taskTitle);
+            var project = dashboard.Menu.NavigateToProjects().OpenProject("ConPty-Projekt");
+            _ = project.OpenTask(taskTitle);
         }
         finally
         {
@@ -138,8 +138,8 @@ public partial class End2EndTest
             // bleiben — sonst laufen Folge-Phasen gegen einen unerwarteten Fensterzustand.
             TryCloseKonsolenTestfenster(dialog, settings);
 
-            if (File.Exists(pfad))
-                File.Delete(pfad);
+            if (File.Exists(path))
+                File.Delete(path);
         }
     }
 
@@ -344,9 +344,9 @@ public partial class End2EndTest
         Thread.Sleep(300); // cmd protokolliert Eingabezeile und Echo-Ausgabe in getrennten Chunks.
 
         await using var db = OpenTestDbContext();
-        var aufgabe = await db.Aufgaben.OrderByDescending(a => a.ErstellungsDatum).FirstAsync();
-        var trefferVorReattach = await db.Protokolleintraege
-            .CountAsync(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.CliOutput && p.Inhalt.Contains(marker));
+        var workItem = await db.WorkItems.OrderByDescending(a => a.CreatedAt).FirstAsync();
+        var trefferVorReattach = await db.LogEntries
+            .CountAsync(p => p.WorkItemId == workItem.Id && p.Type == LogEntryType.CliOutput && p.Content.Contains(marker));
 
         // Weg vom CLI-Panel (Info) und zurück (CLI) — TerminalControl wird neu an die Session gebunden.
         taskDetail.SwitchPanel("InfoCliToggle");
@@ -361,8 +361,8 @@ public partial class End2EndTest
         // Der Replay-Rebuild darf keine bereits vor dem Panelwechsel gespeicherten Chunks nochmals
         // protokollieren. Die konkrete Anzahl ist absichtlich nicht eins: cmd liefert sowohl
         // die eingegebene Echo-Zeile als auch deren Ausgabe.
-        var trefferNachReattach = await db.Protokolleintraege
-            .CountAsync(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.CliOutput && p.Inhalt.Contains(marker));
+        var trefferNachReattach = await db.LogEntries
+            .CountAsync(p => p.WorkItemId == workItem.Id && p.Type == LogEntryType.CliOutput && p.Content.Contains(marker));
         Assert.Equal(trefferVorReattach, trefferNachReattach);
     }
 
@@ -418,9 +418,9 @@ public partial class End2EndTest
         await WartenBisAsync(async () =>
         {
             await using var db = OpenTestDbContext();
-            var aufgabe = await db.Aufgaben.OrderByDescending(a => a.ErstellungsDatum).FirstAsync();
-            return await db.Protokolleintraege
-                .AnyAsync(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.CliOutput && p.Inhalt.Contains(erwarteterInhalt));
+            var workItem = await db.WorkItems.OrderByDescending(a => a.CreatedAt).FirstAsync();
+            return await db.LogEntries
+                .AnyAsync(p => p.WorkItemId == workItem.Id && p.Type == LogEntryType.CliOutput && p.Content.Contains(erwarteterInhalt));
         });
     }
 

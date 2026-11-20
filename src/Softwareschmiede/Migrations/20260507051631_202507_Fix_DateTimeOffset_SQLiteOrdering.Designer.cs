@@ -10,7 +10,7 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Migrations
 {
-    [DbContext(typeof(SoftwareschmiededDbContext))]
+    [DbContext(typeof(SoftwareschmiedeDbContext))]
     [Migration("20260507051631_202507_Fix_DateTimeOffset_SQLiteOrdering")]
     partial class _202507_Fix_DateTimeOffset_SQLiteOrdering
     {

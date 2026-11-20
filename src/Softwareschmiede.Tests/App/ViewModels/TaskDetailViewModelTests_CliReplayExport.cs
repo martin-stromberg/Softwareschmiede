@@ -16,7 +16,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Unit-Tests für den CLI-Replay-Export (.clireplay) von TaskDetailViewModel.</summary>
 public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AufgabeService _aufgabeService;
     private readonly ProtokollService _protokollService;
     private readonly TodoService _todoService;
@@ -51,7 +51,7 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
         _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
-        var arbeitsverzeichnisMock = new Mock<IArbeitsverzeichnisResolver>();
+        var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
         _entwicklungsprozessService = new EntwicklungsprozessService(
             _aufgabeService,
             _protokollService,
@@ -63,12 +63,12 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
 
         _dialogServiceMock = new Mock<IDialogService>();
 
-        _db.Projekte.Add(new Projekt
+        _db.Projects.Add(new Project
         {
             Id = _projektId,
             Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
 
@@ -112,15 +112,15 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
             cliReplayExportService: _exportServiceMock.Object);
     }
 
-    private async Task<Aufgabe> ErstelleAufgabeAsync(AufgabeStatus status = AufgabeStatus.Neu)
+    private async Task<WorkItem> ErstelleAufgabeAsync(WorkItemStatus status = WorkItemStatus.New)
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Replayexport-Aufgabe", "Beschreibung");
-        if (status != AufgabeStatus.Neu)
-            await _aufgabeService.StatusSetzenAsync(aufgabe.Id, status);
-        return await _aufgabeService.GetByIdAsync(aufgabe.Id) ?? aufgabe;
+        var workItem = await _aufgabeService.CreateAsync(_projektId, "Replayexport-Aufgabe", "Beschreibung");
+        if (status != WorkItemStatus.New)
+            await _aufgabeService.StatusSetzenAsync(workItem.Id, status);
+        return await _aufgabeService.GetByIdAsync(workItem.Id) ?? workItem;
     }
 
-    private void SetupSaveDialog(string? pfad)
+    private void SetupSaveDialog(string? path)
     {
         _dialogServiceMock
             .Setup(d => d.ShowSaveFileDialogAsync(
@@ -129,16 +129,16 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(pfad);
+            .ReturnsAsync(path);
     }
 
     /// <summary>Der Replay-Export-Command ist ausführbar, sobald eine Aufgabe geladen wurde.</summary>
     [Fact]
     public async Task ExportCliReplayCommand_CanExecute_WhenAufgabeGeladen()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
@@ -150,9 +150,9 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
     [Fact]
     public async Task ExportCliReplayAsync_ShouldAbort_WhenDialogCancelled()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         SetupSaveDialog(null);
 
@@ -168,9 +168,9 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
     [Fact]
     public async Task ExportCliReplayAsync_RuftExportServiceMitPfad()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         var zielPfad = Path.Combine(Path.GetTempPath(), $"cli-replay-{Guid.NewGuid():N}.clireplay");
         SetupSaveDialog(zielPfad);
@@ -178,7 +178,7 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
         await ((AsyncRelayCommand)sut.ExportCliReplayCommand).ExecuteAsync();
 
         _exportServiceMock.Verify(
-            s => s.ExportCliReplayAsync(aufgabe.Id, zielPfad, It.IsAny<CancellationToken>()),
+            s => s.ExportCliReplayAsync(workItem.Id, zielPfad, It.IsAny<CancellationToken>()),
             Times.Once);
         sut.FehlerMeldung.Should().BeNull();
     }
@@ -187,9 +187,9 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
     [Fact]
     public async Task ExportCliReplayAsync_ShouldSetFehlerMeldung_WhenTargetPathIsNotCliReplay()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         SetupSaveDialog(Path.Combine(Path.GetTempPath(), $"cli-replay-{Guid.NewGuid():N}.txt"));
 
@@ -206,11 +206,11 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
     [Fact]
     public async Task ExportCliReplayAsync_OhneAufzeichnung_ZeigtFehlerOhneSpeicherdialog()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        _exportServiceMock.Setup(s => s.HatAufzeichnung(aufgabe.Id)).Returns(false);
+        _exportServiceMock.Setup(s => s.HatAufzeichnung(workItem.Id)).Returns(false);
 
         await ((AsyncRelayCommand)sut.ExportCliReplayCommand).ExecuteAsync();
 
@@ -229,14 +229,14 @@ public sealed class TaskDetailViewModelTests_CliReplayExport : IDisposable
     [Fact]
     public async Task ExportCliReplayAsync_ShouldSetFehlerMeldung_WhenServiceFails()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         var zielPfad = Path.Combine(Path.GetTempPath(), $"cli-replay-{Guid.NewGuid():N}.clireplay");
         SetupSaveDialog(zielPfad);
         _exportServiceMock
-            .Setup(s => s.ExportCliReplayAsync(aufgabe.Id, zielPfad, It.IsAny<CancellationToken>()))
+            .Setup(s => s.ExportCliReplayAsync(workItem.Id, zielPfad, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Für diese Aufgabe liegt keine Aufzeichnung vor."));
 
         await ((AsyncRelayCommand)sut.ExportCliReplayCommand).ExecuteAsync();

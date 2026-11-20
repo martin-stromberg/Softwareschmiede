@@ -23,9 +23,9 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     {
         foreach (var sut in _suts)
             sut.Dispose();
-        foreach (var pfad in _tempFiles)
-            if (File.Exists(pfad))
-                File.Delete(pfad);
+        foreach (var path in _tempFiles)
+            if (File.Exists(path))
+                File.Delete(path);
     }
 
     private KonsolenTestViewModel CreateSut()
@@ -45,10 +45,10 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         var chunks = (chunkDaten.Length > 0 ? chunkDaten : [Encoding.UTF8.GetBytes("X")])
             .Select((daten, i) => new CliOutputChunkRecord(TimeSpan.Zero, daten))
             .ToArray();
-        var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
+        var path = Path.Combine(Path.GetTempPath(), $"konsolentest-{Guid.NewGuid():N}.clireplay");
+        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "TestPlugin",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -56,11 +56,11 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             IstVollstaendig = istVollstaendig,
             Chunks = chunks,
         });
-        _tempFiles.Add(pfad);
-        return pfad;
+        _tempFiles.Add(path);
+        return path;
     }
 
-    private void SetupOpenDialog(string? pfad)
+    private void SetupOpenDialog(string? path)
     {
         _dialogServiceMock
             .Setup(d => d.ShowOpenFileDialogAsync(
@@ -68,7 +68,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(pfad);
+            .ReturnsAsync(path);
     }
 
     private static async Task WarteBisAsync(Func<bool> bedingung, TimeSpan? timeout = null)
@@ -86,16 +86,16 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task AufzeichnungOeffnen_LaadtSessionUndQuellEintraege()
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync(
+        var path = await ErstelleAufzeichnungsDateiAsync(
             chunkDaten: [Encoding.UTF8.GetBytes("alpha\x1b[31m"), Encoding.UTF8.GetBytes("beta")]);
-        SetupOpenDialog(pfad);
+        SetupOpenDialog(path);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
 
         sut.Session.Should().NotBeNull();
         sut.Session.Should().BeOfType<TerminalReplaySession>();
-        sut.DateiPfad.Should().Be(pfad);
+        sut.DateiPfad.Should().Be(path);
         sut.QuellEintraege.Should().HaveCount(2);
         sut.QuellEintraege[0].Index.Should().Be(1, "die #-Spalte zählt 1-basiert wie der PositionsText");
         sut.QuellEintraege[1].Index.Should().Be(2);
@@ -114,8 +114,8 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task AufzeichnungOeffnen_SetztGeometrieText()
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync();
-        SetupOpenDialog(pfad);
+        var path = await ErstelleAufzeichnungsDateiAsync();
+        SetupOpenDialog(path);
         var sut = CreateSut();
 
         sut.GeometrieText.Should().BeEmpty("ohne geladene Aufzeichnung ist der Geometrie-Text leer");
@@ -135,8 +135,8 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task AufzeichnungOeffnen_UnvollstaendigeAufzeichnung_ZeigtHinweis()
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync(istVollstaendig: false);
-        SetupOpenDialog(pfad);
+        var path = await ErstelleAufzeichnungsDateiAsync(istVollstaendig: false);
+        SetupOpenDialog(path);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
@@ -148,10 +148,10 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task AufzeichnungOeffnen_KorrupteDatei_ZeigtFehlermeldung()
     {
-        var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-korrupt-{Guid.NewGuid():N}.clireplay");
-        await File.WriteAllBytesAsync(pfad, Encoding.ASCII.GetBytes("kein clireplay"), TestContext.Current.CancellationToken);
-        _tempFiles.Add(pfad);
-        SetupOpenDialog(pfad);
+        var path = Path.Combine(Path.GetTempPath(), $"konsolentest-korrupt-{Guid.NewGuid():N}.clireplay");
+        await File.WriteAllBytesAsync(path, Encoding.ASCII.GetBytes("kein clireplay"), TestContext.Current.CancellationToken);
+        _tempFiles.Add(path);
+        SetupOpenDialog(path);
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
@@ -179,9 +179,9 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task Wiedergabe_LaeuftBisEnde_UndSynchronisiertQuellAnsicht()
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync(
+        var path = await ErstelleAufzeichnungsDateiAsync(
             chunkDaten: [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B")]);
-        SetupOpenDialog(pfad);
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         sut.ZeitrafferSchwelleText = "0";
@@ -205,10 +205,10 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task Wiedergabe_PausierenUndFortsetzen()
     {
-        var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-pause-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
+        var path = Path.Combine(Path.GetTempPath(), $"konsolentest-pause-{Guid.NewGuid():N}.clireplay");
+        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -220,8 +220,8 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 new CliOutputChunkRecord(TimeSpan.FromMinutes(5), Encoding.UTF8.GetBytes("B")),
             ],
         }, TestContext.Current.CancellationToken);
-        _tempFiles.Add(pfad);
-        SetupOpenDialog(pfad);
+        _tempFiles.Add(path);
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
 
@@ -260,9 +260,9 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task Wiedergabe_NachEnde_StartetErneutAbPosition0()
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync(
+        var path = await ErstelleAufzeichnungsDateiAsync(
             chunkDaten: [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B")]);
-        SetupOpenDialog(pfad);
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         sut.ZeitrafferSchwelleText = "0";
@@ -290,8 +290,8 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task ZeitrafferSchwelleText_ValidiertUndWirktLive()
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync();
-        SetupOpenDialog(pfad);
+        var path = await ErstelleAufzeichnungsDateiAsync();
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         var session = (TerminalReplaySession)sut.Session!;
@@ -320,8 +320,8 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [InlineData("1e13")]
     public async Task ZeitrafferSchwelleText_UngueltigeWerte_WerdenAbgewiesen(string eingabe)
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync();
-        SetupOpenDialog(pfad);
+        var path = await ErstelleAufzeichnungsDateiAsync();
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         var session = (TerminalReplaySession)sut.Session!;
@@ -338,8 +338,8 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task ZeitrafferSchwelleText_Ungueltig_UebernimmtLetzteGueltigeSchwelleAufFrischeSession()
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync();
-        SetupOpenDialog(pfad);
+        var path = await ErstelleAufzeichnungsDateiAsync();
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
 
@@ -362,10 +362,10 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task Wiedergabe_NeustartAusPausiertemLauf_SpieltErneutAbPosition0()
     {
-        var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-neustart-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
+        var path = Path.Combine(Path.GetTempPath(), $"konsolentest-neustart-{Guid.NewGuid():N}.clireplay");
+        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -377,8 +377,8 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 new CliOutputChunkRecord(TimeSpan.FromMinutes(5), Encoding.UTF8.GetBytes("B")),
             ],
         }, TestContext.Current.CancellationToken);
-        _tempFiles.Add(pfad);
-        SetupOpenDialog(pfad);
+        _tempFiles.Add(path);
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         var erste = (TerminalReplaySession)sut.Session!;
@@ -418,8 +418,8 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task Schliessen_LoestCloseRequestedAus()
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync();
-        SetupOpenDialog(pfad);
+        var path = await ErstelleAufzeichnungsDateiAsync();
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         var closeRequested = false;
@@ -460,9 +460,9 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task SchrittVor_SchrittZurueck_SynchronisierenPositionUndQuellAuswahl()
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync(
+        var path = await ErstelleAufzeichnungsDateiAsync(
             chunkDaten: [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B"), Encoding.UTF8.GetBytes("C")]);
-        SetupOpenDialog(pfad);
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
 
@@ -496,10 +496,10 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task SchrittCommands_CanExecute_NachZustand()
     {
-        var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-schritt-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
+        var path = Path.Combine(Path.GetTempPath(), $"konsolentest-schritt-{Guid.NewGuid():N}.clireplay");
+        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -511,8 +511,8 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 new CliOutputChunkRecord(TimeSpan.FromMinutes(5), Encoding.UTF8.GetBytes("B")),
             ],
         }, TestContext.Current.CancellationToken);
-        _tempFiles.Add(pfad);
-        SetupOpenDialog(pfad);
+        _tempFiles.Add(path);
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         var session = (TerminalReplaySession)sut.Session!;
@@ -553,10 +553,10 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task SchrittCommands_Execute_WaehrendLaufenderWiedergabe_SindNoOp()
     {
-        var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-schrittguard-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
+        var path = Path.Combine(Path.GetTempPath(), $"konsolentest-schrittguard-{Guid.NewGuid():N}.clireplay");
+        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -568,8 +568,8 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 new CliOutputChunkRecord(TimeSpan.FromMinutes(5), Encoding.UTF8.GetBytes("B")),
             ],
         }, TestContext.Current.CancellationToken);
-        _tempFiles.Add(pfad);
-        SetupOpenDialog(pfad);
+        _tempFiles.Add(path);
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         var session = (TerminalReplaySession)sut.Session!;
@@ -595,9 +595,9 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task WiedergabeNeustarten_AusSchrittmodus_SpieltAbPosition0()
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync(
+        var path = await ErstelleAufzeichnungsDateiAsync(
             chunkDaten: [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B"), Encoding.UTF8.GetBytes("C")]);
-        SetupOpenDialog(pfad);
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         sut.ZeitrafferSchwelleText = "0";
@@ -636,9 +636,9 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task SchrittVor_BisEnde_ZeigtStatusBeendet()
     {
-        var pfad = await ErstelleAufzeichnungsDateiAsync(
+        var path = await ErstelleAufzeichnungsDateiAsync(
             chunkDaten: [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B"), Encoding.UTF8.GetBytes("C")]);
-        SetupOpenDialog(pfad);
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         sut.ZeitrafferSchwelleText = "0";
@@ -669,10 +669,10 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task Pausiert_Schritt_Fortsetzen_ViewModelEbene()
     {
-        var pfad = Path.Combine(Path.GetTempPath(), $"konsolentest-schrittpause-{Guid.NewGuid():N}.clireplay");
-        await _store.SpeichernAsync(pfad, new CliOutputAufzeichnung
+        var path = Path.Combine(Path.GetTempPath(), $"konsolentest-schrittpause-{Guid.NewGuid():N}.clireplay");
+        await _store.SpeichernAsync(path, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -685,8 +685,8 @@ public sealed class KonsolenTestViewModelTests : IDisposable
                 new CliOutputChunkRecord(TimeSpan.FromMinutes(10), Encoding.UTF8.GetBytes("C")),
             ],
         }, TestContext.Current.CancellationToken);
-        _tempFiles.Add(pfad);
-        SetupOpenDialog(pfad);
+        _tempFiles.Add(path);
+        SetupOpenDialog(path);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
         var session = (TerminalReplaySession)sut.Session!;

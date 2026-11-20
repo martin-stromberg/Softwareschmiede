@@ -179,12 +179,12 @@ public partial class End2EndTest
         await using var db = OpenTestDbContext();
         var repository = db.GitRepositories.Single();
 
-        db.Add(new RepositoryStartKonfiguration
+        db.Add(new RepositoryStartConfiguration
         {
             Id = Guid.NewGuid(),
             GitRepositoryId = repository.Id,
             WorkingDirectoryRelativePath = workingDirectoryRelativePath,
-            Aktiv = true
+            Active = true
         });
         await db.SaveChangesAsync();
     }
@@ -193,7 +193,7 @@ public partial class End2EndTest
     /// <returns>Der vollständige aktuelle Inhalt der Logdatei, oder <see cref="string.Empty"/>.</returns>
     private async Task<string> ReadProzessStartLogAsync()
     {
-        var pfad = ResolveProzessStartLogPfad();
-        return File.Exists(pfad) ? await File.ReadAllTextAsync(pfad) : string.Empty;
+        var path = ResolveProzessStartLogPfad();
+        return File.Exists(path) ? await File.ReadAllTextAsync(path) : string.Empty;
     }
 }

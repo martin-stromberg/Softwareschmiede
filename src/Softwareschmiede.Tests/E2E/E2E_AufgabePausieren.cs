@@ -46,10 +46,10 @@ public partial class End2EndTest
         // in der Seitenleiste erscheint (über die UI nicht abbildbar ohne echten CLI-Start).
         await using (var db = OpenTestDbContext())
         {
-            var aufgabe = await db.Aufgaben.SingleAsync(a => a.Titel == titel);
-            aufgabe.Status = AufgabeStatus.Gestartet;
-            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-            aufgabe.KiPluginPrefix = "Softwareschmiede.KiSimulator";
+            var workItem = await db.WorkItems.SingleAsync(a => a.Title == titel);
+            workItem.Status = WorkItemStatus.Started;
+            workItem.ExecutionStatus = WorkItemExecutionStatus.Active;
+            workItem.AiPluginPrefix = "Softwareschmiede.KiSimulator";
             await db.SaveChangesAsync();
         }
 
@@ -93,11 +93,11 @@ public partial class End2EndTest
 
         await using (var db = OpenTestDbContext())
         {
-            var aufgabe = await db.Aufgaben.SingleAsync(a => a.Titel == titel);
-            Assert.NotNull(aufgabe.PausiertBisUtc);
+            var workItem = await db.WorkItems.SingleAsync(a => a.Title == titel);
+            Assert.NotNull(workItem.PausedUntilUtc);
             Assert.True(
-                Math.Abs((aufgabe.PausiertBisUtc.Value - new DateTimeOffset(ziel)).TotalMinutes) <= 1.5,
-                $"PausiertBisUtc '{aufgabe.PausiertBisUtc:O}' weicht vom erwarteten Ziel '{ziel:O}' ab.");
+                Math.Abs((workItem.PausedUntilUtc.Value - new DateTimeOffset(ziel)).TotalMinutes) <= 1.5,
+                $"PausiertBisUtc '{workItem.PausedUntilUtc:O}' weicht vom erwarteten Ziel '{ziel:O}' ab.");
         }
 
         // Kachel zeigt „⏸ Pausiert (noch …)" (HelpText des Status-Elements) und „Pausiert:True"
@@ -115,8 +115,8 @@ public partial class End2EndTest
 
         await using (var db = OpenTestDbContext())
         {
-            var aufgabe = await db.Aufgaben.SingleAsync(a => a.Titel == titel);
-            Assert.Null(aufgabe.PausiertBisUtc);
+            var workItem = await db.WorkItems.SingleAsync(a => a.Title == titel);
+            Assert.Null(workItem.PausedUntilUtc);
         }
 
         WarteAufKachelStatus(mainWindow, titel, status => !status.StartsWith("⏸ Pausiert", StringComparison.Ordinal), Long);

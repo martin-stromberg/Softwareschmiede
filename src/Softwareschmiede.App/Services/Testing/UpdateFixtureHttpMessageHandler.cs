@@ -99,13 +99,13 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
 
     private byte[] LadeAntwortInhalt(UpdateE2EAntwort antwort)
     {
-        if (antwort.Inhalt is not null)
-            return Encoding.UTF8.GetBytes(antwort.Inhalt);
+        if (antwort.Content is not null)
+            return Encoding.UTF8.GetBytes(antwort.Content);
 
         if (antwort.BodyDatei is not null)
         {
-            var pfad = Path.GetFullPath(Path.Combine(_kontext.Konfiguration.Testwurzel, antwort.BodyDatei));
-            var relativ = Path.GetRelativePath(Path.GetFullPath(_kontext.Konfiguration.Testwurzel), pfad);
+            var path = Path.GetFullPath(Path.Combine(_kontext.Konfiguration.Testwurzel, antwort.BodyDatei));
+            var relativ = Path.GetRelativePath(Path.GetFullPath(_kontext.Konfiguration.Testwurzel), path);
             if (relativ == ".."
                 || relativ.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                 || relativ.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal)
@@ -114,7 +114,7 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
                 throw new HttpRequestException($"Update-E2E-Antwortdatei liegt außerhalb der Testwurzel: {antwort.BodyDatei}");
             }
 
-            return File.ReadAllBytes(pfad);
+            return File.ReadAllBytes(path);
         }
 
         return [];

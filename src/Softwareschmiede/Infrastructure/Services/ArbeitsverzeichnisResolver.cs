@@ -6,7 +6,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Infrastructure.Services;
 
 /// <summary>Resolver für das effektive Arbeitsverzeichnis inkl. Runtime-Fallback.</summary>
-public sealed class ArbeitsverzeichnisResolver : IArbeitsverzeichnisResolver
+public sealed class ArbeitsverzeichnisResolver : IWorkingDirectoryResolver
 {
     private readonly ArbeitsverzeichnisSettingsService _settingsService;
     private readonly ILogger<ArbeitsverzeichnisResolver> _logger;
@@ -21,7 +21,7 @@ public sealed class ArbeitsverzeichnisResolver : IArbeitsverzeichnisResolver
     }
 
     /// <inheritdoc/>
-    public async Task<ArbeitsverzeichnisResolutionResult> ResolveAsync(CancellationToken ct = default)
+    public async Task<WorkingDirectoryResolutionResult> ResolveAsync(CancellationToken ct = default)
     {
         var configuredPath = await _settingsService.GetArbeitsverzeichnisAsync(ct);
 
@@ -50,7 +50,7 @@ public sealed class ArbeitsverzeichnisResolver : IArbeitsverzeichnisResolver
 
             _logger.LogInformation("WorkdirResolved: configuredPath={ConfiguredPath}, resolvedPath={ResolvedPath}, reasonCode={ReasonCode}, isFallback={IsFallback}",
                 configuredPath, fullPath, "configured", false);
-            return new ArbeitsverzeichnisResolutionResult(fullPath, false, "configured", configuredPath);
+            return new WorkingDirectoryResolutionResult(fullPath, false, "configured", configuredPath);
         }
         catch (Exception ex)
         {
@@ -59,11 +59,11 @@ public sealed class ArbeitsverzeichnisResolver : IArbeitsverzeichnisResolver
         }
     }
 
-    private ArbeitsverzeichnisResolutionResult CreateFallback(string reasonCode, string? configuredPath)
+    private WorkingDirectoryResolutionResult CreateFallback(string reasonCode, string? configuredPath)
     {
         var fallbackPath = Path.GetTempPath();
         _logger.LogWarning("WorkdirFallbackUsed: configuredPath={ConfiguredPath}, resolvedPath={ResolvedPath}, reasonCode={ReasonCode}, isFallback={IsFallback}",
             configuredPath, fallbackPath, reasonCode, true);
-        return new ArbeitsverzeichnisResolutionResult(fallbackPath, true, reasonCode, configuredPath);
+        return new WorkingDirectoryResolutionResult(fallbackPath, true, reasonCode, configuredPath);
     }
 }

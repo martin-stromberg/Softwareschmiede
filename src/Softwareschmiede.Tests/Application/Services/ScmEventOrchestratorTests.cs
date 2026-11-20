@@ -46,17 +46,17 @@ public sealed class ScmEventOrchestratorTests
         Guid eventId;
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var project = new Projekt { Id = Guid.NewGuid(), Name = "SCM" };
-            var repository = new GitRepository { Id = Guid.NewGuid(), ProjektId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginTyp = fixture.Repository.ProviderPrefix, RepositoryName = "repo" };
-            var task = new Aufgabe { Id = Guid.NewGuid(), Titel = "SCM task", ProjektId = project.Id, GitRepositoryId = repository.Id, Status = AufgabeStatus.Gestartet, KiPluginPrefix = ScmDispatchFixture.KiPrefix };
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            var project = new Project { Id = Guid.NewGuid(), Name = "SCM" };
+            var repository = new GitRepository { Id = Guid.NewGuid(), ProjectId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginType = fixture.Repository.ProviderPrefix, RepositoryName = "repo" };
+            var task = new WorkItem { Id = Guid.NewGuid(), Title = "SCM task", ProjectId = project.Id, GitRepositoryId = repository.Id, Status = WorkItemStatus.Started, AiPluginPrefix = ScmDispatchFixture.KiPrefix };
             var time = DateTimeOffset.UtcNow;
             var observation = new ScmEventObservation(new(fixture.Repository, ScmReferenceKind.Issue, 7), ScmContentKind.IssueComment,
                 Guid.NewGuid().ToString(), "42", time, time, null, "U_1", "owner", null, null,
                 "$Softwareschmiede test", "https://github.com/owner/repo/issues/7", time, ["EYES"]);
             var incomingEvent = new ScmIncomingEvent
             {
-                AufgabeId = task.Id,
+                WorkItemId = task.Id,
                 EventKey = observation.EventKey,
                 ObservationJson = JsonSerializer.Serialize(observation, ScmEventStore.JsonOptions),
                 ReceivedUtc = time.ToUnixTimeMilliseconds()
@@ -84,8 +84,8 @@ public sealed class ScmEventOrchestratorTests
         var (taskId, eventId) = await fixture.AddAsync();
         await fixture.DispatchAsync(eventId);
         using var scope = fixture.Services.CreateScope();
-        var task = await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
-        Assert.Equal(AufgabeStatus.Gestartet, task!.Status);
+        var task = await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
+        Assert.Equal(WorkItemStatus.Started, task!.Status);
         Assert.Contains("Keine Standard-CLI", (await fixture.EventAsync(eventId)).Reason);
         Assert.Empty(fixture.Sessions);
         Assert.Equal(2, fixture.Responses.Count);
@@ -109,8 +109,8 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
         using var verification = fixture.Services.CreateScope();
-        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
-        Assert.Equal(ScmDispatchFixture.KiPrefix, task!.KiPluginPrefix);
+        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
+        Assert.Equal(ScmDispatchFixture.KiPrefix, task!.AiPluginPrefix);
     }
 
     /// <summary>A settings default that names no installed plugin is not guessed around:
@@ -145,8 +145,8 @@ public sealed class ScmEventOrchestratorTests
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            (await db.Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.KiPluginPrefix = second.Prefix;
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            (await db.WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.AiPluginPrefix = second.Prefix;
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
                 .SetPluginEnabledAsync(second.Prefix, false, TestContext.Current.CancellationToken);
@@ -160,8 +160,8 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
         using var verification = fixture.Services.CreateScope();
-        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
-        Assert.Equal(ScmDispatchFixture.KiPrefix, task!.KiPluginPrefix);
+        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
+        Assert.Equal(ScmDispatchFixture.KiPrefix, task!.AiPluginPrefix);
     }
 
     /// <summary>With no executable plugin configured the event waits honestly: an understandable
@@ -186,9 +186,9 @@ public sealed class ScmEventOrchestratorTests
         Assert.Empty(fixture.Prompts);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var entries = await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-            Assert.Contains(entries, x => x.Typ == ProtokollTyp.SystemMeldung && x.Inhalt.Contains(ScmDispatchFixture.KiPrefix));
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            var entries = await db.LogEntries.Where(x => x.WorkItemId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+            Assert.Contains(entries, x => x.Type == LogEntryType.SystemMessage && x.Content.Contains(ScmDispatchFixture.KiPrefix));
         }
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
@@ -225,22 +225,22 @@ public sealed class ScmEventOrchestratorTests
 
     /// <summary>Terminal absence does not override completion, archive or pause guards.</summary>
     [Theory]
-    [InlineData(AufgabeStatus.Beendet, false)]
-    [InlineData(AufgabeStatus.Archiviert, false)]
-    [InlineData(AufgabeStatus.Neu, true)]
-    public async Task BlockedTask_IsNeverActivated(AufgabeStatus status, bool paused)
+    [InlineData(WorkItemStatus.Completed, false)]
+    [InlineData(WorkItemStatus.Archived, false)]
+    [InlineData(WorkItemStatus.New, true)]
+    public async Task BlockedTask_IsNeverActivated(WorkItemStatus status, bool paused)
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(status, configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            if (paused) { (await db.Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(1); await db.SaveChangesAsync(TestContext.Current.CancellationToken); }
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            if (paused) { (await db.WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.PausedUntilUtc = DateTimeOffset.UtcNow.AddHours(1); await db.SaveChangesAsync(TestContext.Current.CancellationToken); }
         }
         await fixture.DispatchAsync(eventId);
         using var verification = fixture.Services.CreateScope();
-        Assert.Equal(status, (await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.Status);
+        Assert.Equal(status, (await verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.Status);
         Assert.Empty(fixture.Sessions);
         Assert.Equal("Wartend", (await fixture.EventAsync(eventId)).Status);
     }
@@ -320,7 +320,7 @@ public sealed class ScmEventOrchestratorTests
         var adapter = cli.GetScmPromptSession(taskId)!;
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             await db.ScmIncomingEvents.ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)long.MaxValue), cancellationToken: TestContext.Current.CancellationToken);
         }
         using (var scope = fixture.Services.CreateScope())

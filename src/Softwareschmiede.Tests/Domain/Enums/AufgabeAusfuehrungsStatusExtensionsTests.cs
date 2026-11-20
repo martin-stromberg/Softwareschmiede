@@ -3,14 +3,14 @@ using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.Tests.Domain.Enums;
 
-/// <summary>Tests für <see cref="AufgabeAusfuehrungsStatusExtensions"/>.</summary>
+/// <summary>Tests für <see cref="WorkItemExecutionStatusExtensions"/>.</summary>
 public sealed class AufgabeAusfuehrungsStatusExtensionsTests
 {
     /// <summary>SollCliAnzeigen liefert true, wenn AusfuehrungsStatus Beendet ist und AufgabeStatus Gestartet ist.</summary>
     [Fact]
     public void SollCliAnzeigen_WhenAusfuehrungsStatusIsBeendet_AndAufgabeStatusIsGestartet_ReturnsTrue()
     {
-        var result = AufgabeAusfuehrungsStatus.Beendet.SollCliAnzeigen(AufgabeStatus.Gestartet);
+        var result = WorkItemExecutionStatus.Completed.ShouldShowCli(WorkItemStatus.Started);
 
         result.Should().BeTrue();
     }
@@ -19,7 +19,7 @@ public sealed class AufgabeAusfuehrungsStatusExtensionsTests
     [Fact]
     public void SollCliAnzeigen_WhenAusfuehrungsStatusIsBeendet_AndAufgabeStatusIsWartend_ReturnsTrue()
     {
-        var result = AufgabeAusfuehrungsStatus.Beendet.SollCliAnzeigen(AufgabeStatus.Wartend);
+        var result = WorkItemExecutionStatus.Completed.ShouldShowCli(WorkItemStatus.Waiting);
 
         result.Should().BeTrue();
     }
@@ -28,7 +28,7 @@ public sealed class AufgabeAusfuehrungsStatusExtensionsTests
     [Fact]
     public void SollCliAnzeigen_WhenAusfuehrungsStatusIsBeendet_AndAufgabeStatusIsBeendet_ReturnsFalse()
     {
-        var result = AufgabeAusfuehrungsStatus.Beendet.SollCliAnzeigen(AufgabeStatus.Beendet);
+        var result = WorkItemExecutionStatus.Completed.ShouldShowCli(WorkItemStatus.Completed);
 
         result.Should().BeFalse();
     }
@@ -37,7 +37,7 @@ public sealed class AufgabeAusfuehrungsStatusExtensionsTests
     [Fact]
     public void SollCliAnzeigen_WhenAusfuehrungsStatusIsBeendet_AndAufgabeStatusIsArchiviert_ReturnsFalse()
     {
-        var result = AufgabeAusfuehrungsStatus.Beendet.SollCliAnzeigen(AufgabeStatus.Archiviert);
+        var result = WorkItemExecutionStatus.Completed.ShouldShowCli(WorkItemStatus.Archived);
 
         result.Should().BeFalse();
     }
@@ -46,7 +46,7 @@ public sealed class AufgabeAusfuehrungsStatusExtensionsTests
     [Fact]
     public void SollCliAnzeigen_WhenAusfuehrungsStatusIsAktiv_AndAufgabeStatusIsGestartet_ReturnsTrue()
     {
-        var result = AufgabeAusfuehrungsStatus.Aktiv.SollCliAnzeigen(AufgabeStatus.Gestartet);
+        var result = WorkItemExecutionStatus.Active.ShouldShowCli(WorkItemStatus.Started);
 
         result.Should().BeTrue();
     }
@@ -55,7 +55,7 @@ public sealed class AufgabeAusfuehrungsStatusExtensionsTests
     [Fact]
     public void SollCliAnzeigen_WhenAusfuehrungsStatusIsNichtGestartet_AndAufgabeStatusIsGestartet_ReturnsFalse()
     {
-        var result = AufgabeAusfuehrungsStatus.NichtGestartet.SollCliAnzeigen(AufgabeStatus.Gestartet);
+        var result = WorkItemExecutionStatus.NotStarted.ShouldShowCli(WorkItemStatus.Started);
 
         result.Should().BeFalse();
     }

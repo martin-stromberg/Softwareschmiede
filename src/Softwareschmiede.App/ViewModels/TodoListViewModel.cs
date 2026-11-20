@@ -66,20 +66,20 @@ public sealed class TodoListViewModel : ViewModelBase
     }
 
     /// <summary>Lädt die To-Dos der angegebenen Aufgabe und aktualisiert <see cref="OffeneTodoCount"/>.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe, deren To-Dos geladen werden sollen.</param>
+    /// <param name="workItemId">ID der Aufgabe, deren To-Dos geladen werden sollen.</param>
     /// <param name="ct">Abbruch-Token.</param>
-    public async Task LadenAsync(Guid aufgabeId, CancellationToken ct)
+    public async Task LadenAsync(Guid workItemId, CancellationToken ct)
     {
-        _aufgabeId = aufgabeId;
+        _aufgabeId = workItemId;
         Todos.Clear();
 
-        if (aufgabeId == Guid.Empty)
+        if (workItemId == Guid.Empty)
         {
             OffeneTodoCount = 0;
             return;
         }
 
-        var todos = await _todoService.GetAllTodosAsync(aufgabeId, ct);
+        var todos = await _todoService.GetAllTodosAsync(workItemId, ct);
         foreach (var todo in todos)
             Todos.Add(new TodoViewModel(todo));
 

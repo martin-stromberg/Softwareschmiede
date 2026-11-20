@@ -20,9 +20,9 @@ public sealed class CliOutputProtokollWriterTests
     public async Task CompleteAsync_DraintAngenommeneZeilen_BevorProviderDisposedWird()
     {
         await using var provider = CreateCliOutputServiceProvider();
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var sut = new CliOutputProtokollWriter(
-            aufgabeId,
+            workItemId,
             provider.GetRequiredService<IServiceScopeFactory>(),
             NullLogger<CliOutputProtokollWriter>.Instance);
 
@@ -30,12 +30,12 @@ public sealed class CliOutputProtokollWriterTests
         await sut.CompleteAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
-        var eintraege = db.Protokolleintraege
+        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>();
+        var eintraege = db.LogEntries
             .AsNoTracking()
-            .Where(e => e.AufgabeId == aufgabeId && e.Typ == ProtokollTyp.CliOutput)
-            .OrderBy(e => e.Zeitstempel)
-            .Select(e => e.Inhalt)
+            .Where(e => e.WorkItemId == workItemId && e.Type == LogEntryType.CliOutput)
+            .OrderBy(e => e.Timestamp)
+            .Select(e => e.Content)
             .ToList();
 
         eintraege.Should().Equal("erste", "zweite ohne ende");
@@ -48,9 +48,9 @@ public sealed class CliOutputProtokollWriterTests
     public async Task OnDiagnoseChunk_SchreibtMarkerAlsProtokollzeilen()
     {
         await using var provider = CreateCliOutputServiceProvider();
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var sut = new CliOutputProtokollWriter(
-            aufgabeId,
+            workItemId,
             provider.GetRequiredService<IServiceScopeFactory>(),
             NullLogger<CliOutputProtokollWriter>.Instance);
 
@@ -59,11 +59,11 @@ public sealed class CliOutputProtokollWriterTests
         await sut.CompleteAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
-        var eintraege = db.Protokolleintraege
+        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>();
+        var eintraege = db.LogEntries
             .AsNoTracking()
-            .Where(e => e.AufgabeId == aufgabeId && e.Typ == ProtokollTyp.CliOutput)
-            .Select(e => e.Inhalt)
+            .Where(e => e.WorkItemId == workItemId && e.Type == LogEntryType.CliOutput)
+            .Select(e => e.Content)
             .ToList();
 
         eintraege.Should().Equal("[Terminal-Diagnose] Markerzeile");
@@ -141,7 +141,7 @@ public sealed class CliOutputProtokollWriterTests
     {
         var saveBlocker = new BlockingSaveChangesInterceptor();
         await using var provider = CreateCliOutputServiceProvider(saveBlocker);
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var queueFullLogged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var loggerMock = new Mock<ILogger<CliOutputProtokollWriter>>();
         loggerMock
@@ -154,7 +154,7 @@ public sealed class CliOutputProtokollWriterTests
             .Callback(() => queueFullLogged.TrySetResult());
 
         var sut = new CliOutputProtokollWriter(
-            aufgabeId,
+            workItemId,
             provider.GetRequiredService<IServiceScopeFactory>(),
             loggerMock.Object);
         var expectedLines = Enumerable.Range(0, CliOutputProtokollWriter.QueueCapacity + 20)
@@ -179,12 +179,12 @@ public sealed class CliOutputProtokollWriterTests
         await sut.CompleteAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var persistedLines = db.Protokolleintraege
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var persistedLines = db.LogEntries
             .AsNoTracking()
-            .Where(e => e.AufgabeId == aufgabeId && e.Typ == ProtokollTyp.CliOutput)
-            .OrderBy(e => e.Zeitstempel)
-            .Select(e => e.Inhalt)
+            .Where(e => e.WorkItemId == workItemId && e.Type == LogEntryType.CliOutput)
+            .OrderBy(e => e.Timestamp)
+            .Select(e => e.Content)
             .ToList();
 
         persistedLines.Should().Equal(expectedLines);
@@ -198,9 +198,9 @@ public sealed class CliOutputProtokollWriterTests
     public async Task RateLimitMarker_PersistiertSessionLimit_UndPausiertAufgabe()
     {
         await using var provider = CreateCliOutputServiceProvider(mitLimitService: true);
-        var aufgabeId = await SeedLaufendeAufgabeAsync(provider);
+        var workItemId = await SeedLaufendeAufgabeAsync(provider);
         var sut = new CliOutputProtokollWriter(
-            aufgabeId,
+            workItemId,
             provider.GetRequiredService<IServiceScopeFactory>(),
             NullLogger<CliOutputProtokollWriter>.Instance);
 
@@ -209,19 +209,19 @@ public sealed class CliOutputProtokollWriterTests
         await sut.CompleteAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
 
-        var einstellung = db.AppEinstellungen
+        var einstellung = db.AppSettings
             .AsNoTracking()
-            .SingleOrDefault(e => e.Schluessel == KiPluginLimitService.SessionLimitKeyPrefix + "Softwareschmiede.TestKi");
+            .SingleOrDefault(e => e.Key == KiPluginLimitService.SessionLimitKeyPrefix + "Softwareschmiede.TestKi");
         einstellung.Should().NotBeNull("der Marker muss das Session-Limit des Plugin-Prefix persistieren");
 
-        var aufgabe = db.Aufgaben.AsNoTracking().Single(a => a.Id == aufgabeId);
-        aufgabe.PausiertBisUtc.Should().NotBeNull("die Aufgabe muss bei zukünftigem Limit pausiert werden");
+        var workItem = db.WorkItems.AsNoTracking().Single(a => a.Id == workItemId);
+        workItem.PausedUntilUtc.Should().NotBeNull("die Aufgabe muss bei zukünftigem Limit pausiert werden");
 
-        db.Protokolleintraege
+        db.LogEntries
             .AsNoTracking()
-            .Any(e => e.AufgabeId == aufgabeId && e.Typ == ProtokollTyp.RateLimit)
+            .Any(e => e.WorkItemId == workItemId && e.Type == LogEntryType.RateLimit)
             .Should().BeTrue("der Marker erzeugt weiterhin den RateLimit-Protokolleintrag");
     }
 
@@ -230,9 +230,9 @@ public sealed class CliOutputProtokollWriterTests
     public async Task MarkerfreieZeile_LoestKeineLimitVerarbeitungAus()
     {
         await using var provider = CreateCliOutputServiceProvider(mitLimitService: true);
-        var aufgabeId = await SeedLaufendeAufgabeAsync(provider);
+        var workItemId = await SeedLaufendeAufgabeAsync(provider);
         var sut = new CliOutputProtokollWriter(
-            aufgabeId,
+            workItemId,
             provider.GetRequiredService<IServiceScopeFactory>(),
             NullLogger<CliOutputProtokollWriter>.Instance);
 
@@ -240,11 +240,11 @@ public sealed class CliOutputProtokollWriterTests
         await sut.CompleteAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         using var scope = provider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
 
-        db.AppEinstellungen.AsNoTracking().Any(e => e.Schluessel.StartsWith(KiPluginLimitService.SessionLimitKeyPrefix))
+        db.AppSettings.AsNoTracking().Any(e => e.Key.StartsWith(KiPluginLimitService.SessionLimitKeyPrefix))
             .Should().BeFalse("ohne Marker darf kein Session-Limit persistiert werden");
-        db.Aufgaben.AsNoTracking().Single(a => a.Id == aufgabeId).PausiertBisUtc.Should().BeNull();
+        db.WorkItems.AsNoTracking().Single(a => a.Id == workItemId).PausedUntilUtc.Should().BeNull();
     }
 
     private static bool IstQueueVollLogeintrag(object? state)
@@ -253,29 +253,29 @@ public sealed class CliOutputProtokollWriterTests
     private static async Task<Guid> SeedLaufendeAufgabeAsync(ServiceProvider provider)
     {
         using var scope = provider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var projektId = Guid.NewGuid();
-        db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var projectId = Guid.NewGuid();
+        db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
-            Id = projektId,
+            Id = projectId,
             Name = "Writer-Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
-        var aufgabe = new Softwareschmiede.Domain.Entities.Aufgabe
+        var workItem = new Softwareschmiede.Domain.Entities.WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = projektId,
-            Titel = "Laufende Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = Guid.NewGuid().ToString("N"),
-            KiPluginPrefix = "Softwareschmiede.TestKi",
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            ProjectId = projectId,
+            Title = "Laufende Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = Guid.NewGuid().ToString("N"),
+            AiPluginPrefix = "Softwareschmiede.TestKi",
+            CreatedAt = DateTimeOffset.UtcNow
         };
-        db.Aufgaben.Add(aufgabe);
+        db.WorkItems.Add(workItem);
         await db.SaveChangesAsync();
-        return aufgabe.Id;
+        return workItem.Id;
     }
 
     private static ServiceProvider CreateCliOutputServiceProvider(params IInterceptor[] interceptors)
@@ -285,7 +285,7 @@ public sealed class CliOutputProtokollWriterTests
     {
         var databaseName = Guid.NewGuid().ToString();
         var services = new ServiceCollection()
-            .AddDbContext<SoftwareschmiededDbContext>(options =>
+            .AddDbContext<SoftwareschmiedeDbContext>(options =>
             {
                 options.UseInMemoryDatabase(databaseName);
                 if (interceptors.Length > 0)

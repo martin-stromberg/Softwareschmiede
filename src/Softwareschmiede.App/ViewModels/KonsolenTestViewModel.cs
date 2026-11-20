@@ -209,22 +209,22 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
 
     private async Task OeffneAufzeichnungAsync(CancellationToken ct)
     {
-        var pfad = await _dialogService.ShowOpenFileDialogAsync(
+        var path = await _dialogService.ShowOpenFileDialogAsync(
             "CLI-Aufzeichnung öffnen",
             "CLI-Replay-Dateien (*.clireplay)|*.clireplay",
             null,
             ct);
 
-        if (string.IsNullOrWhiteSpace(pfad))
+        if (string.IsNullOrWhiteSpace(path))
             return;
 
         try
         {
-            var aufzeichnung = await _store.LadeAsync(pfad, ct);
+            var aufzeichnung = await _store.LadeAsync(path, ct);
             // Die Quelltext-Formatierung großer Aufzeichnungen läuft abseits des UI-Threads;
             // die ObservableCollection wird erst danach auf dem UI-Thread befüllt.
             var eintraege = await Task.Run(() => ErzeugeQuellEintraege(aufzeichnung), ct);
-            LadeAufzeichnung(pfad, aufzeichnung, eintraege);
+            LadeAufzeichnung(path, aufzeichnung, eintraege);
         }
         catch (OperationCanceledException)
         {
@@ -232,12 +232,12 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Die CLI-Aufzeichnung {Pfad} konnte nicht geladen werden.", pfad);
+            _logger.LogWarning(ex, "Die CLI-Aufzeichnung {Pfad} konnte nicht geladen werden.", path);
             FehlerMeldung = $"Die Aufzeichnung konnte nicht geladen werden: {ex.Message}";
         }
     }
 
-    private void LadeAufzeichnung(string pfad, CliOutputAufzeichnung aufzeichnung, IReadOnlyList<CliChunkAnzeigeEintrag> eintraege)
+    private void LadeAufzeichnung(string path, CliOutputAufzeichnung aufzeichnung, IReadOnlyList<CliChunkAnzeigeEintrag> eintraege)
     {
         EntsorgeReplaySession();
 
@@ -246,7 +246,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         _aufzeichnung = aufzeichnung;
         _replaySession = ErzeugeReplaySession(aufzeichnung);
 
-        DateiPfad = pfad;
+        DateiPfad = path;
         QuellEintraege.Clear();
         foreach (var eintrag in eintraege)
             QuellEintraege.Add(eintrag);

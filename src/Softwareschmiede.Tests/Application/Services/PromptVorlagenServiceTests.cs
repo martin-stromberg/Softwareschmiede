@@ -25,7 +25,7 @@ public sealed class PromptVorlagenServiceTests
             "Initialanforderung senden",
             "Weitermachen",
             "Pullrequest");
-        vorlagen[0].Prompttext.Should().Be("Die Anforderung zum Thema '%TaskName%' ist in issue.md beschrieben.");
+        vorlagen[0].PromptText.Should().Be("Die Anforderung zum Thema '%TaskName%' ist in issue.md beschrieben.");
     }
 
     /// <summary>EnsureInitialPromptVorlagenAsync legt keine Duplikate an, wenn bereits Vorlagen existieren.</summary>
@@ -33,11 +33,11 @@ public sealed class PromptVorlagenServiceTests
     public async Task EnsureInitialPromptVorlagenAsync_MitBestehenderVorlage_LegtKeineDuplikateAn()
     {
         using var db = TestDbContextFactory.Create();
-        db.PromptVorlagen.Add(new PromptVorlage
+        db.PromptTemplates.Add(new PromptTemplate
         {
             Name = "Benutzerdefiniert",
-            Prompttext = "Eigener Prompt",
-            Sortierung = 0
+            PromptText = "Eigener Prompt",
+            SortOrder = 0
         });
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         var sut = new PromptVorlagenService(db, NullLogger<PromptVorlagenService>.Instance);
@@ -54,25 +54,25 @@ public sealed class PromptVorlagenServiceTests
     public void PromptVorlagenPlatzhalterService_Resolve_ErsetztBekanntePlatzhalter()
     {
         var sut = new PromptVorlagenPlatzhalterService();
-        var projekt = new Projekt { Id = Guid.NewGuid(), Name = "Projekt A", Status = ProjektStatus.Aktiv };
+        var project = new Project { Id = Guid.NewGuid(), Name = "Projekt A", Status = ProjectStatus.Active };
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjektId = projekt.Id,
-            Projekt = projekt,
+            ProjectId = project.Id,
+            Project = project,
             RepositoryName = "Repo",
             RepositoryUrl = "https://example.test/repo.git",
-            PluginTyp = "git"
+            PluginType = "git"
         };
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Aufgabe B",
-            Projekt = projekt,
+            Title = "Aufgabe B",
+            Project = project,
             GitRepository = repository
         };
 
-        var result = sut.Resolve("%ProjectName%/%TaskName%/%RepositoryUrl%/%Unknown%", aufgabe);
+        var result = sut.Resolve("%ProjectName%/%TaskName%/%RepositoryUrl%/%Unknown%", workItem);
 
         result.Should().Be("Projekt A/Aufgabe B/https://example.test/repo.git/%Unknown%");
     }
@@ -82,14 +82,14 @@ public sealed class PromptVorlagenServiceTests
     public void PromptVorlagenPlatzhalterService_Resolve_FehlendesRepositoryWirdLeer()
     {
         var sut = new PromptVorlagenPlatzhalterService();
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Aufgabe",
-            Projekt = new Projekt { Id = Guid.NewGuid(), Name = "Projekt", Status = ProjektStatus.Aktiv }
+            Title = "Aufgabe",
+            Project = new Project { Id = Guid.NewGuid(), Name = "Projekt", Status = ProjectStatus.Active }
         };
 
-        var result = sut.Resolve("Repo=%RepositoryUrl%", aufgabe);
+        var result = sut.Resolve("Repo=%RepositoryUrl%", workItem);
 
         result.Should().Be("Repo=");
     }

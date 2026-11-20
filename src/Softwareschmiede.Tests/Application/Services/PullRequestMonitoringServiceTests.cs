@@ -22,8 +22,8 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldKeepPullRequestDue_WhenProviderFailsTransiently()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, aufgabe) = AddAufgabe(db);
-        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
+        var (_, workItem) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("rate limit"));
@@ -32,7 +32,7 @@ public sealed class PullRequestMonitoringServiceTests
 
         await sut.RunOnceAsync(TestContext.Current.CancellationToken);
 
-        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.PreMergeRunning, saved.MonitoringPhase);
         Assert.Equal("rate limit", saved.LastError);
         Assert.True(saved.NextCheckUtc > _timeProvider.GetUtcNow());
@@ -48,8 +48,8 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldMarkPostMergeUncertain_WhenMergedPullRequestHasNoMergeSha()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, aufgabe) = AddAufgabe(db);
-        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.PreMergeSucceeded, _timeProvider.GetUtcNow());
+        var (_, workItem) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeSucceeded, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Status(PullRequestStatus.Merged, PullRequestMergeStatus.Merged, mergeCommitSha: null));
@@ -59,7 +59,7 @@ public sealed class PullRequestMonitoringServiceTests
 
         await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
-        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.PostMergeUncertain, saved.MonitoringPhase);
         Assert.Contains("Merge-Commit-SHA", saved.LastError);
         Assert.True(saved.NextCheckUtc > _timeProvider.GetUtcNow());
@@ -70,8 +70,8 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldPersistApprovalOnlyAsNonTerminalApproval()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, aufgabe) = AddAufgabe(db);
-        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
+        var (_, workItem) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Status(PullRequestStatus.Open, PullRequestMergeStatus.Mergeable));
@@ -97,7 +97,7 @@ public sealed class PullRequestMonitoringServiceTests
 
         await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
-        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.Approved, saved.MonitoringPhase);
         Assert.Equal(PullRequestStatus.Open, saved.Status);
         Assert.Null(saved.MergeCommitSha);
@@ -114,8 +114,8 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldNotApproveAgain_WhenApprovalOnlyAlreadySucceeded()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, aufgabe) = AddAufgabe(db);
-        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
+        var (_, workItem) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Status(PullRequestStatus.Open, PullRequestMergeStatus.Mergeable));
@@ -144,7 +144,7 @@ public sealed class PullRequestMonitoringServiceTests
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
         await sut.RunOnceAsync(TestContext.Current.CancellationToken);
 
-        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.Approved, saved.MonitoringPhase);
         Assert.Equal(PullRequestStatus.Open, saved.Status);
         Assert.Contains("genehmigt", saved.LastError);
@@ -160,8 +160,8 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldKeepAutoMergeOpen_WhenCompletionDidNotMergePullRequest()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, aufgabe) = AddAufgabe(db);
-        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
+        var (_, workItem) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Status(PullRequestStatus.Open, PullRequestMergeStatus.Mergeable));
@@ -187,7 +187,7 @@ public sealed class PullRequestMonitoringServiceTests
 
         await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
-        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.Approved, saved.MonitoringPhase);
         Assert.Equal(PullRequestStatus.Open, saved.Status);
         Assert.Null(saved.MergeCommitSha);
@@ -200,8 +200,8 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldNotEnableAutoMergeAgain_WhenWaitingForMerge()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, aufgabe) = AddAufgabe(db);
-        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
+        var (_, workItem) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Status(PullRequestStatus.Open, PullRequestMergeStatus.Mergeable));
@@ -230,7 +230,7 @@ public sealed class PullRequestMonitoringServiceTests
         _timeProvider.Advance(TimeSpan.FromMinutes(5));
         await sut.RunOnceAsync(TestContext.Current.CancellationToken);
 
-        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.Approved, saved.MonitoringPhase);
         Assert.Equal(PullRequestStatus.Open, saved.Status);
         Assert.Contains("Auto-Merge", saved.LastError);
@@ -246,8 +246,8 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldTreatSkippedPreMergeRunsAsSucceeded()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, aufgabe) = AddAufgabe(db);
-        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
+        var (_, workItem) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Status(PullRequestStatus.Open, PullRequestMergeStatus.Mergeable));
@@ -260,7 +260,7 @@ public sealed class PullRequestMonitoringServiceTests
 
         await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
-        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.PreMergeSucceeded, saved.MonitoringPhase);
         Assert.Null(saved.LastError);
     }
@@ -270,8 +270,8 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RunOnceAsync_ShouldTreatSkippedPostMergeRunsAsSucceeded()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, aufgabe) = AddAufgabe(db);
-        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.PreMergeSucceeded, _timeProvider.GetUtcNow());
+        var (_, workItem) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.PreMergeSucceeded, _timeProvider.GetUtcNow());
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Status(PullRequestStatus.Merged, PullRequestMergeStatus.Merged, mergeCommitSha: "merge"));
@@ -284,7 +284,7 @@ public sealed class PullRequestMonitoringServiceTests
 
         await provider.GetRequiredService<PullRequestMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
-        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestMonitoringPhase.PostMergeSucceeded, saved.MonitoringPhase);
         Assert.Null(saved.LastError);
     }
@@ -294,8 +294,8 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task GetDueForMonitoringAsync_ShouldExcludeCompletedPullRequests()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, aufgabe) = AddAufgabe(db);
-        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
+        var (_, workItem) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
         var service = new PullRequestReferenzService(db, _timeProvider, NullLogger<PullRequestReferenzService>.Instance);
 
         var due = await service.GetDueForMonitoringAsync(_timeProvider.GetUtcNow(), 10, TestContext.Current.CancellationToken);
@@ -308,8 +308,8 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RefreshAufgabeAsync_ShouldUpdateCompletedPullRequestStatus_WhenProviderReportsMerged()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, aufgabe) = AddAufgabe(db);
-        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
+        var (_, workItem) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Status(PullRequestStatus.Merged, PullRequestMergeStatus.Merged, mergeCommitSha: "merge"));
@@ -320,9 +320,9 @@ public sealed class PullRequestMonitoringServiceTests
             ]);
         using var provider = BuildProvider(db, plugin.Object);
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
 
-        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestStatus.Merged, saved.Status);
         Assert.Equal(PullRequestMergeStatus.Merged, saved.MergeStatus);
         Assert.Equal("merge", saved.MergeCommitSha);
@@ -334,8 +334,8 @@ public sealed class PullRequestMonitoringServiceTests
     public async Task RefreshAufgabeAsync_ShouldNotCompletePullRequest_WhenOpenPreMergeSucceeded()
     {
         using var db = TestDbContextFactory.Create();
-        var (_, aufgabe) = AddAufgabe(db);
-        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
+        var (_, workItem) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, workItem.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
         var plugin = CreatePluginMock();
         plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Status(PullRequestStatus.Open, PullRequestMergeStatus.Mergeable));
@@ -352,9 +352,9 @@ public sealed class PullRequestMonitoringServiceTests
                 ["Softwareschmiede.GitHub.AutoCompletePullRequests"] = "true"
             });
 
-        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(workItem.Id, TestContext.Current.CancellationToken);
 
-        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        var saved = db.PullRequestReferences.Single(p => p.Id == pullRequest.Id);
         Assert.Equal(PullRequestStatus.Open, saved.Status);
         Assert.Equal(PullRequestMonitoringPhase.PreMergeSucceeded, saved.MonitoringPhase);
         plugin.Verify(p => p.CompletePullRequestAsync(
@@ -365,7 +365,7 @@ public sealed class PullRequestMonitoringServiceTests
     }
 
     private ServiceProvider BuildProvider(
-        SoftwareschmiededDbContext db,
+        SoftwareschmiedeDbContext db,
         IGitPlugin gitPlugin,
         IReadOnlyDictionary<string, string>? settings = null)
     {
@@ -429,21 +429,21 @@ public sealed class PullRequestMonitoringServiceTests
             mergeStatus,
             DateTimeOffset.UtcNow);
 
-    private static PullRequestReferenz AddPullRequest(
-        SoftwareschmiededDbContext db,
-        Guid aufgabeId,
+    private static PullRequestReference AddPullRequest(
+        SoftwareschmiedeDbContext db,
+        Guid workItemId,
         PullRequestMonitoringPhase phase,
         DateTimeOffset nextCheckUtc)
     {
-        var pullRequest = new PullRequestReferenz
+        var pullRequest = new PullRequestReference
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabeId,
+            WorkItemId = workItemId,
             Provider = PullRequestProvider.GitHub,
             RepositoryId = "owner/repo",
             PullRequestNumber = 42,
             Url = "https://github.com/owner/repo/pull/42",
-            Titel = "PR",
+            Title = "PR",
             SourceBranch = "feature/pr",
             TargetBranch = "main",
             HeadSha = "head",
@@ -454,33 +454,33 @@ public sealed class PullRequestMonitoringServiceTests
             NextCheckUtc = nextCheckUtc
         };
 
-        db.PullRequestReferenzen.Add(pullRequest);
+        db.PullRequestReferences.Add(pullRequest);
         db.SaveChanges();
         return pullRequest;
     }
 
-    private static (Projekt Projekt, Aufgabe Aufgabe) AddAufgabe(SoftwareschmiededDbContext db)
+    private static (Project Project, WorkItem WorkItem) AddAufgabe(SoftwareschmiedeDbContext db)
     {
-        var projekt = new Projekt
+        var project = new Project
         {
             Id = Guid.NewGuid(),
             Name = "Projekt",
-            Beschreibung = "Test",
-            Status = ProjektStatus.Aktiv,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Description = "Test",
+            Status = ProjectStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow
         };
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = projekt.Id,
-            Titel = "Aufgabe",
-            Status = AufgabeStatus.Neu,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            ProjectId = project.Id,
+            Title = "Aufgabe",
+            Status = WorkItemStatus.New,
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
-        db.Projekte.Add(projekt);
-        db.Aufgaben.Add(aufgabe);
+        db.Projects.Add(project);
+        db.WorkItems.Add(workItem);
         db.SaveChanges();
-        return (projekt, aufgabe);
+        return (project, workItem);
     }
 }

@@ -20,14 +20,14 @@ public sealed class RepositoryStartskriptService
     }
 
     /// <summary>Führt das konfigurierte Startskript für ein Repository aus.</summary>
-    public async Task RunAsync(string repositoryRootPath, RepositoryStartKonfiguration configuration, CancellationToken ct = default)
+    public async Task RunAsync(string repositoryRootPath, RepositoryStartConfiguration configuration, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRootPath);
         ArgumentNullException.ThrowIfNull(configuration);
 
         await RepositoryScriptExecutor.RunAsync(
             repositoryRootPath,
-            configuration.Aktiv,
+            configuration.Active,
             configuration.StartScriptRelativePath,
             "Startskript",
             _cliRunner,

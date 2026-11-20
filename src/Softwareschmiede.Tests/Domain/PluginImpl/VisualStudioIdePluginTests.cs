@@ -123,14 +123,14 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     public async Task FindEntryPointsAsync_MitGenauEinerSln_LiefertEinen()
     {
         var verzeichnis = CreateTempDirectory();
-        var solutionPfad = Path.Combine(verzeichnis, "Einzige.sln");
-        File.WriteAllText(solutionPfad, string.Empty);
+        var solutionPath = Path.Combine(verzeichnis, "Einzige.sln");
+        File.WriteAllText(solutionPath, string.Empty);
         var sut = CreateSut();
 
         var entryPoints = await sut.FindEntryPointsAsync(verzeichnis, TestContext.Current.CancellationToken);
 
         entryPoints.Should().ContainSingle();
-        entryPoints[0].Path.Should().Be(solutionPfad);
+        entryPoints[0].Path.Should().Be(solutionPath);
     }
 
     /// <summary>Ohne .sln/.slnx-Datei liefert FindEntryPointsAsync eine leere Liste.</summary>
@@ -151,17 +151,17 @@ public sealed class VisualStudioIdePluginTests : IDisposable
     public async Task OpenEntryPointAsync_RuftOpenSolutionFileAuf()
     {
         var verzeichnis = CreateTempDirectory();
-        var solutionPfad = Path.Combine(verzeichnis, "Loesung.sln");
-        File.WriteAllText(solutionPfad, string.Empty);
-        var prozessStarterMock = new Mock<IProzessStarter>();
+        var solutionPath = Path.Combine(verzeichnis, "Loesung.sln");
+        File.WriteAllText(solutionPath, string.Empty);
+        var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = new VisualStudioIdePlugin(prozessStarterMock.Object);
 
-        await sut.OpenEntryPointAsync(new IdeEntryPoint(solutionPfad), TestContext.Current.CancellationToken);
+        await sut.OpenEntryPointAsync(new IdeEntryPoint(solutionPath), TestContext.Current.CancellationToken);
 
         prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a =>
-                a.DateiName == solutionPfad &&
-                a.ShellAusfuehren == true)),
+            p => p.Start(It.Is<ProcessStartRequest>(a =>
+                a.FileName == solutionPath &&
+                a.UseShellExecute == true)),
             Times.Once);
     }
 
@@ -178,5 +178,5 @@ public sealed class VisualStudioIdePluginTests : IDisposable
 
     private string CreateTempDirectory() => _tempDirectoryFixture.CreateTempDirectory("visual_studio_ide_plugin_tests");
 
-    private static VisualStudioIdePlugin CreateSut() => new(new Mock<IProzessStarter>().Object);
+    private static VisualStudioIdePlugin CreateSut() => new(new Mock<IProcessStarter>().Object);
 }

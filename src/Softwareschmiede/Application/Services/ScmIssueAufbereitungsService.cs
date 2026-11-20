@@ -11,23 +11,23 @@ namespace Softwareschmiede.Application.Services;
 
 /// <summary>Erkennt am repository-weiten Enumerationskanal neu angelegte Issues und reiht dafür
 /// einen dedizierten, trigger-freien Aufbereitungsauftrag ein: eine als Zweck markierte Aufgabe mit
-/// <see cref="IssueReferenz"/> im eigenen <c>IssueAufbereitung</c>-Namensraum plus ein internes
+/// <see cref="IssueReference"/> im eigenen <c>IssueAufbereitung</c>-Namensraum plus ein internes
 /// <see cref="ScmIncomingEvent"/>, das ohne Trigger-Validierung angelegt wird und sofort fällig
 /// über den dedizierten Aufbereitungs-Ausführungspfad des Orchestrierers verarbeitet wird
 /// (Entwicklungsschritt 6).</summary>
 /// <param name="db">Datenbankkontext.</param>
-/// <param name="aufgaben">Anlage der Aufbereitungs-Aufgabe samt SourceKey-Dedup.</param>
+/// <param name="workItems">Anlage der Aufbereitungs-Aufgabe samt SourceKey-Dedup.</param>
 /// <param name="einstellungen">Persistierte Funktionskonfiguration (Plugin-Schlüssel, Kommentar-Schalter).</param>
 /// <param name="notifier">Benachrichtigt Ansichten über dauerhafte Änderungen.</param>
 /// <param name="time">Zeitquelle.</param>
 /// <param name="logger">Protokoll.</param>
 public sealed class ScmIssueAufbereitungsService(
-    SoftwareschmiededDbContext db, AufgabeService aufgaben, AppEinstellungService einstellungen,
+    SoftwareschmiedeDbContext db, AufgabeService workItems, AppEinstellungService einstellungen,
     ScmEventChangeNotifier notifier, TimeProvider time, ILogger<ScmIssueAufbereitungsService> logger)
 {
-    /// <summary>Zweck-Markierung (<see cref="Aufgabe.Zweck"/> bzw. <see cref="ScmIncomingEvent.Zweck"/>)
+    /// <summary>Zweck-Markierung (<see cref="WorkItem.Purpose"/> bzw. <see cref="ScmIncomingEvent.Purpose"/>)
     /// der Issue-Aufbereitung; einziger Zweck-Token des Systems.</summary>
-    public const string Zweck = "IssueAufbereitung";
+    public const string Purpose = "IssueAufbereitung";
 
     /// <summary>Checkpoint-Schlüssel der Erstbeobachtungs-Baseline eines Ereignis-Repositorys
     /// (eigener Namensraum neben den Quell-Checkpoints; wird einmalig gesetzt und nie fortgeschrieben).</summary>
@@ -43,14 +43,14 @@ public sealed class ScmIssueAufbereitungsService(
     public static string AufbereitungsSourceKey(ScmEventReference reference)
         => string.Join('/', new[] { reference.Repository.ProviderPrefix.ToLowerInvariant(),
             reference.Repository.Host.ToLowerInvariant(), reference.Repository.RepositoryId,
-            Zweck, reference.Number.ToString(System.Globalization.CultureInfo.InvariantCulture) }
+            Purpose, reference.Number.ToString(System.Globalization.CultureInfo.InvariantCulture) }
             .Select(Uri.EscapeDataString));
 
     /// <summary>Deterministischer, deduplizierender EventKey des internen Aufbereitungsauftrags:
     /// eindeutig je Issue-Beschreibung (ContentKey) und Zweck, unabhängig von Revision und BodyHash.</summary>
     /// <param name="observation">Die auslösende Beschreibungs-Beobachtung.</param>
     public static string AufbereitungsEventKey(ScmEventObservation observation)
-        => $"{observation.ContentKey}/{Zweck}";
+        => $"{observation.ContentKey}/{Purpose}";
 
     /// <summary>Checkpoint-Schlüssel der abgeschlossenen Aufbereitungs-Auswertung einer Issue-Referenz
     /// (<c>issueaufbereitung-issue/{provider}/{host}/{repoId}/{number}</c>) — das authoritative
@@ -139,13 +139,13 @@ public sealed class ScmIssueAufbereitungsService(
     /// <param name="reference">Die beobachtete Issue-Referenz.</param>
     /// <param name="batch">Der gelesene Beschreibungs-Batch samt Anfrage-Metadaten.</param>
     /// <param name="repositories">Die lokalen Repositories, die kanonisch auf dasselbe
-    /// Provider-Repository auflösen; nur <see cref="GitRepository.IssueAufbereitungAktiv"/>
+    /// Provider-Repository auflösen; nur <see cref="GitRepository.IssuePreparationEnabled"/>
     /// freigeschaltete erzeugen Aufbereitungsaufträge.</param>
     /// <param name="ct">Abbruchtoken.</param>
     public async Task ErkennenUndEinreihenAsync(IScmEventSource source, ScmEventReference reference,
         ScmEventBatch batch, IReadOnlyList<GitRepository> repositories, CancellationToken ct = default)
     {
-        var freigeschaltet = repositories.Where(x => x.IssueAufbereitungAktiv)
+        var freigeschaltet = repositories.Where(x => x.IssuePreparationEnabled)
             .OrderBy(x => x.RepositoryUrl, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Id).ToList();
         if (freigeschaltet.Count == 0 || batch.Observations.Count == 0)
             return;
@@ -175,27 +175,27 @@ public sealed class ScmIssueAufbereitungsService(
                 continue;
             }
             var pluginPrefix = await einstellungen.GetScmIssueAufbereitungPluginPrefixAsync(ct);
-            var task = await aufgaben.CreateFromIssueEventAsync(repository.ProjektId, issue,
-                repository.Id, AufbereitungsSourceKey(reference), ct, Zweck, pluginPrefix);
+            var task = await workItems.CreateFromIssueEventAsync(repository.ProjectId, issue,
+                repository.Id, AufbereitungsSourceKey(reference), ct, Purpose, pluginPrefix);
             // Sofort fällig (NextAttemptUtc bleibt leer): Plugin-Auflösung, Kommentar-Schalter und
             // Ausführungsbegrenzung wirken erst zum Ausführungszeitpunkt im Orchestrator.
             var item = new ScmIncomingEvent
             {
-                AufgabeId = task.Id,
+                WorkItemId = task.Id,
                 EventKey = eventKey,
                 ObservationJson = JsonSerializer.Serialize(observation, ScmEventStore.JsonOptions),
                 ReceivedUtc = time.GetUtcNow().ToUnixTimeMilliseconds(),
-                Zweck = Zweck,
+                Purpose = Purpose,
                 Reason = $"Interner Aufbereitungsauftrag für Issue #{issue.Nummer}."
             };
             db.ScmIncomingEvents.Add(item);
-            db.Protokolleintraege.Add(new Protokolleintrag
+            db.LogEntries.Add(new LogEntry
             {
                 Id = Guid.NewGuid(),
-                AufgabeId = task.Id,
-                Typ = ProtokollTyp.SystemMeldung,
-                Inhalt = $"Issue-Aufbereitung für Issue #{issue.Nummer} eingereiht (interner, trigger-freier Auftrag).",
-                Zeitstempel = time.GetUtcNow()
+                WorkItemId = task.Id,
+                Type = LogEntryType.SystemMessage,
+                Content = $"Issue-Aufbereitung für Issue #{issue.Nummer} eingereiht (interner, trigger-freier Auftrag).",
+                Timestamp = time.GetUtcNow()
             });
             try
             {

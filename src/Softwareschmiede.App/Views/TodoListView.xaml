@@ -71,7 +71,7 @@
                                     </CheckBox.Style>
                                 </CheckBox>
                                 <TextBlock Grid.Column="1"
-                                           Text="{Binding Beschreibung}"
+                                           Text="{Binding Description}"
                                            FontSize="14"
                                            VerticalAlignment="Center"
                                            TextWrapping="Wrap"

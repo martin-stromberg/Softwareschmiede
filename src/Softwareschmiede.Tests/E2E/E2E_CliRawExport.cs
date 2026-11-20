@@ -79,18 +79,18 @@ public partial class End2EndTest
     private void SeedCliOutputForAktuelleAufgabe(string output)
     {
         using var db = OpenTestDbContext();
-        var aufgabeId = db.Aufgaben
-            .OrderByDescending(a => a.ErstellungsDatum)
+        var workItemId = db.WorkItems
+            .OrderByDescending(a => a.CreatedAt)
             .Select(a => a.Id)
             .First();
 
-        db.Protokolleintraege.Add(new Protokolleintrag
+        db.LogEntries.Add(new LogEntry
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabeId,
-            Typ = ProtokollTyp.CliOutput,
-            Inhalt = output,
-            Zeitstempel = DateTimeOffset.UtcNow
+            WorkItemId = workItemId,
+            Type = LogEntryType.CliOutput,
+            Content = output,
+            Timestamp = DateTimeOffset.UtcNow
         });
 
         db.SaveChanges();
@@ -110,11 +110,11 @@ public partial class End2EndTest
     private void DeleteProjectInDatenbank(string projektName)
     {
         using var db = OpenTestDbContext();
-        var projekt = db.Projekte.SingleOrDefault(p => p.Name == projektName);
-        if (projekt is null)
+        var project = db.Projects.SingleOrDefault(p => p.Name == projektName);
+        if (project is null)
             return;
 
-        db.Projekte.Remove(projekt);
+        db.Projects.Remove(project);
         db.SaveChanges();
     }
 }

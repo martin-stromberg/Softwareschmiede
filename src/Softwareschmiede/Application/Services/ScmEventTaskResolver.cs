@@ -21,24 +21,24 @@ public enum ScmTaskResolutionKind
 }
 
 /// <summary>Ergebnis der Aufgabenauflösung: zugeordnete Aufgabe oder Grund der Nicht-Zuordnung.</summary>
-public sealed record ScmTaskResolution(ScmTaskResolutionKind Kind, Guid? AufgabeId)
+public sealed record ScmTaskResolution(ScmTaskResolutionKind Kind, Guid? WorkItemId)
 {
     /// <summary>Mehrere Aufgaben tragen dieselbe Referenz.</summary>
     public static readonly ScmTaskResolution Ambiguous = new(ScmTaskResolutionKind.Ambiguous, null);
     /// <summary>Keine Aufgabe zuordenbar und keine anlegbar.</summary>
     public static readonly ScmTaskResolution Unassigned = new(ScmTaskResolutionKind.Unassigned, null);
     /// <summary>Genau eine Aufgabe wurde gefunden oder angelegt.</summary>
-    public static ScmTaskResolution Assigned(Guid aufgabeId)
-        => aufgabeId == Guid.Empty
+    public static ScmTaskResolution Assigned(Guid workItemId)
+        => workItemId == Guid.Empty
             ? throw new InvalidOperationException("Eine zugeordnete Auflösung benötigt eine Aufgaben-ID.")
-            : new ScmTaskResolution(ScmTaskResolutionKind.Assigned, aufgabeId);
+            : new ScmTaskResolution(ScmTaskResolutionKind.Assigned, workItemId);
 }
 
 /// <summary>Löst eine SCM-Referenz zu genau einer lokalen Aufgabe auf: Wiederverwendung bei
 /// eindeutigem Treffer, Anlage aus den Ereignisdaten bei fehlendem Treffer, Mehrdeutigkeitsdiagnose
 /// bei mehreren Treffern. Läuft vor der Inbox-Aufnahme und hält deren Aufgabeninvariante.</summary>
 public sealed class ScmEventTaskResolver(
-    SoftwareschmiededDbContext db, AufgabeService aufgaben, ILogger<ScmEventTaskResolver> logger)
+    SoftwareschmiedeDbContext db, AufgabeService workItems, ILogger<ScmEventTaskResolver> logger)
 {
     /// <summary>Findet die eindeutig passende Aufgabe zur Referenz der qualifizierten Beobachtung
     /// <paramref name="trigger"/> oder legt sie an; <paramref name="repositories"/> enthält die
@@ -60,16 +60,16 @@ public sealed class ScmEventTaskResolver(
             return ScmTaskResolution.Unassigned;
         }
         var repositoryIds = repositories.Select(x => (Guid?)x.Id).ToArray();
-        var taskIds = await db.Aufgaben.AsNoTracking()
+        var taskIds = await db.WorkItems.AsNoTracking()
             .Where(a => repositoryIds.Contains(a.GitRepositoryId)
-                && a.Zweck == null
-                && a.IssueReferenz != null && a.IssueReferenz.IssueNummer == reference.Number)
+                && a.Purpose == null
+                && a.IssueReference != null && a.IssueReference.IssueNumber == reference.Number)
             .Select(a => a.Id).Distinct().ToListAsync(ct);
         if (taskIds.Count > 1) return ScmTaskResolution.Ambiguous;
         if (taskIds.Count == 1) return ScmTaskResolution.Assigned(taskIds[0]);
         var repository = ChooseRepository(repositories);
         var composed = issue with { Body = ComposeBody(issue.Body, trigger) };
-        var task = await aufgaben.CreateFromIssueEventAsync(repository.ProjektId, composed,
+        var task = await workItems.CreateFromIssueEventAsync(repository.ProjectId, composed,
             repository.Id, IssueSourceKey(reference), ct);
         return ScmTaskResolution.Assigned(task.Id);
     }
@@ -93,11 +93,11 @@ public sealed class ScmEventTaskResolver(
         if (contextTaskIds.Count > 1) return ScmTaskResolution.Ambiguous;
         if (contextTaskIds.Count == 1) return ScmTaskResolution.Assigned(contextTaskIds[0]);
         var repository = ChooseRepository(repositories);
-        var context = new ScmRepositoryContext(repository.Id, repository.PluginTyp, repositoryId, reference.Repository.Konto);
+        var context = new ScmRepositoryContext(repository.Id, repository.PluginType, repositoryId, reference.Repository.Konto);
         var composed = pullRequest with { Body = ComposeBody(pullRequest.Body, trigger) };
         try
         {
-            var task = await aufgaben.CreateFromPullRequestAsync(repository.ProjektId, composed, context, ct);
+            var task = await workItems.CreateFromPullRequestAsync(repository.ProjectId, composed, context, ct);
             return ScmTaskResolution.Assigned(task.Id);
         }
         catch (InvalidOperationException)
@@ -111,14 +111,14 @@ public sealed class ScmEventTaskResolver(
 
     private Task<List<Guid>> PullRequestTaskIdsAsync(PullRequestProvider provider, string repositoryId,
         int number, CancellationToken ct)
-        => db.PullRequestReferenzen.AsNoTracking()
+        => db.PullRequestReferences.AsNoTracking()
             .Where(p => p.Provider == provider && p.RepositoryId == repositoryId && p.PullRequestNumber == number)
-            .Select(p => p.AufgabeId).Distinct().ToListAsync(ct);
+            .Select(p => p.WorkItemId).Distinct().ToListAsync(ct);
 
     /// <summary>Projektion der für den Kontextabgleich benötigten Aufgabenfelder.</summary>
-    private sealed record ContextCandidate(Guid Id, string? BranchName, int? IssueNummer);
+    private sealed record ContextCandidate(Guid Id, string? BranchName, int? IssueNumber);
 
-    /// <summary>Aktive Aufgaben (Status nicht <see cref="AufgabeStatus.Beendet"/>/<see cref="AufgabeStatus.Archiviert"/>)
+    /// <summary>Aktive Aufgaben (Status nicht <see cref="WorkItemStatus.Completed"/>/<see cref="WorkItemStatus.Archived"/>)
     /// im Repository-Scope, deren Branch- oder Issue-Bezug denselben Aufgabenkontext wie der Pull Request beschreibt.
     /// Die Datenbankabfrage lädt nur potenzielle Treffer (Branch-Kandidat oder passende Issue-Nummer) als Projektion;
     /// der abschließende Groß-/Kleinschreibungsvergleich des Branchnamens bleibt im Speicher, weil die SQLite-Provider
@@ -130,15 +130,15 @@ public sealed class ScmEventTaskResolver(
         var closingNumbers = PullRequestBodyBuilder.ExtractClosingIssueNumbers(pullRequest.Body, repositoryId).ToArray();
         var branchMatchPossible = !string.IsNullOrWhiteSpace(pullRequest.BranchName)
             && string.Equals(pullRequest.SourceRepositoryId, repositoryId, StringComparison.OrdinalIgnoreCase);
-        var candidates = await db.Aufgaben.AsNoTracking()
+        var candidates = await db.WorkItems.AsNoTracking()
             .Where(a => repositoryIds.Contains(a.GitRepositoryId)
-                && a.Zweck == null
-                && a.Status != AufgabeStatus.Beendet && a.Status != AufgabeStatus.Archiviert
+                && a.Purpose == null
+                && a.Status != WorkItemStatus.Completed && a.Status != WorkItemStatus.Archived
                 && ((branchMatchPossible && a.BranchName != null)
-                    || (a.IssueReferenz != null && a.IssueReferenz.IssueNummer != null
-                        && closingNumbers.Contains(a.IssueReferenz.IssueNummer.Value))))
+                    || (a.IssueReference != null && a.IssueReference.IssueNumber != null
+                        && closingNumbers.Contains(a.IssueReference.IssueNumber.Value))))
             .Select(a => new ContextCandidate(a.Id, a.BranchName,
-                a.IssueReferenz == null ? null : a.IssueReferenz.IssueNummer))
+                a.IssueReference == null ? null : a.IssueReference.IssueNumber))
             .ToListAsync(ct);
         return candidates
             .Where(a => MatchesBranch(pullRequest, repositoryId, a) || MatchesClosingIssue(closingNumbers, a))
@@ -151,7 +151,7 @@ public sealed class ScmEventTaskResolver(
             && string.Equals(kandidat.BranchName, pullRequest.BranchName, StringComparison.OrdinalIgnoreCase);
 
     private static bool MatchesClosingIssue(IReadOnlyCollection<int> closingNumbers, ContextCandidate kandidat)
-        => kandidat.IssueNummer is { } issueNummer && closingNumbers.Contains(issueNummer);
+        => kandidat.IssueNumber is { } issueNummer && closingNumbers.Contains(issueNummer);
 
     private static GitRepository ChooseRepository(IReadOnlyList<GitRepository> repositories)
         => repositories.OrderBy(x => x.RepositoryUrl, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Id).FirstOrDefault()

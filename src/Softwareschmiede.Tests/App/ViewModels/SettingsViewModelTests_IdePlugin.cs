@@ -15,7 +15,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Unit-Tests für die IDE-Plugin-Logik in SettingsViewModel: Reihenfolge-Parsing (plugins.ide.order), Verschiebe-Logik sowie Aktivierungs-Validierung und -Persistierung.</summary>
 public sealed class SettingsViewModelTests_IdePlugin : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AppEinstellungService _einstellungService;
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
     private readonly DarkModeService _darkModeService;

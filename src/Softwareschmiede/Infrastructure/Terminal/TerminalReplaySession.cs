@@ -184,7 +184,7 @@ public sealed class TerminalReplaySession : ITerminalSession
             }
 
             if (terminationWiderrufen)
-                SetRuntimeStatus(CliRuntimeStatus.Laeuft);
+                SetRuntimeStatus(CliRuntimeStatus.Running);
             sterbendeSchleife?.ContinueWith(
                 // Der Retry prüft den Disposed-Zustand erneut; ein zwischenzeitliches
                 // Dispose() kann dennoch das CTS schon entsorgt haben — dann ist der
@@ -216,7 +216,7 @@ public sealed class TerminalReplaySession : ITerminalSession
             _schleifeBeendenAngefordert = false;
             _schleifeBeendenKonsumiert = false;
         }
-        SetRuntimeStatus(CliRuntimeStatus.Laeuft);
+        SetRuntimeStatus(CliRuntimeStatus.Running);
         _playbackTask = Task.Run(() => WiedergabeLoopAsync(_playbackCts.Token));
     }
 

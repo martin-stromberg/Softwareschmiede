@@ -15,7 +15,7 @@ namespace Softwareschmiede.Application.Services;
 /// </summary>
 public sealed class DiffCachingService
 {
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly IMemoryCache _memoryCache;
     private readonly ILogger<DiffCachingService> _logger;
 
@@ -26,7 +26,7 @@ public sealed class DiffCachingService
 
     /// <inheritdoc cref="DiffCachingService"/>
     public DiffCachingService(
-        SoftwareschmiededDbContext db,
+        SoftwareschmiedeDbContext db,
         IMemoryCache memoryCache,
         ILogger<DiffCachingService> logger)
     {
@@ -40,13 +40,13 @@ public sealed class DiffCachingService
     /// </summary>
     public async Task<DiffResult?> GetFromCacheAsync(
         Guid diffResultId,
-        Guid aufgabeId,
+        Guid workItemId,
         string filePath,
         string sourceVersion,
         string targetVersion,
         CancellationToken ct = default)
     {
-        var cacheKey = GenerateCacheKey(aufgabeId, filePath, sourceVersion, targetVersion);
+        var cacheKey = GenerateCacheKey(workItemId, filePath, sourceVersion, targetVersion);
 
         // Versuche zuerst aus Memory Cache zu laden
         if (_memoryCache.TryGetValue($"{CacheKeyPrefix}mem_{cacheKey}", out DiffResult? cachedResult))
@@ -97,13 +97,13 @@ public sealed class DiffCachingService
     /// </summary>
     public async Task SetInCacheAsync(
         DiffResult diffResult,
-        Guid aufgabeId,
+        Guid workItemId,
         string filePath,
         string sourceVersion,
         string targetVersion,
         CancellationToken ct = default)
     {
-        var cacheKey = GenerateCacheKey(aufgabeId, filePath, sourceVersion, targetVersion);
+        var cacheKey = GenerateCacheKey(workItemId, filePath, sourceVersion, targetVersion);
 
         try
         {
@@ -190,12 +190,12 @@ public sealed class DiffCachingService
     /// Generiert einen eindeutigen Cache-Schlüssel auf Basis der Eingabeparameter.
     /// </summary>
     private static string GenerateCacheKey(
-        Guid aufgabeId,
+        Guid workItemId,
         string filePath,
         string sourceVersion,
         string targetVersion)
     {
-        var input = $"{aufgabeId}_{filePath}_{sourceVersion}_{targetVersion}";
+        var input = $"{workItemId}_{filePath}_{sourceVersion}_{targetVersion}";
         using var sha256 = SHA256.Create();
         var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(input));
         return Convert.ToBase64String(hashBytes);

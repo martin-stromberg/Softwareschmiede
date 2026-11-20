@@ -1061,7 +1061,7 @@ public sealed class GitHubEventSourceTests
         var result = await Plugin(api).ReadIssueAsync(Issue, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.Equal(7, result!.Nummer);
-        Assert.Equal("Fehler im Import", result.Titel);
+        Assert.Equal("Fehler im Import", result.Title);
         Assert.Equal("Beschreibung", result.Body);
         Assert.Equal(new[] { "bug", "prio" }, result.Labels);
         Assert.Equal("v1", result.Milestone);

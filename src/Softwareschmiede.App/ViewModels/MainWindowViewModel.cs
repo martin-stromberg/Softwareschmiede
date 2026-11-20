@@ -108,8 +108,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// </summary>
     public AufgabenListenModus AufgabenListenModus
     {
-        get => _modusBindung.Wert;
-        set => _modusBindung.Wert = value;
+        get => _modusBindung.Value;
+        set => _modusBindung.Value = value;
     }
 
     /// <summary>Gibt an, ob aktuell das Dashboard angezeigt wird.</summary>
@@ -117,7 +117,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// Anzahl der fachlich laufenden Automatisierungen in der Seitenleiste — nur der
-    /// klassifizierte Zustand <see cref="KiAusfuehrungsZustand.Laeuft"/> zählt.
+    /// klassifizierte Zustand <see cref="AiExecutionState.Running"/> zählt.
     /// </summary>
     public int LaufendeAutomatisierungenAnzahl
     {
@@ -389,7 +389,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private async Task RefreshScmCountAsync()
     {
         using var scope = _serviceProvider.CreateScope();
-        var count = await scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>()
+        var count = await scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>()
             .ScmIncomingEvents.CountAsync(x => x.Status != "Verarbeitet" && x.Status != "Abgebrochen");
         _dispatcherInvoke(() =>
         {
@@ -422,12 +422,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var aufgaben = await _aufgabeService.GetAktiveAufgabenAsync(ct);
-            var offeneTodoCounts = await _todoService.GetOpenTodoCountsAsync(aufgaben.Select(a => a.Id), ct);
-            AktiveAufgabenListe.ReplaceAll(aufgaben.Select(a => MapAktiveAufgabePanelItem(a, offeneTodoCounts)));
+            var workItems = await _aufgabeService.GetAktiveAufgabenAsync(ct);
+            var offeneTodoCounts = await _todoService.GetOpenTodoCountsAsync(workItems.Select(a => a.Id), ct);
+            AktiveAufgabenListe.ReplaceAll(workItems.Select(a => MapAktiveAufgabePanelItem(a, offeneTodoCounts)));
             LaufendeAutomatisierungenAnzahl = AktiveAufgabenListe.Count(item =>
                 Softwareschmiede.App.Converters.KiAusfuehrungsStatusAdapter.Klassifiziere(item, out _)
-                    == KiAusfuehrungsZustand.Laeuft);
+                    == AiExecutionState.Running);
         }
         catch (OperationCanceledException)
         {
@@ -443,7 +443,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void NavigateZuAufgabe(Guid aufgabeId)
+    private void NavigateZuAufgabe(Guid workItemId)
     {
         var viewModel = _serviceProvider.GetRequiredService<TaskDetailViewModel>();
         viewModel.ZurueckAction = NavigateToDashboard;
@@ -458,29 +458,29 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         };
         Title = "Softwareschmiede – Aufgabe";
         CurrentView = viewModel;
-        viewModel.AufgabeId = aufgabeId;
+        viewModel.WorkItemId = workItemId;
     }
 
     private AktiveAufgabePanelItem MapAktiveAufgabePanelItem(
-        Aufgabe aufgabe,
+        WorkItem workItem,
         IReadOnlyDictionary<Guid, int> offeneTodoCounts)
     {
-        var offeneTodoCount = offeneTodoCounts.GetValueOrDefault(aufgabe.Id);
+        var offeneTodoCount = offeneTodoCounts.GetValueOrDefault(workItem.Id);
         var offeneTodosCommand = new AsyncRelayCommand(
-            ct => OffeneTodosDialogOeffnenAsync(aufgabe.Id, aufgabe.Titel, ct));
+            ct => OffeneTodosDialogOeffnenAsync(workItem.Id, workItem.Title, ct));
         offeneTodosCommand.OnError = ex =>
-            _logger.LogWarning(ex, "Fehler beim Öffnen des offene To-Dos-Dialogs für Aufgabe {AufgabeId}.", aufgabe.Id);
+            _logger.LogWarning(ex, "Fehler beim Öffnen des offene To-Dos-Dialogs für Aufgabe {AufgabeId}.", workItem.Id);
 
-        var (scmPluginName, scmPluginSymbol) = ResolvePlugin(PluginType.SourceCodeManagement, aufgabe.GitRepository?.PluginTyp);
-        var (kiPluginName, kiPluginSymbol) = ResolvePlugin(PluginType.DevelopmentAutomation, aufgabe.KiPluginPrefix);
-        var repositoryName = aufgabe.GitRepository?.RepositoryName;
+        var (scmPluginName, scmPluginSymbol) = ResolvePlugin(PluginType.SourceCodeManagement, workItem.GitRepository?.PluginType);
+        var (kiPluginName, kiPluginSymbol) = ResolvePlugin(PluginType.DevelopmentAutomation, workItem.AiPluginPrefix);
+        var repositoryName = workItem.GitRepository?.RepositoryName;
 
         return new AktiveAufgabePanelItem
         {
-            Id = aufgabe.Id,
-            Titel = aufgabe.Titel,
+            Id = workItem.Id,
+            Title = workItem.Title,
             RepositoryName = string.IsNullOrWhiteSpace(repositoryName)
-                ? aufgabe.Projekt?.Name ?? string.Empty
+                ? workItem.Project?.Name ?? string.Empty
                 : repositoryName!,
             ScmPluginName = scmPluginName,
             ScmPluginSymbol = scmPluginSymbol,
@@ -492,29 +492,29 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             RepositoryGruppeIstFallback = string.IsNullOrWhiteSpace(repositoryName),
             KiGruppenName = kiPluginName ?? AufgabenListenAnsicht.NichtAusgefuehrt,
             KiGruppeIstFallback = kiPluginName is null,
-            SortierZeitpunkt = aufgabe.LetzterCliStartUtc ?? aufgabe.ErstellungsDatum,
-            Status = aufgabe.Status,
-            AusfuehrungsStatus = aufgabe.AusfuehrungsStatus,
-            AktiveRunId = aufgabe.AktiveRunId,
-            LastHeartbeatUtc = aufgabe.LastHeartbeatUtc,
-            LaufStatus = aufgabe.LaufStatus,
-            LiveLaufStatus = _runningStatusSource.GetLiveLaufStatus(aufgabe.Id),
-            LetzterCliStartUtc = aufgabe.LetzterCliStartUtc,
-            PausiertBisUtc = aufgabe.PausiertBisUtc,
-            IsAktiv = GetAktiveAufgabeId() == aufgabe.Id,
-            HasScheduledPrompt = _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id) is not null,
+            SortierZeitpunkt = workItem.LastCliStartUtc ?? workItem.CreatedAt,
+            Status = workItem.Status,
+            ExecutionStatus = workItem.ExecutionStatus,
+            ActiveRunId = workItem.ActiveRunId,
+            LastHeartbeatUtc = workItem.LastHeartbeatUtc,
+            RunStatus = workItem.RunStatus,
+            LiveLaufStatus = _runningStatusSource.GetLiveRunStatus(workItem.Id),
+            LastCliStartUtc = workItem.LastCliStartUtc,
+            PausedUntilUtc = workItem.PausedUntilUtc,
+            IsAktiv = GetAktiveAufgabeId() == workItem.Id,
+            HasScheduledPrompt = _promptZeitVersandService.GetScheduledPromptStatus(workItem.Id) is not null,
             OffeneTodoCount = offeneTodoCount,
             OffeneTodosAnzeigenCommand = offeneTodosCommand
         };
     }
 
-    private async Task OffeneTodosDialogOeffnenAsync(Guid aufgabeId, string aufgabenTitel, CancellationToken ct)
+    private async Task OffeneTodosDialogOeffnenAsync(Guid workItemId, string aufgabenTitel, CancellationToken ct)
     {
         if (_dialogService is null)
             return;
 
         var viewModel = _serviceProvider.GetRequiredService<OpenTodosDialogViewModel>();
-        await viewModel.LoadAsync(aufgabeId, aufgabenTitel, ct);
+        await viewModel.LoadAsync(workItemId, aufgabenTitel, ct);
         await _dialogService.ShowOpenTodosDialogAsync(viewModel, ct);
     }
 
@@ -542,8 +542,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private Guid? GetAktiveAufgabeId()
     {
-        return CurrentView is TaskDetailViewModel { AufgabeId: var aufgabeId } && aufgabeId != Guid.Empty
-            ? aufgabeId
+        return CurrentView is TaskDetailViewModel { WorkItemId: var workItemId } && workItemId != Guid.Empty
+            ? workItemId
             : null;
     }
 
@@ -552,7 +552,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _dispatcherInvoke(AktiveAufgabenImHintergrundAktualisieren);
     }
 
-    private void OnLaufdatenChanged(Guid aufgabeId)
+    private void OnLaufdatenChanged(Guid workItemId)
     {
         _dispatcherInvoke(AktiveAufgabenImHintergrundAktualisieren);
     }

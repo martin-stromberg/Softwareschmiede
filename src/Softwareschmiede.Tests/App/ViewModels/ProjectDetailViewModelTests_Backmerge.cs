@@ -15,7 +15,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Tests für die projektbezogene Backmerge-Option in <see cref="ProjectDetailViewModel"/>.</summary>
 public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
     private readonly AppEinstellungService _einstellungService;
@@ -60,22 +60,22 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
             _pluginManagerMock.Object,
             NullLogger<ProjectDetailViewModel>.Instance);
 
-    private async Task<Projekt> ErstelleProjektMitRepositoryAsync(string? basisBranch = "staging")
+    private async Task<Project> ErstelleProjektMitRepositoryAsync(string? basisBranch = "staging")
     {
-        var projekt = await _projektService.CreateAsync("Backmerge-Test-Projekt", null);
+        var project = await _projektService.CreateAsync("Backmerge-Test-Projekt", null);
         await _projektService.AddRepositoryAsync(
-            projekt.Id,
+            project.Id,
             "Softwareschmiede.GitHub",
             "https://github.com/test/repo",
             "test-repo",
             defaultSourceBranchName: basisBranch,
             ct: CancellationToken.None);
-        return projekt;
+        return project;
     }
 
-    private static async Task LadenAsync(ProjectDetailViewModel sut, Guid projektId)
+    private static async Task LadenAsync(ProjectDetailViewModel sut, Guid projectId)
     {
-        sut.ProjektId = projektId;
+        sut.ProjectId = projectId;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
     }
 
@@ -84,12 +84,12 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
     [Fact]
     public async Task LadenAsync_ProjektbezogenerModus_OptionSichtbarUndFlagGeladen()
     {
-        var projekt = await ErstelleProjektMitRepositoryAsync();
-        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeModus.Projektbezogen, TestContext.Current.CancellationToken);
-        await _einstellungService.SetBackmergeProjektAktivAsync(projekt.Id, true, TestContext.Current.CancellationToken);
+        var project = await ErstelleProjektMitRepositoryAsync();
+        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeMode.ProjectScoped, TestContext.Current.CancellationToken);
+        await _einstellungService.SetBackmergeProjektAktivAsync(project.Id, true, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await LadenAsync(sut, projekt.Id);
+        await LadenAsync(sut, project.Id);
 
         sut.IsBackmergeOptionVisible.Should().BeTrue();
         sut.IsBackmergeAutoMergeEnabled.Should().BeTrue();
@@ -97,15 +97,15 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
 
     /// <summary>Ohne Modus „Projektbezogen aktivierbar“ bleibt die Option verborgen.</summary>
     [Theory]
-    [InlineData(ScmBackmergeModus.Deaktiviert)]
-    [InlineData(ScmBackmergeModus.Global)]
-    public async Task LadenAsync_NichtProjektbezogenerModus_OptionVerborgen(ScmBackmergeModus modus)
+    [InlineData(ScmBackmergeMode.Disabled)]
+    [InlineData(ScmBackmergeMode.Global)]
+    public async Task LadenAsync_NichtProjektbezogenerModus_OptionVerborgen(ScmBackmergeMode modus)
     {
-        var projekt = await ErstelleProjektMitRepositoryAsync();
+        var project = await ErstelleProjektMitRepositoryAsync();
         await _einstellungService.SetScmBackmergeModusAsync(modus, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await LadenAsync(sut, projekt.Id);
+        await LadenAsync(sut, project.Id);
 
         sut.IsBackmergeOptionVisible.Should().BeFalse();
     }
@@ -114,11 +114,11 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
     [Fact]
     public async Task LadenAsync_OhneBasisBranch_OptionVerborgen()
     {
-        var projekt = await ErstelleProjektMitRepositoryAsync(basisBranch: null);
-        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeModus.Projektbezogen, TestContext.Current.CancellationToken);
+        var project = await ErstelleProjektMitRepositoryAsync(basisBranch: null);
+        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeMode.ProjectScoped, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        await LadenAsync(sut, projekt.Id);
+        await LadenAsync(sut, project.Id);
 
         sut.IsBackmergeOptionVisible.Should().BeFalse();
     }
@@ -127,15 +127,15 @@ public sealed class ProjectDetailViewModelTests_Backmerge : IDisposable
     [Fact]
     public async Task IsBackmergeAutoMergeEnabled_Umschalten_PersistiertProjektFlag()
     {
-        var projekt = await ErstelleProjektMitRepositoryAsync();
-        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeModus.Projektbezogen, TestContext.Current.CancellationToken);
+        var project = await ErstelleProjektMitRepositoryAsync();
+        await _einstellungService.SetScmBackmergeModusAsync(ScmBackmergeMode.ProjectScoped, TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        await LadenAsync(sut, projekt.Id);
+        await LadenAsync(sut, project.Id);
 
         sut.IsBackmergeAutoMergeEnabled = true;
 
         var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (!await _einstellungService.GetBackmergeProjektAktivAsync(projekt.Id, TestContext.Current.CancellationToken))
+        while (!await _einstellungService.GetBackmergeProjektAktivAsync(project.Id, TestContext.Current.CancellationToken))
         {
             DateTime.UtcNow.Should().BeBefore(deadline, "die Freigabe muss zeitnah persistiert werden");
             await Task.Delay(50, TestContext.Current.CancellationToken);

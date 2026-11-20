@@ -8,35 +8,35 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Service für To-Do-CRUD-Operationen und Abfragen.</summary>
 public sealed class TodoService
 {
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly ILogger<TodoService> _logger;
 
     /// <inheritdoc cref="TodoService"/>
-    public TodoService(SoftwareschmiededDbContext db, ILogger<TodoService> logger)
+    public TodoService(SoftwareschmiedeDbContext db, ILogger<TodoService> logger)
     {
         _db = db;
         _logger = logger;
     }
 
     /// <summary>Erstellt ein neues To-Do für eine Aufgabe.</summary>
-    public async Task<Todo> CreateTodoAsync(Guid aufgabeId, string beschreibung, CancellationToken ct = default)
+    public async Task<Todo> CreateTodoAsync(Guid workItemId, string beschreibung, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(beschreibung);
 
-        _logger.LogInformation("To-Do für Aufgabe {AufgabeId} erstellen.", aufgabeId);
+        _logger.LogInformation("To-Do für Aufgabe {AufgabeId} erstellen.", workItemId);
 
         var todo = new Todo
         {
             Id = Guid.NewGuid(),
-            AufgabeId = aufgabeId,
-            Beschreibung = beschreibung,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            WorkItemId = workItemId,
+            Description = beschreibung,
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         _db.Todos.Add(todo);
         await _db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("To-Do {TodoId} für Aufgabe {AufgabeId} erstellt.", todo.Id, aufgabeId);
+        _logger.LogInformation("To-Do {TodoId} für Aufgabe {AufgabeId} erstellt.", todo.Id, workItemId);
         return todo;
     }
 
@@ -48,7 +48,7 @@ public sealed class TodoService
         var todo = await _db.Todos.FindAsync([todoId], ct)
             ?? throw new InvalidOperationException($"To-Do {todoId} nicht gefunden.");
 
-        todo.ErledigtAm = DateTimeOffset.UtcNow;
+        todo.CompletedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("To-Do {TodoId} als erledigt markiert.", todoId);
@@ -69,32 +69,32 @@ public sealed class TodoService
     }
 
     /// <summary>Gibt die offenen To-Dos (<see cref="Todo.IstOffen"/>) einer Aufgabe zurück.</summary>
-    public async Task<IReadOnlyList<Todo>> GetOpenTodosAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<Todo>> GetOpenTodosAsync(Guid workItemId, CancellationToken ct = default)
         // t.ErledigtAm == null statt t.IstOffen: EF Core kann die berechnete Eigenschaft nicht in SQL
         // übersetzen ("Translation of member 'IstOffen' ... failed") - siehe TodoService.GetTodoCountAsync.
         => await _db.Todos
             .AsNoTracking()
-            .Where(t => t.AufgabeId == aufgabeId && t.ErledigtAm == null)
-            .OrderBy(t => t.ErstellungsDatum)
+            .Where(t => t.WorkItemId == workItemId && t.CompletedAt == null)
+            .OrderBy(t => t.CreatedAt)
             .ToListAsync(ct);
 
     /// <summary>Gibt alle To-Dos (offen und erledigt) einer Aufgabe zurück.</summary>
-    public async Task<IReadOnlyList<Todo>> GetAllTodosAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<Todo>> GetAllTodosAsync(Guid workItemId, CancellationToken ct = default)
         => await _db.Todos
             .AsNoTracking()
-            .Where(t => t.AufgabeId == aufgabeId)
-            .OrderBy(t => t.ErstellungsDatum)
+            .Where(t => t.WorkItemId == workItemId)
+            .OrderBy(t => t.CreatedAt)
             .ToListAsync(ct);
 
     /// <summary>Gibt die Anzahl offener To-Dos einer Aufgabe zurück.</summary>
-    public async Task<int> GetTodoCountAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task<int> GetTodoCountAsync(Guid workItemId, CancellationToken ct = default)
         // t.ErledigtAm == null statt t.IstOffen: EF Core kann die berechnete Eigenschaft Todo.IstOffen
         // nicht in SQL übersetzen (InvalidOperationException "Translation of member 'IstOffen' ...
         // failed"), da sie kein gemapptes Modellmitglied ist. Die Eigenschaft bleibt für In-Memory-
         // LINQ-Ausdrücke (z. B. EntwicklungsprozessService.AbschliessenAsync) nutzbar.
         => await _db.Todos
             .AsNoTracking()
-            .CountAsync(t => t.AufgabeId == aufgabeId && t.ErledigtAm == null, ct);
+            .CountAsync(t => t.WorkItemId == workItemId && t.CompletedAt == null, ct);
 
     /// <summary>Gibt die Anzahl offener To-Dos für mehrere Aufgaben zurück.</summary>
     public async Task<IReadOnlyDictionary<Guid, int>> GetOpenTodoCountsAsync(
@@ -107,9 +107,9 @@ public sealed class TodoService
 
         return await _db.Todos
             .AsNoTracking()
-            .Where(t => ids.Contains(t.AufgabeId) && t.ErledigtAm == null)
-            .GroupBy(t => t.AufgabeId)
-            .Select(g => new { AufgabeId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.AufgabeId, x => x.Count, ct);
+            .Where(t => ids.Contains(t.WorkItemId) && t.CompletedAt == null)
+            .GroupBy(t => t.WorkItemId)
+            .Select(g => new { WorkItemId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.WorkItemId, x => x.Count, ct);
     }
 }

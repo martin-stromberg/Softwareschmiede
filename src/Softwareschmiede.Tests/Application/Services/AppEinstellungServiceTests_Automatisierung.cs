@@ -11,7 +11,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// Prüfmodus der Abschlussüberwachung sowie die Backmerge-Optionen Draft-Aktivierung und Admin-Merge.</summary>
 public sealed class AppEinstellungServiceTests_Automatisierung : IDisposable
 {
-    private readonly SoftwareschmiededDbContext _db = TestDbContextFactory.Create();
+    private readonly SoftwareschmiedeDbContext _db = TestDbContextFactory.Create();
     private readonly AppEinstellungService _sut;
 
     /// <inheritdoc cref="AppEinstellungServiceTests_Automatisierung"/>
@@ -24,7 +24,7 @@ public sealed class AppEinstellungServiceTests_Automatisierung : IDisposable
     /// <summary>Ohne gespeicherten Eintrag gilt der ereignisgesteuerte Prüfmodus.</summary>
     [Fact]
     public async Task GetScmTaskCompletionPruefmodusAsync_WithoutEntry_DefaultsToEreignisgesteuert()
-        => (await _sut.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionPruefmodus.Ereignisgesteuert);
+        => (await _sut.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionCheckMode.EventDriven);
 
     /// <summary>Ungültige gespeicherte Werte fallen auf „Ereignisgesteuert“ zurück.</summary>
     [Theory]
@@ -33,14 +33,14 @@ public sealed class AppEinstellungServiceTests_Automatisierung : IDisposable
     public async Task GetScmTaskCompletionPruefmodusAsync_InvalidStoredValue_FallsBackToEreignisgesteuert(string stored)
     {
         await _sut.SetSettingAsync(AppEinstellungService.ScmTaskCompletionPruefmodusKey, stored, TestContext.Current.CancellationToken);
-        (await _sut.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionPruefmodus.Ereignisgesteuert);
+        (await _sut.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionCheckMode.EventDriven);
     }
 
     /// <summary>Der persistierte Prüfmodus gilt zur Laufzeit.</summary>
     [Theory]
-    [InlineData(ScmTaskCompletionPruefmodus.Ereignisgesteuert)]
-    [InlineData(ScmTaskCompletionPruefmodus.AlleAufgaben)]
-    public async Task SetScmTaskCompletionPruefmodusAsync_PersistedValue_IsHonored(ScmTaskCompletionPruefmodus modus)
+    [InlineData(ScmTaskCompletionCheckMode.EventDriven)]
+    [InlineData(ScmTaskCompletionCheckMode.AllWorkItems)]
+    public async Task SetScmTaskCompletionPruefmodusAsync_PersistedValue_IsHonored(ScmTaskCompletionCheckMode modus)
     {
         await _sut.SetScmTaskCompletionPruefmodusAsync(modus, TestContext.Current.CancellationToken);
         (await _sut.GetScmTaskCompletionPruefmodusAsync(TestContext.Current.CancellationToken)).Should().Be(modus);
@@ -49,7 +49,7 @@ public sealed class AppEinstellungServiceTests_Automatisierung : IDisposable
     /// <summary>Ein nicht definierter Prüfmodus wird abgelehnt.</summary>
     [Fact]
     public async Task SetScmTaskCompletionPruefmodusAsync_UndefinedValue_Throws()
-        => await FluentActions.Invoking(() => _sut.SetScmTaskCompletionPruefmodusAsync((ScmTaskCompletionPruefmodus)42))
+        => await FluentActions.Invoking(() => _sut.SetScmTaskCompletionPruefmodusAsync((ScmTaskCompletionCheckMode)42))
             .Should().ThrowAsync<ArgumentOutOfRangeException>();
 
     /// <summary>Beide Backmerge-Optionen sind ohne Eintrag deaktiviert und werden getrennt persistiert.</summary>

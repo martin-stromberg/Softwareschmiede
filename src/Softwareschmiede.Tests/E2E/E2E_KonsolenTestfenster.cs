@@ -59,7 +59,7 @@ public partial class End2EndTest
     /// Tastaturauswahl als Produktsemantik vorausgesetzt.</summary>
     private async Task ReplayText_MitFrischerAufzeichnung(Window mainWindow, string pluginName, Action<KonsolenTestDialogView> pruefung)
     {
-        var pfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_selection_{Guid.NewGuid():N}.clireplay");
+        var path = Path.Combine(Path.GetTempPath(), $"softwareschmiede_selection_{Guid.NewGuid():N}.clireplay");
         var prozessstartsVorher = File.Exists(ResolveProzessStartLogPfad())
             ? await File.ReadAllTextAsync(ResolveProzessStartLogPfad()) : string.Empty;
         SettingsView? settings = null;
@@ -67,11 +67,11 @@ public partial class End2EndTest
         try
         {
             var store = new CliReplayAufzeichnungStore();
-            await using (var stream = File.Create(pfad))
+            await using (var stream = File.Create(path))
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = pluginName,
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow,
@@ -91,7 +91,7 @@ public partial class End2EndTest
             settings = new SettingsView(mainWindow).ForceShow();
             dialog = settings.OpenKonsolenTestDialog();
             dialog.SetZeitrafferSchwelle("0");
-            dialog.OeffneAufzeichnung(pfad);
+            dialog.OeffneAufzeichnung(path);
             dialog.WarteAufStatus($"Aufzeichnung geladen ({pluginName}, 1 Chunks) — bereit.");
             dialog.StartWiedergabe();
             dialog.WarteAufStatus("Wiedergabe beendet.");
@@ -107,8 +107,8 @@ public partial class End2EndTest
         finally
         {
             TryCloseKonsolenTestfenster(dialog, settings);
-            if (File.Exists(pfad))
-                File.Delete(pfad);
+            if (File.Exists(path))
+                File.Delete(path);
         }
     }
 
@@ -144,7 +144,7 @@ public partial class End2EndTest
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     protected async Task KonsolenTestfenster_OeffnetLaedtAufzeichnungUndSpieltAb_E2E(Window mainWindow)
     {
-        var pfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
+        var path = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         var pausePfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         var schrittPfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         var defektPfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
@@ -159,11 +159,11 @@ public partial class End2EndTest
             // Synthetische Aufzeichnung mit zwei getrennten Roh-Chunks (Chunk-Grenzen bleiben
             // sichtbar); Chunk 1 enthält SGR-Farbsequenzen — die Quell-Ansicht muss die
             // Steuersequenzen sichtbar machen (ESC als ␛).
-            await using (var stream = File.Create(pfad))
+            await using (var stream = File.Create(path))
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Diagnose",
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(50),
@@ -184,7 +184,7 @@ public partial class End2EndTest
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Pause",
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow.AddSeconds(3),
@@ -206,7 +206,7 @@ public partial class End2EndTest
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Schritt",
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(100),
@@ -229,7 +229,7 @@ public partial class End2EndTest
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Breit",
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(10),
@@ -249,7 +249,7 @@ public partial class End2EndTest
             {
                 await store.SpeichernAsync(stream, new CliOutputAufzeichnung
                 {
-                    AufgabeId = Guid.NewGuid(),
+                    WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Schmal",
                     StartUtc = DateTimeOffset.UtcNow,
                     EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(10),
@@ -402,7 +402,7 @@ public partial class End2EndTest
 
             // Maximale Geschwindigkeit: Inter-Chunk-Pausen der Aufzeichnung ignorieren.
             dialog.SetZeitrafferSchwelle("0");
-            dialog.OeffneAufzeichnung(pfad);
+            dialog.OeffneAufzeichnung(path);
             dialog.WarteAufStatus("Aufzeichnung geladen (E2E-Diagnose, 2 Chunks) — bereit.");
 
             Assert.False(dialog.IstFehlerSichtbar(),
@@ -502,8 +502,8 @@ public partial class End2EndTest
             // offenen Dialog statt der Hauptansicht.
             TryCloseKonsolenTestfenster(dialog, settings);
 
-            if (File.Exists(pfad))
-                File.Delete(pfad);
+            if (File.Exists(path))
+                File.Delete(path);
             if (File.Exists(pausePfad))
                 File.Delete(pausePfad);
             if (File.Exists(schrittPfad))

@@ -33,12 +33,12 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         var observation = ScmEventStore.Observation(item);
         Assert.Equal(7, observation.Reference.Number);
         Assert.Equal(ScmKontoModus.SeparatesKonto, observation.Reference.Repository.Konto);
-        Assert.NotEqual(Guid.Empty, item.AufgabeId);
+        Assert.NotEqual(Guid.Empty, item.WorkItemId);
         fixture.Git.As<IScmEventSource>().Verify(x => x.EnumerateReferencesAsync(
             It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Never);
         var checkpoint = Assert.Single(await db.ScmObservationCheckpoints
@@ -70,10 +70,10 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var task = Assert.Single(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var task = Assert.Single(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(task.Id, item.AufgabeId);
+        Assert.Equal(task.Id, item.WorkItemId);
         Assert.Equal("github-actions[bot]", ScmEventStore.Observation(item).AuthorLogin);
         Assert.Equal("Zugestellt", item.Status);
         Assert.Single(fixture.Prompts);
@@ -95,7 +95,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         var checkpoint = Assert.Single(await db.ScmObservationCheckpoints
             .Where(x => x.SourceKey.StartsWith("notifications/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
@@ -123,7 +123,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         fixture.Git.As<IScmEventSource>().Verify(x => x.ReadEventsAsync(
             It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -149,7 +149,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
 
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var checkpoint = Assert.Single(await db.ScmObservationCheckpoints
                 .Where(x => x.SourceKey.StartsWith("notifications/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal("Temporary", checkpoint.ErrorCode);
@@ -160,7 +160,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         // Nach der Backoff-Zeit (NextAttemptUtc entfernen) wird die Inbox erneut gelesen.
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var checkpoint = await db.ScmObservationCheckpoints.SingleAsync(x => x.SourceKey.StartsWith("notifications/"), cancellationToken: TestContext.Current.CancellationToken);
             checkpoint.NextAttemptUtc = null;
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -173,7 +173,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
 
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var checkpoint = Assert.Single(await db.ScmObservationCheckpoints
                 .Where(x => x.SourceKey.StartsWith("notifications/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             Assert.NotNull(checkpoint.WatermarkUtc);
@@ -194,7 +194,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         ConfigureBotResolution(fixture);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             db.Add(new ScmObservationCheckpoint { SourceKey = "notifications/test-scm/github.com" });
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
@@ -202,7 +202,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var verify = fixture.Services.CreateScope();
-        var db2 = verify.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db2 = verify.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var checkpoint = Assert.Single(await db2.ScmObservationCheckpoints
             .Where(x => x.SourceKey == "notifications/test-scm/github.com").ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.NotNull(checkpoint.WatermarkUtc);
@@ -237,7 +237,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         fixture.Git.As<IScmEventSource>().Verify(x => x.ReadEventsAsync(
             It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -286,16 +286,16 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         string repositoryUrl = "https://github.com/owner/repo", string repositoryName = "repo")
     {
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "Inbox" };
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var project = new Project { Id = Guid.NewGuid(), Name = "Inbox" };
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            Projekt = project,
+            Project = project,
             RepositoryUrl = repositoryUrl,
             RepositoryName = repositoryName,
-            PluginTyp = fixture.Repository.ProviderPrefix,
-            Aktiv = true
+            PluginType = fixture.Repository.ProviderPrefix,
+            Active = true
         };
         db.AddRange(project, repository);
         await db.SaveChangesAsync();

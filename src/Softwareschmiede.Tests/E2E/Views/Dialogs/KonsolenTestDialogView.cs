@@ -30,15 +30,15 @@ public sealed class KonsolenTestDialogView : DialogView
     /// setzt den Dateinamen per ValuePattern und ruft die Öffnen-Schaltfläche auf (deterministisch,
     /// unabhängig vom Tastaturfokus und vom Autocomplete-Dropdown). Erwartet eine existierende
     /// .clireplay-Datei.</summary>
-    /// <param name="pfad">Der Pfad der zu ladenden .clireplay-Datei.</param>
+    /// <param name="path">Der Pfad der zu ladenden .clireplay-Datei.</param>
     /// <returns>Diese Instanz.</returns>
-    public KonsolenTestDialogView OeffneAufzeichnung(string pfad)
+    public KonsolenTestDialogView OeffneAufzeichnung(string path)
     {
         KlickAufzeichnungOeffnen();
 
         var openDialog = WaitForOpenDialog();
         openDialog.Focus();
-        Keyboard.Type(pfad);
+        Keyboard.Type(path);
 
         // Das Dateiname-Feld des nativen Dialogs zeigt beim Tippen eine Autocomplete-Liste
         // (UIA: sichtbares Listen-Element "Dateiname:"). Sie darf nicht per Enter übernommen

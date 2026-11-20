@@ -20,7 +20,7 @@ public sealed class OpenTodosDialogViewModel : ViewModelBase
     }
 
     /// <summary>Eindeutige ID der Aufgabe.</summary>
-    public Guid AufgabeId
+    public Guid WorkItemId
     {
         get => _aufgabeId;
         private set => SetProperty(ref _aufgabeId, value);
@@ -43,15 +43,15 @@ public sealed class OpenTodosDialogViewModel : ViewModelBase
     public bool IsEmpty => !HasOpenTodos;
 
     /// <summary>Lädt die offenen To-Dos einer Aufgabe.</summary>
-    public async Task LoadAsync(Guid aufgabeId, string aufgabenTitel, CancellationToken ct = default)
+    public async Task LoadAsync(Guid workItemId, string aufgabenTitel, CancellationToken ct = default)
     {
-        _logger.LogInformation("Offene To-Dos für Aufgabe {AufgabeId} laden.", aufgabeId);
+        _logger.LogInformation("Offene To-Dos für Aufgabe {AufgabeId} laden.", workItemId);
 
-        AufgabeId = aufgabeId;
+        WorkItemId = workItemId;
         AufgabenTitel = aufgabenTitel;
 
         Todos.Clear();
-        var todos = await _todoService.GetOpenTodosAsync(aufgabeId, ct);
+        var todos = await _todoService.GetOpenTodosAsync(workItemId, ct);
         foreach (var todo in todos)
         {
             Todos.Add(new TodoViewModel(todo));

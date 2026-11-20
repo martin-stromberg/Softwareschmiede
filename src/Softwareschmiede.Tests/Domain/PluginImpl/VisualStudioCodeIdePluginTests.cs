@@ -75,16 +75,16 @@ public sealed class VisualStudioCodeIdePluginTests
     public async Task OpenEntryPointAsync_RuftOpenDirectoryAuf()
     {
         var repositoryPfad = @"C:\repos\meinprojekt";
-        var prozessStarterMock = new Mock<IProzessStarter>();
+        var prozessStarterMock = new Mock<IProcessStarter>();
         var sut = new VisualStudioCodeIdePlugin(prozessStarterMock.Object, CreateLocator(new VisualStudioCodeAvailability(true, "code.cmd")));
 
         await sut.OpenEntryPointAsync(new IdeEntryPoint(repositoryPfad), TestContext.Current.CancellationToken);
 
         prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a =>
-                a.DateiName == "code.cmd" &&
-                a.Argumente == $"\"{repositoryPfad}\"" &&
-                a.ShellAusfuehren == false)),
+            p => p.Start(It.Is<ProcessStartRequest>(a =>
+                a.FileName == "code.cmd" &&
+                a.Arguments == $"\"{repositoryPfad}\"" &&
+                a.UseShellExecute == false)),
             Times.Once);
     }
 
@@ -100,7 +100,7 @@ public sealed class VisualStudioCodeIdePluginTests
     }
 
     private static VisualStudioCodeIdePlugin CreateSut(VisualStudioCodeAvailability availability)
-        => new(new Mock<IProzessStarter>().Object, CreateLocator(availability));
+        => new(new Mock<IProcessStarter>().Object, CreateLocator(availability));
 
     private static IVisualStudioCodeLocator CreateLocator(VisualStudioCodeAvailability availability)
         => new TestVisualStudioCodeLocator(availability);

@@ -10,7 +10,7 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Migrations
 {
-    [DbContext(typeof(SoftwareschmiededDbContext))]
+    [DbContext(typeof(SoftwareschmiedeDbContext))]
     [Migration("20260523052722_202605230001_AddTaskRecoveryIndicators")]
     partial class _202605230001_AddTaskRecoveryIndicators
     {

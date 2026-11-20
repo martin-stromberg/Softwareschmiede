@@ -10,7 +10,7 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Migrations
 {
-    [DbContext(typeof(SoftwareschmiededDbContext))]
+    [DbContext(typeof(SoftwareschmiedeDbContext))]
     [Migration("20260610000003_202606100003_AddWindowGeometrySettings")]
     partial class _202606100003_AddWindowGeometrySettings
     {

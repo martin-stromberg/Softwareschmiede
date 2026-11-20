@@ -28,15 +28,15 @@ public partial class End2EndTest
         var repositoryId = Guid.NewGuid();
         using (var db = OpenTestDbContext())
         {
-            var projekt = new Projekt { Id = Guid.NewGuid(), Name = "Aufbereitung-E2E" };
-            db.AddRange(projekt, new GitRepository
+            var project = new Project { Id = Guid.NewGuid(), Name = "Aufbereitung-E2E" };
+            db.AddRange(project, new GitRepository
             {
                 Id = repositoryId,
-                ProjektId = projekt.Id,
-                PluginTyp = "Softwareschmiede.GitHub",
+                ProjectId = project.Id,
+                PluginType = "Softwareschmiede.GitHub",
                 RepositoryUrl = "https://github.com/owner/" + repositoryName,
                 RepositoryName = repositoryName,
-                Aktiv = true
+                Active = true
             });
             db.SaveChanges();
         }
@@ -76,13 +76,13 @@ public partial class End2EndTest
             // Persistenz-Nachweis in AppEinstellungen und Repository-Flag.
             using (var db = OpenTestDbContext())
             {
-                Assert.Equal("True", db.AppEinstellungen
-                    .Where(e => e.Schluessel == AppEinstellungService.ScmIssueAufbereitungEnabledKey)
-                    .Select(e => e.Wert).FirstOrDefault());
-                Assert.Equal("False", db.AppEinstellungen
-                    .Where(e => e.Schluessel == AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey)
-                    .Select(e => e.Wert).FirstOrDefault());
-                Assert.True(db.GitRepositories.Single(r => r.Id == repositoryId).IssueAufbereitungAktiv);
+                Assert.Equal("True", db.AppSettings
+                    .Where(e => e.Key == AppEinstellungService.ScmIssueAufbereitungEnabledKey)
+                    .Select(e => e.Value).FirstOrDefault());
+                Assert.Equal("False", db.AppSettings
+                    .Where(e => e.Key == AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey)
+                    .Select(e => e.Value).FirstOrDefault());
+                Assert.True(db.GitRepositories.Single(r => r.Id == repositoryId).IssuePreparationEnabled);
             }
         }
         finally
@@ -104,12 +104,12 @@ public partial class End2EndTest
                 try
                 {
                     using var db = OpenTestDbContext();
-                    db.AppEinstellungen
-                        .Where(e => e.Schluessel == AppEinstellungService.ScmIssueAufbereitungEnabledKey
-                            || e.Schluessel == AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey
-                            || e.Schluessel == AppEinstellungService.ScmIssueAufbereitungPluginKey)
+                    db.AppSettings
+                        .Where(e => e.Key == AppEinstellungService.ScmIssueAufbereitungEnabledKey
+                            || e.Key == AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey
+                            || e.Key == AppEinstellungService.ScmIssueAufbereitungPluginKey)
                         .ToList()
-                        .ForEach(e => e.Wert = null);
+                        .ForEach(e => e.Value = null);
                     db.SaveChanges();
                 }
                 catch { }

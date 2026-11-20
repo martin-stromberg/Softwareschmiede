@@ -35,7 +35,7 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
     {
         var sut = CreateSut();
         var configuration = CreateConfig();
-        configuration.Aktiv = false;
+        configuration.Active = false;
 
         await sut.RunAsync(_repositoryRootPath, configuration, TestContext.Current.CancellationToken);
 
@@ -132,12 +132,12 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
             _cliRunnerMock.Object,
             NullLogger<RepositoryStartskriptService>.Instance);
 
-    private static RepositoryStartKonfiguration CreateConfig()
+    private static RepositoryStartConfiguration CreateConfig()
         => new()
         {
             Id = Guid.NewGuid(),
             GitRepositoryId = Guid.NewGuid(),
-            Aktiv = true,
+            Active = true,
             StartScriptRelativePath = "start.ps1"
         };
 

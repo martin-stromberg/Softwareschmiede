@@ -10,7 +10,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Tests für den SCM-Kontomodus (<see cref="AppEinstellungService.ScmKontoModusKey"/>).</summary>
 public sealed class AppEinstellungServiceTests_KontoModus : IDisposable
 {
-    private readonly SoftwareschmiededDbContext _db = TestDbContextFactory.Create();
+    private readonly SoftwareschmiedeDbContext _db = TestDbContextFactory.Create();
     private readonly AppEinstellungService _sut;
 
     /// <inheritdoc cref="AppEinstellungServiceTests_KontoModus"/>

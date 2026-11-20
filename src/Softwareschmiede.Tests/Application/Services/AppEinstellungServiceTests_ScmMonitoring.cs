@@ -9,7 +9,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Tests für die SCM-Einstellungen (Überwachungs-Schalter und Trigger-Keyword) in <see cref="AppEinstellungService"/>.</summary>
 public sealed class AppEinstellungServiceTests_ScmMonitoring : IDisposable
 {
-    private readonly SoftwareschmiededDbContext _db = TestDbContextFactory.Create();
+    private readonly SoftwareschmiedeDbContext _db = TestDbContextFactory.Create();
     private readonly AppEinstellungService _sut;
 
     /// <inheritdoc cref="AppEinstellungServiceTests_ScmMonitoring"/>

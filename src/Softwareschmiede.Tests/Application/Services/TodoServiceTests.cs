@@ -10,7 +10,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Tests für den TodoService.</summary>
 public sealed class TodoServiceTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly TodoService _sut;
     private readonly Guid _aufgabeId;
 
@@ -20,23 +20,23 @@ public sealed class TodoServiceTests : IDisposable
         _db = TestDbContextFactory.Create();
         _sut = new TodoService(_db, NullLogger<TodoService>.Instance);
 
-        var projektId = Guid.NewGuid();
-        _db.Projekte.Add(new Projekt
+        var projectId = Guid.NewGuid();
+        _db.Projects.Add(new Project
         {
-            Id = projektId,
+            Id = projectId,
             Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
 
         _aufgabeId = Guid.NewGuid();
-        _db.Aufgaben.Add(new Aufgabe
+        _db.WorkItems.Add(new WorkItem
         {
             Id = _aufgabeId,
-            ProjektId = projektId,
-            Titel = "Testaufgabe",
-            Status = AufgabeStatus.Neu,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            ProjectId = projectId,
+            Title = "Testaufgabe",
+            Status = WorkItemStatus.New,
+            CreatedAt = DateTimeOffset.UtcNow
         });
         _db.SaveChanges();
     }
@@ -54,13 +54,13 @@ public sealed class TodoServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.Id.Should().NotBeEmpty();
-        result.AufgabeId.Should().Be(_aufgabeId);
-        result.Beschreibung.Should().Be("Erstes Todo");
-        result.ErledigtAm.Should().BeNull();
+        result.WorkItemId.Should().Be(_aufgabeId);
+        result.Description.Should().Be("Erstes Todo");
+        result.CompletedAt.Should().BeNull();
 
         var gespeichert = _db.Todos.Find(result.Id);
         gespeichert.Should().NotBeNull();
-        gespeichert!.Beschreibung.Should().Be("Erstes Todo");
+        gespeichert!.Description.Should().Be("Erstes Todo");
     }
 
     /// <summary>CreateTodoAsync lehnt eine leere Beschreibung ab.</summary>
@@ -87,8 +87,8 @@ public sealed class TodoServiceTests : IDisposable
 
         // Assert
         var aktualisiert = _db.Todos.Find(todo.Id);
-        aktualisiert!.ErledigtAm.Should().NotBeNull();
-        aktualisiert.ErledigtAm!.Value.Should().BeOnOrAfter(vorMarkierung.AddSeconds(-1));
+        aktualisiert!.CompletedAt.Should().NotBeNull();
+        aktualisiert.CompletedAt!.Value.Should().BeOnOrAfter(vorMarkierung.AddSeconds(-1));
     }
 
     /// <summary>DeleteTodoAsync entfernt das Todo aus der Datenbank.</summary>
@@ -163,13 +163,13 @@ public sealed class TodoServiceTests : IDisposable
     {
         // Arrange
         var zweiteAufgabeId = Guid.NewGuid();
-        _db.Aufgaben.Add(new Aufgabe
+        _db.WorkItems.Add(new WorkItem
         {
             Id = zweiteAufgabeId,
-            ProjektId = _db.Projekte.Single().Id,
-            Titel = "Zweite Testaufgabe",
-            Status = AufgabeStatus.Neu,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            ProjectId = _db.Projects.Single().Id,
+            Title = "Zweite Testaufgabe",
+            Status = WorkItemStatus.New,
+            CreatedAt = DateTimeOffset.UtcNow
         });
         _db.SaveChanges();
 

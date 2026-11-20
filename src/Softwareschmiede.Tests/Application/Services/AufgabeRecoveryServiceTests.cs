@@ -11,19 +11,19 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>AufgabeRecoveryServiceTests.</summary>
 public sealed class AufgabeRecoveryServiceTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly Guid _projektId = Guid.NewGuid();
 
     /// <summary>AufgabeRecoveryServiceTests.</summary>
     public AufgabeRecoveryServiceTests()
     {
         _db = TestDbContextFactory.Create();
-        _db.Projekte.Add(new Projekt
+        _db.Projects.Add(new Project
         {
             Id = _projektId,
             Name = "Recovery Projekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
     }
@@ -32,32 +32,32 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        await sut.RecoverManuellAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        await sut.RecoverManuellAsync(workItem.Id, TestContext.Current.CancellationToken);
 
-        var loaded = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
-        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
-        _db.Protokolleintraege.Count(e => e.AufgabeId == aufgabe.Id && e.Typ == ProtokollTyp.StatusUebergang).Should().Be(1);
-        _db.Protokolleintraege.Single(e => e.AufgabeId == aufgabe.Id).Inhalt.Should().Contain("Manuelle Wiederherstellung");
+        var loaded = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        loaded!.Status.Should().Be(WorkItemStatus.Started);
+        _db.LogEntries.Count(e => e.WorkItemId == workItem.Id && e.Type == LogEntryType.StatusTransition).Should().Be(1);
+        _db.LogEntries.Single(e => e.WorkItemId == workItem.Id).Content.Should().Contain("Manuelle Wiederherstellung");
     }
 
     /// <summary><summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning.</summary>.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Wartend);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Waiting);
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        await sut.RecoverManuellAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        await sut.RecoverManuellAsync(workItem.Id, TestContext.Current.CancellationToken);
 
-        var loaded = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
-        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
+        var loaded = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        loaded!.Status.Should().Be(WorkItemStatus.Started);
         loaded.RecoveryVersion.Should().Be(1);
-        _db.Protokolleintraege.Count(e => e.AufgabeId == aufgabe.Id && e.Typ == ProtokollTyp.StatusUebergang).Should().Be(1);
+        _db.LogEntries.Count(e => e.WorkItemId == workItem.Id && e.Type == LogEntryType.StatusTransition).Should().Be(1);
     }
 
     /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
@@ -67,27 +67,27 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
     /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
     [Theory]
-    [InlineData(AufgabeStatus.Gestartet, AufgabeAusfuehrungsStatus.Aktiv, true)]
-    [InlineData(AufgabeStatus.Wartend, AufgabeAusfuehrungsStatus.Aktiv, true)]
-    [InlineData(AufgabeStatus.Gestartet, AufgabeAusfuehrungsStatus.Beendet, false)]
-    [InlineData(AufgabeStatus.Gestartet, AufgabeAusfuehrungsStatus.NichtGestartet, false)]
-    [InlineData(AufgabeStatus.Neu, AufgabeAusfuehrungsStatus.Aktiv, false)]
-    [InlineData(AufgabeStatus.Archiviert, AufgabeAusfuehrungsStatus.Aktiv, false)]
-    [InlineData(AufgabeStatus.Beendet, AufgabeAusfuehrungsStatus.Aktiv, false)]
-    public void IstRecoveryStatus_ShouldMatchAllowedStates(AufgabeStatus status, AufgabeAusfuehrungsStatus ausfuehrungsStatus, bool expected)
+    [InlineData(WorkItemStatus.Started, WorkItemExecutionStatus.Active, true)]
+    [InlineData(WorkItemStatus.Waiting, WorkItemExecutionStatus.Active, true)]
+    [InlineData(WorkItemStatus.Started, WorkItemExecutionStatus.Completed, false)]
+    [InlineData(WorkItemStatus.Started, WorkItemExecutionStatus.NotStarted, false)]
+    [InlineData(WorkItemStatus.New, WorkItemExecutionStatus.Active, false)]
+    [InlineData(WorkItemStatus.Archived, WorkItemExecutionStatus.Active, false)]
+    [InlineData(WorkItemStatus.Completed, WorkItemExecutionStatus.Active, false)]
+    public void IstRecoveryStatus_ShouldMatchAllowedStates(WorkItemStatus status, WorkItemExecutionStatus executionStatus, bool expected)
     {
-        AufgabeRecoveryService.IstRecoveryStatus(status, ausfuehrungsStatus).Should().Be(expected);
+        AufgabeRecoveryService.IstRecoveryStatus(status, executionStatus).Should().Be(expected);
     }
 
     /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning.</summary>.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var running = new FakeRunningAutomationStatusSource(true);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(aufgabe.Id);
+        var act = () => sut.RecoverManuellAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Wiederherstellung nicht möglich, Verarbeitung läuft noch.");
@@ -97,11 +97,11 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenStatusIsNotRecoverable()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Neu);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.New);
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(aufgabe.Id);
+        var act = () => sut.RecoverManuellAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Wiederherstellung für aktuellen Status nicht verfügbar.");
@@ -111,11 +111,11 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var running = new ThrowingRunningAutomationStatusSource();
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(aufgabe.Id);
+        var act = () => sut.RecoverManuellAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Prüfung der Laufzeit war nicht möglich.");
@@ -126,65 +126,65 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     public async Task TestRecoveryCandidates()
     {
         // Arrange – Aufgabe InArbeit mit altem Heartbeat
-        var aufgabeAlt = new Aufgabe
+        var aufgabeAlt = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Alte InArbeit Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            ProjectId = _projektId,
+            Title = "Alte InArbeit Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         // Aufgabe Wartend mit altem Heartbeat
-        var aufgabeWartend = new Aufgabe
+        var aufgabeWartend = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Alte Wartend Aufgabe",
-            Status = AufgabeStatus.Wartend,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            ProjectId = _projektId,
+            Title = "Alte Wartend Aufgabe",
+            Status = WorkItemStatus.Waiting,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-6),
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         // Aufgabe InArbeit mit frischem Heartbeat (soll nicht erkannt werden)
-        var aufgabeFrisch = new Aufgabe
+        var aufgabeFrisch = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Frische InArbeit Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            ProjectId = _projektId,
+            Title = "Frische InArbeit Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
-        var aufgabeBeendeteAusfuehrung = new Aufgabe
+        var aufgabeBeendeteAusfuehrung = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Beendete Ausfuehrung",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet,
+            ProjectId = _projektId,
+            Title = "Beendete Ausfuehrung",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Completed,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         // Aufgabe Neu (soll nie erkannt werden)
-        var aufgabeNeu = new Aufgabe
+        var aufgabeNeu = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Neue Aufgabe",
-            Status = AufgabeStatus.Neu,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
+            ProjectId = _projektId,
+            Title = "Neue Aufgabe",
+            Status = WorkItemStatus.New,
+            ExecutionStatus = WorkItemExecutionStatus.NotStarted,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
-        _db.Aufgaben.AddRange(aufgabeAlt, aufgabeWartend, aufgabeFrisch, aufgabeBeendeteAusfuehrung, aufgabeNeu);
+        _db.WorkItems.AddRange(aufgabeAlt, aufgabeWartend, aufgabeFrisch, aufgabeBeendeteAusfuehrung, aufgabeNeu);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
@@ -205,17 +205,17 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task ScanForRecoveryCandidates_ShouldExcludeRunningTasks()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Laufende Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            ProjectId = _projektId,
+            Title = "Laufende Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
-        _db.Aufgaben.Add(aufgabe);
+        _db.WorkItems.Add(workItem);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(true);
@@ -230,29 +230,29 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task ScanForRecoveryCandidates_ShouldExcludePausedTasks()
     {
-        var pausiert = new Aufgabe
+        var pausiert = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Pausierte Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            ProjectId = _projektId,
+            Title = "Pausierte Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
-            PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(2),
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            PausedUntilUtc = DateTimeOffset.UtcNow.AddHours(2),
+            CreatedAt = DateTimeOffset.UtcNow
         };
-        var abgelaufenePause = new Aufgabe
+        var abgelaufenePause = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Aufgabe mit abgelaufener Pause",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            ProjectId = _projektId,
+            Title = "Aufgabe mit abgelaufener Pause",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
-            PausiertBisUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            PausedUntilUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+            CreatedAt = DateTimeOffset.UtcNow
         };
-        _db.Aufgaben.AddRange(pausiert, abgelaufenePause);
+        _db.WorkItems.AddRange(pausiert, abgelaufenePause);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
@@ -268,15 +268,15 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenTaskIsPaused()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        var tracked = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
-        tracked!.PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(1);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
+        var tracked = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        tracked!.PausedUntilUtc = DateTimeOffset.UtcNow.AddHours(1);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(aufgabe.Id);
+        var act = () => sut.RecoverManuellAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*pausiert*");
@@ -285,22 +285,22 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    private async Task<Aufgabe> ErstelleAufgabeAsync(AufgabeStatus status)
+    private async Task<WorkItem> ErstelleAufgabeAsync(WorkItemStatus status)
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Recovery Task",
+            ProjectId = _projektId,
+            Title = "Recovery Task",
             Status = status,
-            AusfuehrungsStatus = status.IstAktivOderWartend()
-                ? AufgabeAusfuehrungsStatus.Aktiv
-                : AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            ExecutionStatus = status.IsActiveOrWaiting()
+                ? WorkItemExecutionStatus.Active
+                : WorkItemExecutionStatus.NotStarted,
+            CreatedAt = DateTimeOffset.UtcNow
         };
-        _db.Aufgaben.Add(aufgabe);
+        _db.WorkItems.Add(workItem);
         await _db.SaveChangesAsync();
-        return aufgabe;
+        return workItem;
     }
 
     private sealed class FakeRunningAutomationStatusSource(bool isRunning) : IRunningAutomationStatusSource
@@ -311,9 +311,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         /// <summary>GetRunningCount.</summary>
         public int GetRunningCount() => isRunning ? 1 : 0;
         /// <summary>IsRunning.</summary>
-        public bool IsRunning(Guid aufgabeId) => isRunning;
+        public bool IsRunning(Guid workItemId) => isRunning;
         /// <summary>GetLiveLaufStatus.</summary>
-        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => isRunning ? AufgabeLaufStatus.Laeuft : null;
+        public WorkItemRunStatus? GetLiveRunStatus(Guid workItemId) => isRunning ? WorkItemRunStatus.Running : null;
     }
 
     private sealed class ThrowingRunningAutomationStatusSource : IRunningAutomationStatusSource
@@ -324,8 +324,8 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         /// <summary>GetRunningCount.</summary>
         public int GetRunningCount() => 0;
         /// <summary>IsRunning.</summary>
-        public bool IsRunning(Guid aufgabeId) => throw new TimeoutException("simulated");
+        public bool IsRunning(Guid workItemId) => throw new TimeoutException("simulated");
         /// <summary>GetLiveLaufStatus.</summary>
-        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => throw new TimeoutException("simulated");
+        public WorkItemRunStatus? GetLiveRunStatus(Guid workItemId) => throw new TimeoutException("simulated");
     }
 }

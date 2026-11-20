@@ -14,7 +14,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Tests für die Basis-Branch-Bearbeitung in <see cref="ProjectDetailViewModel"/>.</summary>
 public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
@@ -45,18 +45,18 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
             _pluginManagerMock.Object,
             NullLogger<ProjectDetailViewModel>.Instance);
 
-    private async Task<(Softwareschmiede.Domain.Entities.Projekt Projekt, GitRepository Repository)> ErstelleProjektMitRepositoryAsync(string? defaultSourceBranchName = null)
+    private async Task<(Softwareschmiede.Domain.Entities.Project Project, GitRepository Repository)> ErstelleProjektMitRepositoryAsync(string? defaultSourceBranchName = null)
     {
-        var projekt = await _projektService.CreateAsync("Basis-Branch-Test-Projekt", null);
+        var project = await _projektService.CreateAsync("Basis-Branch-Test-Projekt", null);
         var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
+            project.Id,
             "Softwareschmiede.GitHub",
             "https://github.com/test/repo",
             "test-repo",
             defaultSourceBranchName: defaultSourceBranchName,
             ct: CancellationToken.None);
 
-        return (projekt, repository);
+        return (project, repository);
     }
 
     private static Mock<IGitPlugin> CreatePluginMock(string pluginPrefix)
@@ -71,9 +71,9 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
     [Fact]
     public async Task ProjectDetailVM_SelectedRepository_ShouldLoadSourceBranchName()
     {
-        var (projekt, _) = await ErstelleProjektMitRepositoryAsync(defaultSourceBranchName: "staging");
+        var (project, _) = await ErstelleProjektMitRepositoryAsync(defaultSourceBranchName: "staging");
         var sut = CreateSut();
-        sut.ProjektId = projekt.Id;
+        sut.ProjectId = project.Id;
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
@@ -84,9 +84,9 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
     [Fact]
     public async Task ProjectDetailVM_SaveSourceBranch_ShouldCallService()
     {
-        var (projekt, repository) = await ErstelleProjektMitRepositoryAsync(defaultSourceBranchName: "main");
+        var (project, repository) = await ErstelleProjektMitRepositoryAsync(defaultSourceBranchName: "main");
         var sut = CreateSut();
-        sut.ProjektId = projekt.Id;
+        sut.ProjectId = project.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         await ((AsyncRelayCommand)sut.EditSourceBranchCommand).ExecuteAsync();
@@ -96,7 +96,7 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
 
         sut.IsEditingSourceBranch.Should().BeFalse();
         sut.SelectedRepositorySourceBranchName.Should().Be("staging");
-        var persisted = await _projektService.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
+        var persisted = await _projektService.GetDetailAsync(project.Id, TestContext.Current.CancellationToken);
         persisted!.Repositories.Single(r => r.Id == repository.Id).DefaultSourceBranchName.Should().Be("staging");
     }
 
@@ -104,14 +104,14 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
     [Fact]
     public async Task ProjectDetailVM_SaveSourceBranch_ShouldFail_WhenBranchDoesNotExist()
     {
-        var (projekt, repository) = await ErstelleProjektMitRepositoryAsync(defaultSourceBranchName: "main");
+        var (project, repository) = await ErstelleProjektMitRepositoryAsync(defaultSourceBranchName: "main");
         var pluginMock = CreatePluginMock("Softwareschmiede.GitHub");
         pluginMock.Setup(p => p.GetRemoteBranchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(["main", "staging"]);
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([pluginMock.Object]);
 
         var sut = CreateSut();
-        sut.ProjektId = projekt.Id;
+        sut.ProjectId = project.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         await ((AsyncRelayCommand)sut.EditSourceBranchCommand).ExecuteAsync();
@@ -121,7 +121,7 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
 
         sut.IsEditingSourceBranch.Should().BeTrue();
         sut.SourceBranchInputError.Should().NotBeNullOrEmpty();
-        var persisted = await _projektService.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
+        var persisted = await _projektService.GetDetailAsync(project.Id, TestContext.Current.CancellationToken);
         persisted!.Repositories.Single(r => r.Id == repository.Id).DefaultSourceBranchName.Should().Be("main");
     }
 
@@ -129,14 +129,14 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
     [Fact]
     public async Task ProjectDetailVM_EditSourceBranchMode_ShouldLoadAvailableBranches()
     {
-        var (projekt, _) = await ErstelleProjektMitRepositoryAsync(defaultSourceBranchName: "main");
+        var (project, _) = await ErstelleProjektMitRepositoryAsync(defaultSourceBranchName: "main");
         var pluginMock = CreatePluginMock("Softwareschmiede.GitHub");
         pluginMock.Setup(p => p.GetRemoteBranchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(["main", "staging"]);
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([pluginMock.Object]);
 
         var sut = CreateSut();
-        sut.ProjektId = projekt.Id;
+        sut.ProjectId = project.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         await ((AsyncRelayCommand)sut.EditSourceBranchCommand).ExecuteAsync();
@@ -149,9 +149,9 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
     [Fact]
     public async Task ProjectDetailVM_CancelSourceBranchEdit_ShouldDiscardChanges()
     {
-        var (projekt, repository) = await ErstelleProjektMitRepositoryAsync(defaultSourceBranchName: "main");
+        var (project, repository) = await ErstelleProjektMitRepositoryAsync(defaultSourceBranchName: "main");
         var sut = CreateSut();
-        sut.ProjektId = projekt.Id;
+        sut.ProjectId = project.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         await ((AsyncRelayCommand)sut.EditSourceBranchCommand).ExecuteAsync();
@@ -161,7 +161,7 @@ public sealed class ProjectDetailViewModelTests_BasisBranch : IDisposable
 
         sut.IsEditingSourceBranch.Should().BeFalse();
         sut.SelectedRepositorySourceBranchName.Should().Be("main");
-        var persisted = await _projektService.GetDetailAsync(projekt.Id, TestContext.Current.CancellationToken);
+        var persisted = await _projektService.GetDetailAsync(project.Id, TestContext.Current.CancellationToken);
         persisted!.Repositories.Single(r => r.Id == repository.Id).DefaultSourceBranchName.Should().Be("main");
     }
 }

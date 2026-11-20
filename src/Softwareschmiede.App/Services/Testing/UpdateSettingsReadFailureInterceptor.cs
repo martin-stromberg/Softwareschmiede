@@ -123,13 +123,13 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
                 versuchIndex,
                 ordinal,
                 grenze = lesefehler?.Grenze,
-                fehlerAktiv = lesefehler?.Aktiv == true || _failureEnabled
+                fehlerAktiv = lesefehler?.Active == true || _failureEnabled
             });
 
         if (_failureEnabled)
             throw FailureException;
 
-        if (lesefehler?.Aktiv != true
+        if (lesefehler?.Active != true
             || versuch is null
             || !lesefehler.TrifftVersuch(versuch)
             || ordinal < lesefehler.GrenzOrdinal())

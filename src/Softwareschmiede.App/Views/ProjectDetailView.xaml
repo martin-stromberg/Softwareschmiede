@@ -113,15 +113,15 @@
                         <StackPanel Orientation="Horizontal">
                             <RadioButton Content="Alle"
                                          GroupName="AufgabenFilter"
-                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Alle}"
+                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=All}"
                                          Margin="0,0,16,0" />
                             <RadioButton Content="Aktiv"
                                          GroupName="AufgabenFilter"
-                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Aktiv}"
+                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Active}"
                                          Margin="0,0,16,0" />
                             <RadioButton Content="Archiviert"
                                          GroupName="AufgabenFilter"
-                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Archiviert}" />
+                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Archived}" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -369,7 +369,7 @@
                                                 <RowDefinition />
                                             </Grid.RowDefinitions>
                                             <TextBlock Grid.Row="0"
-                                                       Text="{Binding Titel}"
+                                                       Text="{Binding Title}"
                                                        FontWeight="SemiBold"
                                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                                        TextTrimming="CharacterEllipsis" />
@@ -382,7 +382,7 @@
                                 </ListBox.ItemTemplate>
                                 <ListBox.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem">
-                                        <Setter Property="AutomationProperties.Name" Value="{Binding Titel}" />
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
                                         <EventSetter Event="MouseDoubleClick" Handler="AufgabeDoubleClick" />
                                     </Style>
                                 </ListBox.ItemContainerStyle>
@@ -410,7 +410,7 @@
                                                 <RowDefinition />
                                             </Grid.RowDefinitions>
                                             <TextBlock Grid.Row="0"
-                                                       Text="{Binding Titel}"
+                                                       Text="{Binding Title}"
                                                        FontWeight="SemiBold"
                                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                                        TextTrimming="CharacterEllipsis" />
@@ -423,7 +423,7 @@
                                 </ListBox.ItemTemplate>
                                 <ListBox.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem">
-                                        <Setter Property="AutomationProperties.Name" Value="{Binding Titel}" />
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
                                         <EventSetter Event="MouseDoubleClick" Handler="AufgabeDoubleClick" />
                                     </Style>
                                 </ListBox.ItemContainerStyle>
@@ -479,7 +479,7 @@
                                                        Foreground="{DynamicResource AccentBrush}"
                                                        Margin="0,0,6,0"
                                                        Text="{Binding NummerText}" />
-                                            <TextBlock Text="{Binding Titel}"
+                                            <TextBlock Text="{Binding Title}"
                                                        FontWeight="SemiBold"
                                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                                        TextTrimming="CharacterEllipsis" />

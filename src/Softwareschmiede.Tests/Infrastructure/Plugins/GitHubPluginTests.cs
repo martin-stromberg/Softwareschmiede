@@ -77,7 +77,7 @@ public sealed class GitHubPluginTests
         // Assert
         result.Should().HaveCount(2);
         result[0].Nummer.Should().Be(1);
-        result[0].Titel.Should().Be("Bug Fix");
+        result[0].Title.Should().Be("Bug Fix");
         result[0].Labels.Should().BeEquivalentTo(new[] { "bug", "urgent" });
         result[0].Milestone.Should().Be("v1.0");
         result[1].Nummer.Should().Be(2);
@@ -232,7 +232,7 @@ public sealed class GitHubPluginTests
 
         result.IsSuccess.Should().BeTrue();
         result.Issue!.Nummer.Should().Be(17);
-        result.Issue.Titel.Should().Be("Titel");
+        result.Issue.Title.Should().Be("Titel");
         result.Issue.Body.Should().Be("Body");
         result.Issue.IssueUrl.Should().Be("https://github.com/owner/repo/issues/17");
     }
@@ -672,7 +672,7 @@ public sealed class GitHubPluginTests
 
         // Assert
         result.Nummer.Should().Be(42);
-        result.Titel.Should().Be("My PR");
+        result.Title.Should().Be("My PR");
         result.Url.Should().Be(prUrl);
         result.BranchName.Should().Be("feature/branch");
     }

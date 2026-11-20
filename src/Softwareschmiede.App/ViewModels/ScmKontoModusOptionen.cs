@@ -17,14 +17,14 @@ public static class ScmKontoModusTexte
 
 /// <summary>
 /// Auswahloption für den SCM-Konto-Modus in den Einstellungen: der Steuerwert
-/// (<see cref="Modus"/>) zusammen mit dem sichtbaren Anzeige-Label.
+/// (<see cref="Mode"/>) zusammen mit dem sichtbaren Anzeige-Label.
 /// </summary>
-/// <param name="Modus">Der persistierte Konto-Modus.</param>
+/// <param name="Mode">Der persistierte Konto-Modus.</param>
 /// <param name="Label">Der in der Auswahlbox angezeigte Text.</param>
-public sealed record ScmKontoModusOption(ScmKontoModus Modus, string Label)
+public sealed record ScmKontoModusOption(ScmKontoModus Mode, string Label)
 {
     /// <summary>Alle wählbaren Konto-Modi in Anzeigereihenfolge.</summary>
-    public static IReadOnlyList<ScmKontoModusOption> Alle { get; } =
+    public static IReadOnlyList<ScmKontoModusOption> All { get; } =
     [
         new(ScmKontoModus.Benutzerkonto, ScmKontoModusTexte.Benutzerkonto),
         new(ScmKontoModus.SeparatesKonto, ScmKontoModusTexte.SeparatesKonto)
@@ -32,7 +32,7 @@ public sealed record ScmKontoModusOption(ScmKontoModus Modus, string Label)
 
     /// <summary>Liefert die Auswahloption zu einem gespeicherten Modus.</summary>
     public static ScmKontoModusOption FuerModus(ScmKontoModus modus)
-        => Alle.First(o => o.Modus == modus);
+        => All.First(o => o.Mode == modus);
 
     /// <inheritdoc/>
     public override string ToString() => Label;

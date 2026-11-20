@@ -143,7 +143,7 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
             var repo = db.GitRepositories.FirstOrDefault(r => r.RepositoryName == repositoryName);
             saved = repo is null
                 ? null
-                : db.RepositoryInitialisierungKonfigurationen.Where(c => c.GitRepositoryId == repo.Id).SingleOrDefault()?.InitialisierungsskriptRelativePath;
+                : db.RepositoryInitializationConfigurations.Where(c => c.GitRepositoryId == repo.Id).SingleOrDefault()?.InitializationScriptRelativePath;
             if (string.Equals(saved, expected, StringComparison.Ordinal))
                 return saved;
 

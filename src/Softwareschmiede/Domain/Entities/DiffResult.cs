@@ -11,13 +11,13 @@ public sealed class DiffResult
     public Guid Id { get; set; }
 
     /// <summary>ID der zugehörigen Aufgabe (NOT NULL).</summary>
-    public Guid AufgabeId { get; set; }
+    public Guid WorkItemId { get; set; }
 
     /// <summary>Optionale ID des Git-Repositories (für Kontext).</summary>
     public Guid? GitRepositoryId { get; set; }
 
     /// <summary>Optionaler Verweis auf Protokolleintrag (wenn als Ereignis protokolliert).</summary>
-    public Guid? ProtokollEintragId { get; set; }
+    public Guid? LogEntryId { get; set; }
 
     /// <summary>Relative Dateipfad im Repository (z.B. "src/App.razor").</summary>
     public string FilePath { get; set; } = string.Empty;
@@ -62,13 +62,13 @@ public sealed class DiffResult
     public DateTimeOffset? ExpiresAt { get; set; }
 
     /// <summary>Navigationseigenschaft zur zugehörigen Aufgabe.</summary>
-    public Aufgabe Aufgabe { get; set; } = null!;
+    public WorkItem WorkItem { get; set; } = null!;
 
     /// <summary>Optionale Navigationseigenschaft zum Git-Repository.</summary>
     public GitRepository? GitRepository { get; set; }
 
     /// <summary>Optionale Navigationseigenschaft zum Protokolleintrag.</summary>
-    public Protokolleintrag? ProtokollEintrag { get; set; }
+    public LogEntry? LogEntry { get; set; }
 
     /// <summary>Diff-Blöcke (kaskadierendes Löschen).</summary>
     public List<DiffBlock> DiffBlocks { get; set; } = [];

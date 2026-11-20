@@ -77,16 +77,16 @@ public sealed class PromptZeitVersandService : IDisposable
     /// Vergangenheit oder Gegenwart, wird sofort versendet. Ein bereits geplanter Prompt für
     /// dieselbe Aufgabe wird ersetzt (alter Timer wird abgebrochen).
     /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe, deren Session den Prompt erhalten soll.</param>
+    /// <param name="workItemId">ID der Aufgabe, deren Session den Prompt erhalten soll.</param>
     /// <param name="promptText">Der bereits platzhalteraufgelöste Prompttext.</param>
     /// <param name="targetTime">Der Zeitpunkt, zu dem der Prompt versendet werden soll.</param>
-    public async Task SchedulePromptAsync(Guid aufgabeId, string promptText, DateTimeOffset targetTime)
+    public async Task SchedulePromptAsync(Guid workItemId, string promptText, DateTimeOffset targetTime)
     {
         var now = _timeProvider.GetUtcNow();
 
         // Aktive Pause: Der Versand wird auf das Pausenende verschoben statt sofort/zur Zielzeit
         // zu senden — der Prompt geht nicht verloren.
-        var pausiertBis = await GetPausiertBisUtcAsync(aufgabeId);
+        var pausiertBis = await GetPausiertBisUtcAsync(workItemId);
         if (pausiertBis is { } bis && bis > now && bis > targetTime)
         {
             targetTime = bis;
@@ -94,8 +94,8 @@ public sealed class PromptZeitVersandService : IDisposable
 
         if (targetTime <= now)
         {
-            var sofortInfo = new ScheduledPromptInfo(aufgabeId, promptText, targetTime);
-            var ersetzterEintrag = RemoveEntry(aufgabeId);
+            var sofortInfo = new ScheduledPromptInfo(workItemId, promptText, targetTime);
+            var ersetzterEintrag = RemoveEntry(workItemId);
             ersetzterEintrag?.Timer?.Dispose();
             // Sofortversand: bewusst kein persistierter Datensatz im Erfolgsfall — es gibt dann
             // keine Wartestellung, die einen App-Neustart überleben müsste. Schlägt der Versand
@@ -107,58 +107,58 @@ public sealed class PromptZeitVersandService : IDisposable
             // in-flight-Versands persistierten neueren Plan überschreiben (dessen Datensatz die
             // Löschung nach dem späteren Versand per Mismatch verweigern und als Leiche überleben
             // würde).
-            if (!await SendPromptAsync(aufgabeId, promptText, nachzustellung: false, ersetzterEintrag?.Info ?? sofortInfo)
-                && MarkiereWartetAufSession(aufgabeId, sofortInfo))
+            if (!await SendPromptAsync(workItemId, promptText, nachzustellung: false, ersetzterEintrag?.Info ?? sofortInfo)
+                && MarkiereWartetAufSession(workItemId, sofortInfo))
             {
-                await UpsertDatensatzWennAktuellAsync(aufgabeId, sofortInfo, ersetzterEintrag?.Info);
+                await UpsertDatensatzWennAktuellAsync(workItemId, sofortInfo, ersetzterEintrag?.Info);
             }
             return;
         }
 
         // DB zuerst: Der Datensatz muss vor dem Timer-Armieren stehen, damit ein sofort feuernder
         // Timer-Callback den Plan nicht vor der Persistenz entfernt.
-        await UpsertDatensatzAsync(aufgabeId, promptText, targetTime);
+        await UpsertDatensatzAsync(workItemId, promptText, targetTime);
 
-        RemoveEntry(aufgabeId)?.Timer?.Dispose();
+        RemoveEntry(workItemId)?.Timer?.Dispose();
 
-        var info = new ScheduledPromptInfo(aufgabeId, promptText, targetTime);
+        var info = new ScheduledPromptInfo(workItemId, promptText, targetTime);
         // Timer zunächst inaktiv (Timeout.InfiniteTimeSpan) anlegen und erst NACH dem Eintragen in
         // _scheduledPrompts scharfschalten (timer.Change): Würde der Timer bereits mit der echten
         // Restlaufzeit erzeugt, könnte sein Callback bei sehr kurzer Restlaufzeit auf einem ThreadPool-Thread
         // feuern, bevor die nachfolgende Zeile den Eintrag unter _lock einfügt — HandleTimerElapsedAsync fände
         // dann keinen Eintrag und würde den Prompt kommentarlos nie versenden.
         var timer = _timeProvider.CreateTimer(
-            _ => HandleTimerElapsedAsync(aufgabeId).SafeFireAndForget(_logger, "PromptZeitVersandService.HandleTimerElapsedAsync"),
+            _ => HandleTimerElapsedAsync(workItemId).SafeFireAndForget(_logger, "PromptZeitVersandService.HandleTimerElapsedAsync"),
             null,
             Timeout.InfiniteTimeSpan,
             Timeout.InfiniteTimeSpan);
 
         lock (_lock)
         {
-            _scheduledPrompts[aufgabeId] = new ScheduledPromptEntry { Info = info, Timer = timer };
+            _scheduledPrompts[workItemId] = new ScheduledPromptEntry { Info = info, Timer = timer };
         }
 
         timer.Change(targetTime - now, Timeout.InfiniteTimeSpan);
-        ScheduledPromptChanged?.Invoke(aufgabeId);
+        ScheduledPromptChanged?.Invoke(workItemId);
     }
 
     /// <summary>Bricht einen für die Aufgabe geplanten Prompt-Versand ab (Eintrag + persistierter Datensatz), falls vorhanden.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
-    public async Task CancelScheduledPromptAsync(Guid aufgabeId)
+    /// <param name="workItemId">ID der Aufgabe.</param>
+    public async Task CancelScheduledPromptAsync(Guid workItemId)
     {
-        RemoveEntry(aufgabeId)?.Timer?.Dispose();
-        await LoescheDatensatzAsync(aufgabeId);
-        ScheduledPromptChanged?.Invoke(aufgabeId);
+        RemoveEntry(workItemId)?.Timer?.Dispose();
+        await LoescheDatensatzAsync(workItemId);
+        ScheduledPromptChanged?.Invoke(workItemId);
     }
 
     /// <summary>Gibt Informationen zum aktuell für die Aufgabe geplanten Prompt zurück, oder null wenn keiner geplant ist.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="workItemId">ID der Aufgabe.</param>
     /// <returns>Die <see cref="ScheduledPromptInfo"/> des geplanten Prompts, oder null.</returns>
-    public ScheduledPromptInfo? GetScheduledPromptStatus(Guid aufgabeId)
+    public ScheduledPromptInfo? GetScheduledPromptStatus(Guid workItemId)
     {
         lock (_lock)
         {
-            return _scheduledPrompts.TryGetValue(aufgabeId, out var entry)
+            return _scheduledPrompts.TryGetValue(workItemId, out var entry)
                 ? entry.Info with { WartetAufSession = entry.WartetAufSession }
                 : null;
         }
@@ -190,28 +190,28 @@ public sealed class PromptZeitVersandService : IDisposable
                 // Wiederherstellung der übrigen Pläne nicht blockieren.
                 try
                 {
-                    var aufgabe = await aufgabeService.GetByIdAsync(plan.AufgabeId);
-                    if (aufgabe is null)
+                    var workItem = await aufgabeService.GetByIdAsync(plan.WorkItemId);
+                    if (workItem is null)
                     {
                         // Verwaister Datensatz (dürfte durch FK-Cascade nicht vorkommen) — defensiv entfernen.
-                        await store.LoeschenAsync(plan.AufgabeId);
+                        await store.LoeschenAsync(plan.WorkItemId);
                         continue;
                     }
 
                     var now = _timeProvider.GetUtcNow();
-                    var ziel = plan.ZielZeitpunktUtc;
-                    if (aufgabe.PausiertBisUtc is { } bis && bis > now && bis > ziel)
+                    var ziel = plan.TargetTimeUtc;
+                    if (workItem.PausedUntilUtc is { } bis && bis > now && bis > ziel)
                     {
                         ziel = bis;
-                        await store.UpdateZielZeitpunktAsync(plan.AufgabeId, bis);
+                        await store.UpdateZielZeitpunktAsync(plan.WorkItemId, bis);
                     }
 
-                    var info = new ScheduledPromptInfo(plan.AufgabeId, plan.PromptText, ziel);
+                    var info = new ScheduledPromptInfo(plan.WorkItemId, plan.PromptText, ziel);
                     if (ziel <= now)
                     {
                         lock (_lock)
                         {
-                            _scheduledPrompts[plan.AufgabeId] = new ScheduledPromptEntry
+                            _scheduledPrompts[plan.WorkItemId] = new ScheduledPromptEntry
                             {
                                 Info = info,
                                 Timer = null,
@@ -221,16 +221,16 @@ public sealed class PromptZeitVersandService : IDisposable
                         continue;
                     }
 
-                    var aufgabeId = plan.AufgabeId;
+                    var workItemId = plan.WorkItemId;
                     var timer = _timeProvider.CreateTimer(
-                        _ => HandleTimerElapsedAsync(aufgabeId).SafeFireAndForget(_logger, "PromptZeitVersandService.HandleTimerElapsedAsync"),
+                        _ => HandleTimerElapsedAsync(workItemId).SafeFireAndForget(_logger, "PromptZeitVersandService.HandleTimerElapsedAsync"),
                         null,
                         Timeout.InfiniteTimeSpan,
                         Timeout.InfiniteTimeSpan);
 
                     lock (_lock)
                     {
-                        _scheduledPrompts[aufgabeId] = new ScheduledPromptEntry { Info = info, Timer = timer };
+                        _scheduledPrompts[workItemId] = new ScheduledPromptEntry { Info = info, Timer = timer };
                     }
 
                     try
@@ -242,7 +242,7 @@ public sealed class PromptZeitVersandService : IDisposable
                         // Armiierung fehlgeschlagen (z. B. Zielzeit jenseits des Timer-Maximums):
                         // den soeben eingetragenen, nie feuernden Eintrag wieder entfernen, damit
                         // kein untoter Plan in der Warteschlange zurückbleibt.
-                        RemoveEntry(aufgabeId)?.Timer?.Dispose();
+                        RemoveEntry(workItemId)?.Timer?.Dispose();
                         throw;
                     }
                 }
@@ -252,7 +252,7 @@ public sealed class PromptZeitVersandService : IDisposable
                         ex,
                         "Persistierter zeitgesteuerter Prompt {PromptId} für Aufgabe {AufgabeId} konnte nicht wiederhergestellt werden — die übrigen Pläne werden fortgesetzt.",
                         plan.Id,
-                        plan.AufgabeId);
+                        plan.WorkItemId);
                 }
             }
         }
@@ -262,11 +262,11 @@ public sealed class PromptZeitVersandService : IDisposable
         }
     }
 
-    private ScheduledPromptEntry? RemoveEntry(Guid aufgabeId)
+    private ScheduledPromptEntry? RemoveEntry(Guid workItemId)
     {
         lock (_lock)
         {
-            return _scheduledPrompts.Remove(aufgabeId, out var entry) ? entry : null;
+            return _scheduledPrompts.Remove(workItemId, out var entry) ? entry : null;
         }
     }
 
@@ -278,14 +278,14 @@ public sealed class PromptZeitVersandService : IDisposable
     /// Pausen-Umplanung in <see cref="HandleTimerElapsedAsync"/>).
     /// </summary>
     /// <returns><c>true</c>, wenn der Eintrag zurückgelegt wurde; <c>false</c>, wenn ein neuerer Eintrag die Markierung verweigerte.</returns>
-    private bool MarkiereWartetAufSession(Guid aufgabeId, ScheduledPromptInfo info)
+    private bool MarkiereWartetAufSession(Guid workItemId, ScheduledPromptInfo info)
     {
         var markiert = false;
         lock (_lock)
         {
-            if (!_scheduledPrompts.ContainsKey(aufgabeId))
+            if (!_scheduledPrompts.ContainsKey(workItemId))
             {
-                _scheduledPrompts[aufgabeId] = new ScheduledPromptEntry
+                _scheduledPrompts[workItemId] = new ScheduledPromptEntry
                 {
                     Info = info,
                     Timer = null,
@@ -296,52 +296,52 @@ public sealed class PromptZeitVersandService : IDisposable
         }
 
         if (markiert)
-            ScheduledPromptChanged?.Invoke(aufgabeId);
+            ScheduledPromptChanged?.Invoke(workItemId);
         return markiert;
     }
 
-    private void OnCliProcessStatusChanged(Guid aufgabeId, CliProcessStatus status)
+    private void OnCliProcessStatusChanged(Guid workItemId, CliProcessStatus status)
     {
-        if (status != CliProcessStatus.Gestartet)
+        if (status != CliProcessStatus.Started)
             return;
 
-        ZustellungNachSessionStartAsync(aufgabeId).SafeFireAndForget(_logger, "PromptZeitVersandService.ZustellungNachSessionStart");
+        ZustellungNachSessionStartAsync(workItemId).SafeFireAndForget(_logger, "PromptZeitVersandService.ZustellungNachSessionStart");
     }
 
     /// <summary>Stellt wartende bzw. fällige Pläne beim Start einer CLI-Session der Aufgabe zu.</summary>
-    private async Task ZustellungNachSessionStartAsync(Guid aufgabeId)
+    private async Task ZustellungNachSessionStartAsync(Guid workItemId)
     {
         ScheduledPromptEntry entry;
         lock (_lock)
         {
-            if (!_scheduledPrompts.TryGetValue(aufgabeId, out var vorhanden))
+            if (!_scheduledPrompts.TryGetValue(workItemId, out var vorhanden))
                 return;
 
             if (!vorhanden.WartetAufSession && vorhanden.Info.TargetTime > _timeProvider.GetUtcNow())
                 return;
 
-            _scheduledPrompts.Remove(aufgabeId);
+            _scheduledPrompts.Remove(workItemId);
             entry = vorhanden;
         }
 
         entry.Timer?.Dispose();
-        if (!await SendPromptAsync(aufgabeId, entry.Info.PromptText, nachzustellung: true, entry.Info))
-            MarkiereWartetAufSession(aufgabeId, entry.Info);
+        if (!await SendPromptAsync(workItemId, entry.Info.PromptText, nachzustellung: true, entry.Info))
+            MarkiereWartetAufSession(workItemId, entry.Info);
     }
 
-    private async Task HandleTimerElapsedAsync(Guid aufgabeId)
+    private async Task HandleTimerElapsedAsync(Guid workItemId)
     {
         ScheduledPromptEntry entry;
         lock (_lock)
         {
-            if (!_scheduledPrompts.Remove(aufgabeId, out var removed))
+            if (!_scheduledPrompts.Remove(workItemId, out var removed))
                 return;
             entry = removed;
         }
 
         // Pause kann NACH dem Planen gesetzt worden sein: aktuellen PausiertBisUtc-Wert laden und
         // bei aktiver Pause den Timer auf das Pausenende neu scharf machen statt zu senden.
-        var pausiertBis = await GetPausiertBisUtcAsync(aufgabeId);
+        var pausiertBis = await GetPausiertBisUtcAsync(workItemId);
         var now = _timeProvider.GetUtcNow();
         if (pausiertBis is { } bis && bis > now)
         {
@@ -349,13 +349,13 @@ public sealed class PromptZeitVersandService : IDisposable
             lock (_lock)
             {
                 // Nur zurücklegen, wenn nicht zwischenzeitlich ein neuer Prompt geplant wurde.
-                if (!_scheduledPrompts.ContainsKey(aufgabeId))
+                if (!_scheduledPrompts.ContainsKey(workItemId))
                 {
                     // TargetTime auf das Pausenende aktualisieren, damit GetScheduledPromptStatus
                     // die tatsächliche neue Zielzeit meldet statt des verstrichenen Zeitpunkts.
-                    _scheduledPrompts[aufgabeId] = new ScheduledPromptEntry
+                    _scheduledPrompts[workItemId] = new ScheduledPromptEntry
                     {
-                        Info = new ScheduledPromptInfo(aufgabeId, entry.Info.PromptText, bis),
+                        Info = new ScheduledPromptInfo(workItemId, entry.Info.PromptText, bis),
                         Timer = entry.Timer
                     };
                     entry.Timer?.Change(bis - now, Timeout.InfiniteTimeSpan);
@@ -367,10 +367,10 @@ public sealed class PromptZeitVersandService : IDisposable
             {
                 _logger.LogInformation(
                     "Zeitgesteuerter Prompt für Aufgabe {AufgabeId} auf das Pausenende {PausiertBisUtc} verschoben.",
-                    aufgabeId,
+                    workItemId,
                     bis);
-                await UpdateZielZeitpunktDatensatzAsync(aufgabeId, bis);
-                ScheduledPromptChanged?.Invoke(aufgabeId);
+                await UpdateZielZeitpunktDatensatzAsync(workItemId, bis);
+                ScheduledPromptChanged?.Invoke(workItemId);
             }
             else
             {
@@ -381,11 +381,11 @@ public sealed class PromptZeitVersandService : IDisposable
         }
 
         entry.Timer?.Dispose();
-        if (!await SendPromptAsync(aufgabeId, entry.Info.PromptText, nachzustellung: false, entry.Info))
-            MarkiereWartetAufSession(aufgabeId, entry.Info);
+        if (!await SendPromptAsync(workItemId, entry.Info.PromptText, nachzustellung: false, entry.Info))
+            MarkiereWartetAufSession(workItemId, entry.Info);
     }
 
-    private async Task<DateTimeOffset?> GetPausiertBisUtcAsync(Guid aufgabeId)
+    private async Task<DateTimeOffset?> GetPausiertBisUtcAsync(Guid workItemId)
     {
         if (_scopeFactory is null)
             return null;
@@ -394,20 +394,20 @@ public sealed class PromptZeitVersandService : IDisposable
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
-            var aufgabe = await aufgabeService.GetByIdAsync(aufgabeId);
-            return aufgabe?.PausiertBisUtc;
+            var workItem = await aufgabeService.GetByIdAsync(workItemId);
+            return workItem?.PausedUntilUtc;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(
                 ex,
                 "Pausenstatus für Aufgabe {AufgabeId} konnte nicht geladen werden — Versand wird nicht verschoben.",
-                aufgabeId);
+                workItemId);
             return null;
         }
     }
 
-    /// <param name="aufgabeId">ID der Aufgabe, deren Session den Prompt erhalten soll.</param>
+    /// <param name="workItemId">ID der Aufgabe, deren Session den Prompt erhalten soll.</param>
     /// <param name="promptText">Der zu versendende Prompttext.</param>
     /// <param name="nachzustellung"><c>true</c> bei einer Nachzustellung nach einem Session-Start (steuert den Protokolleintrag).</param>
     /// <param name="datensatzReferenz">
@@ -418,14 +418,14 @@ public sealed class PromptZeitVersandService : IDisposable
     /// versendete Plan selbst, wenn keiner ersetzt wurde.
     /// </param>
     /// <returns><c>true</c>, wenn der Prompt zugestellt wurde; <c>false</c>, wenn der Plan auf eine Session wartet.</returns>
-    private async Task<bool> SendPromptAsync(Guid aufgabeId, string promptText, bool nachzustellung, ScheduledPromptInfo datensatzReferenz)
+    private async Task<bool> SendPromptAsync(Guid workItemId, string promptText, bool nachzustellung, ScheduledPromptInfo datensatzReferenz)
     {
-        var session = _kiService.GetTerminalSession(aufgabeId);
+        var session = _kiService.GetTerminalSession(workItemId);
         if (session is null)
         {
             _logger.LogWarning(
                 "Zeitgesteuerter Prompt für Aufgabe {AufgabeId} wartet auf eine CLI-Session, da aktuell keine aktive vorhanden ist.",
-                aufgabeId);
+                workItemId);
             return false;
         }
 
@@ -438,7 +438,7 @@ public sealed class PromptZeitVersandService : IDisposable
             _logger.LogDebug(
                 ex,
                 "Zeitgesteuerter Prompt für Aufgabe {AufgabeId} konnte nicht versendet werden, da die Session zwischenzeitlich disposed wurde — der Plan wartet auf die nächste Session.",
-                aufgabeId);
+                workItemId);
             return false;
         }
         catch (Exception ex)
@@ -446,14 +446,14 @@ public sealed class PromptZeitVersandService : IDisposable
             _logger.LogWarning(
                 ex,
                 "Zeitgesteuerter Prompt für Aufgabe {AufgabeId} konnte nicht versendet werden — der Plan wartet auf die nächste Session.",
-                aufgabeId);
+                workItemId);
             return false;
         }
 
-        await LoescheDatensatzWennAktuellAsync(aufgabeId, datensatzReferenz);
-        PromptSent?.Invoke(aufgabeId);
-        ScheduledPromptChanged?.Invoke(aufgabeId);
-        await SchreibeVersandProtokollAsync(aufgabeId, nachzustellung);
+        await LoescheDatensatzWennAktuellAsync(workItemId, datensatzReferenz);
+        PromptSent?.Invoke(workItemId);
+        ScheduledPromptChanged?.Invoke(workItemId);
+        await SchreibeVersandProtokollAsync(workItemId, nachzustellung);
         return true;
     }
 
@@ -463,7 +463,7 @@ public sealed class PromptZeitVersandService : IDisposable
     /// Versand beobachtet (<see cref="PromptSent"/> ohne Abonnenten). Fehler (z. B. eine
     /// zwischenzeitlich gelöschte Aufgabe) brechen den Versand nicht.
     /// </summary>
-    private async Task SchreibeVersandProtokollAsync(Guid aufgabeId, bool nachzustellung)
+    private async Task SchreibeVersandProtokollAsync(Guid workItemId, bool nachzustellung)
     {
         if (_scopeFactory is null)
             return;
@@ -478,22 +478,22 @@ public sealed class PromptZeitVersandService : IDisposable
             var inhalt = nachzustellung
                 ? "Zeitgesteuerter Prompt nach CLI-Start zugestellt."
                 : "Zeitgesteuerter Prompt versendet.";
-            await protokollService.AddEintragAsync(aufgabeId, ProtokollTyp.SystemMeldung, inhalt);
+            await protokollService.AddEintragAsync(workItemId, LogEntryType.SystemMessage, inhalt);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(
                 ex,
                 "Protokolleintrag für den zeitgesteuerten Prompt-Versand der Aufgabe {AufgabeId} konnte nicht geschrieben werden.",
-                aufgabeId);
+                workItemId);
         }
     }
 
-    private Task UpsertDatensatzAsync(Guid aufgabeId, string promptText, DateTimeOffset zielZeitpunktUtc)
+    private Task UpsertDatensatzAsync(Guid workItemId, string promptText, DateTimeOffset zielZeitpunktUtc)
         => MitStoreAsync(
-            store => store.UpsertAsync(aufgabeId, promptText, zielZeitpunktUtc),
+            store => store.UpsertAsync(workItemId, promptText, zielZeitpunktUtc),
             "Zeitgesteuerter Prompt für Aufgabe {AufgabeId} konnte nicht persistiert werden — der Plan bleibt sitzungsgebunden.",
-            aufgabeId);
+            workItemId);
 
     /// <summary>
     /// Persistiert den Plan nur, wenn der Datensatz noch dem erwarteten Vorgängerstand entspricht
@@ -501,17 +501,17 @@ public sealed class PromptZeitVersandService : IDisposable
     /// verhindert, dass der Fehlerpfad eines alten Sofortversands einen zwischenzeitlich
     /// persistierten neueren Plan überschreibt.
     /// </summary>
-    private Task UpsertDatensatzWennAktuellAsync(Guid aufgabeId, ScheduledPromptInfo plan, ScheduledPromptInfo? erwarteterVorgaenger)
+    private Task UpsertDatensatzWennAktuellAsync(Guid workItemId, ScheduledPromptInfo plan, ScheduledPromptInfo? erwarteterVorgaenger)
         => MitStoreAsync(
-            store => store.UpsertWennUebereinstimmendAsync(aufgabeId, plan.PromptText, plan.TargetTime, erwarteterVorgaenger),
+            store => store.UpsertWennUebereinstimmendAsync(workItemId, plan.PromptText, plan.TargetTime, erwarteterVorgaenger),
             "Zeitgesteuerter Prompt für Aufgabe {AufgabeId} konnte nicht persistiert werden — der Plan bleibt sitzungsgebunden.",
-            aufgabeId);
+            workItemId);
 
-    private Task LoescheDatensatzAsync(Guid aufgabeId)
+    private Task LoescheDatensatzAsync(Guid workItemId)
         => MitStoreAsync(
-            store => store.LoeschenAsync(aufgabeId),
+            store => store.LoeschenAsync(workItemId),
             "Persistierter zeitgesteuerter Prompt für Aufgabe {AufgabeId} konnte nicht gelöscht werden.",
-            aufgabeId);
+            workItemId);
 
     /// <summary>
     /// Löscht den Datensatz des versendeten Plans. Ein vom versendeten Plan abweichender Datensatz
@@ -522,28 +522,28 @@ public sealed class PromptZeitVersandService : IDisposable
     /// und wird mitgelöscht, damit der bereits zugestellte Prompt nach einem Neustart nicht
     /// erneut zugestellt wird.
     /// </summary>
-    private Task LoescheDatensatzWennAktuellAsync(Guid aufgabeId, ScheduledPromptInfo datensatzReferenz)
+    private Task LoescheDatensatzWennAktuellAsync(Guid workItemId, ScheduledPromptInfo datensatzReferenz)
     {
         bool neuererPlanAktiv;
         lock (_lock)
         {
-            neuererPlanAktiv = _scheduledPrompts.ContainsKey(aufgabeId);
+            neuererPlanAktiv = _scheduledPrompts.ContainsKey(workItemId);
         }
 
         return MitStoreAsync(
-            store => store.LoeschenNachVersandAsync(aufgabeId, datensatzReferenz.PromptText, datensatzReferenz.TargetTime, neuererPlanAktiv),
+            store => store.LoeschenNachVersandAsync(workItemId, datensatzReferenz.PromptText, datensatzReferenz.TargetTime, neuererPlanAktiv),
             "Persistierter zeitgesteuerter Prompt für Aufgabe {AufgabeId} konnte nach dem Versand nicht gelöscht werden.",
-            aufgabeId);
+            workItemId);
     }
 
-    private Task UpdateZielZeitpunktDatensatzAsync(Guid aufgabeId, DateTimeOffset zielZeitpunktUtc)
+    private Task UpdateZielZeitpunktDatensatzAsync(Guid workItemId, DateTimeOffset zielZeitpunktUtc)
         => MitStoreAsync(
-            store => store.UpdateZielZeitpunktAsync(aufgabeId, zielZeitpunktUtc),
+            store => store.UpdateZielZeitpunktAsync(workItemId, zielZeitpunktUtc),
             "Zielzeitpunkt des persistierten zeitgesteuerten Prompts für Aufgabe {AufgabeId} konnte nicht aktualisiert werden.",
-            aufgabeId);
+            workItemId);
 
     /// <summary>Führt eine Store-Aktion in einem eigenen Scope aus; Fehler werden geloggt statt den Aufrufer zu brechen.</summary>
-    private async Task MitStoreAsync(Func<ZeitgesteuerterPromptStore, Task> aktion, string fehlerText, params object[] argumente)
+    private async Task MitStoreAsync(Func<ZeitgesteuerterPromptStore, Task> action, string fehlerText, params object[] argumente)
     {
         if (_scopeFactory is null)
             return;
@@ -554,7 +554,7 @@ public sealed class PromptZeitVersandService : IDisposable
             var store = scope.ServiceProvider.GetService<ZeitgesteuerterPromptStore>();
             if (store is null)
                 return;
-            await aktion(store);
+            await action(store);
         }
         catch (Exception ex)
         {

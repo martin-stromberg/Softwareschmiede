@@ -57,7 +57,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
                 {
                     Url = ReleaseUrl,
                     Status = 200,
-                    Inhalt = "[{\"tag_name\":\"v1.3.0\"}]",
+                    Content = "[{\"tag_name\":\"v1.3.0\"}]",
                     Header = new Dictionary<string, string>
                     {
                         ["Link"] = "<https://api.github.test/page2>; rel=\"next\"",
@@ -95,7 +95,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         var assetApiUrl = "https://api.github.com/repos/o/r/releases/assets/91001";
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten = [new UpdateE2EAntwort { Url = assetApiUrl, Inhalt = "ok" }],
+            Antworten = [new UpdateE2EAntwort { Url = assetApiUrl, Content = "ok" }],
         });
 
         using var antwort = await _client.GetAsync(assetApiUrl, TestContext.Current.CancellationToken);
@@ -113,7 +113,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         var manifestUrl = "https://e2e.invalid/szenario/update-1.3.0.json";
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten = [new UpdateE2EAntwort { Url = manifestUrl, Inhalt = "{}" }],
+            Antworten = [new UpdateE2EAntwort { Url = manifestUrl, Content = "{}" }],
         });
 
         using var antwort = await _client.GetAsync(manifestUrl, TestContext.Current.CancellationToken);
@@ -131,7 +131,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
         var manifestApiUrl = "https://api.github.com/repos/o/r/releases/assets/91011";
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten = [new UpdateE2EAntwort { Url = manifestApiUrl, Inhalt = "{}", Art = "manifest" }],
+            Antworten = [new UpdateE2EAntwort { Url = manifestApiUrl, Content = "{}", Art = "manifest" }],
         });
 
         using var antwort = await _client.GetAsync(manifestApiUrl, TestContext.Current.CancellationToken);
@@ -161,16 +161,16 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
     {
         SchreibeSzenario(new UpdateE2ESzenario
         {
-            Antworten = [new UpdateE2EAntwort { Url = ReleaseUrl, Inhalt = "ok", Gate = "releaseApi" }],
+            Antworten = [new UpdateE2EAntwort { Url = ReleaseUrl, Content = "ok", Gate = "releaseApi" }],
         });
 
-        var anfrage = _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken);
+        var request = _client.GetAsync(ReleaseUrl, TestContext.Current.CancellationToken);
         await Task.Delay(400, TestContext.Current.CancellationToken);
-        Assert.False(anfrage.IsCompleted, "Die Anfrage lieferte ohne Gate-Freigabe eine Antwort.");
+        Assert.False(request.IsCompleted, "Die Anfrage lieferte ohne Gate-Freigabe eine Antwort.");
         AssertProtokollEnthaelt(UpdateE2EEreignisse.HttpRequestBlocked);
 
         File.WriteAllText(Path.Combine(_wurzel, "gates", "releaseApi.release"), string.Empty);
-        using var antwort = await anfrage;
+        using var antwort = await request;
 
         Assert.Equal(HttpStatusCode.OK, antwort.StatusCode);
         AssertProtokollEnthaelt(UpdateE2EEreignisse.HttpRequestReleased);
@@ -188,7 +188,7 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
                 new UpdateE2EAntwort
                 {
                     Url = ReleaseUrl,
-                    Inhalt = inhalt,
+                    Content = inhalt,
                     StreamGate = "download",
                     StreamGateBytes = 400,
                 },

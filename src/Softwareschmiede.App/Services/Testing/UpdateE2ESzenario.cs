@@ -56,7 +56,7 @@ public sealed class UpdateE2EAntwort
 
     /// <summary>Inline-Antworttext (Alternative zu <see cref="BodyDatei"/>).</summary>
     [JsonPropertyName("body")]
-    public string? Inhalt { get; set; }
+    public string? Content { get; set; }
 
     /// <summary>Content-Type der Antwort (Standard <c>application/json</c>).</summary>
     [JsonPropertyName("contentType")]
@@ -95,7 +95,7 @@ public sealed class UpdateE2ELesefehler
 {
     /// <summary>Aktiviert den kontrollierten Lesefehler.</summary>
     [JsonPropertyName("enabled")]
-    public bool Aktiv { get; set; }
+    public bool Active { get; set; }
 
     /// <summary>
     /// Gewählter Versuch: <c>startup</c> (einmaliger Startversuch), <c>manuell</c> (manueller
@@ -150,7 +150,7 @@ public sealed class UpdateE2ECliSicherheit
 {
     /// <summary>Aktiviert die Fixture-Sicherheitsprüfung (statt der produktiven Auswertung).</summary>
     [JsonPropertyName("enabled")]
-    public bool Aktiv { get; set; }
+    public bool Active { get; set; }
 
     /// <summary>Beschreibungen der simuliert riskanten Aufgaben.</summary>
     [JsonPropertyName("riskyTasks")]

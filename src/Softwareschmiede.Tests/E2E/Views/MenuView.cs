@@ -155,13 +155,13 @@ public sealed class MenuView : BaseWindowView
         => GetCheckBoxChecked("AutoShutdownErzwingen");
 
     /// <summary>Setzt die Erzwingen-Checkbox auf den gewünschten Zustand (Togglen nur bei Abweichung).</summary>
-    /// <param name="erzwingen">Der Zielzustand.</param>
+    /// <param name="force">Der Zielzustand.</param>
     /// <returns>Diese Instanz.</returns>
     /// <exception cref="TimeoutException">Die Checkbox wurde nicht rechtzeitig sichtbar.</exception>
-    public MenuView SetzeAutoShutdownErzwingen(bool erzwingen)
+    public MenuView SetzeAutoShutdownErzwingen(bool force)
         => SetzeCheckBoxZustand(
             "AutoShutdownErzwingen",
-            erzwingen,
+            force,
             "Die Auto-Shutdown-Erzwingen-Checkbox wurde nicht rechtzeitig sichtbar.");
 
     /// <summary>Liest den Countdown-Text des Auto-Shutdown-Blocks ("AutoShutdownCountdown").</summary>

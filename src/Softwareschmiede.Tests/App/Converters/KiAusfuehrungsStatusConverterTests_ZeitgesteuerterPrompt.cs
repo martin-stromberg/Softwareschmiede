@@ -19,8 +19,8 @@ public sealed class KiAusfuehrungsStatusConverterTests_ZeitgesteuerterPrompt
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Aufgabe mit geplantem Prompt",
-            Status = AufgabeStatus.Wartend,
+            Title = "Aufgabe mit geplantem Prompt",
+            Status = WorkItemStatus.Waiting,
             HasScheduledPrompt = true
         };
 
@@ -36,12 +36,12 @@ public sealed class KiAusfuehrungsStatusConverterTests_ZeitgesteuerterPrompt
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Laufende Aufgabe mit geplantem Prompt",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-1",
+            Title = "Laufende Aufgabe mit geplantem Prompt",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-1",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
-            LaufStatus = AufgabeLaufStatus.Laeuft,
+            RunStatus = WorkItemRunStatus.Running,
             HasScheduledPrompt = true
         };
 
@@ -57,9 +57,9 @@ public sealed class KiAusfuehrungsStatusConverterTests_ZeitgesteuerterPrompt
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Aufgabe ohne geplanten Prompt",
-            Status = AufgabeStatus.Wartend,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            Title = "Aufgabe ohne geplanten Prompt",
+            Status = WorkItemStatus.Waiting,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
             HasScheduledPrompt = false
         };
 

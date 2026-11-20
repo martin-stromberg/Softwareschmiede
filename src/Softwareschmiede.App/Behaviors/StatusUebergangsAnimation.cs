@@ -44,19 +44,19 @@ public static class StatusUebergangsAnimation
 
         // Änderungsschlüssel ist die Aufgaben-Id - neben Aufgabe wird auch das
         // Panel-Item der aktiven Aufgabenliste akzeptiert (Kachel-Template).
-        var aufgabeId = element.DataContext switch
+        var workItemId = element.DataContext switch
         {
-            Aufgabe aufgabe => aufgabe.Id,
+            WorkItem workItem => workItem.Id,
             AktiveAufgabePanelItem item => item.Id,
             _ => (Guid?)null
         };
-        if (aufgabeId is null)
+        if (workItemId is null)
             return;
 
-        RegistriereUnloadedBereinigung(element, aufgabeId.Value);
+        RegistriereUnloadedBereinigung(element, workItemId.Value);
 
         var neuerStatus = (string?)e.NewValue;
-        if (!AenderungsErkennung.HatSichGeaendert(aufgabeId.Value, neuerStatus))
+        if (!AenderungsErkennung.HatSichGeaendert(workItemId.Value, neuerStatus))
             return;
 
         var animation = new DoubleAnimation
@@ -70,12 +70,12 @@ public static class StatusUebergangsAnimation
         element.BeginAnimation(UIElement.OpacityProperty, animation);
     }
 
-    private static void RegistriereUnloadedBereinigung(FrameworkElement element, Guid aufgabeId)
+    private static void RegistriereUnloadedBereinigung(FrameworkElement element, Guid workItemId)
     {
         if ((bool)element.GetValue(UnloadedBereinigungRegistriertProperty))
             return;
 
         element.SetValue(UnloadedBereinigungRegistriertProperty, true);
-        element.Unloaded += (_, _) => AenderungsErkennung.Entfernen(aufgabeId);
+        element.Unloaded += (_, _) => AenderungsErkennung.Entfernen(workItemId);
     }
 }

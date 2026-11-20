@@ -11,7 +11,9 @@ namespace Softwareschmiede.Application.Services;
 
 /// <summary>Unveränderlicher Auftrag; ausschließlich vom Host validierte Herkunft und IDs.</summary>
 public sealed record ScmExchangeRequest(
-    Guid EventId, Guid AttemptId, Guid CliRunId, Guid AufgabeId,
+    Guid EventId, Guid AttemptId, Guid CliRunId,
+    // Wire-Feldname bleibt "aufgabeId" — Protokollversion 1 schreibt ihn fest vor.
+    [property: JsonPropertyName("aufgabeId")] Guid WorkItemId,
     string Body, string EventKind, string Repository, string OriginUrl)
 {
     /// <summary>Version des lokalen, credentialfreien Austauschprotokolls.</summary>
@@ -575,7 +577,7 @@ public sealed class ScmEventExchangeProtocol
     private static void ValidateRequest(ScmExchangeRequest request)
     {
         if (request.ProtocolVersion != 1 || request.EventId == Guid.Empty || request.AttemptId == Guid.Empty ||
-            request.CliRunId == Guid.Empty || request.AufgabeId == Guid.Empty || request.Body is null)
+            request.CliRunId == Guid.Empty || request.WorkItemId == Guid.Empty || request.Body is null)
             throw new ArgumentException("Ungültige SCM-Auftragskorrelation.", nameof(request));
     }
 

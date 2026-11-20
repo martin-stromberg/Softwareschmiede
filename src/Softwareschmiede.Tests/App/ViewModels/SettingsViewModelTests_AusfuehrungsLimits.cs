@@ -20,7 +20,7 @@ public sealed class SettingsViewModelTests_AusfuehrungsLimits : IDisposable
 {
     private const string KiPrefix = "Softwareschmiede.TestKi";
 
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AppEinstellungService _einstellungService;
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
     private readonly DarkModeService _darkModeService;

@@ -13,10 +13,10 @@ public sealed class StatusAenderungsErkennungTests
     public void HatSichGeaendert_ShouldReturnFalse_OnErstbeobachtung()
     {
         // Arrange
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
 
         // Act
-        var result = _sut.HatSichGeaendert(aufgabeId, "▶ Läuft");
+        var result = _sut.HatSichGeaendert(workItemId, "▶ Läuft");
 
         // Assert
         result.Should().BeFalse();
@@ -27,11 +27,11 @@ public sealed class StatusAenderungsErkennungTests
     public void HatSichGeaendert_ShouldReturnFalse_WhenStatusUnveraendert()
     {
         // Arrange
-        var aufgabeId = Guid.NewGuid();
-        _sut.HatSichGeaendert(aufgabeId, "▶ Läuft");
+        var workItemId = Guid.NewGuid();
+        _sut.HatSichGeaendert(workItemId, "▶ Läuft");
 
         // Act
-        var result = _sut.HatSichGeaendert(aufgabeId, "▶ Läuft");
+        var result = _sut.HatSichGeaendert(workItemId, "▶ Läuft");
 
         // Assert
         result.Should().BeFalse();
@@ -42,11 +42,11 @@ public sealed class StatusAenderungsErkennungTests
     public void HatSichGeaendert_ShouldReturnTrue_WhenStatusWechselt()
     {
         // Arrange
-        var aufgabeId = Guid.NewGuid();
-        _sut.HatSichGeaendert(aufgabeId, "▶ Läuft");
+        var workItemId = Guid.NewGuid();
+        _sut.HatSichGeaendert(workItemId, "▶ Läuft");
 
         // Act
-        var result = _sut.HatSichGeaendert(aufgabeId, "⏸ Wartet");
+        var result = _sut.HatSichGeaendert(workItemId, "⏸ Wartet");
 
         // Assert
         result.Should().BeTrue();

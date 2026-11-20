@@ -35,7 +35,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
     {
         var scriptPath = CreateScript("scripts/init.ps1");
         var configuration = CreateConfig();
-        configuration.InitialisierungsskriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
+        configuration.InitializationScriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
 
         _cliRunnerMock
             .Setup(runner => runner.RunAsync(
@@ -66,7 +66,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
     {
         var scriptPath = CreateScript("scripts/init.ps1");
         var configuration = CreateConfig();
-        configuration.InitialisierungsskriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
+        configuration.InitializationScriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
 
         _cliRunnerMock
             .Setup(runner => runner.RunAsync(
@@ -94,7 +94,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
     {
         var sut = CreateSut();
         var configuration = CreateConfig();
-        configuration.InitialisierungsskriptRelativePath = "..\\outside.ps1";
+        configuration.InitializationScriptRelativePath = "..\\outside.ps1";
 
         var act = () => sut.RunAsync(_repositoryRootPath, configuration);
 
@@ -108,7 +108,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
     {
         var sut = CreateSut();
         var configuration = CreateConfig();
-        configuration.Aktiv = false;
+        configuration.Active = false;
 
         await sut.RunAsync(_repositoryRootPath, configuration, TestContext.Current.CancellationToken);
 
@@ -128,7 +128,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
     {
         var sut = CreateSut();
         var configuration = CreateConfig();
-        configuration.InitialisierungsskriptRelativePath = "does-not-exist.ps1";
+        configuration.InitializationScriptRelativePath = "does-not-exist.ps1";
 
         var act = () => sut.RunAsync(_repositoryRootPath, configuration);
 
@@ -142,7 +142,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
     {
         var scriptPath = CreateScript("nested/init.ps1");
         var configuration = CreateConfig();
-        configuration.InitialisierungsskriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
+        configuration.InitializationScriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
 
         _cliRunnerMock
             .Setup(runner => runner.RunAsync(
@@ -172,7 +172,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
     {
         var scriptPath = CreateScript(relativeScriptPath);
         var configuration = CreateConfig();
-        configuration.InitialisierungsskriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
+        configuration.InitializationScriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
 
         var capture = SetupCliRunnerCapture();
 
@@ -189,7 +189,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
     {
         var scriptPath = CreateScript("scripts/init.exe");
         var configuration = CreateConfig();
-        configuration.InitialisierungsskriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
+        configuration.InitializationScriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
 
         var capture = SetupCliRunnerCapture();
 
@@ -262,7 +262,7 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
     {
         var scriptPath = CreateScript("scripts/init.txt");
         var configuration = CreateConfig();
-        configuration.InitialisierungsskriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
+        configuration.InitializationScriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
 
         var sut = CreateSut();
         var act = () => sut.RunAsync(_repositoryRootPath, configuration);
@@ -320,13 +320,13 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
         public IReadOnlyList<string> Args { get; set; } = [];
     }
 
-    private static RepositoryInitialisierungKonfiguration CreateConfig()
+    private static RepositoryInitializationConfiguration CreateConfig()
         => new()
         {
             Id = Guid.NewGuid(),
             GitRepositoryId = Guid.NewGuid(),
-            Aktiv = true,
-            InitialisierungsskriptRelativePath = "init.ps1"
+            Active = true,
+            InitializationScriptRelativePath = "init.ps1"
         };
 
     private string CreateScript(string relativePath)

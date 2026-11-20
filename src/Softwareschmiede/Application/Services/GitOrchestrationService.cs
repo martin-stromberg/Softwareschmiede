@@ -47,171 +47,171 @@ public sealed class GitOrchestrationService
     }
 
     /// <summary>Führt einen Commit durch und protokolliert die Aktion.</summary>
-    public async Task CommitAsync(Guid aufgabeId, string message, CancellationToken ct = default)
+    public async Task CommitAsync(Guid workItemId, string message, CancellationToken ct = default)
     {
-        _logger.LogInformation("Commit für Aufgabe {AufgabeId} durchführen.", aufgabeId);
+        _logger.LogInformation("Commit für Aufgabe {AufgabeId} durchführen.", workItemId);
 
-        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
-        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+        if (string.IsNullOrEmpty(workItem.LocalClonePath))
+            throw new InvalidOperationException($"Aufgabe {workItemId} hat keinen lokalen Klonpfad.");
 
-        var gitPlugin = await ResolveGitPluginAsync(aufgabe, ct);
-        await gitPlugin.CommitAsync(aufgabe.LokalerKlonPfad, message, ct);
+        var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
+        await gitPlugin.CommitAsync(workItem.LocalClonePath, message, ct);
 
         await _protokollService.AddEintragAsync(
-            aufgabeId,
-            ProtokollTyp.GitAktion,
+            workItemId,
+            LogEntryType.GitAction,
             $"Commit: {message}",
             ct: ct);
 
-        _logger.LogInformation("Commit für Aufgabe {AufgabeId} durchgeführt.", aufgabeId);
+        _logger.LogInformation("Commit für Aufgabe {AufgabeId} durchgeführt.", workItemId);
     }
 
     /// <summary>Setzt Commits zurück und protokolliert die Aktion.</summary>
-    public async Task ResetAsync(Guid aufgabeId, string resetType, string? targetRef, CancellationToken ct = default)
+    public async Task ResetAsync(Guid workItemId, string resetType, string? targetRef, CancellationToken ct = default)
     {
-        _logger.LogInformation("Reset ({ResetType}) für Aufgabe {AufgabeId} durchführen.", resetType, aufgabeId);
+        _logger.LogInformation("Reset ({ResetType}) für Aufgabe {AufgabeId} durchführen.", resetType, workItemId);
 
-        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
-        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+        if (string.IsNullOrEmpty(workItem.LocalClonePath))
+            throw new InvalidOperationException($"Aufgabe {workItemId} hat keinen lokalen Klonpfad.");
 
-        var gitPlugin = await ResolveGitPluginAsync(aufgabe, ct);
-        await gitPlugin.ResetAsync(aufgabe.LokalerKlonPfad, resetType, targetRef, ct);
+        var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
+        await gitPlugin.ResetAsync(workItem.LocalClonePath, resetType, targetRef, ct);
 
         var ziel = targetRef ?? "HEAD";
         await _protokollService.AddEintragAsync(
-            aufgabeId,
-            ProtokollTyp.GitAktion,
+            workItemId,
+            LogEntryType.GitAction,
             $"Reset ({resetType}) auf {ziel}",
             ct: ct);
 
-        _logger.LogInformation("Reset ({ResetType}) für Aufgabe {AufgabeId} durchgeführt.", resetType, aufgabeId);
+        _logger.LogInformation("Reset ({ResetType}) für Aufgabe {AufgabeId} durchgeführt.", resetType, workItemId);
     }
 
     /// <summary>Pusht den Branch auf den Remote und protokolliert die Aktion.</summary>
-    public async Task PushAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task PushAsync(Guid workItemId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Push für Aufgabe {AufgabeId} durchführen.", aufgabeId);
+        _logger.LogInformation("Push für Aufgabe {AufgabeId} durchführen.", workItemId);
 
-        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
-        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+        if (string.IsNullOrEmpty(workItem.LocalClonePath))
+            throw new InvalidOperationException($"Aufgabe {workItemId} hat keinen lokalen Klonpfad.");
 
-        if (string.IsNullOrEmpty(aufgabe.BranchName))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen Branch-Namen.");
+        if (string.IsNullOrEmpty(workItem.BranchName))
+            throw new InvalidOperationException($"Aufgabe {workItemId} hat keinen Branch-Namen.");
 
-        var gitPlugin = await ResolveGitPluginAsync(aufgabe, ct);
-        await gitPlugin.PushBranchAsync(aufgabe.LokalerKlonPfad, aufgabe.BranchName, ct);
+        var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
+        await gitPlugin.PushBranchAsync(workItem.LocalClonePath, workItem.BranchName, ct);
 
         await _protokollService.AddEintragAsync(
-            aufgabeId,
-            ProtokollTyp.GitAktion,
-            $"Push: Branch '{aufgabe.BranchName}' gepusht.",
+            workItemId,
+            LogEntryType.GitAction,
+            $"Push: Branch '{workItem.BranchName}' gepusht.",
             ct: ct);
 
-        _logger.LogInformation("Push für Aufgabe {AufgabeId} durchgeführt.", aufgabeId);
+        _logger.LogInformation("Push für Aufgabe {AufgabeId} durchgeführt.", workItemId);
     }
 
     /// <summary>Holt Änderungen vom Remote und protokolliert die Aktion.</summary>
-    public async Task PullAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task PullAsync(Guid workItemId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Pull für Aufgabe {AufgabeId} durchführen.", aufgabeId);
+        _logger.LogInformation("Pull für Aufgabe {AufgabeId} durchführen.", workItemId);
 
-        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
-        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+        if (string.IsNullOrEmpty(workItem.LocalClonePath))
+            throw new InvalidOperationException($"Aufgabe {workItemId} hat keinen lokalen Klonpfad.");
 
-        var gitPlugin = await ResolveGitPluginAsync(aufgabe, ct);
-        await gitPlugin.PullAsync(aufgabe.LokalerKlonPfad, ct);
+        var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
+        await gitPlugin.PullAsync(workItem.LocalClonePath, ct);
 
         var pullLogText = string.Equals(gitPlugin.PluginPrefix, "LocalDirectoryPlugin", StringComparison.Ordinal)
             ? "Pull: Kein Merge durchgeführt. Arbeitsverzeichnis wurde per Dateisynchronisation aktualisiert."
             : "Pull: Änderungen vom Remote geholt.";
 
         await _protokollService.AddEintragAsync(
-            aufgabeId,
-            ProtokollTyp.GitAktion,
+            workItemId,
+            LogEntryType.GitAction,
             pullLogText,
             ct: ct);
 
-        _logger.LogInformation("Pull für Aufgabe {AufgabeId} durchgeführt.", aufgabeId);
+        _logger.LogInformation("Pull für Aufgabe {AufgabeId} durchgeführt.", workItemId);
     }
 
     /// <summary>Übernimmt Änderungen vom Arbeitsverzeichnis ins Quellverzeichnis.</summary>
-    public async Task MergeToSourceAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task MergeToSourceAsync(Guid workItemId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Merge (Workspace -> Source) für Aufgabe {AufgabeId} durchführen.", aufgabeId);
+        _logger.LogInformation("Merge (Workspace -> Source) für Aufgabe {AufgabeId} durchführen.", workItemId);
 
-        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
-        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+        if (string.IsNullOrEmpty(workItem.LocalClonePath))
+            throw new InvalidOperationException($"Aufgabe {workItemId} hat keinen lokalen Klonpfad.");
 
-        var gitPlugin = await ResolveGitPluginAsync(aufgabe, ct);
-        await gitPlugin.MergeToSourceAsync(aufgabe.LokalerKlonPfad, ct);
+        var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
+        await gitPlugin.MergeToSourceAsync(workItem.LocalClonePath, ct);
 
         await _protokollService.AddEintragAsync(
-            aufgabeId,
-            ProtokollTyp.GitAktion,
+            workItemId,
+            LogEntryType.GitAction,
             "Merge: Änderungen aus dem Arbeitsverzeichnis ins Quellverzeichnis übernommen.",
             ct: ct);
 
-        _logger.LogInformation("Merge (Workspace -> Source) für Aufgabe {AufgabeId} durchgeführt.", aufgabeId);
+        _logger.LogInformation("Merge (Workspace -> Source) für Aufgabe {AufgabeId} durchgeführt.", workItemId);
     }
 
     /// <summary>Liefert die vom Plugin bereitgestellten Git-Aktions-Capabilities für die Aufgabe.</summary>
-    public async Task<GitActionCapabilities> GetGitActionCapabilitiesAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task<GitActionCapabilities> GetGitActionCapabilitiesAsync(Guid workItemId, CancellationToken ct = default)
     {
-        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
-        var gitPlugin = await ResolveGitPluginAsync(aufgabe, ct);
-        return await gitPlugin.GetGitActionCapabilitiesAsync(aufgabe.LokalerKlonPfad, ct);
+        var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
+        return await gitPlugin.GetGitActionCapabilitiesAsync(workItem.LocalClonePath, ct);
     }
 
     /// <summary>Erstellt einen Pull Request und protokolliert die Aktion.</summary>
     public async Task<PullRequest> PullRequestErstellenAsync(
-        Guid aufgabeId,
+        Guid workItemId,
         string? title = null,
         string? body = null,
         CancellationToken ct = default)
     {
-        _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellen.", aufgabeId);
+        _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellen.", workItemId);
 
-        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var workItem = await _aufgabeService.GetDetailAsync(workItemId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {workItemId} nicht gefunden.");
 
-        if (string.IsNullOrEmpty(aufgabe.BranchName))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen Branch-Namen.");
+        if (string.IsNullOrEmpty(workItem.BranchName))
+            throw new InvalidOperationException($"Aufgabe {workItemId} hat keinen Branch-Namen.");
 
-        var gitPlugin = await ResolveGitPluginAsync(aufgabe, ct);
-        var repositoryId = await ResolveRepositoryIdAsync(aufgabe, ct);
+        var gitPlugin = await ResolveGitPluginAsync(workItem, ct);
+        var repositoryId = await ResolveRepositoryIdAsync(workItem, ct);
 
-        var prTitle = title ?? aufgabe.Titel;
-        var issueNummer = aufgabe.IssueReferenz?.IssueNummer;
+        var prTitle = title ?? workItem.Title;
+        var issueNummer = workItem.IssueReference?.IssueNumber;
 
-        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+        if (string.IsNullOrEmpty(workItem.LocalClonePath))
+            throw new InvalidOperationException($"Aufgabe {workItemId} hat keinen lokalen Klonpfad.");
 
-        var baseBranch = await ResolveDefaultSourceBranchNameAsync(aufgabe, ct);
-        var prBody = await BuildPullRequestBodyAsync(aufgabe, body, baseBranch, ct);
+        var baseBranch = await ResolveDefaultSourceBranchNameAsync(workItem, ct);
+        var prBody = await BuildPullRequestBodyAsync(workItem, body, baseBranch, ct);
 
-        await gitPlugin.PushBranchAsync(aufgabe.LokalerKlonPfad, aufgabe.BranchName, ct);
-        var pullRequest = await gitPlugin.CreatePullRequestAsync(repositoryId, aufgabe.BranchName, baseBranch, prTitle, prBody, ct);
+        await gitPlugin.PushBranchAsync(workItem.LocalClonePath, workItem.BranchName, ct);
+        var pullRequest = await gitPlugin.CreatePullRequestAsync(repositoryId, workItem.BranchName, baseBranch, prTitle, prBody, ct);
 
         if (_pullRequestReferenzService is not null)
         {
-            await _pullRequestReferenzService.SaveCreatedAsync(aufgabeId, repositoryId, pullRequest, ct);
+            await _pullRequestReferenzService.SaveCreatedAsync(workItemId, repositoryId, pullRequest, ct);
         }
 
         var issueLogSuffix = issueNummer is > 0
@@ -219,44 +219,44 @@ public sealed class GitOrchestrationService
             : string.Empty;
 
         await _protokollService.AddEintragAsync(
-            aufgabeId,
-            ProtokollTyp.GitAktion,
-            $"Push: Branch '{aufgabe.BranchName}' vor Pull-Request-Erstellung gepusht.",
+            workItemId,
+            LogEntryType.GitAction,
+            $"Push: Branch '{workItem.BranchName}' vor Pull-Request-Erstellung gepusht.",
             ct: ct);
 
         await _protokollService.AddEintragAsync(
-            aufgabeId,
-            ProtokollTyp.GitAktion,
-            $"Pull Request erstellt: #{pullRequest.Nummer} – {pullRequest.Titel} ({pullRequest.Url}){issueLogSuffix}",
+            workItemId,
+            LogEntryType.GitAction,
+            $"Pull Request erstellt: #{pullRequest.Nummer} – {pullRequest.Title} ({pullRequest.Url}){issueLogSuffix}",
             ct: ct);
 
-        _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellt.", aufgabeId);
+        _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellt.", workItemId);
 
         return pullRequest;
     }
 
-    private async Task<string> BuildPullRequestBodyAsync(Aufgabe aufgabe, string? fallbackBody, string? baseBranch, CancellationToken ct)
+    private async Task<string> BuildPullRequestBodyAsync(WorkItem workItem, string? fallbackBody, string? baseBranch, CancellationToken ct)
     {
-        if (_gitWorkspaceBrowserService is null || string.IsNullOrWhiteSpace(aufgabe.LokalerKlonPfad))
+        if (_gitWorkspaceBrowserService is null || string.IsNullOrWhiteSpace(workItem.LocalClonePath))
         {
-            return PullRequestBodyBuilder.Build(aufgabe, fallbackBody);
+            return PullRequestBodyBuilder.Build(workItem, fallbackBody);
         }
 
-        var sourceBranch = !string.IsNullOrWhiteSpace(aufgabe.BasisBranchName)
-            ? aufgabe.BasisBranchName
+        var sourceBranch = !string.IsNullOrWhiteSpace(workItem.BaseBranchName)
+            ? workItem.BaseBranchName
             : baseBranch;
 
-        var snapshot = await _gitWorkspaceBrowserService.LoadSnapshotAsync(aufgabe.LokalerKlonPfad, sourceBranch, ct);
+        var snapshot = await _gitWorkspaceBrowserService.LoadSnapshotAsync(workItem.LocalClonePath, sourceBranch, ct);
         if (snapshot.HasError)
         {
             _logger.LogWarning(
                 "Commit-Liste für Pull Request von Aufgabe {AufgabeId} konnte nicht geladen werden: {Error}",
-                aufgabe.Id,
+                workItem.Id,
                 snapshot.ErrorMessage);
-            return PullRequestBodyBuilder.Build(aufgabe, fallbackBody);
+            return PullRequestBodyBuilder.Build(workItem, fallbackBody);
         }
 
-        return PullRequestBodyBuilder.BuildFromCommits(aufgabe, snapshot.BranchCommits);
+        return PullRequestBodyBuilder.BuildFromCommits(workItem, snapshot.BranchCommits);
     }
 
     /// <summary>
@@ -271,7 +271,7 @@ public sealed class GitOrchestrationService
     /// wo <paramref name="clonePath"/> nur eine Pointer-Datei enthält). Bleibt <paramref name="gitPlugin"/>
     /// <c>null</c>, verhält sich die Methode wie zuvor und verwendet <paramref name="clonePath"/> unverändert.
     /// </param>
-    public async Task ValidateWorkingDirectoryAfterCloneAsync(string clonePath, RepositoryStartKonfiguration? startConfig, IGitPlugin? gitPlugin = null)
+    public async Task ValidateWorkingDirectoryAfterCloneAsync(string clonePath, RepositoryStartConfiguration? startConfig, IGitPlugin? gitPlugin = null)
     {
         if (startConfig?.WorkingDirectoryRelativePath is null)
         {
@@ -294,18 +294,18 @@ public sealed class GitOrchestrationService
     }
 
     /// <summary>Ermittelt die Repository-ID aus der Aufgabe oder dem zugehörigen Projekt.</summary>
-    private async Task<string> ResolveRepositoryIdAsync(Aufgabe aufgabe, CancellationToken ct)
+    private async Task<string> ResolveRepositoryIdAsync(WorkItem workItem, CancellationToken ct)
     {
-        if (aufgabe.GitRepository is not null)
+        if (workItem.GitRepository is not null)
         {
-            return ExtractRepositoryIdFromUrl(aufgabe.GitRepository.RepositoryUrl);
+            return ExtractRepositoryIdFromUrl(workItem.GitRepository.RepositoryUrl);
         }
 
-        var projekt = await _projektService.GetDetailAsync(aufgabe.ProjektId, ct)
-            ?? throw new InvalidOperationException($"Projekt {aufgabe.ProjektId} nicht gefunden.");
+        var project = await _projektService.GetDetailAsync(workItem.ProjectId, ct)
+            ?? throw new InvalidOperationException($"Projekt {workItem.ProjectId} nicht gefunden.");
 
-        var aktiveRepositories = projekt.Repositories
-            .Where(repository => repository.Aktiv)
+        var aktiveRepositories = project.Repositories
+            .Where(repository => repository.Active)
             .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(repository => repository.Id)
             .ToList();
@@ -318,53 +318,53 @@ public sealed class GitOrchestrationService
         if (aktiveRepositories.Count == 0)
         {
             throw new InvalidOperationException(
-                $"Aufgabe {aufgabe.Id} kann keinen Pull Request erstellen, weil im Projekt '{projekt.Name}' kein aktives Repository vorhanden ist.");
+                $"Aufgabe {workItem.Id} kann keinen Pull Request erstellen, weil im Projekt '{project.Name}' kein aktives Repository vorhanden ist.");
         }
 
         throw new InvalidOperationException(
-            $"Aufgabe {aufgabe.Id} kann keinen Pull Request erstellen, weil im Projekt '{projekt.Name}' mehrere aktive Repositories vorhanden sind. Verknüpfen Sie die Aufgabe mit genau einem Repository.");
+            $"Aufgabe {workItem.Id} kann keinen Pull Request erstellen, weil im Projekt '{project.Name}' mehrere aktive Repositories vorhanden sind. Verknüpfen Sie die Aufgabe mit genau einem Repository.");
     }
 
-    private async Task<IGitPlugin> ResolveGitPluginAsync(Aufgabe aufgabe, CancellationToken ct)
+    private async Task<IGitPlugin> ResolveGitPluginAsync(WorkItem workItem, CancellationToken ct)
     {
-        var selectedPluginPrefix = await ResolveSelectedPluginPrefixAsync(aufgabe, ct);
+        var selectedPluginPrefix = await ResolveSelectedPluginPrefixAsync(workItem, ct);
         var gitPlugin = await _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(selectedPluginPrefix, ct);
 
         _logger.LogDebug(
             "Git-Plugin für Aufgabe {AufgabeId} aufgelöst: Selected='{SelectedPluginPrefix}', Effective='{EffectivePluginPrefix}'.",
-            aufgabe.Id,
+            workItem.Id,
             selectedPluginPrefix ?? "<default>",
             gitPlugin.PluginPrefix);
 
         return gitPlugin;
     }
 
-    private async Task<string?> ResolveSelectedPluginPrefixAsync(Aufgabe aufgabe, CancellationToken ct)
+    private async Task<string?> ResolveSelectedPluginPrefixAsync(WorkItem workItem, CancellationToken ct)
     {
-        if (!string.IsNullOrWhiteSpace(aufgabe.GitRepository?.PluginTyp))
+        if (!string.IsNullOrWhiteSpace(workItem.GitRepository?.PluginType))
         {
-            return aufgabe.GitRepository.PluginTyp.Trim();
+            return workItem.GitRepository.PluginType.Trim();
         }
 
-        var projekt = await _projektService.GetDetailAsync(aufgabe.ProjektId, ct)
-            ?? throw new InvalidOperationException($"Projekt {aufgabe.ProjektId} nicht gefunden.");
+        var project = await _projektService.GetDetailAsync(workItem.ProjectId, ct)
+            ?? throw new InvalidOperationException($"Projekt {workItem.ProjectId} nicht gefunden.");
 
-        var aktiveRepositories = projekt.Repositories
-            .Where(repository => repository.Aktiv)
+        var aktiveRepositories = project.Repositories
+            .Where(repository => repository.Active)
             .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(repository => repository.Id)
             .ToList();
 
-        if (aktiveRepositories.Count == 1 && !string.IsNullOrWhiteSpace(aktiveRepositories[0].PluginTyp))
+        if (aktiveRepositories.Count == 1 && !string.IsNullOrWhiteSpace(aktiveRepositories[0].PluginType))
         {
-            return aktiveRepositories[0].PluginTyp.Trim();
+            return aktiveRepositories[0].PluginType.Trim();
         }
 
         if (aktiveRepositories.Count > 1)
         {
             _logger.LogWarning(
                 "Aufgabe {AufgabeId}: Mehrdeutige Plugin-Auflösung ({RepositoryCount} aktive Repositories). Es wird der konfigurierte Standard genutzt.",
-                aufgabe.Id,
+                workItem.Id,
                 aktiveRepositories.Count);
         }
 
@@ -372,18 +372,18 @@ public sealed class GitOrchestrationService
     }
 
     /// <summary>Ermittelt den konfigurierten Basis-Branch (<see cref="GitRepository.DefaultSourceBranchName"/>) aus der Aufgabe oder dem zugehörigen Projekt.</summary>
-    private async Task<string?> ResolveDefaultSourceBranchNameAsync(Aufgabe aufgabe, CancellationToken ct)
+    private async Task<string?> ResolveDefaultSourceBranchNameAsync(WorkItem workItem, CancellationToken ct)
     {
-        if (aufgabe.GitRepository is not null)
+        if (workItem.GitRepository is not null)
         {
-            return aufgabe.GitRepository.DefaultSourceBranchName;
+            return workItem.GitRepository.DefaultSourceBranchName;
         }
 
-        var projekt = await _projektService.GetDetailAsync(aufgabe.ProjektId, ct)
-            ?? throw new InvalidOperationException($"Projekt {aufgabe.ProjektId} nicht gefunden.");
+        var project = await _projektService.GetDetailAsync(workItem.ProjectId, ct)
+            ?? throw new InvalidOperationException($"Projekt {workItem.ProjectId} nicht gefunden.");
 
-        var aktiveRepositories = projekt.Repositories
-            .Where(repository => repository.Aktiv)
+        var aktiveRepositories = project.Repositories
+            .Where(repository => repository.Active)
             .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(repository => repository.Id)
             .ToList();
@@ -392,7 +392,7 @@ public sealed class GitOrchestrationService
         {
             _logger.LogWarning(
                 "Aufgabe {AufgabeId}: Mehrdeutige Basis-Branch-Auflösung ({RepositoryCount} aktive Repositories). Es wird kein Basis-Branch aufgelöst.",
-                aufgabe.Id,
+                workItem.Id,
                 aktiveRepositories.Count);
         }
 

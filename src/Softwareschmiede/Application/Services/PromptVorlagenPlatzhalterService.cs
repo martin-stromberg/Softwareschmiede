@@ -6,14 +6,14 @@ namespace Softwareschmiede.Application.Services;
 public sealed class PromptVorlagenPlatzhalterService
 {
     /// <summary>Ersetzt bekannte Platzhalter im Prompttext.</summary>
-    public string Resolve(string prompttext, Aufgabe? aufgabe)
+    public string Resolve(string prompttext, WorkItem? workItem)
     {
         if (string.IsNullOrEmpty(prompttext))
             return string.Empty;
 
         return prompttext
-            .Replace("%ProjectName%", aufgabe?.Projekt?.Name ?? string.Empty, StringComparison.Ordinal)
-            .Replace("%TaskName%", aufgabe?.Titel ?? string.Empty, StringComparison.Ordinal)
-            .Replace("%RepositoryUrl%", aufgabe?.GitRepository?.RepositoryUrl ?? string.Empty, StringComparison.Ordinal);
+            .Replace("%ProjectName%", workItem?.Project?.Name ?? string.Empty, StringComparison.Ordinal)
+            .Replace("%TaskName%", workItem?.Title ?? string.Empty, StringComparison.Ordinal)
+            .Replace("%RepositoryUrl%", workItem?.GitRepository?.RepositoryUrl ?? string.Empty, StringComparison.Ordinal);
     }
 }

@@ -25,9 +25,9 @@ public sealed class AufzeichnenderSystemShutdownService(ILogger<AufzeichnenderSy
     public const string LogDateiName = "system-shutdowns.log";
 
     /// <inheritdoc/>
-    public Task RequestShutdownAsync(bool erzwingen, CancellationToken cancellationToken = default)
+    public Task RequestShutdownAsync(bool force, CancellationToken cancellationToken = default)
     {
-        var zeile = $"erzwingen={erzwingen}|{DateTimeOffset.UtcNow:O}|pid={Environment.ProcessId}";
+        var zeile = $"erzwingen={force}|{DateTimeOffset.UtcNow:O}|pid={Environment.ProcessId}";
 
         logger.LogWarning("OS-Shutdown im Testmodus aufgezeichnet: {Zeile}", zeile);
 

@@ -49,7 +49,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private string _designMode;
     private string? _defaultKiPlugin;
     private IGitPlugin? _defaultScmPlugin;
-    private BenachrichtigungsModus _benachrichtigungsModus;
+    private NotificationMode _benachrichtigungsModus;
     private bool _isLoading;
     private string? _fehlerMeldung;
     private string? _erfolgsMeldung;
@@ -77,9 +77,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private string _scmPromptAppendixPullRequestComment = string.Empty;
     private UpdateModusOption? _selectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.NurPruefen);
     private UpdatePfadOption? _selectedUpdatePfad = UpdatePfadOption.FuerPfad(null);
-    private ScmBackmergeModusOption? _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeModus.Deaktiviert);
+    private ScmBackmergeModusOption? _selectedBackmergeModus = ScmBackmergeModusOption.FuerModus(ScmBackmergeMode.Disabled);
     private ScmKontoModusOption? _selectedKontoModus = ScmKontoModusOption.FuerModus(ScmKontoModus.Benutzerkonto);
-    private ScmTaskCompletionPruefmodusOption? _selectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionPruefmodus.Ereignisgesteuert);
+    private ScmTaskCompletionPruefmodusOption? _selectedScmTaskCompletionPruefmodus = ScmTaskCompletionPruefmodusOption.FuerModus(ScmTaskCompletionCheckMode.EventDriven);
     private bool _isScmBackmergeDraftAktivierung;
     private bool _isScmBackmergeAdminMerge;
 
@@ -87,7 +87,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public event EventHandler<UpdateSettings>? UpdateSettingsSaved;
 
     /// <summary>Feste Auswahlliste der Update-Modi (Steuerwert + Anzeige-Label).</summary>
-    public IReadOnlyList<UpdateModusOption> UpdateModusOptionen => UpdateModusOption.Alle;
+    public IReadOnlyList<UpdateModusOption> UpdateModusOptionen => UpdateModusOption.All;
 
     /// <summary>Aktuell ausgewählte Update-Modus-Option aus <see cref="UpdateModusOptionen"/>.</summary>
     public UpdateModusOption? SelectedUpdateMode
@@ -97,7 +97,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Feste Auswahlliste der Update-Pfade (Steuerwert + Anzeige-Label).</summary>
-    public IReadOnlyList<UpdatePfadOption> UpdatePfadOptionen => UpdatePfadOption.Alle;
+    public IReadOnlyList<UpdatePfadOption> UpdatePfadOptionen => UpdatePfadOption.All;
 
     /// <summary>Aktuell ausgewählte Update-Pfad-Option aus <see cref="UpdatePfadOptionen"/>.</summary>
     public UpdatePfadOption? SelectedUpdatePfad
@@ -112,12 +112,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Schreibgeschützter Anzeigetext des aus der Pfad-Auswahl resultierenden exklusiven Update-Kanals.</summary>
     public string AbgeleiteterUpdateKanal
-        => UpdatePfadKanalResolver.ErmittleKanal(SelectedUpdatePfad?.Pfad) == UpdateKanal.ReleaseCandidate
+        => UpdatePfadKanalResolver.ErmittleKanal(SelectedUpdatePfad?.Path) == UpdateKanal.ReleaseCandidate
             ? UpdatePfadTexte.KanalReleaseCandidate
             : UpdatePfadTexte.KanalProduktiv;
 
     /// <summary>Feste Auswahlliste der Backmerge-Modi (Steuerwert + Anzeige-Label).</summary>
-    public IReadOnlyList<ScmBackmergeModusOption> BackmergeModusOptionen => ScmBackmergeModusOption.Alle;
+    public IReadOnlyList<ScmBackmergeModusOption> BackmergeModusOptionen => ScmBackmergeModusOption.All;
 
     /// <summary>Aktuell ausgewählte Backmerge-Modus-Option aus <see cref="BackmergeModusOptionen"/>.</summary>
     public ScmBackmergeModusOption? SelectedBackmergeModus
@@ -132,7 +132,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Feste Auswahlliste der SCM-Überwachungsmodi (Steuerwert + Anzeige-Label).</summary>
-    public IReadOnlyList<ScmKontoModusOption> KontoModusOptionen => ScmKontoModusOption.Alle;
+    public IReadOnlyList<ScmKontoModusOption> KontoModusOptionen => ScmKontoModusOption.All;
 
     /// <summary>Aktuell ausgewählte Überwachungsmodus-Option aus <see cref="KontoModusOptionen"/>.</summary>
     public ScmKontoModusOption? SelectedKontoModus
@@ -146,7 +146,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Feste Auswahlliste der Prüfmodi der SCM-Abschlussüberwachung (Steuerwert + Anzeige-Label).</summary>
-    public IReadOnlyList<ScmTaskCompletionPruefmodusOption> ScmTaskCompletionPruefmodusOptionen => ScmTaskCompletionPruefmodusOption.Alle;
+    public IReadOnlyList<ScmTaskCompletionPruefmodusOption> ScmTaskCompletionPruefmodusOptionen => ScmTaskCompletionPruefmodusOption.All;
 
     /// <summary>Aktuell ausgewählte Prüfmodus-Option aus <see cref="ScmTaskCompletionPruefmodusOptionen"/>.</summary>
     public ScmTaskCompletionPruefmodusOption? SelectedScmTaskCompletionPruefmodus
@@ -208,7 +208,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Benachrichtigungsmodus.</summary>
-    public BenachrichtigungsModus BenachrichtigungsModus
+    public NotificationMode NotificationMode
     {
         get => _benachrichtigungsModus;
         set => SetProperty(ref _benachrichtigungsModus, value);
@@ -330,7 +330,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public bool IsUeberwachungsmodusEnabled => IsScmMonitoringEnabled;
 
     /// <summary>Das Trigger-Keyword wird nur bei aktivierter Ereignisüberwachung im Benutzerkonto-Modus benötigt.</summary>
-    public bool IsTriggerKeywordSichtbar => IsScmMonitoringEnabled && SelectedKontoModus?.Modus == ScmKontoModus.Benutzerkonto;
+    public bool IsTriggerKeywordSichtbar => IsScmMonitoringEnabled && SelectedKontoModus?.Mode == ScmKontoModus.Benutzerkonto;
 
     /// <summary>Das Verzögerungs-Keyword ist in beiden Kontomodi wirksam, weil es aus dem
     /// jeweils akzeptierten Triggertext gelesen wird; sichtbar bei aktiver Überwachung.</summary>
@@ -343,7 +343,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public bool IsTaskCompletionFelderEnabled => IsScmTaskCompletionEnabled;
 
     /// <summary>Die Backmerge-Optionen sind nur bei aktiviertem Backmerge-Modus bedienbar.</summary>
-    public bool IsProzessablaeufeFelderEnabled => SelectedBackmergeModus?.Modus != ScmBackmergeModus.Deaktiviert;
+    public bool IsProzessablaeufeFelderEnabled => SelectedBackmergeModus?.Mode != ScmBackmergeMode.Disabled;
 
     /// <summary>Statuszeile des „Aufgaben ausführen“-Bereichs im Ausklapp-Header.</summary>
     public string AufgabenAusfuehrenStatusText => IsScmMonitoringEnabled ? "aktiviert" : "deaktiviert";
@@ -352,7 +352,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public string AufgabenBeendenStatusText => IsScmTaskCompletionEnabled ? "aktiviert" : "deaktiviert";
 
     /// <summary>Statuszeile des „Prozessabläufe“-Bereichs im Ausklapp-Header.</summary>
-    public string ProzessablaeufeStatusText => SelectedBackmergeModus?.Modus != ScmBackmergeModus.Deaktiviert ? "aktiviert" : "deaktiviert";
+    public string ProzessablaeufeStatusText => SelectedBackmergeModus?.Mode != ScmBackmergeMode.Disabled ? "aktiviert" : "deaktiviert";
 
     /// <summary>Wartezeit in Minuten zwischen dem erkannten Referenz-Schluss und dem automatischen Beenden der Aufgabe.</summary>
     public string ScmTaskCompletionWaitMinutes
@@ -417,7 +417,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public ObservableCollection<IssueAufbereitungKiPluginOption> IssueAufbereitungKiPluginOptionen { get; } = [];
 
     /// <summary>Überwachte Repositories mit Aufbereitungs-Auswahl (persistiertes Flag
-    /// <see cref="GitRepository.IssueAufbereitungAktiv"/>).</summary>
+    /// <see cref="GitRepository.IssuePreparationEnabled"/>).</summary>
     public ObservableCollection<IssueAufbereitungRepositoryEntry> IssueAufbereitungRepositories { get; } = [];
 
     /// <summary>Die Detail-Felder der Aufbereitung sind nur bei aktivierter Funktion bedienbar.</summary>
@@ -462,7 +462,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Editierbare Promptvorlagen.</summary>
-    public ObservableCollection<PromptVorlageEntry> PromptVorlagen { get; } = [];
+    public ObservableCollection<PromptVorlageEntry> PromptTemplates { get; } = [];
 
     /// <summary>Lädt alle Einstellungen.</summary>
     public ICommand LadenCommand { get; }
@@ -632,7 +632,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
             IssueAufbereitungRepositories.Clear();
             foreach (var repository in await _projektService.GetAllRepositoriesAsync(ct))
-                IssueAufbereitungRepositories.Add(new IssueAufbereitungRepositoryEntry(repository, repository.IssueAufbereitungAktiv));
+                IssueAufbereitungRepositories.Add(new IssueAufbereitungRepositoryEntry(repository, repository.IssuePreparationEnabled));
             _kiPluginParallelLimits.Clear();
             var pluginLimitWerte = await _einstellungService.GetSettingsAsync(
                 KiPlugins.Select(x => ScmEventExecutionLimitService.PluginLimitKey(x.PluginPrefix)).ToList(), ct);
@@ -658,7 +658,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             IsScmBackmergeAdminMerge = await _einstellungService.GetScmBackmergeAdminMergeAsync(ct);
 
             var updateSettings = await _einstellungService.GetUpdateSettingsAsync(ct);
-            _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Modus);
+            _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Mode);
             OnPropertyChanged(nameof(SelectedUpdateMode));
             SelectedUpdatePfad = UpdatePfadOption.FuerPfad(updateSettings.UpdatePfad);
         }
@@ -687,31 +687,31 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             if (!ValidierePflichtfelder())
                 return;
 
-            if (SelectedUpdateMode is not { Modus: var updateModus })
+            if (SelectedUpdateMode is not { Mode: var updateModus })
             {
                 FehlerMeldung = "Der ausgewählte Update-Modus ist ungültig.";
                 return;
             }
 
-            if (SelectedUpdatePfad is not { Pfad: var updatePfad })
+            if (SelectedUpdatePfad is not { Path: var updatePfad })
             {
                 FehlerMeldung = "Der ausgewählte Update-Pfad ist ungültig.";
                 return;
             }
 
-            if (SelectedBackmergeModus is not { Modus: var backmergeModus })
+            if (SelectedBackmergeModus is not { Mode: var backmergeModus })
             {
                 FehlerMeldung = "Der ausgewählte Backmerge-Modus ist ungültig.";
                 return;
             }
 
-            if (SelectedKontoModus is not { Modus: var kontoModus })
+            if (SelectedKontoModus is not { Mode: var kontoModus })
             {
                 FehlerMeldung = "Der ausgewählte Überwachungsmodus ist ungültig.";
                 return;
             }
 
-            if (SelectedScmTaskCompletionPruefmodus is not { Modus: var pruefmodus })
+            if (SelectedScmTaskCompletionPruefmodus is not { Mode: var pruefmodus })
             {
                 FehlerMeldung = "Der ausgewählte Prüfmodus ist ungültig.";
                 return;
@@ -1022,7 +1022,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private bool ValidiereScmKontoModus()
     {
         // Der Überwachungsmodus ist nur bei aktivierter Ereignisüberwachung wirksam.
-        if (!IsScmMonitoringEnabled || SelectedKontoModus?.Modus != ScmKontoModus.SeparatesKonto)
+        if (!IsScmMonitoringEnabled || SelectedKontoModus?.Mode != ScmKontoModus.SeparatesKonto)
             return true;
 
         var github = SourceCodeManagementPlugins.FirstOrDefault(x =>
@@ -1178,15 +1178,15 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private async Task LadePromptVorlagenAsync(CancellationToken ct)
     {
         var vorlagen = await _promptVorlagenService.GetAllAsync(ct);
-        PromptVorlagen.Clear();
+        PromptTemplates.Clear();
         _geloeschtePromptVorlagenIds.Clear();
 
         foreach (var vorlage in vorlagen)
         {
-            PromptVorlagen.Add(new PromptVorlageEntry(
+            PromptTemplates.Add(new PromptVorlageEntry(
                 vorlage.Id,
                 vorlage.Name,
-                vorlage.Prompttext,
+                vorlage.PromptText,
                 false));
         }
     }
@@ -1196,15 +1196,15 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         foreach (var id in _geloeschtePromptVorlagenIds)
             await _promptVorlagenService.DeleteAsync(id, ct);
 
-        foreach (var entry in PromptVorlagen)
+        foreach (var entry in PromptTemplates)
         {
             if (entry.IsNeu)
             {
-                await _promptVorlagenService.CreateAsync(entry.Name, entry.Prompttext, ct);
+                await _promptVorlagenService.CreateAsync(entry.Name, entry.PromptText, ct);
             }
             else
             {
-                await _promptVorlagenService.UpdateAsync(entry.Id, entry.Name, entry.Prompttext, ct);
+                await _promptVorlagenService.UpdateAsync(entry.Id, entry.Name, entry.PromptText, ct);
             }
         }
 
@@ -1214,7 +1214,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     private bool ValidierePromptVorlagen()
     {
-        foreach (var vorlage in PromptVorlagen)
+        foreach (var vorlage in PromptTemplates)
         {
             if (string.IsNullOrWhiteSpace(vorlage.Name))
             {
@@ -1222,7 +1222,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(vorlage.Prompttext))
+            if (string.IsNullOrWhiteSpace(vorlage.PromptText))
             {
                 FehlerMeldung = $"Der Prompttext der Vorlage '{vorlage.Name}' darf nicht leer sein.";
                 return false;
@@ -1234,7 +1234,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     private void PromptVorlageHinzufuegen()
     {
-        PromptVorlagen.Add(new PromptVorlageEntry(Guid.NewGuid(), "Neue Promptvorlage", string.Empty, true));
+        PromptTemplates.Add(new PromptVorlageEntry(Guid.NewGuid(), "Neue Promptvorlage", string.Empty, true));
     }
 
     private void PromptVorlageLoeschen(PromptVorlageEntry? entry)
@@ -1245,7 +1245,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         if (!entry.IsNeu)
             _geloeschtePromptVorlagenIds.Add(entry.Id);
 
-        PromptVorlagen.Remove(entry);
+        PromptTemplates.Remove(entry);
     }
 
     private void OnDarkModeChanged(string mode) => DesignMode = mode;
@@ -1289,7 +1289,7 @@ public sealed class PromptVorlageEntry : ViewModelBase
     }
 
     /// <summary>Prompttext.</summary>
-    public string Prompttext
+    public string PromptText
     {
         get => _prompttext;
         set => SetProperty(ref _prompttext, value);
@@ -1312,7 +1312,7 @@ public sealed record IssueAufbereitungKiPluginOption(string? PluginPrefix, strin
 }
 
 /// <summary>Editierbarer Repository-Eintrag der Issue-Aufbereitung (persistiertes Flag
-/// <see cref="GitRepository.IssueAufbereitungAktiv"/>). Der Anzeigename ist der
+/// <see cref="GitRepository.IssuePreparationEnabled"/>). Der Anzeigename ist der
 /// Repository-Name — keine internen Kennungen als Benutzereingabe.</summary>
 public sealed class IssueAufbereitungRepositoryEntry : ViewModelBase
 {

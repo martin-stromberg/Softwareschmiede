@@ -16,17 +16,17 @@ public sealed class AufgabeRecoveryServiceTests
     public async Task RecoverManuellAsync_ShouldSetGestartetAndCreateAudit_WhenStatusIsGestartet()
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.Gestartet);
+        var workItem = await CreateTaskAsync(db, WorkItemStatus.Started);
         var sut = new AufgabeRecoveryService(db.Context, new AlwaysNotRunningAutomationStatusSource(), NullLogger<AufgabeRecoveryService>.Instance);
 
-        await sut.RecoverManuellAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        await sut.RecoverManuellAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         await using var assertContext = db.CreateNewContext();
-        var loaded = await assertContext.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
-        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
+        var loaded = await assertContext.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        loaded!.Status.Should().Be(WorkItemStatus.Started);
         loaded.RecoveryVersion.Should().Be(1);
-        assertContext.Protokolleintraege
-            .Count(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.StatusUebergang && p.Inhalt.Contains("Manuelle Wiederherstellung"))
+        assertContext.LogEntries
+            .Count(p => p.WorkItemId == workItem.Id && p.Type == LogEntryType.StatusTransition && p.Content.Contains("Manuelle Wiederherstellung"))
             .Should().Be(1);
     }
 
@@ -35,19 +35,19 @@ public sealed class AufgabeRecoveryServiceTests
     public async Task RecoverManuellAsync_ShouldThrowAndKeepStatus_WhenProcessingIsStillRunning()
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.Gestartet);
+        var workItem = await CreateTaskAsync(db, WorkItemStatus.Started);
         var sut = new AufgabeRecoveryService(db.Context, new AlwaysRunningAutomationStatusSource(), NullLogger<AufgabeRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(aufgabe.Id);
+        var act = () => sut.RecoverManuellAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Wiederherstellung nicht möglich, Verarbeitung läuft noch.");
 
         await using var assertContext = db.CreateNewContext();
-        var loaded = await assertContext.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
-        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
+        var loaded = await assertContext.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        loaded!.Status.Should().Be(WorkItemStatus.Started);
         loaded.RecoveryVersion.Should().Be(0);
-        assertContext.Protokolleintraege.Count(p => p.AufgabeId == aufgabe.Id).Should().Be(0);
+        assertContext.LogEntries.Count(p => p.WorkItemId == workItem.Id).Should().Be(0);
     }
 
     /// <summary>Prüft, dass ein Nebenläufigkeitskonflikt erkannt wird, wenn RecoveryVersion sich während der Recovery ändert.</summary>
@@ -55,26 +55,26 @@ public sealed class AufgabeRecoveryServiceTests
     public async Task RecoverManuellAsync_ShouldThrowConcurrencyConflict_WhenRecoveryVersionChangedConcurrently()
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.Gestartet);
+        var workItem = await CreateTaskAsync(db, WorkItemStatus.Started);
         using var concurrentContext = db.CreateNewContext();
         var runningStatus = new MutatingNotRunningAutomationStatusSource(() =>
         {
-            var concurrent = concurrentContext.Aufgaben.Single(a => a.Id == aufgabe.Id);
+            var concurrent = concurrentContext.WorkItems.Single(a => a.Id == workItem.Id);
             concurrent.RecoveryVersion++;
             concurrentContext.SaveChanges();
         });
         var sut = new AufgabeRecoveryService(db.Context, runningStatus, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(aufgabe.Id);
+        var act = () => sut.RecoverManuellAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Status wurde bereits geändert. Ansicht wurde aktualisiert.");
 
         await using var assertContext = db.CreateNewContext();
-        var loaded = await assertContext.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
-        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
+        var loaded = await assertContext.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        loaded!.Status.Should().Be(WorkItemStatus.Started);
         loaded.RecoveryVersion.Should().Be(1);
-        assertContext.Protokolleintraege.Count(p => p.AufgabeId == aufgabe.Id).Should().Be(0);
+        assertContext.LogEntries.Count(p => p.WorkItemId == workItem.Id).Should().Be(0);
     }
 
     /// <summary>Prüft, dass Recovery für ungültige Ausgangszustände abgelehnt wird.</summary>
@@ -82,10 +82,10 @@ public sealed class AufgabeRecoveryServiceTests
     public async Task RecoverManuellAsync_ShouldRejectInvalidState()
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.Neu);
+        var workItem = await CreateTaskAsync(db, WorkItemStatus.New);
         var sut = new AufgabeRecoveryService(db.Context, new AlwaysNotRunningAutomationStatusSource(), NullLogger<AufgabeRecoveryService>.Instance);
 
-        var act = () => sut.RecoverManuellAsync(aufgabe.Id);
+        var act = () => sut.RecoverManuellAsync(workItem.Id);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Wiederherstellung für aktuellen Status nicht verfügbar.");
@@ -96,7 +96,7 @@ public sealed class AufgabeRecoveryServiceTests
     public async Task RecoverManuellAsync_ShouldAllowExactlyOneSuccess_WhenTriggeredInParallel()
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.Gestartet);
+        var workItem = await CreateTaskAsync(db, WorkItemStatus.Started);
 
         await using var context1 = db.CreateNewContext();
         await using var context2 = db.CreateNewContext();
@@ -109,25 +109,25 @@ public sealed class AufgabeRecoveryServiceTests
         var recovery1 = new AufgabeRecoveryService(context1, runningStatus, NullLogger<AufgabeRecoveryService>.Instance);
         var recovery2 = new AufgabeRecoveryService(context2, runningStatus, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var task1 = Task.Run(() => ExecuteRecoverSafeAsync(recovery1, aufgabe.Id));
-        var task2 = Task.Run(() => ExecuteRecoverSafeAsync(recovery2, aufgabe.Id));
+        var task1 = Task.Run(() => ExecuteRecoverSafeAsync(recovery1, workItem.Id));
+        var task2 = Task.Run(() => ExecuteRecoverSafeAsync(recovery2, workItem.Id));
         var results = await Task.WhenAll(task1, task2);
 
         results.Count(r => r).Should().Be(1);
 
         await using var assertContext = db.CreateNewContext();
-        var loaded = await assertContext.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
-        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
-        assertContext.Protokolleintraege
-            .Count(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.StatusUebergang && p.Inhalt.Contains("Manuelle Wiederherstellung"))
+        var loaded = await assertContext.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        loaded!.Status.Should().Be(WorkItemStatus.Started);
+        assertContext.LogEntries
+            .Count(p => p.WorkItemId == workItem.Id && p.Type == LogEntryType.StatusTransition && p.Content.Contains("Manuelle Wiederherstellung"))
             .Should().Be(1);
     }
 
-    private static async Task<bool> ExecuteRecoverSafeAsync(AufgabeRecoveryService service, Guid aufgabeId)
+    private static async Task<bool> ExecuteRecoverSafeAsync(AufgabeRecoveryService service, Guid workItemId)
     {
         try
         {
-            await service.RecoverManuellAsync(aufgabeId);
+            await service.RecoverManuellAsync(workItemId);
             return true;
         }
         catch (InvalidOperationException)
@@ -142,8 +142,8 @@ public sealed class AufgabeRecoveryServiceTests
         public event Action<int, int>? RunningCountChanged;
 #pragma warning restore CS0067
         public int GetRunningCount() => 0;
-        public bool IsRunning(Guid aufgabeId) => false;
-        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => null;
+        public bool IsRunning(Guid workItemId) => false;
+        public WorkItemRunStatus? GetLiveRunStatus(Guid workItemId) => null;
     }
 
     private sealed class AlwaysRunningAutomationStatusSource : IRunningAutomationStatusSource
@@ -152,8 +152,8 @@ public sealed class AufgabeRecoveryServiceTests
         public event Action<int, int>? RunningCountChanged;
 #pragma warning restore CS0067
         public int GetRunningCount() => 1;
-        public bool IsRunning(Guid aufgabeId) => true;
-        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => AufgabeLaufStatus.Laeuft;
+        public bool IsRunning(Guid workItemId) => true;
+        public WorkItemRunStatus? GetLiveRunStatus(Guid workItemId) => WorkItemRunStatus.Running;
     }
 
     private sealed class MutatingNotRunningAutomationStatusSource(Action beforeReturn) : IRunningAutomationStatusSource
@@ -164,7 +164,7 @@ public sealed class AufgabeRecoveryServiceTests
 #pragma warning restore CS0067
         public int GetRunningCount() => 0;
 
-        public bool IsRunning(Guid aufgabeId)
+        public bool IsRunning(Guid workItemId)
         {
             if (Interlocked.Exchange(ref _called, 1) == 0)
             {
@@ -174,7 +174,7 @@ public sealed class AufgabeRecoveryServiceTests
             return false;
         }
 
-        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => null;
+        public WorkItemRunStatus? GetLiveRunStatus(Guid workItemId) => null;
     }
 
     // Ensures all participant tasks have completed their initial DB read before any proceeds to
@@ -188,31 +188,31 @@ public sealed class AufgabeRecoveryServiceTests
 #pragma warning restore CS0067
         public int GetRunningCount() => 0;
 
-        public bool IsRunning(Guid aufgabeId)
+        public bool IsRunning(Guid workItemId)
         {
             _barrier.SignalAndWait(TimeSpan.FromSeconds(10));
             return false;
         }
 
-        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId) => null;
+        public WorkItemRunStatus? GetLiveRunStatus(Guid workItemId) => null;
     }
 
-    private static async Task<Aufgabe> CreateTaskAsync(DatabaseFixture db, AufgabeStatus status)
+    private static async Task<WorkItem> CreateTaskAsync(DatabaseFixture db, WorkItemStatus status)
     {
-        var projekt = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var projektEntity = await projekt.CreateAsync("Recovery-Parallel", null);
+        var project = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var projektEntity = await project.CreateAsync("Recovery-Parallel", null);
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
-        var aufgabe = await aufgabeService.CreateAsync(projektEntity.Id, "Festhängende Aufgabe", "test");
-        await aufgabeService.StatusSetzenAsync(aufgabe.Id, status);
-        if (status.IstAktivOderWartend())
+        var workItem = await aufgabeService.CreateAsync(projektEntity.Id, "Festhängende Aufgabe", "test");
+        await aufgabeService.StatusSetzenAsync(workItem.Id, status);
+        if (status.IsActiveOrWaiting())
         {
             // Aktiven Ausführungsstatus direkt auf der Entity setzen (das frühere
             // AufgabeService.AusfuehrungAktivSetzenAsync wurde entfernt): simuliert den Zustand
             // einer gestarteten Aufgabe ohne zugehörige Laufdaten (AktiveRunId bleibt null).
-            aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
+            workItem.ExecutionStatus = WorkItemExecutionStatus.Active;
             await db.Context.SaveChangesAsync();
         }
 
-        return aufgabe;
+        return workItem;
     }
 }

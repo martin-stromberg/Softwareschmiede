@@ -74,22 +74,22 @@ public sealed class WorkdirMigrationTests
         await db.Context.Database.MigrateAsync(PreviousBeforeAusfuehrungsStatusMigration, cancellationToken: TestContext.Current.CancellationToken);
         (await ColumnInfoAsync(db, "Aufgaben", "AusfuehrungsStatus")).Should().BeNull();
 
-        var projektId = Guid.NewGuid().ToString();
+        var projectId = Guid.NewGuid().ToString();
         await ExecuteNonQueryAsync(
             db,
             "INSERT INTO Projekte (Id, Name, Beschreibung, ErstellungsDatum, Status) VALUES ($id, $name, NULL, $erstellt, $status);",
-            ("$id", projektId),
+            ("$id", projectId),
             ("$name", "Backfill-Projekt"),
             ("$erstellt", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
             ("$status", "Aktiv"));
 
-        var neuId = await InsertLegacyAufgabeAsync(db, projektId, "Neu", null);
-        var aktivId = await InsertLegacyAufgabeAsync(db, projektId, "Gestartet", "lauf-aktiv");
-        var aktivTrimId = await InsertLegacyAufgabeAsync(db, projektId, "Wartend", "  ");
-        var gestartetOhneRunId = await InsertLegacyAufgabeAsync(db, projektId, "Gestartet", null);
-        var wartendOhneRunId = await InsertLegacyAufgabeAsync(db, projektId, "Wartend", null);
-        var beendetId = await InsertLegacyAufgabeAsync(db, projektId, "Beendet", null);
-        var archiviertId = await InsertLegacyAufgabeAsync(db, projektId, "Archiviert", "lauf-alt");
+        var neuId = await InsertLegacyAufgabeAsync(db, projectId, "Neu", null);
+        var aktivId = await InsertLegacyAufgabeAsync(db, projectId, "Gestartet", "lauf-aktiv");
+        var aktivTrimId = await InsertLegacyAufgabeAsync(db, projectId, "Wartend", "  ");
+        var gestartetOhneRunId = await InsertLegacyAufgabeAsync(db, projectId, "Gestartet", null);
+        var wartendOhneRunId = await InsertLegacyAufgabeAsync(db, projectId, "Wartend", null);
+        var beendetId = await InsertLegacyAufgabeAsync(db, projectId, "Beendet", null);
+        var archiviertId = await InsertLegacyAufgabeAsync(db, projectId, "Archiviert", "lauf-alt");
 
         await db.Context.Database.MigrateAsync(AddAufgabeAusfuehrungsStatusMigration, cancellationToken: TestContext.Current.CancellationToken);
 
@@ -131,7 +131,7 @@ public sealed class WorkdirMigrationTests
         return null;
     }
 
-    private static async Task<string> InsertLegacyAufgabeAsync(DatabaseFixture db, string projektId, string status, string? aktiveRunId)
+    private static async Task<string> InsertLegacyAufgabeAsync(DatabaseFixture db, string projectId, string status, string? aktiveRunId)
     {
         var id = Guid.NewGuid().ToString();
         await ExecuteNonQueryAsync(
@@ -149,7 +149,7 @@ public sealed class WorkdirMigrationTests
                  NULL, NULL, NULL);
             """,
             ("$id", id),
-            ("$projektId", projektId),
+            ("$projektId", projectId),
             ("$titel", $"Alt-{status}-{id[..6]}"),
             ("$status", status),
             ("$erstellt", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
@@ -157,11 +157,11 @@ public sealed class WorkdirMigrationTests
         return id;
     }
 
-    private static async Task<string?> GetAufgabeAusfuehrungsStatusAsync(DatabaseFixture db, string aufgabeId)
+    private static async Task<string?> GetAufgabeAusfuehrungsStatusAsync(DatabaseFixture db, string workItemId)
         => (string?)await ExecuteScalarAsync(
             db,
             "SELECT AusfuehrungsStatus FROM Aufgaben WHERE Id = $id;",
-            ("$id", aufgabeId));
+            ("$id", workItemId));
 
     private sealed record TableColumnInfo(string Name, bool NotNull);
 }

@@ -9,34 +9,34 @@ namespace Softwareschmiede.App.ViewModels;
 public static class ScmBackmergeModusTexte
 {
     /// <summary>Automatische Backmerge-Bestätigung deaktiviert.</summary>
-    public const string Deaktiviert = "Deaktiviert";
+    public const string Disabled = "Deaktiviert";
 
     /// <summary>Backmerge-Pull-Requests in allen Projekten automatisch mergen.</summary>
     public const string Global = "Global aktiviert";
 
     /// <summary>Backmerge-Pull-Requests nur in Projekten mit aktivierter Option automatisch mergen.</summary>
-    public const string Projektbezogen = "Projektbezogen aktivierbar";
+    public const string ProjectScoped = "Projektbezogen aktivierbar";
 }
 
 /// <summary>
 /// Auswahloption für den Backmerge-Modus in den Einstellungen: der Steuerwert
-/// (<see cref="Modus"/>) zusammen mit dem sichtbaren Anzeige-Label.
+/// (<see cref="Mode"/>) zusammen mit dem sichtbaren Anzeige-Label.
 /// </summary>
-/// <param name="Modus">Der persistierte Backmerge-Modus.</param>
+/// <param name="Mode">Der persistierte Backmerge-Modus.</param>
 /// <param name="Label">Der in der Auswahlbox angezeigte Text.</param>
-public sealed record ScmBackmergeModusOption(ScmBackmergeModus Modus, string Label)
+public sealed record ScmBackmergeModusOption(ScmBackmergeMode Mode, string Label)
 {
     /// <summary>Alle wählbaren Backmerge-Modi in Anzeigereihenfolge.</summary>
-    public static IReadOnlyList<ScmBackmergeModusOption> Alle { get; } =
+    public static IReadOnlyList<ScmBackmergeModusOption> All { get; } =
     [
-        new(ScmBackmergeModus.Deaktiviert, ScmBackmergeModusTexte.Deaktiviert),
-        new(ScmBackmergeModus.Global, ScmBackmergeModusTexte.Global),
-        new(ScmBackmergeModus.Projektbezogen, ScmBackmergeModusTexte.Projektbezogen)
+        new(ScmBackmergeMode.Disabled, ScmBackmergeModusTexte.Disabled),
+        new(ScmBackmergeMode.Global, ScmBackmergeModusTexte.Global),
+        new(ScmBackmergeMode.ProjectScoped, ScmBackmergeModusTexte.ProjectScoped)
     ];
 
     /// <summary>Liefert die Auswahloption zu einem gespeicherten Modus.</summary>
-    public static ScmBackmergeModusOption FuerModus(ScmBackmergeModus modus)
-        => Alle.First(o => o.Modus == modus);
+    public static ScmBackmergeModusOption FuerModus(ScmBackmergeMode modus)
+        => All.First(o => o.Mode == modus);
 
     /// <inheritdoc/>
     public override string ToString() => Label;

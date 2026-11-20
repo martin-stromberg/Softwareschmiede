@@ -31,12 +31,12 @@ public sealed class CliOutputProtokollWriter : ITerminalOutputSink, ITerminalDia
     private int _completed;
 
     /// <summary>Erstellt einen Writer fuer eine konkrete Aufgabe.</summary>
-    /// <param name="aufgabeId">Aufgabe, zu der die Ausgabe gehoert.</param>
+    /// <param name="workItemId">Aufgabe, zu der die Ausgabe gehoert.</param>
     /// <param name="scopeFactory">Factory fuer scoped Zugriff auf <see cref="ProtokollService"/>.</param>
     /// <param name="logger">Logger fuer Persistenzfehler.</param>
-    public CliOutputProtokollWriter(Guid aufgabeId, IServiceScopeFactory scopeFactory, ILogger<CliOutputProtokollWriter> logger)
+    public CliOutputProtokollWriter(Guid workItemId, IServiceScopeFactory scopeFactory, ILogger<CliOutputProtokollWriter> logger)
     {
-        _aufgabeId = aufgabeId;
+        _aufgabeId = workItemId;
         _scopeFactory = scopeFactory;
         _logger = logger;
         _workerTask = Task.Run(ProcessLinesAsync);

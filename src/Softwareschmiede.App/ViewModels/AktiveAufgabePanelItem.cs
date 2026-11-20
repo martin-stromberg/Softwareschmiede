@@ -12,7 +12,7 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
     public Guid Id { get; init; }
 
     /// <summary>Titel der Aufgabe.</summary>
-    public string Titel { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
 
     /// <summary>Name des zugehörigen Repositorys (<see cref="Domain.Entities.GitRepository.RepositoryName"/>), Fallback Projektname.</summary>
     public string RepositoryName { get; init; } = string.Empty;
@@ -45,31 +45,31 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
     public DateTimeOffset SortierZeitpunkt { get; init; }
 
     /// <summary>Optionaler Laufzeit-Substatus der aktiven CLI-Ausführung.</summary>
-    public AufgabeLaufStatus? LaufStatus { get; init; }
+    public WorkItemRunStatus? RunStatus { get; init; }
 
-    /// <summary>Live-Substatus aus der Laufzeitquelle (<see cref="Domain.Interfaces.IRunningAutomationStatusSource.GetLiveLaufStatus"/>); <c>null</c> = kein laufender gehandelter Prozess.</summary>
-    public AufgabeLaufStatus? LiveLaufStatus { get; init; }
+    /// <summary>Live-Substatus aus der Laufzeitquelle (<see cref="Domain.Interfaces.IRunningAutomationStatusSource.GetLiveRunStatus"/>); <c>null</c> = kein laufender gehandelter Prozess.</summary>
+    public WorkItemRunStatus? LiveLaufStatus { get; init; }
 
     /// <summary>Aktueller Aufgabenstatus.</summary>
-    public AufgabeStatus Status { get; init; }
+    public WorkItemStatus Status { get; init; }
 
     /// <summary>Persistierter Lebenszyklusstatus der KI-Ausführung.</summary>
-    public AufgabeAusfuehrungsStatus AusfuehrungsStatus { get; init; } = AufgabeAusfuehrungsStatus.NichtGestartet;
+    public WorkItemExecutionStatus ExecutionStatus { get; init; } = WorkItemExecutionStatus.NotStarted;
 
     /// <summary>Aktive Lauf-ID der KI-Ausführung.</summary>
-    public string? AktiveRunId { get; init; }
+    public string? ActiveRunId { get; init; }
 
     /// <summary>Zeitstempel des letzten Heartbeats einer aktiven Ausführung.</summary>
     public DateTimeOffset? LastHeartbeatUtc { get; init; }
 
     /// <summary>Zeitstempel des letzten echten CLI-Prozessstarts.</summary>
-    public DateTimeOffset? LetzterCliStartUtc { get; init; }
+    public DateTimeOffset? LastCliStartUtc { get; init; }
 
     /// <summary>Optionaler UTC-Zeitpunkt, bis zu dem die Aufgabe pausiert ist (null oder Vergangenheit = nicht pausiert).</summary>
-    public DateTimeOffset? PausiertBisUtc { get; init; }
+    public DateTimeOffset? PausedUntilUtc { get; init; }
 
-    /// <summary>Gibt an, ob die Aufgabe aktuell pausiert ist (<see cref="PausiertBisUtc"/> liegt in der Zukunft).</summary>
-    public bool IstPausiert => PausiertBisUtc > DateTimeOffset.UtcNow;
+    /// <summary>Gibt an, ob die Aufgabe aktuell pausiert ist (<see cref="PausedUntilUtc"/> liegt in der Zukunft).</summary>
+    public bool IstPausiert => PausedUntilUtc > DateTimeOffset.UtcNow;
 
     /// <summary>Gibt an, ob für diese Aufgabe aktuell ein zeitgesteuerter Prompt in der Warteschlange steht.</summary>
     public bool HasScheduledPrompt { get; init; }

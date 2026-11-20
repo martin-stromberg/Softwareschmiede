@@ -28,20 +28,20 @@ public sealed class AutoShutdownEinstellungenService
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-        var erzwingen = await einstellungService.GetAutoShutdownErzwingenAsync(ct);
+        var force = await einstellungService.GetAutoShutdownErzwingenAsync(ct);
         var toleranz = await einstellungService.GetAutoShutdownToleranzMinutenAsync(ct);
-        return (erzwingen, toleranz);
+        return (force, toleranz);
     }
 
     /// <summary>Speichert den Schalter "Herunterfahren erzwingen".</summary>
-    /// <param name="erzwingen">Der zu speichernde Schalter.</param>
+    /// <param name="force">Der zu speichernde Schalter.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    public async Task SpeichereErzwingenAsync(bool erzwingen, CancellationToken ct = default)
+    public async Task SpeichereErzwingenAsync(bool force, CancellationToken ct = default)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-        await einstellungService.SetAutoShutdownErzwingenAsync(erzwingen, ct);
-        _logger.LogDebug("Auto-Shutdown-Erzwingen '{Erzwingen}' gespeichert.", erzwingen);
+        await einstellungService.SetAutoShutdownErzwingenAsync(force, ct);
+        _logger.LogDebug("Auto-Shutdown-Erzwingen '{Erzwingen}' gespeichert.", force);
     }
 
     /// <summary>Speichert die Toleranzzeit (Minuten) des Auto-Shutdown-Countdowns.</summary>

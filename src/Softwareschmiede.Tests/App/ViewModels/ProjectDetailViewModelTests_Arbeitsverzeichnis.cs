@@ -14,7 +14,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Tests für die nachträgliche Bearbeitung des Arbeitsverzeichnisses in <see cref="ProjectDetailViewModel"/>.</summary>
 public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
@@ -45,11 +45,11 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
             _pluginManagerMock.Object,
             NullLogger<ProjectDetailViewModel>.Instance);
 
-    private async Task<(Softwareschmiede.Domain.Entities.Projekt Projekt, GitRepository Repository)> ErstelleProjektMitRepositoryAsync(string? workingDirectory = null)
+    private async Task<(Softwareschmiede.Domain.Entities.Project Project, GitRepository Repository)> ErstelleProjektMitRepositoryAsync(string? workingDirectory = null)
     {
-        var projekt = await _projektService.CreateAsync("Arbeitsverzeichnis-Test-Projekt", null);
+        var project = await _projektService.CreateAsync("Arbeitsverzeichnis-Test-Projekt", null);
         var repository = await _projektService.AddRepositoryAsync(
-            projekt.Id,
+            project.Id,
             "Softwareschmiede.GitHub",
             "https://github.com/test/repo",
             "test-repo");
@@ -57,16 +57,16 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
         if (workingDirectory != null)
             await _projektService.SaveRepositoryWorkingDirectoryAsync(repository.Id, workingDirectory);
 
-        return (projekt, repository);
+        return (project, repository);
     }
 
     /// <summary>ArbeitsverzeichnisBearbeitenCommand ist nicht ausführbar, solange kein Repository zugewiesen ist.</summary>
     [Fact]
     public async Task ArbeitsverzeichnisBearbeitenCommand_CanExecuteFalse_OhneRepository()
     {
-        var projekt = await _projektService.CreateAsync("Ohne-Repository-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await _projektService.CreateAsync("Ohne-Repository-Projekt", null, TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        sut.ProjektId = projekt.Id;
+        sut.ProjectId = project.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.ArbeitsverzeichnisBearbeitenCommand.CanExecute(null).Should().BeFalse();
@@ -76,9 +76,9 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
     [Fact]
     public async Task ArbeitsverzeichnisBearbeitenCommand_CanExecuteTrue_MitRepository()
     {
-        var (projekt, _) = await ErstelleProjektMitRepositoryAsync();
+        var (project, _) = await ErstelleProjektMitRepositoryAsync();
         var sut = CreateSut();
-        sut.ProjektId = projekt.Id;
+        sut.ProjectId = project.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.ArbeitsverzeichnisBearbeitenCommand.CanExecute(null).Should().BeTrue();
@@ -88,7 +88,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
     [Fact]
     public async Task ArbeitsverzeichnisBearbeitenAsync_Confirmed_PersistiertNeuesArbeitsverzeichnis()
     {
-        var (projekt, repository) = await ErstelleProjektMitRepositoryAsync(workingDirectory: "backend");
+        var (project, repository) = await ErstelleProjektMitRepositoryAsync(workingDirectory: "backend");
 
         _dialogServiceMock
             .Setup(d => d.ArbeitsverzeichnisBearbeitenDialog(It.IsAny<ArbeitsverzeichnisBearbeitenViewModel>()))
@@ -99,7 +99,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
             .Returns(() => new ArbeitsverzeichnisBearbeitenViewModel(NullLogger<ArbeitsverzeichnisBearbeitenViewModel>.Instance));
 
         var sut = CreateSut();
-        sut.ProjektId = projekt.Id;
+        sut.ProjectId = project.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();
@@ -113,7 +113,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
     [Fact]
     public async Task ArbeitsverzeichnisBearbeitenAsync_Aborted_AendertNichts()
     {
-        var (projekt, repository) = await ErstelleProjektMitRepositoryAsync(workingDirectory: "backend");
+        var (project, repository) = await ErstelleProjektMitRepositoryAsync(workingDirectory: "backend");
 
         _dialogServiceMock
             .Setup(d => d.ArbeitsverzeichnisBearbeitenDialog(It.IsAny<ArbeitsverzeichnisBearbeitenViewModel>()))
@@ -124,7 +124,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
             .Returns(() => new ArbeitsverzeichnisBearbeitenViewModel(NullLogger<ArbeitsverzeichnisBearbeitenViewModel>.Instance));
 
         var sut = CreateSut();
-        sut.ProjektId = projekt.Id;
+        sut.ProjectId = project.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();
@@ -138,7 +138,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
     [Fact]
     public async Task ArbeitsverzeichnisBearbeitenAsync_Confirmed_RootAuswahl_SetztAufNullZurueck()
     {
-        var (projekt, repository) = await ErstelleProjektMitRepositoryAsync(workingDirectory: "backend");
+        var (project, repository) = await ErstelleProjektMitRepositoryAsync(workingDirectory: "backend");
 
         _dialogServiceMock
             .Setup(d => d.ArbeitsverzeichnisBearbeitenDialog(It.IsAny<ArbeitsverzeichnisBearbeitenViewModel>()))
@@ -149,7 +149,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
             .Returns(() => new ArbeitsverzeichnisBearbeitenViewModel(NullLogger<ArbeitsverzeichnisBearbeitenViewModel>.Instance));
 
         var sut = CreateSut();
-        sut.ProjektId = projekt.Id;
+        sut.ProjectId = project.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         await ((AsyncRelayCommand)sut.ArbeitsverzeichnisBearbeitenCommand).ExecuteAsync();

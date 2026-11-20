@@ -14,7 +14,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Unit-Tests für den CLI-Rohausgabe-Export von TaskDetailViewModel.</summary>
 public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AufgabeService _aufgabeService;
     private readonly ProtokollService _protokollService;
     private readonly TodoService _todoService;
@@ -48,7 +48,7 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
         _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
-        var arbeitsverzeichnisMock = new Mock<IArbeitsverzeichnisResolver>();
+        var arbeitsverzeichnisMock = new Mock<IWorkingDirectoryResolver>();
         _entwicklungsprozessService = new EntwicklungsprozessService(
             _aufgabeService,
             _protokollService,
@@ -60,12 +60,12 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
 
         _dialogServiceMock = new Mock<IDialogService>();
 
-        _db.Projekte.Add(new Projekt
+        _db.Projects.Add(new Project
         {
             Id = _projektId,
             Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
     }
@@ -106,21 +106,21 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
             arbeitsverzeichnisOeffnenService);
     }
 
-    private async Task<Aufgabe> ErstelleAufgabeAsync(AufgabeStatus status = AufgabeStatus.Neu)
+    private async Task<WorkItem> ErstelleAufgabeAsync(WorkItemStatus status = WorkItemStatus.New)
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Exportaufgabe", "Beschreibung");
-        if (status != AufgabeStatus.Neu)
-            await _aufgabeService.StatusSetzenAsync(aufgabe.Id, status);
-        return await _aufgabeService.GetByIdAsync(aufgabe.Id) ?? aufgabe;
+        var workItem = await _aufgabeService.CreateAsync(_projektId, "Exportaufgabe", "Beschreibung");
+        if (status != WorkItemStatus.New)
+            await _aufgabeService.StatusSetzenAsync(workItem.Id, status);
+        return await _aufgabeService.GetByIdAsync(workItem.Id) ?? workItem;
     }
 
     /// <summary>Der Export-Command ist ausführbar, sobald eine Aufgabe geladen wurde.</summary>
     [Fact]
     public async Task ExportCliRawCommand_CanExecute_WhenAufgabeGeladen()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
@@ -132,10 +132,10 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
     [Fact]
     public async Task ExportCliRawAsync_ShouldAbort_WhenDialogCancelled()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-output-1", TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
+        await _protokollService.AddCliOutputAsync(workItem.Id, "cli-output-1", TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         _dialogServiceMock
@@ -156,18 +156,18 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
     [Fact]
     public async Task ExportCliRawAsync_ShouldWriteOnlyCliOutput_InChronologicalOrder()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "prompt-1", ct: TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
+        await _protokollService.AddEintragAsync(workItem.Id, LogEntryType.Prompt, "prompt-1", ct: TestContext.Current.CancellationToken);
         await Task.Delay(5, TestContext.Current.CancellationToken);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1", TestContext.Current.CancellationToken);
+        await _protokollService.AddCliOutputAsync(workItem.Id, "cli-1", TestContext.Current.CancellationToken);
         await Task.Delay(5, TestContext.Current.CancellationToken);
-        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.SystemMeldung, "sys-1", ct: TestContext.Current.CancellationToken);
+        await _protokollService.AddEintragAsync(workItem.Id, LogEntryType.SystemMessage, "sys-1", ct: TestContext.Current.CancellationToken);
         await Task.Delay(5, TestContext.Current.CancellationToken);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-2", TestContext.Current.CancellationToken);
+        await _protokollService.AddCliOutputAsync(workItem.Id, "cli-2", TestContext.Current.CancellationToken);
 
         var exportPfad = Path.Combine(Path.GetTempPath(), $"cli-raw-export-{Guid.NewGuid():N}.raw");
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         _dialogServiceMock
@@ -198,10 +198,10 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
     [Fact]
     public async Task ExportCliRawAsync_ShouldSetFehlerMeldung_WhenTargetPathIsNotRaw()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1", TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
+        await _protokollService.AddCliOutputAsync(workItem.Id, "cli-1", TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         _dialogServiceMock
@@ -222,10 +222,10 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
     [Fact]
     public async Task ExportCliRawAsync_ShouldSetFehlerMeldung_WhenFileWriteFails()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1", TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeAsync(WorkItemStatus.Started);
+        await _protokollService.AddCliOutputAsync(workItem.Id, "cli-1", TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         var verzeichnisPfad = Path.Combine(Path.GetTempPath(), $"cli-raw-export-dir-{Guid.NewGuid():N}.raw");

@@ -11,7 +11,7 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 /// <summary>E2E-Test: CLI-Prozess starten und Fenster in WPF-Control einbetten.</summary>
 public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly KiAusfuehrungsService _kiService;
 
     /// <summary>CliEmbeddingServiceIntegrationTests.</summary>
@@ -33,31 +33,31 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     [Fact]
     public void IsRunning_GibtFalse_WennKeinProzessGestartet()
     {
-        var aufgabeId = Guid.NewGuid();
-        _kiService.IsRunning(aufgabeId).Should().BeFalse();
+        var workItemId = Guid.NewGuid();
+        _kiService.IsRunning(workItemId).Should().BeFalse();
     }
 
     /// <summary>GetLastExitCode gibt null zurück wenn kein Prozess gestartet wurde.</summary>
     [Fact]
     public void GetLastExitCode_GibtNull_WennKeinProzessGestartet()
     {
-        var aufgabeId = Guid.NewGuid();
-        _kiService.GetLastExitCode(aufgabeId).Should().BeNull();
+        var workItemId = Guid.NewGuid();
+        _kiService.GetLastExitCode(workItemId).Should().BeNull();
     }
 
     /// <summary>StartCliAsync startet einen Prozess und setzt IsRunning auf true.</summary>
     [OsInterfaceFact]
     public async Task StartCliAsync_StartetProzess_UndSetztIsRunningAufTrue()
     {
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = new FakeKiPlugin();
 
-        var handle = await _kiService.StartCliAsync(aufgabeId, pluginMock, Path.GetTempPath());
+        var handle = await _kiService.StartCliAsync(workItemId, pluginMock, Path.GetTempPath());
 
         handle.Should().NotBeNull();
-        handle.AufgabeId.Should().Be(aufgabeId);
+        handle.WorkItemId.Should().Be(workItemId);
 
-        await _kiService.StopCliAsync(aufgabeId);
+        await _kiService.StopCliAsync(workItemId);
     }
 
     /// <summary>StartTerminalSessionAsync startet einen Prozess via ConPTY und liefert eine PseudoConsoleSession.</summary>
@@ -65,16 +65,16 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     [Trait("Category", "ConPTY")]
     public async Task StartTerminalSessionAsync_StartetProzess_UndSetztPseudoConsoleSession()
     {
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var pluginMock = new FakeKiPlugin();
 
-        var handle = await _kiService.StartTerminalSessionAsync(aufgabeId, pluginMock, Path.GetTempPath());
+        var handle = await _kiService.StartTerminalSessionAsync(workItemId, pluginMock, Path.GetTempPath());
 
         handle.Should().NotBeNull();
-        handle.AufgabeId.Should().Be(aufgabeId);
+        handle.WorkItemId.Should().Be(workItemId);
         handle.Session.Should().NotBeNull("StartTerminalSessionAsync muss eine ITerminalSession liefern");
 
-        await _kiService.StopCliAsync(aufgabeId);
+        await _kiService.StopCliAsync(workItemId);
     }
 }
 
@@ -106,7 +106,7 @@ internal sealed class FakeKiPlugin : IKiPlugin
     }
 
     /// <summary>GetProcessWindowTitle.</summary>
-    public string GetProcessWindowTitle(Guid aufgabeId) => "FakeKi";
+    public string GetProcessWindowTitle(Guid workItemId) => "FakeKi";
 
     /// <summary>SupportsSessionContinuation.</summary>
     public bool SupportsSessionContinuation() => false;

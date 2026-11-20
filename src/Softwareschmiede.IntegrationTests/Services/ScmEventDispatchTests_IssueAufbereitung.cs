@@ -185,8 +185,8 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         Assert.Contains("Issue-Aufbereitung", item.Reason);
         Assert.Empty(fixture.Sessions);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Contains(await db.Protokolleintraege.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => x.Inhalt.Contains("custom.auf"));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Contains(await db.LogEntries.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => x.Content.Contains("custom.auf"));
     }
 
     /// <summary>Die Ausführung zählt in die #410-Begrenzung: Bei erreichtem globalem Limit
@@ -271,9 +271,9 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Responses);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Contains(await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
-            x => x.Inhalt.Contains("geschlossen"));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Contains(await db.LogEntries.Where(x => x.WorkItemId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            x => x.Content.Contains("geschlossen"));
     }
 
     /// <summary>Fehlschlag der Rückschreibung: Der Remote-Fehler wird als unklarer Zustand
@@ -309,9 +309,9 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         Assert.Contains("Remote-Fehler", item.Reason);
         Assert.DoesNotContain(fixture.Responses, x => x.Kind == ScmResponseKind.Comment); // kein Fehlerkommentar
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Contains(await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
-            x => x.Inhalt.Contains("Issue-Aufbereitung fehlgeschlagen"));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Contains(await db.LogEntries.Where(x => x.WorkItemId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            x => x.Content.Contains("Issue-Aufbereitung fehlgeschlagen"));
     }
 
     /// <summary>Ein begründeter Abschluss ohne Remoteaktion verarbeitet den Auftrag —
@@ -348,33 +348,33 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
         string? kiPluginPrefix, bool issueAufbereitungAktiv = true)
     {
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "Aufbereitung" };
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var project = new Project { Id = Guid.NewGuid(), Name = "Aufbereitung" };
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjektId = project.Id,
+            ProjectId = project.Id,
             RepositoryUrl = "https://github.com/owner/repo",
             RepositoryName = "repo",
-            PluginTyp = fixture.Repository.ProviderPrefix,
-            Aktiv = true,
-            IssueAufbereitungAktiv = issueAufbereitungAktiv
+            PluginType = fixture.Repository.ProviderPrefix,
+            Active = true,
+            IssuePreparationEnabled = issueAufbereitungAktiv
         };
-        var task = new Aufgabe
+        var task = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Issue Titel 9",
-            ProjektId = project.Id,
+            Title = "Issue Titel 9",
+            ProjectId = project.Id,
             GitRepositoryId = repository.Id,
-            Zweck = ScmIssueAufbereitungsService.Zweck,
-            KiPluginPrefix = kiPluginPrefix
+            Purpose = ScmIssueAufbereitungsService.Purpose,
+            AiPluginPrefix = kiPluginPrefix
         };
-        var referenz = new IssueReferenz
+        var referenz = new IssueReference
         {
             Id = Guid.NewGuid(),
-            AufgabeId = task.Id,
-            IssueNummer = 9,
-            Titel = "Issue Titel 9",
+            WorkItemId = task.Id,
+            IssueNumber = 9,
+            Title = "Issue Titel 9",
             Body = "Issue-Beschreibung",
             IssueUrl = "https://github.com/owner/repo/issues/9",
             SourceKey = "test-scm/github.com/R_1/IssueAufbereitung/9"
@@ -385,11 +385,11 @@ public sealed class ScmEventDispatchTests_IssueAufbereitung
             "Issue-Beschreibung", "https://github.com/owner/repo/issues/9", time);
         var item = new ScmIncomingEvent
         {
-            AufgabeId = task.Id,
-            EventKey = observation.ContentKey + "/" + ScmIssueAufbereitungsService.Zweck,
+            WorkItemId = task.Id,
+            EventKey = observation.ContentKey + "/" + ScmIssueAufbereitungsService.Purpose,
             ObservationJson = JsonSerializer.Serialize(observation, ScmEventStore.JsonOptions),
             ReceivedUtc = time.ToUnixTimeMilliseconds(),
-            Zweck = ScmIssueAufbereitungsService.Zweck,
+            Purpose = ScmIssueAufbereitungsService.Purpose,
             Reason = "Interner Aufbereitungsauftrag für Issue #9."
         };
         db.AddRange(project, repository, task, referenz, item);

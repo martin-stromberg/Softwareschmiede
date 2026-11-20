@@ -25,13 +25,13 @@ public static class AufgabenListenModusServiceTestFactory
         var dbPath = Path.Combine(Path.GetTempPath(), $"sws-mods-{Guid.NewGuid():N}.db");
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddDbContext<SoftwareschmiededDbContext>(
+        services.AddDbContext<SoftwareschmiedeDbContext>(
             o => o.UseSqlite($"Data Source={dbPath};Pooling=False"));
         services.AddScoped<AppEinstellungService>();
         var provider = services.BuildServiceProvider();
         using (var initScope = provider.CreateScope())
         {
-            initScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Database.EnsureCreated();
+            initScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().Database.EnsureCreated();
         }
 
         var service = new AufgabenListenModusService(

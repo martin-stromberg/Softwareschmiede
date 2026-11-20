@@ -20,7 +20,7 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
 {
     private const string KiPrefix = "Softwareschmiede.TestKi";
 
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AppEinstellungService _einstellungService;
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
     private readonly DarkModeService _darkModeService;
@@ -83,15 +83,15 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
 
     private async Task<GitRepository> AddRepositoryAsync(string name = "repo")
     {
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "P" };
+        var project = new Project { Id = Guid.NewGuid(), Name = "P" };
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            ProjektId = project.Id,
+            ProjectId = project.Id,
             RepositoryUrl = "https://github.com/owner/" + name,
             RepositoryName = name,
-            PluginTyp = "test-scm",
-            Aktiv = true
+            PluginType = "test-scm",
+            Active = true
         };
         _db.AddRange(project, repository);
         await _db.SaveChangesAsync();
@@ -162,7 +162,7 @@ public sealed class SettingsViewModelTests_IssueAufbereitung : IDisposable
         (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmIssueAufbereitungKommentarEnabledKey, TestContext.Current.CancellationToken)).Should().Be("False");
         (await _einstellungService.GetSettingAsync(AppEinstellungService.ScmIssueAufbereitungPluginKey, TestContext.Current.CancellationToken)).Should().Be(KiPrefix);
         var stored = await _db.GitRepositories.FindAsync(new object?[] { repository.Id }, TestContext.Current.CancellationToken);
-        stored!.IssueAufbereitungAktiv.Should().BeTrue();
+        stored!.IssuePreparationEnabled.Should().BeTrue();
     }
 
     /// <summary>Der Standard-Eintrag persistiert null als Plugin-Prefix (Fallback-Kette).</summary>

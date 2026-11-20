@@ -16,17 +16,17 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
     [Fact]
     public void Convert_ShouldReturnSymbolOnly_WhenLaeuft()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Laufende Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-1",
+            Title = "Laufende Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-1",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-1)
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().Be("▶");
     }
@@ -38,10 +38,10 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Prompt-Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-prompt",
+            Title = "Prompt-Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-prompt",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
             HasScheduledPrompt = true
         };
@@ -55,18 +55,18 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
     [Fact]
     public void Convert_ShouldReturnSymbolOnly_WhenPausiert()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Pausierte Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-pausiert",
+            Title = "Pausierte Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-pausiert",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
-            PausiertBisUtc = DateTimeOffset.UtcNow.AddMinutes(90)
+            PausedUntilUtc = DateTimeOffset.UtcNow.AddMinutes(90)
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().Be("⏸");
     }
@@ -78,10 +78,10 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
         var item = new AktiveAufgabePanelItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Aufgabe mit wartender Live-CLI",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet,
-            LiveLaufStatus = AufgabeLaufStatus.WartetAufEingabe
+            Title = "Aufgabe mit wartender Live-CLI",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Completed,
+            LiveLaufStatus = WorkItemRunStatus.WaitingForInput
         };
 
         var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
@@ -93,18 +93,18 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
     [Fact]
     public void Convert_ShouldReturnSymbolOnly_WhenWartetAufEingabe()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Wartende Aufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-3",
+            Title = "Wartende Aufgabe",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-3",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
-            LaufStatus = AufgabeLaufStatus.WartetAufEingabe
+            RunStatus = WorkItemRunStatus.WaitingForInput
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().Be("⏸");
     }
@@ -113,15 +113,15 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
     [Fact]
     public void Convert_ShouldReturnSymbolOnly_WhenStatusIstWartend()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Wartende Aufgabe",
-            Status = AufgabeStatus.Wartend,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv
+            Title = "Wartende Aufgabe",
+            Status = WorkItemStatus.Waiting,
+            ExecutionStatus = WorkItemExecutionStatus.Active
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().Be("⏸");
     }
@@ -130,17 +130,17 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
     [Fact]
     public void Convert_ShouldReturnSymbolOnly_WhenBereit()
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = "Aufgabe ohne aktiven Lauf",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            AktiveRunId = "run-2",
+            Title = "Aufgabe ohne aktiven Lauf",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-2",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10)
         };
 
-        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+        var result = _sut.Convert(workItem, typeof(string), null!, CultureInfo.InvariantCulture);
 
         result.Should().Be("✓");
     }
@@ -158,7 +158,7 @@ public sealed class KiAusfuehrungsStatusSymbolConverterTests
     [Fact]
     public void ConvertBack_ShouldThrowNotSupportedException()
     {
-        var act = () => _sut.ConvertBack("▶", typeof(Aufgabe), null!, CultureInfo.InvariantCulture);
+        var act = () => _sut.ConvertBack("▶", typeof(WorkItem), null!, CultureInfo.InvariantCulture);
 
         act.Should().Throw<NotSupportedException>();
     }

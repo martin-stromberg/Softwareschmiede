@@ -15,7 +15,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         var store = new CliReplayAufzeichnungStore();
         var quelle = new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "Devin CLI (äöü)",
             StartUtc = new DateTimeOffset(2025, 3, 4, 10, 20, 30, TimeSpan.Zero),
             EndeUtc = new DateTimeOffset(2025, 3, 4, 11, 0, 0, TimeSpan.Zero),
@@ -35,7 +35,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         stream.Position = 0;
         var geladen = await store.LadeAsync(stream, TestContext.Current.CancellationToken);
 
-        geladen.AufgabeId.Should().Be(quelle.AufgabeId);
+        geladen.WorkItemId.Should().Be(quelle.WorkItemId);
         geladen.PluginName.Should().Be(quelle.PluginName);
         geladen.StartUtc.Should().Be(quelle.StartUtc);
         geladen.EndeUtc.Should().Be(quelle.EndeUtc);
@@ -58,7 +58,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         var quelle = CreateAufzeichnung();
         quelle = new CliOutputAufzeichnung
         {
-            AufgabeId = quelle.AufgabeId,
+            WorkItemId = quelle.WorkItemId,
             PluginName = quelle.PluginName,
             StartUtc = quelle.StartUtc,
             EndeUtc = null,
@@ -127,7 +127,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         using var stream = new MemoryStream();
         await store.SpeichernAsync(stream, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 0,
@@ -150,7 +150,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         using var stream = new MemoryStream();
         await store.SpeichernAsync(stream, new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
@@ -223,7 +223,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         var store = new CliReplayAufzeichnungStore();
         var quelle = new CliOutputAufzeichnung
         {
-            AufgabeId = Guid.NewGuid(),
+            WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = new DateTimeOffset(2025, 3, 4, 10, 20, 30, TimeSpan.FromHours(2)),
             EndeUtc = new DateTimeOffset(2025, 3, 4, 11, 0, 0, TimeSpan.FromHours(2)),
@@ -251,28 +251,28 @@ public sealed class CliReplayAufzeichnungStoreTests
     public async Task DateiWrapper_SpeichernUndLaden_Roundtrip()
     {
         var store = new CliReplayAufzeichnungStore();
-        var pfad = Path.Combine(Path.GetTempPath(), $"clireplay-test-{Guid.NewGuid():N}.clireplay");
+        var path = Path.Combine(Path.GetTempPath(), $"clireplay-test-{Guid.NewGuid():N}.clireplay");
         try
         {
             var quelle = CreateAufzeichnung();
-            await store.SpeichernAsync(pfad, quelle, TestContext.Current.CancellationToken);
+            await store.SpeichernAsync(path, quelle, TestContext.Current.CancellationToken);
 
-            File.Exists(pfad).Should().BeTrue();
-            var geladen = await store.LadeAsync(pfad, TestContext.Current.CancellationToken);
-            geladen.AufgabeId.Should().Be(quelle.AufgabeId);
+            File.Exists(path).Should().BeTrue();
+            var geladen = await store.LadeAsync(path, TestContext.Current.CancellationToken);
+            geladen.WorkItemId.Should().Be(quelle.WorkItemId);
             geladen.Chunks.Should().HaveCount(1);
             geladen.Chunks[0].Data.Should().Equal(Encoding.UTF8.GetBytes("payload"));
         }
         finally
         {
-            if (File.Exists(pfad))
-                File.Delete(pfad);
+            if (File.Exists(path))
+                File.Delete(path);
         }
     }
 
     private static CliOutputAufzeichnung CreateAufzeichnung() => new()
     {
-        AufgabeId = Guid.NewGuid(),
+        WorkItemId = Guid.NewGuid(),
         PluginName = "TestPlugin",
         StartUtc = new DateTimeOffset(2025, 1, 1, 8, 0, 0, TimeSpan.Zero),
         EndeUtc = new DateTimeOffset(2025, 1, 1, 8, 30, 0, TimeSpan.Zero),

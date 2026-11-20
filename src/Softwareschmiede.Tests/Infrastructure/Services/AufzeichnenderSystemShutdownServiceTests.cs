@@ -26,18 +26,18 @@ public sealed class AufzeichnenderSystemShutdownServiceTests : IDisposable
     {
         var testDbPath = Path.Combine(_verzeichnis, "test.db");
 
-        var pfad = AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(testDbPath);
+        var path = AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(testDbPath);
 
-        pfad.Should().Be(Path.Combine(_verzeichnis, AufzeichnenderSystemShutdownService.LogDateiName));
+        path.Should().Be(Path.Combine(_verzeichnis, AufzeichnenderSystemShutdownService.LogDateiName));
     }
 
     /// <summary>Ein leerer Test-DB-Pfad fällt auf das temporäre Verzeichnis zurück.</summary>
     [Fact]
     public void ResolveLogDateiPfad_FaelltBeiLeeremPfadAufTempZurueck()
     {
-        var pfad = AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(null);
+        var path = AufzeichnenderSystemShutdownService.ResolveLogDateiPfad(null);
 
-        pfad.Should().Be(Path.Combine(Path.GetTempPath(), AufzeichnenderSystemShutdownService.LogDateiName));
+        path.Should().Be(Path.Combine(Path.GetTempPath(), AufzeichnenderSystemShutdownService.LogDateiName));
     }
 
     /// <summary>Jede Anforderung wird als Zeile mit Force-Flag, UTC-Zeitstempel und PID angehängt — ohne echten Shutdown.</summary>
@@ -49,8 +49,8 @@ public sealed class AufzeichnenderSystemShutdownServiceTests : IDisposable
         var sut = new AufzeichnenderSystemShutdownService(
             NullLogger<AufzeichnenderSystemShutdownService>.Instance, logPfad);
 
-        await sut.RequestShutdownAsync(erzwingen: true, cancellationToken: TestContext.Current.CancellationToken);
-        await sut.RequestShutdownAsync(erzwingen: false, cancellationToken: TestContext.Current.CancellationToken);
+        await sut.RequestShutdownAsync(force: true, cancellationToken: TestContext.Current.CancellationToken);
+        await sut.RequestShutdownAsync(force: false, cancellationToken: TestContext.Current.CancellationToken);
 
         File.Exists(logPfad).Should().BeTrue();
         var zeilen = await File.ReadAllLinesAsync(logPfad, TestContext.Current.CancellationToken);
@@ -69,7 +69,7 @@ public sealed class AufzeichnenderSystemShutdownServiceTests : IDisposable
         var sut = new AufzeichnenderSystemShutdownService(
             NullLogger<AufzeichnenderSystemShutdownService>.Instance, logPfad);
 
-        var task = sut.RequestShutdownAsync(erzwingen: false, cancellationToken: TestContext.Current.CancellationToken);
+        var task = sut.RequestShutdownAsync(force: false, cancellationToken: TestContext.Current.CancellationToken);
 
         task.IsCompletedSuccessfully.Should().BeTrue();
         await task;

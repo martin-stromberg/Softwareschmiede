@@ -28,7 +28,7 @@ public sealed class CliReplayAufzeichnungStore
         {
             writer.Write(Magic);
             writer.Write(UnterstuetzteVersion);
-            writer.Write(aufzeichnung.AufgabeId.ToByteArray());
+            writer.Write(aufzeichnung.WorkItemId.ToByteArray());
             writer.Write(aufzeichnung.StartUtc.UtcTicks);
             writer.Write(aufzeichnung.EndeUtc?.UtcTicks ?? 0L);
             writer.Write(aufzeichnung.Cols);
@@ -69,25 +69,25 @@ public sealed class CliReplayAufzeichnungStore
     }
 
     /// <summary>Schreibt die Aufzeichnung in die angegebene Datei.</summary>
-    /// <param name="pfad">Der Ziel-Dateipfad.</param>
+    /// <param name="path">Der Ziel-Dateipfad.</param>
     /// <param name="aufzeichnung">Die zu serialisierende Aufzeichnung.</param>
     /// <param name="ct">Abbruch-Token.</param>
-    public async Task SpeichernAsync(string pfad, CliOutputAufzeichnung aufzeichnung, CancellationToken ct = default)
+    public async Task SpeichernAsync(string path, CliOutputAufzeichnung aufzeichnung, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(pfad);
-        await using var stream = new FileStream(pfad, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
         await SpeichernAsync(stream, aufzeichnung, ct).ConfigureAwait(false);
     }
 
     /// <summary>Liest eine Aufzeichnung aus der angegebenen Datei.</summary>
-    /// <param name="pfad">Der Quell-Dateipfad.</param>
+    /// <param name="path">Der Quell-Dateipfad.</param>
     /// <param name="ct">Abbruch-Token.</param>
     /// <returns>Die deserialisierte Aufzeichnung.</returns>
     /// <exception cref="InvalidDataException">Das Format ist ungültig.</exception>
-    public async Task<CliOutputAufzeichnung> LadeAsync(string pfad, CancellationToken ct = default)
+    public async Task<CliOutputAufzeichnung> LadeAsync(string path, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(pfad);
-        await using var stream = new FileStream(pfad, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
         return await LadeAsync(stream, ct).ConfigureAwait(false);
     }
 
@@ -100,7 +100,7 @@ public sealed class CliReplayAufzeichnungStore
             throw new InvalidDataException("Die Datei ist keine CLI-Aufzeichnung (ungültiges Magic).");
 
         int version;
-        Guid aufgabeId;
+        Guid workItemId;
         long startTicks;
         long endeTicks;
         int cols;
@@ -113,7 +113,7 @@ public sealed class CliReplayAufzeichnungStore
             var guidBytes = reader.ReadBytes(16);
             if (guidBytes.Length != 16)
                 throw new EndOfStreamException();
-            aufgabeId = new Guid(guidBytes);
+            workItemId = new Guid(guidBytes);
             startTicks = reader.ReadInt64();
             endeTicks = reader.ReadInt64();
             cols = reader.ReadInt32();
@@ -164,7 +164,7 @@ public sealed class CliReplayAufzeichnungStore
 
         return new CliOutputAufzeichnung
         {
-            AufgabeId = aufgabeId,
+            WorkItemId = workItemId,
             PluginName = Encoding.UTF8.GetString(pluginNameBytes),
             StartUtc = new DateTimeOffset(startTicks, TimeSpan.Zero),
             EndeUtc = endeTicks == 0 ? null : new DateTimeOffset(endeTicks, TimeSpan.Zero),

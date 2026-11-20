@@ -40,8 +40,8 @@ public sealed class PluginSelectionService
         => _defaultSettingsService.SaveDefaultPluginPrefixAsync(pluginType, pluginPrefix, ct);
 
     /// <summary>Speichert den PluginPrefix als Projekt-Standard für den Plugin-Typ.</summary>
-    public Task SaveProjectDefaultPluginPrefixAsync(Guid projektId, PluginType pluginType, string? pluginPrefix, CancellationToken ct = default)
-        => _defaultSettingsService.SaveProjectDefaultPluginPrefixAsync(projektId, pluginType, pluginPrefix, ct);
+    public Task SaveProjectDefaultPluginPrefixAsync(Guid projectId, PluginType pluginType, string? pluginPrefix, CancellationToken ct = default)
+        => _defaultSettingsService.SaveProjectDefaultPluginPrefixAsync(projectId, pluginType, pluginPrefix, ct);
 
     /// <summary>Löst das SCM-Plugin auf.</summary>
     public async Task<IGitPlugin> ResolveSourceCodeManagementPluginAsync(string? selectedPluginPrefix, CancellationToken ct = default)
@@ -102,7 +102,7 @@ public sealed class PluginSelectionService
     /// </summary>
     public async Task<string?> ResolveDevelopmentAutomationPluginWithProjectScopeAsync(
         string? aufgabenPluginPrefix,
-        Guid projektId,
+        Guid projectId,
         CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(aufgabenPluginPrefix))
@@ -110,7 +110,7 @@ public sealed class PluginSelectionService
             return aufgabenPluginPrefix.Trim();
         }
 
-        var projectDefault = await _defaultSettingsService.GetProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, ct);
+        var projectDefault = await _defaultSettingsService.GetProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, ct);
         if (!string.IsNullOrWhiteSpace(projectDefault))
         {
             return projectDefault;
@@ -136,7 +136,7 @@ public sealed class PluginSelectionService
     /// </summary>
     public async Task<KiPluginResolution> ResolveEnabledDevelopmentAutomationPluginWithProjectScopeAsync(
         string? aufgabenPluginPrefix,
-        Guid projektId,
+        Guid projectId,
         CancellationToken ct = default)
     {
         var enabledPlugins = await _pluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync(ct);
@@ -173,7 +173,7 @@ public sealed class PluginSelectionService
             return new(taskPlugin, ignored);
         }
 
-        var projectDefault = await _defaultSettingsService.GetProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, ct);
+        var projectDefault = await _defaultSettingsService.GetProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, ct);
         if (ResolveEnabledPrefix(projectDefault) is { } projectPlugin)
         {
             return new(projectPlugin, ignored);

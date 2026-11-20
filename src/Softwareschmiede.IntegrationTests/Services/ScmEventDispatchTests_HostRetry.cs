@@ -38,7 +38,7 @@ public sealed class ScmEventDispatchTests_HostRetry
         Assert.Equal(long.MaxValue, (await fixture.EventAsync(eventId)).NextAttemptUtc);
         var retryAt = manualRetry ? long.MaxValue : clock.Now.AddHours(2).ToUnixTimeMilliseconds();
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents
+            await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents
                 .Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(e => e.NextAttemptUtc, retryAt), cancellationToken: TestContext.Current.CancellationToken);
 
         fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
@@ -80,7 +80,7 @@ public sealed class ScmEventDispatchTests_HostRetry
             .ThrowsAsync(new ScmProviderException(ScmProviderFailureKind.RateLimit, "Fixture rate limit", clock.Now.AddSeconds(10)));
         await fixture.DispatchAsync(eventId);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents
+            await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents
                 .Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(e => e.Status, "Verarbeitet"), cancellationToken: TestContext.Current.CancellationToken);
         fixture.Git.As<IScmEventResponder>().Setup(x => x.ExecuteResponseAsync(
             It.IsAny<ScmResponseRequest>(), It.IsAny<CancellationToken>()))
@@ -90,7 +90,7 @@ public sealed class ScmEventDispatchTests_HostRetry
         await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var verification = fixture.Services.CreateScope();
-        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Status);
         Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
         Assert.Single(fixture.Sessions);

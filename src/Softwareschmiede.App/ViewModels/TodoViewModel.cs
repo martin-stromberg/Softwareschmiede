@@ -12,22 +12,22 @@ public sealed class TodoViewModel : ViewModelBase
     public TodoViewModel(Todo todo)
     {
         Id = todo.Id;
-        _beschreibung = todo.Beschreibung;
-        _erledigtAm = todo.ErledigtAm;
-        ErstellungsDatum = todo.ErstellungsDatum;
+        _beschreibung = todo.Description;
+        _erledigtAm = todo.CompletedAt;
+        CreatedAt = todo.CreatedAt;
     }
 
     /// <summary>Eindeutige ID des To-Dos.</summary>
     public Guid Id { get; }
 
     /// <summary>Text des To-Dos.</summary>
-    public string Beschreibung
+    public string Description
     {
         get => _beschreibung;
         set => SetProperty(ref _beschreibung, value);
     }
 
-    /// <summary>Gibt an, ob das To-Do erledigt ist, abgeleitet aus <see cref="Todo.ErledigtAm"/>.</summary>
+    /// <summary>Gibt an, ob das To-Do erledigt ist, abgeleitet aus <see cref="Todo.CompletedAt"/>.</summary>
     public bool IstErledigt
     {
         get => _erledigtAm is not null;
@@ -35,5 +35,5 @@ public sealed class TodoViewModel : ViewModelBase
     }
 
     /// <summary>Erstellungszeitstempel des To-Dos.</summary>
-    public DateTimeOffset ErstellungsDatum { get; }
+    public DateTimeOffset CreatedAt { get; }
 }

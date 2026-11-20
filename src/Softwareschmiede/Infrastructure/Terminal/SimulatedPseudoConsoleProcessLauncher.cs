@@ -34,7 +34,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
     public bool IsPseudoTerminal => false;
 
     /// <inheritdoc/>
-    public TerminalSessionStartResult Start(Guid aufgabeId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
+    public TerminalSessionStartResult Start(Guid workItemId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
     {
         var workingDir = !string.IsNullOrEmpty(spec.WorkingDirectory) && Directory.Exists(spec.WorkingDirectory)
             ? spec.WorkingDirectory
@@ -53,7 +53,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
         foreach (var entry in spec.EnvironmentVariables)
             psi.EnvironmentVariables[entry.Key] = entry.Value;
 
-        _logger.LogInformation("CLI-Prozess (Pipe-Backend, {FileName} {Arguments}) für Aufgabe {AufgabeId} starten.", spec.FileName, spec.Arguments, aufgabeId);
+        _logger.LogInformation("CLI-Prozess (Pipe-Backend, {FileName} {Arguments}) für Aufgabe {AufgabeId} starten.", spec.FileName, spec.Arguments, workItemId);
 
         var process = Process.Start(psi)
             ?? throw new InvalidOperationException("CLI-Prozess auf dem Pipe-Backend konnte nicht gestartet werden.");

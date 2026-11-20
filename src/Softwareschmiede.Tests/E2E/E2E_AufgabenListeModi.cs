@@ -47,31 +47,31 @@ public partial class End2EndTest
         Guid aufgabeOhneRepoId;
         await using (var db = OpenTestDbContext())
         {
-            var projekt = await db.Projekte.SingleAsync(p => p.Name == projektName);
+            var project = await db.Projects.SingleAsync(p => p.Name == projektName);
             var repo = new GitRepository
             {
                 Id = Guid.NewGuid(),
-                ProjektId = projekt.Id,
+                ProjectId = project.Id,
                 RepositoryName = "modi-repo",
                 RepositoryUrl = "https://example.invalid/modi-repo.git",
-                PluginTyp = "LocalDirectoryPlugin",
-                Aktiv = true
+                PluginType = "LocalDirectoryPlugin",
+                Active = true
             };
             db.GitRepositories.Add(repo);
 
-            var aufgabeMitRepo = await db.Aufgaben.SingleAsync(a => a.Titel == titelMitRepo);
-            aufgabeMitRepo.Status = AufgabeStatus.Gestartet;
-            aufgabeMitRepo.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-            aufgabeMitRepo.KiPluginPrefix = "Softwareschmiede.KiSimulator";
+            var aufgabeMitRepo = await db.WorkItems.SingleAsync(a => a.Title == titelMitRepo);
+            aufgabeMitRepo.Status = WorkItemStatus.Started;
+            aufgabeMitRepo.ExecutionStatus = WorkItemExecutionStatus.Active;
+            aufgabeMitRepo.AiPluginPrefix = "Softwareschmiede.KiSimulator";
             aufgabeMitRepo.GitRepositoryId = repo.Id;
             aufgabeMitRepoId = aufgabeMitRepo.Id;
 
-            var aufgabeOhneRepo = await db.Aufgaben.SingleAsync(a => a.Titel == titelOhneRepo);
-            aufgabeOhneRepo.Status = AufgabeStatus.Gestartet;
-            aufgabeOhneRepo.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
+            var aufgabeOhneRepo = await db.WorkItems.SingleAsync(a => a.Title == titelOhneRepo);
+            aufgabeOhneRepo.Status = WorkItemStatus.Started;
+            aufgabeOhneRepo.ExecutionStatus = WorkItemExecutionStatus.Active;
             aufgabeOhneRepoId = aufgabeOhneRepo.Id;
 
-            db.Todos.Add(new Todo { Id = Guid.NewGuid(), AufgabeId = aufgabeMitRepo.Id, Beschreibung = "Offenes Todo", ErstellungsDatum = DateTimeOffset.UtcNow });
+            db.Todos.Add(new Todo { Id = Guid.NewGuid(), WorkItemId = aufgabeMitRepo.Id, Description = "Offenes Todo", CreatedAt = DateTimeOffset.UtcNow });
             await db.SaveChangesAsync();
         }
 
@@ -124,10 +124,10 @@ public partial class End2EndTest
 
         await using (var db = OpenTestDbContext())
         {
-            var eintraege = await db.AppEinstellungen
-                .Where(e => e.Schluessel == AppEinstellungService.AktiveAufgabenListenModusKey
-                            || e.Schluessel == AppEinstellungService.AktiveAufgabenListenModusDashboardKey)
-                .ToDictionaryAsync(e => e.Schluessel, e => e.Wert);
+            var eintraege = await db.AppSettings
+                .Where(e => e.Key == AppEinstellungService.AktiveAufgabenListenModusKey
+                            || e.Key == AppEinstellungService.AktiveAufgabenListenModusDashboardKey)
+                .ToDictionaryAsync(e => e.Key, e => e.Value);
             Assert.Equal("Repository", eintraege[AppEinstellungService.AktiveAufgabenListenModusDashboardKey]);
             Assert.True(
                 !eintraege.ContainsKey(AppEinstellungService.AktiveAufgabenListenModusKey)
@@ -143,9 +143,9 @@ public partial class End2EndTest
         menu.WaitForAufgabenGruppe("modi-repo", Medium);
         await using (var db = OpenTestDbContext())
         {
-            var wert = await db.AppEinstellungen
-                .Where(e => e.Schluessel == AppEinstellungService.AktiveAufgabenListenModusKey)
-                .Select(e => e.Wert)
+            var wert = await db.AppSettings
+                .Where(e => e.Key == AppEinstellungService.AktiveAufgabenListenModusKey)
+                .Select(e => e.Value)
                 .FirstOrDefaultAsync();
             Assert.Equal("Repository", wert);
         }

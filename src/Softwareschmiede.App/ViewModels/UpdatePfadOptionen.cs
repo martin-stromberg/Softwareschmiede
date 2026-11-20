@@ -24,24 +24,24 @@ public static class UpdatePfadTexte
 
 /// <summary>
 /// Auswahloption für den Update-Pfad in den Einstellungen: der Steuerwert
-/// (<see cref="Pfad"/>) zusammen mit dem sichtbaren Anzeige-Label.
+/// (<see cref="Path"/>) zusammen mit dem sichtbaren Anzeige-Label.
 /// </summary>
-/// <param name="Pfad">Der persistierte Update-Pfad.</param>
+/// <param name="Path">Der persistierte Update-Pfad.</param>
 /// <param name="Label">Der in der Auswahlbox angezeigte Text.</param>
-public sealed record UpdatePfadOption(string Pfad, string Label)
+public sealed record UpdatePfadOption(string Path, string Label)
 {
     /// <summary>Alle wählbaren Update-Pfade in Anzeigereihenfolge.</summary>
-    public static IReadOnlyList<UpdatePfadOption> Alle { get; } =
+    public static IReadOnlyList<UpdatePfadOption> All { get; } =
     [
         new(UpdatePfadKanalResolver.ProduktivversionenPfad, UpdatePfadTexte.Produktivversionen),
         new(UpdatePfadKanalResolver.VorabversionenPfad, UpdatePfadTexte.Vorabversionen)
     ];
 
     /// <summary>Liefert die Auswahloption zu einem gespeicherten Pfad; unbekannte oder leere Werte fallen auf die Produktiv-Option zurück.</summary>
-    public static UpdatePfadOption FuerPfad(string? pfad)
+    public static UpdatePfadOption FuerPfad(string? path)
     {
-        var normalisiert = UpdatePfadKanalResolver.NormalisierePfad(pfad);
-        return Alle.First(o => o.Pfad == normalisiert);
+        var normalisiert = UpdatePfadKanalResolver.NormalisierePfad(path);
+        return All.First(o => o.Path == normalisiert);
     }
 
     /// <inheritdoc/>

@@ -238,7 +238,7 @@ public abstract class CliKiPluginBase : IKiPlugin
     }
 
     /// <inheritdoc/>
-    public virtual string GetProcessWindowTitle(Guid aufgabeId) => string.Empty;
+    public virtual string GetProcessWindowTitle(Guid workItemId) => string.Empty;
 
     /// <inheritdoc/>
     public abstract bool SupportsSessionContinuation();

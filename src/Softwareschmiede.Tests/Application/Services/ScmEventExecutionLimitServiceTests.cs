@@ -15,7 +15,7 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     private const string PrefixA = "Softwareschmiede.TestA";
     private const string PrefixB = "Softwareschmiede.TestB";
 
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AppEinstellungService _einstellungen;
     private readonly Mock<ICliExecutionLimitSource> _cli;
     private readonly ScmEventExecutionLimitService _sut;
@@ -31,12 +31,12 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         _cli.Setup(x => x.GetLaufendeAufgabenIds()).Returns([]);
         _sut = new ScmEventExecutionLimitService(_db, _einstellungen, _cli.Object, TimeProvider.System, _pool);
 
-        _db.Projekte.Add(new Projekt
+        _db.Projects.Add(new Project
         {
             Id = _projektId,
             Name = "Limit-Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
     }
@@ -50,20 +50,20 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     private async Task<Guid> LaufendeAufgabeAsync(string titel, string? kiPluginPrefix,
         Mock<IScmPromptSessionAdapter>? session = null, DateTimeOffset? pausiertBisUtc = null)
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Titel = titel,
-            ProjektId = _projektId,
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-            KiPluginPrefix = kiPluginPrefix,
-            PausiertBisUtc = pausiertBisUtc
+            Title = titel,
+            ProjectId = _projektId,
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            AiPluginPrefix = kiPluginPrefix,
+            PausedUntilUtc = pausiertBisUtc
         };
-        _db.Aufgaben.Add(aufgabe);
+        _db.WorkItems.Add(workItem);
         await _db.SaveChangesAsync();
-        _cli.Setup(x => x.GetScmPromptSession(aufgabe.Id)).Returns(session?.Object);
-        return aufgabe.Id;
+        _cli.Setup(x => x.GetScmPromptSession(workItem.Id)).Returns(session?.Object);
+        return workItem.Id;
     }
 
     private void SetzeLaufende(params Guid[] ids)

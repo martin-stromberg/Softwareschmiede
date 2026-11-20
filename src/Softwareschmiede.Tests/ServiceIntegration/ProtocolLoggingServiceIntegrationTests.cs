@@ -9,7 +9,7 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 /// <summary>E2E-Test: Stdout-Streaming und Protokoll-Eintrag in UI.</summary>
 public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly ProtokollService _protokollService;
     private readonly AufgabeService _aufgabeService;
     private readonly ProjektService _projektService;
@@ -29,9 +29,9 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 
     private async Task SeedAufgabeAsync()
     {
-        var projekt = await _projektService.CreateAsync("Log-Projekt", null);
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Log-Aufgabe", null);
-        _aufgabeId = aufgabe.Id;
+        var project = await _projektService.CreateAsync("Log-Projekt", null);
+        var workItem = await _aufgabeService.CreateAsync(project.Id, "Log-Aufgabe", null);
+        _aufgabeId = workItem.Id;
     }
 
     /// <summary><summary>AddCliOutputAsync_StreichtAusgabeInProtokoll.</summary>.</summary>
@@ -45,7 +45,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 
         var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
         eintraege.Should().HaveCount(2);
-        eintraege.All(e => e.Typ == ProtokollTyp.CliOutput).Should().BeTrue();
+        eintraege.All(e => e.Type == LogEntryType.CliOutput).Should().BeTrue();
     }
 
     /// <summary><summary>AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert.</summary>.</summary>
@@ -61,7 +61,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
         var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
         eintraege.Should().HaveCount(5);
         for (var i = 0; i < zeilen.Count; i++)
-            eintraege[i].Inhalt.Should().Be(zeilen[i]);
+            eintraege[i].Content.Should().Be(zeilen[i]);
     }
 
     /// <summary><summary>AddStatusUebergangAsync_ErstelltEintragImProtokoll.</summary>.</summary>
@@ -70,11 +70,11 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
     {
         await SeedAufgabeAsync();
 
-        await _protokollService.AddStatusUebergangAsync(_aufgabeId, AufgabeStatus.Neu, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
+        await _protokollService.AddStatusUebergangAsync(_aufgabeId, WorkItemStatus.New, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
         var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
         eintraege.Should().HaveCount(1);
-        eintraege[0].Typ.Should().Be(ProtokollTyp.StatusUebergang);
-        eintraege[0].Inhalt.Should().Contain("Gestartet");
+        eintraege[0].Type.Should().Be(LogEntryType.StatusTransition);
+        eintraege[0].Content.Should().Contain("Gestartet");
     }
 }

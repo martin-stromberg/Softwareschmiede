@@ -10,20 +10,20 @@ public sealed class AufgabeStatusEnumTests
     [Fact]
     public void TestNewStatusEnum()
     {
-        var values = Enum.GetValues<AufgabeStatus>();
+        var values = Enum.GetValues<WorkItemStatus>();
 
-        values.Should().Contain(AufgabeStatus.Neu);
-        values.Should().Contain(AufgabeStatus.Gestartet);
-        values.Should().Contain(AufgabeStatus.Wartend);
-        values.Should().Contain(AufgabeStatus.Beendet);
-        values.Should().Contain(AufgabeStatus.Archiviert);
+        values.Should().Contain(WorkItemStatus.New);
+        values.Should().Contain(WorkItemStatus.Started);
+        values.Should().Contain(WorkItemStatus.Waiting);
+        values.Should().Contain(WorkItemStatus.Completed);
+        values.Should().Contain(WorkItemStatus.Archived);
     }
 
     /// <summary>Alte Enum-Werte (Offen, InBearbeitung, KiAktiv, Abgeschlossen) sind nicht mehr vorhanden.</summary>
     [Fact]
     public void OldStatusValues_ShouldNotExist()
     {
-        var names = Enum.GetNames<AufgabeStatus>();
+        var names = Enum.GetNames<WorkItemStatus>();
 
         names.Should().NotContain("Offen");
         names.Should().NotContain("InBearbeitung");
@@ -36,12 +36,12 @@ public sealed class AufgabeStatusEnumTests
 
     /// <summary>Alle neuen Enum-Werte sind gültige Integerwerte.</summary>
     [Theory]
-    [InlineData(AufgabeStatus.Neu)]
-    [InlineData(AufgabeStatus.Gestartet)]
-    [InlineData(AufgabeStatus.Wartend)]
-    [InlineData(AufgabeStatus.Beendet)]
-    [InlineData(AufgabeStatus.Archiviert)]
-    public void EachStatus_ShouldBeDefinedInEnum(AufgabeStatus status)
+    [InlineData(WorkItemStatus.New)]
+    [InlineData(WorkItemStatus.Started)]
+    [InlineData(WorkItemStatus.Waiting)]
+    [InlineData(WorkItemStatus.Completed)]
+    [InlineData(WorkItemStatus.Archived)]
+    public void EachStatus_ShouldBeDefinedInEnum(WorkItemStatus status)
     {
         Enum.IsDefined(status).Should().BeTrue();
     }

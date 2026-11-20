@@ -4,7 +4,7 @@ using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Tests.Domain.Entities;
 
-/// <summary>Tests für den <see cref="Aufgabe.GitArbeitsbereich"/>-Wrapper.</summary>
+/// <summary>Tests für den <see cref="WorkItem.GitWorkspace"/>-Wrapper.</summary>
 public sealed class AufgabeTests_GitArbeitsbereich
 {
     /// <summary>Der Getter liefert eine GitArbeitsbereich-Instanz mit den erwarteten Werten, wenn beide zugrunde liegenden Felder gesetzt sind.</summary>
@@ -12,17 +12,17 @@ public sealed class AufgabeTests_GitArbeitsbereich
     public void GitArbeitsbereich_Get_ShouldReturnInstance_WhenBranchNameAndLokalerKlonPfadAreSet()
     {
         // Arrange
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             BranchName = "feature/x",
-            LokalerKlonPfad = @"C:\repos\task-1"
+            LocalClonePath = @"C:\repos\task-1"
         };
 
         // Act
-        var gitArbeitsbereich = aufgabe.GitArbeitsbereich;
+        var gitArbeitsbereich = workItem.GitWorkspace;
 
         // Assert
-        gitArbeitsbereich.Should().Be(new GitArbeitsbereich("feature/x", @"C:\repos\task-1"));
+        gitArbeitsbereich.Should().Be(new GitWorkspace("feature/x", @"C:\repos\task-1"));
     }
 
     /// <summary>Der Setter schreibt BranchName und LokalerKlonPfad korrekt in die zugrunde liegenden Felder.</summary>
@@ -30,14 +30,14 @@ public sealed class AufgabeTests_GitArbeitsbereich
     public void GitArbeitsbereich_Set_ShouldWriteBranchNameAndLokalerKlonPfad()
     {
         // Arrange
-        var aufgabe = new Aufgabe();
+        var workItem = new WorkItem();
 
         // Act
-        aufgabe.GitArbeitsbereich = new GitArbeitsbereich("feature/y", @"C:\repos\task-2");
+        workItem.GitWorkspace = new GitWorkspace("feature/y", @"C:\repos\task-2");
 
         // Assert
-        aufgabe.BranchName.Should().Be("feature/y");
-        aufgabe.LokalerKlonPfad.Should().Be(@"C:\repos\task-2");
+        workItem.BranchName.Should().Be("feature/y");
+        workItem.LocalClonePath.Should().Be(@"C:\repos\task-2");
     }
 
     /// <summary>Der Setter mit null löscht BranchName und LokalerKlonPfad.</summary>
@@ -45,18 +45,18 @@ public sealed class AufgabeTests_GitArbeitsbereich
     public void GitArbeitsbereich_SetNull_ShouldClearBranchNameAndLokalerKlonPfad()
     {
         // Arrange
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             BranchName = "feature/z",
-            LokalerKlonPfad = @"C:\repos\task-3"
+            LocalClonePath = @"C:\repos\task-3"
         };
 
         // Act
-        aufgabe.GitArbeitsbereich = null;
+        workItem.GitWorkspace = null;
 
         // Assert
-        aufgabe.BranchName.Should().BeNull();
-        aufgabe.LokalerKlonPfad.Should().BeNull();
+        workItem.BranchName.Should().BeNull();
+        workItem.LocalClonePath.Should().BeNull();
     }
 
     /// <summary>Der Getter liefert null, wenn nur LokalerKlonPfad gesetzt ist und BranchName fehlt (Teilzustand).</summary>
@@ -64,14 +64,14 @@ public sealed class AufgabeTests_GitArbeitsbereich
     public void GitArbeitsbereich_Get_ShouldReturnNull_WhenOnlyLokalerKlonPfadIsSet()
     {
         // Arrange
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             BranchName = null,
-            LokalerKlonPfad = @"C:\repos\task-4"
+            LocalClonePath = @"C:\repos\task-4"
         };
 
         // Act
-        var gitArbeitsbereich = aufgabe.GitArbeitsbereich;
+        var gitArbeitsbereich = workItem.GitWorkspace;
 
         // Assert
         gitArbeitsbereich.Should().BeNull();
@@ -82,14 +82,14 @@ public sealed class AufgabeTests_GitArbeitsbereich
     public void GitArbeitsbereich_Get_ShouldReturnNull_WhenOnlyBranchNameIsSet()
     {
         // Arrange
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             BranchName = "feature/only-branch",
-            LokalerKlonPfad = null
+            LocalClonePath = null
         };
 
         // Act
-        var gitArbeitsbereich = aufgabe.GitArbeitsbereich;
+        var gitArbeitsbereich = workItem.GitWorkspace;
 
         // Assert
         gitArbeitsbereich.Should().BeNull();
@@ -100,14 +100,14 @@ public sealed class AufgabeTests_GitArbeitsbereich
     public void GitArbeitsbereich_Get_ShouldReturnNull_WhenBothFieldsAreNull()
     {
         // Arrange
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             BranchName = null,
-            LokalerKlonPfad = null
+            LocalClonePath = null
         };
 
         // Act
-        var gitArbeitsbereich = aufgabe.GitArbeitsbereich;
+        var gitArbeitsbereich = workItem.GitWorkspace;
 
         // Assert
         gitArbeitsbereich.Should().BeNull();

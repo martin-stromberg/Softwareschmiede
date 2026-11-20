@@ -124,7 +124,7 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
         {
             var detailNumber = int.Parse(detail.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
             var detailPr = detail.Groups[1].Value == "pulls";
-            var title = scenario.Texts.FirstOrDefault(x => x.Number == detailNumber && x.PullRequest == detailPr)?.Titel
+            var title = scenario.Texts.FirstOrDefault(x => x.Number == detailNumber && x.PullRequest == detailPr)?.Title
                 ?? $"SCM Referenz {detailNumber}";
             var body = scenario.Texts.FirstOrDefault(x => x.Number == detailNumber && x.PullRequest == detailPr
                 && x.Kind == "Description")?.Body ?? string.Empty;

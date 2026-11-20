@@ -10,7 +10,7 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Migrations
 {
-    [DbContext(typeof(SoftwareschmiededDbContext))]
+    [DbContext(typeof(SoftwareschmiedeDbContext))]
     [Migration("20260821160341_AddAutonomAufgabeMaxLengthConstraints")]
     partial class AddAutonomAufgabeMaxLengthConstraints
     {

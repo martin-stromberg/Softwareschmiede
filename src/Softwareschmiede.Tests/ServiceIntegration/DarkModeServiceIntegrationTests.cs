@@ -8,7 +8,7 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 /// <summary>Integrationstests für die Dark-Mode-Persistierung.</summary>
 public sealed class DarkModeServiceIntegrationTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly AppEinstellungService _einstellungService;
 
     /// <summary>DarkModeServiceIntegrationTests.</summary>

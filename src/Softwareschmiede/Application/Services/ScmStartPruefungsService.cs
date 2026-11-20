@@ -77,7 +77,7 @@ public sealed class ScmStartPruefungsService : BackgroundService
     /// <summary>
     /// Sammelphase zwischen Auslöser und Durchlauf: bündelt Burst-Auslöser (z. B. mehrere
     /// gleichzeitig endende Prozesse oder eine Pausen-Anwendung auf viele Aufgaben) und gibt
-    /// dem Exited-Handler Zeit, den beendeten <see cref="Domain.Enums.AufgabeAusfuehrungsStatus"/>
+    /// dem Exited-Handler Zeit, den beendeten <see cref="Domain.Enums.WorkItemExecutionStatus"/>
     /// zu persistieren — <see cref="IRunningAutomationStatusSource.RunningCountChanged"/> feuert
     /// vor dieser Persistenz. Testbar über das injizierte <see cref="TimeProvider"/>.
     /// </summary>

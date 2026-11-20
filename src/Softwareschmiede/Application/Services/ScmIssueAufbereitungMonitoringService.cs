@@ -46,11 +46,11 @@ public sealed class ScmIssueAufbereitungMonitoringService(
             return;
         }
         var kontoModus = await einstellungen.GetScmKontoModusAsync(ct);
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         // Die Vorfilterung auf die Aufbereitungs-Freischaltung spart Enumeration und
         // Beschreibungs-Reads für nicht freigeschaltete Repositories.
         var repositories = await db.GitRepositories.AsNoTracking()
-            .Where(x => x.Aktiv && x.IssueAufbereitungAktiv).ToListAsync(ct);
+            .Where(x => x.Active && x.IssuePreparationEnabled).ToListAsync(ct);
         var plugins = scope.ServiceProvider.GetRequiredService<IPluginManager>().GetSourceCodeManagementPlugins();
         foreach (var plugin in plugins)
         {
@@ -65,7 +65,7 @@ public sealed class ScmIssueAufbereitungMonitoringService(
             foreach (var (alias, aliasGroup) in aliasGroups)
             {
                 using var resolutionScope = scopes.CreateScope();
-                var resolutionDb = resolutionScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+                var resolutionDb = resolutionScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
                 var resolutionKey = $"issueaufbereitung-repository/{plugin.PluginPrefix.ToLowerInvariant()}/{Uri.EscapeDataString(alias.ToLowerInvariant())}";
                 var checkpoint = await resolutionDb.ScmObservationCheckpoints.FindAsync([resolutionKey], ct);
                 if (checkpoint?.NextAttemptUtc > _time.GetUtcNow().ToUnixTimeMilliseconds())
@@ -141,7 +141,7 @@ public sealed class ScmIssueAufbereitungMonitoringService(
     {
         var issues = discovered.Where(x => x.Kind == ScmReferenceKind.Issue).ToList();
         using var scope = scopes.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var baseline = await db.ScmObservationCheckpoints.FindAsync([ScmIssueAufbereitungsService.BaselineKey(repository)], ct);
         if (baseline is null)
         {

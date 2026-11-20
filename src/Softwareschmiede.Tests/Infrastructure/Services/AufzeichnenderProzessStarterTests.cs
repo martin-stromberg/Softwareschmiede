@@ -30,9 +30,9 @@ public sealed class AufzeichnenderProzessStarterTests : IDisposable
     {
         var logDateiPfad = AufzeichnenderProzessStarter.ResolveLogDateiPfad(_testDbPath);
         var starter = new AufzeichnenderProzessStarter(NullLogger<AufzeichnenderProzessStarter>.Instance, logDateiPfad);
-        var anfrage = new ProzessStartAnfrage("explorer.exe", @"C:\Temp\Arbeitsverzeichnis", ShellAusfuehren: false);
+        var request = new ProcessStartRequest("explorer.exe", @"C:\Temp\Arbeitsverzeichnis", UseShellExecute: false);
 
-        starter.Starten(anfrage);
+        starter.Start(request);
 
         File.Exists(logDateiPfad).Should().BeTrue();
         var inhalt = File.ReadAllText(logDateiPfad);
@@ -46,9 +46,9 @@ public sealed class AufzeichnenderProzessStarterTests : IDisposable
     {
         var logDateiPfad = AufzeichnenderProzessStarter.ResolveLogDateiPfad(_testDbPath);
         var starter = new AufzeichnenderProzessStarter(NullLogger<AufzeichnenderProzessStarter>.Instance, logDateiPfad);
-        var anfrage = new ProzessStartAnfrage("explorer.exe", @"C:\Temp\Arbeitsverzeichnis", ShellAusfuehren: true);
+        var request = new ProcessStartRequest("explorer.exe", @"C:\Temp\Arbeitsverzeichnis", UseShellExecute: true);
 
-        starter.Starten(anfrage);
+        starter.Start(request);
 
         var inhalt = File.ReadAllText(logDateiPfad);
         inhalt.Should().Be($@"explorer.exe|C:\Temp\Arbeitsverzeichnis|True{Environment.NewLine}");

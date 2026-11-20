@@ -29,10 +29,10 @@ public sealed class BenachrichtigungsEinstellungenService
         "application/ogg"
     };
 
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
 
     /// <inheritdoc cref="BenachrichtigungsEinstellungenService"/>
-    public BenachrichtigungsEinstellungenService(SoftwareschmiededDbContext db)
+    public BenachrichtigungsEinstellungenService(SoftwareschmiedeDbContext db)
     {
         _db = db;
     }
@@ -40,70 +40,70 @@ public sealed class BenachrichtigungsEinstellungenService
     /// <summary>Gibt die gespeicherten Benachrichtigungseinstellungen des Benutzers zurück.</summary>
     public async Task<BenachrichtigungsEinstellungenDto> GetAsync(string benutzerId, CancellationToken ct = default)
     {
-        var einstellung = await _db.BenachrichtigungsEinstellungen
+        var einstellung = await _db.NotificationSettings
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.BenutzerId == benutzerId, ct);
+            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
 
         if (einstellung is null)
         {
             return new BenachrichtigungsEinstellungenDto(
-                BenachrichtigungsModus.Banner,
-                BenachrichtigungsModus.Deaktiviert);
+                NotificationMode.Banner,
+                NotificationMode.Disabled);
         }
 
-        return new BenachrichtigungsEinstellungenDto(einstellung.BannerModus, einstellung.TonModus);
+        return new BenachrichtigungsEinstellungenDto(einstellung.BannerMode, einstellung.SoundMode);
     }
 
     /// <summary>Speichert die Benachrichtigungseinstellungen des Benutzers.</summary>
     public async Task SaveAsync(string benutzerId, BenachrichtigungsEinstellungenDto dto, CancellationToken ct = default)
     {
-        var einstellung = await _db.BenachrichtigungsEinstellungen
-            .FirstOrDefaultAsync(s => s.BenutzerId == benutzerId, ct);
+        var einstellung = await _db.NotificationSettings
+            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
 
         if (einstellung is null)
         {
-            einstellung = new BenachrichtigungsEinstellung
+            einstellung = new NotificationSetting
             {
                 Id = Guid.NewGuid(),
-                BenutzerId = benutzerId
+                UserId = benutzerId
             };
-            _db.BenachrichtigungsEinstellungen.Add(einstellung);
+            _db.NotificationSettings.Add(einstellung);
         }
 
-        einstellung.BannerModus = dto.BannerModus;
-        einstellung.TonModus = dto.TonModus;
-        einstellung.AktualisiertAm = DateTimeOffset.UtcNow;
+        einstellung.BannerMode = dto.BannerMode;
+        einstellung.SoundMode = dto.SoundMode;
+        einstellung.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
     }
 
     /// <summary>Gibt Metadaten der hochgeladenen Audio-Datei des Benutzers zurück.</summary>
     public async Task<BenachrichtigungsAudioInfoDto> GetAudioInfoAsync(string benutzerId, CancellationToken ct = default)
     {
-        var audio = await _db.BenachrichtigungsAudioDateien
+        var audio = await _db.NotificationAudioFiles
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.BenutzerId == benutzerId, ct);
+            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
 
         if (audio is null)
         {
             return new BenachrichtigungsAudioInfoDto(false, null, null, null);
         }
 
-        return new BenachrichtigungsAudioInfoDto(true, audio.OriginalDateiname, audio.MimeType, audio.GroesseBytes);
+        return new BenachrichtigungsAudioInfoDto(true, audio.OriginalFileName, audio.MimeType, audio.SizeBytes);
     }
 
     /// <summary>Gibt den Base64-kodierten Audio-Payload des Benutzers zurück.</summary>
     public async Task<BenachrichtigungsAudioPayload?> GetAudioPayloadAsync(string benutzerId, CancellationToken ct = default)
     {
-        var audio = await _db.BenachrichtigungsAudioDateien
+        var audio = await _db.NotificationAudioFiles
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.BenutzerId == benutzerId, ct);
+            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
 
-        if (audio is null || audio.Inhalt.Length == 0)
+        if (audio is null || audio.Content.Length == 0)
         {
             return null;
         }
 
-        return new BenachrichtigungsAudioPayload(audio.MimeType, Convert.ToBase64String(audio.Inhalt));
+        return new BenachrichtigungsAudioPayload(audio.MimeType, Convert.ToBase64String(audio.Content));
     }
 
     /// <summary>Speichert eine neue Audio-Datei für den Benutzer.</summary>
@@ -116,38 +116,38 @@ public sealed class BenachrichtigungsEinstellungenService
     {
         ValidateAudioDatei(dateiname, mimeType, inhalt);
 
-        var existing = await _db.BenachrichtigungsAudioDateien
-            .FirstOrDefaultAsync(s => s.BenutzerId == benutzerId, ct);
+        var existing = await _db.NotificationAudioFiles
+            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
 
         if (existing is null)
         {
-            existing = new BenachrichtigungsAudioDatei
+            existing = new NotificationAudioFile
             {
                 Id = Guid.NewGuid(),
-                BenutzerId = benutzerId
+                UserId = benutzerId
             };
-            _db.BenachrichtigungsAudioDateien.Add(existing);
+            _db.NotificationAudioFiles.Add(existing);
         }
 
-        existing.OriginalDateiname = SanitizeDateiname(dateiname);
+        existing.OriginalFileName = SanitizeDateiname(dateiname);
         existing.MimeType = NormalizeMimeType(mimeType, dateiname);
-        existing.GroesseBytes = inhalt.Length;
-        existing.Inhalt = inhalt;
-        existing.HochgeladenAm = DateTimeOffset.UtcNow;
+        existing.SizeBytes = inhalt.Length;
+        existing.Content = inhalt;
+        existing.UploadedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
     }
 
     /// <summary>Löscht die benutzerdefinierte Audio-Datei des Benutzers.</summary>
     public async Task RemoveAudioAsync(string benutzerId, CancellationToken ct = default)
     {
-        var existing = await _db.BenachrichtigungsAudioDateien
-            .FirstOrDefaultAsync(s => s.BenutzerId == benutzerId, ct);
+        var existing = await _db.NotificationAudioFiles
+            .FirstOrDefaultAsync(s => s.UserId == benutzerId, ct);
         if (existing is null)
         {
             return;
         }
 
-        _db.BenachrichtigungsAudioDateien.Remove(existing);
+        _db.NotificationAudioFiles.Remove(existing);
         await _db.SaveChangesAsync(ct);
     }
 

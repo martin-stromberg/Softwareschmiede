@@ -11,7 +11,7 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Service für die manuelle Wiederherstellung festhängender Aufgaben.</summary>
 public sealed class AufgabeRecoveryService
 {
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly IRunningAutomationStatusSource _runningStatusSource;
     private readonly ILogger<AufgabeRecoveryService> _logger;
 
@@ -20,7 +20,7 @@ public sealed class AufgabeRecoveryService
 
     /// <summary>Erstellt eine neue Instanz des <see cref="AufgabeRecoveryService"/>.</summary>
     public AufgabeRecoveryService(
-        SoftwareschmiededDbContext db,
+        SoftwareschmiedeDbContext db,
         IRunningAutomationStatusSource runningStatusSource,
         ILogger<AufgabeRecoveryService> logger)
     {
@@ -42,13 +42,13 @@ public sealed class AufgabeRecoveryService
         // Pausierte Aufgaben (PausiertBisUtc in der Zukunft) sind keine „festhängenden" Kandidaten:
         // sie wurden bewusst bis zu einem bekannten Zeitpunkt angehalten (z. B. Session-Limit des
         // KI-Plugins) und tauchen nach Pausenende bei weiterhin abgelaufenem Heartbeat wieder auf.
-        var kandidaten = await _db.Aufgaben
+        var kandidaten = await _db.WorkItems
             .AsNoTracking()
-            .Where(a => AufgabeStatusExtensions.AktivOderWartendStatus.Contains(a.Status)
-                && a.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv
+            .Where(a => WorkItemStatusExtensions.ActiveOrWaitingStatuses.Contains(a.Status)
+                && a.ExecutionStatus == WorkItemExecutionStatus.Active
                 && a.LastHeartbeatUtc != null
                 && a.LastHeartbeatUtc < cutoff
-                && (a.PausiertBisUtc == null || a.PausiertBisUtc <= now))
+                && (a.PausedUntilUtc == null || a.PausedUntilUtc <= now))
             .Select(a => a.Id)
             .ToListAsync(ct);
 
@@ -57,35 +57,35 @@ public sealed class AufgabeRecoveryService
 
     /// <summary>
     /// Führt eine manuelle Recovery durch.
-    /// Erlaubt nur Recovery aus <see cref="AufgabeStatus.Gestartet"/> oder <see cref="AufgabeStatus.Wartend"/>.
+    /// Erlaubt nur Recovery aus <see cref="WorkItemStatus.Started"/> oder <see cref="WorkItemStatus.Waiting"/>.
     /// </summary>
-    public async Task RecoverManuellAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task RecoverManuellAsync(Guid workItemId, CancellationToken ct = default)
     {
         var correlationId = Guid.NewGuid().ToString("N");
         _logger.LogInformation(
             "TaskRecoveryRequested CorrelationId={CorrelationId} TaskId={TaskId} Trigger=Manual",
             correlationId,
-            aufgabeId);
+            workItemId);
 
-        var aufgabe = await _db.Aufgaben
+        var workItem = await _db.WorkItems
             .AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Id == aufgabeId, ct);
+            .FirstOrDefaultAsync(a => a.Id == workItemId, ct);
 
-        if (aufgabe is null)
+        if (workItem is null)
         {
-            LogRejected(correlationId, aufgabeId, "NotFound");
+            LogRejected(correlationId, workItemId, "NotFound");
             throw new InvalidOperationException("Aufgabe wurde nicht gefunden.");
         }
 
-        if (!IstRecoveryStatus(aufgabe.Status, aufgabe.AusfuehrungsStatus))
+        if (!IstRecoveryStatus(workItem.Status, workItem.ExecutionStatus))
         {
-            LogRejected(correlationId, aufgabeId, "InvalidState");
+            LogRejected(correlationId, workItemId, "InvalidState");
             throw new InvalidOperationException("Wiederherstellung für aktuellen Status nicht verfügbar.");
         }
 
-        if (aufgabe.PausiertBisUtc is { } pausiertBis && aufgabe.PausiertBisUtc.IstAktuellPausiert(DateTimeOffset.UtcNow))
+        if (workItem.PausedUntilUtc is { } pausiertBis && workItem.PausedUntilUtc.IstAktuellPausiert(DateTimeOffset.UtcNow))
         {
-            LogRejected(correlationId, aufgabeId, "Paused");
+            LogRejected(correlationId, workItemId, "Paused");
             throw new InvalidOperationException(
                 $"Wiederherstellung nicht möglich, die Aufgabe ist bis {pausiertBis.ToLocalTime():dd.MM.yyyy HH:mm:ss} pausiert.");
         }
@@ -93,7 +93,7 @@ public sealed class AufgabeRecoveryService
         bool isRunning;
         try
         {
-            isRunning = _runningStatusSource.IsRunning(aufgabeId);
+            isRunning = _runningStatusSource.IsRunning(workItemId);
         }
         catch (Exception ex)
         {
@@ -101,21 +101,21 @@ public sealed class AufgabeRecoveryService
                 ex,
                 "TaskRecoveryRejected CorrelationId={CorrelationId} TaskId={TaskId} ReasonCode=RunningStatusUnavailable",
                 correlationId,
-                aufgabeId);
+                workItemId);
             throw new InvalidOperationException("Prüfung der Laufzeit war nicht möglich.");
         }
 
         _logger.LogInformation(
             "TaskRecoveryEligibilityChecked CorrelationId={CorrelationId} TaskId={TaskId} IsRunning={IsRunning} CurrentStatus={CurrentStatus} CurrentAusfuehrungsStatus={CurrentAusfuehrungsStatus}",
             correlationId,
-            aufgabeId,
+            workItemId,
             isRunning,
-            aufgabe.Status,
-            aufgabe.AusfuehrungsStatus);
+            workItem.Status,
+            workItem.ExecutionStatus);
 
         if (isRunning)
         {
-            LogRejected(correlationId, aufgabeId, "StillRunning");
+            LogRejected(correlationId, workItemId, "StillRunning");
             throw new InvalidOperationException("Wiederherstellung nicht möglich, Verarbeitung läuft noch.");
         }
 
@@ -130,28 +130,28 @@ public sealed class AufgabeRecoveryService
             int rowCount;
             if (_db.Database.IsRelational())
             {
-                rowCount = await _db.Aufgaben
-                    .Where(a => a.Id == aufgabeId
-                        && a.Status == aufgabe.Status
-                        && a.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv
-                        && a.RecoveryVersion == aufgabe.RecoveryVersion)
+                rowCount = await _db.WorkItems
+                    .Where(a => a.Id == workItemId
+                        && a.Status == workItem.Status
+                        && a.ExecutionStatus == WorkItemExecutionStatus.Active
+                        && a.RecoveryVersion == workItem.RecoveryVersion)
                     .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(a => a.Status, AufgabeStatus.Gestartet)
+                        .SetProperty(a => a.Status, WorkItemStatus.Started)
                         .SetProperty(a => a.RecoveryVersion, a => a.RecoveryVersion + 1), ct);
             }
             else
             {
-                var tracked = await _db.Aufgaben.FirstOrDefaultAsync(a => a.Id == aufgabeId, ct);
+                var tracked = await _db.WorkItems.FirstOrDefaultAsync(a => a.Id == workItemId, ct);
                 if (tracked is null
-                    || tracked.Status != aufgabe.Status
-                    || tracked.AusfuehrungsStatus != AufgabeAusfuehrungsStatus.Aktiv
-                    || tracked.RecoveryVersion != aufgabe.RecoveryVersion)
+                    || tracked.Status != workItem.Status
+                    || tracked.ExecutionStatus != WorkItemExecutionStatus.Active
+                    || tracked.RecoveryVersion != workItem.RecoveryVersion)
                 {
                     rowCount = 0;
                 }
                 else
                 {
-                    tracked.Status = AufgabeStatus.Gestartet;
+                    tracked.Status = WorkItemStatus.Started;
                     tracked.RecoveryVersion++;
                     rowCount = 1;
                 }
@@ -162,22 +162,22 @@ public sealed class AufgabeRecoveryService
                 _logger.LogInformation(
                     "TaskRecoveryConcurrencyConflict CorrelationId={CorrelationId} TaskId={TaskId}",
                     correlationId,
-                    aufgabeId);
+                    workItemId);
                 throw new InvalidOperationException("Status wurde bereits geändert. Ansicht wurde aktualisiert.");
             }
 
-            var auditEintrag = new Protokolleintrag
+            var auditEintrag = new LogEntry
             {
                 Id = Guid.NewGuid(),
-                AufgabeId = aufgabeId,
-                Typ = ProtokollTyp.StatusUebergang,
-                Inhalt =
-                    $"Manuelle Wiederherstellung: {aufgabe.Status} → {AufgabeStatus.Gestartet}\n" +
+                WorkItemId = workItemId,
+                Type = LogEntryType.StatusTransition,
+                Content =
+                    $"Manuelle Wiederherstellung: {workItem.Status} → {WorkItemStatus.Started}\n" +
                     $"ReasonCode: RecoveryManual\n" +
                     $"CorrelationId: {correlationId}",
-                Zeitstempel = DateTimeOffset.UtcNow
+                Timestamp = DateTimeOffset.UtcNow
             };
-            _db.Protokolleintraege.Add(auditEintrag);
+            _db.LogEntries.Add(auditEintrag);
             await _db.SaveChangesAsync(ct);
             if (transaction is not null)
             {
@@ -187,9 +187,9 @@ public sealed class AufgabeRecoveryService
             _logger.LogInformation(
                 "TaskRecoverySucceeded CorrelationId={CorrelationId} TaskId={TaskId} FromStatus={FromStatus} ToStatus={ToStatus}",
                 correlationId,
-                aufgabeId,
-                aufgabe.Status,
-                AufgabeStatus.Gestartet);
+                workItemId,
+                workItem.Status,
+                WorkItemStatus.Started);
         }
         catch
         {
@@ -208,20 +208,20 @@ public sealed class AufgabeRecoveryService
         }
     }
 
-    private void LogRejected(string correlationId, Guid aufgabeId, string reasonCode)
+    private void LogRejected(string correlationId, Guid workItemId, string reasonCode)
         => _logger.LogInformation(
             "TaskRecoveryRejected CorrelationId={CorrelationId} TaskId={TaskId} ReasonCode={ReasonCode}",
             correlationId,
-            aufgabeId,
+            workItemId,
             reasonCode);
 
     /// <summary>
     /// Prüft, ob eine Aufgabe für die generische Crash-Recovery in Frage kommt.
     /// </summary>
     /// <param name="status">Der Aufgabenstatus.</param>
-    /// <param name="ausfuehrungsStatus">Der persistierte KI-Ausführungsstatus.</param>
+    /// <param name="executionStatus">Der persistierte KI-Ausführungsstatus.</param>
     /// <returns><c>true</c>, wenn die Aufgabe ein Recovery-Kandidat ist; andernfalls <c>false</c>.</returns>
-    internal static bool IstRecoveryStatus(AufgabeStatus status, AufgabeAusfuehrungsStatus ausfuehrungsStatus)
-        => status.IstAktivOderWartend()
-            && ausfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv;
+    internal static bool IstRecoveryStatus(WorkItemStatus status, WorkItemExecutionStatus executionStatus)
+        => status.IsActiveOrWaiting()
+            && executionStatus == WorkItemExecutionStatus.Active;
 }

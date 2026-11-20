@@ -47,20 +47,20 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await AufbereitungMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var task = Assert.Single(await db.Aufgaben.Include(x => x.IssueReferenz).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(ScmIssueAufbereitungsService.Zweck, task.Zweck);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var task = Assert.Single(await db.WorkItems.Include(x => x.IssueReference).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(ScmIssueAufbereitungsService.Purpose, task.Purpose);
         Assert.Equal(repositoryId, task.GitRepositoryId);
-        Assert.Equal("custom.auf", task.KiPluginPrefix);
-        Assert.Equal(9, task.IssueReferenz!.IssueNummer);
-        Assert.EndsWith("/IssueAufbereitung/9", task.IssueReferenz.SourceKey);
-        Assert.DoesNotContain("/Issue/9", task.IssueReferenz.SourceKey);
+        Assert.Equal("custom.auf", task.AiPluginPrefix);
+        Assert.Equal(9, task.IssueReference!.IssueNumber);
+        Assert.EndsWith("/IssueAufbereitung/9", task.IssueReference.SourceKey);
+        Assert.DoesNotContain("/Issue/9", task.IssueReference.SourceKey);
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(task.Id, item.AufgabeId);
-        Assert.Equal(ScmIssueAufbereitungsService.Zweck, item.Zweck);
+        Assert.Equal(task.Id, item.WorkItemId);
+        Assert.Equal(ScmIssueAufbereitungsService.Purpose, item.Purpose);
         Assert.EndsWith("/IssueAufbereitung", item.EventKey);
-        Assert.Contains(await db.Protokolleintraege.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
-            x => x.AufgabeId == task.Id && x.Typ == ProtokollTyp.SystemMeldung && x.Inhalt.Contains("Issue-Aufbereitung"));
+        Assert.Contains(await db.LogEntries.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            x => x.WorkItemId == task.Id && x.Type == LogEntryType.SystemMessage && x.Content.Contains("Issue-Aufbereitung"));
     }
 
     /// <summary>Erstlauf: Der Baseline-Checkpoint wird angelegt und alle enumerierten
@@ -84,7 +84,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         fixture.Git.As<IScmEventSource>().Verify(x => x.ReadEventsAsync(
             It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var baseline = Assert.Single(await db.ScmObservationCheckpoints
             .Where(x => x.SourceKey.StartsWith("issueaufbereitung/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal("issueaufbereitung/test-scm/github.com/R_1", baseline.SourceKey);
@@ -97,7 +97,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
             Assert.Equal(long.MaxValue, x.NextAttemptUtc);
             Assert.Null(x.ErrorCode);
         });
-        Assert.Empty(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Empty(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
@@ -157,7 +157,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
             It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary>Ohne Repository-Freischaltung (<see cref="GitRepository.IssueAufbereitungAktiv"/>)
+    /// <summary>Ohne Repository-Freischaltung (<see cref="GitRepository.IssuePreparationEnabled"/>)
     /// wird die Repository nicht einmal aufgelöst.</summary>
     [Fact]
     public async Task AufbereitungMonitor_RepositoryFlagDisabled_NoProviderWork()
@@ -198,7 +198,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         fixture.Git.As<IScmEventSource>().Verify(x => x.EnumerateReferencesAsync(
             It.IsAny<ScmEventRepository>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Once);
         using var verification = fixture.Services.CreateScope();
-        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.True(await db.ScmObservationCheckpoints.AnyAsync(
             x => x.SourceKey == "issueaufbereitung/test-scm/github.com/R_1", cancellationToken: TestContext.Current.CancellationToken));
     }
@@ -253,7 +253,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await AufbereitungMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(ScmKontoModus.SeparatesKonto, ScmEventStore.Observation(item).Reference.Repository.Konto);
     }
@@ -287,10 +287,10 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await AufbereitungMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var task = Assert.Single(await db.Aufgaben.Include(x => x.IssueReferenz).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(ScmIssueAufbereitungsService.Zweck, task.Zweck);
-        Assert.Equal(9, task.IssueReferenz!.IssueNummer);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var task = Assert.Single(await db.WorkItems.Include(x => x.IssueReference).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(ScmIssueAufbereitungsService.Purpose, task.Purpose);
+        Assert.Equal(9, task.IssueReference!.IssueNumber);
         Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
@@ -323,15 +323,15 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await AufbereitungMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var failed = Assert.Single(await db.ScmObservationCheckpoints
             .Where(x => x.SourceKey == "issueaufbereitung-issue/test-scm/github.com/R_1/9")
             .ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal("Temporary", failed.ErrorCode);
         Assert.True(failed.NextAttemptUtc > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         Assert.True(failed.NextAttemptUtc < long.MaxValue);
-        var task = Assert.Single(await db.Aufgaben.Include(x => x.IssueReferenz).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(10, task.IssueReferenz!.IssueNummer);
+        var task = Assert.Single(await db.WorkItems.Include(x => x.IssueReference).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(10, task.IssueReference!.IssueNumber);
         var enumeration = Assert.Single(await db.ScmObservationCheckpoints
             .Where(x => x.SourceKey.StartsWith("issueaufbereitung-enumeration/"))
             .ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
@@ -358,7 +358,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await AufbereitungMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var failed = Assert.Single(await db.ScmObservationCheckpoints
             .Where(x => x.SourceKey.StartsWith("issueaufbereitung-repository/") && x.SourceKey.Contains("other"))
             .ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
@@ -386,8 +386,8 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         fixture.Git.As<IScmEventSource>().Verify(x => x.ReadEventsAsync(
             It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Empty(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Empty(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
@@ -424,12 +424,12 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
             It.Is<ScmEventReadRequest>(r => r.Reference.Repository.Konto == ScmKontoModus.SeparatesKonto),
             It.IsAny<CancellationToken>()), Times.Never);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var task = Assert.Single(await db.Aufgaben.Include(x => x.IssueReferenz)
-            .Where(x => x.Zweck == ScmIssueAufbereitungsService.Zweck).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(9, task.IssueReferenz!.IssueNummer);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var task = Assert.Single(await db.WorkItems.Include(x => x.IssueReference)
+            .Where(x => x.Purpose == ScmIssueAufbereitungsService.Purpose).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(9, task.IssueReference!.IssueNumber);
         Assert.Single(await db.ScmIncomingEvents
-            .Where(x => x.Zweck == ScmIssueAufbereitungsService.Zweck).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+            .Where(x => x.Purpose == ScmIssueAufbereitungsService.Purpose).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     /// <summary>Das eingereihte interne Ereignis wird noch im selben Zyklus zugestellt — auch bei
@@ -460,9 +460,9 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         await AufbereitungMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var verification = fixture.Services.CreateScope();
-        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(ScmIssueAufbereitungsService.Zweck, item.Zweck);
+        Assert.Equal(ScmIssueAufbereitungsService.Purpose, item.Purpose);
         // „Aufgenommen" wäre der Zustand ohne den zyklusinternen Dispatch-Anstoß.
         Assert.Equal("Wartend", item.Status);
         Assert.Contains("custom.auf", item.Reason);
@@ -478,17 +478,17 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
         string url = "https://github.com/owner/repo", string? pluginTyp = null)
     {
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "Aufbereitung" };
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var project = new Project { Id = Guid.NewGuid(), Name = "Aufbereitung" };
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            Projekt = project,
+            Project = project,
             RepositoryUrl = url,
             RepositoryName = "repo",
-            PluginTyp = pluginTyp ?? fixture.Repository.ProviderPrefix,
-            Aktiv = true,
-            IssueAufbereitungAktiv = aufbereitung
+            PluginType = pluginTyp ?? fixture.Repository.ProviderPrefix,
+            Active = true,
+            IssuePreparationEnabled = aufbereitung
         };
         db.AddRange(project, repository);
         await db.SaveChangesAsync();
@@ -518,7 +518,7 @@ public sealed class ScmIssueAufbereitungMonitoringServiceTests
     private static async Task AddSnapshotAsync(ScmDispatchFixture fixture, ScmEventObservation observation)
     {
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         db.ScmContentSnapshots.Add(new ScmContentSnapshot
         {
             ContentKey = observation.ContentKey,

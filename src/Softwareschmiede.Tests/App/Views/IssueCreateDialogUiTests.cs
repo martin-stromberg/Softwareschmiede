@@ -116,7 +116,7 @@ public sealed class IssueCreateDialogUiTests
         public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
         public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
             => Task.FromResult(new ProcessStartInfo());
-        public string GetProcessWindowTitle(Guid aufgabeId) => PluginName;
+        public string GetProcessWindowTitle(Guid workItemId) => PluginName;
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;

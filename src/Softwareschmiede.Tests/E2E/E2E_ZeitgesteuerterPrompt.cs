@@ -61,8 +61,8 @@ public partial class End2EndTest
 
         await using (var db = OpenTestDbContext())
         {
-            var aufgabe = await db.Aufgaben.SingleAsync();
-            var datensatz = await db.ZeitgesteuertePrompts.SingleOrDefaultAsync(z => z.AufgabeId == aufgabe.Id);
+            var workItem = await db.WorkItems.SingleAsync();
+            var datensatz = await db.ScheduledPrompts.SingleOrDefaultAsync(z => z.WorkItemId == workItem.Id);
             Assert.NotNull(datensatz);
         }
 
@@ -75,7 +75,7 @@ public partial class End2EndTest
 
         await using (var db = OpenTestDbContext())
         {
-            Assert.False(await db.ZeitgesteuertePrompts.AnyAsync());
+            Assert.False(await db.ScheduledPrompts.AnyAsync());
         }
 
         taskDetailReopened.ForceClose(recurseToDashboard: false);

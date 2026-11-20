@@ -12,7 +12,7 @@ public interface ICliExecutionLimitSource
     IReadOnlyCollection<Guid> GetLaufendeAufgabenIds();
 
     /// <summary>Gibt die für eine Aufgabe registrierte SCM-Promptsitzung zurück, sofern vorhanden.</summary>
-    /// <param name="aufgabeId">Aufgaben-ID.</param>
+    /// <param name="workItemId">Aufgaben-ID.</param>
     /// <returns>Adapter der SCM-Promptsitzung oder <c>null</c>.</returns>
-    IScmPromptSessionAdapter? GetScmPromptSession(Guid aufgabeId);
+    IScmPromptSessionAdapter? GetScmPromptSession(Guid workItemId);
 }

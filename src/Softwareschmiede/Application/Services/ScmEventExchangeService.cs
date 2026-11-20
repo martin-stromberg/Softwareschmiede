@@ -23,7 +23,7 @@ public sealed class ScmEventExchangeService(IServiceScopeFactory scopes, TimePro
             logger.LogDebug("SCM-Ereignisüberwachung ist deaktiviert; Antwortkanal-Prüfung wird übersprungen.");
             return;
         }
-        var ids = await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents.AsNoTracking()
+        var ids = await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents.AsNoTracking()
             .Where(x => x.DeliveryAttemptId != null && x.Status != "Verarbeitet" && x.Status != "Abgebrochen").Select(x => x.Id).ToListAsync(ct);
         foreach (var id in ids)
         {

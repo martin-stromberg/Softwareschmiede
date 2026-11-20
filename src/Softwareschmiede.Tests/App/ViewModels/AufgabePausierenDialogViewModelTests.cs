@@ -103,7 +103,7 @@ public sealed class AufgabePausierenDialogViewModelTests
 
         sut.Ergebnis.Should().NotBeNull();
         sut.Ergebnis!.Aufheben.Should().BeFalse();
-        sut.Ergebnis.PausiertBisUtc.Should().BeCloseTo(erwartetUtc, TimeSpan.FromMinutes(1));
+        sut.Ergebnis.PausedUntilUtc.Should().BeCloseTo(erwartetUtc, TimeSpan.FromMinutes(1));
         closed.Should().Equal(true);
     }
 
@@ -129,7 +129,7 @@ public sealed class AufgabePausierenDialogViewModelTests
 
         sut.Ergebnis.Should().NotBeNull();
         sut.Ergebnis!.Aufheben.Should().BeTrue();
-        sut.Ergebnis.PausiertBisUtc.Should().BeNull();
+        sut.Ergebnis.PausedUntilUtc.Should().BeNull();
         closed.Should().Equal(true);
     }
 

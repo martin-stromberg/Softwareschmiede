@@ -15,7 +15,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// muss den "Prompt in Wartestellung"-Status eines aktiven PromptZeitVersandService-Eintrags übernehmen.</summary>
 public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly TodoService _todoService;
     private readonly AufgabeService _aufgabeService;
     private readonly KiAusfuehrungsService _kiService;
@@ -45,12 +45,12 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
         var dashboardViewModel = new DashboardViewModel(projektService, _aufgabeService, recoveryService, NullLogger<DashboardViewModel>.Instance);
         _serviceProviderMock.Setup(sp => sp.GetService(typeof(DashboardViewModel))).Returns(dashboardViewModel);
 
-        _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
+        _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
             Id = _projektId,
             Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
     }
@@ -82,26 +82,26 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     [Fact]
     public async Task AktiveAufgabenAktualisierenAsync_MitGeplantemPrompt_SetztHasScheduledPrompt()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit geplantem Prompt", null, ct: TestContext.Current.CancellationToken);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
-        await _promptZeitVersandService.SchedulePromptAsync(aufgabe.Id, "Testprompt", DateTimeOffset.UtcNow.AddMinutes(5));
+        var workItem = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit geplantem Prompt", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
+        await _promptZeitVersandService.SchedulePromptAsync(workItem.Id, "Testprompt", DateTimeOffset.UtcNow.AddMinutes(5));
 
         var sut = CreateSut();
         await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
-        sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id && a.HasScheduledPrompt);
+        sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == workItem.Id && a.HasScheduledPrompt);
     }
 
     /// <summary>Ist für eine Aufgabe kein Prompt geplant, muss HasScheduledPrompt false bleiben.</summary>
     [Fact]
     public async Task AktiveAufgabenAktualisierenAsync_OhneGeplantenPrompt_HasScheduledPromptBleibtFalse()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne geplanten Prompt", null, ct: TestContext.Current.CancellationToken);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
+        var workItem = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne geplanten Prompt", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
 
         var sut = CreateSut();
         await sut.AktiveAufgabenAktualisierenAsync(TestContext.Current.CancellationToken);
 
-        sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id && !a.HasScheduledPrompt);
+        sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == workItem.Id && !a.HasScheduledPrompt);
     }
 }

@@ -37,7 +37,7 @@ public sealed class CliRuntimeStatusEvaluatorTests
             now,
             TimeSpan.FromSeconds(4));
 
-        status.Should().Be(CliRuntimeStatus.Laeuft);
+        status.Should().Be(CliRuntimeStatus.Running);
     }
 
     /// <summary>Lange fehlende Aktivitaet ergibt WartetAufEingabe.</summary>
@@ -54,7 +54,7 @@ public sealed class CliRuntimeStatusEvaluatorTests
             now,
             TimeSpan.FromSeconds(4));
 
-        status.Should().Be(CliRuntimeStatus.WartetAufEingabe);
+        status.Should().Be(CliRuntimeStatus.WaitingForInput);
     }
 
     /// <summary>Frische Benutzereingabe setzt den Status wieder auf Laeuft.</summary>
@@ -71,6 +71,6 @@ public sealed class CliRuntimeStatusEvaluatorTests
             now,
             TimeSpan.FromSeconds(4));
 
-        status.Should().Be(CliRuntimeStatus.Laeuft);
+        status.Should().Be(CliRuntimeStatus.Running);
     }
 }

@@ -24,22 +24,22 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(arbeitsverzeichnis, "backend"));
-        var aufgabe = await ErstelleAufgabeMitRepositoryAsync("backend");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeMitRepositoryAsync("backend");
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
-        var prozessStarterMock = new Mock<IProzessStarter>();
+        var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock, locator);
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
         var erwarteterPfad = Path.GetFullPath(Path.Combine(arbeitsverzeichnis, "backend"));
         prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a =>
-                a.DateiName == "code.cmd"
-                && a.Argumente == $"\"{erwarteterPfad}\"")),
+            p => p.Start(It.Is<ProcessStartRequest>(a =>
+                a.FileName == "code.cmd"
+                && a.Arguments == $"\"{erwarteterPfad}\"")),
             Times.Once);
     }
 
@@ -48,21 +48,21 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
     public async Task OeffneIdeAsync_OhneSolutionOhneKonfiguration_RuftVsCodeMitRepositoryRootAuf()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
-        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
-        var prozessStarterMock = new Mock<IProzessStarter>();
+        var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock, locator);
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
         prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a =>
-                a.DateiName == "code.cmd"
-                && a.Argumente == $"\"{arbeitsverzeichnis}\"")),
+            p => p.Start(It.Is<ProcessStartRequest>(a =>
+                a.FileName == "code.cmd"
+                && a.Arguments == $"\"{arbeitsverzeichnis}\"")),
             Times.Once);
     }
 
@@ -71,19 +71,19 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
     public async Task OeffneIdeAsync_OhneSolutionOhneVsCode_ZeigtFehlermeldung()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
-        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
-        var prozessStarterMock = new Mock<IProzessStarter>();
+        var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable);
         var sut = CreateSut(prozessStarterMock, locator);
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().Contain("Visual Studio Code");
-        prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
+        prozessStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
     /// <summary>Ohne Solutions im aufgelösten (konfigurierten) Arbeitsverzeichnis fällt OeffneIdeAsync auf Visual Studio Code mit dem aufgelösten Verzeichnis zurück, selbst wenn im Repository-Root eine .sln-Datei liegt.</summary>
@@ -96,22 +96,22 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
         var unterverzeichnis = Path.Combine(arbeitsverzeichnis, "backend");
         Directory.CreateDirectory(unterverzeichnis);
 
-        var aufgabe = await ErstelleAufgabeMitRepositoryAsync("backend");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
+        var workItem = await ErstelleAufgabeMitRepositoryAsync("backend");
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/x", arbeitsverzeichnis, ct: TestContext.Current.CancellationToken);
 
-        var prozessStarterMock = new Mock<IProzessStarter>();
+        var prozessStarterMock = new Mock<IProcessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock, locator);
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
         var erwarteterPfad = Path.GetFullPath(unterverzeichnis);
         prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a =>
-                a.DateiName == "code.cmd"
-                && a.Argumente == $"\"{erwarteterPfad}\"")),
+            p => p.Start(It.Is<ProcessStartRequest>(a =>
+                a.FileName == "code.cmd"
+                && a.Arguments == $"\"{erwarteterPfad}\"")),
             Times.Once);
     }
 }

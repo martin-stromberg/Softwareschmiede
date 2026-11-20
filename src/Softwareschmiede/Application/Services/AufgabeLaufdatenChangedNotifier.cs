@@ -7,9 +7,9 @@ public sealed class AufgabeLaufdatenChangedNotifier
     public event Action<Guid>? LaufdatenChanged;
 
     /// <summary>Meldet geaenderte Laufdaten fuer die angegebene Aufgabe.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe mit geaenderten Laufdaten.</param>
-    public void NotifyLaufdatenChanged(Guid aufgabeId)
+    /// <param name="workItemId">ID der Aufgabe mit geaenderten Laufdaten.</param>
+    public void NotifyLaufdatenChanged(Guid workItemId)
     {
-        LaufdatenChanged?.Invoke(aufgabeId);
+        LaufdatenChanged?.Invoke(workItemId);
     }
 }

@@ -11,19 +11,19 @@ public sealed class BenachrichtigungsService
 {
     private readonly BenachrichtigungsEinstellungenService _einstellungenService;
     private readonly BenachrichtigungsAuditService _auditService;
-    private readonly IBenachrichtigungsAudioService? _audioService;
-    private readonly IBenachrichtigungsBannerService? _bannerService;
-    private readonly IBenutzerkontextService _benutzerkontextService;
+    private readonly INotificationAudioService? _audioService;
+    private readonly INotificationBannerService? _bannerService;
+    private readonly IUserContextService _benutzerkontextService;
     private readonly ILogger<BenachrichtigungsService> _logger;
 
     /// <inheritdoc cref="BenachrichtigungsService"/>
     public BenachrichtigungsService(
         BenachrichtigungsEinstellungenService einstellungenService,
         BenachrichtigungsAuditService auditService,
-        IBenutzerkontextService benutzerkontextService,
+        IUserContextService benutzerkontextService,
         ILogger<BenachrichtigungsService> logger,
-        IBenachrichtigungsAudioService? audioService = null,
-        IBenachrichtigungsBannerService? bannerService = null)
+        INotificationAudioService? audioService = null,
+        INotificationBannerService? bannerService = null)
     {
         _einstellungenService = einstellungenService;
         _auditService = auditService;
@@ -38,38 +38,38 @@ public sealed class BenachrichtigungsService
     /// und sendet sie wenn nötig.
     /// </summary>
     public async Task DispatchAsync(
-        Guid aufgabeId,
-        AufgabeStatus neuerStatus,
+        Guid workItemId,
+        WorkItemStatus neuerStatus,
         CancellationToken ct = default)
     {
-        var benutzerId = _benutzerkontextService.GetBenutzerId();
+        var benutzerId = _benutzerkontextService.GetUserId();
         var einstellungen = await _einstellungenService.GetAsync(benutzerId, ct);
         var ereignisId = Guid.NewGuid();
 
         await DispatchFuerKanalAsync(
             ereignisId,
-            aufgabeId,
+            workItemId,
             benutzerId,
-            BenachrichtigungsKanal.Banner,
-            einstellungen.BannerModus,
+            NotificationChannel.Banner,
+            einstellungen.BannerMode,
             neuerStatus,
             ct);
 
         await DispatchFuerKanalAsync(
             ereignisId,
-            aufgabeId,
+            workItemId,
             benutzerId,
-            BenachrichtigungsKanal.Ton,
-            einstellungen.TonModus,
+            NotificationChannel.Sound,
+            einstellungen.SoundMode,
             neuerStatus,
             ct);
     }
 
     /// <summary>
     /// Zeigt eine Banner-Benachrichtigung für eine Aufgabe an.
-    /// Delegiert an <see cref="IBenachrichtigungsBannerService"/> sofern verfügbar; sonst Logging-Fallback.
+    /// Delegiert an <see cref="INotificationBannerService"/> sofern verfügbar; sonst Logging-Fallback.
     /// </summary>
-    public async Task ShowBannerAsync(Guid aufgabeId, string message, CancellationToken ct = default)
+    public async Task ShowBannerAsync(Guid workItemId, string message, CancellationToken ct = default)
     {
         if (_bannerService is not null)
         {
@@ -79,13 +79,13 @@ public sealed class BenachrichtigungsService
 
         _logger.LogInformation(
             "Banner-Benachrichtigung für Aufgabe {AufgabeId}: {Message}",
-            aufgabeId,
+            workItemId,
             message);
     }
 
     /// <summary>
     /// Spielt eine Audiodatei ab (MP3, WAV oder OGG).
-    /// Delegiert an <see cref="IBenachrichtigungsAudioService"/> sofern verfügbar.
+    /// Delegiert an <see cref="INotificationAudioService"/> sofern verfügbar.
     /// </summary>
     public async Task PlayAudioAsync(string filePath, CancellationToken ct = default)
     {
@@ -117,22 +117,22 @@ public sealed class BenachrichtigungsService
 
     private async Task DispatchFuerKanalAsync(
         Guid ereignisId,
-        Guid aufgabeId,
+        Guid workItemId,
         string benutzerId,
-        BenachrichtigungsKanal kanal,
-        BenachrichtigungsModus modus,
-        AufgabeStatus neuerStatus,
+        NotificationChannel kanal,
+        NotificationMode modus,
+        WorkItemStatus neuerStatus,
         CancellationToken ct)
     {
-        if (modus == BenachrichtigungsModus.Deaktiviert)
+        if (modus == NotificationMode.Disabled)
         {
             await _auditService.LogAsync(
                 ereignisId,
-                aufgabeId,
+                workItemId,
                 benutzerId,
                 kanal,
                 modus,
-                BenachrichtigungsEntscheidung.Unterdrueckt,
+                NotificationDecision.Suppressed,
                 "Modus ist Deaktiviert.",
                 ct);
             return;
@@ -142,13 +142,13 @@ public sealed class BenachrichtigungsService
         {
             switch (kanal)
             {
-                case BenachrichtigungsKanal.Banner:
+                case NotificationChannel.Banner:
                     await ShowBannerAsync(
-                        aufgabeId,
-                        $"Aufgabe: Status geändert zu {neuerStatus}",
+                        workItemId,
+                        $"Aufgabe: Status geändert zu {neuerStatus.ToDisplayText()}",
                         ct);
                     break;
-                case BenachrichtigungsKanal.Ton:
+                case NotificationChannel.Sound:
                     var audio = await _einstellungenService.GetAudioPayloadAsync(benutzerId, ct);
                     if (audio is not null)
                     {
@@ -175,12 +175,12 @@ public sealed class BenachrichtigungsService
 
             await _auditService.LogAsync(
                 ereignisId,
-                aufgabeId,
+                workItemId,
                 benutzerId,
                 kanal,
                 modus,
-                BenachrichtigungsEntscheidung.Gesendet,
-                $"Status: {neuerStatus}",
+                NotificationDecision.Sent,
+                $"Status: {neuerStatus.ToDisplayText()}",
                 ct);
         }
         catch (OperationCanceledException)
@@ -193,29 +193,29 @@ public sealed class BenachrichtigungsService
                 ex,
                 "Fehler beim Versenden der {Kanal}-Benachrichtigung für Aufgabe {AufgabeId}.",
                 kanal,
-                aufgabeId);
+                workItemId);
 
             await _auditService.LogAsync(
                 ereignisId,
-                aufgabeId,
+                workItemId,
                 benutzerId,
                 kanal,
                 modus,
-                BenachrichtigungsEntscheidung.Fehlgeschlagen,
+                NotificationDecision.Failed,
                 ex.Message,
                 ct);
         }
     }
 
-    private void LöscheDateiSicher(string pfad)
+    private void LöscheDateiSicher(string path)
     {
         try
         {
-            File.Delete(pfad);
+            File.Delete(path);
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Temporäre Audiodatei konnte nicht gelöscht werden: {Pfad}", pfad);
+            _logger.LogDebug(ex, "Temporäre Audiodatei konnte nicht gelöscht werden: {Pfad}", path);
         }
     }
 

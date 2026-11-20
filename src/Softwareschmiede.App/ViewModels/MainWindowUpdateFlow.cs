@@ -91,14 +91,14 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
 
     /// <summary>Tooltip der Prüfen-Schaltfläche; begründet die Deaktivierung im Modus „Aus".</summary>
     public string UpdatePruefenTooltip
-        => _aktuelleUpdateEinstellungen is { Modus: UpdateMode.Aus }
+        => _aktuelleUpdateEinstellungen is { Mode: UpdateMode.Aus }
             ? "Update-Prüfung ist in den Einstellungen deaktiviert."
             : "Auf Programmupdate prüfen";
 
     /// <summary>Gibt an, ob eine manuelle Update-Prüfung aktuell gestartet werden kann.</summary>
     public bool KannPruefen()
         => _updateService is not null
-           && _aktuelleUpdateEinstellungen is { Modus: not UpdateMode.Aus }
+           && _aktuelleUpdateEinstellungen is { Mode: not UpdateMode.Aus }
            && !UpdateCheckLaeuft
            && !UpdateWirdVorbereitet;
 
@@ -108,7 +108,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
            && _cliUpdateSafetyService is not null
            && _updateProgressDialogService is not null
            && _dialogService is not null
-           && _aktuelleUpdateEinstellungen is { Modus: not UpdateMode.Aus }
+           && _aktuelleUpdateEinstellungen is { Mode: not UpdateMode.Aus }
            && UpdateVerfuegbar
            && !UpdateCheckLaeuft
            && !UpdateWirdVorbereitet;
@@ -176,7 +176,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
 
             ApplyUpdateCheckResult(result, isManualRefresh: false);
 
-            if (settings.Modus == UpdateMode.BeiProgrammstartPruefenUndAusfuehren
+            if (settings.Mode == UpdateMode.BeiProgrammstartPruefenUndAusfuehren
                 && result.Status == UpdateCheckStatus.UpdateVerfuegbar
                 && result.Update is not null)
             {
@@ -259,7 +259,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
                 return;
             }
 
-            if (settings.Modus == UpdateMode.Aus)
+            if (settings.Mode == UpdateMode.Aus)
             {
                 UpdateAngebotEntfernen();
                 return;

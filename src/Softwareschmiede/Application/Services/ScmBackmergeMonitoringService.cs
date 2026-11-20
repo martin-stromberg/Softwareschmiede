@@ -36,14 +36,14 @@ public sealed class ScmBackmergeMonitoringService(
         var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
         // Laufzeit-Schalter (Einstellungen → Automatisierung → Prozessabläufe): Bei deaktiviertem
         // Backmerge-Modus wird nicht enumeriert. Die Ereignisüberwachung ist davon unabhängig.
-        if (await einstellungen.GetScmBackmergeModusAsync(ct) == ScmBackmergeModus.Deaktiviert)
+        if (await einstellungen.GetScmBackmergeModusAsync(ct) == ScmBackmergeMode.Disabled)
         {
             logger.LogDebug("Backmerge-Automatisierung ist deaktiviert; Durchlauf wird übersprungen.");
             return;
         }
 
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var repositories = await db.GitRepositories.AsNoTracking().Where(x => x.Aktiv).ToListAsync(ct);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var repositories = await db.GitRepositories.AsNoTracking().Where(x => x.Active).ToListAsync(ct);
         var plugins = scope.ServiceProvider.GetRequiredService<IPluginManager>().GetSourceCodeManagementPlugins();
         foreach (var plugin in plugins)
         {
@@ -58,7 +58,7 @@ public sealed class ScmBackmergeMonitoringService(
             foreach (var (alias, aliasGroup) in aliasGroups)
             {
                 using var resolutionScope = scopes.CreateScope();
-                var resolutionDb = resolutionScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+                var resolutionDb = resolutionScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
                 var resolutionKey = $"backmerge-repository/{plugin.PluginPrefix.ToLowerInvariant()}/{Uri.EscapeDataString(alias.ToLowerInvariant())}";
                 var checkpoint = await resolutionDb.ScmObservationCheckpoints.FindAsync([resolutionKey], ct);
                 if (checkpoint?.NextAttemptUtc > _time.GetUtcNow().ToUnixTimeMilliseconds())

@@ -112,7 +112,7 @@ public sealed class E2E_RepositoryInitialisierungAusfuehrungTests : WpfTestBase
 
     /// <summary>
     /// Legt das Initialisierungsskript im Quellverzeichnis des (einzigen) zugewiesenen Repositories ab
-    /// und hinterlegt die zugehörige aktive <see cref="RepositoryInitialisierungKonfiguration"/> direkt
+    /// und hinterlegt die zugehörige aktive <see cref="RepositoryInitializationConfiguration"/> direkt
     /// in der Test-Datenbank.
     /// </summary>
     private async Task SeedInitialisierungsskriptAsync(string relativeScriptPath, string scriptContent)
@@ -128,12 +128,12 @@ public sealed class E2E_RepositoryInitialisierungAusfuehrungTests : WpfTestBase
         }
         await File.WriteAllTextAsync(scriptFullPath, scriptContent);
 
-        db.Add(new RepositoryInitialisierungKonfiguration
+        db.Add(new RepositoryInitializationConfiguration
         {
             Id = Guid.NewGuid(),
             GitRepositoryId = repository.Id,
-            InitialisierungsskriptRelativePath = relativeScriptPath,
-            Aktiv = true
+            InitializationScriptRelativePath = relativeScriptPath,
+            Active = true
         });
         await db.SaveChangesAsync();
     }
@@ -144,10 +144,10 @@ public sealed class E2E_RepositoryInitialisierungAusfuehrungTests : WpfTestBase
         while (DateTime.UtcNow < deadline)
         {
             await using var db = OpenTestDbContext();
-            var aufgabe = db.Aufgaben.FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(aufgabe?.LokalerKlonPfad))
+            var workItem = db.WorkItems.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(workItem?.LocalClonePath))
             {
-                return aufgabe.LokalerKlonPfad;
+                return workItem.LocalClonePath;
             }
 
             await Task.Delay(200);
@@ -162,7 +162,7 @@ public sealed class E2E_RepositoryInitialisierungAusfuehrungTests : WpfTestBase
         while (DateTime.UtcNow < deadline)
         {
             await using var db = OpenTestDbContext();
-            if (db.Protokolleintraege.Any(p => p.Inhalt.Contains("Repository-Initialisierungsskript konnte nicht ausgeführt werden")))
+            if (db.LogEntries.Any(p => p.Content.Contains("Repository-Initialisierungsskript konnte nicht ausgeführt werden")))
             {
                 return true;
             }

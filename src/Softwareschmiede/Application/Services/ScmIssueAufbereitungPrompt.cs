@@ -5,7 +5,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>Fester, deterministischer Analyse-Prompt der Issue-Aufbereitung. Er wird aus den
-/// persistierten Erkennungsdaten (Issue-Titel aus <see cref="IssueReferenz"/> und Beschreibung aus
+/// persistierten Erkennungsdaten (Issue-Titel aus <see cref="IssueReference"/> und Beschreibung aus
 /// <see cref="ScmEventObservation.Body"/>) gebaut und bildet den <c>Body</c> der
 /// <see cref="ScmExchangeRequest"/> — damit ist der gespeicherte <c>request.json</c>-Inhalt beim
 /// Wiederanlauf bitgleich rekonstruierbar. Der Kommentar-Schalter fließt bewusst nicht ein:

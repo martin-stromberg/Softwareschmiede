@@ -141,7 +141,7 @@ public sealed class ScmEventDispatchTests_AgentActions
         // Keine KI-Kanalaktion wurde remote ausgeführt — nur die Empfangsreaktion des Hosts.
         Assert.Equal(actionsBefore, fixture.Responses.Count);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.DoesNotContain(await db.ScmOutgoingActions.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => x.Purpose.StartsWith("ai:", StringComparison.Ordinal));
     }
 

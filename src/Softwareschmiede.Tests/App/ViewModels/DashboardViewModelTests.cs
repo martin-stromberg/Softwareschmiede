@@ -16,7 +16,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Unit-Tests für DashboardViewModel.</summary>
 public sealed class DashboardViewModelTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
     private readonly AufgabeRecoveryService _recoveryService;
@@ -31,12 +31,12 @@ public sealed class DashboardViewModelTests : IDisposable
         var runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
         _recoveryService = new AufgabeRecoveryService(_db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance);
 
-        _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
+        _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
             Id = _projektId,
             Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
     }
@@ -68,8 +68,8 @@ public sealed class DashboardViewModelTests : IDisposable
     public async Task LadenAsync_ShouldNotModifyAktiveAufgabenListe_WhenCalled()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Zu startende Aufgabe", null, ct: TestContext.Current.CancellationToken);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
+        var workItem = await _aufgabeService.CreateAsync(_projektId, "Zu startende Aufgabe", null, ct: TestContext.Current.CancellationToken);
+        await _aufgabeService.StartenAsync(workItem.Id, "feature/test", "/tmp/klon", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
         var geteilteListe = new ObservableCollection<AktiveAufgabePanelItem>();
         sut.Initialize(geteilteListe, _ => { });
@@ -90,13 +90,13 @@ public sealed class DashboardViewModelTests : IDisposable
         var sut = CreateSut();
         Guid? aufgerufeneAufgabeId = null;
         sut.Initialize(new ObservableCollection<AktiveAufgabePanelItem>(), id => aufgerufeneAufgabeId = id);
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
 
         // Act
-        ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabeId);
+        ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(workItemId);
 
         // Assert
-        aufgerufeneAufgabeId.Should().Be(aufgabeId);
+        aufgerufeneAufgabeId.Should().Be(workItemId);
     }
 
     /// <summary>NavigateZuAufgabeCommand wirft keine Ausnahme, wenn Initialize noch nicht aufgerufen wurde.</summary>

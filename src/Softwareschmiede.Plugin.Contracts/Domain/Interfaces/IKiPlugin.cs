@@ -15,8 +15,8 @@ public interface IKiPlugin : IPlugin
     Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default);
 
     /// <summary>Gibt einen Hinweis auf den erwarteten Fenstertitel des CLI-Prozesses zurück (optional).</summary>
-    /// <param name="aufgabeId">Aufgaben-ID für Identifikation.</param>
-    string GetProcessWindowTitle(Guid aufgabeId);
+    /// <param name="workItemId">Aufgaben-ID für Identifikation.</param>
+    string GetProcessWindowTitle(Guid workItemId);
 
     /// <summary>Gibt an, ob das Plugin Session-Fortsetzung unterstützt.</summary>
     bool SupportsSessionContinuation();

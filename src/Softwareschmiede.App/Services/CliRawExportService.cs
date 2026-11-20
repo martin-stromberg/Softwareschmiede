@@ -10,7 +10,7 @@ namespace Softwareschmiede.App.Services;
 public interface ICliRawExportService
 {
     /// <summary>Schreibt die CLI-Rohausgabe einer Aufgabe in die angegebene .raw-Datei.</summary>
-    Task ExportCliRawAsync(Guid aufgabeId, string zielPfad, CancellationToken ct = default);
+    Task ExportCliRawAsync(Guid workItemId, string zielPfad, CancellationToken ct = default);
 }
 
 /// <summary>Implementierung des CLI-Raw-Exports mit persistierter Protokollbasis.</summary>
@@ -27,18 +27,18 @@ public sealed class CliRawExportService : ICliRawExportService
     }
 
     /// <inheritdoc/>
-    public async Task ExportCliRawAsync(Guid aufgabeId, string zielPfad, CancellationToken ct = default)
+    public async Task ExportCliRawAsync(Guid workItemId, string zielPfad, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(zielPfad);
 
-        var protokolle = await _protokollService.GetByAufgabeAsync(aufgabeId, ct);
+        var protokolle = await _protokollService.GetByAufgabeAsync(workItemId, ct);
         var inhalt = string.Join(
             Environment.NewLine,
             protokolle
-                .Where(eintrag => eintrag.Typ == ProtokollTyp.CliOutput)
-                .Select(eintrag => eintrag.Inhalt));
+                .Where(eintrag => eintrag.Type == LogEntryType.CliOutput)
+                .Select(eintrag => eintrag.Content));
 
-        _logger.LogDebug("Exportiere {Anzahl} CLI-Rohausgabezeilen nach {ZielPfad}.", protokolle.Count(e => e.Typ == ProtokollTyp.CliOutput), zielPfad);
+        _logger.LogDebug("Exportiere {Anzahl} CLI-Rohausgabezeilen nach {ZielPfad}.", protokolle.Count(e => e.Type == LogEntryType.CliOutput), zielPfad);
         await File.WriteAllTextAsync(zielPfad, inhalt, new UTF8Encoding(false), ct);
     }
 }
