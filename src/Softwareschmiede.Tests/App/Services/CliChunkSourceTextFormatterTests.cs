@@ -5,7 +5,7 @@ using Softwareschmiede.App.Services;
 namespace Softwareschmiede.Tests.App.Services;
 
 /// <summary>Unit-Tests für <see cref="CliChunkSourceTextFormatter"/>.</summary>
-public sealed class CliChunkSourcetextFormatterTests
+public sealed class CliChunkSourceTextFormatterTests
 {
     /// <summary>ESC wird als ␛, CR als \r, LF als \n, TAB als \t sichtbar gemacht.</summary>
     [Fact]

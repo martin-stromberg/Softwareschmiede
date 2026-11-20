@@ -5,7 +5,7 @@ using Softwareschmiede.Infrastructure.Plugins;
 namespace Softwareschmiede.Tests.ServiceIntegration;
 
 /// <summary>Integrationstests für die CommandLineParameters-Übergabe vom CredentialStore an ProcessStartInfo.</summary>
-public sealed class CliAiPluginCommandLineParameterIntegrationTests
+public sealed class CliAiPluginCommandLineParametersIntegrationTests
 {
     private readonly InMemoryCredentialStore _credentialStore = new();
 
