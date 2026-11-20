@@ -1,3 +1,5 @@
+using Softwareschmiede.TestSupport;
+
 namespace Softwareschmiede.Tests.Helpers;
 
 /// <summary>Verwaltet temporäre Testverzeichnisse und löscht sie beim Dispose.</summary>
@@ -21,8 +23,7 @@ public sealed class TestTempDirectoryFixture : IDisposable
     {
         foreach (var directory in _tempDirectories)
         {
-            if (Directory.Exists(directory))
-                Directory.Delete(directory, recursive: true);
+            TempDirectoryCleanup.DeleteBestEffort(directory);
         }
     }
 }

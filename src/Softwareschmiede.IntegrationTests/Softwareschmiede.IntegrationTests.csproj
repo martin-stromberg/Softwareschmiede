@@ -33,6 +33,15 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <Compile Include="..\Softwareschmiede.Tests\Helpers\ScmDispatchFixture.cs" Link="Infrastructure\ScmDispatchFixture.cs" />
+    <Compile Include="..\Softwareschmiede.Tests\Helpers\TempDirectoryCleanup.cs" Link="Infrastructure\TempDirectoryCleanup.cs" />
+    <!-- FlakyConventionTests scannt jeweils die eigene Assembly — per Link auch hier
+         eingebunden, damit die Regel "Flaky nur mit OsInterface" genau dort abgesichert
+         ist, wo derzeit Flaky-markierte Tests liegen. TestCategories/FlakyAttribute/
+         OsInterfaceAttribute sind die Compile-Abhaengigkeiten des Tests. -->
+    <Compile Include="..\Softwareschmiede.Tests\Infrastructure\Testing\FlakyConventionTests.cs" Link="Infrastructure\FlakyConventionTests.cs" />
+    <Compile Include="..\Softwareschmiede.Tests\Infrastructure\Testing\TestCategories.cs" Link="Infrastructure\TestCategories.cs" />
+    <Compile Include="..\Softwareschmiede.Tests\Infrastructure\Testing\FlakyAttribute.cs" Link="Infrastructure\FlakyAttribute.cs" />
+    <Compile Include="..\Softwareschmiede.Tests\Infrastructure\Testing\OsInterfaceAttribute.cs" Link="Infrastructure\OsInterfaceAttribute.cs" />
   </ItemGroup>
 
   <ItemGroup>

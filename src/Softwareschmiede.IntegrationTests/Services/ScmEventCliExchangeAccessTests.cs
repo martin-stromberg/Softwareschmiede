@@ -17,6 +17,10 @@ namespace Softwareschmiede.IntegrationTests.Services;
 public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "scm-access-tests-" + Guid.NewGuid().ToString("N"));
+    /// <summary>Registry der gestarteten eingeschraenkten Kindprozesse als Kill-Sicherheitsnetz
+    /// fuer Pfade, in denen der Test-finally nicht oder noch nicht gewirkt hat (Handle-Release-
+    /// Latenz, abgebrochene Testausfuehrung). xUnit fuehrt Tests einer Klasse sequentiell aus.</summary>
+    private readonly List<Process> _restrictedChildren = [];
 
     /// <summary>Creates an isolated effective CLI workspace.</summary>
     public ScmEventCliExchangeAccessTests() => Directory.CreateDirectory(_root);
@@ -325,6 +329,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         return session;
     }
 
-    /// <summary>Removes only the isolated fixture workspace.</summary>
-    public void Dispose() => Directory.Delete(_root, recursive: true);
+    /// <summary>Removes only the isolated fixture workspace; laufende Kindprozesse werden
+    /// zuerst beendet und Restfehler nur diagnostisch gemeldet statt den Assert zu ueberdecken.</summary>
+    public void Dispose() => TempDirectoryCleanup.DeleteBestEffort(_root, _restrictedChildren);
 }

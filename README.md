@@ -304,7 +304,7 @@ Die Konfigurationsbasis liegt in `src/Softwareschmiede/appsettings*.json`. Im ak
 │   └── Softwareschmiede.IntegrationTests/ # Integrationstests
 ├── plugins/                               # Plugin-Projekte
 ├── docs/                                  # Feature-, Hilfe- und CI/CD-Dokumentation
-├── scripts/                               # Build-/Release-Hilfsskripte
+├── scripts/                               # Build-/Release-/Test-Hilfsskripte
 ├── site/                                  # Quellen der öffentlichen GitHub-Pages-Projektseite
 └── Softwareschmiede.slnx
 ```
@@ -325,6 +325,8 @@ dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTe
 # Nur E2E-Tests
 dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category=OsInterface&FullyQualifiedName~E2E" -c Debug
 ```
+
+Als nachweislich umgebungsflaky klassifizierte OS-nahe Tests tragen zusätzlich die Kategorie `Flaky` — immer nur in Kombination mit `OsInterface` (durch `FlakyConventionTests` abgesichert), die blockierende Lane bleibt retry-frei. Schlägt ein `Flaky`-Test in der CI fehl, wiederholt `scripts/Retry-FlakyTests.ps1` genau diesen Fehlschlag einmal; `scripts/Analyze-FlakyTestResults.ps1` wertet TRX-Ergebnisse auf Flake-Ereignisse aus und meldet Quarantäne-Kandidaten. Lokal bildet `scripts/Run-AllTestsIndividually.ps1` denselben Einmal-Retry ab. Details und Vergaberegeln: [OS-Interface-Tests](docs/help/stabilitaet/os-interface-tests.md).
 
 Für Coverage verwenden die CI-Workflows `XPlat Code Coverage` und erzwingen auf `staging` eine **Line-Coverage von mindestens 70 %** für die regulären Tests.
 

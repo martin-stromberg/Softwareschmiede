@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using FluentAssertions;
+using Softwareschmiede.TestSupport;
 
 namespace Softwareschmiede.IntegrationTests.Scripts;
 
@@ -321,7 +322,7 @@ public sealed class StartPs1IntegrationTests : IDisposable
     {
         foreach (var directory in _temporaryDirectories.Where(Directory.Exists))
         {
-            Directory.Delete(directory, recursive: true);
+            TempDirectoryCleanup.DeleteBestEffort(directory);
         }
     }
 
