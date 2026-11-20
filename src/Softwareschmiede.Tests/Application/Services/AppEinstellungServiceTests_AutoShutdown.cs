@@ -33,7 +33,7 @@ public sealed class AppEinstellungServiceTests_AutoShutdown : IDisposable
         await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
         var service = CreateService(db);
 
-        (await service.GetAutoShutdownErzwingenAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
+        (await service.GetAutoShutdownForceAsync(TestContext.Current.CancellationToken)).Should().BeFalse();
         (await service.GetAutoShutdownToleranceMinutesAsync(TestContext.Current.CancellationToken))
             .Should().Be(AppSettingService.AutoShutdownDefaultToleranceMinutes);
     }
@@ -46,14 +46,14 @@ public sealed class AppEinstellungServiceTests_AutoShutdown : IDisposable
         {
             await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
             var service = CreateService(db);
-            await service.SetAutoShutdownErzwingenAsync(true, TestContext.Current.CancellationToken);
+            await service.SetAutoShutdownForceAsync(true, TestContext.Current.CancellationToken);
             await service.SetAutoShutdownToleranceMinutesAsync(42, TestContext.Current.CancellationToken);
         }
 
         await using (var db = CreateContext())
         {
             var service = CreateService(db);
-            (await service.GetAutoShutdownErzwingenAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
+            (await service.GetAutoShutdownForceAsync(TestContext.Current.CancellationToken)).Should().BeTrue();
             (await service.GetAutoShutdownToleranceMinutesAsync(TestContext.Current.CancellationToken)).Should().Be(42);
         }
     }

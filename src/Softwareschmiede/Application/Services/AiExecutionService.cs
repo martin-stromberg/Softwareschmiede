@@ -317,7 +317,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
             try { scmConfiguration = ScmCliAccessEvaluator.Capture(aiPlugin.PluginPrefix, spec); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
-                // An unavailable SCM channel must never break a regular manual CLI start.
+                // Ein nicht verfügbarer SCM-Kanal darf einen regulären manuellen CLI-Start niemals brechen.
                 scmConfiguration = [new ScmCliConfigurationFile("unavailable-managed-configuration", "unknown")];
             }
 
@@ -397,7 +397,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
             // Exited eventuell schon vor der Registrierung ausgelöst — dann hier über denselben Pfad
             // wie ein reguläres Exited-Event bereinigen: HandleExitedCoreAsync entfernt das Handle
             // atomar (Genau-einmal-Semantik auch gegen ein parallel zugestelltes Exited) und bildet
-            // den Exit-Code korrekt auf Gestoppt/Fehler inkl. Fehler-Protokolleintrag ab (kein
+            // den Exit-Code korrekt auf Stopped/Fehler inkl. Fehler-Protokolleintrag ab (kein
             // Gestartet-Event für einen bereits beendeten Prozess).
             if (process.HasExited)
             {
@@ -519,7 +519,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
         }
 
         var process = handle.Process;
-        handle.AbsichtlichGestoppt = true;
+        handle.IntentionallyStopped = true;
 
         _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} beenden.", workItemId);
 
@@ -710,9 +710,9 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
             RaiseRunningCountChanged();
 
             CliProcessStatus status;
-            if (handle.AbsichtlichGestoppt)
+            if (handle.IntentionallyStopped)
             {
-                status = CliProcessStatus.Gestoppt;
+                status = CliProcessStatus.Stopped;
             }
             else if (isErrorEnd || (exitCode.HasValue && exitCode.Value != 0))
             {
@@ -721,7 +721,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
             }
             else
             {
-                status = CliProcessStatus.Gestoppt;
+                status = CliProcessStatus.Stopped;
             }
 
             await PersistExecutionFinishedAsync(workItemId).ConfigureAwait(false);
@@ -866,13 +866,13 @@ public sealed class CliProcessHandle
     /// <summary>Zeitstempel des letzten Heartbeats.</summary>
     public DateTimeOffset LastHeartbeat { get; set; } = DateTimeOffset.UtcNow;
 
-    private volatile bool _absichtlichGestoppt;
+    private volatile bool _intentionallyStopped;
 
     /// <summary>Gibt an, ob der Prozess absichtlich durch <see cref="AiExecutionService.StopCliAsync"/> beendet wurde.</summary>
-    public bool AbsichtlichGestoppt
+    public bool IntentionallyStopped
     {
-        get => _absichtlichGestoppt;
-        set => _absichtlichGestoppt = value;
+        get => _intentionallyStopped;
+        set => _intentionallyStopped = value;
     }
 
     /// <summary>Die zugehörige <see cref="ITerminalSession"/>, oder null bei klassischem Start.</summary>
@@ -897,7 +897,7 @@ public enum CliProcessStatus
     /// <summary>Prozess läuft.</summary>
     Started,
     /// <summary>Prozess wurde gestoppt.</summary>
-    Gestoppt,
+    Stopped,
     /// <summary>Prozess ist mit einem Fehler beendet.</summary>
     Error
 }

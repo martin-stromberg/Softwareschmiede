@@ -74,8 +74,8 @@ public sealed class ScmEventMonitoringService(
             // Ein für das Konto unsichtbares Repository (404/403) liefert ihm auch keine Notifications
             // und wird daher nur ausgelassen, statt die Überwachung aller Repositories anzuhalten.
             var inboxMode = accountMode == ScmKontoModus.SeparatesKonto && plugin is IScmNotificationSource;
-            // Resolve the entire local reference set before assigning any incoming event.
-            // Raw HTTPS/SSH addresses and plugin display names are not repository identities.
+            // Die gesamte lokale Referenzmenge auflösen, bevor irgendein eingehendes Ereignis zugeordnet
+            // wird. Rohe HTTPS/SSH-Adressen und Plugin-Anzeigenamen sind keine Repository-Identitäten.
             var aliasGroups = linked.Where(x => ScmPluginMatcher.MatchesPlugin(plugin, x.Repository))
                 .GroupBy(x => x.RepositoryId, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(x => x.Key, x => (Repository: x.First().Repository, Linked: x.ToList()), StringComparer.OrdinalIgnoreCase);
@@ -128,7 +128,7 @@ public sealed class ScmEventMonitoringService(
                         retryPermanent: true);
                 }
             }
-            // An unresolved alias could name any of the resolved repositories. Do not guess an assignment.
+            // Ein unaufgelöster Alias könnte jedes der aufgelösten Repositories meinen. Keine Zuordnung raten.
             if (!complete) continue;
             if (accountMode == ScmKontoModus.SeparatesKonto && plugin is IScmNotificationSource notificationSource)
             {

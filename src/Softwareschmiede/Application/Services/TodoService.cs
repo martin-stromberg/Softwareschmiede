@@ -91,7 +91,7 @@ public sealed class TodoService
         // t.CompletedAt == null statt t.IsOpen: EF Core kann die berechnete Eigenschaft Todo.IsOpen
         // nicht in SQL übersetzen (InvalidOperationException "Translation of member 'IsOpen' ...
         // failed"), da sie kein gemapptes Modellmitglied ist. Die Eigenschaft bleibt für In-Memory-
-        // LINQ-Ausdrücke (z. B. EntwicklungsprozessService.AbschliessenAsync) nutzbar.
+        // LINQ-Ausdrücke (z. B. DevelopmentProcessService.CompleteAsync) nutzbar.
         => await _db.Todos
             .AsNoTracking()
             .CountAsync(t => t.WorkItemId == workItemId && t.CompletedAt == null, ct);

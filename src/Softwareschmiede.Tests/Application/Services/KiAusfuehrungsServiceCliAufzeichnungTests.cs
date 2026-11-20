@@ -48,7 +48,7 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
         recording.PluginName.Should().Be("TestPlugin");
         recording.Cols.Should().Be(new TerminalSessionOptions().DefaultCols);
         recording.Rows.Should().Be(new TerminalSessionOptions().DefaultRows);
-        recording.IstVollstaendig.Should().BeTrue();
+        recording.IsComplete.Should().BeTrue();
         recording.Chunks.Should().HaveCount(2);
         recording.Chunks[0].Data.Should().Equal(chunks[0]);
         recording.Chunks[1].Data.Should().Equal(chunks[1]);
@@ -121,7 +121,7 @@ public sealed class KiAusfuehrungsServiceCliAufzeichnungTests
 
         var recording = sut.GetCliRecording(workItemId);
         recording.Should().NotBeNull();
-        recording!.IstVollstaendig.Should().BeFalse();
+        recording!.IsComplete.Should().BeFalse();
         recording.Chunks.Should().HaveCount(1);
         recording.Chunks[0].Data.Should().Equal(chunks[0]);
     }

@@ -186,7 +186,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 UseShellExecute = false,
                 CreateNoWindow = true,
             },
-            CliProcessStatus.Gestoppt);
+            CliProcessStatus.Stopped);
 
         var geladen = await WaitForAufgabeStatusAsync(provider, workItemId, WorkItemExecutionStatus.Completed);
         geladen.Status.Should().Be(WorkItemStatus.Started);
@@ -230,7 +230,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var gestoppt = new TaskCompletionSource();
         sut.CliProcessStatusChanged += (_, status) =>
         {
-            if (status == CliProcessStatus.Gestoppt)
+            if (status == CliProcessStatus.Stopped)
                 gestoppt.TrySetResult();
         };
 
@@ -338,7 +338,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             .Callback(() => errorLogged.TrySetResult());
         sut.CliProcessStatusChanged += (_, status) =>
         {
-            // Nur beim Exited-Handler werfen (Gestoppt/Fehler), nicht beim initialen Gestartet-Event,
+            // Nur beim Exited-Handler werfen (Stopped/Fehler), nicht beim initialen Gestartet-Event,
             // das außerhalb des try-catch-geschützten Exited-Handlers liegt.
             if (status != CliProcessStatus.Started)
                 throw new InvalidOperationException("Simulierter Subscriber-Fehler");
@@ -373,14 +373,14 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var gestoppt = new TaskCompletionSource();
         sut.CliProcessStatusChanged += (_, status) =>
         {
-            if (status == CliProcessStatus.Gestoppt)
+            if (status == CliProcessStatus.Stopped)
                 gestoppt.TrySetResult();
         };
 
         await sut.StopCliAsync(workItemId);
 
         var finished = await Task.WhenAny(gestoppt.Task, Task.Delay(TimeSpan.FromSeconds(15)));
-        finished.Should().Be(gestoppt.Task, "StopCliAsync muss letztlich zu HandleProcessExited und damit zum Gestoppt-Status führen");
+        finished.Should().Be(gestoppt.Task, "StopCliAsync muss letztlich zu HandleProcessExited und damit zum Stopped-Status führen");
 
         AssertSessionDisposed(session!, "HandleProcessExited muss die PseudoConsoleSession disposen");
         sut.GetTerminalSession(workItemId).Should().BeNull("nach HandleProcessExited darf das Handle nicht mehr in _handles vorhanden sein");
@@ -646,10 +646,10 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// Ist der Prozess bereits vor der Event-Verdrahtung beendet (das Session-<c>Exited</c> feuerte ohne
     /// Subscriber), muss der Exit-Code denselben Status-Mapping-Pfad wie ein reguläres Exited durchlaufen —
     /// ExitCode != 0 → <see cref="CliProcessStatus.Error"/> inkl. SystemMeldung-Protokolleintrag,
-    /// ExitCode == 0 → <see cref="CliProcessStatus.Gestoppt"/>. Zuvor wurde auf diesem Pfad immer Gestoppt
+    /// ExitCode == 0 → <see cref="CliProcessStatus.Stopped"/>. Zuvor wurde auf diesem Pfad immer Stopped
     /// gemeldet und weder der Fehlerstatus noch der Fehler-Protokolleintrag erzeugt.</summary>
     [OsInterfaceTheory]
-    [InlineData(0, CliProcessStatus.Gestoppt)]
+    [InlineData(0, CliProcessStatus.Stopped)]
     [InlineData(1, CliProcessStatus.Error)]
     public async Task StartTerminalSessionAsync_ProzessVorVerdrahtungBeendet_MapptExitCodeAufStatus(
         int exitCode,
@@ -723,7 +723,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// <summary>Fehlschlägt die Leseschleife einer Terminal-Session zur Laufzeit (<see cref="ITerminalSession.Failed"/>
     /// nach der Event-Verdrahtung, Prozess läuft noch), muss der Dienst gemäß Plan
     /// <see cref="CliProcessStatus.Error"/> melden — ein fataler Session-Fehler ist kein reguläres Prozessende
-    /// (zuvor wurde hier fälschlich Gestoppt gemeldet).</summary>
+    /// (zuvor wurde hier fälschlich Stopped gemeldet).</summary>
     [OsInterfaceFact]
     public async Task StartTerminalSessionAsync_SessionFailed_MeldetFehlerStattGestoppt()
     {
@@ -753,7 +753,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
             var completed = await Task.WhenAny(fehlerSignal.Task, Task.Delay(TimeSpan.FromSeconds(10)));
             completed.Should().Be(fehlerSignal.Task,
-                "ein Laufzeitfehler der Leseschleife muss als Fehler gemeldet werden, nicht als Gestoppt");
+                "ein Laufzeitfehler der Leseschleife muss als Fehler gemeldet werden, nicht als Stopped");
 
             statusEvents.Should().Equal(new[] { CliProcessStatus.Started, CliProcessStatus.Error });
             sut.GetTerminalSession(workItemId).Should().BeNull("das Handle muss nach dem Session-Fehler entfernt worden sein");

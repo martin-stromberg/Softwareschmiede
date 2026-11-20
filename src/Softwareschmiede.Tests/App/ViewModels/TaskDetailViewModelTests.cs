@@ -269,7 +269,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         await _logService.AddEntryAsync(workItem.Id, LogEntryType.Prompt, "Testinhalt", ct: TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        typeof(TaskDetailViewModel).GetField("_aufgabeId", BindingFlags.NonPublic | BindingFlags.Instance)!
+        typeof(TaskDetailViewModel).GetField("_workItemId", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(sut, workItem.Id);
 
         var method = typeof(TaskDetailViewModel).GetMethod("LadeProtokolleAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -285,7 +285,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     {
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
-        typeof(TaskDetailViewModel).GetField("_aufgabeId", BindingFlags.NonPublic | BindingFlags.Instance)!
+        typeof(TaskDetailViewModel).GetField("_workItemId", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(sut, workItem.Id);
 
         await _db.DisposeAsync();
@@ -303,7 +303,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     {
         var workItem = await ErstelleAufgabe(WorkItemStatus.New);
         var sut = CreateSut();
-        typeof(TaskDetailViewModel).GetField("_aufgabeId", BindingFlags.NonPublic | BindingFlags.Instance)!
+        typeof(TaskDetailViewModel).GetField("_workItemId", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(sut, workItem.Id);
 
         using var cts = new CancellationTokenSource();

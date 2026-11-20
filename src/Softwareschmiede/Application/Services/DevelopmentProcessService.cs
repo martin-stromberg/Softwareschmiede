@@ -270,7 +270,7 @@ public sealed class DevelopmentProcessService
                 if (current.ExitCode is null && current.Failure is null && !current.Process.HasExited)
                 {
                     // Lebende Session wird wiederverwendet: kein Gestartet-Ereignis — stattdessen das
-                    // dedizierte CliLaufAktiv-Signal, damit die Laufdaten-Persistenz nachgezogen wird.
+                    // dedizierte CliRunActive-Signal, damit die Laufdaten-Persistenz nachgezogen wird.
                     _options.AiExecutionService.NotifyRunActive(workItemId);
                     return;
                 }

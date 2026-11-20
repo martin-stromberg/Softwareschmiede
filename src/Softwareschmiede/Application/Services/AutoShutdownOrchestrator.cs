@@ -252,7 +252,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
             // gelöschte Auslöse-Flag erneut löschen). Die volle DB-Zählung, die
             // LaufdatenChanged-Heartbeat-Events sonst zyklisch mitlaufen ließen, entfällt
             // im deaktivierten Ruhezustand damit. Nach einem ausgelösten Shutdown
-            // (_shutdownAusgeloest) bleibt die Zählung weiter aktiv, damit ein
+            // (_shutdownTriggered) bleibt die Zählung weiter aktiv, damit ein
             // count > 0-Übergang das Flag zurücksetzen kann.
             if (_disposed || (!_enabled && _countdownEndUtc is null && !_shutdownTriggered))
             {
@@ -275,7 +275,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
         lock (_syncLock)
         {
             // Eine zum Dispose-Zeitpunkt in-flight befindliche Auswertung darf nach
-            // _countdownTimer.Dispose() kein ArmiereCountdownTimerUnterLock mehr
+            // _countdownTimer.Dispose() kein ArmCountdownTimerUnderLock mehr
             // aufrufen — früh zurückkehren statt ITimer.Change zu riskieren.
             if (_disposed)
             {

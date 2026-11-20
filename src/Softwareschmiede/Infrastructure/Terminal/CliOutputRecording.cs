@@ -21,10 +21,10 @@ public sealed class CliOutputRecording
 
     /// <summary><c>true</c>, wenn die Aufzeichnung bis zum Session-Ende lückenlos lief;
     /// <c>false</c>, wenn das Byte-Budget überschritten wurde (nur das Präfix ist enthalten).</summary>
-    public required bool IstVollstaendig { get; init; }
+    public required bool IsComplete { get; init; }
 
     /// <summary>Zeitpunkt des Aufzeichnungsendes (UTC), oder <c>null</c> solange die Aufzeichnung läuft.</summary>
-    public DateTimeOffset? EndeUtc { get; init; }
+    public DateTimeOffset? EndUtc { get; init; }
 
     /// <summary>Die aufgezeichneten Chunks in Eingangsreihenfolge.</summary>
     public required IReadOnlyList<CliOutputChunkRecord> Chunks { get; init; }

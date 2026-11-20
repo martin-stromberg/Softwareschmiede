@@ -29,8 +29,8 @@ public sealed class CliOutputRecorderTests
         recording.StartUtc.Should().Be(timeProvider.Start);
         recording.Cols.Should().Be(120);
         recording.Rows.Should().Be(30);
-        recording.IstVollstaendig.Should().BeTrue();
-        recording.EndeUtc.Should().BeNull("Complete() wurde noch nicht aufgerufen");
+        recording.IsComplete.Should().BeTrue();
+        recording.EndUtc.Should().BeNull("Complete() wurde noch nicht aufgerufen");
         recording.Chunks.Should().HaveCount(2);
         recording.Chunks[0].Offset.Should().Be(TimeSpan.Zero);
         recording.Chunks[0].Data.Should().Equal(Encoding.UTF8.GetBytes("erster"),
@@ -51,7 +51,7 @@ public sealed class CliOutputRecorderTests
         sut.OnOutputChunk(Encoding.UTF8.GetBytes("xy"));    // wird nicht mehr angenommen
 
         var recording = sut.GetRecording();
-        recording.IstVollstaendig.Should().BeFalse();
+        recording.IsComplete.Should().BeFalse();
         recording.Chunks.Should().HaveCount(1);
         recording.Chunks[0].Data.Should().Equal(Encoding.UTF8.GetBytes("abcde"));
     }
@@ -71,7 +71,7 @@ public sealed class CliOutputRecorderTests
         await sut.CompleteAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
 
         var recording = sut.GetRecording();
-        recording.EndeUtc.Should().Be(timeProvider.Start + TimeSpan.FromSeconds(2),
+        recording.EndUtc.Should().Be(timeProvider.Start + TimeSpan.FromSeconds(2),
             "das erste Complete() muss den Endzeitpunkt festhalten; spätere Aufrufe ändern ihn nicht");
     }
 
@@ -88,7 +88,7 @@ public sealed class CliOutputRecorderTests
         sut.Complete();
 
         snapshot.Chunks.Should().HaveCount(1);
-        snapshot.EndeUtc.Should().BeNull();
+        snapshot.EndUtc.Should().BeNull();
         sut.GetRecording().Chunks.Should().HaveCount(2);
     }
 

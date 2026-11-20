@@ -13,7 +13,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
     private const int QueueWarningThreshold = 1000;
     private const int QueueWarningRepeatInterval = 1000;
 
-    private readonly Guid _aufgabeId;
+    private readonly Guid _workItemId;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<CliOutputLogWriter> _logger;
     private readonly Channel<string> _lines = Channel.CreateBounded<string>(new BoundedChannelOptions(QueueCapacity)
@@ -36,7 +36,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
     /// <param name="logger">Logger fuer Persistenzfehler.</param>
     public CliOutputLogWriter(Guid workItemId, IServiceScopeFactory scopeFactory, ILogger<CliOutputLogWriter> logger)
     {
-        _aufgabeId = workItemId;
+        _workItemId = workItemId;
         _scopeFactory = scopeFactory;
         _logger = logger;
         _workerTask = Task.Run(ProcessLinesAsync);
@@ -80,7 +80,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
             {
                 _logger.LogWarning(
                     "Timeout beim Abschluss der CLI-Ausgabe fuer Aufgabe {AufgabeId}. Eine aktive Producer-Phase schreibt noch in die Queue. Noch ausstehende Zeilen: {QueuedLineCount}.",
-                    _aufgabeId,
+                    _workItemId,
                     Volatile.Read(ref _queuedLineCount));
                 return;
             }
@@ -106,7 +106,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
             {
                 _logger.LogWarning(
                     "Timeout beim Drain der CLI-Ausgabe fuer Aufgabe {AufgabeId}. Noch ausstehende Zeilen: {QueuedLineCount}.",
-                    _aufgabeId,
+                    _workItemId,
                     Volatile.Read(ref _queuedLineCount));
                 return;
             }
@@ -128,7 +128,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
             _logger.LogWarning(
                 ex,
                 "Timeout beim Drain der CLI-Ausgabe fuer Aufgabe {AufgabeId}. Noch ausstehende Zeilen: {QueuedLineCount}.",
-                _aufgabeId,
+                _workItemId,
                 Volatile.Read(ref _queuedLineCount));
         }
         catch (OperationCanceledException ex)
@@ -136,7 +136,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
             _logger.LogWarning(
                 ex,
                 "Drain der CLI-Ausgabe fuer Aufgabe {AufgabeId} wurde abgebrochen. Noch ausstehende Zeilen: {QueuedLineCount}.",
-                _aufgabeId,
+                _workItemId,
                 Volatile.Read(ref _queuedLineCount));
         }
     }
@@ -158,7 +158,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
         {
             _logger.LogWarning(
                 "CLI-Ausgabe-Queue fuer Aufgabe {AufgabeId} ist voll ({QueueCapacity} Zeilen). Terminal-Output-Reader wartet auf Persistenz.",
-                _aufgabeId,
+                _workItemId,
                 QueueCapacity);
 
             while (!_lines.Writer.TryWrite(line))
@@ -177,7 +177,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
         {
             _logger.LogWarning(
                 "CLI-Ausgabe-Queue fuer Aufgabe {AufgabeId} enthaelt {QueuedLineCount} Zeilen. Persistenz faellt hinter die Terminal-Ausgabe zurueck.",
-                _aufgabeId,
+                _workItemId,
                 queued);
         }
     }
@@ -200,7 +200,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unerwarteter Fehler beim Verarbeiten der CLI-Ausgabe fuer Aufgabe {AufgabeId}.", _aufgabeId);
+            _logger.LogError(ex, "Unerwarteter Fehler beim Verarbeiten der CLI-Ausgabe fuer Aufgabe {AufgabeId}.", _workItemId);
         }
     }
 
@@ -210,7 +210,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var logService = scope.ServiceProvider.GetRequiredService<LogService>();
-            await logService.AddCliOutputAsync(_aufgabeId, line).ConfigureAwait(false);
+            await logService.AddCliOutputAsync(_workItemId, line).ConfigureAwait(false);
 
             // Session-Limit-Marker mit gültigem Reset-Zeitpunkt: Plugin-Limit persistieren und
             // alle aktiv laufenden Aufgaben desselben KiPluginPrefix pausieren (ohne laufende
@@ -221,7 +221,7 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
                 var limitService = scope.ServiceProvider.GetService<AiPluginLimitService>();
                 if (limitService is not null)
                 {
-                    await limitService.ProcessRateLimitAsync(_aufgabeId, resetUtc.Value).ConfigureAwait(false);
+                    await limitService.ProcessRateLimitAsync(_workItemId, resetUtc.Value).ConfigureAwait(false);
                 }
             }
         }
@@ -230,11 +230,11 @@ public sealed class CliOutputLogWriter : ITerminalOutputSink, ITerminalDiagnosti
             _logger.LogWarning(
                 ex,
                 "CLI-Ausgabe fuer Aufgabe {AufgabeId} konnte nicht persistiert werden, da der ServiceProvider bereits disposed wurde.",
-                _aufgabeId);
+                _workItemId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "CLI-Ausgabe fuer Aufgabe {AufgabeId} konnte nicht persistiert werden.", _aufgabeId);
+            _logger.LogError(ex, "CLI-Ausgabe fuer Aufgabe {AufgabeId} konnte nicht persistiert werden.", _workItemId);
         }
     }
 }

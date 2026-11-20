@@ -28,7 +28,7 @@ public sealed class AutoShutdownEinstellungenService
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
-        var force = await settingService.GetAutoShutdownErzwingenAsync(ct);
+        var force = await settingService.GetAutoShutdownForceAsync(ct);
         var tolerance = await settingService.GetAutoShutdownToleranceMinutesAsync(ct);
         return (force, tolerance);
     }
@@ -40,7 +40,7 @@ public sealed class AutoShutdownEinstellungenService
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var settingService = scope.ServiceProvider.GetRequiredService<AppSettingService>();
-        await settingService.SetAutoShutdownErzwingenAsync(force, ct);
+        await settingService.SetAutoShutdownForceAsync(force, ct);
         _logger.LogDebug("Auto-Shutdown-Erzwingen '{Erzwingen}' gespeichert.", force);
     }
 

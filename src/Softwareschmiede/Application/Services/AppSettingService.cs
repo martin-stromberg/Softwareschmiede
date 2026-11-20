@@ -600,13 +600,13 @@ public sealed class AppSettingService
     /// </summary>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns><see langword="true"/>, wenn der Shutdown erzwungen werden soll.</returns>
-    public async Task<bool> GetAutoShutdownErzwingenAsync(CancellationToken ct = default)
+    public async Task<bool> GetAutoShutdownForceAsync(CancellationToken ct = default)
         => await GetBoolSettingAsync(AutoShutdownForceKey, ct) ?? false;
 
     /// <summary>Setzt den Schalter "Herunterfahren erzwingen" des Auto-Shutdowns (<see cref="AutoShutdownForceKey"/>).</summary>
     /// <param name="force">Der zu speichernde Schalter.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    public Task SetAutoShutdownErzwingenAsync(bool force, CancellationToken ct = default)
+    public Task SetAutoShutdownForceAsync(bool force, CancellationToken ct = default)
         => SetBoolSettingAsync(AutoShutdownForceKey, force, ct);
 
     /// <summary>

@@ -31,7 +31,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     private readonly AiExecutionService _aiService;
     private readonly CliProcessManager _sut;
     private readonly Guid _projektId = Guid.NewGuid();
-    private readonly Guid _aufgabeId = Guid.NewGuid();
+    private readonly Guid _workItemId = Guid.NewGuid();
     private readonly List<PseudoConsoleSession> _sessions = new();
 
     /// <summary>CliProcessManagerTests_LaufStatus.</summary>
@@ -58,7 +58,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
             });
             db.WorkItems.Add(new WorkItem
             {
-                Id = _aufgabeId,
+                Id = _workItemId,
                 ProjectId = _projektId,
                 Title = "CLI-Prozess-Aufgabe",
                 Status = WorkItemStatus.Started,
@@ -93,7 +93,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     {
         using var scope = _provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
-        return db.WorkItems.AsNoTracking().Single(a => a.Id == _aufgabeId);
+        return db.WorkItems.AsNoTracking().Single(a => a.Id == _workItemId);
     }
 
     /// <summary>
@@ -127,7 +127,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     private async Task RaiseStatusChangedAsync(CliProcessStatus status, Func<WorkItem, bool> condition)
     {
         var method = typeof(CliProcessManager).GetMethod("OnCliProcessStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        method.Invoke(_sut, new object[] { _aufgabeId, status });
+        method.Invoke(_sut, new object[] { _workItemId, status });
 
         await PollUntilAsync(() => condition(LadeAufgabe()));
     }
@@ -156,12 +156,12 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     /// Voller Zyklus über die tatsächliche Produktionsverdrahtung: Gestartet setzt AktiveRunId + LaufStatus
     /// Laeuft sofort; ein anschließender RuntimeStatusChanged-Wechsel der Sitzung auf WartetAufEingabe muss
     /// bei weiterhin laufendem Prozess (AktiveRunId bleibt gesetzt) als LaufStatus persistiert werden;
-    /// Gestoppt entfernt danach sowohl AktiveRunId als auch LaufStatus wieder vollständig.
+    /// Stopped entfernt danach sowohl AktiveRunId als auch LaufStatus wieder vollständig.
     /// </summary>
     [Fact]
     public async Task VollerZyklus_GestartetWartetGestoppt_PersistiertLaufStatusUeberDieSitzung()
     {
-        var session = RegisterFakeSessionForAufgabe(_aufgabeId);
+        var session = RegisterFakeSessionForAufgabe(_workItemId);
 
         // Läuft: CliProcessManager setzt AktiveRunId + LaufStatus=Laeuft sofort beim Start und abonniert
         // die Sitzung.
@@ -180,7 +180,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
         waehrendWarten.RunStatus.Should().Be(WorkItemRunStatus.WaitingForInput);
 
         // Bereit: Prozess wird beendet — AktiveRunId und LaufStatus müssen beide entfernt werden.
-        await RaiseStatusChangedAsync(CliProcessStatus.Gestoppt, a => a.ActiveRunId == null);
+        await RaiseStatusChangedAsync(CliProcessStatus.Stopped, a => a.ActiveRunId == null);
         var nachStopp = LadeAufgabe();
         nachStopp.ActiveRunId.Should().BeNull();
         nachStopp.RunStatus.Should().BeNull();
@@ -194,9 +194,9 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     [Fact]
     public async Task RaisesRuntimeStatusChanged_AfterGestoppt_AktualisiertLaufStatusNichtMehr()
     {
-        var session = RegisterFakeSessionForAufgabe(_aufgabeId);
+        var session = RegisterFakeSessionForAufgabe(_workItemId);
         await RaiseStatusChangedAsync(CliProcessStatus.Started, a => a.ActiveRunId != null);
-        await RaiseStatusChangedAsync(CliProcessStatus.Gestoppt, a => a.ActiveRunId == null);
+        await RaiseStatusChangedAsync(CliProcessStatus.Stopped, a => a.ActiveRunId == null);
 
         // Verspätetes Event nach dem Stopp: darf keinen Effekt mehr haben (weder über die Abmeldung in
         // CliProcessManager, noch nachgelagert über den IsRunning-Guard der Laufdaten-Sicherstellung).
@@ -214,7 +214,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     [Fact]
     public async Task OnRuntimeStatusChanged_HeiltFehlendeAktiveRunId()
     {
-        var session = RegisterFakeSessionForAufgabe(_aufgabeId);
+        var session = RegisterFakeSessionForAufgabe(_workItemId);
         LadeAufgabe().ActiveRunId.Should().BeNull("Ausgangslage: keine Gestartet-Persistierung");
 
         // Session deterministisch in den Wartezustand bringen (Schwelle: 1 ms), damit die
@@ -223,7 +223,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
         ForceRuntimeStatusRefresh(session);
 
         var method = typeof(CliProcessManager).GetMethod("OnRuntimeStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        method.Invoke(_sut, new object[] { _aufgabeId, CliRuntimeStatus.WaitingForInput });
+        method.Invoke(_sut, new object[] { _workItemId, CliRuntimeStatus.WaitingForInput });
 
         await PollUntilAsync(() => LadeAufgabe().ActiveRunId is not null);
         var workItem = LadeAufgabe();

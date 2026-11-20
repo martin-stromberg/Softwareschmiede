@@ -691,7 +691,7 @@ public sealed partial class TerminalControlTests
                 StartUtc = DateTimeOffset.UtcNow,
                 Cols = cols,
                 Rows = rows,
-                IstVollstaendig = true,
+                IsComplete = true,
                 Chunks = chunks,
             },
             new FakeTimeProvider());

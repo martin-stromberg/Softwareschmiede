@@ -256,7 +256,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         IsPaused = false;
         _wiedergabeBeendet = false;
         FehlerMeldung = null;
-        UnvollstaendigHinweis = recording.IstVollstaendig
+        UnvollstaendigHinweis = recording.IsComplete
             ? null
             : "Aufzeichnung unvollständig — das Speicher-Limit wurde erreicht; die Wiedergabe endet vor dem tatsächlichen Ende der Session.";
         PositionsText = $"Chunk 0/{recording.Chunks.Count}";

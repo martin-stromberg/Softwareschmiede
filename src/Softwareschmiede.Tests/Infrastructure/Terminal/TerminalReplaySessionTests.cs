@@ -837,7 +837,7 @@ public sealed class TerminalReplaySessionTests
             StartUtc = DateTimeOffset.UtcNow,
             Cols = cols,
             Rows = rows,
-            IstVollstaendig = true,
+            IsComplete = true,
             Chunks = records,
         };
     }

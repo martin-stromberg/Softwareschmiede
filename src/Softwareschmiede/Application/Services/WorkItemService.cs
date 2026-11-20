@@ -21,12 +21,12 @@ public sealed class WorkItemService : IActiveWorkItemsService
     private static readonly Expression<Func<WorkItem, bool>> IsActiveOrWaitingPredicate =
         a => WorkItemStatusExtensions.ActiveOrWaitingStatuses.Contains(a.Status);
 
-    // Serialisiert prozessweit alle Laufdaten-Mutationen einer Aufgabe (AktivenLaufSetzen/
-    // Sicherstellen/Beenden sowie die laufdatenrücksetzenden Lebenszyklus-Pfade Starten/
-    // Abschliessen/StartZuruecksetzen). AufgabeService-Instanzen sind scoped, die Schreibpfade
+    // Serialisiert prozessweit alle Laufdaten-Mutationen einer Aufgabe (SetActiveRun/
+    // EnsureRunData/EndActiveRun sowie die laufdatenrücksetzenden Lebenszyklus-Pfade Start/
+    // Complete/ResetStart). WorkItemService-Instanzen sind scoped, die Schreibpfade
     // konvergieren aber aus mehreren Quellen (CliProcessManager-Selbstheilung,
     // AiExecutionService-Exit-Pfad, ViewModel-Aufrufe) in unterschiedlichen DbContexts auf
-    // derselben Row: ohne gemeinsame Sperre kann ein Sicherstellen-Save nach dem Beenden-Save
+    // derselben Row: ohne gemeinsame Sperre kann ein EnsureRunData-Save nach dem EndActiveRun-Save
     // landen und einen Phantom-Lauf wiederbeleben (Issue 342). Einträge werden bewusst nie
     // entfernt — das Entfernen während wartender Aufrufer wäre selbst eine Race-Bedingung, und
     // der Speicherbedarf bleibt durch die Anzahl der Aufgaben begrenzt.
@@ -1080,7 +1080,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
             workItem.ActiveRunId = null;
             workItem.LastHeartbeatUtc = null;
             workItem.LastCliStartUtc = null;
-            // LaufStatus gehört nur zu einem aktiven Lauf (siehe AktivenLaufSetzenAsync) — beim Beenden
+            // LaufStatus gehört nur zu einem aktiven Lauf (siehe SetActiveRunAsync) — beim Beenden
             // entfernen, damit kein veralteter Substatus eines beendeten Laufs zurückbleibt.
             workItem.RunStatus = null;
             workItem.ExecutionStatus = WorkItemExecutionStatus.Completed;
@@ -1102,7 +1102,7 @@ public sealed class WorkItemService : IActiveWorkItemsService
     /// <see cref="WorkItem.LastCliStartUtc"/>-Wert bleibt erhalten (Sortierstabilität der Aufgabenliste).
     /// Aufgaben in terminalem Status (<see cref="WorkItemStatus.Completed"/>/<see cref="WorkItemStatus.Archived"/>)
     /// werden ohne Änderung übersprungen, damit der periodische Abgleich keine Warnungsflut erzeugt.
-    /// Wird von <c>CliProcessManager</c> aus den Selbstheilungspfaden (CliLaufAktiv, RuntimeStatusChanged,
+    /// Wird von <c>CliProcessManager</c> aus den Selbstheilungspfaden (CliRunActive, RuntimeStatusChanged,
     /// Heartbeat-Tick, periodischer Abgleich) aufgerufen.
     /// </summary>
     /// <param name="id">ID der Aufgabe.</param>

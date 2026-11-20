@@ -102,7 +102,7 @@ public sealed class ScmEventOrchestrator(
                 var session = cli.GetScmPromptSession(taskId);
                 var prefix = await select(task, session?.IsAlive == true ? session : null, ct);
                 if (prefix is null) return;
-                // A confirmed queue selection is an explicit retry, unlike a host-outbox poll.
+                // Eine bestätigte Queue-Auswahl ist ein expliziter Wiederholungsversuch, anders als ein Host-Outbox-Poll.
                 item.NextAttemptUtc = null;
                 await db.SaveChangesAsync(ct);
                 await DispatchCoreAsync(eventId, taskId, prefix, ct, owner);
@@ -176,8 +176,8 @@ public sealed class ScmEventOrchestrator(
                 }
                 return;
             }
-            // A due receipt/waiting response can select an otherwise delayed event. Its
-            // independent retry must not authorize another health check, start or prompt.
+            // Eine fällige Eingangs-/Warte-Antwort kann ein sonst verzögertes Ereignis auswählen. Ihr
+            // eigenständiger Retry darf keinen weiteren Health-Check, Start oder Prompt autorisieren.
             if (item.NextAttemptUtc > time.GetUtcNow().ToUnixTimeMilliseconds()) return;
             if (await db.ScmIncomingEvents.AnyAsync(x => x.WorkItemId == item.WorkItemId && x.Sequence < item.Sequence && x.Status != "Verarbeitet" && x.Status != "Abgebrochen", ct))
             {
@@ -270,8 +270,8 @@ public sealed class ScmEventOrchestrator(
                 blocked = BlockReason(task);
                 if (blocked is not null) { await WaitWithCommentAsync(item, observation, responder, blocked, ct); return; }
                 if (task.Status == WorkItemStatus.New) await tasks.SetStatusAsync(task.Id, WorkItemStatus.Started, ct);
-                // A denied channel must still identify the actual run that was checked, so the
-                // user can distinguish it from the replacement run after a regular restart.
+                // Ein verweigerter Kanal muss den tatsächlich geprüften Lauf trotzdem identifizieren,
+                // damit der Anwender ihn vom Ersatzlauf nach einem regulären Neustart unterscheiden kann.
                 item.CliRunId = adapter.CliRunId.ToString("D");
                 var ready = await adapter.WaitForInputReadyAsync(ct);
                 if (ready != ScmPromptReadyStatus.Ready)
@@ -301,7 +301,7 @@ public sealed class ScmEventOrchestrator(
                     observation.ContentKind.ToString(), $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url), adapter.WorkingDirectory, ct, access.RestrictedWriteSids, promptSuffix);
                 if (!ReferenceEquals(adapter, cli.GetScmPromptSession(task.Id)) || !adapter.IsAlive)
                 { await WaitAsync(item, "CLI-Sitzung hat sich geändert. Erneut prüfen.", ct); return; }
-                // A cancellation between preparation and write wins over the tracked delivery state.
+                // Ein Abbruch zwischen Vorbereitung und Schreiben geht dem getrackten Zustellungszustand vor.
                 if (await IsCancelledAsync(item.Id, ct)) return;
                 item.Status = "ZustellungVorbereitet";
                 item.DeliveryAttemptId = attemptId;
@@ -338,7 +338,7 @@ public sealed class ScmEventOrchestrator(
             }
             catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
             {
-                // Configuration, workspace and start failures require a deliberate retry after correction.
+                // Konfigurations-, Arbeitsbereichs- und Startfehler erfordern einen bewussten Wiederholungsversuch nach Korrektur.
                 item.NextAttemptUtc = long.MaxValue;
                 await WaitWithCommentAsync(item, observation, responder, ex.Message, ct);
             }
@@ -492,7 +492,7 @@ public sealed class ScmEventOrchestrator(
             RestrictedWriteSids = JsonSerializer.Deserialize<string[]>(item.ExchangeRestrictedWriteSidsJson ?? "[]") ?? []
         };
         var messages = await exchange.ReadAsync(attempt, ct);
-        // A user cancellation ends all reconciliation; no further remote action is created.
+        // Ein Benutzerabbruch beendet jegliche Abstimmung; es wird keine weitere Remote-Aktion erzeugt.
         if (await IsCancelledAsync(item.Id, ct)) return;
         if (messages.Diagnostic is not null)
         {

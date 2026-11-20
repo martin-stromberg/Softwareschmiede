@@ -246,7 +246,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull();
 
         var method = typeof(TaskDetailViewModel).GetMethod("OnCliProcessStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        method.Invoke(sut, new object[] { workItem.Id, CliProcessStatus.Gestoppt });
+        method.Invoke(sut, new object[] { workItem.Id, CliProcessStatus.Stopped });
 
         _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id).Should().NotBeNull(
             "ein CLI-Stopp darf den persistierten Plan nicht mehr stornieren");

@@ -427,7 +427,7 @@ public sealed class TerminalReplaySession : ITerminalSession
                 // Das Pausiert-Flag wird hier zusätzlich unter dem Render-Lock geprüft:
                 // Pause() setzt es unter _pauseLock und nimmt danach den Render-Lock als
                 // Fence — trifft das Pausieren zwischen Gate-Prüfung und Apply ein (relevant bei
-                // FastForwardThreshold = 0, wo alle Delays 0 sind), wird der in-flight Chunk
+                // TimeLapseThreshold = 0, wo alle Delays 0 sind), wird der in-flight Chunk
                 // zurückgehalten statt trotz Pausierung noch angewendet.
                 var applied = false;
                 while (!applied)

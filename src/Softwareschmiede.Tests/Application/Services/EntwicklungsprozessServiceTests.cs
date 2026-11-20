@@ -557,7 +557,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     }
 
     /// <summary>AbschliessenAsync beendet eine laufende CLI-Session über StopCliAsync
-    /// (nachweisbar am AbsichtlichGestoppt-Flag des Handles).</summary>
+    /// (nachweisbar am IntentionallyStopped-Flag des Handles).</summary>
     [Fact]
     public async Task AbschliessenAsync_ShouldStopRunningCli_WhenSessionActive()
     {
@@ -576,13 +576,13 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         try
         {
             var handle = await _kiAusfuehrungsService.StartTerminalSessionAsync(workItem.Id, _kiPluginMock.Object, directory, ct: TestContext.Current.CancellationToken);
-            handle.AbsichtlichGestoppt.Should().BeFalse();
+            handle.IntentionallyStopped.Should().BeFalse();
 
             // Act
             await _sut.CompleteAsync(workItem.Id, TestContext.Current.CancellationToken);
 
             // Assert
-            handle.AbsichtlichGestoppt.Should().BeTrue();
+            handle.IntentionallyStopped.Should().BeTrue();
         }
         finally
         {

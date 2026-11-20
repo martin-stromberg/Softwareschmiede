@@ -14,7 +14,7 @@ public sealed class TodoListViewModel : ViewModelBase
     private readonly TodoService _todoService;
     private readonly ILogger<TodoListViewModel> _logger;
 
-    private Guid _aufgabeId;
+    private Guid _workItemId;
     private int _offeneTodoCount;
     private string? _neuesTodoBeschreibung;
 
@@ -70,7 +70,7 @@ public sealed class TodoListViewModel : ViewModelBase
     /// <param name="ct">Abbruch-Token.</param>
     public async Task LadenAsync(Guid workItemId, CancellationToken ct)
     {
-        _aufgabeId = workItemId;
+        _workItemId = workItemId;
         Todos.Clear();
 
         if (workItemId == Guid.Empty)
@@ -88,14 +88,14 @@ public sealed class TodoListViewModel : ViewModelBase
 
     private async Task TodoHinzufuegenAsync(CancellationToken ct)
     {
-        if (_aufgabeId == Guid.Empty || string.IsNullOrWhiteSpace(_neuesTodoBeschreibung))
+        if (_workItemId == Guid.Empty || string.IsNullOrWhiteSpace(_neuesTodoBeschreibung))
             return;
 
         FehlerCallback?.Invoke(null);
 
         try
         {
-            var todo = await _todoService.CreateTodoAsync(_aufgabeId, _neuesTodoBeschreibung, ct);
+            var todo = await _todoService.CreateTodoAsync(_workItemId, _neuesTodoBeschreibung, ct);
             Todos.Add(new TodoViewModel(todo));
             OffeneTodoCountAktualisieren();
             NeuesTodoBeschreibung = null;
@@ -106,7 +106,7 @@ public sealed class TodoListViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Erstellen eines To-Dos für Aufgabe {AufgabeId}.", _aufgabeId);
+            _logger.LogError(ex, "Fehler beim Erstellen eines To-Dos für Aufgabe {AufgabeId}.", _workItemId);
             FehlerCallback?.Invoke($"To-Do konnte nicht erstellt werden: {ex.Message}");
         }
     }

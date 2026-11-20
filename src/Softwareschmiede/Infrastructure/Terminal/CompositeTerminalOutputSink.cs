@@ -7,14 +7,14 @@ namespace Softwareschmiede.Infrastructure.Terminal;
 public sealed class CompositeTerminalOutputSink : ITerminalOutputSink, ITerminalDiagnosticsSink
 {
     private readonly IReadOnlyList<ITerminalOutputSink> _inner;
-    private readonly IReadOnlyList<ITerminalDiagnosticsSink> _diagnoseSinks;
+    private readonly IReadOnlyList<ITerminalDiagnosticsSink> _diagnosticsSinks;
 
     /// <summary>Erstellt eine Composite-Senke über die übergebenen inneren Senken.</summary>
     /// <param name="inner">Die inneren Senken in Aufrufreihenfolge.</param>
     public CompositeTerminalOutputSink(params ITerminalOutputSink[] inner)
     {
         _inner = inner;
-        _diagnoseSinks = inner.OfType<ITerminalDiagnosticsSink>().ToArray();
+        _diagnosticsSinks = inner.OfType<ITerminalDiagnosticsSink>().ToArray();
     }
 
     /// <inheritdoc/>
@@ -27,7 +27,7 @@ public sealed class CompositeTerminalOutputSink : ITerminalOutputSink, ITerminal
     /// <inheritdoc/>
     public void OnDiagnosticsChunk(ReadOnlySpan<byte> bytes)
     {
-        foreach (var sink in _diagnoseSinks)
+        foreach (var sink in _diagnosticsSinks)
             sink.OnDiagnosticsChunk(bytes);
     }
 

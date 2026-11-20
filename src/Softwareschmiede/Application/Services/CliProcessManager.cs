@@ -188,7 +188,7 @@ public sealed class CliProcessManager : IDisposable
                     SetActiveRunAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.SetActiveRunAsync");
                     SubscribeRuntimeStatus(workItemId);
                     break;
-                case CliProcessStatus.Gestoppt:
+                case CliProcessStatus.Stopped:
                 case CliProcessStatus.Error:
                     StopHeartbeat(workItemId);
                     UnsubscribeRuntimeStatus(workItemId);
@@ -275,7 +275,7 @@ public sealed class CliProcessManager : IDisposable
             }
 
             // Defensive Bereinigung einer eventuell noch vorhandenen alten Registrierung (z. B. wenn ein
-            // Gestoppt-Event für einen vorherigen Lauf derselben Aufgabe ausblieb) — verhindert doppelte
+            // Stopped-Event für einen vorherigen Lauf derselben Aufgabe ausblieb) — verhindert doppelte
             // Event-Registrierungen und einen dadurch überzähligen Persistierungsaufruf pro Statuswechsel.
             UnsubscribeRuntimeStatusCore(workItemId);
 
@@ -310,7 +310,7 @@ public sealed class CliProcessManager : IDisposable
     /// Übersetzt einen <see cref="CliRuntimeStatus"/>-Wechsel der <see cref="PseudoConsoleSession"/> in den
     /// Domain-Substatus <see cref="WorkItemRunStatus"/> und persistiert ihn. <see cref="CliRuntimeStatus.Inactive"/>
     /// wird ignoriert: Das Beenden des Laufs (inkl. Zurücksetzen von <see cref="Domain.Entities.WorkItem.RunStatus"/>)
-    /// übernimmt bereits <see cref="EndActiveRunAsync"/> über das separate <see cref="CliProcessStatus.Gestoppt"/>-
+    /// übernimmt bereits <see cref="EndActiveRunAsync"/> über das separate <see cref="CliProcessStatus.Stopped"/>-
     /// bzw. <see cref="CliProcessStatus.Error"/>-Ereignis.
     /// </summary>
     /// <param name="workItemId">ID der Aufgabe, deren Laufzeit-Substatus sich geändert hat.</param>

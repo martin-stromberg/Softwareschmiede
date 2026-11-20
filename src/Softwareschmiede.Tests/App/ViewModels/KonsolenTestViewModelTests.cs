@@ -40,7 +40,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         return sut;
     }
 
-    private async Task<string> ErstelleAufzeichnungsDateiAsync(bool istVollstaendig = true, params byte[][] chunkDaten)
+    private async Task<string> ErstelleAufzeichnungsDateiAsync(bool isComplete = true, params byte[][] chunkDaten)
     {
         var chunks = (chunkDaten.Length > 0 ? chunkDaten : [Encoding.UTF8.GetBytes("X")])
             .Select((data, i) => new CliOutputChunkRecord(TimeSpan.Zero, data))
@@ -53,7 +53,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
             Rows = 24,
-            IstVollstaendig = istVollstaendig,
+            IsComplete = isComplete,
             Chunks = chunks,
         });
         _tempFiles.Add(path);
@@ -135,7 +135,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
     [Fact]
     public async Task AufzeichnungOeffnen_UnvollstaendigeAufzeichnung_ZeigtHinweis()
     {
-        var path = await ErstelleAufzeichnungsDateiAsync(istVollstaendig: false);
+        var path = await ErstelleAufzeichnungsDateiAsync(isComplete: false);
         SetupOpenDialog(path);
         var sut = CreateSut();
 
@@ -213,7 +213,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
             Rows = 24,
-            IstVollstaendig = true,
+            IsComplete = true,
             Chunks =
             [
                 new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("A")),
@@ -370,7 +370,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
             Rows = 24,
-            IstVollstaendig = true,
+            IsComplete = true,
             Chunks =
             [
                 new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("A")),
@@ -504,7 +504,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
             Rows = 24,
-            IstVollstaendig = true,
+            IsComplete = true,
             Chunks =
             [
                 new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("A")),
@@ -561,7 +561,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
             Rows = 24,
-            IstVollstaendig = true,
+            IsComplete = true,
             Chunks =
             [
                 new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("A")),
@@ -677,7 +677,7 @@ public sealed class KonsolenTestViewModelTests : IDisposable
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
             Rows = 24,
-            IstVollstaendig = true,
+            IsComplete = true,
             Chunks =
             [
                 new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("A")),

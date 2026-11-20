@@ -74,10 +74,10 @@ public partial class End2EndTest
                     WorkItemId = Guid.NewGuid(),
                     PluginName = pluginName,
                     StartUtc = DateTimeOffset.UtcNow,
-                    EndeUtc = DateTimeOffset.UtcNow,
+                    EndUtc = DateTimeOffset.UtcNow,
                     Cols = 80,
                     Rows = 24,
-                    IstVollstaendig = true,
+                    IsComplete = true,
                     Chunks =
                     [
                         new CliOutputChunkRecord(TimeSpan.Zero,
@@ -166,10 +166,10 @@ public partial class End2EndTest
                     WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Diagnose",
                     StartUtc = DateTimeOffset.UtcNow,
-                    EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(50),
+                    EndUtc = DateTimeOffset.UtcNow.AddMilliseconds(50),
                     Cols = 80,
                     Rows = 24,
-                    IstVollstaendig = true,
+                    IsComplete = true,
                     Chunks =
                     [
                         new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("\x1b[31mE2E-Replay-Chunk-1\x1b[0m")),
@@ -187,10 +187,10 @@ public partial class End2EndTest
                     WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Pause",
                     StartUtc = DateTimeOffset.UtcNow,
-                    EndeUtc = DateTimeOffset.UtcNow.AddSeconds(3),
+                    EndUtc = DateTimeOffset.UtcNow.AddSeconds(3),
                     Cols = 80,
                     Rows = 24,
-                    IstVollstaendig = true,
+                    IsComplete = true,
                     Chunks =
                     [
                         new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("pause-chunk-1")),
@@ -209,10 +209,10 @@ public partial class End2EndTest
                     WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Schritt",
                     StartUtc = DateTimeOffset.UtcNow,
-                    EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(100),
+                    EndUtc = DateTimeOffset.UtcNow.AddMilliseconds(100),
                     Cols = 80,
                     Rows = 24,
-                    IstVollstaendig = true,
+                    IsComplete = true,
                     Chunks =
                     [
                         new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("schritt-chunk-1")),
@@ -232,10 +232,10 @@ public partial class End2EndTest
                     WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Breit",
                     StartUtc = DateTimeOffset.UtcNow,
-                    EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(10),
+                    EndUtc = DateTimeOffset.UtcNow.AddMilliseconds(10),
                     Cols = 220,
                     Rows = 50,
-                    IstVollstaendig = true,
+                    IsComplete = true,
                     Chunks =
                     [
                         new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("e2e-breit")),
@@ -252,10 +252,10 @@ public partial class End2EndTest
                     WorkItemId = Guid.NewGuid(),
                     PluginName = "E2E-Schmal",
                     StartUtc = DateTimeOffset.UtcNow,
-                    EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(10),
+                    EndUtc = DateTimeOffset.UtcNow.AddMilliseconds(10),
                     Cols = 60,
                     Rows = 20,
-                    IstVollstaendig = true,
+                    IsComplete = true,
                     Chunks =
                     [
                         new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("e2e-schmal")),

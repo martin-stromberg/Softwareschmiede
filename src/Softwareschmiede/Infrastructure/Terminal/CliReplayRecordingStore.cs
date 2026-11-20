@@ -8,7 +8,7 @@ namespace Softwareschmiede.Infrastructure.Terminal;
 public sealed class CliReplayRecordingStore
 {
     private static readonly byte[] Magic = "SWCLRPLY"u8.ToArray();
-    private const int UnterstuetzteVersion = 1;
+    private const int SupportedVersion = 1;
 
     /// <summary>Schreibt die Aufzeichnung in den angegebenen Stream.</summary>
     /// <param name="stream">Der Zielstream (muss schreibbar sein).</param>
@@ -27,13 +27,13 @@ public sealed class CliReplayRecordingStore
         using (var writer = new BinaryWriter(buffer, Encoding.UTF8, leaveOpen: true))
         {
             writer.Write(Magic);
-            writer.Write(UnterstuetzteVersion);
+            writer.Write(SupportedVersion);
             writer.Write(recording.WorkItemId.ToByteArray());
             writer.Write(recording.StartUtc.UtcTicks);
-            writer.Write(recording.EndeUtc?.UtcTicks ?? 0L);
+            writer.Write(recording.EndUtc?.UtcTicks ?? 0L);
             writer.Write(recording.Cols);
             writer.Write(recording.Rows);
-            writer.Write(recording.IstVollstaendig);
+            writer.Write(recording.IsComplete);
             writer.Write(pluginNameBytes.Length);
             writer.Write(pluginNameBytes);
 
@@ -65,7 +65,7 @@ public sealed class CliReplayRecordingStore
         using var buffered = new MemoryStream();
         await stream.CopyToAsync(buffered, ct).ConfigureAwait(false);
         buffered.Position = 0;
-        return Lese(buffered, ct);
+        return Read(buffered, ct);
     }
 
     /// <summary>Schreibt die Aufzeichnung in die angegebene Datei.</summary>
@@ -91,7 +91,7 @@ public sealed class CliReplayRecordingStore
         return await LoadAsync(stream, ct).ConfigureAwait(false);
     }
 
-    private static CliOutputRecording Lese(Stream stream, CancellationToken ct)
+    private static CliOutputRecording Read(Stream stream, CancellationToken ct)
     {
         using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
 
@@ -102,10 +102,10 @@ public sealed class CliReplayRecordingStore
         int version;
         Guid workItemId;
         long startTicks;
-        long endeTicks;
+        long endTicks;
         int cols;
         int rows;
-        bool istVollstaendig;
+        bool isComplete;
         int pluginNameLength;
         try
         {
@@ -115,10 +115,10 @@ public sealed class CliReplayRecordingStore
                 throw new EndOfStreamException();
             workItemId = new Guid(guidBytes);
             startTicks = reader.ReadInt64();
-            endeTicks = reader.ReadInt64();
+            endTicks = reader.ReadInt64();
             cols = reader.ReadInt32();
             rows = reader.ReadInt32();
-            istVollstaendig = reader.ReadBoolean();
+            isComplete = reader.ReadBoolean();
             pluginNameLength = reader.ReadInt32();
         }
         catch (EndOfStreamException ex)
@@ -126,8 +126,8 @@ public sealed class CliReplayRecordingStore
             throw new InvalidDataException("Die Aufzeichnung endet unerwartet im Header.", ex);
         }
 
-        if (version != UnterstuetzteVersion)
-            throw new InvalidDataException($"Nicht unterstützte Aufzeichnungs-Version {version} (unterstützt: {UnterstuetzteVersion}).");
+        if (version != SupportedVersion)
+            throw new InvalidDataException($"Nicht unterstützte Aufzeichnungs-Version {version} (unterstützt: {SupportedVersion}).");
         if (cols <= 0 || rows <= 0)
             throw new InvalidDataException($"Ungültige Terminal-Geometrie im Aufzeichnungs-Header ({cols}x{rows}).");
         if (pluginNameLength < 0 || pluginNameLength > stream.Length - stream.Position)
@@ -167,10 +167,10 @@ public sealed class CliReplayRecordingStore
             WorkItemId = workItemId,
             PluginName = Encoding.UTF8.GetString(pluginNameBytes),
             StartUtc = new DateTimeOffset(startTicks, TimeSpan.Zero),
-            EndeUtc = endeTicks == 0 ? null : new DateTimeOffset(endeTicks, TimeSpan.Zero),
+            EndUtc = endTicks == 0 ? null : new DateTimeOffset(endTicks, TimeSpan.Zero),
             Cols = cols,
             Rows = rows,
-            IstVollstaendig = istVollstaendig,
+            IsComplete = isComplete,
             Chunks = chunks,
         };
     }

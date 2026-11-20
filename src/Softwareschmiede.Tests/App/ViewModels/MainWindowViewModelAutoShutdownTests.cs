@@ -126,7 +126,7 @@ public sealed class MainWindowViewModelAutoShutdownTests : IDisposable
     {
         await using var db = TestDbContextFactory.CreateSqlite($"Data Source={_einstellungenDbPath};Pooling=False");
         var service = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
-        return (await service.GetAutoShutdownErzwingenAsync(), await service.GetAutoShutdownToleranceMinutesAsync());
+        return (await service.GetAutoShutdownForceAsync(), await service.GetAutoShutdownToleranceMinutesAsync());
     }
 
     /// <summary>Die fachliche Anzahl zählt nur als „Läuft" klassifizierte Aufgaben.</summary>

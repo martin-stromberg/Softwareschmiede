@@ -18,10 +18,10 @@ public sealed class CliReplayAufzeichnungStoreTests
             WorkItemId = Guid.NewGuid(),
             PluginName = "Devin CLI (äöü)",
             StartUtc = new DateTimeOffset(2025, 3, 4, 10, 20, 30, TimeSpan.Zero),
-            EndeUtc = new DateTimeOffset(2025, 3, 4, 11, 0, 0, TimeSpan.Zero),
+            EndUtc = new DateTimeOffset(2025, 3, 4, 11, 0, 0, TimeSpan.Zero),
             Cols = 220,
             Rows = 50,
-            IstVollstaendig = false,
+            IsComplete = false,
             Chunks =
             [
                 new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("chunk-0")),
@@ -38,10 +38,10 @@ public sealed class CliReplayAufzeichnungStoreTests
         geladen.WorkItemId.Should().Be(source.WorkItemId);
         geladen.PluginName.Should().Be(source.PluginName);
         geladen.StartUtc.Should().Be(source.StartUtc);
-        geladen.EndeUtc.Should().Be(source.EndeUtc);
+        geladen.EndUtc.Should().Be(source.EndUtc);
         geladen.Cols.Should().Be(220);
         geladen.Rows.Should().Be(50);
-        geladen.IstVollstaendig.Should().BeFalse();
+        geladen.IsComplete.Should().BeFalse();
         geladen.Chunks.Should().HaveCount(3);
         geladen.Chunks[0].Offset.Should().Be(TimeSpan.Zero);
         geladen.Chunks[0].Data.Should().Equal(Encoding.UTF8.GetBytes("chunk-0"));
@@ -61,10 +61,10 @@ public sealed class CliReplayAufzeichnungStoreTests
             WorkItemId = source.WorkItemId,
             PluginName = source.PluginName,
             StartUtc = source.StartUtc,
-            EndeUtc = null,
+            EndUtc = null,
             Cols = source.Cols,
             Rows = source.Rows,
-            IstVollstaendig = true,
+            IsComplete = true,
             Chunks = source.Chunks,
         };
 
@@ -73,7 +73,7 @@ public sealed class CliReplayAufzeichnungStoreTests
         stream.Position = 0;
         var geladen = await store.LoadAsync(stream, TestContext.Current.CancellationToken);
 
-        geladen.EndeUtc.Should().BeNull();
+        geladen.EndUtc.Should().BeNull();
     }
 
     /// <summary>Ungültiges Magic → <see cref="InvalidDataException"/>.</summary>
@@ -132,7 +132,7 @@ public sealed class CliReplayAufzeichnungStoreTests
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 0,
             Rows = -5,
-            IstVollstaendig = true,
+            IsComplete = true,
             Chunks = [],
         }, TestContext.Current.CancellationToken);
         stream.Position = 0;
@@ -155,7 +155,7 @@ public sealed class CliReplayAufzeichnungStoreTests
             StartUtc = DateTimeOffset.UtcNow,
             Cols = 80,
             Rows = 24,
-            IstVollstaendig = true,
+            IsComplete = true,
             Chunks = [new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("abcdef"))],
         }, TestContext.Current.CancellationToken);
 
@@ -226,10 +226,10 @@ public sealed class CliReplayAufzeichnungStoreTests
             WorkItemId = Guid.NewGuid(),
             PluginName = "P",
             StartUtc = new DateTimeOffset(2025, 3, 4, 10, 20, 30, TimeSpan.FromHours(2)),
-            EndeUtc = new DateTimeOffset(2025, 3, 4, 11, 0, 0, TimeSpan.FromHours(2)),
+            EndUtc = new DateTimeOffset(2025, 3, 4, 11, 0, 0, TimeSpan.FromHours(2)),
             Cols = 80,
             Rows = 24,
-            IstVollstaendig = true,
+            IsComplete = true,
             Chunks = [],
         };
 
@@ -240,8 +240,8 @@ public sealed class CliReplayAufzeichnungStoreTests
 
         geladen.StartUtc.Should().Be(source.StartUtc, "derselbe Zeitpunkt muss erhalten bleiben");
         geladen.StartUtc.Offset.Should().Be(TimeSpan.Zero, "die Speicherung erfolgt UTC-normalisiert");
-        geladen.EndeUtc.Should().Be(source.EndeUtc);
-        geladen.EndeUtc!.Value.Offset.Should().Be(TimeSpan.Zero);
+        geladen.EndUtc.Should().Be(source.EndUtc);
+        geladen.EndUtc!.Value.Offset.Should().Be(TimeSpan.Zero);
     }
 
     /// <summary>Die Datei-Wrapper <see cref="CliReplayRecordingStore.SaveAsync(string, CliOutputRecording, CancellationToken)"/>
@@ -275,10 +275,10 @@ public sealed class CliReplayAufzeichnungStoreTests
         WorkItemId = Guid.NewGuid(),
         PluginName = "TestPlugin",
         StartUtc = new DateTimeOffset(2025, 1, 1, 8, 0, 0, TimeSpan.Zero),
-        EndeUtc = new DateTimeOffset(2025, 1, 1, 8, 30, 0, TimeSpan.Zero),
+        EndUtc = new DateTimeOffset(2025, 1, 1, 8, 30, 0, TimeSpan.Zero),
         Cols = 80,
         Rows = 24,
-        IstVollstaendig = true,
+        IsComplete = true,
         Chunks = [new CliOutputChunkRecord(TimeSpan.FromMilliseconds(42), Encoding.UTF8.GetBytes("payload"))],
     };
 }
